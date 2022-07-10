@@ -1,0 +1,167 @@
+﻿package ACLPackage;
+
+{$R *.res}
+{$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
+{$ALIGN 8}
+{$ASSERTIONS ON}
+{$BOOLEVAL OFF}
+{$DEBUGINFO OFF}
+{$EXTENDEDSYNTAX ON}
+{$IMPORTEDDATA ON}
+{$IOCHECKS ON}
+{$LOCALSYMBOLS ON}
+{$LONGSTRINGS ON}
+{$OPENSTRINGS ON}
+{$OPTIMIZATION OFF}
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+{$REFERENCEINFO ON}
+{$SAFEDIVIDE OFF}
+{$STACKFRAMES ON}
+{$TYPEDADDRESS OFF}
+{$VARSTRINGCHECKS ON}
+{$WRITEABLECONST OFF}
+{$MINENUMSIZE 1}
+{$IMAGEBASE $400000}
+{$DEFINE DEBUG}
+{$ENDIF IMPLICITBUILDING}
+{$DESCRIPTION 'Artem''s Components Library v2021.11'}
+{$IMPLICITBUILD ON}
+
+requires
+  rtl,
+  vcl,
+  designide,
+  vclx,
+  vclsmp,
+  vclie;
+
+contains
+  ACL.Classes in 'Base\ACL.Classes.pas',
+  ACL.Classes.ByteBuffer in 'Base\ACL.Classes.ByteBuffer.pas',
+  ACL.Classes.Collections in 'Base\ACL.Classes.Collections.pas',
+  ACL.Classes.MessageWindow in 'Base\ACL.Classes.MessageWindow.pas',
+  ACL.Classes.StringList in 'Base\ACL.Classes.StringList.pas',
+  ACL.Classes.Timer in 'Base\ACL.Classes.Timer.pas',
+  ACL.Crypto in 'Base\ACL.Crypto.pas',
+  ACL.DataBroadcaster in 'Base\ACL.DataBroadcaster.pas',
+  ACL.Expressions in 'Base\ACL.Expressions.pas',
+  ACL.Expressions.FormatString in 'Base\ACL.Expressions.FormatString.pas',
+  ACL.Expressions.Math in 'Base\ACL.Expressions.Math.pas',
+  ACL.FastCode in 'Base\ACL.FastCode.pas',
+  ACL.FileFormats.INI in 'Base\ACL.FileFormats.INI.pas',
+  ACL.FileFormats.CSV in 'Base\ACL.FileFormats.CSV.pas',
+  ACL.FileFormats.XML in 'Base\ACL.FileFormats.XML.pas',
+  ACL.Geometry in 'Base\ACL.Geometry.pas',
+  ACL.Graphics in 'Base\ACL.Graphics.pas',
+  ACL.Graphics.Palette in 'Base\ACL.Graphics.Palette.pas',
+  ACL.Graphics.Images in 'Base\ACL.Graphics.Images.pas',
+  ACL.Graphics.Gdiplus in 'Base\ACL.Graphics.Gdiplus.pas',
+  ACL.Graphics.FontCache in 'Base\ACL.Graphics.FontCache.pas',
+  ACL.Graphics.Layers in 'Base\ACL.Graphics.Layers.pas',
+  ACL.Graphics.Layers.Software in 'Base\ACL.Graphics.Layers.Software.pas',
+  ACL.Graphics.SkinImage in 'Base\ACL.Graphics.SkinImage.pas',
+  ACL.Graphics.SkinImageSet in 'Base\ACL.Graphics.SkinImageSet.pas',
+  ACL.Graphics.TextLayout in 'Base\ACL.Graphics.TextLayout.pas',
+  ACL.Graphics.TextLayout32 in 'Base\ACL.Graphics.TextLayout32.pas',
+  ACL.Hashes in 'Base\ACL.Hashes.pas',
+  ACL.Math in 'Base\ACL.Math.pas',
+  ACL.Math.Complex in 'Base\ACL.Math.Complex.pas',
+  ACL.MUI in 'Base\ACL.MUI.pas',
+  ACL.ObjectLinks in 'Base\ACL.ObjectLinks.pas',
+  ACL.Parsers in 'Base\ACL.Parsers.pas',
+  ACL.Parsers.Ripper in 'Base\ACL.Parsers.Ripper.pas',
+  ACL.SQLite3 in 'Base\ACL.SQLite3.pas',
+  ACL.Threading in 'Base\ACL.Threading.pas',
+  ACL.Threading.Pool in 'Base\ACL.Threading.Pool.pas',
+  ACL.Threading.Sorting in 'Base\ACL.Threading.Sorting.pas',
+  ACL.UI.Application in 'Visual\ACL.UI.Application.pas',
+  ACL.UI.AeroPeek in 'Visual\ACL.UI.AeroPeek.pas',
+  ACL.UI.Animation in 'Visual\ACL.UI.Animation.pas',
+  ACL.UI.Controls.HexView in 'Visual\ACL.UI.Controls.HexView.pas',
+  ACL.UI.Controls.ActivityIndicator in 'Visual\ACL.UI.Controls.ActivityIndicator.pas',
+  ACL.UI.Controls.BaseControls in 'Visual\ACL.UI.Controls.BaseControls.pas',
+  ACL.UI.Controls.BaseEditors in 'Visual\ACL.UI.Controls.BaseEditors.pas',
+  ACL.UI.Controls.Calendar in 'Visual\ACL.UI.Controls.Calendar.pas',
+  ACL.UI.Controls.Bevel in 'Visual\ACL.UI.Controls.Bevel.pas',
+  ACL.UI.Controls.Buttons in 'Visual\ACL.UI.Controls.Buttons.pas',
+  ACL.UI.Controls.Category in 'Visual\ACL.UI.Controls.Category.pas',
+  ACL.UI.Controls.CheckComboBox in 'Visual\ACL.UI.Controls.CheckComboBox.pas',
+  ACL.UI.Controls.ColorPalette in 'Visual\ACL.UI.Controls.ColorPalette.pas',
+  ACL.UI.Controls.ColorPicker in 'Visual\ACL.UI.Controls.ColorPicker.pas',
+  ACL.UI.Controls.ComboBox in 'Visual\ACL.UI.Controls.ComboBox.pas',
+  ACL.UI.Controls.CompoundControl in 'Visual\ACL.UI.Controls.CompoundControl.pas',
+  ACL.UI.Controls.CompoundControl.SubClass in 'Visual\ACL.UI.Controls.CompoundControl.SubClass.pas',
+  ACL.UI.Controls.CompoundControl.SubClass.ContentCells in 'Visual\ACL.UI.Controls.CompoundControl.SubClass.ContentCells.pas',
+  ACL.UI.Controls.CompoundControl.SubClass.Scrollbox in 'Visual\ACL.UI.Controls.CompoundControl.SubClass.Scrollbox.pas',
+  ACL.UI.Controls.DropDown in 'Visual\ACL.UI.Controls.DropDown.pas',
+  ACL.UI.Controls.FormattedLabel in 'Visual\ACL.UI.Controls.FormattedLabel.pas',
+  ACL.UI.Controls.GroupBox in 'Visual\ACL.UI.Controls.GroupBox.pas',
+  ACL.UI.Controls.ImageComboBox in 'Visual\ACL.UI.Controls.ImageComboBox.pas',
+  ACL.UI.Controls.Images in 'Visual\ACL.UI.Controls.Images.pas',
+  ACL.UI.Controls.Labels in 'Visual\ACL.UI.Controls.Labels.pas',
+  ACL.UI.Controls.MagnifierGlass in 'Visual\ACL.UI.Controls.MagnifierGlass.pas',
+  ACL.UI.Controls.Memo in 'Visual\ACL.UI.Controls.Memo.pas',
+  ACL.UI.Controls.ObjectInspector in 'Visual\ACL.UI.Controls.ObjectInspector.pas',
+  ACL.UI.Controls.ObjectInspector.PropertyEditors in 'Visual\ACL.UI.Controls.ObjectInspector.PropertyEditors.pas',
+  ACL.UI.Controls.Panel in 'Visual\ACL.UI.Controls.Panel.pas',
+  ACL.UI.Controls.ProgressBar in 'Visual\ACL.UI.Controls.ProgressBar.pas',
+  ACL.UI.Controls.ProgressBox in 'Visual\ACL.UI.Controls.ProgressBox.pas',
+  ACL.UI.Controls.ScrollBar in 'Visual\ACL.UI.Controls.ScrollBar.pas',
+  ACL.UI.Controls.ScrollBox in 'Visual\ACL.UI.Controls.ScrollBox.pas',
+  ACL.UI.Controls.SearchBox in 'Visual\ACL.UI.Controls.SearchBox.pas',
+  ACL.UI.Controls.ShellTreeView in 'Visual\ACL.UI.Controls.ShellTreeView.pas',
+  ACL.UI.Controls.Slider in 'Visual\ACL.UI.Controls.Slider.pas',
+  ACL.UI.Controls.SpinEdit in 'Visual\ACL.UI.Controls.SpinEdit.pas',
+  ACL.UI.Controls.Splitter in 'Visual\ACL.UI.Controls.Splitter.pas',
+  ACL.UI.Controls.TabControl in 'Visual\ACL.UI.Controls.TabControl.pas',
+  ACL.UI.Controls.TextEdit in 'Visual\ACL.UI.Controls.TextEdit.pas',
+  ACL.UI.Controls.TimeEdit in 'Visual\ACL.UI.Controls.TimeEdit.pas',
+  ACL.UI.Controls.DateTimeEdit in 'Visual\ACL.UI.Controls.DateTimeEdit.pas',
+  ACL.UI.Controls.BindingDiagram in 'Visual\ACL.UI.Controls.BindingDiagram.pas',
+  ACL.UI.Controls.BindingDiagram.SubClass in 'Visual\ACL.UI.Controls.BindingDiagram.SubClass.pas',
+  ACL.UI.Controls.BindingDiagram.Types in 'Visual\ACL.UI.Controls.BindingDiagram.Types.pas',
+  ACL.UI.Controls.TreeList in 'Visual\ACL.UI.Controls.TreeList.pas',
+  ACL.UI.Controls.TreeList.Options in 'Visual\ACL.UI.Controls.TreeList.Options.pas',
+  ACL.UI.Controls.TreeList.SubClass in 'Visual\ACL.UI.Controls.TreeList.SubClass.pas',
+  ACL.UI.Controls.TreeList.SubClass.DragAndDrop in 'Visual\ACL.UI.Controls.TreeList.SubClass.DragAndDrop.pas',
+  ACL.UI.Controls.TreeList.Types in 'Visual\ACL.UI.Controls.TreeList.Types.pas',
+  ACL.UI.DesignTime.PropEditors in 'Visual\ACL.UI.DesignTime.PropEditors.pas',
+  ACL.UI.DesignTime.PropEditors.ImageList in 'Visual\ACL.UI.DesignTime.PropEditors.ImageList.pas',
+  ACL.UI.DesignTime.PropEditors.Texture in 'Visual\ACL.UI.DesignTime.PropEditors.Texture.pas',
+  ACL.UI.DesignTime.Reg in 'Visual\ACL.UI.DesignTime.Reg.pas',
+  ACL.UI.Dialogs in 'Visual\ACL.UI.Dialogs.pas',
+  ACL.UI.Dialogs.FolderBrowser in 'Visual\ACL.UI.Dialogs.FolderBrowser.pas',
+  ACL.UI.Dialogs.FontPicker in 'Visual\ACL.UI.Dialogs.FontPicker.pas',
+  ACL.UI.Dialogs.ColorPicker in 'Visual\ACL.UI.Dialogs.ColorPicker.pas',
+  ACL.UI.DropSource in 'Visual\ACL.UI.DropSource.pas',
+  ACL.UI.DropTarget in 'Visual\ACL.UI.DropTarget.pas',
+  ACL.UI.Forms in 'Visual\ACL.UI.Forms.pas',
+  ACL.UI.HintWindow in 'Visual\ACL.UI.HintWindow.pas',
+  ACL.UI.ImageList in 'Visual\ACL.UI.ImageList.pas',
+  ACL.UI.PopupMenu in 'Visual\ACL.UI.PopupMenu.pas',
+  ACL.UI.Resources in 'Visual\ACL.UI.Resources.pas',
+  ACL.UI.TrayIcon in 'Visual\ACL.UI.TrayIcon.pas',
+  ACL.UI.Insight in 'Visual\ACL.UI.Insight.pas',
+  ACL.Utils.Clipboard in 'Base\ACL.Utils.Clipboard.pas',
+  ACL.Utils.CommandLine in 'Base\ACL.Utils.CommandLine.pas',
+  ACL.Utils.Common in 'Base\ACL.Utils.Common.pas',
+  ACL.Utils.Desktop in 'Base\ACL.Utils.Desktop.pas',
+  ACL.Utils.Logger in 'Base\ACL.Utils.Logger.pas',
+  ACL.Utils.Date in 'Base\ACL.Utils.Date.pas',
+  ACL.Utils.DPIAware in 'Base\ACL.Utils.DPIAware.pas',
+  ACL.Utils.FileSystem in 'Base\ACL.Utils.FileSystem.pas',
+  ACL.Utils.FileSystem.Watcher in 'Base\ACL.Utils.FileSystem.Watcher.pas',
+  ACL.Utils.Registry in 'Base\ACL.Utils.Registry.pas',
+  ACL.Utils.RTTI in 'Base\ACL.Utils.RTTI.pas',
+  ACL.Utils.Shell in 'Base\ACL.Utils.Shell.pas',
+  ACL.Utils.Shell.FileTypeRegistrar in 'Base\ACL.Utils.Shell.FileTypeRegistrar.pas',
+  ACL.Utils.Shell.UserAccounts in 'Base\ACL.Utils.Shell.UserAccounts.pas',
+  ACL.Utils.Stream in 'Base\ACL.Utils.Stream.pas',
+  ACL.Utils.Strings in 'Base\ACL.Utils.Strings.pas',
+  ACL.Utils.Strings.Transcode in 'Base\ACL.Utils.Strings.Transcode.pas',
+  ACL.Web in 'Base\ACL.Web.pas',
+  ACL.Web.Http in 'Base\ACL.Web.Http.pas';
+
+end.
+
