@@ -541,7 +541,7 @@ type
   TACLSubControlOptions = class(TPersistent)
   strict private
     FAlign: TACLBoolean;
-    FControl: TWinControl;
+    FControl: TControl;
     FOwner: TControl;
     FPosition: TACLBorder;
     FPrevWndProc: TWndMethod;
@@ -549,7 +549,7 @@ type
     function GetActualIndentBetweenElements: Integer;
     function Validate: Boolean;
     procedure SetAlign(AValue: TACLBoolean);
-    procedure SetControl(AValue: TWinControl);
+    procedure SetControl(AValue: TControl);
     procedure SetPosition(AValue: TACLBorder);
   protected
     procedure Changed; virtual;
@@ -569,7 +569,7 @@ type
   published
     property Align: TACLBoolean read FAlign write SetAlign default TACLBoolean.Default;
     property Position: TACLBorder read FPosition write SetPosition default mRight;
-    property Control: TWinControl read FControl write SetControl; // last
+    property Control: TControl read FControl write SetControl; // last
   end;
 
   { TACLContainer }
@@ -2569,14 +2569,17 @@ begin
 end;
 
 procedure TACLSubControlOptions.WindowProc(var Message: TMessage);
+var
+  AWindowPos: PWindowPos;
 begin
-  case Message.Msg of
-    WM_WINDOWPOSCHANGED:
-      if TWMWindowPosMsg(Message).WindowPos^.flags and (SWP_NOMOVE or SWP_NOSIZE) <> (SWP_NOMOVE or SWP_NOSIZE) then
-      begin
-        if not (csAligning in Control.ControlState) then
-          TACLMainThread.RunPostponed(Changed, Self);
-      end;
+  if Message.Msg = WM_WINDOWPOSCHANGED then
+  begin
+    AWindowPos := TWMWindowPosMsg(Message).WindowPos;
+    if (AWindowPos = nil) or (AWindowPos^.flags and (SWP_NOMOVE or SWP_NOSIZE) <> (SWP_NOMOVE or SWP_NOSIZE)) then
+    begin
+      if not (csAligning in Control.ControlState) then
+        TACLMainThread.RunPostponed(Changed, Self);
+    end;
   end;
   FPrevWndProc(Message);
 end;
@@ -2711,7 +2714,7 @@ begin
   end;
 end;
 
-procedure TACLSubControlOptions.SetControl(AValue: TWinControl);
+procedure TACLSubControlOptions.SetControl(AValue: TControl);
 const
   sErrorUnsupportedControl = 'The control cannot be set as sub-control';
 begin
