@@ -262,6 +262,8 @@ end;
 
 function acDecodeDateTime(const Value: UnicodeString; AFormat: TACLDateTimeFormat): TDateTime;
 begin
+  Result := 0;
+  if Value <> '' then
   try
     if AFormat = RFC822 then
       Result := RFC822ToDateTime(Value)
