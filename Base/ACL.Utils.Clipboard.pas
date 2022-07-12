@@ -37,6 +37,7 @@ type
 var
   CF_CONFIG: Word = 0;
   CF_FILEURIS: Word = 0;
+  CF_SHELLIDList: Word = 0;
 
 function GlobalAllocFromData(AData: PByte; ADataSize: Integer): HGLOBAL;
 function GlobalAllocFromStream(AStream: TMemoryStream): HGLOBAL;
@@ -358,6 +359,7 @@ initialization
   OleInitialize(nil);
   CF_CONFIG := RegisterClipboardFormat('ACL.CFG');
   CF_FILEURIS := RegisterClipboardFormat('ACL.FileURIs');
+  CF_SHELLIDList := RegisterClipboardFormat(CFSTR_SHELLIDLIST);
 
 finalization
   OleUninitialize;

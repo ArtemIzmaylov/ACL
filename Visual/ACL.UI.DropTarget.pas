@@ -316,6 +316,7 @@ end;
 function TACLDropTarget.GetFiles(out AFiles: TACLStringList): Boolean;
 var
   AMedium: TStgMedium;
+  AStream: TACLGlobalMemoryStream;
   AText: UnicodeString;
   I: Integer;
 begin
@@ -330,6 +331,24 @@ begin
       FreeAndNil(AFiles);
   finally
     ReleaseStgMedium(AMedium);
+  end
+  else
+
+  if GetData(CF_SHELLIDList, AMedium) then
+  try
+    if AMedium.tymed = TYMED_HGLOBAL then
+    begin
+      AStream := TACLGlobalMemoryStream.Create(AMedium.hGlobal);
+      try
+        Result := TPIDLHelper.ShellListStreamToFiles(AStream, AFiles);
+        if Result then
+          ValidateFiles(AFiles);
+      finally
+        AStream.Free;
+      end;
+    end;
+  finally
+    ReleaseStgMedium(AMedium)
   end
   else
 

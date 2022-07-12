@@ -126,7 +126,11 @@ type
     class function GetDisplayName(AParentFolder: IShellFolder; PIDL: PItemIDList; AFlags: DWORD): UnicodeString;
     class function GetHasChildren(AParentfolder: IShellFolder; PIDL: PItemIDList): Boolean;
     class function StrRetToString(PIDL: PItemIDList; AStrRet: TStrRet; AFlag: UnicodeString = ''): UnicodeString;
-    //
+
+    // https://docs.microsoft.com/en-us/windows/win32/shell/clipboard#cfstr_shellidlist
+    class function FilesToShellListStream(AFiles: TACLStringList; out AStream: TMemoryStream): Boolean;
+    class function ShellListStreamToFiles(AStream: TCustomMemoryStream; out AFiles: TACLStringList): Boolean;
+
     class function ConcatPIDLs(IDList1, IDList2: PItemIDList): PItemIDList;
     class function CopyPIDL(IDList: PItemIDList): PItemIDList;
     class function CreatePIDL(ASize: Integer): PItemIDList;
@@ -201,7 +205,14 @@ procedure UpdateShellCache;
 implementation
 
 uses
-  SysUtils, Math, ActiveX, ComObj, ACL.Utils.Strings, ACL.Utils.Registry;
+  Winapi.ActiveX,
+  System.SysUtils,
+  System.Math,
+  System.Win.ComObj,
+  // ACL
+  ACL.Utils.Strings,
+  ACL.Utils.Stream,
+  ACL.Utils.Registry;
 
 var
   FDesktopFolder: TACLShellFolder = nil;
@@ -969,6 +980,125 @@ begin
     Result := acStringReplace(Result, '?', '');
 end;
 
+class function TPIDLHelper.FilesToShellListStream(AFiles: TACLStringList; out AStream: TMemoryStream): Boolean;
+
+  function GetCommonFilePath(AFiles: TACLStringList): string;
+  begin
+    Result := acExtractFilePath(AFiles[0]);
+    for var I := 1 to AFiles.Count - 1 do
+    begin
+      if not acGetMinimalCommonPath(Result, AFiles[I]) then
+        Exit(EmptyStr);
+    end;
+  end;
+
+  function GetRootFolderPIDL(const ACommonPath: string): PItemIDList;
+  begin
+    if ACommonPath <> '' then
+      Result := GetFolderPIDL(0, ACommonPath)
+    else
+      Result := GetDesktopPIDL;
+  end;
+
+var
+  AOffsets: array of UInt;
+  APIDL: PItemIDList;
+  APIDLSize: Integer;
+  ARootPIDL: PItemIDList;
+  ARootPIDLSize: Integer;
+  I: Integer;
+begin
+  Result := False;
+  if AFiles.Count = 0 then
+    Exit;
+
+  ARootPIDL := GetRootFolderPIDL(GetCommonFilePath(AFiles));
+  if ARootPIDL <> nil then
+  try
+    AStream := TMemoryStream.Create;
+
+    // write the CIDA structure
+    SetLength(AOffsets, AFiles.Count + 1);
+    AStream.WriteInt32(AFiles.Count);
+    AStream.WriteBuffer(AOffsets[0], SizeOf(AOffsets[0]) * Length(AOffsets));
+
+    // Root
+    AOffsets[0] := AStream.Position;
+    ARootPIDLSize := GetPIDLSize(ARootPIDL);
+    AStream.WriteBuffer(ARootPIDL^, ARootPIDLSize);
+    Dec(ARootPIDLSize, SizeOf(Word));
+
+    // Files
+    for I := 0 to AFiles.Count - 1 do
+    begin
+      APIDL := GetFolderPIDL(0, AFiles[I]);
+      try
+        if APIDL = nil then
+        begin
+          FreeAndNil(AStream);
+          Exit(False);
+        end;
+
+        AOffsets[I + 1] := AStream.Position;
+        APIDLSize := GetPIDLSize(APIDL);
+        if not ((APIDLSize >= ARootPIDLSize) and CompareMem(APIDL, ARootPIDL, ARootPIDLSize)) then
+        begin
+          FreeAndNil(AStream);
+          Exit(False);
+        end;
+
+        AStream.WriteBuffer((PByte(APIDL) + ARootPIDLSize)^, APIDLSize - ARootPIDLSize);
+      finally
+        DisposePIDL(APIDL);
+      end;
+    end;
+
+    AStream.Position := SizeOf(UInt);
+    AStream.WriteBuffer(AOffsets[0], SizeOf(AOffsets[0]) * Length(AOffsets));
+    AStream.Position := AStream.Size;
+  finally
+    DisposePIDL(ARootPIDL);
+  end;
+end;
+
+class function TPIDLHelper.ShellListStreamToFiles(AStream: TCustomMemoryStream; out AFiles: TACLStringList): Boolean;
+var
+  ACount: Integer;
+  AFileName: string;
+  AOffsets: array of UInt;
+  ARootPath: IShellFolder;
+  ARootPIDL: PItemIDList;
+  I: Integer;
+begin
+  ACount := AStream.ReadInt32;
+  if ACount <= 0 then Exit(False);
+
+  SetLength(AOffsets, ACount + 1);
+  AStream.ReadBuffer(AOffsets[0], SizeOf(AOffsets[0]) * Length(AOffsets));
+
+  ARootPIDL := PItemIDList(PByte(AStream.Memory) + AOffsets[0]);
+  ARootPath := TACLShellFolder.Root.GetChild(ARootPIDL);
+  if ARootPath = nil then
+    Exit(False);
+
+  AFiles := nil;
+  for I := 1 to ACount do
+  begin
+    AFileName := GetDisplayName(ARootPath, PItemIDList(PByte(AStream.Memory) + AOffsets[I]), SHGDN_FORPARSING);
+    if AFileName <> '' then
+    begin
+      if AFiles = nil then
+      begin
+        AFiles := TACLStringList.Create;
+        AFiles.EnsureCapacity(ACount - I);
+      end;
+      AFiles.Add(acSimplifyLongFileName(AFileName));
+    end;
+  end;
+
+  Result := AFiles <> nil;
+end;
+
 class function TPIDLHelper.ConcatPIDLs(IDList1, IDList2: PItemIDList): PItemIDList;
 var
   cb1, cb2: Integer;
@@ -982,7 +1112,7 @@ begin
   begin
     if Assigned(IDList1) then
       CopyMemory(Result, IDList1, cb1);
-    CopyMemory(PAnsiChar(Result) + cb1, IDList2, cb2);
+    CopyMemory(PByte(Result) + cb1, IDList2, cb2);
   end;
 end;
 
@@ -1047,7 +1177,7 @@ end;
 class function TPIDLHelper.GetNextPIDL(IDList: PItemIDList): PItemIDList;
 begin
   Result := IDList;
-  Inc(PAnsiChar(Result), IDList^.mkid.cb);
+  Inc(PByte(Result), IDList^.mkid.cb);
 end;
 
 class function TPIDLHelper.GetPIDLSize(IDList: PItemIDList): Integer;

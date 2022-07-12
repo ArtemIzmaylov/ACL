@@ -197,11 +197,8 @@ type
   { TACLDragDropDataProviderPIDL }
 
   TACLDragDropDataProviderPIDL = class(TACLDragDropDataProviderFiles)
-  strict private
-    function GetRootFolderPIDL(AFiles: TACLStringList): PItemIDList;
   protected
     function FilesToHGLOBAL(AFiles: TACLStringList): HGLOBAL; override;
-    function FilesToStream(AFiles: TACLStringList): TMemoryStream;
   public
     function GetFormat: TFormatEtc; override;
   end;
@@ -298,9 +295,6 @@ implementation
 
 uses
   Math, SysUtils, Forms;
-
-var
-  CF_IDLIST: Word = 0;
 
 type
 
@@ -586,9 +580,7 @@ var
   AStream: TMemoryStream;
 begin
   Result := 0;
-
-  AStream := FilesToStream(AFiles);
-  if AStream <> nil then
+  if TPIDLHelper.FilesToShellListStream(AFiles, AStream) then
   try
     Result := GlobalAllocFromData(AStream.Memory, AStream.Size);
   finally
@@ -596,88 +588,9 @@ begin
   end;
 end;
 
-function TACLDragDropDataProviderPIDL.FilesToStream(AFiles: TACLStringList): TMemoryStream;
-var
-  AOffsets: array of UInt;
-  APIDL: PItemIDList;
-  APIDLSize: Integer;
-  ARootPIDL: PItemIDList;
-  ARootPIDLSize: Integer;
-  I: Integer;
-begin
-  Result := nil;
-
-  ARootPIDL := GetRootFolderPIDL(AFiles);
-  if ARootPIDL <> nil then
-  try
-    Result := TMemoryStream.Create;
-
-    // write the CIDA structure
-    SetLength(AOffsets, AFiles.Count + 1);
-    Result.WriteInt32(AFiles.Count);
-    Result.WriteBuffer(AOffsets[0], SizeOf(AOffsets[0]) * Length(AOffsets));
-
-    AOffsets[0] := Result.Position;
-    ARootPIDLSize := TPIDLHelper.GetPIDLSize(ARootPIDL);
-    Result.WriteBuffer(ARootPIDL^, ARootPIDLSize);
-    Dec(ARootPIDLSize, SizeOf(Word));
-
-    for I := 0 to AFiles.Count - 1 do
-    begin
-      APIDL := TPIDLHelper.GetFolderPIDL(0, AFiles[I]);
-      try
-        if APIDL = nil then
-        begin
-          FreeAndNil(Result);
-          Exit;
-        end;
-
-        AOffsets[I + 1] := Result.Position;
-        APIDLSize := TPIDLHelper.GetPIDLSize(APIDL);
-        if not ((APIDLSize >= ARootPIDLSize) and CompareMem(APIDL, ARootPIDL, ARootPIDLSize)) then
-        begin
-          FreeAndNil(Result);
-          Exit;
-        end;
-
-        Result.WriteBuffer((PByte(APIDL) + ARootPIDLSize)^, APIDLSize - ARootPIDLSize);
-      finally
-        TPIDLHelper.DisposePIDL(APIDL);
-      end;
-    end;
-
-    Result.Position := SizeOf(UInt);
-    Result.WriteBuffer(AOffsets[0], SizeOf(AOffsets[0]) * Length(AOffsets));
-    Result.Position := Result.Size;
-  finally
-    TPIDLHelper.DisposePIDL(ARootPIDL);
-  end;
-end;
-
 function TACLDragDropDataProviderPIDL.GetFormat: TFormatEtc;
 begin
-  if CF_IDLIST = 0 then
-    CF_IDLIST := RegisterClipboardFormat(CFSTR_SHELLIDLIST);
-  Result := MakeFormat(CF_IDLIST);
-end;
-
-function TACLDragDropDataProviderPIDL.GetRootFolderPIDL(AFiles: TACLStringList): PItemIDList;
-var
-  APath: string;
-  I: Integer;
-begin
-  APath := ExtractFilePath(AFiles[0]);
-  for I := 1 to AFiles.Count - 1 do
-    if not acGetMinimalCommonPath(APath, AFiles[I]) then
-    begin
-      APath := '';
-      Break;
-    end;
-
-  if APath <> '' then
-    Result := TPIDLHelper.GetFolderPIDL(0, APath)
-  else
-    Result := TPIDLHelper.GetDesktopPIDL;
+  Result := MakeFormat(CF_SHELLIDList);
 end;
 
 { TACLDragDropDataProviderText }
