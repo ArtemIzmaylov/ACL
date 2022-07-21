@@ -751,6 +751,7 @@ var
   R: TRect;
 begin
   inherited;
+  if FCalendar = nil then Exit;
 
   AHandle := BeginDeferWindowPos(4);
   try

@@ -105,6 +105,7 @@ type
       ADataStream: TStream = nil; AProgressProc: THttpRequestProgressProc = nil);
     //
     property ContentLength: Integer index HTTP_QUERY_CONTENT_LENGTH read GetQueryValue;
+    property ContentRange: string index HTTP_QUERY_CONTENT_RANGE read GetQueryValueAsString;
     property ContentType: string index HTTP_QUERY_CONTENT_TYPE read GetQueryValueAsString;
     property RawHeaders: string index HTTP_QUERY_RAW_HEADERS read GetQueryValueAsString;
     property StatusCode: Integer index HTTP_QUERY_STATUS_CODE read GetQueryValue;
@@ -180,6 +181,7 @@ type
     FCacheStream: TStream;
     FCacheStreamLock: TACLCriticalSection;
     FConnection: THttpConnection;
+    FFatalError: Boolean;
     FFreeBlocks: TACLThreadList<Integer>;
     FFreeBlocksCursor: Integer;
     FFreeBlocksEvent: TACLEvent;
@@ -245,6 +247,13 @@ type
     constructor Create(const DefaultText: string = ''); overload;
     //
     property Info: TACLWebErrorInfo read FInfo;
+  end;
+
+  { EHttpRangeError }
+
+  EHttpRangeError = class(EHttpError)
+  public
+    constructor Create; reintroduce;
   end;
 
   { TACLHttpClientTask }
@@ -365,6 +374,13 @@ end;
 constructor EHttpError.Create(const Code: Integer; const Text: string);
 begin
   Info.Initialize(Code, Text);
+end;
+
+{ EHttpRangeError }
+
+constructor EHttpRangeError.Create;
+begin
+  inherited Create(acWebErrorUnknown, sErrorRange);
 end;
 
 { THttpConnection }
@@ -580,8 +596,12 @@ begin
 
   if (ARange <> nil) and (ARange.GetOffset > 0) then
   begin
+    if StatusCode <> HTTP_STATUS_PARTIAL_CONTENT then
+      raise EHttpRangeError.Create;
+    if ContentRange = '' then
+      raise EHttpRangeError.Create;
     if ContentLength = 0 then
-      raise EHttpError.Create(acWebErrorUnknown, sErrorRange);
+      raise EHttpRangeError.Create;
   end;
 end;
 
@@ -602,7 +622,8 @@ begin
   Result := InternetQueryDataAvailable(Handle, X, 0, 0) and (X > 0);
 end;
 
-function THttpRequest.SendCore(const AHeaders: string; ADataStream: TStream = nil; AProgressProc: THttpRequestProgressProc = nil): Boolean;
+function THttpRequest.SendCore(const AHeaders: string;
+  ADataStream: TStream = nil; AProgressProc: THttpRequestProgressProc = nil): Boolean;
 var
   ABuffer: TInternetBuffersW;
   AContentPosition: Int64;
@@ -1019,6 +1040,9 @@ var
   AChunkSize: Integer;
   AOffset: Integer;
 begin
+  if FFatalError then
+    Exit(0);
+
   Result := 0;
   ABuffer := @Buffer;
   while Count > 0 do
@@ -1034,8 +1058,8 @@ begin
       with FFreeBlocks.LockList do
       try
         FFreeBlocksCursor := Max(IndexOf(ABlockIndex), 0);
-        FUpdateThread.SetPaused(False);
         FFreeBlocksEvent.Reset;
+        FUpdateThread.SetPaused(False);
       finally
         FFreeBlocks.UnlockList;
       end;
@@ -1043,6 +1067,8 @@ begin
       // wait while block will be downloaded
       if not FFreeBlocksEvent.WaitFor(WaitTimeout) then
         Exit(0); // Download thread failed
+      if FFatalError then
+        Exit(0); // Failed
     end;
 
     // Read Cached Data
@@ -1173,7 +1199,12 @@ begin
         ARequest.Free;
       end;
     except
-      // do nothing
+      on E: EHttpError do
+      begin
+        Stream.FFatalError := True;
+        Stream.FFreeBlocksEvent.Reset;
+        Terminate;
+      end;
     end
     else
       Sleep(100);
