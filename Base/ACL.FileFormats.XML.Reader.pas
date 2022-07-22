@@ -2,7 +2,6 @@
 {*                                           *}
 {*        Artem's Components Library         *}
 {*          Stream based XML Parser          *}
-{*        ported from .NET platform          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
 {*                 2006-2022                 *}
@@ -14,6 +13,9 @@ unit ACL.FileFormats.XML.Reader;
 
 {$I ACL.Config.inc}
 {$SCOPEDENUMS ON}
+
+// Ported from .NET platform:
+// https://github.com/microsoft/referencesource/tree/master/System.Xml/System/Xml/Core
 
 interface
 
@@ -713,8 +715,8 @@ type
     procedure ParseXmlDeclarationFragment;
     procedure SkipPartialTextValue;
 
-    function HandleEntityReference(AIsInAttributeValue: Boolean; AExpandType: TEntityExpandType;
-      out ACharRefEndPos: Integer): TEntityType;
+    function HandleEntityReference(AIsInAttributeValue: Boolean;
+      AExpandType: TEntityExpandType; out ACharRefEndPos: Integer): TEntityType;
     procedure PopElementContext;
     procedure ResetAttributes;
     procedure FullAttributeCleanup; inline;
@@ -4563,8 +4565,8 @@ begin
   end;
 end;
 
-function TACLXMLTextReader.HandleEntityReference(AIsInAttributeValue: Boolean; AExpandType: TEntityExpandType;
-  out ACharRefEndPos: Integer): TEntityType;
+function TACLXMLTextReader.HandleEntityReference(
+  AIsInAttributeValue: Boolean; AExpandType: TEntityExpandType; out ACharRefEndPos: Integer): TEntityType;
 var
   AEntityType: TEntityType;
 begin
@@ -4589,8 +4591,8 @@ begin
     ACharRefEndPos := ParseNamedCharRef(AExpandType <> TEntityExpandType.OnlyGeneral, nil);
     if ACharRefEndPos >= 0 then
       Exit(TEntityType.CharacterNamed);
-
-    Throw(SDTDNotImplemented);
+    if AIsInAttributeValue then
+      Throw(SDTDNotImplemented);
     Result := TEntityType.Skipped;
   end;
 end;
@@ -4603,7 +4605,7 @@ end;
 //# Returns true when the whole value has been parsed. Return false when it needs to be called again to get a next chunk of value.
 function TACLXMLTextReader.ParseText(out AStartPosition, AEndPosition: Integer; var AOutOrChars: Integer): Boolean;
 label
-  LblReadData, ReturnPartialValue;
+  NoValue, LblReadData, ReturnPartialValue;
 var
   AChars: TCharArray;
   APosition, ARcount, ARpos, AOrChars, ACharRefEndPos, ACharCount, AOffset: Integer;
@@ -4702,22 +4704,27 @@ begin
               goto ReturnPartialValue;
             case HandleEntityReference(False, TEntityExpandType.All, APosition) of
               //# Needed only for XmlTextReader (reporting of entities)
-              TEntityType.Unexpanded:
-                Throw(SDTDNotImplemented);
               TEntityType.CharacterDec, //# VCL removed V1Compat mode
               TEntityType.CharacterHex,
               TEntityType.CharacterNamed:
+                if not TACLXMLCharType.IsWhiteSpace(FParsingState.Chars[APosition - 1]) then
+                  AOrChars := AOrChars or $FF;
+              TEntityType.Unexpanded:
                 begin
-                  if not TACLXMLCharType.IsWhiteSpace(FParsingState.Chars[APosition - 1]) then
-                    AOrChars := AOrChars or $FF;
+                  // make sure we will report EntityReference after the text node
+                  FNextParsingFunction := FParsingFunction;
+                  FParsingFunction := TParsingFunction.EntityReference;
+                  // end the value (returns nothing)
+                  goto NoValue;
                 end;
-              else
-                APosition := FParsingState.CharPos;
+            else
+              APosition := FParsingState.CharPos + 1; // +1, because of Continue;
             end;
             AChars := FParsingState.Chars;
           end;
           Continue;
         end;
+
       ']':
         begin
           if (FParsingState.CharsUsed - APosition < 3) and not FParsingState.IsEof then
@@ -4750,15 +4757,7 @@ begin
             end;
           end;
           AOffset := APosition - FParsingState.CharPos;
-//# VCL we don't need this
-//#          if ZeroEndingStream(APos) then
-//#          begin
-//#            AChars := FPs.Chars;
-//#            APos := FPs.CharPos + AOffset;
-//#            goto ReturnPartialValue;
-//#          end
-//#          else
-            ThrowInvalidChar(FParsingState.Chars, FParsingState.CharsUsed, FParsingState.CharPos + AOffset);
+          ThrowInvalidChar(FParsingState.Chars, FParsingState.CharsUsed, FParsingState.CharPos + AOffset);
           Break;
         end;
       end;
@@ -4784,6 +4783,8 @@ LblReadData:
     APosition := FParsingState.CharPos;
     AChars := FParsingState.Chars;
   end;
+
+NoValue:
   //# returns nothing
   AStartPosition := APosition;
   AEndPosition := APosition;
