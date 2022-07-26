@@ -16,9 +16,26 @@ unit ACL.UI.Forms;
 interface
 
 uses
-  Types, Windows, Messages, SysUtils, Classes, Controls,
-  Graphics, Forms, ImgList, Dialogs, ExtCtrls, StdCtrls,
-  ActnList, Menus, CommDlg, ActiveX, Contnrs, TypInfo,
+  Winapi.Windows,
+  Winapi.Messages,
+  Winapi.CommDlg,
+  Winapi.ActiveX,
+  // System
+  System.Types,
+  System.SysUtils,
+  System.Classes,
+  System.Contnrs,
+  System.TypInfo,
+  // Vcl
+  Vcl.Controls,
+  Vcl.Graphics,
+  Vcl.Forms,
+  Vcl.ImgList,
+  Vcl.Dialogs,
+  Vcl.ExtCtrls,
+  Vcl.StdCtrls,
+  Vcl.ActnList,
+  Vcl.Menus,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -64,9 +81,10 @@ type
 
   TACLBasicScalableForm = class(TACLBasicForm, IACLScaleFactor)
   strict private
-    FScaleFactor: TACLScaleFactor;
     FLoadedClientHeight: Integer;
     FLoadedClientWidth: Integer;
+    FParentFontLocked: Boolean;
+    FScaleFactor: TACLScaleFactor;
 
     procedure ScaleFactorChangeHandler(Sender: TObject);
     procedure SetClientHeight(Value: Integer);
@@ -86,6 +104,7 @@ type
     procedure ChangeScale(M, D: Integer; IsDpiChange: Boolean); override;
     procedure DoShow; override;
     procedure InitializeNewForm; override;
+    function IsDesigning: Boolean;
     procedure Loaded; override;
     procedure ReadState(Reader: TReader); override;
     procedure ScaleControlsForDpi(NewPPI: Integer); override;
@@ -177,9 +196,11 @@ type
     procedure LoadPosition(AConfig: TACLIniFile); virtual;
     procedure SavePosition(AConfig: TACLIniFile); virtual;
     procedure ShowAndActivate; virtual;
-    //
-    property ShowOnTaskBar: Boolean read FShowOnTaskBar write SetShowOnTaskBar;
-    property StayOnTop: Boolean read FStayOnTop write SetStayOnTop;
+  published
+    property Color stored False; // Color synchronizes with resources (ref. to ResourceChanged)
+    property DoubleBuffered default True;
+    property ShowOnTaskBar: Boolean read FShowOnTaskBar write SetShowOnTaskBar default False;
+    property StayOnTop: Boolean read FStayOnTop write SetStayOnTop default False;
   end;
 
   { TACLCustomPopupForm }
@@ -229,7 +250,8 @@ type
 
   { TACLLocalizableForm }
 
-  TACLLocalizableForm = class(TACLForm, IACLLocalizableComponentRoot)
+  TACLLocalizableForm = class(TACLForm,
+    IACLLocalizableComponentRoot)
   strict private
     procedure WMLANG(var Msg: TMessage); message WM_ACL_LANG;
   protected
@@ -288,7 +310,11 @@ procedure TerminateOpenForms;
 implementation
 
 uses
-  Math, AppEvnts, Character, DwmApi,
+  Winapi.DwmApi,
+  System.Math,
+  System.Character,
+  // Vcl
+  Vcl.AppEvnts,
   // ACL.UI
   ACL.UI.Controls.BaseControls;
 
@@ -306,9 +332,10 @@ type
   TACLScaleFactorAccess = class(TACLScaleFactor);
   TApplicationAccess = class(TApplication);
   TCustomFormAccess = class(TCustomForm);
-  TEnableNonClientDpiScalingProc = function (AHandle: HWND): LongBool; stdcall;
   TScrollingWinControlAccess = class(TScrollingWinControl);
   TWinControlAccess = class(TWinControl);
+
+  TEnableNonClientDpiScalingProc = function (AHandle: HWND): LongBool; stdcall;
 
   { TACLFormScalingHelper }
 
@@ -516,6 +543,11 @@ begin
     Font.Height := acGetFontHeight(ScaleFactor.TargetDPI, Font.Size);
 end;
 
+function TACLBasicScalableForm.IsDesigning: Boolean;
+begin
+  Result := csDesigning in ComponentState;
+end;
+
 procedure TACLBasicScalableForm.Loaded;
 begin
   inherited;
@@ -551,7 +583,7 @@ procedure TACLBasicScalableForm.ScaleForCurrentDPI;
 begin
   DisableAlign;
   try
-    if Scaled and not (csDesigning in ComponentState) and (Parent = nil) then
+    if Scaled and not IsDesigning and (Parent = nil) then
       ScaleForPPI(TACLApplication.GetTargetDPI(Self));
     ScalingFlags := [];
     Perform(CM_PARENTBIDIMODECHANGED, 0, 0);
@@ -597,7 +629,7 @@ procedure TACLBasicScalableForm.ApplicationSettingsChanged(AChanges: TACLApplica
 begin
   if acScalingMode in AChanges then
   begin
-    if Scaled and not (csDesigning in ComponentState) then
+    if Scaled and not IsDesigning then
       ScaleForCurrentDpi;
   end;
   inherited;
@@ -651,14 +683,22 @@ end;
 
 procedure TACLBasicScalableForm.TakeParentFontIfNecessary;
 begin
-  if ParentFont then
+  // Workaround for
+  // The "TForm.ParentFont = true causes scaling error with HighDPI" issue
+  // https://quality.embarcadero.com/browse/RSP-30677
+  if ParentFont and not FParentFontLocked then
   begin
-    if Parent <> nil then
-      Font := TWinControlAccess(Parent).Font
-    else
-      acAssignFont(Font, Application.DefaultFont, ScaleFactor, acSystemScaleFactor);
+    FParentFontLocked := True;
+    try
+      if (Parent <> nil) and not IsDesigning then
+        Font := TWinControlAccess(Parent).Font
+      else
+        acAssignFont(Font, Application.DefaultFont, ScaleFactor, acSystemScaleFactor);
 
-    ParentFont := True;
+      ParentFont := True;
+    finally
+      FParentFontLocked := False;
+    end;
   end;
 end;
 
@@ -688,9 +728,7 @@ end;
 procedure TACLBasicScalableForm.WMDPIChanged(var Message: TMessage);
 var
   ATargetDPI: Integer;
-{$IFDEF DELPHI101SEATTLE}
   APrevPixelsPerInch: Integer;
-{$ENDIF}
 begin
   if [csDesigning, csLoading] * ComponentState = [] then
   begin
@@ -705,16 +743,12 @@ begin
 
     if (ATargetDPI <> TACLFormScalingHelper.GetCurrentPPI(Self)) and Scaled and (TACLApplication.TargetDPI = 0) then
     begin
-    {$IFDEF DELPHI101SEATTLE}
       if Assigned(OnBeforeMonitorDpiChanged) then
         OnBeforeMonitorDpiChanged(Self, PixelsPerInch, ATargetDPI);
       APrevPixelsPerInch := PixelsPerInch;
-    {$ENDIF}
       ScaleForPPI(ATargetDPI, PRect(Message.LParam));
-    {$IFDEF DELPHI101SEATTLE}
       if Assigned(OnAfterMonitorDpiChanged) then
         OnAfterMonitorDpiChanged(Self, APrevPixelsPerInch, PixelsPerInch);
-    {$ENDIF}
     end;
     Message.Result := 0;
   end;
@@ -1055,7 +1089,7 @@ begin
   if FShowOnTaskBar <> AValue then
   begin
     FShowOnTaskBar := AValue;
-    if HandleAllocated then
+    if HandleAllocated and not IsDesigning then
     begin
       AExStyle := GetWindowLong(Handle, GWL_EXSTYLE);
 
@@ -1514,7 +1548,7 @@ const
 var
   AStayOnTop: Boolean;
 begin
-  if (AForm <> nil) and AForm.HandleAllocated and IsWindowVisible(AForm.Handle) then
+  if (AForm <> nil) and AForm.HandleAllocated and not AForm.IsDesigning and IsWindowVisible(AForm.Handle) then
   begin
     AStayOnTop := (AForm.FormStyle = fsStayOnTop) or StayOnTopAvailable and AForm.ShouldBeStayOnTop;
     if IsStayOnTop(AForm.Handle) <> AStayOnTop then
