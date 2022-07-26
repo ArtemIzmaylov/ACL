@@ -2,7 +2,6 @@
 {*                                           *}
 {*        Artem's Components Library         *}
 {*         Stream based XML Writer           *}
-{*        ported from .NET platform          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
 {*                 2006-2022                 *}
@@ -14,6 +13,9 @@ unit ACL.FileFormats.XML.Writer;
 
 {$I ACL.Config.inc}
 {$SCOPEDENUMS ON}
+
+// Ported from .NET platform:
+// https://github.com/microsoft/referencesource/tree/master/System.Xml/System/Xml/Core
 
 interface
 
