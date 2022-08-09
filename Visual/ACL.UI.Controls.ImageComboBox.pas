@@ -4,7 +4,7 @@
 {*             Editors Controls              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,17 @@ unit ACL.UI.Controls.ImageComboBox;
 interface
 
 uses
-  Windows, Classes, Controls, Graphics, Types, ImgList, UITypes, Messages, ImageList,
+  Winapi.Messages,
+  Winapi.Windows,
+  // Vcl
+  Vcl.Controls,
+  Vcl.Graphics,
+  Vcl.ImgList,
+  // System
+  System.Classes,
+  System.ImageList,
+  System.Types,
+  System.UITypes,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -158,7 +168,8 @@ type
 implementation
 
 uses
-  SysUtils, Math,
+  System.SysUtils,
+  System.Math,
   // ACL
   ACL.Utils.Common,
   ACL.Utils.DPIAware,

@@ -4,7 +4,7 @@
 {*             TreeList Control              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,15 @@ unit ACL.UI.Controls.ShellTreeView;
 interface
 
 uses
-  Windows, Types, Classes, ShellAPI, ShlObj, ImgList, Controls,
+  Winapi.Windows,
+  Winapi.ShellApi,
+  Winapi.ShlObj,
+  // System
+  System.Types,
+  System.Classes,
+  // Vcl
+  Vcl.ImgList,
+  Vcl.Controls,
   // ACL
   ACL.Classes,
   ACL.Geometry,
@@ -200,7 +208,12 @@ type
 implementation
 
 uses
-  SysUtils, AnsiStrings, ACL.UI.Dialogs, ACL.Utils.FileSystem, ACL.Utils.Desktop;
+  System.AnsiStrings,
+  System.SysUtils,
+  // ACL
+  ACL.UI.Dialogs,
+  ACL.Utils.FileSystem,
+  ACL.Utils.Desktop;
 
 const
   sShellOpenVerb = 'open';
@@ -646,7 +659,7 @@ begin
         if ACommand then
         begin
           CM.GetCommandString(LongInt(ACommand) - 1, GCS_VERBA, nil, ZVerb, SizeOf(ZVerb));
-          if acSameText(UnicodeString(AnsiStrings.StrPas(ZVerb)), sShellOpenVerb) then
+          if acSameText(UnicodeString(System.AnsiStrings.StrPas(ZVerb)), sShellOpenVerb) then
           begin
             ANode.Expanded := True;
             Exit;

@@ -4,7 +4,7 @@
 {*            Shell API Wrappers             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,13 @@ unit ACL.Utils.Shell;
 interface
 
 uses
-  Windows, Classes, ShlObj, ShellApi, Generics.Collections,
+  Winapi.ActiveX,
+  Winapi.ShellApi,
+  Winapi.ShlObj,
+  Winapi.Windows,
+  // System
+  System.Classes,
+  System.Generics.Collections,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -205,7 +211,6 @@ procedure UpdateShellCache;
 implementation
 
 uses
-  Winapi.ActiveX,
   System.SysUtils,
   System.Math,
   System.Win.ComObj,

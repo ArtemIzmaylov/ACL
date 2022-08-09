@@ -16,10 +16,13 @@ unit ACL.UI.Application;
 interface
 
 uses
-  UITypes,
-  Windows,
-  Graphics,
-  Controls,
+  Winapi.Windows,
+  // System
+  System.UITypes,
+  System.SysUtils,
+  // VCL
+  Vcl.Graphics,
+  Vcl.Controls,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -103,8 +106,7 @@ type
 implementation
 
 uses
-  Forms,
-  SysUtils,
+  Vcl.Forms,
   // ACL
   ACL.UI.Controls.BaseControls,
   ACL.Utils.DPIAware,

@@ -4,7 +4,7 @@
 {*               Math Routines               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,7 @@ unit ACL.Math;
 interface
 
 uses
-  Math;
+  System.Math;
 
 // MinMax, MaxMin
 function MaxMin(const AValue, AMinValue, AMaxValue: Double): Double; overload; inline;

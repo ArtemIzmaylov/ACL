@@ -4,7 +4,7 @@
 {*             Macros Processor              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,11 +16,11 @@ unit ACL.Expressions.FormatString;
 interface
 
 uses
-  Math,
-  SysUtils,
-  Classes,
-  Variants,
-  Generics.Collections,
+  System.Math,
+  System.SysUtils,
+  System.Classes,
+  System.Variants,
+  System.Generics.Collections,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,

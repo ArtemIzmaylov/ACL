@@ -4,7 +4,7 @@
 {*          Compoud Control Classes          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -17,7 +17,20 @@ unit ACL.UI.Controls.CompoundControl.SubClass;
 interface
 
 uses
-  Windows, Messages, SysUtils, Types, ActiveX, Classes, Controls, Graphics, Forms, StdCtrls, Generics.Collections,
+  Winapi.Windows,
+  Winapi.Messages,
+  Winapi.ActiveX,
+  // System
+  System.SysUtils,
+  System.Types,
+  System.Classes,
+  System.Generics.Collections,
+  System.Math,
+  // Vcl
+  Vcl.Controls,
+  Vcl.Graphics,
+  Vcl.Forms,
+  Vcl.StdCtrls,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -628,7 +641,8 @@ type
 implementation
 
 uses
-  Math, ACL.Utils.FileSystem, ACL.Utils.Strings;
+  ACL.Utils.FileSystem,
+  ACL.Utils.Strings;
 
 { TACLHitTestInfo }
 

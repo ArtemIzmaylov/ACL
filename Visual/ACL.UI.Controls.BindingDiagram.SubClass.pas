@@ -16,8 +16,14 @@ unit ACL.UI.Controls.BindingDiagram.SubClass;
 interface
 
 uses
+  Winapi.Windows,
+  // System
+  System.Types,
+  System.SysUtils,
+  System.Classes,
   // VCL
-  Types, SysUtils, Windows, Messages, Classes, Graphics, Controls,
+  Vcl.Graphics,
+  Vcl.Controls,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,

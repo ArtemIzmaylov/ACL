@@ -16,7 +16,14 @@ unit ACL.Classes.Collections;
 interface
 
 uses
-  Windows, Types, SysUtils, Classes, Generics.Defaults, Generics.Collections, Contnrs,
+  Winapi.Windows,
+  // System
+  System.Classes,
+  System.Contnrs,
+  System.Generics.Collections,
+  System.Generics.Defaults,
+  System.SysUtils,
+  System.Types,
   // ACL
   ACL.Classes,
   ACL.FastCode,
@@ -689,7 +696,10 @@ type
 implementation
 
 uses
-  TypInfo, SysConst, RTLConsts, Math,
+  System.Math,
+  System.RTLConsts,
+  System.SysConst,
+  System.TypInfo,
   // ACL
   ACL.Utils.Common,
   ACL.Hashes;

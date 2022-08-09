@@ -16,7 +16,17 @@ unit ACL.UI.Controls.Images;
 interface
 
 uses
-  Types, Windows, SysUtils, Classes, Messages, Graphics, Controls, ImgList, UITypes,
+  Winapi.Messages,
+  Winapi.Windows,
+  // Vcl
+  Vcl.Controls,
+  Vcl.Graphics,
+  Vcl.ImgList,
+  // System
+  System.Classes,
+  System.SysUtils,
+  System.Types,
+  System.UITypes,
   // ACL
   ACL.Math,
   ACL.Classes,

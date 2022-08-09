@@ -4,7 +4,7 @@
 {*            Hashing Algorithms             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -17,7 +17,13 @@ unit ACL.Hashes;
 interface
 
 uses
-  Windows, Hash, Classes, SysUtils, AnsiStrings, Generics.Defaults,
+  Winapi.Windows,
+  // System
+  System.AnsiStrings,
+  System.Classes,
+  System.Generics.Defaults,
+  System.Hash,
+  System.SysUtils,
   // ACL
   ACL.Classes;
 
@@ -215,7 +221,8 @@ function ElfHash(const S: UnicodeString; AIgnoryCase: Boolean = True): Integer; 
 implementation
 
 uses
-  Math,
+  System.Math,
+  // ACL
   ACL.FastCode,
   ACL.Utils.Common,
   ACL.Utils.FileSystem,

@@ -4,7 +4,7 @@
 {*            Font Select Dialog             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,17 @@ unit ACL.UI.Dialogs.ColorPicker;
 interface
 
 uses
-  Windows, UITypes, Types, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
+  Winapi.Windows,
+  // System
+  System.UITypes,
+  System.Types,
+  System.SysUtils,
+  System.Classes,
+  // Vcl
+  Vcl.Graphics,
+  Vcl.Controls,
+  Vcl.Forms,
+  Vcl.Dialogs,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -68,7 +78,7 @@ type
 implementation
 
 uses
-  Math;
+  System.Math;
 
 { TACLColorPickerDialog }
 

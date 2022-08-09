@@ -4,7 +4,7 @@
 {*              Common Classes               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,10 @@ unit ACL.Classes.ByteBuffer;
 interface
 
 uses
-  Windows, Classes, SysUtils,
+  Winapi.Windows,
+  // System
+  System.Classes,
+  System.SysUtils,
   // ACL
   ACL.Math,
   ACL.Utils.Common,
@@ -166,10 +169,12 @@ function acCompare(const AContainer1, AContainer2: IACLDataContainer): Boolean;
 implementation
 
 uses
-  Math,
+  System.Math,
+  System.RTLConsts,
+  // ACL
   ACL.FastCode,
   ACL.Utils.FileSystem,
-  ACL.Utils.Stream, RTLConsts;
+  ACL.Utils.Stream;
 
 function acCompare(const AContainer1, AContainer2: IACLDataContainer): Boolean;
 begin

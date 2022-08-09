@@ -16,7 +16,18 @@ unit ACL.UI.Controls.Slider;
 interface
 
 uses
-  UITypes, Types, Windows, SysUtils, Classes, Controls, Messages, Graphics, ImgList, ActnList, Menus, Forms,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.Classes,
+  System.Math,
+  System.SysUtils,
+  System.Types,
+  System.UITypes,
+  // Vcl
+  Vcl.Controls,
+  Vcl.Graphics,
+  Vcl.Forms,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -410,7 +421,7 @@ type
 implementation
 
 uses
-  Math, ACL.Math;
+  ACL.Math;
 
 { TACLSliderCustomOptions }
 
@@ -638,7 +649,7 @@ end;
 
 procedure TACLSliderOptionsValue.SetMax(AValue: Single);
 begin
-  AValue := Math.Max(AValue, Min + 1);
+  AValue := System.Math.Max(AValue, Min + 1);
   if AValue <> FMax then
   begin
     FMax := AValue;
@@ -648,7 +659,7 @@ end;
 
 procedure TACLSliderOptionsValue.SetMin(AValue: Single);
 begin
-  AValue := Math.Min(AValue, Max - 1);
+  AValue := System.Math.Min(AValue, Max - 1);
   if AValue <> FMin then
   begin
     FMin := AValue;
@@ -658,7 +669,7 @@ end;
 
 procedure TACLSliderOptionsValue.SetPage(AValue: Single);
 begin
-  AValue := Math.Max(AValue, 0.01);
+  AValue := System.Math.Max(AValue, 0.01);
   SetSingleFieldValue(FPage, AValue, [apcLayout]);
 end;
 

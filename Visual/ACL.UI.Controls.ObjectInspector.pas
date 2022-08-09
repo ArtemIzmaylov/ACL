@@ -4,7 +4,7 @@
 {*             Object Inspector              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,18 @@ unit ACL.UI.Controls.ObjectInspector;
 interface
 
 uses
-  Windows, Types, TypInfo, Variants, Classes, Messages, Graphics, Controls, ImgList, Generics.Collections,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.Types,
+  System.TypInfo,
+  System.Variants,
+  System.Classes,
+  System.Generics.Collections,
+  // VCL
+  Vcl.Graphics,
+  Vcl.Controls,
+  Vcl.ImgList,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -385,7 +396,9 @@ type
 implementation
 
 uses
-  SysUtils, Forms;
+  System.SysUtils,
+  // VCL
+  Vcl.Forms;
 
 type
   TACLPropertyEditorAccess = class(TACLPropertyEditor);

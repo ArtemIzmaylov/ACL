@@ -4,7 +4,7 @@
 {*             ImageList Classes             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,8 +16,21 @@ unit ACL.UI.ImageList;
 interface
 
 uses
-  Types, TypInfo, Windows, Messages, SysUtils, Classes, Controls, ImgList, Graphics, ActnList,
-  StdCtrls, Generics.Collections, ZLib,
+  Winapi.Messages,
+  Winapi.Windows,
+  // System
+  System.Classes,
+  System.Generics.Collections,
+  System.SysUtils,
+  System.Types,
+  System.TypInfo,
+  System.ZLib,
+  // Vcl
+  Vcl.ActnList,
+  Vcl.Controls,
+  Vcl.Graphics,
+  Vcl.ImgList,
+  Vcl.StdCtrls,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -76,8 +89,9 @@ procedure acSetImageList(AValue: TCustomImageList; var AFieldValue: TCustomImage
 implementation
 
 uses
-  Math, RTLConsts,
-  //
+  System.Math,
+  System.RTLConsts,
+  // ACL
   ACL.Utils.DPIAware,
   ACL.Utils.RTTI,
   ACL.Utils.Stream;

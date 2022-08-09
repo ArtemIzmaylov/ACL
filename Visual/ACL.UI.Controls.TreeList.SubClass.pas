@@ -16,8 +16,23 @@ unit ACL.UI.Controls.TreeList.SubClass;
 interface
 
 uses
-  Windows, Messages, ImgList, Classes, Types, Generics.Defaults, Generics.Collections, SysUtils, Controls, StdCtrls,
-  Graphics, Forms, Menus, UITypes, ActiveX,
+  Winapi.Windows,
+  Winapi.Messages,
+  Winapi.ActiveX,
+  // Vcl
+  Vcl.ImgList,
+  Vcl.Controls,
+  Vcl.StdCtrls,
+  Vcl.Graphics,
+  Vcl.Forms,
+  Vcl.Menus,
+  // System
+  System.Classes,
+  System.Types,
+  System.Generics.Defaults,
+  System.Generics.Collections,
+  System.SysUtils,
+  System.UITypes,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,

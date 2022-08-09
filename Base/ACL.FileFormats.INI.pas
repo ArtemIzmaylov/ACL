@@ -4,7 +4,7 @@
 {*        Fast IniFile Implementation        *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,10 +16,15 @@ unit ACL.FileFormats.INI;
 interface
 
 uses
+  Winapi.Windows,
 {$IFNDEF ACL_BASE_NOVCL}
-  Graphics,
+  Vcl.Graphics,
 {$ENDIF}
-  Types, SysUtils, Windows, Classes, Generics.Collections,
+  // System
+  System.Classes,
+  System.Generics.Collections,
+  System.SysUtils,
+  System.Types,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,

@@ -4,7 +4,7 @@
 {*              Common Classes               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,15 @@ unit ACL.Classes;
 interface
 
 uses
-  Types, TypInfo, Windows, Classes, SysUtils, Messages, Contnrs, Generics.Collections,
+  Winapi.Messages,
+  Winapi.Windows,
+  // System
+  System.Types,
+  System.TypInfo,
+  System.Classes,
+  System.SysUtils,
+  System.Contnrs,
+  System.Generics.Collections,
   // ACL
   ACL.ObjectLinks,
   ACL.Threading,
@@ -245,8 +253,9 @@ function CreateUniqueName(AComponent: TComponent; const APrefixName, ASuffixName
 implementation
 
 uses
-  Math,
-  SysConst,
+  System.Math,
+  System.SysConst,
+  // ACL
   ACL.FastCode,
   ACL.Math,
   ACL.Threading.Sorting,

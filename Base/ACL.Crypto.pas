@@ -4,7 +4,7 @@
 {*                  Crypto                   *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,8 +16,8 @@ unit ACL.Crypto;
 interface
 
 uses
-  Classes,
-  SysUtils;
+  System.Classes,
+  System.SysUtils;
 
 type
   { TRC4 }
@@ -63,7 +63,8 @@ function acEncryptString(const S, Key: string): string;
 implementation
 
 uses
-  Math,
+  System.Math,
+  // ACL
   ACL.FastCode,
   ACL.Utils.Strings.Transcode;
 

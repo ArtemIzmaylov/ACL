@@ -4,20 +4,33 @@
 {*             TreeList Control              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.TreeList.Options;
 
-{$I ACL.Config.INC}
+{$I ACL.Config.inc}
 
 interface
 
 uses
-  Windows, Messages, ImgList, Types, Generics.Defaults, Generics.Collections,
-  SysUtils, Controls, Classes, StdCtrls, Graphics, Forms, Menus, UITypes,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.Types,
+  System.Generics.Defaults,
+  System.Generics.Collections,
+  System.SysUtils,
+  System.Classes,
+  System.UITypes,
+  // Vcl
+  Vcl.Controls,
+  Vcl.StdCtrls,
+  Vcl.Graphics,
+  Vcl.Forms,
+  Vcl.ImgList,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,

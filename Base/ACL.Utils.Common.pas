@@ -4,7 +4,7 @@
 {*             System Utilities              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -17,11 +17,18 @@ unit ACL.Utils.Common;
 interface
 
 uses
-  UITypes, Types, Windows, Messages, SysUtils,
+  Winapi.Windows,
+  Winapi.Messages,
+  Winapi.PsAPI,
 {$IFNDEF ACL_BASE_NOVCL}
-  Graphics,
+  Vcl.Graphics,
 {$ENDIF}
-  Classes, Math;
+  // System
+  System.UITypes,
+  System.Types,
+  System.SysUtils,
+  System.Classes,
+  System.Math;
 
 const
   SIZE_ONE_KILOBYTE = 1024;
@@ -224,13 +231,12 @@ implementation
 
 uses
 {$IFNDEF ACL_BASE_NOVCL}
-  Forms,
+  Vcl.Forms,
 {$ENDIF}
 {$IFDEF DEBUG}
   ACL.Utils.Shell,
 {$ENDIF}
-  PsAPI,
-  TypInfo,
+  System.TypInfo,
   // ACL
   ACL.Math,
   ACL.Utils.Strings,
@@ -517,13 +523,13 @@ begin
   if not ClassRegistered or (TempClass.lpfnWndProc <> @DefWindowProc) then
   begin
     if ClassRegistered then
-      Windows.UnregisterClass(UtilWindowClass.lpszClassName, HInstance);
-    Windows.RegisterClass(UtilWindowClass);
+      Winapi.Windows.UnregisterClass(UtilWindowClass.lpszClassName, HInstance);
+    Winapi.Windows.RegisterClass(UtilWindowClass);
   end;
   Result := CreateWindowEx(WS_EX_TOOLWINDOW, UtilWindowClass.lpszClassName, PChar(Name),
     WS_POPUP {!0}, 0, 0, 0, 0, IfThen(IsMessageWindow, HWND_MESSAGE), 0, HInstance, nil);
   if Assigned(Method) then
-    SetWindowLong(Result, GWL_WNDPROC, NativeUInt(Classes.MakeObjectInstance(Method)));
+    SetWindowLong(Result, GWL_WNDPROC, NativeUInt(System.Classes.MakeObjectInstance(Method)));
 end;
 
 function WndCreate(Method: TWndMethod; const ClassName: string; const Name: string = ''): HWND;
@@ -550,7 +556,7 @@ begin
     AInstance := Pointer(GetWindowLong(W, GWL_WNDPROC));
     DestroyWindow(W);
     if AInstance <> @DefWindowProc then
-      Classes.FreeObjectInstance(AInstance);
+      System.Classes.FreeObjectInstance(AInstance);
   end;
 end;
 

@@ -4,7 +4,7 @@
 {*        Activity Indicator Control         *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,17 @@ unit ACL.UI.Controls.ActivityIndicator;
 interface
 
 uses
-  Types, Windows, SysUtils, Classes, Messages, Graphics, Controls,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.Classes,
+  System.Generics.Collections,
+  System.SysUtils,
+  System.Types,
+  System.UITypes,
+  // Vcl
+  Vcl.Controls,
+  Vcl.Graphics,
   // ACL
   ACL.Math,
   ACL.Classes,
@@ -77,7 +87,7 @@ type
 implementation
 
 uses
-  Math;
+  System.Math;
 
 { TACLStyleActivityIndicator }
 

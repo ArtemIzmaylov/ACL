@@ -4,7 +4,7 @@
 {*                 Time Edit                 *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,16 @@ unit ACL.UI.Controls.TimeEdit;
 interface
 
 uses
-  Windows, Classes, Controls, Graphics, Types, ImgList, UITypes, Messages, Forms,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.Classes,
+  System.Types,
+  System.UITypes,
+  // Vcl
+  Vcl.Controls,
+  Vcl.Graphics,
+  Vcl.Forms,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -84,7 +93,9 @@ type
 implementation
 
 uses
-  Math, Variants, SysUtils,
+  System.Math,
+  System.Variants,
+  System.SysUtils,
   // ACL
   ACL.Geometry,
   ACL.Graphics,

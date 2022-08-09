@@ -4,7 +4,7 @@
 {*            Search Like Controls           *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,19 @@ unit ACL.UI.Controls.SearchBox;
 interface
 
 uses
-  Windows, Messages, UITypes, Classes, Math, Types, Controls, Graphics, Forms, Generics.Collections, Generics.Defaults,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.Classes,
+  System.Generics.Collections,
+  System.Generics.Defaults,
+  System.Math,
+  System.Types,
+  System.UITypes,
+  // Vcl
+  Vcl.Controls,
+  Vcl.Graphics,
+  Vcl.Forms,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -95,7 +107,8 @@ type
 implementation
 
 uses
-  SysUtils, TypInfo;
+  System.SysUtils,
+  System.TypInfo;
 
 { TACLSearchEdit }
 

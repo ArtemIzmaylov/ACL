@@ -16,7 +16,14 @@ unit ACL.UI.Controls.ProgressBar;
 interface
 
 uses
-  Types, Windows, Messages, Classes, Graphics, Controls,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.Types,
+  System.Classes,
+  // Vcl
+  Vcl.Graphics,
+  Vcl.Controls,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -98,7 +105,8 @@ type
 implementation
 
 uses
-  Math, SysUtils, Dialogs, Forms,
+  System.Math,
+  System.SysUtils,
   // ACL
   ACL.Geometry,
   ACL.Graphics,
@@ -262,12 +270,12 @@ begin
       0: begin
            ANeedRedraw := not SameValue(FMax, AValue);
            FMax := AValue;
-           FMin := Math.Min(FMin, FMax);
+           FMin := System.Math.Min(FMin, FMax);
          end;
       1: begin
            ANeedRedraw := not SameValue(FMin, AValue);
            FMin := AValue;
-           FMax := Math.Max(FMin, FMax);
+           FMax := System.Math.Max(FMin, FMax);
          end;
       2: begin
            ANeedRedraw := not SameValue(FProgress, AValue);

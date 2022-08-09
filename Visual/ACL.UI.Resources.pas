@@ -17,7 +17,16 @@ unit ACL.UI.Resources;
 interface
 
 uses
-  UITypes, Types, Windows, Variants, Classes, Graphics, Generics.Defaults, Generics.Collections,
+  Winapi.Windows,
+  // System
+  System.UITypes,
+  System.Types,
+  System.Variants,
+  System.Classes,
+  System.Generics.Defaults,
+  System.Generics.Collections,
+  // VCL
+  Vcl.Graphics,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -791,7 +800,11 @@ function acResourceCollectionFieldSet(var AField: TACLCustomResourceCollection; 
 implementation
 
 uses
-  TypInfo, SysUtils, Math, Forms,
+  System.TypInfo,
+  System.SysUtils,
+  System.Math,
+  // VCL
+  Vcl.Forms,
   // ACL
   ACL.Math,
   ACL.UI.Controls.BaseControls,

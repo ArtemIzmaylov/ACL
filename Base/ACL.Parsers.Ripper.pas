@@ -16,7 +16,9 @@ unit ACL.Parsers.Ripper;
 interface
 
 uses
-  Math, SysUtils, Types,
+  System.Math,
+  System.SysUtils,
+  System.Types,
   // ACL
   ACL.Classes.Collections,
   ACL.Expressions,

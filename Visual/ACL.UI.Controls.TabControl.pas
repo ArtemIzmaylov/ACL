@@ -16,7 +16,17 @@ unit ACL.UI.Controls.TabControl;
 interface
 
 uses
-  Types, Windows, SysUtils, Classes, Controls, Messages, Graphics, Forms,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.Classes,
+  System.Math,
+  System.SysUtils,
+  System.Types,
+  // Vcl
+  Vcl.Graphics,
+  Vcl.Controls,
+  Vcl.Forms,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -350,7 +360,7 @@ var
 implementation
 
 uses
-  Math, ACL.MUI;
+  ACL.MUI;
 
 const
   TabControlOffset = 2;

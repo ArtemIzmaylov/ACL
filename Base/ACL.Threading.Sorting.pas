@@ -4,7 +4,7 @@
 {*         Multi Threading Routines          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,8 +16,12 @@ unit ACL.Threading.Sorting;
 interface
 
 uses
-  Windows, Classes, Generics.Defaults,
-  //
+  Winapi.Windows,
+  // System
+  System.Classes,
+  System.Generics.Defaults,
+  System.SysUtils,
+  // ACL
   ACL.Classes,
   ACL.Classes.Collections,
   ACL.Classes.StringList,
@@ -102,7 +106,7 @@ type
 implementation
 
 uses
-  SysUtils, ACL.FastCode;
+  ACL.FastCode;
 
 type
   TACLStringListAccess = class(TACLStringList);

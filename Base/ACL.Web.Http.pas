@@ -4,7 +4,7 @@
 {*        HTTP Client Implementation         *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,11 @@ unit ACL.Web.Http;
 interface
 
 uses
-  Types, Windows, Classes, WinInet,
+  Winapi.Windows,
+  Winapi.WinInet,
+  // System
+  System.Classes,
+  System.Types,
   // ACL
   ACL.Classes,
   ACL.Classes.ByteBuffer,
@@ -210,8 +214,10 @@ type
 implementation
 
 uses
-  StrUtils, SysUtils, Math,
-  //
+  System.StrUtils,
+  System.SysUtils,
+  System.Math,
+  // ACL
   ACL.Classes.StringList,
   ACL.FastCode,
   ACL.Math,

@@ -4,7 +4,7 @@
 {*              Styles Support               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,15 +16,30 @@ unit ACL.UI.DesignTime.PropEditors;
 interface
 
 uses
-  Windows, UITypes, Types, TypInfo, Classes, Graphics, Dialogs, ImgList, Math,
+  Winapi.Windows,
+  // System
+  System.UITypes,
+  System.Types,
+  System.TypInfo,
+  System.Classes,
+  System.Math,
+  // Vcl
+  Vcl.Graphics,
+  Vcl.Dialogs,
+  Vcl.ImgList,
   // PropertyEditors
-  DesignEditors, DesignIntf, VCLEditors, ColnEdit,
+  ColnEdit,
+  DesignEditors,
+  DesignIntf,
+  VCLEditors,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Gdiplus,
+  ACL.Graphics.SkinImage,
+  ACL.Graphics.SkinImageSet,
   ACL.UI.Dialogs,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.DropDown,
@@ -330,7 +345,7 @@ type
 implementation
 
 uses
-  SysUtils,
+  System.SysUtils,
   // ACL
   ACL.UI.Controls.ColorPicker,
   ACL.UI.Controls.Images;
@@ -1017,7 +1032,7 @@ function TACLImageIndexProperty.GetImages: TCustomImageList;
 var
   APropInfo: PPropInfo;
 begin
-  APropInfo := TypInfo.GetPropInfo(GetComponent(0), 'Images', [tkClass]);
+  APropInfo := System.TypInfo.GetPropInfo(GetComponent(0), 'Images', [tkClass]);
   if APropInfo <> nil then
     Result := TCustomImageList(GetObjectProp(GetComponent(0), APropInfo, TCustomImageList))
   else

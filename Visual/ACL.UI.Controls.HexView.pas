@@ -4,7 +4,7 @@
 {*              HexView Control              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,17 @@ unit ACL.UI.Controls.HexView;
 interface
 
 uses
-  UITypes, Types, SysUtils, Windows, Messages, Classes, Graphics, Controls, Forms,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.UITypes,
+  System.Types,
+  System.SysUtils,
+  System.Classes,
+  // Vcl
+  Vcl.Graphics,
+  Vcl.Controls,
+  Vcl.Forms,
   // ACL
   ACL.Classes,
   ACL.Classes.ByteBuffer,
@@ -404,7 +414,10 @@ function FormatHex(const ABytes: TBytes): string;
 implementation
 
 uses
-  Math, AnsiStrings, ACL.Utils.DPIAware;
+  System.Math,
+  System.AnsiStrings,
+  // ACL
+  ACL.Utils.DPIAware;
 
 const
   acHexViewHitDataOffset = 'DataOffset';

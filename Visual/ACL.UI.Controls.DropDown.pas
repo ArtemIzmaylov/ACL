@@ -16,7 +16,16 @@ unit ACL.UI.Controls.DropDown;
 interface
 
 uses
-  Windows, Classes, Controls, Graphics, Types, ImgList, UITypes, Messages,
+  Winapi.Windows,
+  Winapi.Messages,
+  // VCL
+  Vcl.Controls,
+  Vcl.Graphics,
+  Vcl.ImgList,
+  // System
+  System.Classes,
+  System.Types,
+  System.UITypes,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -360,7 +369,7 @@ begin
       FDropDownJustClosed := Assigned(FDropDown);
     WM_LBUTTONDOWN, WM_RBUTTONDOWN, WM_MBUTTONDOWN:
       if not Focused then
-        Windows.SetFocus(Handle);
+        Winapi.Windows.SetFocus(Handle);
   end;
 
   inherited WndProc(Message);

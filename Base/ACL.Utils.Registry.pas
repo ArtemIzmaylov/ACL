@@ -4,7 +4,7 @@
 {*         Registry Access Functions         *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,8 @@ unit ACL.Utils.Registry;
 interface
 
 uses
-  Windows, SysUtils,
+  Winapi.Windows,
+  System.SysUtils,
   // ACL
   ACL.Classes,
   ACL.Utils.Common,

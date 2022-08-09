@@ -4,7 +4,7 @@
 {*               Web Services                *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,12 @@ unit ACL.WEB;
 interface
 
 uses
-  Windows, Classes, SysUtils, Types,
+  Winapi.Windows,
+  // System
+  System.Classes,
+  System.SysUtils,
+  System.Types,
+  System.Math,
   // ACL
   ACL.Classes.StringList,
   ACL.FileFormats.INI,
@@ -152,8 +157,8 @@ function acURLEscape(const S: UnicodeString): UnicodeString;
 implementation
 
 uses
-  Math, WinInet,
-  //
+  Winapi.WinInet,
+  // ACL
   ACL.Math,
   ACL.Parsers,
   ACL.Utils.Common,

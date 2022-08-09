@@ -4,7 +4,7 @@
 {*       Custom Expressions Processor        *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -20,12 +20,13 @@ unit ACL.Expressions;
 interface
 
 uses
-  Windows,
-  Classes,
-  Generics.Collections,
-  Math,
-  SysUtils,
-  Variants,
+  Winapi.Windows,
+  // System
+  System.Classes,
+  System.Generics.Collections,
+  System.Math,
+  System.SysUtils,
+  System.Variants,
   // ACL
   ACL.Parsers,
   ACL.Classes,

@@ -16,8 +16,20 @@ unit ACL.UI.Controls.TreeList.Types;
 interface
 
 uses
-  Generics.Collections, Generics.Defaults,
-  ImgList, UITypes, Types, SysUtils, Windows, Classes, Messages, Graphics, Controls, StdCtrls,
+  Winapi.Windows,
+  Winapi.Messages,
+  // Vcl
+  Vcl.Graphics,
+  Vcl.Controls,
+  Vcl.ImgList,
+  Vcl.StdCtrls,
+  // System
+  System.Classes,
+  System.Generics.Collections,
+  System.Generics.Defaults,
+  System.SysUtils,
+  System.Types,
+  System.UITypes,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -319,7 +331,7 @@ type
     FTreeList: IACLTreeList;
   protected
     function CreateGroup(const ACaption: UnicodeString): TACLTreeListGroup; virtual;
-    procedure Notify(const Item: TACLTreeListGroup; Action: Generics.Collections.TCollectionNotification); override;
+    procedure Notify(const Item: TACLTreeListGroup; Action: TCollectionNotification); override;
   public
     constructor Create(ATreeList: IACLTreeList);
     destructor Destroy; override;
@@ -1352,10 +1364,10 @@ procedure TACLTreeListGroups.Notify;
 begin
   if (FIndex <> nil) and (FIndexLockCount = 0) then
     case Action of
-      Generics.Collections.cnRemoved,
-      Generics.Collections.cnExtracted:
+      cnRemoved,
+      cnExtracted:
         FIndex.Remove(Item.Caption);
-      Generics.Collections.cnAdded:
+      cnAdded:
         FIndex.Add(Item.Caption, Item);
     end;
   inherited;

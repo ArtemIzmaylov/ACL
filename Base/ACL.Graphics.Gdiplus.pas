@@ -4,7 +4,7 @@
 {*             Gdiplus Wrappers              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,18 @@ unit ACL.Graphics.Gdiplus;
 interface
 
 uses
-  UiTypes, Types, Windows, GDIPOBJ, GDIPAPI, ActiveX, SysUtils, Classes, Graphics, Contnrs,
+  Winapi.ActiveX,
+  Winapi.Windows,
+  Winapi.GDIPOBJ,
+  Winapi.GDIPAPI,
+  // System
+  System.Classes,
+  System.Contnrs,
+  System.SysUtils,
+  System.Types,
+  System.UiTypes,
+  // Vcl
+  Vcl.Graphics,
   // ACL
   ACL.Classes.Collections,
   ACL.Math;
@@ -274,7 +285,7 @@ procedure GpDrawImage(AGraphics: GpGraphics; AImage: GpImage;
 implementation
 
 uses
-  Math,
+  System.Math,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,

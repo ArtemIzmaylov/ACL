@@ -4,7 +4,7 @@
 {*         HintWindow Implementation         *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,15 @@ unit ACL.UI.HintWindow;
 interface
 
 uses
-  Types, Windows, Messages, Classes, Controls, Graphics, Forms,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.Types,
+  System.Classes,
+  // Vcl
+  Vcl.Controls,
+  Vcl.Graphics,
+  Vcl.Forms,
   // ACL
   ACL.Classes.Timer,
   ACL.Geometry,
@@ -145,7 +153,8 @@ type
 implementation
 
 uses
-  Math, SysUtils,
+  System.Math,
+  System.SysUtils,
   // ACL
   ACL.Classes,
   ACL.Graphics,

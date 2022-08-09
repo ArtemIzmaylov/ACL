@@ -4,7 +4,7 @@
 {*          Message Window Routines          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,13 @@ unit ACL.Classes.MessageWindow;
 interface
 
 uses
-  Types, Windows, Classes, SysUtils, Messages, Contnrs,
+  Winapi.Messages,
+  Winapi.Windows,
+  // System
+  System.Types,
+  System.Classes,
+  System.SysUtils,
+  System.Contnrs,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -101,12 +107,12 @@ end;
 
 procedure TACLCustomMessageWindow.PostMessage(AMessage: Cardinal; AParamW: WPARAM; AParamL: LPARAM);
 begin
-  Windows.PostMessage(Handle, AMessage, AParamW, AParamL);
+  Winapi.Windows.PostMessage(Handle, AMessage, AParamW, AParamL);
 end;
 
 procedure TACLCustomMessageWindow.SendMessage(AMessage: Cardinal; AParamW: WPARAM; AParamL: LPARAM);
 begin
-  Windows.SendMessage(Handle, AMessage, AParamW, AParamL);
+  Winapi.Windows.SendMessage(Handle, AMessage, AParamW, AParamL);
 end;
 
 procedure TACLCustomMessageWindow.WndProc(var AMessage: TMessage);

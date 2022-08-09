@@ -4,7 +4,7 @@
 {*             Strings Utilities             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,14 @@ unit ACL.Utils.Strings;
 interface
 
 uses
-  Types, Windows, Math, SysUtils, Character, Classes, Generics.Collections,
+  Winapi.Windows,
+  // System
+  System.Types,
+  System.Math,
+  System.SysUtils,
+  System.Character,
+  System.Classes,
+  System.Generics.Collections,
   // ACL
   ACL.Threading;
 
@@ -283,7 +290,7 @@ type
 
 function StrToIntDefA(const S: AnsiString; ADefault: Integer): Integer;
 begin
-  Result := SysUtils.StrToIntDef(string(S), ADefault);
+  Result := System.SysUtils.StrToIntDef(string(S), ADefault);
 end;
 
 //==============================================================================

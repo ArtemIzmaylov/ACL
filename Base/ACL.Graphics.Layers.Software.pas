@@ -16,7 +16,16 @@ unit ACL.Graphics.Layers.Software;
 interface
 
 uses
-  UITypes, Types, Windows, SysUtils, Classes, Graphics, Messages, Math,
+  Winapi.Messages,
+  Winapi.Windows,
+  // System
+  System.Classes,
+  System.Math,
+  System.SysUtils,
+  System.Types,
+  System.UITypes,
+  // VCL
+  Vcl.Graphics,
   // ACL
   ACL.Classes.Collections,
   ACL.Graphics,

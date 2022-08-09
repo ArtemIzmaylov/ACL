@@ -4,7 +4,7 @@
 {*          Binding Diagram Control          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,8 +16,12 @@ unit ACL.UI.Controls.BindingDiagram;
 interface
 
 uses
-  // VCL
-  Types, SysUtils, Windows, Messages, Classes, Graphics, Controls,
+  System.Types,
+  System.SysUtils,
+  System.Classes,
+  // Vcl
+  Vcl.Graphics,
+  Vcl.Controls,
   // ACL
   ACL.Geometry,
   ACL.UI.Controls.BaseControls,

@@ -4,7 +4,7 @@
 {*             ScrollBar Control             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,16 @@ unit ACL.UI.Controls.ScrollBar;
 interface
 
 uses
-  Windows, Messages, SysUtils, Classes, Forms, StdCtrls, Controls, Graphics,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.SysUtils,
+  System.Classes,
+  // Vcl
+  Vcl.Forms,
+  Vcl.StdCtrls,
+  Vcl.Controls,
+  Vcl.Graphics,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -295,7 +304,12 @@ type
 implementation
 
 uses
-  Types, Consts, Math, ACL.Math;
+  System.Types,
+  System.Math,
+  // VCL
+  VCL.Consts,
+  // ACL
+  ACL.Math;
 
 const
   SCROLL_BAR_MIN_DISTANCE = 34;
@@ -584,7 +598,7 @@ begin
         if (ADelta < FThumbnailSize) or (ScrollInfo.Max = ScrollInfo.Min) then Exit;
         ASize := Max(FThumbnailSize, ASize);
         Dec(ADelta, ASize);
-        Result := Classes.Bounds(ButtonUp.Bounds.Right, Bounds.Top, ASize, acRectHeight(Bounds));
+        Result := System.Classes.Bounds(ButtonUp.Bounds.Right, Bounds.Top, ASize, acRectHeight(Bounds));
         ASize := (ScrollInfo.Max - ScrollInfo.Min) - (ScrollInfo.Page - 1);
         OffsetRect(Result, MulDiv(ADelta, Min(ScrollInfo.Position - ScrollInfo.Min, ASize), ASize), 0);
       end;
@@ -606,7 +620,7 @@ begin
         if (ADelta < FThumbnailSize) or (ScrollInfo.Max = ScrollInfo.Min) then Exit;
         ASize := Max(ASize, FThumbnailSize);
         Dec(ADelta, ASize);
-        Result := Classes.Bounds(Bounds.Left, ButtonUp.Bounds.Bottom, acRectWidth(Bounds), ASize);
+        Result := System.Classes.Bounds(Bounds.Left, ButtonUp.Bounds.Bottom, acRectWidth(Bounds), ASize);
         ASize := (ScrollInfo.Max - ScrollInfo.Min) - (ScrollInfo.Page - 1);
         OffsetRect(Result, 0, MulDiv(ADelta, Min(ScrollInfo.Position - ScrollInfo.Min, ASize), ASize));
       end;
@@ -880,9 +894,9 @@ begin
     scLineDown:
       Inc(ANewPos, ViewInfo.SmallChange);
     scPageUp:
-      Dec(ANewPos, Math.Max(ViewInfo.SmallChange, ViewInfo.ScrollInfo.Page));
+      Dec(ANewPos, System.Math.Max(ViewInfo.SmallChange, ViewInfo.ScrollInfo.Page));
     scPageDown:
-      Inc(ANewPos, Math.Max(ViewInfo.SmallChange, ViewInfo.ScrollInfo.Page));
+      Inc(ANewPos, System.Math.Max(ViewInfo.SmallChange, ViewInfo.ScrollInfo.Page));
     scTop:
       ANewPos := ViewInfo.ScrollInfo.Min;
     scBottom:

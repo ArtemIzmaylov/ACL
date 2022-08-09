@@ -4,7 +4,7 @@
 {*               Object Links                *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,12 @@ unit ACL.ObjectLinks;
 interface
 
 uses
-  Windows, Types, SysUtils, Classes, Generics.Collections,
+  Winapi.Windows,
+  // System
+  System.Classes,
+  System.Generics.Collections,
+  System.SysUtils,
+  System.Types,
   // ACL
   ACL.Threading;
 

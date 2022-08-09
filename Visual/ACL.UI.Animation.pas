@@ -4,7 +4,7 @@
 {*             Animation Manager             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,16 @@ unit ACL.UI.Animation;
 interface
 
 uses
-  UITypes, Types, Windows, Messages, Classes, Controls, Graphics, Generics.Collections,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.UITypes,
+  System.Types,
+  System.Classes,
+  System.Generics.Collections,
+  // Vcl
+  Vcl.Controls,
+  Vcl.Graphics,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -219,7 +228,11 @@ function AnimationManager: TACLAnimationManager;
 implementation
 
 uses
-  SysUtils, Math, Forms, StrUtils;
+  System.SysUtils,
+  System.Math,
+  System.StrUtils,
+  // VCL
+  Vcl.Forms;
 
 var
   FAnimationManager: TACLAnimationManager;

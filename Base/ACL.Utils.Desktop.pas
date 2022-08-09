@@ -16,9 +16,16 @@ unit ACL.Utils.Desktop;
 interface
 
 uses
-  Windows, Types, Classes, Messages, MultiMon,
+  Winapi.Windows,
+  Winapi.MultiMon,
+  Winapi.Messages,
+  Winapi.ShellApi,
+  // System
+  System.Types,
+  System.Classes,
+  // Vcl
 {$IFNDEF ACL_BASE_NOVCL}
-  Forms,
+  Vcl.Forms,
 {$ENDIF}
   // ACL
   ACL.Classes.Collections;
@@ -113,9 +120,9 @@ implementation
 
 uses
 {$IFNDEF ACL_BASE_NOVCL}
-  Controls,
+  Vcl.Controls,
 {$ENDIF}
-  ShellAPI, SysUtils,
+  System.SysUtils,
   // ACL
   ACL.Classes.MessageWindow,
   ACL.Utils.Common,

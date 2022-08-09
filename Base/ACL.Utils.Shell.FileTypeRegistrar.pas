@@ -18,7 +18,12 @@ unit ACL.Utils.Shell.FileTypeRegistrar;
 interface
 
 uses
-  SysUtils, ActiveX, Windows, ShlObj, ShellAPI,
+  Winapi.ActiveX,
+  Winapi.Windows,
+  Winapi.ShellAPI,
+  Winapi.ShlObj,
+  // System
+  System.SysUtils,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -152,7 +157,7 @@ type
 implementation
 
 uses
-  AnsiStrings;
+  System.AnsiStrings;
 
 { TACLFileTypeIconLibraryItem }
 
@@ -257,11 +262,11 @@ begin
         AXmlDoc[0].Enum(
           procedure (ANode: TACLXMLNode)
           begin
-            if AnsiStrings.SameText(ANode.NodeName, 'author') then
+            if System.AnsiStrings.SameText(ANode.NodeName, 'author') then
               FAuthor := ANode.NodeValue
-            else if AnsiStrings.SameText(ANode.NodeName, 'name') then
+            else if System.AnsiStrings.SameText(ANode.NodeName, 'name') then
               FName := ANode.NodeValue
-            else if AnsiStrings.SameText(ANode.NodeName, 'icon') then
+            else if System.AnsiStrings.SameText(ANode.NodeName, 'icon') then
               FItems.Add(TACLFileTypeIconLibraryItem.Create(ANode));
           end);
       end;

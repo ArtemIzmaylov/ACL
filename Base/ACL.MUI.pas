@@ -4,7 +4,7 @@
 {*          Multilanguage UI Engine          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,9 +16,15 @@ unit ACL.MUI;
 interface
 
 uses
-  Windows, Classes, Messages, Generics.Collections,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.Classes,
+  System.Generics.Collections,
+  // VCL
 {$IFNDEF ACL_BASE_NOVCL}
-  Forms, Graphics,
+  Vcl.Forms,
+  Vcl.Graphics,
 {$ENDIF}
   // ACL
   ACL.Classes,
@@ -178,10 +184,15 @@ procedure LangSetFileClass(AClass: TACLLocalizationClass);
 implementation
 
 uses
-  TypInfo, SysUtils,
+  System.TypInfo,
+  System.SysUtils,
+  // VCL
 {$IFNDEF ACL_BASE_NOVCL}
-  Controls, Menus, ActnList,
+  Vcl.Controls,
+  Vcl.Menus,
+  Vcl.ActnList,
 {$ENDIF}
+  // ACL
   ACL.Utils.FileSystem,
   ACL.Utils.Strings;
 

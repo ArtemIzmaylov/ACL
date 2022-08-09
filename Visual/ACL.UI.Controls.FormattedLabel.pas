@@ -16,7 +16,11 @@ unit ACL.UI.Controls.FormattedLabel;
 interface
 
 uses
-  Types, Classes, Messages, Controls, Graphics, Forms, StdCtrls,
+  System.Types,
+  System.Classes,
+  // Vcl
+  Vcl.Controls,
+  Vcl.Graphics,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -189,7 +193,8 @@ type
 implementation
 
 uses
-  SysUtils, Windows, Math;
+  System.SysUtils,
+  System.Math;
 
 { TACLStyleFormattedLabel }
 

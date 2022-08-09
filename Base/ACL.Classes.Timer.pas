@@ -4,7 +4,7 @@
 {*    Standard and High-Resolution Timers    *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,12 @@ unit ACL.Classes.Timer;
 interface
 
 uses
-  Windows, Classes, Messages, ACL.Classes.Collections;
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.Classes,
+  // ACL
+  ACL.Classes.Collections;
 
 type
 
@@ -78,7 +83,8 @@ type
 implementation
 
 uses
-  Math, SysUtils,
+  System.Math,
+  System.SysUtils,
   // ACL
   ACL.Classes,
   ACL.Classes.MessageWindow,

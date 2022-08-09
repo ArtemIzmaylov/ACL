@@ -16,19 +16,21 @@ unit ACL.UI.Controls.BaseControls;
 interface
 
 uses
-  UxTheme,
-  UITypes,
-  Types,
-  Windows,
-  ActnList,
-  Classes,
-  Controls,
-  Generics.Collections,
-  Graphics,
-  ImgList,
-  Messages,
-  StdCtrls,
-  SysUtils,
+  Winapi.Messages,
+  Winapi.UxTheme,
+  Winapi.Windows,
+  // System
+  System.Classes,
+  System.Generics.Collections,
+  System.SysUtils,
+  System.Types,
+  System.UITypes,
+  // Vcl
+  Vcl.ActnList,
+  Vcl.Controls,
+  Vcl.Graphics,
+  Vcl.ImgList,
+  Vcl.StdCtrls,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -702,9 +704,11 @@ function MouseTracker: TACLMouseTracking;
 implementation
 
 uses
-  DwmApi,
-  Forms,
-  Math,
+  Winapi.DwmApi,
+  // System
+  System.Math,
+  // Vcl
+  Vcl.Forms,
   // ACL
   ACL.Threading,
   ACL.UI.HintWindow,
@@ -1454,7 +1458,7 @@ begin
     end;
     if ACursor <> crDefault then
     begin
-      Windows.SetCursor(Screen.Cursors[ACursor]);
+      Winapi.Windows.SetCursor(Screen.Cursors[ACursor]);
       AMessage.Result := 1;
       Result := True;
     end;
@@ -1645,7 +1649,7 @@ end;
 procedure TACLGraphicControl.InvalidateRect(const R: TRect);
 begin
   if (Parent <> nil) and Parent.HandleAllocated then
-    Windows.InvalidateRect(Parent.Handle, acRectOffset(R, Left, Top), True);
+    Winapi.Windows.InvalidateRect(Parent.Handle, acRectOffset(R, Left, Top), True);
 end;
 
 function TACLGraphicControl.GetCursor(const P: TPoint): TCursor;
@@ -1897,7 +1901,7 @@ end;
 procedure TACLCustomControl.InvalidateRect(const R: TRect);
 begin
   if HandleAllocated and not IsDestroying then
-    Windows.InvalidateRect(Handle, R, True);
+    Winapi.Windows.InvalidateRect(Handle, R, True);
 end;
 
 procedure TACLCustomControl.ApplyColorSchema(const ASchema: TACLColorSchema);
@@ -2500,7 +2504,7 @@ end;
 
 procedure TACLDeferPlacementUpdate.Add(AControl: TWinControl; ALeft, ATop, AWidth, AHeight: Integer);
 begin
-  Add(AControl, Classes.Bounds(ALeft, ATop, AWidth, AHeight));
+  Add(AControl, System.Classes.Bounds(ALeft, ATop, AWidth, AHeight));
 end;
 
 procedure TACLDeferPlacementUpdate.BeginUpdate;

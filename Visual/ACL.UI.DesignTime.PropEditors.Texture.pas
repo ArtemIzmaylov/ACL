@@ -4,7 +4,7 @@
 {*          Texture Property Editor          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,27 +16,42 @@ unit ACL.UI.DesignTime.PropEditors.Texture;
 interface
 
 uses
-  Types, Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms, Dialogs, StdCtrls, ExtCtrls,
-  ImageList, ImgList,
-  //
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.Types,
+  System.SysUtils,
+  System.Variants,
+  System.Classes,
+  System.ImageList,
+  // Vcl
+  Vcl.Graphics,
+  Vcl.Controls,
+  Vcl.Forms,
+  Vcl.Dialogs,
+  Vcl.StdCtrls,
+  Vcl.ExtCtrls,
+  Vcl.ImgList,
+  // ACL
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Images,
   ACL.Graphics.SkinImage,
   ACL.Graphics.SkinImageSet,
   ACL.UI.Controls.BaseControls,
-  ACL.UI.Controls.Buttons,
-  ACL.UI.Dialogs,
   ACL.UI.Controls.BaseEditors,
+  ACL.UI.Controls.Buttons,
+  ACL.UI.Controls.Category,
   ACL.UI.Controls.ComboBox,
   ACL.UI.Controls.DropDown,
-  ACL.UI.Controls.SpinEdit,
-  ACL.UI.Forms,
   ACL.UI.Controls.GroupBox,
-  ACL.UI.Controls.Category,
   ACL.UI.Controls.Panel,
-  ACL.UI.Resources,
-  ACL.UI.ImageList;
+  ACL.UI.Controls.SpinEdit,
+  ACL.UI.Controls.TextEdit,
+  ACL.UI.Dialogs,
+  ACL.UI.Forms,
+  ACL.UI.ImageList,
+  ACL.UI.Resources;
 
 type
 
@@ -121,7 +136,7 @@ type
 implementation
 
 uses
-  Math;
+  System.Math;
 
 {$R *.dfm}
 

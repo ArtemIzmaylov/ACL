@@ -4,7 +4,7 @@
 {*           RTTI Helpers Routines           *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,13 @@ unit ACL.Utils.RTTI;
 interface
 
 uses
-  Windows, Messages, Classes, Variants, TypInfo, Rtti;
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.Classes,
+  System.Variants,
+  System.TypInfo,
+  System.Rtti;
 
 type
   TMemberVisibilities = set of TMemberVisibility;
@@ -73,7 +79,10 @@ type
 implementation
 
 uses
-  Types, SysUtils, Math, RTLConsts,
+  System.Types,
+  System.SysUtils,
+  System.Math,
+  System.RTLConsts,
   // ACL
   ACL.FastCode,
   ACL.Utils.Common,
@@ -168,7 +177,7 @@ var
   AProperty: TRttiProperty;
 begin
   if mvPublished in AVisibility then
-    Result := TypInfo.GetPropInfo(AObject, AName)
+    Result := System.TypInfo.GetPropInfo(AObject, AName)
   else
     Result := nil;
 
@@ -278,7 +287,7 @@ class function TRTTI.GetPropValueAsVariant(AObject: TObject; APropInfo: PPropInf
 begin
   if AObject <> nil then
   begin
-    Result := TypInfo.GetPropValue(AObject, APropInfo, PreferStrings);
+    Result := System.TypInfo.GetPropValue(AObject, APropInfo, PreferStrings);
     if IsUnsignedInt(APropInfo) then
       Result := LongWord(Int64(Result));
   end
@@ -329,7 +338,7 @@ begin
     if APropInfo^.PropType^.Kind = tkEnumeration then
       SetEnumPropValue(AObject, APropInfo, AValue)
     else
-      TypInfo.SetPropValue(AObject, APropInfo, AValue);
+      System.TypInfo.SetPropValue(AObject, APropInfo, AValue);
   finally
     FormatSettings := APrevFormatSettings;
   end;
@@ -347,7 +356,7 @@ begin
   if IsBoolean(APropInfo) and VarIsNumeric(AValue) then
     SetOrdProp(AObject, APropInfo, Ord(FastTrunc(AValue) <> 0))
   else
-    TypInfo.SetPropValue(AObject, APropInfo, AValue);
+    System.TypInfo.SetPropValue(AObject, APropInfo, AValue);
 end;
 
 class procedure TRTTI.SetPropValueAsVariant(AObject: TObject; const AName: UnicodeString; const AValue: Variant);
