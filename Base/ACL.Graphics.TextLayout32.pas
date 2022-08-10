@@ -1,7 +1,7 @@
 ﻿{*********************************************}
 {*                                           *}
 {*        Artem's Components Library         *}
-{*     Formatted Text with alpha channel     *}
+{* Formatted Text with alpha channel support *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
 {*                 2006-2022                 *}
@@ -17,11 +17,13 @@ unit ACL.Graphics.TextLayout32;
 interface
 
 uses
-  Windows,
-  UITypes,
-  Types,
-  Classes,
-  Graphics,
+  Winapi.Windows,
+  // System
+  System.UITypes,
+  System.Types,
+  System.Classes,
+  // VCL
+  Vcl.Graphics,
   // ACL
   ACL.Classes,
   ACL.FastCode,
@@ -205,7 +207,8 @@ procedure DrawText32Prepared(DC: HDC; const R: TRect; const ATextViewInfo: TACLT
 implementation
 
 uses
-  Math, SysUtils;
+  System.Math,
+  System.SysUtils;
 
 const
   MapTextOffsets: array[TACLMarginPart] of TPoint =

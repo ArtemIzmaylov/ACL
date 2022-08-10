@@ -4,7 +4,7 @@
 {*         Multi Threading Routines          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -17,7 +17,15 @@ unit ACL.Threading;
 interface
 
 uses
-  SyncObjs, Types, Windows, Messages, SysUtils, Classes, Generics.Defaults, Generics.Collections,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.SyncObjs,
+  System.Types,
+  System.SysUtils,
+  System.Classes,
+  System.Generics.Defaults,
+  System.Generics.Collections,
   // ACL
   ACL.Utils.Common;
 
@@ -187,10 +195,8 @@ procedure RunInThread(Func: TThreadStartRoutine; Context: Pointer);
 implementation
 
 uses
-{$IFNDEF ACL_BASE_NOVCL}
-  Forms,
-{$ENDIF}
-  Math,
+  // System
+  System.Math,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -685,7 +691,7 @@ class procedure TACLMainThread.CheckSynchronize;
 begin
   if not IsMainThread then
     raise EInvalidArgument.Create(ClassName);
-  Classes.CheckSynchronize;
+  System.Classes.CheckSynchronize;
   Execute;
 end;
 

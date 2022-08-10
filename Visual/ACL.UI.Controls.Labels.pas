@@ -4,7 +4,7 @@
 {*              Label Controls               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,19 @@ unit ACL.UI.Controls.Labels;
 interface
 
 uses
-  UITypes, Types, Windows, Messages, SysUtils, Classes, Controls, ImgList, Graphics, ActnList, ExtCtrls,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.Classes,
+  System.SysUtils,
+  System.Types,
+  System.UITypes,
+  // Vcl
+  Vcl.Controls,
+  Vcl.ImgList,
+  Vcl.Graphics,
+  Vcl.ActnList,
+  Vcl.ExtCtrls,
   // ACL
   ACL.FastCode,
   ACL.Geometry,
@@ -195,7 +207,7 @@ procedure acDrawLabelLine(ACanvas: TCanvas; const ALineRect, ATextRect: TRect; A
 implementation
 
 uses
-  Math;
+  System.Math;
 
 procedure acDrawLabelLine(ACanvas: TCanvas; const ALineRect, ATextRect: TRect; AColor1, AColor2: TAlphaColor);
 var

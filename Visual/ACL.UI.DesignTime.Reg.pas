@@ -4,7 +4,7 @@
 {*        Register Components Helper         *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -17,7 +17,17 @@ unit ACL.UI.DesignTime.Reg;
 interface
 
 uses
-  TypInfo, Types, Classes, Graphics, DesignIntf, VCLEditors, DesignEditors, ImgList, UITypes,
+  Vcl.Graphics,
+  Vcl.ImgList,
+  // System
+  System.Classes,
+  System.Types,
+  System.TypInfo,
+  System.UITypes,
+  // Designer
+  DesignIntf,
+  DesignEditors,
+  VCLEditors,
   // ACL
   ACL.UI.DesignTime.PropEditors;
 
@@ -28,7 +38,9 @@ procedure Register;
 implementation
 
 uses
-  SysUtils, Controls, Math,
+  System.SysUtils,
+  System.Math,
+  Vcl.Controls,
   //
   ACL.Classes,
   ACL.Classes.StringList,
@@ -104,6 +116,8 @@ begin
   // Forms
   RegisterComponents(sACLComponentsPage, [TACLApplicationController]);
   RegisterPropertyEditor(TypeInfo(Integer), TACLApplicationController, 'TargetDPI', TACLDPIPropertyEditor);
+  RegisterCustomModule(TACLForm, TCustomModule);
+  RegisterCustomModule(TACLLocalizableForm, TCustomModule);
 
   // Common
   RegisterComponents(sACLComponentsPage, [TACLTrayIcon, TACLDropTarget, TACLTimer]);

@@ -4,7 +4,7 @@
 {*               Color Palette               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,13 @@ unit ACL.UI.Controls.ColorPalette;
 interface
 
 uses
-  Windows, Types, Classes, UITypes, Graphics,
+  Winapi.Windows,
+  // System
+  System.Types,
+  System.Classes,
+  System.UITypes,
+  // Vcl
+  Vcl.Graphics,
   // ACL
   ACL.Classes.Collections,
   ACL.Classes,
@@ -223,7 +229,12 @@ const
 implementation
 
 uses
-  SysUtils, Math, ACL.Math, Forms;
+  System.SysUtils,
+  System.Math,
+  // Vcl
+  Vcl.Forms,
+  // ACl
+  ACL.Math;
 
 { TACLColorPaletteItem }
 

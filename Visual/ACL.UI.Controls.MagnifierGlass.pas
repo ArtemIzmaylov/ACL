@@ -4,7 +4,7 @@
 {*          Magnifier Glass Control          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,14 @@ unit ACL.UI.Controls.MagnifierGlass;
 interface
 
 uses
-  Types, Windows, SysUtils, Classes, Messages, Graphics,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.Types,
+  System.SysUtils,
+  System.Classes,
+  // VCL
+  Vcl.Graphics,
   // ACL
   ACL.Math,
   ACL.Classes,
@@ -88,7 +95,8 @@ type
 implementation
 
 uses
-  Math,
+  System.Math,
+  // ACL
   ACL.Utils.Common,
   ACL.Utils.Desktop;
 

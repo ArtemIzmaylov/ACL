@@ -4,7 +4,7 @@
 {*             StringList Class              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,12 @@ unit ACL.Classes.StringList;
 interface
 
 uses
-  Classes, SysUtils, ACL.Classes, ACL.Utils.Common, ACL.Utils.Strings;
+  System.Classes,
+  System.SysUtils,
+  // ACL
+  ACL.Classes,
+  ACL.Utils.Common,
+  ACL.Utils.Strings;
 
 type
 
@@ -166,7 +171,8 @@ type
 implementation
 
 uses
-  Math,
+  System.Math,
+  // ACL
   ACL.FastCode,
   ACL.Parsers,
   ACL.Threading.Sorting,

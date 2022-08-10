@@ -4,7 +4,7 @@
 {*            Simple XML Document            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,12 @@ unit ACL.FileFormats.XML;
 interface
 
 uses
-  Windows, Classes, SysUtils, AnsiStrings, Variants,
+  Winapi.Windows,
+  // System
+  System.Classes,
+  System.SysUtils,
+  System.AnsiStrings,
+  System.Variants,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -281,7 +286,11 @@ type
 implementation
 
 uses
-  Types, Math, StrUtils, ACL.Parsers;
+  System.Types,
+  System.Math,
+  System.StrUtils,
+  // ACL
+  ACL.Parsers;
 
 const
   sXMLSpaceModeAttr = 'xml:space';
@@ -629,7 +638,7 @@ var
   I: Integer;
 begin
   for I := 0 to Count - 1 do
-    if AnsiStrings.SameText(TACLXMLAttribute(List[I]).Name, AName) then
+    if System.AnsiStrings.SameText(TACLXMLAttribute(List[I]).Name, AName) then
     begin
       AAttr := Items[I];
       Exit(True);

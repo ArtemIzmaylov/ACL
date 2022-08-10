@@ -16,9 +16,10 @@ unit ACL.Utils.Logger;
 interface
 
 uses
-  Windows,
-  Classes,
-  SysUtils,
+  Winapi.Windows,
+  // System
+  System.Classes,
+  System.SysUtils,
   // ACL
   ACL.Threading,
   ACL.Utils.FileSystem,
@@ -113,7 +114,7 @@ function GetDebugLogFileName: string;
 implementation
 
 uses
-  StrUtils;
+  System.StrUtils;
 
 var
   FGeneralLog: TACLCriticalSection;

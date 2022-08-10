@@ -4,7 +4,7 @@
 {*             Editors Controls              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,18 @@ unit ACL.UI.Controls.Memo;
 interface
 
 uses
-  Windows, Messages, StdCtrls, UITypes, Classes, Types, Controls, Graphics, Forms, Menus,
+  Winapi.Windows,
+  Winapi.Messages,
+  // VCL
+  Vcl.Controls,
+  Vcl.Graphics,
+  Vcl.Forms,
+  Vcl.Menus,
+  Vcl.StdCtrls,
+  // System
+  System.UITypes,
+  System.Classes,
+  System.Types,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -163,7 +174,13 @@ type
 implementation
 
 uses
-  SysUtils, Math, ACL.Geometry, ACL.Utils.Common, ACL.MUI, ACL.Math;
+  System.SysUtils,
+  System.Math,
+  // ACL
+  ACL.Geometry,
+  ACL.Utils.Common,
+  ACL.MUI,
+  ACL.Math;
 
 { TACLInnerMemo }
 

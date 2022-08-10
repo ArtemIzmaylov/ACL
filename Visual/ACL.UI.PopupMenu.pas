@@ -4,7 +4,7 @@
 {*             Skinned PopupMenu             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,10 +16,35 @@ unit ACL.UI.PopupMenu;
 interface
 
 uses
-  Generics.Collections, Generics.Defaults,
-  Types, Math, Windows, Messages, Classes, Graphics, Forms, Controls, ImgList, ActnList, ExtCtrls, Menus, OleAcc,
-  Actions, UITypes, StdCtrls, SysUtils, Character, Consts, MMSystem, CommCtrl, ShellApi, Contnrs, Dialogs,
-  Themes,
+  Winapi.CommCtrl,
+  Winapi.Messages,
+  Winapi.MMSystem,
+  Winapi.ShellApi,
+  Winapi.Windows,
+  Winapi.OleAcc,
+  // Vcl
+  Vcl.Forms,
+  Vcl.ActnList,
+  Vcl.Consts,
+  Vcl.Controls,
+  Vcl.Dialogs,
+  Vcl.ExtCtrls,
+  Vcl.Graphics,
+  Vcl.ImgList,
+  Vcl.Menus,
+  Vcl.StdCtrls,
+  Vcl.Themes,
+  // System
+  System.Actions,
+  System.Character,
+  System.Classes,
+  System.Contnrs,
+  System.Generics.Collections,
+  System.Generics.Defaults,
+  System.Math,
+  System.SysUtils,
+  System.Types,
+  System.UITypes,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,

@@ -4,7 +4,7 @@
 {*         SQLite Database Wrappers          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,14 @@ unit ACL.SQLite3;
 interface
 
 uses
-  Windows, SysUtils, Classes, Variants, Sqlite, Generics.Collections, Generics.Defaults,
+  Winapi.Windows,
+  // System
+  System.SysUtils,
+  System.Classes,
+  System.Variants,
+  System.Sqlite,
+  System.Generics.Collections,
+  System.Generics.Defaults,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -264,7 +271,10 @@ procedure SQLiteResultSetNull(AContext: HSQLCONTEXT);
 implementation
 
 uses
-  Math, ACL.Hashes, ACL.Math;
+  System.Math,
+  // ACL
+  ACL.Hashes,
+  ACL.Math;
   
 const
   SQLErrorMessage = 'Error: %s (%d)' + acCRLF + 'Last query:' + acCRLF + '%s';

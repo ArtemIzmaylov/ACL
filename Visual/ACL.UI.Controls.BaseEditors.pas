@@ -4,7 +4,7 @@
 {*             Editors Controls              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,21 @@ unit ACL.UI.Controls.BaseEditors;
 interface
 
 uses
-  Types, Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, ImgList, StdCtrls, UITypes, Mask,
+  Winapi.Windows,
+  Winapi.Messages,
+  // Vcl
+  Vcl.Controls,
+  Vcl.Forms,
+  Vcl.Graphics,
+  Vcl.ImgList,
+  Vcl.Mask,
+  Vcl.StdCtrls,
+  // System
+  System.Classes,
+  System.Generics.Collections,
+  System.SysUtils,
+  System.Types,
+  System.UITypes,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -380,7 +394,10 @@ function EditDateTimeFormatToString: string;
 implementation
 
 uses
-  Math, Character, Consts;
+  System.Math,
+  System.Character,
+  // VCL
+  Vcl.Consts;
 
 type
   TWinControlAccess = class(TWinControl);

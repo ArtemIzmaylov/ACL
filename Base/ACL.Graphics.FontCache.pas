@@ -4,7 +4,7 @@
 {*                Font Cache                 *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -17,12 +17,14 @@ unit ACL.Graphics.FontCache;
 interface
 
 uses
-  UITypes,
-  Windows,
-  Generics.Defaults,
-  Generics.Collections,
-  Classes,
-  Graphics,
+  Winapi.Windows,
+  // System
+  System.UITypes,
+  System.Generics.Defaults,
+  System.Generics.Collections,
+  System.Classes,
+  // Vcl
+  Vcl.Graphics,
   // ACL
   ACL.Classes.Collections,
   ACL.Graphics,
@@ -180,9 +182,10 @@ type
 implementation
 
 uses
-  ActiveX,
-  SysUtils,
-  Math,
+  Winapi.ActiveX,
+  // System
+  System.SysUtils,
+  System.Math,
   // ACL
   ACL.FastCode,
   ACL.Parsers,
@@ -277,7 +280,7 @@ begin
   if GetOutlineTextMetricsW(DC, SizeOf(AOutlineTextMetrics), @AOutlineTextMetrics) <> 0 then
     FPanose := AOutlineTextMetrics.otmPanoseNumber;
 
-  ASize := Windows.GetFontUnicodeRanges(DC, nil);
+  ASize := Winapi.Windows.GetFontUnicodeRanges(DC, nil);
   if ASize = 0 then //# "Roboto Bk"
     Exit;
 

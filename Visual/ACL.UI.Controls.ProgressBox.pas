@@ -4,7 +4,7 @@
 {*           Progress Box Control            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,15 @@ unit ACL.UI.Controls.ProgressBox;
 interface
 
 uses
-  UITypes, Types, Windows, Messages, Classes, Graphics, Controls,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.Classes,
+  System.Types,
+  System.UITypes,
+  // Vcl
+  Vcl.Graphics,
+  Vcl.Controls,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -141,7 +149,10 @@ type
 implementation
 
 uses
-  Math, SysUtils, Dialogs, Forms,
+  System.Math,
+  System.SysUtils,
+  // Vcl
+  Vcl.Forms,
   // ACL
   ACL.Geometry,
   ACL.Graphics.Gdiplus,
@@ -416,7 +427,7 @@ begin
     FDelayTimer.Enabled := False;
     FProgressActive := False;
     Visible := False;
-    Windows.SetFocus(FSavedFocus);
+    Winapi.Windows.SetFocus(FSavedFocus);
     CallNotifyEvent(Self, OnFinish);
   end;
 end;

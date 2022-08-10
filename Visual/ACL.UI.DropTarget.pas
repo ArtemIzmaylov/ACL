@@ -4,7 +4,7 @@
 {*           DropTarget Component            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,15 @@ unit ACL.UI.DropTarget;
 interface
 
 uses
-  Windows, Messages, ActiveX, Classes, Controls, ShlObj, Generics.Collections,
+  Winapi.Windows,
+  Winapi.Messages,
+  Winapi.ActiveX,
+  Winapi.ShlObj,
+  // System
+  System.Classes,
+  System.Generics.Collections,
+  // Vcl
+  Vcl.Controls,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -149,7 +157,13 @@ type
 implementation
 
 uses
-  ShellAPI, ComObj, Math, SysUtils, Forms;
+  Winapi.ShellApi,
+  // System
+  System.Math,
+  System.SysUtils,
+  System.Win.ComObj,
+  // Vcl
+  Vcl.Forms;
 
 type
 

@@ -4,7 +4,7 @@
 {*              SkinImage Class              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -17,7 +17,16 @@ unit ACL.Graphics.SkinImage;
 interface
 
 uses
-  Windows, UITypes, SysUtils, Classes, Graphics, Math, Generics.Collections, ZLib,
+  Winapi.Windows,
+  // System
+  System.UITypes,
+  System.SysUtils,
+  System.Classes,
+  System.Math,
+  System.Generics.Collections,
+  System.ZLib,
+  // VCL
+  Vcl.Graphics,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -294,7 +303,7 @@ procedure acCalculateTiledAreas(const R: TRect; const AParams: TACLSkinImageTile
 implementation
 
 uses
-  Types,
+  System.Types,
   // ACL
   ACL.FastCode,
   ACL.Graphics.Gdiplus,

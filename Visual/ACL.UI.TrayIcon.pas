@@ -4,7 +4,7 @@
 {*             TrayIcon Classes              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,8 +16,20 @@ unit ACL.UI.TrayIcon;
 interface
 
 uses
-  Types, Windows, Messages, SysUtils, Classes, Graphics, Controls,
-  Forms, Menus, ShellApi, ExtCtrls, Generics.Collections,
+  Winapi.Messages,
+  Winapi.ShellApi,
+  Winapi.Windows,
+  // System
+  System.Classes,
+  System.Generics.Collections,
+  System.SysUtils,
+  System.Types,
+  // Vcl
+  Vcl.Controls,
+  Vcl.ExtCtrls,
+  Vcl.Forms,
+  Vcl.Graphics,
+  Vcl.Menus,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -128,7 +140,8 @@ function acTrayIconGetIsMouseAtIcon: Boolean;
 implementation
 
 uses
-  Math,
+  System.Math,
+  // ACL
   ACL.Classes.MessageWindow,
   ACL.Utils.Desktop,
   ACL.Utils.DPIAware,

@@ -4,7 +4,7 @@
 {*             Calendar Control              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,13 +16,15 @@ unit ACL.UI.Controls.Calendar;
 interface
 
 uses
-  UITypes,
-  Types,
-  Windows,
-  Classes,
-  SysUtils,
-  Graphics,
-  Controls,
+  Winapi.Windows,
+  // System
+  System.Classes,
+  System.SysUtils,
+  System.Types,
+  System.UITypes,
+  // Vcl
+  Vcl.Graphics,
+  Vcl.Controls,
   // ACL
   ACL.Geometry,
   ACL.Graphics,
@@ -670,7 +672,7 @@ begin
   for X := 0 to FCellsPerRow - 1 do
     for Y := 0 to ARowCount - 1 do
     begin
-      FCells[Y * FCellsPerRow + X].Calculate(Types.Bounds(
+      FCells[Y * FCellsPerRow + X].Calculate(System.Types.Bounds(
         ABounds.Left + X * ACellWidth, ABounds.Top + Y * ACellHeight, ACellWidth, ACellHeight), []);
     end;
 

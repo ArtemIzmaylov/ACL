@@ -16,7 +16,16 @@ unit ACL.UI.Controls.SpinEdit;
 interface
 
 uses
-  Windows, Classes, Controls, Graphics, Types, ImgList, UITypes, Messages, Forms,
+  Winapi.Messages,
+  Winapi.Windows,
+  // System
+  System.Classes,
+  System.Types,
+  System.UITypes,
+  // Vcl
+  Vcl.Controls,
+  Vcl.Forms,
+  Vcl.Graphics,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -204,7 +213,9 @@ type
 implementation
 
 uses
-  Math, Variants, SysUtils,
+  System.Math,
+  System.Variants,
+  System.SysUtils,
   // ACL
   ACL.Geometry,
   ACL.Graphics,

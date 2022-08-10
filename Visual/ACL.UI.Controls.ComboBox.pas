@@ -4,7 +4,7 @@
 {*             Editors Controls              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,15 @@ unit ACL.UI.Controls.ComboBox;
 interface
 
 uses
-  Windows, SysUtils, Classes, Controls, Graphics, Types, ImgList, UITypes, Messages,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.SysUtils,
+  System.Classes,
+  System.Types,
+  // VCL
+  Vcl.Controls,
+  Vcl.Graphics,
   // ACL
   ACL.Graphics.SkinImage,
   ACL.MUI,

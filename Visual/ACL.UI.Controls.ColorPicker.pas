@@ -16,7 +16,15 @@ unit ACL.UI.Controls.ColorPicker;
 interface
 
 uses
-  Windows, UITypes, Types, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
+  Winapi.Windows,
+  // System
+  System.UITypes,
+  System.Types,
+  System.SysUtils,
+  System.Classes,
+  // Vcl
+  Vcl.Graphics,
+  Vcl.Controls,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -304,7 +312,8 @@ type
 implementation
 
 uses
-  Math, Character;
+  System.Math,
+  System.Character;
 
 type
   TACLCustomEditAccess = class(TACLCustomEdit);
@@ -1060,7 +1069,7 @@ const
 var
   R: TRect;
 begin
-  R := Classes.Bounds(CursorPosition.X - AreaSize div 2, CursorPosition.Y - AreaSize div 2, AreaSize, AreaSize);
+  R := System.Classes.Bounds(CursorPosition.X - AreaSize div 2, CursorPosition.Y - AreaSize div 2, AreaSize, AreaSize);
   R := acRectOffset(R, ContentBounds.TopLeft);
 
   ACanvas.Brush.Color := GetCursorColor;

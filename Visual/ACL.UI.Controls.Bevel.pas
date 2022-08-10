@@ -4,7 +4,7 @@
 {*               Bevel Control               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,19 @@ unit ACL.UI.Controls.Bevel;
 interface
 
 uses
-  UITypes, Types, Windows, Messages, SysUtils, Classes, Controls, ImgList, Graphics, ActnList, ExtCtrls,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.Classes,
+  System.SysUtils,
+  System.Types,
+  System.UITypes,
+  // Vcl
+  Vcl.Controls,
+  Vcl.ImgList,
+  Vcl.Graphics,
+  Vcl.ActnList,
+  Vcl.ExtCtrls,
   // ACL
   ACL.Geometry,
   ACL.Graphics,
@@ -81,7 +93,7 @@ type
 implementation
 
 uses
-  Math;
+  System.Math;
 
 { TACLStyleBevel }
 

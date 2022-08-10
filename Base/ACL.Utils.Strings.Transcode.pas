@@ -4,7 +4,7 @@
 {*             Strings Utilities             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,15 @@ unit ACL.Utils.Strings.Transcode;
 interface
 
 uses
-  Windows, SysUtils, Types, Classes, Messages, MultiMon, ACL.Classes;
+  Winapi.Windows,
+  Winapi.Messages,
+  Winapi.MultiMon,
+  // System
+  System.SysUtils,
+  System.Types,
+  System.Classes,
+  // ACL
+  ACL.Classes;
 
 type
 
@@ -125,7 +133,9 @@ type
 implementation
 
 uses
-  Math, Character, AnsiStrings,
+  System.Math,
+  System.Character,
+  System.AnsiStrings,
   // ACL
   ACL.FastCode,
   ACL.Hashes,
@@ -625,7 +635,7 @@ begin
       A := acExtractString(ACursorStart, ACursorFinish);
       if AResult <> '' then
         AResult := AResult + '.';
-      if AnsiStrings.SameText(Copy(A, 1, 4), 'xn--') then
+      if System.AnsiStrings.SameText(Copy(A, 1, 4), 'xn--') then
         AResult := AResult + Decode(Copy(A, 5, MaxInt))
       else
         AResult := AResult + UnicodeString(A);

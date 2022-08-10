@@ -4,7 +4,7 @@
 {*   Clipboard and Data Sharing Utilities    *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,13 @@ unit ACL.Utils.Clipboard;
 interface
 
 uses
-  Windows, Messages, ActiveX, ShellAPI, ShlObj, Classes,
+  Winapi.Windows,
+  Winapi.Messages,
+  Winapi.ActiveX,
+  Winapi.ShlObj,
+  Winapi.ShellAPI,
+  // System
+  System.Classes,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -70,7 +76,8 @@ function acTextToHGLOBAL(const S: UnicodeString): HGLOBAL; overload;
 implementation
 
 uses
-  SysUtils,
+  System.SysUtils,
+  // ACL
   ACL.FastCode,
   ACL.Utils.FileSystem,
   ACL.Utils.Stream,

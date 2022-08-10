@@ -4,7 +4,7 @@
 {*              Date Utilities               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -14,7 +14,7 @@ unit ACL.Utils.Date;
 interface
 
 uses
-  Windows;
+  Winapi.Windows;
 
 type
   TCalendarId = type DWORD;
@@ -51,9 +51,11 @@ type
     class function GetEndOfMonth(const AValue: TDateTime): TDateTime;
     class function GetEndOfYear(const AValue: TDateTime): TDateTime;
     class function GetMonthOfYear(const AValue: TDateTime): Byte;
+    class function GetNearestFutureValue(const ANow, ACurrentValue, ADelta: TDateTime): TDateTime;
     class function GetStartOfMonth(const AValue: TDateTime): TDateTime;
     class function GetStartOfWeek(const AValue: TDateTime): TDateTime;
     class function GetStartOfYear(const AValue: TDateTime): TDateTime;
+    class function InRange(const AValue, AMinDate, AMaxDate{Non-inclusive}: TDateTime): Boolean;
     class function IsWeekend(const AValue: TDateTime): Boolean;
     class function DateTimeToMilliseconds(const AValue: TDateTime): UInt64;
     class function DateTimeToSeconds(const AValue: TDateTime): UInt64;
@@ -70,7 +72,9 @@ type
 implementation
 
 uses
-  Math, DateUtils, SysUtils;
+  System.Math,
+  System.DateUtils,
+  System.SysUtils;
 
 function GetCalendarID(Locale: LCID): TCalendarId; overload;
 begin
@@ -171,7 +175,7 @@ end;
 
 class function TACLDateUtils.GetDayOfMonth(const AValue: TDateTime): Byte;
 begin
-  Result := DateUtils.DayOfTheMonth(AValue);
+  Result := System.DateUtils.DayOfTheMonth(AValue);
 end;
 
 class function TACLDateUtils.GetDayOfWeek(const AValue: TDateTime): Byte;
@@ -210,6 +214,22 @@ begin
   Result := MonthOf(AValue);
 end;
 
+class function TACLDateUtils.GetNearestFutureValue(const ANow, ACurrentValue, ADelta: TDateTime): TDateTime;
+begin
+  if (ADelta < 0) or IsZero(ADelta) then
+    raise EInvalidArgument.Create('Datetime delta must be a positive value');
+
+  Result := ACurrentValue;
+  if Result > ANow then
+  begin
+    while Result - ADelta > ANow do
+      Result := Result - ADelta;
+  end
+  else
+    while Result < ANow do
+      Result := Result + ADelta;
+end;
+
 class function TACLDateUtils.GetStartOfMonth(const AValue: TDateTime): TDateTime;
 begin
   Result := StartOfTheMonth(AValue);
@@ -220,7 +240,7 @@ const
   OffsetDistance: array[TWeekDay] of Integer = (0, 6, 5, 4, 3, 2, 1);
 begin
   Result := AddDays(AValue, OffsetDistance[FFirstDayInWeek]);
-  Result := DateUtils.StartOfTheWeek(Result); // always starts from Monday
+  Result := System.DateUtils.StartOfTheWeek(Result); // always starts from Monday
   Result := AddDays(Result, -OffsetDistance[FFirstDayInWeek]);
 end;
 
@@ -239,6 +259,15 @@ begin
   begin
     FWeekLayout[I] := AIndex;
     AIndex := TWeekDay((Ord(AIndex) + 1) mod (Ord(High(TWeekDay)) - Ord(Low(TWeekDay)) + 1));
+  end;
+end;
+
+class function TACLDateUtils.InRange(const AValue, AMinDate, AMaxDate: TDateTime): Boolean;
+begin
+  try
+    Result := System.Math.InRange(DateTimeToSeconds(AValue), DateTimeToSeconds(AMinDate), DateTimeToSeconds(AMaxDate));
+  except
+    Result := (AValue >= AMinDate) and (AValue <= AMaxDate);
   end;
 end;
 

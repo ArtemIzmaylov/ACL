@@ -4,7 +4,7 @@
 {*              DPI Aware Utils              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,9 +16,9 @@ unit ACL.Utils.DPIAware;
 interface
 
 uses
-  Windows,
+  Winapi.Windows,
 {$IFNDEF ACL_BASE_NOVCL}
-  Graphics,
+  Vcl.Graphics,
 {$ENDIF}
   ACL.Geometry;
 
@@ -57,7 +57,8 @@ uses
 {$IFNDEF ACL_BASE_NOVCL}
   ACL.Graphics,
 {$ENDIF}
-  SysUtils, Math;
+  System.SysUtils,
+  System.Math;
 
 type
 

@@ -4,7 +4,7 @@
 {*           DropSource Component            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,13 @@ unit ACL.UI.DropSource;
 interface
 
 uses
-  Windows, ActiveX, Classes, ComObj, ShlObj, Generics.Collections,
+  Winapi.Windows,
+  Winapi.ActiveX,
+  Winapi.ShlObj,
+  // System
+  System.Classes,
+  System.Generics.Collections,
+  System.Win.ComObj,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -294,7 +300,10 @@ function DropSourceIsActive: Boolean;
 implementation
 
 uses
-  Math, SysUtils, Forms;
+  System.Math,
+  System.SysUtils,
+  // Vcl
+  Vcl.Forms;
 
 type
 

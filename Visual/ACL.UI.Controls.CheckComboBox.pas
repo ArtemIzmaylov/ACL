@@ -4,7 +4,7 @@
 {*             Editors Controls              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,12 @@ unit ACL.UI.Controls.CheckComboBox;
 interface
 
 uses
-  Windows, Classes, Controls, Graphics, Types, ImgList, UITypes, Messages, StdCtrls,
+  System.Classes,
+  System.Types,
+  // VCL
+  Vcl.Controls,
+  Vcl.Graphics,
+  Vcl.StdCtrls,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -158,7 +163,8 @@ type
 implementation
 
 uses
-  Math, SysUtils;
+  System.Math,
+  System.SysUtils;
 
 { TACLCheckComboBoxItem }
 

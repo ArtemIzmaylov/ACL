@@ -4,7 +4,7 @@
 {*                  Images                   *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,14 +16,16 @@ unit ACL.Graphics.Images;
 interface
 
 uses
-  Windows,
-  Types,
-  ActiveX,
-  SysUtils,
-  Classes,
-  Graphics,
-  GDIPOBJ,
-  GDIPAPI,
+  Winapi.Windows,
+  Winapi.ActiveX,
+  Winapi.GDIPOBJ,
+  Winapi.GDIPAPI,
+  // System
+  System.Types,
+  System.SysUtils,
+  System.Classes,
+  // Vcl
+  Vcl.Graphics,
   // ACL
   ACL.Classes,
   ACL.Classes.ByteBuffer,
@@ -300,7 +302,8 @@ function acGraphicToBitmap(AGraphic: TGraphic): TACLBitmap;
 implementation
 
 uses
-  Math,
+  System.Math,
+  // ACL
   ACL.FastCode,
   ACL.Math,
   ACL.Utils.FileSystem,

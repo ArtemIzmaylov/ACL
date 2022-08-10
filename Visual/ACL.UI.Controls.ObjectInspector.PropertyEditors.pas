@@ -4,7 +4,7 @@
 {*             Object Inspector              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,15 @@ unit ACL.UI.Controls.ObjectInspector.PropertyEditors;
 interface
 
 uses
-  TypInfo, Types, Classes, Graphics, Dialogs, Controls, Generics.Collections, Contnrs,
+  // System
+  System.TypInfo,
+  System.Types,
+  System.Classes,
+  System.Generics.Collections,
+  System.Contnrs,
+  // VCL
+  Vcl.Graphics,
+  Vcl.Controls,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -321,7 +329,9 @@ type
 implementation
 
 uses
-  SysUtils, ACL.Geometry;
+  System.SysUtils,
+  // ACL
+  ACL.Geometry;
 
 type
   TACLInplaceCheckBoxAccess = class(TACLInplaceCheckBox);

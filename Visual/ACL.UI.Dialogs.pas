@@ -4,7 +4,7 @@
 {*          Common Dialogs Wrappes           *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -17,8 +17,29 @@ unit ACL.UI.Dialogs;
 interface
 
 uses
-  Types, Windows, Messages, SysUtils, Classes, Controls, StdCtrls, Graphics, Math, Forms, ImgList, ExtCtrls, ActnList,
-  Menus, CommDlg, ActiveX, ShlObj, Generics.Collections, Variants, Dialogs, Consts,
+  Winapi.ActiveX,
+  Winapi.CommDlg,
+  Winapi.Messages,
+  Winapi.ShlObj,
+  Winapi.Windows,
+  // System
+  System.Classes,
+  System.Generics.Collections,
+  System.Math,
+  System.SysUtils,
+  System.Types,
+  System.Variants,
+  // Vcl
+  Vcl.ActnList,
+  Vcl.Consts,
+  Vcl.Controls,
+  Vcl.Dialogs,
+  Vcl.ExtCtrls,
+  Vcl.Forms,
+  Vcl.Graphics,
+  Vcl.ImgList,
+  Vcl.Menus,
+  Vcl.StdCtrls,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,

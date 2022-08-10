@@ -4,7 +4,7 @@
 {*          Compoud Control Classes          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,16 @@ unit ACL.UI.Controls.CompoundControl;
 interface
 
 uses
-  Types, Windows, Classes, Messages, Graphics, Controls, StdCtrls, Forms,
+  Winapi.Messages,
+  Winapi.Windows,
+  // System
+  System.Classes,
+  System.Types,
+  // Vcl
+  Vcl.Controls,
+  Vcl.Forms,
+  Vcl.Graphics,
+  Vcl.StdCtrls,
   // ACL
   ACL.MUI,
   ACL.Geometry,
@@ -137,7 +146,10 @@ type
 implementation
 
 uses
-  SysUtils, ACL.Utils.Common, ACL.Graphics;
+  System.SysUtils,
+  // ACL
+  ACL.Graphics,
+  ACL.Utils.Common;
 
 type
   TACLCompoundControlSubClassAccess = class(TACLCompoundControlSubClass);

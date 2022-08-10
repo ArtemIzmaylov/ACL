@@ -4,20 +4,28 @@
 {*             Splitter Control              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.Splitter;
 
-{$I ACL.Config.INC}
+{$I ACL.Config.inc}
 
 interface
 
 uses
-  Types, Windows, SysUtils, Classes, Controls, Messages, Graphics, ImgList,
-  ActnList, Menus, Forms,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.Classes,
+  System.SysUtils,
+  System.Types,
+  System.Math,
+  // Vcl
+  Vcl.Controls,
+  Vcl.Graphics,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -128,7 +136,7 @@ type
 implementation
 
 uses
-  Math, ACL.Utils.Desktop;
+  ACL.Utils.Desktop;
 
 { TACLSplitter }
 

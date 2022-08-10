@@ -4,7 +4,7 @@
 {*            Shell Browse Dialog            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,8 +16,26 @@ unit ACL.UI.Dialogs.FolderBrowser;
 interface
 
 uses
-  Windows, SysUtils, Classes, Controls, Graphics, Messages, Math, StdCtrls, ActiveX, ComObj, ShlObj, ImgList, Themes,
-  ShellApi, AnsiStrings, Forms, Dialogs, Types,
+  Winapi.ActiveX,
+  Winapi.Messages,
+  Winapi.ShellApi,
+  Winapi.ShlObj,
+  Winapi.Windows,
+  // System
+  System.AnsiStrings,
+  System.Classes,
+  System.Math,
+  System.SysUtils,
+  System.Types,
+  System.Win.ComObj,
+  // Vcl
+  Vcl.Controls,
+  Vcl.Dialogs,
+  Vcl.Forms,
+  Vcl.Graphics,
+  Vcl.ImgList,
+  Vcl.StdCtrls,
+  Vcl.Themes,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,

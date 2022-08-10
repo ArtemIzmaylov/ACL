@@ -4,7 +4,7 @@
 {*     Formatted Text based on BB Codes      *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,17 +16,18 @@ unit ACL.Graphics.TextLayout;
 interface
 
 uses
-  Windows,
-  UITypes,
-  Classes,
-  Generics.Collections,
-  Generics.Defaults,
-  Graphics,
-  Math,
-  SysUtils,
-  Types,
-  // RegExp
-  RegularExpressions,
+  Winapi.Windows,
+  // System
+  System.UITypes,
+  System.Classes,
+  System.Generics.Collections,
+  System.Generics.Defaults,
+  System.Math,
+  System.SysUtils,
+  System.Types,
+  System.RegularExpressions,
+  // VCL
+  Vcl.Graphics,
   // ACL
   ACL.Classes.Collections,
   ACL.Classes.StringList,

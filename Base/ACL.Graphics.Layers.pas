@@ -4,7 +4,7 @@
 {*               Bitmap Layers               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,16 @@ unit ACL.Graphics.Layers;
 interface
 
 uses
-  UITypes, Types, Windows, SysUtils, Classes, Graphics, Messages, Math,
+  Winapi.Messages,
+  Winapi.Windows,
+  // System
+  System.Classes,
+  System.Math,
+  System.SysUtils,
+  System.Types,
+  System.UITypes,
+  // VCL
+  Vcl.Graphics,
   // ACL
   ACL.Classes.Collections,
   ACL.Graphics,

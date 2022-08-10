@@ -4,7 +4,7 @@
 {*          Compoud Control Classes          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,15 @@ unit ACL.UI.Controls.CompoundControl.SubClass.ContentCells;
 interface
 
 uses
-  Windows, SysUtils, Types, Classes, Controls, Graphics, Generics.Collections,
+  Winapi.Windows,
+  // System
+  System.SysUtils,
+  System.Types,
+  System.Classes,
+  System.Generics.Collections,
+  // Vcl
+  Vcl.Controls,
+  Vcl.Graphics,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -148,7 +156,7 @@ type
 implementation
 
 uses
-  Math;
+  System.Math;
 
 { TACLCompoundControlSubClassBaseContentCell }
 
@@ -177,7 +185,7 @@ end;
 
 function TACLCompoundControlSubClassBaseContentCell.GetClientBounds: TRect;
 begin
-  Result := Types.Bounds(0, Top, ViewInfo.Owner.GetContentWidth, Height);
+  Result := System.Types.Bounds(0, Top, ViewInfo.Owner.GetContentWidth, Height);
 end;
 
 function TACLCompoundControlSubClassBaseContentCell.GetBounds: TRect;

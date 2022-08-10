@@ -4,7 +4,7 @@
 {*                 Text Editor               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,15 @@ unit ACL.UI.Controls.TextEdit;
 interface
 
 uses
-  Windows, Messages, StdCtrls, UITypes, Classes, Types, Controls, Graphics, Forms, Menus,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.UITypes,
+  System.Classes,
+  System.Types,
+  // Vcl
+  Vcl.Controls,
+  Vcl.Graphics,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -153,7 +161,11 @@ type
 implementation
 
 uses
-  Math, Character, Consts, SysUtils;
+  Vcl.Consts,
+  // System
+  System.Math,
+  System.Character,
+  System.SysUtils;
 
 type
   TACLInnerEditAccess = class(TACLInnerEdit);

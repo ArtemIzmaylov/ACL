@@ -4,7 +4,7 @@
 {*               Panel Control               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,20 +16,18 @@ unit ACL.UI.Controls.Panel;
 interface
 
 uses
-  Types, Windows, SysUtils, Classes, Controls, Messages, StdCtrls, ImgList, Menus, Generics.Collections, Consts,
-  ActnList, Graphics, Math, Forms, Dialogs, CommCtrl, ExtCtrls, Themes,
+  System.Types,
+  System.SysUtils,
+  System.Classes,
+  System.Math,
+  // VCL
+  Vcl.Controls,
+  Vcl.Consts,
+  Vcl.Graphics,
   // ACL
   ACL.Classes,
-  ACL.Classes.Collections,
-  ACL.Classes.StringList,
-  ACL.Geometry,
-  ACL.Graphics,
-  ACL.Graphics.SkinImage,
   ACL.UI.Controls.BaseControls,
-  ACL.UI.Controls.Buttons,
-  ACL.UI.Resources,
-  ACL.Utils.Common,
-  ACL.Utils.FileSystem;
+  ACL.Utils.Common;
 
 type
 

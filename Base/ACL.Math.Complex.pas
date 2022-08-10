@@ -4,7 +4,7 @@
 {*           Mathematics Routines            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -20,7 +20,7 @@ unit ACL.Math.Complex;
 interface
 
 uses
-  Windows;
+  Winapi.Windows;
 
 const
   PowerOfTwoMax = 15; // supported by FFT Engine
@@ -104,7 +104,9 @@ const
 implementation
 
 uses
-  SysUtils, ACL.Utils.Common;
+  System.SysUtils,
+  // ACL
+  ACL.Utils.Common;
 
 const
   TwoPower: array[0..PowerOfTwoMax] of Integer = (

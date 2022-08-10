@@ -4,22 +4,32 @@
 {*            Graphics Utilities             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.Graphics;
 
-{$I ACL.Config.INC}
+{$I ACL.Config.inc}
 
 interface
 
 uses
+  Winapi.GDIPAPI,
+  Winapi.Windows,
+  Winapi.Messages,
+  // Vcl
+  Vcl.Graphics,
 {$IFNDEF ACL_BASE_NOVCL}
-  Controls,
+  Vcl.Controls,
 {$ENDIF}
-  System.UITypes, Winapi.GDIPAPI, Types, Windows, SysUtils, Classes, Graphics, Messages, Math,
+  // System
+  System.UITypes,
+  System.Types,
+  System.SysUtils,
+  System.Classes,
+  System.Math,
   // ACL
   ACL.Classes.Collections,
   ACL.Geometry,
@@ -766,7 +776,7 @@ end;
 
 function acRectVisible(DC: HDC; const R: TRect): Boolean;
 begin
-  Result := not R.IsEmpty and Windows.RectVisible(DC, R);
+  Result := not R.IsEmpty and Winapi.Windows.RectVisible(DC, R);
 end;
 
 procedure acRestoreClipRegion(DC: HDC; ARegion: HRGN);

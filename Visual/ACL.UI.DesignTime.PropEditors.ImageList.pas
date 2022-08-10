@@ -4,7 +4,7 @@
 {*         ImageList Property Editor         *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,8 +16,30 @@ unit ACL.UI.DesignTime.PropEditors.ImageList;
 interface
 
 uses
-  Types, Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms, Dialogs, ComCtrls, StdCtrls,
-  ExtCtrls, ToolWin, Actions, ActnList, ImgList, Menus, ExtDlgs, Generics.Collections, Generics.Defaults, ImageList,
+  Winapi.Messages,
+  Winapi.Windows,
+  // System
+  System.Actions,
+  System.Classes,
+  System.Generics.Collections,
+  System.Generics.Defaults,
+  System.ImageList,
+  System.SysUtils,
+  System.Types,
+  System.Variants,
+  // VCL
+  Vcl.ActnList,
+  Vcl.ComCtrls,
+  Vcl.Controls,
+  Vcl.Dialogs,
+  Vcl.ExtCtrls,
+  Vcl.ExtDlgs,
+  Vcl.Forms,
+  Vcl.Graphics,
+  Vcl.ImgList,
+  Vcl.Menus,
+  Vcl.StdCtrls,
+  Vcl.ToolWin,
   // ACL
   ACL.Classes.Collections,
   ACL.Geometry,
@@ -105,7 +127,7 @@ type
 implementation
 
 uses
-  Math;
+  System.Math;
 
 {$R *.dfm}
 

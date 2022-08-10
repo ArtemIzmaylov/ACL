@@ -4,7 +4,7 @@
 {*       Sharable SkinImageSet  Class        *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,15 @@ unit ACL.Graphics.SkinImageSet;
 interface
 
 uses
-  Windows, UITypes, Types, Classes, Graphics, Generics.Collections,
+  Winapi.Windows,
+  Winapi.GDIPAPI,
+  // System
+  System.UITypes,
+  System.Types,
+  System.Classes,
+  System.Generics.Collections,
+  // VCL
+  Vcl.Graphics,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -130,7 +138,9 @@ var
 implementation
 
 uses
-  SysUtils, Math, GDIPAPI, Generics.Defaults;
+  System.SysUtils,
+  System.Math,
+  System.Generics.Defaults;
 
 const
   sErrorCannotDeleteLastImage = 'You cannot delete the last image';

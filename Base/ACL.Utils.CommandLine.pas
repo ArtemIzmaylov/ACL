@@ -4,7 +4,7 @@
 {*          Command Line Processor           *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,10 @@ unit ACL.Utils.CommandLine;
 interface
 
 uses
-  SysUtils, Windows, Generics.Collections,
+  Winapi.Windows,
+  // System
+  System.SysUtils,
+  System.Generics.Collections,
   // ACL
   ACL.Classes.Collections,
   ACL.Classes.StringList,
@@ -128,7 +131,7 @@ function GetCommandLineParams: string;
 implementation
 
 uses
-  Math;
+  System.Math;
 
 function FindSwitch(const ACmdLine, ASwitch: UnicodeString): Boolean;
 var

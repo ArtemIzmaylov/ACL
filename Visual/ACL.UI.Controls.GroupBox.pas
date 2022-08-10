@@ -4,7 +4,7 @@
 {*             GroupBox Controls             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,18 @@ unit ACL.UI.Controls.GroupBox;
 interface
 
 uses
-  Types, Windows, SysUtils, Classes, Controls, Messages, StdCtrls, ImgList, Graphics, Math,
+  Winapi.Messages,
+  Winapi.Windows,
+  // System
+  System.Classes,
+  System.Math,
+  System.SysUtils,
+  System.Types,
+  // Vcl
+  Vcl.Controls,
+  Vcl.Graphics,
+  Vcl.ImgList,
+  Vcl.StdCtrls,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,

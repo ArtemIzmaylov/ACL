@@ -4,7 +4,7 @@
 {*       Material Design like Palette        *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -22,11 +22,17 @@ unit ACL.Graphics.Palette;
 interface
 
 uses
-  Types, Windows, SysUtils, Classes, Graphics, Math,
-  // Generics
-  Generics.Collections,
-  Generics.Defaults,
-  //
+  Winapi.Windows,
+  // System
+  System.Classes,
+  System.Generics.Collections,
+  System.Generics.Defaults,
+  System.Math,
+  System.SysUtils,
+  System.Types,
+  // VCL
+  Vcl.Graphics,
+  // ACL
   ACL.Classes.Collections,
   ACL.Graphics,
   ACL.Graphics.Layers,

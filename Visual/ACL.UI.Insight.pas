@@ -17,8 +17,22 @@ unit ACL.UI.Insight;
 interface
 
 uses
-  Windows, Messages, Actions, UITypes, Generics.Collections, Generics.Defaults, ActnList,
-  SysUtils, Menus, Classes, Types, Controls, Graphics, Forms,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.Actions,
+  System.UITypes,
+  System.Generics.Collections,
+  System.Generics.Defaults,
+  System.SysUtils,
+  System.Classes,
+  System.Types,
+  // Vcl
+  Vcl.ActnList,
+  Vcl.Menus,
+  Vcl.Controls,
+  Vcl.Graphics,
+  Vcl.Forms,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -182,7 +196,8 @@ type
 implementation
 
 uses
-  TypInfo, Math;
+  System.TypInfo,
+  System.Math;
 
 type
 

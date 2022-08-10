@@ -16,7 +16,10 @@ unit ACL.DataBroadcaster;
 interface
 
 uses
-  Windows, Messages, Classes, Generics.Collections,
+  Winapi.Windows,
+  Winapi.Messages,
+  System.Classes,
+  System.Generics.Collections,
   // ACL
   ACL.Classes.Collections,
   ACL.Threading,
@@ -67,7 +70,7 @@ function SendDataToHandle(AHandle: HWND; const AData: UnicodeString; ID: Cardina
 implementation
 
 uses
-  SysUtils;
+  System.SysUtils;
 
 const
   SendDataID = 753;

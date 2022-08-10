@@ -17,7 +17,13 @@ unit ACL.Utils.FileSystem;
 interface
 
 uses
-  Types, Windows, Classes, SysUtils, SyncObjs, Generics.Collections,
+  Winapi.Windows,
+  // System
+  System.Types,
+  System.Classes,
+  System.SysUtils,
+  System.SyncObjs,
+  System.Generics.Collections,
   // ACL
   ACL.Classes,
   ACL.Classes.ByteBuffer,
@@ -278,7 +284,9 @@ procedure acClearFileLongPath(out W: TFileLongPath);
 implementation
 
 uses
-  Math, RTLConsts, Character,
+  System.Character,
+  System.Math,
+  System.RTLConsts,
   // ACL
   ACL.FastCode,
   ACL.FileFormats.INI,
@@ -1221,7 +1229,7 @@ destructor TACLFindFileInfo.Destroy;
 begin
   if FFindHandle <> INVALID_HANDLE_VALUE then
   begin
-    Windows.FindClose(FFindHandle);
+    Winapi.Windows.FindClose(FFindHandle);
     FFindHandle := INVALID_HANDLE_VALUE;
   end;
   inherited Destroy;
@@ -1612,7 +1620,7 @@ begin
   try
     Result := AData.dwFileAttributes and FILE_ATTRIBUTE_DIRECTORY = 0;
   finally
-    Windows.FindClose(AHandle);
+    Winapi.Windows.FindClose(AHandle);
   end;
 end;
 

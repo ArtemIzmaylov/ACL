@@ -4,7 +4,7 @@
 {*           Thread Pool Routines            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,14 @@ unit ACL.Threading.Pool;
 interface
 
 uses
-  SyncObjs, Types, Windows, SysUtils, Classes, Generics.Collections, Generics.Defaults,
+  Winapi.Windows,
+  // System
+  System.SyncObjs,
+  System.Types,
+  System.SysUtils,
+  System.Classes,
+  System.Generics.Collections,
+  System.Generics.Defaults,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -152,7 +159,7 @@ function TaskDispatcher: TACLTaskDispatcher;
 implementation
 
 uses
-  Math;
+  System.Math;
 
 type
 

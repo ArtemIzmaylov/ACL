@@ -4,7 +4,7 @@
 {*             Parsers Routines              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,12 @@ unit ACL.Parsers;
 interface
 
 uses
-  Windows, Generics.Collections, Generics.Defaults, Math;
+  Winapi.Windows,
+  // System
+  System.Generics.Collections,
+  System.Generics.Defaults,
+  System.Math,
+  System.SysUtils;
 
 const
   acParserDefaultSpaceChars = ' '#13#10#9#0;
@@ -119,7 +124,7 @@ function acCompareTokens(const S1, S2: UnicodeString): Boolean; overload;
 implementation
 
 uses
-  ACL.Utils.Strings, SysUtils;
+  ACL.Utils.Strings;
 
 function acExtractLine(var P: PWideChar; var C: Integer; out AToken: TACLParserToken): Boolean;
 begin

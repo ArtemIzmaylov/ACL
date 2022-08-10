@@ -16,8 +16,11 @@ unit ACL.Utils.Stream;
 interface
 
 uses
-  Windows, SysUtils, Classes,
-  //
+  Winapi.Windows,
+  // System
+  System.SysUtils,
+  System.Classes,
+  // ACL
   ACL.Classes,
   ACL.Classes.ByteBuffer,
   ACL.Threading,
@@ -278,7 +281,8 @@ function acSaveString(const AFileName: UnicodeString; const AString: AnsiString)
 implementation
 
 uses
-  Math, RTLConsts,
+  System.Math,
+  System.RTLConsts,
   // ACL
   ACL.Math,
   ACL.FastCode,

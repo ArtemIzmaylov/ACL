@@ -4,7 +4,7 @@
 {*              CSV File Format              *}
 {*                                           *}
 {*           (c) Artem Izmaylov              *}
-{*                2021-2021                  *}
+{*                2021-2022                  *}
 {*               www.aimp.ru                 *}
 {*                                           *}
 {*********************************************}
@@ -16,11 +16,11 @@ unit ACL.FileFormats.CSV;
 interface
 
 uses
-  Classes,
-  Math,
-  StrUtils,
-  SysUtils,
-  Variants,
+  System.Classes,
+  System.Math,
+  System.StrUtils,
+  System.SysUtils,
+  System.Variants,
   // ACL
   ACL.Utils.Common,
   ACL.Utils.FileSystem,
@@ -103,7 +103,8 @@ type
     procedure WriteSeparatorIfNecessary;
   public
     constructor Create(const AFileName: string; const ASettings: TACLCSVDocumentSettings); overload;
-    constructor Create(const AStream: TStream; const ASettings: TACLCSVDocumentSettings; AStreamOwnership: TStreamOwnership = soReference); overload;
+    constructor Create(const AStream: TStream; const ASettings: TACLCSVDocumentSettings;
+      AStreamOwnership: TStreamOwnership = soReference); overload;
     destructor Destroy; override;
     procedure NewRow;
     procedure PutValue(const AValue: Boolean); overload;

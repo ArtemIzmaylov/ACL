@@ -4,7 +4,7 @@
 {*               User Accounts               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,12 @@ unit ACL.Utils.Shell.UserAccounts;
 interface
 
 uses
-  Windows, SysUtils, ShlObj, ACL.Classes.Collections;
+  Winapi.Windows,
+  Winapi.ShlObj,
+  // System
+  System.SysUtils,
+  // ACL
+  ACL.Classes.Collections;
 
 type
 

@@ -4,7 +4,7 @@
 {*             ScrollBox Control             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2022                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,7 +16,15 @@ unit ACL.UI.Controls.ScrollBox;
 interface
 
 uses
-  UITypes, Types, Windows, Messages, Classes, Graphics, Controls,
+  Winapi.Windows,
+  Winapi.Messages,
+  // System
+  System.Classes,
+  System.UITypes,
+  System.Types,
+  // Vcl
+  Vcl.Graphics,
+  Vcl.Controls,
   // ACL
   ACL.Geometry,
   ACL.Graphics,
@@ -141,7 +149,10 @@ type
 implementation
 
 uses
-  Forms, Math, SysUtils;
+  Vcl.Forms,
+  // System
+  System.Math,
+  System.SysUtils;
 
 function acGetClientRectOnWindow(AHandle: HWND): TRect;
 var
