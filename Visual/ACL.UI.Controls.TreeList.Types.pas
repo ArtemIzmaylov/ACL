@@ -447,6 +447,7 @@ type
     procedure DeleteChildren; virtual;
     procedure DeleteValues; virtual;
     procedure ExpandCollapseChildren(AExpanded, ARecursive: Boolean);
+    function EnumChildrenData<T: class>: IACLEnumerable<T>;
     function IsChild(ANode: TACLTreeListNode): Boolean;
     // Search
     function Find(const AData: Pointer; ARecursive: Boolean = True): TACLTreeListNode; overload;
@@ -524,6 +525,24 @@ type
     //
     property CheckState: TCheckBoxState read GetCheckState write SetCheckState;
     property Items[Index: Integer]: TACLTreeListNode read GetItem; default;
+  end;
+
+  { TACLTreeListNodesDataEnumerator }
+
+  TACLTreeListNodesDataEnumerator<T: class> = class(TInterfacedObject,
+    IACLEnumerable<T>,
+    IACLEnumerator<T>)
+  strict private
+    FIndex: Integer;
+    FList: TACLTreeListNodeList;
+
+    // IACLEnumerable<T>
+    function GetEnumerator: IACLEnumerator<T>;
+    // IACLEnumerator<T>
+    function GetCurrent: T;
+    function MoveNext: Boolean;
+  public
+    constructor Create(AList: TACLTreeListNodeList);
   end;
 
 implementation
@@ -1517,6 +1536,12 @@ begin
     ARecursive);
 end;
 
+function TACLTreeListNode.EnumChildrenData<T>: IACLEnumerable<T>;
+begin
+  ChildrenNeeded;
+  Result := TACLTreeListNodesDataEnumerator<T>.Create(FSubNodes);
+end;
+
 function TACLTreeListNode.IsChild(ANode: TACLTreeListNode): Boolean;
 var
   I: Integer;
@@ -2131,6 +2156,30 @@ begin
       AOwner.EndUpdate;
     end;
   end;
+end;
+
+{ TACLTreeListNodesDataEnumerator<T> }
+
+constructor TACLTreeListNodesDataEnumerator<T>.Create(AList: TACLTreeListNodeList);
+begin
+  FList := AList;
+  FIndex := -1;
+end;
+
+function TACLTreeListNodesDataEnumerator<T>.GetCurrent: T;
+begin
+  Result := FList[FIndex].Data;
+end;
+
+function TACLTreeListNodesDataEnumerator<T>.GetEnumerator: IACLEnumerator<T>;
+begin
+  Result := Self;
+end;
+
+function TACLTreeListNodesDataEnumerator<T>.MoveNext: Boolean;
+begin
+  Inc(FIndex);
+  Result := (FList <> nil) and InRange(FIndex, 0, FList.Count - 1);
 end;
 
 end.

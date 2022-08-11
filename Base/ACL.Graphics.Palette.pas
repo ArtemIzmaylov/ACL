@@ -56,15 +56,14 @@ type
 
   { TACLPaletteSwatches }
 
-  TACLPaletteSwatches = class(TEnumerable<TACLPaletteSwatch>)
+  TACLPaletteSwatches = class(TACLEnumerable<TACLPaletteSwatch>)
   strict private
-    FData: TDictionary<Integer, TACLPaletteSwatch>;
-  protected
-    function DoGetEnumerator: TEnumerator<TACLPaletteSwatch>; override;
+    FData: TACLDictionary<Integer, TACLPaletteSwatch>;
   public
     constructor Create;
     destructor Destroy; override;
     procedure Add(const H, S, L: Byte);
+    function GetEnumerator: IACLEnumerator<TACLPaletteSwatch>; override;
   end;
 
   { TACLPalette }
@@ -165,7 +164,7 @@ end;
 
 constructor TACLPaletteSwatches.Create;
 begin
-  FData := TDictionary<Integer, TACLPaletteSwatch>.Create(1024);
+  FData := TACLDictionary<Integer, TACLPaletteSwatch>.Create(1024);
 end;
 
 destructor TACLPaletteSwatches.Destroy;
@@ -194,9 +193,9 @@ begin
   FData.AddOrSetValue(AKey, AValue);
 end;
 
-function TACLPaletteSwatches.DoGetEnumerator: TEnumerator<TACLPaletteSwatch>;
+function TACLPaletteSwatches.GetEnumerator: IACLEnumerator<TACLPaletteSwatch>;
 begin
-  Result := FData.Values.GetEnumerator;
+  Result := FData.GetValues.GetEnumerator;
 end;
 
 { TACLPalette }
