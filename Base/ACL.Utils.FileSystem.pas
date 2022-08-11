@@ -167,7 +167,8 @@ type
 
   TACLBufferedFileStream = class(TACLBufferedStream)
   public
-    constructor Create(const AFileName: string; Mode: Word); reintroduce;
+    constructor Create(const AFileName: string; AMode: Word;
+      ABufferSize: Integer = TACLBufferedStream.DefaultBufferSize); reintroduce;
   end;
 
   { TACLClippedFileStream }
@@ -1480,9 +1481,9 @@ end;
 
 { TACLBufferedFileStream }
 
-constructor TACLBufferedFileStream.Create(const AFileName: string; Mode: Word);
+constructor TACLBufferedFileStream.Create(const AFileName: string; AMode: Word; ABufferSize: Integer);
 begin
-  inherited Create(TACLFileStream.Create(AFileName, Mode));
+  inherited Create(TACLFileStream.Create(AFileName, AMode), soOwned, ABufferSize);
 end;
 
 { TACLClippedFileStream }
