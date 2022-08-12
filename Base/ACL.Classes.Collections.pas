@@ -35,6 +35,22 @@ const
   sErrorValueWasNotFoundInMap = 'This value was not found in map';
 
 type
+  // Стандартные IEnumerable<T> зачем-то наследуются от IEnumerable,
+  // заставляя нас реализовывать ненужные оверлоады.
+
+  { IACLEnumerator<T> }
+
+  IACLEnumerator<T> = interface
+    function GetCurrent: T;
+    function MoveNext: Boolean;
+    property Current: T read GetCurrent;
+  end;
+
+  { IACLEnumerable<T> }
+
+  IACLEnumerable<T> = interface
+    function GetEnumerator: IACLEnumerator<T>;
+  end;
 
   { TACLArrayManager }
 
@@ -43,6 +59,15 @@ type
     procedure Move(var AArray: array of T; FromIndex, ToIndex, Count: Integer); overload; virtual; abstract;
     procedure Move(var FromArray, ToArray: array of T; FromIndex, ToIndex, Count: Integer); overload; virtual; abstract;
     procedure Finalize(var AArray: array of T; Index, Count: Integer); virtual; abstract;
+  end;
+
+  { TACLEnumerable }
+
+  TACLEnumerable<T> = class(TACLUnknownObject, IACLEnumerable<T>)
+  public
+    // IACLEnumerable<T>
+    function GetEnumerator: IACLEnumerator<T>; virtual; abstract;
+    function ToArray: TArray<T>; virtual;
   end;
 
   { TACLMoveArrayManager }
@@ -129,7 +154,7 @@ type
 
   TACLListCompareProc<T> = reference to function (const Left, Right: T): Integer;
 
-  TACLList<T> = class(TEnumerable<T>)
+  TACLList<T> = class(TACLEnumerable<T>)
   strict private type
   {$REGION 'Private Types'}
     TListItems = array of T;
@@ -165,13 +190,14 @@ type
     FNotifications: Boolean;
 
     procedure DeleteRangeCore(AIndex, ACount: Integer; AAction: TCollectionNotification);
-    function DoGetEnumerator: TEnumerator<T>; override;
+
     procedure Notify(const Item: T; Action: TCollectionNotification); virtual;
     procedure UpdateNotificationFlag; virtual;
   public
     constructor Create; overload;
     constructor Create(const AComparer: IComparer<T>); overload;
     destructor Destroy; override;
+    function GetEnumerator: IACLEnumerator<T>; override;
 
     // Adding
     function Add(const Value: T): Integer;
@@ -218,13 +244,14 @@ type
 
   { TACLListEnumerator }
 
-  TACLListEnumerator<T> = class(TEnumerator<T>)
+  TACLListEnumerator<T> = class(TInterfacedObject, IACLEnumerator<T>)
   strict private
     FOwner: TACLList<T>;
     FIndex: Integer;
   protected
-    function DoGetCurrent: T; override;
-    function DoMoveNext: Boolean; override;
+    // IACLEnumerator<T>
+    function GetCurrent: T;
+    function MoveNext: Boolean;
   public
     constructor Create(AOwner: TACLList<T>);
   end;
@@ -315,20 +342,40 @@ type
 
   TACLPairEnum<TKey, TValue> = reference to procedure (const Key: TKey; const Value: TValue);
 
-  TACLDictionary<TKey, TValue> = class(TEnumerable<TPair<TKey, TValue>>)
+  TACLDictionary<TKey, TValue> = class(TACLEnumerable<TPair<TKey, TValue>>)
   strict private const
     EMPTY_HASH = -1;
   strict private type
   {$REGION 'Internal Types'}
-    TEnumerator = class(TEnumerator<TPair<TKey, TValue>>)
-    strict private
+
+    TCustomEnumerator = class(TInterfacedObject)
+    protected
       FIndex: Integer;
       FOwner: TACLDictionary<TKey, TValue>;
-    protected
-      function DoGetCurrent: TPair<TKey, TValue>; override;
-      function DoMoveNext: Boolean; override;
     public
       constructor Create(AOwner: TACLDictionary<TKey, TValue>);
+      function MoveNext: Boolean;
+    end;
+
+    TPairEnumerator = class(TCustomEnumerator, IACLEnumerator<TPair<TKey, TValue>>)
+    public
+      function GetCurrent: TPair<TKey, TValue>;
+    end;
+
+    TKeyEnumerator = class(TCustomEnumerator,
+      IACLEnumerable<TKey>,
+      IACLEnumerator<TKey>)
+    public
+      function GetCurrent: TKey;
+      function GetEnumerator: IACLEnumerator<TKey>;
+    end;
+
+    TValueEnumerator = class(TCustomEnumerator,
+      IACLEnumerable<TValue>,
+      IACLEnumerator<TValue>)
+    public
+      function GetCurrent: TValue;
+      function GetEnumerator: IACLEnumerator<TValue>;
     end;
 
     PItem = ^TItem;
@@ -338,6 +385,7 @@ type
       Value: TValue;
     end;
     TItemArray = array of TItem;
+
   {$ENDREGION}
   strict private
     FComparer: IEqualityComparer<TKey>;
@@ -362,7 +410,6 @@ type
     procedure SetItem(const Key: TKey; const Value: TValue);
   protected
     function DoAdd(const Key: TKey; const Value: TValue; ADuplicates: TDuplicates): Boolean;
-    function DoGetEnumerator: TEnumerator<TPair<TKey, TValue>>; override;
     procedure KeyNotify(const Key: TKey; Action: TCollectionNotification); virtual;
     procedure SetCapacity(ACapacity: Integer); virtual;
     procedure ValueNotify(const Value: TValue; Action: TCollectionNotification); virtual;
@@ -380,7 +427,13 @@ type
     procedure Clear(AKeepCapacity: Boolean = False); virtual;
     function ContainsKey(const Key: TKey): Boolean;
     function ContainsValue(const Value: TValue): Boolean;
+
+    // Enums
     procedure Enum(const AProc: TACLPairEnum<TKey, TValue>); virtual;
+    function GetEnumerator: IACLEnumerator<TPair<TKey, TValue>>; override;
+    function GetKeys: IACLEnumerable<TKey>; virtual;
+    function GetValues: IACLEnumerable<TValue>; virtual;
+
     procedure Remove(const Key: TKey);
     procedure TrimExcess;
     function TryExtract(const Key: TKey; out Value: TValue): Boolean;
@@ -474,12 +527,7 @@ type
 
   { TACLCustomHashSet }
 
-  TACLCustomHashSet<T> = class(TEnumerable<T>, IUnknown)
-  strict private
-    // IUnknown
-    function QueryInterface(const IID: TGUID; out Obj): HRESULT; virtual; stdcall;
-    function _AddRef: Integer; stdcall;
-    function _Release: Integer; stdcall;
+  TACLCustomHashSet<T> = class(TACLEnumerable<T>)
   protected
     function GetCount: Integer; virtual; abstract;
   public
@@ -501,15 +549,14 @@ type
     EMPTY_HASH = -1;
   strict private type
   {$REGION 'Internal Types'}
-    TEnumerator = class(TEnumerator<T>)
+    TEnumerator = class(TInterfacedObject, IACLEnumerator<T>)
     strict private
       FIndex: Integer;
       FOwner: TACLHashSet<T>;
-    protected
-      function DoGetCurrent: T; override;
-      function DoMoveNext: Boolean; override;
     public
       constructor Create(AOwner: TACLHashSet<T>);
+      function GetCurrent: T;
+      function MoveNext: Boolean;
     end;
     TItem = record
       HashCode: Integer;
@@ -532,7 +579,6 @@ type
     function Hash(const Item: T): Integer; inline;
     procedure SetCapacity(AValue: Integer);
   protected
-    function DoGetEnumerator: TEnumerator<T>; override;
     function GetCount: Integer; override;
   public
     constructor Create(AInitialCapacity: Integer = 0); overload;
@@ -542,6 +588,7 @@ type
     function Contains(const Item: T): Boolean; override;
     function Exclude(const Item: T): Boolean; override;
     function Include(const Item: T): Boolean; override;
+    function GetEnumerator: IACLEnumerator<T>; override;
   end;
 
   { TACLStringSet }
@@ -631,6 +678,32 @@ type
   { TACLOrderedDictionary }
 
   TACLOrderedDictionary<TKey, TValue> = class(TACLDictionary<TKey, TValue>)
+  strict private type
+  {$REGION 'Internal Types'}
+
+    TEnumerator = class(TInterfacedObject)
+    protected
+      FIndex: Integer;
+      FOwner: TACLOrderedDictionary<TKey, TValue>;
+    public
+      constructor Create(AOwner: TACLOrderedDictionary<TKey, TValue>);
+      function MoveNext: Boolean;
+    end;
+
+    TPairEnumerator = class(TEnumerator, IACLEnumerator<TPair<TKey, TValue>>)
+    public
+      function GetCurrent: TPair<TKey, TValue>;
+    end;
+
+    TValueEnumerator = class(TEnumerator,
+      IACLEnumerable<TValue>,
+      IACLEnumerator<TValue>)
+    public
+      function GetCurrent: TValue;
+      function GetEnumerator: IACLEnumerator<TValue>;
+    end;
+
+  {$ENDREGION}
   strict private
     FOrder: TACLList<TKey>;
 
@@ -643,6 +716,9 @@ type
     procedure AfterConstruction; override;
     procedure Clear(AKeepCapacity: Boolean = False); override;
     procedure Enum(const AProc: TACLPairEnum<TKey, TValue>); override;
+    function GetEnumerator: IACLEnumerator<TPair<TKey, TValue>>; override;
+    function GetKeys: IACLEnumerable<TKey>; override;
+    function GetValues: IACLEnumerable<TValue>; override;
     //
     property Keys[Index: Integer]: TKey read GetKey; default;
   end;
@@ -703,6 +779,29 @@ uses
   // ACL
   ACL.Utils.Common,
   ACL.Hashes;
+
+{ TACLEnumerable<T> }
+
+function TACLEnumerable<T>.ToArray: TArray<T>;
+var
+  ACapacity: Integer;
+  AIndex: Integer;
+begin
+  Result := nil;
+  AIndex := 0;
+  ACapacity := 0;
+  for var AValue in Self do
+  begin
+    if AIndex >= ACapacity then
+    begin
+      ACapacity := GrowCollection(ACapacity, AIndex + 1);
+      SetLength(Result, ACapacity);
+    end;
+    Result[AIndex] := AValue;
+    Inc(AIndex);
+  end;
+  SetLength(Result, AIndex);
+end;
 
 { TACLMoveArrayManager<T> }
 
@@ -961,7 +1060,7 @@ begin
   inherited Destroy;
 end;
 
-function TACLList<T>.DoGetEnumerator: TEnumerator<T>;
+function TACLList<T>.GetEnumerator: IACLEnumerator<T>;
 begin
   Result := TACLListEnumerator<T>.Create(Self);
 end;
@@ -1358,12 +1457,12 @@ begin
   FOwner := AOwner;
 end;
 
-function TACLListEnumerator<T>.DoGetCurrent: T;
+function TACLListEnumerator<T>.GetCurrent: T;
 begin
   Result := FOwner.List[FIndex];
 end;
 
-function TACLListEnumerator<T>.DoMoveNext: Boolean;
+function TACLListEnumerator<T>.MoveNext: Boolean;
 begin
   Inc(FIndex);
   Result := FIndex < FOwner.Count;
@@ -1750,6 +1849,16 @@ begin
   Result := FItems[AIndex].Value;
 end;
 
+function TACLDictionary<TKey, TValue>.GetKeys: IACLEnumerable<TKey>;
+begin
+  Result := TKeyEnumerator.Create(Self);
+end;
+
+function TACLDictionary<TKey, TValue>.GetValues: IACLEnumerable<TValue>;
+begin
+  Result := TValueEnumerator.Create(Self);
+end;
+
 procedure TACLDictionary<TKey, TValue>.Grow;
 begin
   Rehash(Max(Length(FItems) * 2, 4));
@@ -1825,9 +1934,9 @@ begin
     end;
 end;
 
-function TACLDictionary<TKey, TValue>.DoGetEnumerator: TEnumerator<TPair<TKey, TValue>>;
+function TACLDictionary<TKey, TValue>.GetEnumerator: IACLEnumerator<TPair<TKey, TValue>>;
 begin
-  Result := TEnumerator.Create(Self);
+  Result := TPairEnumerator.Create(Self);
 end;
 
 procedure TACLDictionary<TKey, TValue>.SetCapacity(ACapacity: Integer);
@@ -1864,21 +1973,15 @@ begin
   ValueNotify(Value, cnAdded);
 end;
 
-{ TACLDictionary<TKey, TValue>.TEnumerator }
+{ TACLDictionary<TKey, TValue>.TCustomEnumerator }
 
-constructor TACLDictionary<TKey, TValue>.TEnumerator.Create(AOwner: TACLDictionary<TKey, TValue>);
+constructor TACLDictionary<TKey, TValue>.TCustomEnumerator.Create(AOwner: TACLDictionary<TKey, TValue>);
 begin
   FOwner := AOwner;
   FIndex := -1;
 end;
 
-function TACLDictionary<TKey, TValue>.TEnumerator.DoGetCurrent: TPair<TKey, TValue>;
-begin
-  with FOwner.FItems[FIndex] do
-    Result := TPair<TKey, TValue>.Create(Key, Value);
-end;
-
-function TACLDictionary<TKey, TValue>.TEnumerator.DoMoveNext: Boolean;
+function TACLDictionary<TKey, TValue>.TCustomEnumerator.MoveNext: Boolean;
 begin
   Result := False;
   repeat
@@ -1888,6 +1991,38 @@ begin
     if FOwner.FItems[FIndex].HashCode <> FOwner.EMPTY_HASH then
       Exit(True);
   until False;
+end;
+
+{ TACLDictionary<TKey, TValue>.TPairEnumerator }
+
+function TACLDictionary<TKey, TValue>.TPairEnumerator.GetCurrent: TPair<TKey, TValue>;
+begin
+  with FOwner.FItems[FIndex] do
+    Result := TPair<TKey, TValue>.Create(Key, Value);
+end;
+
+{ TACLDictionary<TKey, TValue>.TKeyEnumerator }
+
+function TACLDictionary<TKey, TValue>.TKeyEnumerator.GetCurrent: TKey;
+begin
+  Result := FOwner.FItems[FIndex].Key;
+end;
+
+function TACLDictionary<TKey, TValue>.TKeyEnumerator.GetEnumerator: IACLEnumerator<TKey>;
+begin
+  Result := Self;
+end;
+
+{ TACLDictionary<TKey, TValue>.TValueEnumerator }
+
+function TACLDictionary<TKey, TValue>.TValueEnumerator.GetCurrent: TValue;
+begin
+  Result := FOwner.FItems[FIndex].Value;
+end;
+
+function TACLDictionary<TKey, TValue>.TValueEnumerator.GetEnumerator: IACLEnumerator<TValue>;
+begin
+  Result := Self;
 end;
 
 { TACLThreadList<T> }
@@ -2236,14 +2371,12 @@ constructor TACLObjectList<T>.Create(AOwnsObjects: Boolean);
 begin
   inherited Create;
   OwnsObjects := AOwnsObjects;
-  UpdateNotificationFlag;
 end;
 
 constructor TACLObjectList<T>.Create(const AComparer: IComparer<T>; AOwnsObjects: Boolean);
 begin
   inherited Create(AComparer);
   OwnsObjects := AOwnsObjects;
-  UpdateNotificationFlag;
 end;
 
 procedure TACLObjectList<T>.Notify(const Item: T; Action: TCollectionNotification);
@@ -2255,8 +2388,7 @@ end;
 
 procedure TACLObjectList<T>.UpdateNotificationFlag;
 begin
-  inherited;
-  FNotifications := FNotifications or OwnsObjects;
+  FNotifications := Assigned(OnNotify) or OwnsObjects;
 end;
 
 procedure TACLObjectList<T>.SetOwnObjects(const Value: Boolean);
@@ -2462,24 +2594,6 @@ begin
   end;
 end;
 
-function TACLCustomHashSet<T>._AddRef: Integer; stdcall;
-begin
-  Result := -1;
-end;
-
-function TACLCustomHashSet<T>._Release: Integer; stdcall;
-begin
-  Result := -1;
-end;
-
-function TACLCustomHashSet<T>.QueryInterface(const IID: TGUID; out Obj): HRESULT; stdcall;
-begin
-  if GetInterface(IID, Obj) then
-    Result := S_OK
-  else
-    Result := E_NOINTERFACE;
-end;
-
 { TACLHashSet<T> }
 
 constructor TACLHashSet<T>.Create(AInitialCapacity: Integer = 0);
@@ -2538,6 +2652,11 @@ begin
     DoAdd(AHashCode, not AIndex, Item);
 end;
 
+function TACLHashSet<T>.GetEnumerator: IACLEnumerator<T>;
+begin
+  Result := TEnumerator.Create(Self);
+end;
+
 procedure TACLHashSet<T>.SetCapacity(AValue: Integer);
 var
   ANewCapacity: Integer;
@@ -2565,11 +2684,6 @@ end;
 procedure TACLHashSet<T>.DoGrow;
 begin
   DoRehash(Max(Length(FItems) * 2, 4));
-end;
-
-function TACLHashSet<T>.DoGetEnumerator: TEnumerator<T>;
-begin
-  Result := TEnumerator.Create(Self);
 end;
 
 procedure TACLHashSet<T>.DoRehash(ACapacity: Integer);
@@ -2693,12 +2807,12 @@ begin
   FIndex := -1;
 end;
 
-function TACLHashSet<T>.TEnumerator.DoGetCurrent: T;
+function TACLHashSet<T>.TEnumerator.GetCurrent: T;
 begin
   Result := FOwner.FItems[FIndex].Item;
 end;
 
-function TACLHashSet<T>.TEnumerator.DoMoveNext: Boolean;
+function TACLHashSet<T>.TEnumerator.MoveNext: Boolean;
 begin
   Result := False;
   repeat
@@ -3053,9 +3167,60 @@ begin
   inherited;
 end;
 
+function TACLOrderedDictionary<TKey, TValue>.GetEnumerator: IACLEnumerator<TPair<TKey, TValue>>;
+begin
+  Result := TPairEnumerator.Create(Self);
+end;
+
 function TACLOrderedDictionary<TKey, TValue>.GetKey(Index: Integer): TKey;
 begin
   Result := FOrder.List[Index];
+end;
+
+function TACLOrderedDictionary<TKey, TValue>.GetKeys: IACLEnumerable<TKey>;
+begin
+  Result := FOrder;
+end;
+
+function TACLOrderedDictionary<TKey, TValue>.GetValues: IACLEnumerable<TValue>;
+begin
+  Result := TValueEnumerator.Create(Self);
+end;
+
+{ TACLOrderedDictionary<TKey, TValue>.TEnumerator }
+
+constructor TACLOrderedDictionary<TKey, TValue>.TEnumerator.Create(AOwner: TACLOrderedDictionary<TKey, TValue>);
+begin
+  FOwner := AOwner;
+  FIndex := -1;
+end;
+
+function TACLOrderedDictionary<TKey, TValue>.TEnumerator.MoveNext: Boolean;
+begin
+  Inc(FIndex);
+  Result := FIndex < FOwner.FOrder.Count;
+end;
+
+{ TACLOrderedDictionary<TKey, TValue>.TEnumerator }
+
+function TACLOrderedDictionary<TKey, TValue>.TPairEnumerator.GetCurrent: TPair<TKey, TValue>;
+var
+  AKey: TKey;
+begin
+  AKey := FOwner.FOrder.List[FIndex];
+  Result := TPair<TKey, TValue>.Create(AKey, FOwner.Items[AKey]);
+end;
+
+{ TACLOrderedDictionary<TKey, TValue>.TValueEnumerator }
+
+function TACLOrderedDictionary<TKey, TValue>.TValueEnumerator.GetCurrent: TValue;
+begin
+  Result := FOwner.Items[FOwner.FOrder.List[FIndex]];
+end;
+
+function TACLOrderedDictionary<TKey, TValue>.TValueEnumerator.GetEnumerator: IACLEnumerator<TValue>;
+begin
+  Result := Self;
 end;
 
 { TACLValueCacheManager<TKey, TValue> }
