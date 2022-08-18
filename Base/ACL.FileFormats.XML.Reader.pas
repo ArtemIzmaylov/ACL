@@ -5978,6 +5978,7 @@ begin
                   SafeEndElement;
               end;
 
+            TACLXMLNodeType.CDATA,
             TACLXMLNodeType.Text,
             TACLXMLNodeType.SignificantWhitespace:
               if ALoaderStack.Count > 0 then
