@@ -90,7 +90,7 @@ type
     FView: array[Byte] of TACLTextViewInfo;
 
     procedure CreateViewInfo;
-    function GetView(Index: Byte): TACLTextViewInfo; inline;
+    function GetView(Index: Byte): TACLTextViewInfo;
     procedure ReleaseViewInfo;
     procedure SetFont(AValue: TACLFontInfo);
   protected
@@ -628,7 +628,7 @@ var
 begin
   FEmptyCharView := TACLTextViewInfo.Create(MeasureCanvas.Handle, Font, EmptyChar);
   FSize := FEmptyCharView.Size;
-  for AIndex := Low(AIndex) to High(AIndex) do
+  for AIndex := Low(Byte) to High(Byte) do
   begin
     FData[AIndex] := CreateData(AIndex);
     FView[AIndex] := TACLTextViewInfo.Create(MeasureCanvas.Handle, Font, FData[AIndex]);
@@ -648,7 +648,7 @@ end;
 function TACLHexViewCharacterSet.GetView(Index: Byte): TACLTextViewInfo;
 begin
   Result := FView[Index];
-  if Result.Size.cx = 0 then
+  if (Result = nil) or (Result.Size.cx = 0) then
     Result := FEmptyCharView;
 end;
 
@@ -677,6 +677,7 @@ begin
   FCharactersHex := TACLHexViewHexCharacterSet.Create;
   FStyle := CreateStyle;
   inherited;
+  UpdateCharacters;
 end;
 
 destructor TACLHexViewSubClass.Destroy;

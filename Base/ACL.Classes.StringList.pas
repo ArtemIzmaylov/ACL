@@ -65,6 +65,7 @@ type
     function GetValueFromName(const S: UnicodeString): UnicodeString;
     procedure SetCapacity(Value: Integer);
     procedure SetInterface(AIndex: Integer; const AValue: IUnknown);
+    procedure SetName(Index: Integer; const Value: UnicodeString);
     procedure SetObject(AIndex: Integer; const AValue: TObject);
     procedure SetValue(Index: Integer; const Value: UnicodeString);
     procedure SetValueFromName(const AName, AValue: UnicodeString);
@@ -148,7 +149,7 @@ type
 
     // Row data
     property Interfaces[AIndex: Integer]: IUnknown read GetInterface write SetInterface;
-    property Names[Index: Integer]: UnicodeString read GetName;
+    property Names[Index: Integer]: UnicodeString read GetName write SetName;
     property Objects[Index: Integer]: TObject read GetObject write SetObject;
     property Strings[Index: Integer]: UnicodeString read GetString write SetString; default;
     property ValueFromIndex[Index: Integer]: UnicodeString read GetValue write SetValue;
@@ -776,6 +777,11 @@ begin
     FList^[AIndex].FInterface := AValue;
     Changed;
   end;
+end;
+
+procedure TACLStringList.SetName(Index: Integer; const Value: UnicodeString);
+begin
+  Strings[Index] := Value + Delimiter + ValueFromIndex[Index];
 end;
 
 procedure TACLStringList.SetObject(AIndex: Integer; const AValue: TObject);

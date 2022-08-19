@@ -287,14 +287,16 @@ type
 
   TACLXMLDocumentLoader = class
   strict private
-    FSettings: TACLXMLReaderSettings;
-  protected
     FLoaders: TACLXMLNodeLoaders;
+    FSettings: TACLXMLReaderSettings;
     FSkipRootNode: Boolean;
   public
     constructor Create;
     destructor Destroy; override;
     procedure Run(AContext: TObject; AStream: TStream);
+
+    property Loaders: TACLXMLNodeLoaders read FLoaders;
+    property SkipRootNode: Boolean read FSkipRootNode write FSkipRootNode;
   end;
 
 implementation
@@ -1722,59 +1724,11 @@ begin
 end;
 
 function TACLXMLTextReader.CheckEncoding(const ANewEncodingName: string): TEncoding;
-//#var
-//#  ANewEncoding: TdxEncoding;
 begin
-  Assert(SameText(ANewEncodingName, 'UTF-8'), 'UTF-8');
-  Result := TEncoding.UTF8;
-//#  if FPs.Stream = nil then
-//#  begin
-//#    Exit(FPs.Encoding);
-//#  end;
-//#
-//#  if (0 = String.Compare(ANewEncodingName, 'ucs-2', StringComparison.OrdinalIgnoreCase)) or (0 = String.Compare(ANewEncodingName, 'utf-16', StringComparison.OrdinalIgnoreCase)) or (0 = String.Compare(ANewEncodingName, 'iso-10646-ucs-2', StringComparison.OrdinalIgnoreCase)) or (0 = String.Compare(ANewEncodingName, 'ucs-4', StringComparison.OrdinalIgnoreCase)) then
-//#  begin
-//#    if ((FPs.Encoding.WebName <> 'utf-16BE') and (FPs.Encoding.WebName <> 'utf-16')) and (0 <> String.Compare(ANewEncodingName, 'ucs-4', StringComparison.OrdinalIgnoreCase)) then
-//#    begin
-//#
-//#      if FAfterResetState then
-//#      begin
-//#        Throw(Res.Xml_EncodingSwitchAfterResetState, ANewEncodingName);
-//#      end
-//#      else
-//#      begin
-//#        ThrowWithoutLineInfo(Res.Xml_MissingByteOrderMark);
-//#      end;
-//#    end;
-//#    Exit(FPs.Encoding);
-//#  end;
-//#
-//#  ANewEncoding := nil;
-//#  if 0 = String.Compare(ANewEncodingName, 'utf-8', StringComparison.OrdinalIgnoreCase) then
-//#  begin
-//#    ANewEncoding := TdxUTF8Encoding.Create(True, True);
-//#  end
-//#  else
-//#  begin
-//#    try
-//#      ANewEncoding := Encoding.GetEncoding(ANewEncodingName);
-//#    except
-//#catch ( NotSupportedException innerEx ) {
-//#                    Throw( Res.Xml_UnknownEncoding, newEncodingName, innerEx );
-//#                }
-//#                catch ( ArgumentException innerEx) {
-//#                    Throw( Res.Xml_UnknownEncoding, newEncodingName, innerEx );
-//#                }    end;
-//#
-//#    Debug.Assert(ANewEncoding.EncodingName <> 'UTF-8');
-//#  end;
-//#
-//#  if FAfterResetState and (FPs.Encoding.WebName <> ANewEncoding.WebName) then
-//#  begin
-//#    Throw(Res.Xml_EncodingSwitchAfterResetState, ANewEncodingName);
-//#  end;
-//#
-//#  Result := ANewEncoding;
+  if SameText(ANewEncodingName, 'UTF-8') then
+    Result := TEncoding.UTF8
+  else
+    Result := TEncoding.GetEncoding(ANewEncodingName);
 end;
 
 procedure TACLXMLTextReader.ClearNodes;
@@ -4904,16 +4858,12 @@ begin
           if AIsTextDecl then
             Throw(SXmlInvalidTextDecl);
 
-//# TA: dublicate code after label NoXmlDecl
           if FAfterResetState then
           begin
             AEncodingName := FParsingState.Encoding.WebName;
-            if (((AEncodingName <> 'utf-8') and (AEncodingName <> 'utf-16')) and (AEncodingName <> 'utf-16be'))
-              and not (FParsingState.Encoding is TMBCSEncoding) then
-              //#and not (FPs.Encoding is TUcs4Encoding) then
+            if (((AEncodingName <> 'utf-8') and (AEncodingName <> 'utf-16')) and (AEncodingName <> 'utf-16be')) and not (FParsingState.Encoding is TMBCSEncoding) then
               Throw(SXmlEncodingSwitchAfterResetState, IfThen(FParsingState.Encoding.GetByteCount('A') = 1, 'UTF-8', 'UTF-16'));
           end;
-//#          if FPs.Decoder is TdxSafeAsciiDecoder then
           if FParsingState.Decoder = TEncoding.ASCII then
             SwitchEncodingToUTF8;
         end
@@ -5083,7 +5033,6 @@ NoXmlDecl:
     AEncodingName := FParsingState.Encoding.WebName;
     if (AEncodingName <> 'utf-8') and (AEncodingName <> 'utf-16') and (AEncodingName <> 'utf-16be') and
        not (FParsingState.Encoding is TMBCSEncoding) then
-//#       not (FPs.Encoding is TdxUcs4Encoding) then
       Throw(SXmlEncodingSwitchAfterResetState, IfThen(FParsingState.Encoding.GetByteCount('A') = 1, 'UTF-8', 'UTF-16'));
   end;
 
@@ -5385,20 +5334,11 @@ begin
   begin
     Assert(FParsingState.CharPos = 0);
     FParsingState.Encoding := TEncoding.UTF8;
-//#    FPs.Decoder := TdxSafeAsciiDecoder.Create;
     FParsingState.Decoder := TEncoding.ASCII;
   end
   else
   begin
     FParsingState.Encoding := AEncoding;
-//#    case FPs.Encoding.WebName of
-//#      'utf-16':
-//#        FPs.Decoder := TdxUTF16Decoder.Create(False);
-//#      'utf-16BE':
-//#        FPs.Decoder := TdxUTF16Decoder.Create(True);
-//#      else
-//#        FPs.Decoder := AEncoding.GetDecoder;
-//#    end;
     if ContainsStr(FParsingState.Encoding.WebName, 'utf-16') then
       FParsingState.Decoder := TEncoding.Unicode
     else
@@ -5408,8 +5348,7 @@ end;
 
 procedure TACLXMLTextReader.SwitchEncoding(ANewEncoding: TEncoding);
 begin
-  if (ANewEncoding.WebName <> FParsingState.Encoding.WebName) or (FParsingState.Decoder = TEncoding.ASCII) //#or (FPs.Decoder is TdxSafeAsciiDecoder))
-    and not FAfterResetState then
+  if (ANewEncoding.WebName <> FParsingState.Encoding.WebName) or (FParsingState.Decoder = TEncoding.ASCII) and not FAfterResetState then
   begin
     Assert(FParsingState.Stream <> nil);
     UnDecodeChars;
@@ -5546,7 +5485,7 @@ begin
   FParsingState.IsEof := False;
 end;
 
-{ TACLXMLTextReader.TdxXmlContext }
+{ TACLXMLTextReader.TXmlContext }
 
 constructor TACLXMLTextReader.TXmlContext.Create(APreviousContext: TXmlContext);
 begin
@@ -6039,6 +5978,7 @@ begin
                   SafeEndElement;
               end;
 
+            TACLXMLNodeType.CDATA,
             TACLXMLNodeType.Text,
             TACLXMLNodeType.SignificantWhitespace:
               if ALoaderStack.Count > 0 then

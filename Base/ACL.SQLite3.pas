@@ -11,19 +11,19 @@
 
 unit ACL.SQLite3;
 
-{$I ACL.Config.INC}
+{$I ACL.Config.inc}
 
 interface
 
 uses
   Winapi.Windows,
   // System
-  System.SysUtils,
   System.Classes,
-  System.Variants,
-  System.Sqlite,
   System.Generics.Collections,
   System.Generics.Defaults,
+  System.Sqlite,
+  System.SysUtils,
+  System.Variants,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -97,13 +97,14 @@ type
     function NextRecord: Boolean;
     // I/O
     function ReadBlob(AIndex: Integer; AData: TMemoryStream): Integer; overload;
-    function ReadBlob(const AName: UnicodeString; AData: TMemoryStream): Integer; overload;
+    function ReadBlob(const AName: UnicodeString; AData: TMemoryStream): Integer; overload; inline;
     function ReadDouble(AIndex: Integer): Double; overload;
-    function ReadDouble(const AName: UnicodeString): Double; overload;
+    function ReadDouble(const AName: UnicodeString): Double; overload; inline;
     function ReadInt(AIndex: Integer): Int64; overload;
-    function ReadInt(const AName: UnicodeString): Int64; overload;
-    function ReadStr(AIndex: Integer): UnicodeString; overload;
-    function ReadStr(const AName: UnicodeString): UnicodeString; overload;
+    function ReadInt(const AName: UnicodeString): Int64; overload; inline;
+    function ReadStr(AIndex: Integer; out ALength: Integer): PWideChar; overload;
+    function ReadStr(AIndex: Integer; ASharedStrings: TACLStringSharedTable = nil): UnicodeString; overload; inline;
+    function ReadStr(const AName: UnicodeString; ASharedStrings: TACLStringSharedTable = nil): UnicodeString; overload; inline;
     // Properties
     property Column[Index: Integer]: TACLSQLiteColumn read GetColumn; default;
     property ColumnCount: Integer read GetColumnCount;
@@ -489,14 +490,27 @@ begin
   Result := ReadInt(GetFieldIndex(AName));
 end;
 
-function TACLSQLiteTable.ReadStr(AIndex: Integer): UnicodeString;
+function TACLSQLiteTable.ReadStr(AIndex: Integer; ASharedStrings: TACLStringSharedTable): UnicodeString;
+var
+  L: Integer;
+  P: PWideChar;
 begin
-  Result := UnicodeString(sqlite3_column_text16(FQuery, AIndex));
+  P := ReadStr(AIndex, L);
+  if ASharedStrings <> nil then
+    Result := ASharedStrings.Share(P, L)
+  else
+    Result := acMakeString(P, L);
 end;
 
-function TACLSQLiteTable.ReadStr(const AName: UnicodeString): UnicodeString;
+function TACLSQLiteTable.ReadStr(AIndex: Integer; out ALength: Integer): PWideChar;
 begin
-  Result := ReadStr(GetFieldIndex(AName));
+  ALength := sqlite3_column_bytes16(FQuery, AIndex) div SizeOf(WideChar);
+  Result := sqlite3_column_text16(FQuery, AIndex);
+end;
+
+function TACLSQLiteTable.ReadStr(const AName: UnicodeString; ASharedStrings: TACLStringSharedTable): UnicodeString;
+begin
+  Result := ReadStr(GetFieldIndex(AName), ASharedStrings);
 end;
 
 function TACLSQLiteTable.FetchDataTypes: Boolean;
@@ -818,13 +832,7 @@ end;
 
 class procedure TSQLLiteHelper.KeyContains(Context: HSQLCONTEXT; Count: Integer; Vars: PPointerArray); cdecl;
 begin
-  if KeyFind(Vars^[0], Vars^[1]) >= 0 then
-    SQLiteResultSet(Context, 1)
-  else
-    if SQLiteVarToInt32(Vars^[1]) = 0 then
-      SQLiteResultSet(Context, Ord(sqlite3_value_bytes16(Vars^[0]) = 0))
-    else
-      SQLiteResultSet(Context, 0);
+  SQLiteResultSet(Context, Ord(KeyFind(Vars^[0], Vars^[1]) >= 0));
 end;
 
 class procedure TSQLLiteHelper.KeyContainsOneFrom(Context: HSQLCONTEXT; Count: Integer; Vars: PPointerArray);
@@ -835,7 +843,7 @@ begin
   AResult := False;
   for I := 1 to Count - 1 do
   begin
-    AResult := (KeyFind(Vars^[0], Vars^[I]) >= 0) or (SQLiteVarToInt32(Vars^[I]) = 0) and (sqlite3_value_bytes16(Vars^[0]) = 0);
+    AResult := KeyFind(Vars^[0], Vars^[I]) >= 0;
     if AResult then
       Break;
   end;
@@ -1069,6 +1077,8 @@ end;
 
 function TACLSQLQueryBuilder.ValCore(const APreparedValue: string): TACLSQLQueryBuilder;
 begin
+  if APreparedValue = EmptyStr then
+    raise EInvalidArgument.Create('Value cannot be set to an empty value');
   if FPrevIsValue then
   begin
     FBuffer.Append(', ');

@@ -70,7 +70,7 @@ type
     FCheckCharacters: Boolean;
     FConformanceLevel: TACLXMLConformanceLevel;
     FEncodeInvalidXmlCharAsUCS2: Boolean;
-    FIndent: Boolean; //# TdxTriState;
+    FIndent: Boolean;
     FIndentChars: string;
     FMergeCDataSections: Boolean;
     FNamespaceHandling: TACLXMLNamespaceHandling;
@@ -2713,7 +2713,7 @@ begin
   FData := AData;
 end;
 
-{ TACLXMLWellFormedWriter.TAttributeValueCache.TdxBufferChunk }
+{ TACLXMLWellFormedWriter.TAttributeValueCache.TBufferChunk }
 
 constructor TACLXMLWellFormedWriter.TAttributeValueCache.TBufferChunk.Create(const ABuffer: TCharArray;
   AIndex: Integer; ACount: Integer);
@@ -2903,7 +2903,7 @@ var
 begin
   if FSingleStringValue <> '' then
   begin
-    FSingleStringValue := SysUtils.Trim(FSingleStringValue); //#TODO:  TdxXmlConvert.TrimString(FSingleStringValue);
+    FSingleStringValue := SysUtils.Trim(FSingleStringValue); //#TODO:  XmlConvert.TrimString(FSingleStringValue);
     Exit;
   end;
 

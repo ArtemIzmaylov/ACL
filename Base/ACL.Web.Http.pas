@@ -44,6 +44,39 @@ type
     procedure OnProgress(const AReadBytes, ATotalBytes: Int64);
   end;
 
+  { EHttpError }
+
+  EHttpError = class
+  strict private
+    FInfo: TACLWebErrorInfo;
+  public
+    constructor Create(const Code: Integer; const Text: string); overload;
+    constructor Create(const DefaultText: string = ''); overload;
+    //
+    property Info: TACLWebErrorInfo read FInfo;
+  end;
+
+  { EHttpCanceledError }
+
+  EHttpCanceledError = class(EHttpError)
+  public
+    constructor Create; reintroduce;
+  end;
+
+  { EHttpRangeError }
+
+  EHttpRangeError = class(EHttpError)
+  public
+    constructor Create; reintroduce;
+  end;
+
+  { EHttpWriteError }
+
+  EHttpWriteError = class(EHttpError)
+  public
+    constructor Create; reintroduce;
+  end;
+
   { THttpConnection }
 
   THttpConnection = class
@@ -107,6 +140,7 @@ type
     procedure Receive(ADataProc: THttpRequestDataProc; AProgressProc: THttpRequestProgressProc = nil);
     procedure Send(ACustomHeaders: string = ''; ARange: IACLWebRequestRange = nil;
       ADataStream: TStream = nil; AProgressProc: THttpRequestProgressProc = nil);
+    function StatusIsOk: Boolean;
     //
     property ContentLength: Integer index HTTP_QUERY_CONTENT_LENGTH read GetQueryValue;
     property ContentRange: string index HTTP_QUERY_CONTENT_RANGE read GetQueryValueAsString;
@@ -132,12 +166,12 @@ type
     class function Request(const AMethod, ALink: UnicodeString;
       AHandler: IACLHttpClientHandler; const APostData: TStream = nil; ARange: IACLWebRequestRange = nil;
       AOptions: TACLHttpClientOptions = [hcoThreading]; AThreadPriority: TACLTaskPriority = atpNormal): THandle; overload;
-    class function RequestNoThread(const AMethod, ALink: UnicodeString;
-      AResponseData: TStream; out AErrorInfo: TACLWebErrorInfo; const APostData: TStream = nil;
-      ARange: IACLWebRequestRange = nil; const AMaxAcceptSize: Int64 = 0): Boolean; overload;
     class function RequestNoThread(AMethod: TACLHttpMethod; const ALink: UnicodeString;
-      AResponseData: TStream; out AErrorInfo: TACLWebErrorInfo; const APostData: TStream = nil;
-      ARange: IACLWebRequestRange = nil; const AMaxAcceptSize: Int64 = 0): Boolean; overload;
+      AResponseData: TStream; out AErrorInfo: TACLWebErrorInfo; APostData: TStream = nil;
+      ARange: IACLWebRequestRange = nil; AMaxAcceptSize: Int64 = 0): Boolean; overload;
+    class function RequestNoThread(const AMethod, ALink: UnicodeString;
+      AResponseData: TStream; out AErrorInfo: TACLWebErrorInfo; APostData: TStream = nil;
+      ARange: IACLWebRequestRange = nil; AMaxAcceptSize: Int64 = 0): Boolean; overload;
 
     // Get
     class function Get(const ALink: UnicodeString; AHandler: IACLHttpClientHandler;
@@ -179,7 +213,7 @@ type
   TACLHttpInputStream = class(TStream)
   protected const
     BlockID = $66524565;
-    BlockSize = 64 * SIZE_ONE_KILOBYTE; // do not change, because of file structure
+    BlockSize = 64 * SIZE_ONE_KILOBYTE; // do not change, affects to cache file structure
     WaitTimeout = 10000; // 10 seconds;
   private
     FCacheStream: TStream;
@@ -200,7 +234,8 @@ type
     function GetSize: Int64; override;
     procedure SetSize(const NewSize: Int64); override;
   public
-    constructor Create(const URL: TACLWebURL; const ACachedFileName: string = ''; AMode: TACLHttpInputStreamDownloadMode = hisdmASAP);
+    constructor Create(const URL: TACLWebURL; const ACachedFileName: string = '';
+      AMode: TACLHttpInputStreamDownloadMode = hisdmASAP);
     destructor Destroy; override;
     class function ValidateCacheStream(AStream: TStream): Boolean; overload;
     class procedure ValidateCacheStream(AStream: TStream; AFreeBlocks: TACLList<Integer>); overload;
@@ -242,25 +277,6 @@ const
   IdentUserAgent = 'User-Agent';
 
 type
-
-  { EHttpError }
-
-  EHttpError = class
-  strict private
-    FInfo: TACLWebErrorInfo;
-  public
-    constructor Create(const Code: Integer; const Text: string); overload;
-    constructor Create(const DefaultText: string = ''); overload;
-    //
-    property Info: TACLWebErrorInfo read FInfo;
-  end;
-
-  { EHttpRangeError }
-
-  EHttpRangeError = class(EHttpError)
-  public
-    constructor Create; reintroduce;
-  end;
 
   { TACLHttpClientTask }
 
@@ -382,11 +398,25 @@ begin
   Info.Initialize(Code, Text);
 end;
 
+{ EHttpCanceledError }
+
+constructor EHttpCanceledError.Create;
+begin
+  inherited Create(acWebErrorCanceled, sErrorCancel);
+end;
+
 { EHttpRangeError }
 
 constructor EHttpRangeError.Create;
 begin
   inherited Create(acWebErrorUnknown, sErrorRange);
+end;
+
+{ EHttpWriteError }
+
+constructor EHttpWriteError.Create;
+begin
+  inherited Create(acWebErrorUnknown, sErrorWrite);
 end;
 
 { THttpConnection }
@@ -539,12 +569,12 @@ begin
       if ABytesRead = 0 then
         Break;
       if not ADataProc(ABuffer, ABytesRead) then
-        raise EHttpError.Create(acWebErrorUnknown, sErrorWrite);
+        raise EHttpWriteError.Create;
       if Assigned(AProgressProc) then
       begin
         Inc(AContentPosition, ABytesRead);
         if not AProgressProc(AContentPosition, AContentSize) then
-          raise EHttpError.Create(acWebErrorCanceled, sErrorCancel);
+          raise EHttpCanceledError.Create;
       end;
     end;
   finally
@@ -681,6 +711,12 @@ begin
     Result := HttpSendRequest(Handle, PWideChar(AHeaders), Length(AHeaders), nil, 0);
 end;
 
+function THttpRequest.StatusIsOk: Boolean;
+begin
+  // https://developer.mozilla.org/ru/docs/Web/HTTP/Status
+  Result := InRange(StatusCode, 200, 299);
+end;
+
 procedure THttpRequest.ProcessCookies(var AHeaders: string);
 var
   AValue: string;
@@ -713,7 +749,7 @@ end;
 
 class function TACLHttpClient.RequestNoThread(
   const AMethod, ALink: UnicodeString; AResponseData: TStream; out AErrorInfo: TACLWebErrorInfo;
-  const APostData: TStream = nil; ARange: IACLWebRequestRange = nil; const AMaxAcceptSize: Int64 = 0): Boolean;
+  APostData: TStream; ARange: IACLWebRequestRange; AMaxAcceptSize: Int64): Boolean;
 var
   ATaskHandler: TACLHttpClientSyncTaskHandler;
 begin
@@ -729,18 +765,9 @@ end;
 
 class function TACLHttpClient.RequestNoThread(AMethod: TACLHttpMethod;
   const ALink: UnicodeString; AResponseData: TStream; out AErrorInfo: TACLWebErrorInfo;
-  const APostData: TStream = nil; ARange: IACLWebRequestRange = nil; const AMaxAcceptSize: Int64 = 0): Boolean;
-var
-  ATaskHandler: TACLHttpClientSyncTaskHandler;
+  APostData: TStream; ARange: IACLWebRequestRange; AMaxAcceptSize: Int64): Boolean;
 begin
-  ATaskHandler := TACLHttpClientSyncTaskHandler.Create(AResponseData, AMaxAcceptSize);
-  try
-    Request(AMethod, ALink, ATaskHandler, APostData, ARange, []);
-    AErrorInfo := ATaskHandler.ErrorInfo;
-    Result := AErrorInfo.ErrorCode = 0;
-  finally
-    ATaskHandler.Free;
-  end;
+  Result := RequestNoThread(MethodNames[AMethod], ALink, AResponseData, AErrorInfo, APostData, ARange, AMaxAcceptSize);
 end;
 
 class function TACLHttpClient.Get(const ALink: UnicodeString; AHandler: IACLHttpClientHandler;
@@ -758,12 +785,10 @@ end;
 class function TACLHttpClient.PostNoThread(const ALink: UnicodeString;
   const APostData: AnsiString; AResponseData: TStream; out AErrorInfo: TACLWebErrorInfo): Boolean;
 var
-  APostStream: TMemoryStream;
+  APostStream: TStream;
 begin
-  APostStream := TMemoryStream.Create;
+  APostStream := TACLAnsiStringStream.Create(APostData);
   try
-    APostStream.Size := Length(APostData);
-    Move(PAnsiChar(APostData)^, APostStream.Memory^, APostStream.Size);
     Result := RequestNoThread(hmPost, ALink, AResponseData, AErrorInfo, APostStream);
   finally
     APostStream.Free;
@@ -871,7 +896,7 @@ end;
 
 function TACLHttpClientTask.CheckContentType(ARequest: THttpRequest): Boolean;
 begin
-  if not InRange(ARequest.StatusCode, 200, 299) then
+  if not ARequest.StatusIsOk then
   begin
     FError.Initialize(ARequest.StatusCode, ARequest.StatusText);
     Result := ARequest.ContentLength > 0;
@@ -989,14 +1014,16 @@ begin
       AllocateCacheStream(FSize);
     end;
 
-    // Start the Download Thread
+    // Start the download thread
     FUpdateThread := TACLHttpInputStreamUpdateThread.Create(Self);
   end;
 end;
 
 destructor TACLHttpInputStream.Destroy;
 begin
-  // do no change the order
+  // keep the order
+  FFatalError := True;
+  FFreeBlocksEvent.Signal;
   FreeAndNil(FUpdateThread);
   FreeAndNil(FCacheStreamLock);
   FreeAndNil(FCacheStream);
@@ -1077,7 +1104,7 @@ begin
         Exit(0); // Failed
     end;
 
-    // Read Cached Data
+    // Read data from cache
     FCacheStreamLock.Enter;
     try
       FCacheStream.Position := Position;
@@ -1172,30 +1199,37 @@ var
 begin
   while not Terminated do
   begin
-    if FStream.FMode = hisdmLazy then
+    if FStream.Mode = hisdmLazy then
       CheckForPause;
     if GetNextBlockIndex(ABlockIndex) then
     try
       ARequest := THttpRequest.Create(Stream.FConnection, 'GET', Stream.FURL.Path);
       try
         BlockBuffer.Used := 0;
-        ARequest.Send(Stream.FURL.CustomHeaders, TACLWebRequestRange.Create(ABlockIndex * TACLHttpInputStream.BlockSize));
+        ARequest.Send(Stream.FURL.CustomHeaders,
+          TACLWebRequestRange.Create(ABlockIndex * TACLHttpInputStream.BlockSize));
         ARequest.Receive(
           function (Data: PByte; Count: Integer): Boolean
           var
+            ABytesToWrite: Integer;
             ANextBlockIndex: Integer;
           begin
-            Count := Min(Count, BlockBuffer.Unused);
-            FastMove(Data^, BlockBuffer.DataArr^[FBlockBuffer.Used], Count);
-            BlockBuffer.Used := BlockBuffer.Used + Count;
-            if Terminated then
-              Exit(False);
-            if BlockBuffer.Unused = 0 then
+            while Count > 0 do
             begin
-              WriteBuffer(ABlockIndex);
-              if not GetNextBlockIndex(ANextBlockIndex) or (ANextBlockIndex <> ABlockIndex + 1) then
+              ABytesToWrite := Min(Count, BlockBuffer.Unused);
+              FastMove(Data^, BlockBuffer.DataArr^[FBlockBuffer.Used], ABytesToWrite);
+              BlockBuffer.Used := BlockBuffer.Used + ABytesToWrite;
+              Dec(Count, ABytesToWrite);
+              Inc(Data, ABytesToWrite);
+              if Terminated then
                 Exit(False);
-              ABlockIndex := ANextBlockIndex;
+              if BlockBuffer.Unused = 0 then
+              begin
+                WriteBuffer(ABlockIndex);
+                if not GetNextBlockIndex(ANextBlockIndex) or (ANextBlockIndex <> ABlockIndex + 1) then
+                  Exit(False);
+                ABlockIndex := ANextBlockIndex;
+              end;
             end;
             Result := True;
           end);
@@ -1205,10 +1239,16 @@ begin
         ARequest.Free;
       end;
     except
+      on E: EHttpWriteError do
+      begin
+        // Эта ошибка возникает, если следующий блок отсутсвует или идет не по порядку.
+        // Ошибка не является фатальной и лишь сигнализирует о том, что надо сдвинуться к следующему блоку.
+        Continue;
+      end;
       on E: EHttpError do
       begin
         Stream.FFatalError := True;
-        Stream.FFreeBlocksEvent.Reset;
+        Stream.FFreeBlocksEvent.Signal;
         Terminate;
       end;
     end
