@@ -175,6 +175,19 @@ type
     function ToString: string;
   end;
 
+  { TACLEncodings }
+
+  TACLEncodings = class
+  strict private
+    class var FMap: TObject;
+  public
+    class constructor Create;
+    class destructor Destroy;
+    class function Default: TEncoding;
+    class function Get(const CodePage: Integer): TEncoding; overload;
+    class function Get(const Name: string): TEncoding; overload;
+  end;
+
 var
   DefaultCodePage: Integer = CP_ACP;
 
@@ -195,10 +208,10 @@ function acStringIsRealUnicode(const S: UnicodeString): Boolean;
 // UTF8
 // Unlike built-in to RTL and Windows OS versions of these functions
 // Our functions returns an empty string if UTF8 sequence is invalid
+function acDecodeUTF8(const Source: AnsiString): UnicodeString;
+function acEncodeUTF8(const Source: UnicodeString): AnsiString;
 function acUnicodeToUtf8(Dest: PAnsiChar; MaxDestBytes: Cardinal; Source: PWideChar; SourceChars: Cardinal): Cardinal;
 function acUtf8ToUnicode(Dest: PWideChar; MaxDestChars: Cardinal; Source: PAnsiChar; SourceBytes: Integer): Integer;
-function DecodeUTF8(const Source: AnsiString): UnicodeString;
-function EncodeUTF8(const Source: UnicodeString): AnsiString;
 
 // Search
 function acFindString(const ACharToSearch: WideChar; const AString: UnicodeString; out AIndex: Integer): Boolean; overload;
@@ -246,9 +259,9 @@ function acSameText(const S1, S2: UnicodeString): Boolean;
 function acSameTextEx(const S: UnicodeString; const AStrs: array of UnicodeString): Boolean;
 
 // Encoding
-function DetectEncoding(ABuffer: PByte; ABufferSize: Integer; ADefaultEncoding: TEncoding = nil): TEncoding; overload; deprecated;
-function DetectEncoding(ABuffer: TBytes; out AEncoding: TEncoding; ADefaultEncoding: TEncoding = nil): Integer; overload;
-function DetectEncoding(AStream: TStream; ADefaultEncoding: TEncoding = nil): TEncoding; overload;
+function acDetectEncoding(ABuffer: PByte; ABufferSize: Integer; ADefaultEncoding: TEncoding = nil): TEncoding; overload; deprecated;
+function acDetectEncoding(ABuffer: TBytes; out AEncoding: TEncoding; ADefaultEncoding: TEncoding = nil): Integer; overload;
+function acDetectEncoding(AStream: TStream; ADefaultEncoding: TEncoding = nil): TEncoding; overload;
 
 // Replacing
 function acReplaceChar(const S: UnicodeString; const ACharToReplace, AReplaceBy: WideChar): UnicodeString;
@@ -278,6 +291,7 @@ procedure acCryptStringXOR(var S: UnicodeString; const AKey: UnicodeString);
 implementation
 
 uses
+  ACL.Classes.Collections,
   ACL.FastCode,
   ACL.Parsers,
   ACL.Utils.Common;
@@ -626,7 +640,7 @@ begin
   Result := Count;
 end;
 
-function DecodeUTF8(const Source: AnsiString): UnicodeString;
+function acDecodeUTF8(const Source: AnsiString): UnicodeString;
 var
   L: Integer;
 begin
@@ -642,7 +656,7 @@ begin
     Result := '';
 end;
 
-function EncodeUTF8(const Source: UnicodeString): AnsiString;
+function acEncodeUTF8(const Source: UnicodeString): AnsiString;
 var
   L: Integer;
 begin
@@ -993,27 +1007,27 @@ begin
 end;
 
 // ---------------------------------------------------------------------------------------------------------------------
-// DetectEncoding
+// acDetectEncoding
 // ---------------------------------------------------------------------------------------------------------------------
 
-function DetectEncoding(ABuffer: PByte; ABufferSize: Integer; ADefaultEncoding: TEncoding = nil): TEncoding;
+function acDetectEncoding(ABuffer: PByte; ABufferSize: Integer; ADefaultEncoding: TEncoding = nil): TEncoding;
 var
   ABytes: TBytes;
 begin
   SetLength(ABytes, Min(ABufferSize, MaxPreambleLength));
   FastMove(ABuffer^, ABytes, Length(ABytes));
-  DetectEncoding(ABytes, Result, ADefaultEncoding);
+  acDetectEncoding(ABytes, Result, ADefaultEncoding);
 end;
 
-function DetectEncoding(ABuffer: TBytes; out AEncoding: TEncoding; ADefaultEncoding: TEncoding = nil): Integer;
+function acDetectEncoding(ABuffer: TBytes; out AEncoding: TEncoding; ADefaultEncoding: TEncoding = nil): Integer;
 begin
   AEncoding := nil;
   if ADefaultEncoding = nil then
-    ADefaultEncoding := TEncoding.Default;
+    ADefaultEncoding := TACLEncodings.Default;
   Result := TEncoding.GetBufferEncoding(ABuffer, AEncoding, ADefaultEncoding);
 end;
 
-function DetectEncoding(AStream: TStream; ADefaultEncoding: TEncoding = nil): TEncoding;
+function acDetectEncoding(AStream: TStream; ADefaultEncoding: TEncoding = nil): TEncoding;
 var
   ABytes: TBytes;
   ASavedPosition: Int64;
@@ -1022,7 +1036,7 @@ begin
   try
     SetLength(ABytes, MaxPreambleLength);
     SetLength(ABytes, Max(0, AStream.Read(ABytes, Length(ABytes))));
-    Inc(ASavedPosition, DetectEncoding(ABytes, Result, ADefaultEncoding))
+    Inc(ASavedPosition, acDetectEncoding(ABytes, Result, ADefaultEncoding))
   finally
     AStream.Position := ASavedPosition;
   end;
@@ -1268,6 +1282,64 @@ begin
   L := Length(AKey);
   for I := 1 to Length(S) do
     S[I] := WideChar(Word(S[I]) xor Word(AKey[I mod L + 1]));
+end;
+
+{ TACLEncodings }
+
+class constructor TACLEncodings.Create;
+begin
+  FMap := TACLDictionary<Integer, TEncoding>.Create([doOwnsValues]);
+end;
+
+class destructor TACLEncodings.Destroy;
+begin
+  FreeAndNil(FMap);
+end;
+
+class function TACLEncodings.Default: TEncoding;
+begin
+  Result := Get(DefaultCodePage);
+end;
+
+class function TACLEncodings.Get(const CodePage: Integer): TEncoding;
+var
+  AMap: TACLDictionary<Integer, TEncoding>;
+begin
+  if (CodePage = 0) or (CodePage = CP_ACP) then
+    Exit(TEncoding.Default);
+
+  AMap := TACLDictionary<Integer, TEncoding>(FMap);
+  if not AMap.TryGetValue(CodePage, Result) then
+  begin
+    TMonitor.Enter(FMap);
+    try
+      if not AMap.TryGetValue(CodePage, Result) then
+      begin
+        Result := TEncoding.GetEncoding(CodePage);
+        AMap.Add(CodePage, Result)
+      end;
+    finally
+      TMonitor.Exit(FMap);
+    end;
+  end;
+end;
+
+class function TACLEncodings.Get(const Name: string): TEncoding;
+var
+  AEncoding: TEncoding;
+begin
+  if acSameText(Name, 'utf-8') then
+    Exit(TEncoding.UTF8);
+
+  // По-хорошему, надо бы тут использовать GetCodePageFromEncodingName, но она спрятана в SysUtils.
+  // Пока используем такой вот костыльный подход.
+  // TODO: сделать свой аналог GetCodePageFromEncodingName
+  AEncoding := TEncoding.GetEncoding(Name);
+  try
+    Result := Get(AEncoding.CodePage);
+  finally
+    AEncoding.Free;
+  end;
 end;
 
 { TACLTimeFormat }

@@ -823,7 +823,7 @@ var
 begin
   AStream := TStringStream.Create;
   try
-    TACLMimecode.EncodeString(EncodeUTF8(SQLiteVarToText(Vars^[0])), AStream);
+    TACLMimecode.EncodeString(acEncodeUTF8(SQLiteVarToText(Vars^[0])), AStream);
     SQLiteResultSet(Context, AStream.DataString);
   finally
     AStream.Free;
