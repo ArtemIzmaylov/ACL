@@ -28,6 +28,7 @@ uses
   ACL.Classes.StringList,
   ACL.Hashes,
   ACL.Utils.Common,
+  ACL.Utils.Date,
   ACL.Utils.FileSystem,
   ACL.Utils.Stream,
   ACL.Utils.Strings;

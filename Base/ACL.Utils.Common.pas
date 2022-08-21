@@ -193,9 +193,6 @@ function acObjectUID(AObject: TObject): string;
 function acSetThreadErrorMode(Mode: DWORD): DWORD;
 procedure FreeMemAndNil(var P: Pointer);
 function IfThen(AValue: Boolean; ATrue: TACLBoolean; AFalse: TACLBoolean): TACLBoolean; overload;
-
-function LocalDateTimeToUTC(const AValue: TDateTime): TDateTime;
-function UTCToLocalDateTime(const AValue: TDateTime): TDateTime;
 implementation
 
 uses
@@ -221,11 +218,6 @@ var
   FPerformanceCounterFrequency: Int64 = 0;
   FGetThreadErrorMode: TGetThreadErrorMode = nil;
   FSetThreadErrorMode: TSetThreadErrorMode = nil;
-
-function TzSpecificLocalTimeToSystemTime(lpTimeZoneInformation: PTimeZoneInformation;
-  var lpLocalTime, lpUniversalTime: TSystemTime): BOOL; stdcall; external kernel32;
-function SystemTimeToTzSpecificLocalTime(lpTimeZoneInformation: PTimeZoneInformation;
-  var lpUniversalTime, lpLocalTime: TSystemTime): BOOL; stdcall; external kernel32;
 
 procedure CheckWindowsVersion;
 begin
@@ -507,30 +499,6 @@ begin
     Result := ATrue
   else
     Result := AFalse;
-end;
-
-function LocalDateTimeToUTC(const AValue: TDateTime): TDateTime;
-var
-  AInfo: TTimeZoneInformation;
-  ALocalTime: TSystemTime;
-  AUniversalTime: TSystemTime;
-begin
-  GetTimeZoneInformation(AInfo);
-  DateTimeToSystemTime(AValue, ALocalTime);
-  TzSpecificLocalTimeToSystemTime(@AInfo, ALocalTime, AUniversalTime);
-  Result := SystemTimeToDateTime(AUniversalTime);
-end;
-
-function UTCToLocalDateTime(const AValue: TDateTime):TDateTime;
-var
-  AInfo: TTimeZoneInformation;
-  ALocalTime: TSystemTime;
-  AUniversalTime: TSystemTime;
-begin
-  GetTimeZoneInformation(AInfo);
-  DateTimeToSystemTime(AValue, AUniversalTime);
-  SystemTimeToTzSpecificLocalTime(@AInfo, AUniversalTime, ALocalTime);
-  Result := SystemTimeToDateTime(ALocalTime);
 end;
 
 function acGetShiftState: TShiftState;
