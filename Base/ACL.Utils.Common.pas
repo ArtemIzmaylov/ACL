@@ -98,21 +98,6 @@ type
     class function Wow64SetFileSystemRedirection(AValue: Boolean): LongBool;
   end;
 
-{$IFNDEF ACL_BASE_NOVCL}
-
-  TACLAppUtils = class
-  public
-    class function GetHandle: HWND;
-    class function IsMinimized: Boolean;
-    // SysCommands
-    class procedure ExecCommand(ACommand: Integer);
-    class procedure Minimize;
-    class procedure PostTerminate;
-    class procedure RestoreIfMinimized;
-  end;
-
-{$ENDIF}
-
   { TACLInterfaceHelper }
 
   TACLInterfaceHelper<T: IUnknown> = class
@@ -921,47 +906,6 @@ begin
   AWow64SetProc := TWow64SetProc(GetProcAddress(ALibHandle, 'Wow64EnableWow64FsRedirection'));
   Result := Assigned(AWow64SetProc) and AWow64SetProc(AValue);
 end;
-
-{$IFNDEF ACL_BASE_NOVCL}
-{ TACLAppUtils }
-
-class function TACLAppUtils.GetHandle: HWND;
-begin
-  if Application.MainFormOnTaskBar then
-    Result := Application.MainFormHandle
-  else
-    Result := Application.Handle;
-end;
-
-class function TACLAppUtils.IsMinimized: Boolean;
-begin
-  Result := IsIconic(GetHandle);
-end;
-
-class procedure TACLAppUtils.ExecCommand(ACommand: Integer);
-begin
-  SendMessage(GetHandle, WM_SYSCOMMAND, ACommand, 0);
-end;
-
-class procedure TACLAppUtils.Minimize;
-begin
-  ExecCommand(SC_MINIMIZE);
-end;
-
-class procedure TACLAppUtils.PostTerminate;
-begin
-  if Application.MainForm <> nil then
-    PostMessage(Application.MainFormHandle, WM_CLOSE, 0, 0)
-  else
-    PostQuitMessage(0);
-end;
-
-class procedure TACLAppUtils.RestoreIfMinimized;
-begin
-  if IsMinimized then
-    ExecCommand(SC_RESTORE);
-end;
-{$ENDIF}
 
 { TACLInterfaceHelper }
 

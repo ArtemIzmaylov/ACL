@@ -29,6 +29,7 @@ uses
   ACL.Classes,
   ACL.Geometry,
   ACL.Graphics,
+  ACL.UI.Application,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.CompoundControl.SubClass,
   ACL.UI.Controls.TreeList,
@@ -476,7 +477,7 @@ var
   ID: PItemIDList;
 begin
   try
-    AResult := TACLShellFolder(ANode.Data).ShellFolder.EnumObjects(TACLAppUtils.GetHandle, GetObjectFlags, AEnumList);
+    AResult := TACLShellFolder(ANode.Data).ShellFolder.EnumObjects(TACLApplication.GetHandle, GetObjectFlags, AEnumList);
     if AResult <> 0 then
       Exit;
   except
@@ -597,7 +598,7 @@ begin
     if not ShellIsLibraryPath(AValue) then
       AValue := acIncludeTrailingPathDelimiter(AValue);
 
-    APIDL := TPIDLHelper.GetFolderPIDL(TACLAppUtils.GetHandle, AValue);
+    APIDL := TPIDLHelper.GetFolderPIDL(TACLApplication.GetHandle, AValue);
     try
       SelectPathByPIDL(APIDL);
     finally
