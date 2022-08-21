@@ -25,6 +25,7 @@ uses
   ACL.Threading,
   ACL.Utils.Common,
   ACL.Utils.FileSystem,
+  ACL.Utils.Messaging,
   ACL.Utils.Strings,
   ACL.Utils.Stream;
 

@@ -1259,7 +1259,7 @@ implementation
 uses
   Math, Character,
   // ACL
-  ACL.Classes.MessageWindow,
+  ACL.Utils.Messaging,
   ACL.Graphics.Gdiplus,
   ACL.Math,
   ACL.Threading.Sorting,

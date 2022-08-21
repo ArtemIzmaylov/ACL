@@ -79,16 +79,6 @@ type
     class function From(AValue: Boolean): TACLBoolean; static;
   end;
 
-  { TMessagesHelper }
-
-  TMessagesHelper = class
-  public
-    class function IsInQueue(AWndHandle: HWND; AMessage: Cardinal): Boolean;
-    class procedure Process(AFromMessage, AToMessage: Cardinal; AWndHandle: HWND = 0); overload;
-    class procedure Process(AMessage: Cardinal; AWndHandle: HWND = 0); overload;
-    class procedure Remove(AMessage: Cardinal; AWndHandle: HWND = 0);
-  end;
-
   { TProcessHelper }
 
   TExecuteOption = (eoWaitForTerminate, eoShowGUI);
@@ -183,12 +173,6 @@ function acLoadLibrary(const AFileName: UnicodeString; AFlags: Cardinal = 0): HM
 function acModuleFileName(AModule: HMODULE): UnicodeString; inline;
 function acModuleHandle(const AFileName: UnicodeString): HMODULE;
 
-// Tool Windows
-function WndCreate(Method: TWndMethod; const ClassName: string; const Name: string = ''): HWND;
-function WndCreateMsg(Method: TWndMethod; const ClassName: string): HWND;
-procedure WndFree(W: HWND);
-procedure WndDefaultProc(W: HWND; var M: TMessage);
-
 // Window Handles
 function acGetWindowRect(AHandle: HWND): TRect;
 function acFindWindow(const AClassName: UnicodeString): HWND;
@@ -252,14 +236,6 @@ var
   FPerformanceCounterFrequency: Int64 = 0;
   FGetThreadErrorMode: TGetThreadErrorMode = nil;
   FSetThreadErrorMode: TSetThreadErrorMode = nil;
-
-  UtilWindowClass: TWndClass = (Style: 0; lpfnWndProc: @DefWindowProc;
-    cbClsExtra: 0; cbWndExtra: 0; hInstance: 0; hIcon: 0; hCursor: 0;
-    hbrBackground: 0; lpszMenuName: nil; lpszClassName: 'TPUtilWindow');
-  UtilWindowClassName: string;
-{$IFDEF DEBUG}
-  FLogCritical: TACLCriticalSection;
-{$ENDIF}
 
 function TzSpecificLocalTimeToSystemTime(lpTimeZoneInformation: PTimeZoneInformation;
   var lpLocalTime, lpUniversalTime: TSystemTime): BOOL; stdcall; external kernel32;
@@ -503,61 +479,6 @@ end;
 function acModuleFileName(AModule: HMODULE): UnicodeString;
 begin
   Result := GetModuleName(AModule);
-end;
-
-//==============================================================================
-// ToolWindows
-//==============================================================================
-
-function WndCreateCore(Method: TWndMethod; const ClassName, Name: string; IsMessageWindow: Boolean): HWND;
-var
-  ClassRegistered: Boolean;
-  TempClass: TWndClass;
-begin
-  if not IsMainThread then
-    raise EInvalidOperation.Create('Cannot create window in non-main thread');
-  UtilWindowClassName := ClassName;
-  UtilWindowClass.hInstance := HInstance;
-  UtilWindowClass.lpszClassName := PChar(UtilWindowClassName);
-  ClassRegistered := GetClassInfo(HInstance, UtilWindowClass.lpszClassName, TempClass);
-  if not ClassRegistered or (TempClass.lpfnWndProc <> @DefWindowProc) then
-  begin
-    if ClassRegistered then
-      Winapi.Windows.UnregisterClass(UtilWindowClass.lpszClassName, HInstance);
-    Winapi.Windows.RegisterClass(UtilWindowClass);
-  end;
-  Result := CreateWindowEx(WS_EX_TOOLWINDOW, UtilWindowClass.lpszClassName, PChar(Name),
-    WS_POPUP {!0}, 0, 0, 0, 0, IfThen(IsMessageWindow, HWND_MESSAGE), 0, HInstance, nil);
-  if Assigned(Method) then
-    SetWindowLong(Result, GWL_WNDPROC, NativeUInt(System.Classes.MakeObjectInstance(Method)));
-end;
-
-function WndCreate(Method: TWndMethod; const ClassName: string; const Name: string = ''): HWND;
-begin
-  Result := WndCreateCore(Method, ClassName, Name, False);
-end;
-
-function WndCreateMsg(Method: TWndMethod; const ClassName: string): HWND;
-begin
-  Result := WndCreateCore(Method, ClassName, '', True);
-end;
-
-procedure WndDefaultProc(W: HWND; var M: TMessage);
-begin
-  M.Result := DefWindowProc(W, M.Msg, M.WParam, M.LParam);
-end;
-
-procedure WndFree(W: HWND);
-var
-  AInstance: Pointer;
-begin
-  if W <> 0 then
-  begin
-    AInstance := Pointer(GetWindowLong(W, GWL_WNDPROC));
-    DestroyWindow(W);
-    if AInstance <> @DefWindowProc then
-      System.Classes.FreeObjectInstance(AInstance);
-  end;
 end;
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -805,38 +726,6 @@ begin
     Result := TACLBoolean.True
   else
     Result := TACLBoolean.False;
-end;
-
-{ TMessagesHelper }
-
-class function TMessagesHelper.IsInQueue(AWndHandle: HWND; AMessage: Cardinal): Boolean;
-var
-  AMsg: TMSG;
-begin
-  Result := PeekMessage(AMsg, AWndHandle, AMessage, AMessage, PM_NOREMOVE) and (AMsg.hwnd = AWndHandle);
-end;
-
-class procedure TMessagesHelper.Process(AFromMessage, AToMessage: Cardinal; AWndHandle: HWND = 0);
-var
-  AMsg: TMsg;
-begin
-  while PeekMessage(AMsg, AWndHandle, AFromMessage, AToMessage, PM_REMOVE) do
-  begin
-    TranslateMessage(AMsg);
-    DispatchMessage(AMsg);
-  end;
-end;
-
-class procedure TMessagesHelper.Process(AMessage: Cardinal; AWndHandle: HWND = 0);
-begin
-  Process(AMessage, AMessage, AWndHandle);
-end;
-
-class procedure TMessagesHelper.Remove(AMessage: Cardinal; AWndHandle: HWND = 0);
-var
-  AMsg: TMsg;
-begin
-  while PeekMessage(AMsg, AWndHandle, AMessage, AMessage, PM_REMOVE) do ;
 end;
 
 { TProcessHelper }
@@ -1093,20 +982,8 @@ begin
 end;
 
 initialization
-{$IFDEF DEBUG}
-  FLogCritical := TACLCriticalSection.Create;
-{$ENDIF}
   FGetThreadErrorMode := GetProcAddress(GetModuleHandle(kernel32), 'GetThreadErrorMode');
   FSetThreadErrorMode := GetProcAddress(GetModuleHandle(kernel32), 'SetThreadErrorMode');
+  InvariantFormatSettings := TFormatSettings.Invariant;
   CheckWindowsVersion;
-
-  if IsValidLocale(LOCALE_INVARIANT, LCID_INSTALLED) then
-    InvariantFormatSettings := TFormatSettings.Create(LOCALE_INVARIANT)
-  else
-    InvariantFormatSettings := TFormatSettings.Create(1033); // English
-
-finalization
-{$IFDEF DEBUG}
-  FreeAndNil(FLogCritical);
-{$ENDIF}
 end.

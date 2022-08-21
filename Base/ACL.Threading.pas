@@ -27,7 +27,8 @@ uses
   System.Generics.Defaults,
   System.Generics.Collections,
   // ACL
-  ACL.Utils.Common;
+  ACL.Utils.Common,
+  ACL.Utils.Messaging;
 
 type
   TACLThreadMethodCallMode = (tmcmAsync, tmcmSync, tmcmSyncPostponed);

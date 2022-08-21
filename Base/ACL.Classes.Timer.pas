@@ -87,7 +87,7 @@ uses
   System.SysUtils,
   // ACL
   ACL.Classes,
-  ACL.Classes.MessageWindow,
+  ACL.Utils.Messaging,
   ACL.Classes.StringList,
   ACL.Math,
   ACL.Threading,
@@ -100,7 +100,7 @@ type
 
   { TACLTimerManager }
 
-  TACLTimerManager = class(TACLCustomMessageWindow)
+  TACLTimerManager = class(TACLMessageWindow)
   strict private
     FSystemTimerResolution: Integer;
 
@@ -113,8 +113,8 @@ type
     FHighResolutionTimers: TACLThreadList<TACLTimer>;
     FTimers: TACLList<TACLTimer>;
 
-    function SafeProcessMessage(var AMessage: TMessage): Boolean; override;
-    //
+    procedure HandleMessage(var AMessage: TMessage); override;
+
     property SystemTimerResolution: Integer read GetSystemTimerResolution;
   public
     constructor Create;
@@ -298,7 +298,7 @@ end;
 
 constructor TACLTimerManager.Create;
 begin
-  inherited Create;
+  CreateMsg(ClassName);
   FTimers := TACLList<TACLTimer>.Create;
   FHighResolutionTimers := TACLThreadList<TACLTimer>.Create;
 end;
@@ -313,7 +313,7 @@ end;
 
 procedure TACLTimerManager.RegisterTimer(ATimer: TACLTimer);
 begin
-  FLock.Enter;
+  TMonitor.Enter(Self);
   try;
     FTimers.Add(ATimer);
     if ATimer.HighResolution and (ATimer.Interval < 1000) then
@@ -322,18 +322,18 @@ begin
       SafeUpdateHighResolutionThread;
     end
     else
-      SetTimer(Handle, NativeUInt(ATimer), AlignToSystemTimerResolution(ATimer.Interval), nil);
+      SetTimer(FHandle, NativeUInt(ATimer), AlignToSystemTimerResolution(ATimer.Interval), nil);
   finally
-    FLock.Leave;
+    TMonitor.Exit(Self);
   end;
 end;
 
 procedure TACLTimerManager.UnregisterTimer(ATimer: TACLTimer);
 begin
-  FLock.Enter;
+  TMonitor.Enter(Self);
   try
     if FTimers.Remove(ATimer) >= 0 then
-      KillTimer(Handle, NativeUInt(ATimer));
+      KillTimer(FHandle, NativeUInt(ATimer));
 
     with FHighResolutionTimers.LockList do
     try
@@ -343,11 +343,11 @@ begin
       FHighResolutionTimers.UnlockList;
     end;
   finally
-    FLock.Leave;
+    TMonitor.Exit(Self);
   end;
 end;
 
-function TACLTimerManager.SafeProcessMessage(var AMessage: TMessage): Boolean;
+procedure TACLTimerManager.HandleMessage(var AMessage: TMessage);
 var
   AList: TACLList;
   I: Integer;
@@ -356,7 +356,7 @@ begin
     WM_TIMER:
       begin
         SafeCallTimerProc(TACLTimer(AMessage.WParam));
-        Exit(True);
+        Exit;
       end;
 
     WM_USER:
@@ -364,10 +364,10 @@ begin
         AList := TACLList(AMessage.LParam);
         for I := 0 to AList.Count - 1 do
           SafeCallTimerProc(AList.List[I]);
-        Exit(True);
+        Exit;
       end;
   end;
-  Result := False;
+  inherited;
 end;
 
 function TACLTimerManager.AlignToSystemTimerResolution(AInterval: Cardinal): Cardinal;
@@ -397,12 +397,12 @@ end;
 
 procedure TACLTimerManager.SafeCallTimerProc(ATimer: TACLTimer);
 begin
-//  FLock.Enter;
+//  TMonitor.Enter(Self);
 //  try
   if FTimers.Contains(ATimer) then
     ATimer.Timer;
 //  finally
-//    FLock.Leave;
+//    TMonitor.Exit(Self);
 //  end;
 end;
 
