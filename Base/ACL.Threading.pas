@@ -671,7 +671,7 @@ end;
 
 class constructor TACLMainThread.Create;
 begin
-  FHandle := WndCreateMsg(WndProc, ClassName);
+  FHandle := WndCreate(WndProc, ClassName, True);
   FQueue := TThreadList<PSynchronizeRecord>.Create;
 end;
 

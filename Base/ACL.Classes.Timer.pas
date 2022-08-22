@@ -100,20 +100,20 @@ type
 
   { TACLTimerManager }
 
-  TACLTimerManager = class(TACLMessageWindow)
+  TACLTimerManager = class
   strict private
     FSystemTimerResolution: Integer;
 
     function AlignToSystemTimerResolution(AInterval: Cardinal): Cardinal;
     function GetSystemTimerResolution: Integer;
+    procedure HandleMessage(var AMessage: TMessage);
     procedure SafeCallTimerProc(ATimer: TACLTimer); inline;
     procedure SafeUpdateHighResolutionThread;
   protected
+    FHandle: HWND;
     FHighResolutionThread: TACLTimerManagerHighResolutionThread;
     FHighResolutionTimers: TACLThreadList<TACLTimer>;
     FTimers: TACLList<TACLTimer>;
-
-    procedure HandleMessage(var AMessage: TMessage); override;
 
     property SystemTimerResolution: Integer read GetSystemTimerResolution;
   public
@@ -298,7 +298,7 @@ end;
 
 constructor TACLTimerManager.Create;
 begin
-  CreateMsg(ClassName);
+  FHandle := WndCreate(HandleMessage, ClassName, True);
   FTimers := TACLList<TACLTimer>.Create;
   FHighResolutionTimers := TACLThreadList<TACLTimer>.Create;
 end;
@@ -308,6 +308,7 @@ begin
   FreeAndNil(FHighResolutionThread);
   FreeAndNil(FHighResolutionTimers);
   FreeAndNil(FTimers);
+  WndFree(FHandle);
   inherited Destroy;
 end;
 
@@ -367,7 +368,7 @@ begin
         Exit;
       end;
   end;
-  inherited;
+  WndDefaultProc(FHandle, AMessage);
 end;
 
 function TACLTimerManager.AlignToSystemTimerResolution(AInterval: Cardinal): Cardinal;
@@ -474,7 +475,7 @@ begin
 
       if ATicked.Count > 0 then
       begin
-        FOwner.SendMessage(WM_USER, 0, LPARAM(ATicked));
+        SendMessage(FOwner.FHandle, WM_USER, 0, LPARAM(ATicked));
         ATicks := GetExactTickCount;
       end;
 
