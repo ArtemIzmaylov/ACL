@@ -700,6 +700,11 @@ procedure acLockRedraw(AControl: TWinControl);
 procedure acFullRedraw(AControl: TWinControl);
 procedure acUnlockRedraw(AControl: TWinControl; ARedraw: Boolean);
 
+// Keyboard
+function acGetShiftState: TShiftState;
+function acIsAltKeyPressed: Boolean;
+function acIsCtrlKeyPressed: Boolean;
+
 function MouseTracker: TACLMouseTracking;
 implementation
 
@@ -727,6 +732,39 @@ begin
   if FMouseTracker = nil then
     FMouseTracker := TACLMouseTracking.Create;
   Result := FMouseTracker;
+end;
+
+function acGetShiftState: TShiftState;
+begin
+  //#AI: We must ask use the GetKeyState instead of the GetKeyboardState,
+  // because second doesn't return real information after next actions:
+  // 1. Focus main form of application
+  // 2. Alt+Click on window of another application
+  // 3. Click on taskbar button of our application, click again
+  // 4. Try to get GetKeyboardState in the SC_MINIMIZE handler
+  Result := [];
+  if GetKeyState(VK_SHIFT) < 0 then
+    Include(Result, ssShift);
+  if GetKeyState(VK_CONTROL) < 0 then
+    Include(Result, ssCtrl);
+  if GetKeyState(VK_MENU) < 0 then
+    Include(Result, ssAlt);
+  if GetKeyState(VK_LBUTTON) < 0 then
+    Include(Result, ssLeft);
+  if GetKeyState(VK_MBUTTON) < 0 then
+    Include(Result, ssMiddle);
+  if GetKeyState(VK_RBUTTON) < 0 then
+    Include(Result, ssRight);
+end;
+
+function acIsAltKeyPressed: Boolean;
+begin
+  Result := GetKeyState(VK_MENU) < 0;
+end;
+
+function acIsCtrlKeyPressed: Boolean;
+begin
+  Result := GetKeyState(VK_CONTROL) < 0;
 end;
 
 function acShiftStateToKeys(AShift: TShiftState): WORD;
