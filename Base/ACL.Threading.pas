@@ -111,6 +111,11 @@ type
     procedure Terminate; virtual;
     procedure TerminateForce;
     function WaitFor(ATimeOut: Cardinal = INFINITE): Boolean;
+    /// <summary>
+    ///    Returns True if after AStartTime the specified ATimeout is passed.
+    ///    If ATimeout = 0 or ATimeout = INFINITY - function always returns False.
+    /// </summary>
+    class function IsTimeout(AStartTime: Cardinal; ATimeOut: Cardinal): Boolean; static;
   end;
 
   { TACLPauseableThread }
@@ -237,19 +242,18 @@ const
 var
   AHandles: array[0..1] of THandle;
   AMsg: TMsg;
+  AStartWaitTime: Cardinal;
   AWaitResult: Cardinal;
-  AWaitTime: Cardinal;
 begin
+  Result := wrError;
   if IsMainThread then
   begin
-    Result := wrTimeout;
     AHandles[0] := AHandle;
     AHandles[1] := SyncEvent;
+    AStartWaitTime := TACLThread.GetTickCount;
     while ATimeOut > 0 do
     begin
-      AWaitTime := GetTickCount;
       AWaitResult := MsgWaitForMultipleObjects(2, AHandles, False, Min(MaxWaitTime, ATimeOut), QS_SENDMESSAGE);
-      AWaitTime := Max(GetTickCount - AWaitTime, 0);
       case AWaitResult of
         WAIT_FAILED:
           Exit(wrError);
@@ -262,8 +266,8 @@ begin
         WAIT_OBJECT_0 + 2:
           PeekMessage(AMsg, 0, 0, 0, PM_NOREMOVE);
       end;
-      if ATimeOut <> INFINITE then
-        Dec(ATimeOut, Min(AWaitTime, ATimeOut));
+      if TACLThread.IsTimeout(AStartWaitTime, ATimeOut) then
+        Exit(wrTimeout);
     end;
   end
   else
@@ -274,8 +278,6 @@ begin
         Result := wrAbandoned;
       WAIT_TIMEOUT:
         Result := wrTimeout;
-    else
-      Result := wrError;
     end;
 end;
 
@@ -531,6 +533,20 @@ procedure TACLThread.BeforeDestruction;
 begin
   inherited BeforeDestruction;
   Terminate;
+end;
+
+class function TACLThread.IsTimeout(AStartTime, ATimeOut: Cardinal): Boolean;
+var
+  ANow: Cardinal;
+begin
+  if (ATimeOut = 0) or (ATimeOut = INFINITE) then
+    Exit(False);
+
+  ANow := GetTickCount;
+  if ANow < AStartTime then
+    Result := High(Cardinal) - AStartTime + ANow >= ATimeOut
+  else
+    Result := ANow - AStartTime >= Cardinal(ATimeOut);
 end;
 
 procedure TACLThread.Terminate;
