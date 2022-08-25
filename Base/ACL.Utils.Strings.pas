@@ -179,11 +179,15 @@ type
 
   TACLEncodings = class
   strict private
+    class var FCodePages: TObject;
     class var FMap: TObject;
+
+    class function CodePageEnumProc(lpCodePageString: PWideChar): Cardinal; stdcall; static;
   public
     class constructor Create;
     class destructor Destroy;
     class function Default: TEncoding;
+    class procedure EnumAnsiCodePages(const AProc: TProc<Integer, string>);
     class function Get(const CodePage: Integer): TEncoding; overload;
     class function Get(const Name: string): TEncoding; overload;
   end;
@@ -292,6 +296,7 @@ implementation
 
 uses
   ACL.Classes.Collections,
+  ACL.Classes.StringList,
   ACL.FastCode,
   ACL.Parsers,
   ACL.Utils.Common;
@@ -1293,12 +1298,28 @@ end;
 
 class destructor TACLEncodings.Destroy;
 begin
+  FreeAndNil(FCodePages);
   FreeAndNil(FMap);
 end;
 
 class function TACLEncodings.Default: TEncoding;
 begin
   Result := Get(DefaultCodePage);
+end;
+
+class procedure TACLEncodings.EnumAnsiCodePages(const AProc: TProc<Integer, string>);
+var
+  I: Integer;
+begin
+  if FCodePages = nil then
+  begin
+    FCodePages := TACLStringList.Create;
+    EnumSystemCodePagesW(@CodePageEnumProc, CP_INSTALLED);
+    TACLStringList(FCodePages).SortLogical;
+    TACLStringList(FCodePages).Insert(0, 'Default', TObject(CP_ACP));
+  end;
+  for I := 0 to TACLStringList(FCodePages).Count - 1 do
+    AProc(Integer(TACLStringList(FCodePages).Objects[I]), TACLStringList(FCodePages).Strings[I]);
 end;
 
 class function TACLEncodings.Get(const CodePage: Integer): TEncoding;
@@ -1340,6 +1361,20 @@ begin
   finally
     AEncoding.Free;
   end;
+end;
+
+class function TACLEncodings.CodePageEnumProc(lpCodePageString: PWideChar): Cardinal; stdcall;
+var
+  ACodePage: Integer;
+  ACodePageInfo: TCPInfoEx;
+begin
+  ACodePage := StrToIntDef(lpCodePageString, -1);
+  if ACodePage > 0 then
+  begin
+    if GetCPInfoEx(ACodePage, 0, ACodePageInfo) and (ACodePageInfo.MaxCharSize = 1) then
+      TACLStringList(FCodePages).Add(ACodePageInfo.CodePageName, ACodePage);
+  end;
+  Result := 1;
 end;
 
 { TACLTimeFormat }
