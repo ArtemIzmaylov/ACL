@@ -394,7 +394,6 @@ end;
 procedure TFastFourierTransformUniversal.Transform(AInverse: Boolean);
 var
   B, T, O: PComplex;
-  C: TComplex;
   I: Integer;
   K: TComplexArgument;
 begin
@@ -435,10 +434,8 @@ begin
   T := @FTempBuffer^[FTempBufferOffset];
   for I := 0 to BufferLength - 1 do
   begin
-    C.Re := O^.Re * K;
-    C.Im := O^.Im * K;
-    B^.Re := T^.Re * O^.Re - T^.Im * O^.Im;
-    B^.Im := T^.Re * O^.Im + T^.Im * O^.Re;
+    B^.Re := K * (T^.Re * O^.Re - T^.Im * O^.Im);
+    B^.Im := K * (T^.Re * O^.Im + T^.Im * O^.Re);
     Dec(T);
     Inc(O);
     Inc(B);
