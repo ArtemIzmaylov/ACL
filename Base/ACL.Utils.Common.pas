@@ -17,11 +17,10 @@ unit ACL.Utils.Common;
 interface
 
 uses
+{$IFDEF MSWINDOWS}
   Winapi.Windows,
   Winapi.Messages,
   Winapi.PsAPI,
-{$IFNDEF ACL_BASE_NOVCL}
-  Vcl.Graphics,
 {$ENDIF}
   // System
   System.UITypes,
@@ -71,8 +70,6 @@ type
   end;
 
   TACLStringEnumProc = reference to procedure (const S: UnicodeString);
-
-  TACLFontData = array[0..3] of UnicodeString;
 
   TACLBooleanHelper = record helper for TACLBoolean
   public
@@ -124,33 +121,6 @@ var
 
   InvariantFormatSettings: TFormatSettings;
 
-  acLangSizeSuffixB: string = 'B';
-  acLangSizeSuffixKB: string = 'KB';
-  acLangSizeSuffixMB: string = 'MB';
-  acLangSizeSuffixGB: string = 'GB';
-
-// Conversion
-{$IFNDEF ACL_BASE_NOVCL}
-function FontStyleDecode(const Style: TFontStyles): Byte;
-function FontStyleEncode(Style: Integer): TFontStyles;
-function FontToString(AFont: TFont): UnicodeString; overload;
-function FontToString(const AName: UnicodeString; AColor: TColor; AHeight: Integer; AStyle: TFontStyles): UnicodeString; overload;
-procedure StringToFont(const S: UnicodeString; const Font: TFont);
-procedure StringToFontData(const S: UnicodeString; out AFontData: TACLFontData);
-{$ENDIF}
-function acPointToString(const P: TPoint): UnicodeString;
-function acRectToString(const R: TRect): UnicodeString;
-function acSizeToString(const S: TSize): UnicodeString;
-function acStringToPoint(const S: UnicodeString): TPoint;
-function acStringToRect(const S: UnicodeString): TRect;
-function acStringToSize(const S: UnicodeString): TSize;
-
-// Formatting
-function FormatSize(const AValue: Int64; AAllowGigaBytes: Boolean = True): UnicodeString;
-function TrackFormat(ATrack: Integer): UnicodeString;
-function acFormatFloat(const AFormat: UnicodeString; const AValue: Double; AShowPlusSign: Boolean): UnicodeString; overload;
-function acFormatFloat(const AFormat: UnicodeString; const AValue: Double; const ADecimalSeparator: Char = '.'): UnicodeString; overload;
-
 // HMODULE
 function acGetProcessFileName(const AWindowHandle: HWND; out AFileName: UnicodeString): Boolean;
 function acGetProcAddress(ALibHandle: HMODULE; AProcName: PWideChar; var AResult: Boolean): Pointer;
@@ -163,7 +133,7 @@ function acGetWindowRect(AHandle: HWND): TRect;
 function acFindWindow(const AClassName: UnicodeString): HWND;
 function acGetClassName(Handle: HWND): UnicodeString;
 function acGetWindowText(AHandle: HWND): UnicodeString;
-procedure SwitchToThisWindow(AHandle: HWND; ABringToTop: BOOL);
+procedure acSwitchToWindow(AHandle: HWND);
 procedure acSetWindowText(AHandle: HWND; const AText: UnicodeString);
 
 // System
@@ -193,9 +163,6 @@ implementation
 uses
 {$IFNDEF ACL_BASE_NOVCL}
   Vcl.Forms,
-{$ENDIF}
-{$IFDEF DEBUG}
-  ACL.Utils.Shell,
 {$ENDIF}
   System.TypInfo,
   // ACL
@@ -228,167 +195,13 @@ end;
 
 function acSetThreadErrorMode(Mode: DWORD): DWORD;
 begin
- if Assigned(FSetThreadErrorMode) then
- begin
-   if not FSetThreadErrorMode(Mode, Result) then
-     Result := FGetThreadErrorMode;
- end
- else
-   Result := SetErrorMode(Mode);
-end;
-
-// ---------------------------------------------------------------------------------------------------------------------
-// Conversion
-// ---------------------------------------------------------------------------------------------------------------------
-
-function acStringToPoint(const S: UnicodeString): TPoint;
-begin
-  Result := NullPoint;
-  acExplodeStringAsIntegerArray(S, ',', @Result.X, 2);
-end;
-
-function acStringToSize(const S: UnicodeString): TSize;
-begin
-  Result := NullSize;
-  acExplodeStringAsIntegerArray(S, ',', @Result.cx, 2);
-end;
-
-function acStringToRect(const S: UnicodeString): TRect;
-begin
-  Result := NullRect;
-  acExplodeStringAsIntegerArray(S, ',', @Result.Left, 4);
-end;
-
-function acPointToString(const P: TPoint): UnicodeString;
-begin
-  Result := Format('%d,%d', [P.X, P.Y]);
-end;
-
-function acSizeToString(const S: TSize): UnicodeString;
-begin
-  Result := Format('%d,%d', [S.cx, S.cy]);
-end;
-
-function acRectToString(const R: TRect): UnicodeString;
-begin
-  Result := Format('%d,%d,%d,%d', [R.Left, R.Top, R.Right, R.Bottom]);
-end;
-
-{$IFNDEF ACL_BASE_NOVCL}
-function FontStyleEncode(Style: Integer): TFontStyles;
-begin
-  Result := [];
-  if 1 and Style = 1 then
-    Result := Result + [fsItalic];
-  if 2 and Style = 2 then
-    Result := Result + [fsBold];
-  if 4 and Style = 4 then
-    Result := Result + [fsUnderline];
-  if 8 and Style = 8 then
-    Result := Result + [fsStrikeOut];
-end;
-
-function FontStyleDecode(const Style: TFontStyles): Byte;
-begin
-  Result := 0;
-  if fsItalic in Style then
-    Result := 1;
-  if fsBold in Style then
-    Result := Result or 2;
-  if fsUnderline in Style then
-    Result := Result or 4;
-  if fsStrikeOut in Style then
-    Result := Result or 8;
-end;
-
-function FontToString(const AName: UnicodeString;
-  AColor: TColor; AHeight: Integer; AStyle: TFontStyles): UnicodeString; overload;
-begin
-  Result := Format('%s,%d,%d,%d', [AName, AColor, AHeight, FontStyleDecode(AStyle)]);
-end;
-
-function FontToString(AFont: TFont): UnicodeString; overload;
-begin
-  Result := FontToString(AFont.Name, AFont.Color, AFont.Height, AFont.Style);
-end;
-
-procedure StringToFont(const S: UnicodeString; const Font: TFont);
-var
-  AFontData: TACLFontData;
-begin
-  StringToFontData(S, AFontData);
-  Font.Name := AFontData[0];
-  Font.Color := StrToIntDef(AFontData[1], 0);
-  Font.Height := StrToIntDef(AFontData[2], 0);
-  Font.Style := FontStyleEncode(StrToIntDef(AFontData[3], 0));
-end;
-
-procedure StringToFontData(const S: UnicodeString; out AFontData: TACLFontData);
-var
-  ALen: Integer;
-  APos: Integer;
-  AStart, AScan: PWideChar;
-begin
-  AScan := PWideChar(S);
-  ALen := Length(S);
-  AStart := AScan;
-  APos := 0;
-  while (ALen >= 0) and (APos <= High(AFontData)) do
+  if Assigned(FSetThreadErrorMode) then
   begin
-    if (AScan^ = ',') or (ALen = 0) then
-    begin
-      SetString(AFontData[APos], AStart, (NativeUInt(AScan) - NativeUInt(AStart)) div SizeOf(WideChar));
-      AStart := AScan;
-      Inc(AStart);
-      Inc(APos);
-    end;
-    Dec(ALen);
-    Inc(AScan);
-  end;
-end;
-{$ENDIF}
-
-// ---------------------------------------------------------------------------------------------------------------------
-// Formatting
-// ---------------------------------------------------------------------------------------------------------------------
-
-function FormatSize(const AValue: Int64; AAllowGigaBytes: Boolean = True): UnicodeString;
-begin
-  if AValue < 0 then
-    Exit('-' + FormatSize(-AValue, AAllowGigaBytes));
-
-  if AValue < SIZE_ONE_KILOBYTE then
-    Result := IntToStr(AValue) + ' ' + acLangSizeSuffixB
-  else if AValue < SIZE_ONE_MEGABYTE then
-    Result := FormatFloat('0.00', AValue / SIZE_ONE_KILOBYTE) + ' ' + acLangSizeSuffixKB
-  else if not AAllowGigaBytes or (AValue < SIZE_ONE_GIGABYTE)then
-    Result := FormatFloat('0.00', AValue / SIZE_ONE_MEGABYTE) + ' ' + acLangSizeSuffixMB
+    if not FSetThreadErrorMode(Mode, Result) then
+      Result := FGetThreadErrorMode;
+  end
   else
-    Result := FormatFloat('0.00', AValue / SIZE_ONE_GIGABYTE) + ' ' + acLangSizeSuffixGB;
-end;
-
-function TrackFormat(ATrack: Integer): UnicodeString;
-begin
-  if (ATrack >= 0) and (ATrack < 10) then
-    Result := '0' + IntToStr(ATrack)
-  else
-    Result := IntToStr(ATrack);
-end;
-
-function acFormatFloat(const AFormat: UnicodeString; const AValue: Double; const ADecimalSeparator: Char = '.'): UnicodeString;
-var
-  AFormatSettings: TFormatSettings;
-begin
-  AFormatSettings := FormatSettings;
-  AFormatSettings.DecimalSeparator := ADecimalSeparator;
-  Result := FormatFloat(AFormat, AValue, AFormatSettings);
-end;
-
-function acFormatFloat(const AFormat: UnicodeString; const AValue: Double; AShowPlusSign: Boolean): UnicodeString;
-const
-  SignsMap: array[Boolean] of string = ('', '+');
-begin
-  Result := SignsMap[(AValue >= 0) and AShowPlusSign] + acFormatFloat(AFormat, AValue);
+    Result := SetErrorMode(Mode);
 end;
 
 //==============================================================================
@@ -623,7 +436,7 @@ begin
   end;
 end;
 
-procedure SwitchToThisWindow(AHandle: HWND; ABringToTop: BOOL);
+procedure acSwitchToWindow(AHandle: HWND);
 var
   AInput: TInput;
 begin
