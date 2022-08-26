@@ -142,7 +142,7 @@ implementation
 uses
   System.Math,
   // ACL
-  ACL.Classes.MessageWindow,
+  ACL.Utils.Messaging,
   ACL.Utils.Desktop,
   ACL.Utils.DPIAware,
   ACL.Utils.Strings;

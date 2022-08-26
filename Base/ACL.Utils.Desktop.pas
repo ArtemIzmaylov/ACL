@@ -124,7 +124,7 @@ uses
 {$ENDIF}
   System.SysUtils,
   // ACL
-  ACL.Classes.MessageWindow,
+  ACL.Utils.Messaging,
   ACL.Utils.Common,
   ACL.Utils.Strings;
 
@@ -439,12 +439,12 @@ constructor TACLScreenHelper.Create;
 begin
   inherited Create;
   FMonitors := TACLObjectList.Create;
-  MessageWindow.HandlerAdd(MessageHandler);
+  TACLMessaging.HandlerAdd(MessageHandler);
 end;
 
 destructor TACLScreenHelper.Destroy;
 begin
-  MessageWindow.HandlerRemove(MessageHandler);
+  TACLMessaging.HandlerRemove(MessageHandler);
   FreeAndNil(FMonitors);
   inherited Destroy;
 end;

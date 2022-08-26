@@ -51,6 +51,7 @@ uses
   ACL.Parsers,
   ACL.Threading,
   ACL.UI.AeroPeek,
+  ACL.UI.Application,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.BaseEditors,
@@ -602,7 +603,7 @@ begin
   FDialog := ADialog;
   FSaveDialog := ASaveDialog;
   if AParent = 0 then
-    FParent := TACLAppUtils.GetHandle
+    FParent := TACLApplication.GetHandle
   else
     FParent := AParent;
 

@@ -510,7 +510,7 @@ var
   ABytes: TBytes;
   ASize: Cardinal;
 begin
-  AEncoding := DetectEncoding(AStream, ADefaultEncoding);
+  AEncoding := acDetectEncoding(AStream, ADefaultEncoding);
   ASize := AStream.Size - AStream.Position;
   if ASize <= 0 then
     Result := ''
@@ -528,7 +528,7 @@ begin
       try
         Result := AEncoding.GetString(ABytes);
       except
-        Result := TEncoding.Default.GetString(ABytes);
+        Result := TACLEncodings.Default.GetString(ABytes);
       end;
     end;
 end;

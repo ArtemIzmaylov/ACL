@@ -17,6 +17,7 @@ interface
 
 uses
   Winapi.Windows,
+  Winapi.Messages,
   // System
   System.UITypes,
   System.SysUtils,
@@ -75,6 +76,13 @@ type
     class procedure ListenerRemove(AListener: IUnknown);
     class procedure SetDefaultFont(const AName: TFontName; AHeight: Integer);
     class procedure UpdateColorSet;
+
+    class function GetHandle: HWND;
+    class function IsMinimized: Boolean;
+    class procedure ExecCommand(ASysCommand: Integer);
+    class procedure Minimize;
+    class procedure PostTerminate;
+    class procedure RestoreIfMinimized;
 
     class function GetActualColor(ALightColor, ADarkColor: TColor): TColor; overload;
     class function GetActualColor(ALightColor, ADarkColor: TAlphaColor): TAlphaColor; overload;
@@ -275,6 +283,43 @@ begin
 
   if AChanges <> [] then
     Changed(AChanges);
+end;
+
+class function TACLApplication.GetHandle: HWND;
+begin
+  if Application.MainFormOnTaskBar then
+    Result := Application.MainFormHandle
+  else
+    Result := Application.Handle;
+end;
+
+class function TACLApplication.IsMinimized: Boolean;
+begin
+  Result := IsIconic(GetHandle);
+end;
+
+class procedure TACLApplication.ExecCommand(ASysCommand: Integer);
+begin
+  SendMessage(GetHandle, WM_SYSCOMMAND, ASysCommand, 0);
+end;
+
+class procedure TACLApplication.Minimize;
+begin
+  ExecCommand(SC_MINIMIZE);
+end;
+
+class procedure TACLApplication.PostTerminate;
+begin
+  if Application.MainForm <> nil then
+    PostMessage(Application.MainFormHandle, WM_CLOSE, 0, 0)
+  else
+    PostQuitMessage(0);
+end;
+
+class procedure TACLApplication.RestoreIfMinimized;
+begin
+  if IsMinimized then
+    ExecCommand(SC_RESTORE);
 end;
 
 class function TACLApplication.DecodeColorScheme(const AValue: Word): TACLColorSchema;

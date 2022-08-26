@@ -726,7 +726,6 @@ type
 
     function ReadData: Integer;
     procedure RegisterConsumedCharacters(ACharacters: Int64);
-    function CheckEncoding(const ANewEncodingName: string): TEncoding;
     procedure SetupEncoding(AEncoding: TEncoding);
     procedure SwitchEncoding(ANewEncoding: TEncoding);
     procedure SwitchEncodingToUTF8;
@@ -1721,14 +1720,6 @@ begin
     Inc(I);
   end;
   Dec(ALen, AOffset);
-end;
-
-function TACLXMLTextReader.CheckEncoding(const ANewEncodingName: string): TEncoding;
-begin
-  if SameText(ANewEncodingName, 'UTF-8') then
-    Result := TEncoding.UTF8
-  else
-    Result := TEncoding.GetEncoding(ANewEncodingName);
 end;
 
 procedure TACLXMLTextReader.ClearNodes;
@@ -4979,7 +4970,7 @@ LblContinue:
         1:
           begin
             SetString(AEncodingName, PChar(@FParsingState.Chars[FParsingState.CharPos]), APosition - FParsingState.CharPos);
-            AEncoding := CheckEncoding(AEncodingName);
+            AEncoding := TACLEncodings.Get(AEncodingName);
             if not AIsTextDecl then
               AAttr.SetValue(AEncodingName);
             AXmlDeclState := 2;

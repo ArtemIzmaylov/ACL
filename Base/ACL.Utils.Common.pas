@@ -79,16 +79,6 @@ type
     class function From(AValue: Boolean): TACLBoolean; static;
   end;
 
-  { TMessagesHelper }
-
-  TMessagesHelper = class
-  public
-    class function IsInQueue(AWndHandle: HWND; AMessage: Cardinal): Boolean;
-    class procedure Process(AFromMessage, AToMessage: Cardinal; AWndHandle: HWND = 0); overload;
-    class procedure Process(AMessage: Cardinal; AWndHandle: HWND = 0); overload;
-    class procedure Remove(AMessage: Cardinal; AWndHandle: HWND = 0);
-  end;
-
   { TProcessHelper }
 
   TExecuteOption = (eoWaitForTerminate, eoShowGUI);
@@ -107,21 +97,6 @@ type
     class function IsWow64Window(AWindow: HWND): LongBool;
     class function Wow64SetFileSystemRedirection(AValue: Boolean): LongBool;
   end;
-
-{$IFNDEF ACL_BASE_NOVCL}
-
-  TACLAppUtils = class
-  public
-    class function GetHandle: HWND;
-    class function IsMinimized: Boolean;
-    // SysCommands
-    class procedure ExecCommand(ACommand: Integer);
-    class procedure Minimize;
-    class procedure PostTerminate;
-    class procedure RestoreIfMinimized;
-  end;
-
-{$ENDIF}
 
   { TACLInterfaceHelper }
 
@@ -183,12 +158,6 @@ function acLoadLibrary(const AFileName: UnicodeString; AFlags: Cardinal = 0): HM
 function acModuleFileName(AModule: HMODULE): UnicodeString; inline;
 function acModuleHandle(const AFileName: UnicodeString): HMODULE;
 
-// Tool Windows
-function WndCreate(Method: TWndMethod; const ClassName: string; const Name: string = ''): HWND;
-function WndCreateMsg(Method: TWndMethod; const ClassName: string): HWND;
-procedure WndFree(W: HWND);
-procedure WndDefaultProc(W: HWND; var M: TMessage);
-
 // Window Handles
 function acGetWindowRect(AHandle: HWND): TRect;
 function acFindWindow(const AClassName: UnicodeString): HWND;
@@ -203,11 +172,6 @@ procedure MinimizeMemoryUsage;
 function GetExactTickCount: Int64;
 function TickCountToTime(const ATicks: Int64): Cardinal;
 function TimeToTickCount(const ATime: Cardinal): Int64;
-
-// Keyboard
-function acGetShiftState: TShiftState;
-function acIsAltKeyPressed: Boolean;
-function acIsCtrlKeyPressed: Boolean;
 
 // Interfaces
 procedure acGetInterface(const Instance: IInterface; const IID: TGUID; out Intf); overload;
@@ -224,9 +188,6 @@ function acObjectUID(AObject: TObject): string;
 function acSetThreadErrorMode(Mode: DWORD): DWORD;
 procedure FreeMemAndNil(var P: Pointer);
 function IfThen(AValue: Boolean; ATrue: TACLBoolean; AFalse: TACLBoolean): TACLBoolean; overload;
-
-function LocalDateTimeToUTC(const AValue: TDateTime): TDateTime;
-function UTCToLocalDateTime(const AValue: TDateTime): TDateTime;
 implementation
 
 uses
@@ -252,19 +213,6 @@ var
   FPerformanceCounterFrequency: Int64 = 0;
   FGetThreadErrorMode: TGetThreadErrorMode = nil;
   FSetThreadErrorMode: TSetThreadErrorMode = nil;
-
-  UtilWindowClass: TWndClass = (Style: 0; lpfnWndProc: @DefWindowProc;
-    cbClsExtra: 0; cbWndExtra: 0; hInstance: 0; hIcon: 0; hCursor: 0;
-    hbrBackground: 0; lpszMenuName: nil; lpszClassName: 'TPUtilWindow');
-  UtilWindowClassName: string;
-{$IFDEF DEBUG}
-  FLogCritical: TACLCriticalSection;
-{$ENDIF}
-
-function TzSpecificLocalTimeToSystemTime(lpTimeZoneInformation: PTimeZoneInformation;
-  var lpLocalTime, lpUniversalTime: TSystemTime): BOOL; stdcall; external kernel32;
-function SystemTimeToTzSpecificLocalTime(lpTimeZoneInformation: PTimeZoneInformation;
-  var lpUniversalTime, lpLocalTime: TSystemTime): BOOL; stdcall; external kernel32;
 
 procedure CheckWindowsVersion;
 begin
@@ -505,61 +453,6 @@ begin
   Result := GetModuleName(AModule);
 end;
 
-//==============================================================================
-// ToolWindows
-//==============================================================================
-
-function WndCreateCore(Method: TWndMethod; const ClassName, Name: string; IsMessageWindow: Boolean): HWND;
-var
-  ClassRegistered: Boolean;
-  TempClass: TWndClass;
-begin
-  if not IsMainThread then
-    raise EInvalidOperation.Create('Cannot create window in non-main thread');
-  UtilWindowClassName := ClassName;
-  UtilWindowClass.hInstance := HInstance;
-  UtilWindowClass.lpszClassName := PChar(UtilWindowClassName);
-  ClassRegistered := GetClassInfo(HInstance, UtilWindowClass.lpszClassName, TempClass);
-  if not ClassRegistered or (TempClass.lpfnWndProc <> @DefWindowProc) then
-  begin
-    if ClassRegistered then
-      Winapi.Windows.UnregisterClass(UtilWindowClass.lpszClassName, HInstance);
-    Winapi.Windows.RegisterClass(UtilWindowClass);
-  end;
-  Result := CreateWindowEx(WS_EX_TOOLWINDOW, UtilWindowClass.lpszClassName, PChar(Name),
-    WS_POPUP {!0}, 0, 0, 0, 0, IfThen(IsMessageWindow, HWND_MESSAGE), 0, HInstance, nil);
-  if Assigned(Method) then
-    SetWindowLong(Result, GWL_WNDPROC, NativeUInt(System.Classes.MakeObjectInstance(Method)));
-end;
-
-function WndCreate(Method: TWndMethod; const ClassName: string; const Name: string = ''): HWND;
-begin
-  Result := WndCreateCore(Method, ClassName, Name, False);
-end;
-
-function WndCreateMsg(Method: TWndMethod; const ClassName: string): HWND;
-begin
-  Result := WndCreateCore(Method, ClassName, '', True);
-end;
-
-procedure WndDefaultProc(W: HWND; var M: TMessage);
-begin
-  M.Result := DefWindowProc(W, M.Msg, M.WParam, M.LParam);
-end;
-
-procedure WndFree(W: HWND);
-var
-  AInstance: Pointer;
-begin
-  if W <> 0 then
-  begin
-    AInstance := Pointer(GetWindowLong(W, GWL_WNDPROC));
-    DestroyWindow(W);
-    if AInstance <> @DefWindowProc then
-      System.Classes.FreeObjectInstance(AInstance);
-  end;
-end;
-
 // ---------------------------------------------------------------------------------------------------------------------
 // Internal Tools
 // ---------------------------------------------------------------------------------------------------------------------
@@ -601,63 +494,6 @@ begin
     Result := ATrue
   else
     Result := AFalse;
-end;
-
-function LocalDateTimeToUTC(const AValue: TDateTime): TDateTime;
-var
-  AInfo: TTimeZoneInformation;
-  ALocalTime: TSystemTime;
-  AUniversalTime: TSystemTime;
-begin
-  GetTimeZoneInformation(AInfo);
-  DateTimeToSystemTime(AValue, ALocalTime);
-  TzSpecificLocalTimeToSystemTime(@AInfo, ALocalTime, AUniversalTime);
-  Result := SystemTimeToDateTime(AUniversalTime);
-end;
-
-function UTCToLocalDateTime(const AValue: TDateTime):TDateTime;
-var
-  AInfo: TTimeZoneInformation;
-  ALocalTime: TSystemTime;
-  AUniversalTime: TSystemTime;
-begin
-  GetTimeZoneInformation(AInfo);
-  DateTimeToSystemTime(AValue, AUniversalTime);
-  SystemTimeToTzSpecificLocalTime(@AInfo, AUniversalTime, ALocalTime);
-  Result := SystemTimeToDateTime(ALocalTime);
-end;
-
-function acGetShiftState: TShiftState;
-begin
-  //#AI: We must ask use the GetKeyState instead of the GetKeyboardState,
-  // because second doesn't return real information after next actions:
-  // 1. Focus main form of application
-  // 2. Alt+Click on window of another application
-  // 3. Click on taskbar button of our application, click again
-  // 4. Try to get GetKeyboardState in the SC_MINIMIZE handler
-  Result := [];
-  if GetKeyState(VK_SHIFT) < 0 then
-    Include(Result, ssShift);
-  if GetKeyState(VK_CONTROL) < 0 then
-    Include(Result, ssCtrl);
-  if GetKeyState(VK_MENU) < 0 then
-    Include(Result, ssAlt);
-  if GetKeyState(VK_LBUTTON) < 0 then
-    Include(Result, ssLeft);
-  if GetKeyState(VK_MBUTTON) < 0 then
-    Include(Result, ssMiddle);
-  if GetKeyState(VK_RBUTTON) < 0 then
-    Include(Result, ssRight);
-end;
-
-function acIsAltKeyPressed: Boolean;
-begin
-  Result := GetKeyState(VK_MENU) < 0;
-end;
-
-function acIsCtrlKeyPressed: Boolean;
-begin
-  Result := GetKeyState(VK_CONTROL) < 0;
 end;
 
 procedure acGetInterface(const Instance: IInterface; const IID: TGUID; out Intf);
@@ -805,38 +641,6 @@ begin
     Result := TACLBoolean.True
   else
     Result := TACLBoolean.False;
-end;
-
-{ TMessagesHelper }
-
-class function TMessagesHelper.IsInQueue(AWndHandle: HWND; AMessage: Cardinal): Boolean;
-var
-  AMsg: TMSG;
-begin
-  Result := PeekMessage(AMsg, AWndHandle, AMessage, AMessage, PM_NOREMOVE) and (AMsg.hwnd = AWndHandle);
-end;
-
-class procedure TMessagesHelper.Process(AFromMessage, AToMessage: Cardinal; AWndHandle: HWND = 0);
-var
-  AMsg: TMsg;
-begin
-  while PeekMessage(AMsg, AWndHandle, AFromMessage, AToMessage, PM_REMOVE) do
-  begin
-    TranslateMessage(AMsg);
-    DispatchMessage(AMsg);
-  end;
-end;
-
-class procedure TMessagesHelper.Process(AMessage: Cardinal; AWndHandle: HWND = 0);
-begin
-  Process(AMessage, AMessage, AWndHandle);
-end;
-
-class procedure TMessagesHelper.Remove(AMessage: Cardinal; AWndHandle: HWND = 0);
-var
-  AMsg: TMsg;
-begin
-  while PeekMessage(AMsg, AWndHandle, AMessage, AMessage, PM_REMOVE) do ;
 end;
 
 { TProcessHelper }
@@ -1033,47 +837,6 @@ begin
   Result := Assigned(AWow64SetProc) and AWow64SetProc(AValue);
 end;
 
-{$IFNDEF ACL_BASE_NOVCL}
-{ TACLAppUtils }
-
-class function TACLAppUtils.GetHandle: HWND;
-begin
-  if Application.MainFormOnTaskBar then
-    Result := Application.MainFormHandle
-  else
-    Result := Application.Handle;
-end;
-
-class function TACLAppUtils.IsMinimized: Boolean;
-begin
-  Result := IsIconic(GetHandle);
-end;
-
-class procedure TACLAppUtils.ExecCommand(ACommand: Integer);
-begin
-  SendMessage(GetHandle, WM_SYSCOMMAND, ACommand, 0);
-end;
-
-class procedure TACLAppUtils.Minimize;
-begin
-  ExecCommand(SC_MINIMIZE);
-end;
-
-class procedure TACLAppUtils.PostTerminate;
-begin
-  if Application.MainForm <> nil then
-    PostMessage(Application.MainFormHandle, WM_CLOSE, 0, 0)
-  else
-    PostQuitMessage(0);
-end;
-
-class procedure TACLAppUtils.RestoreIfMinimized;
-begin
-  if IsMinimized then
-    ExecCommand(SC_RESTORE);
-end;
-{$ENDIF}
-
 { TACLInterfaceHelper }
 
 class function TACLInterfaceHelper<T>.GetGuid: TGUID;
@@ -1093,20 +856,8 @@ begin
 end;
 
 initialization
-{$IFDEF DEBUG}
-  FLogCritical := TACLCriticalSection.Create;
-{$ENDIF}
   FGetThreadErrorMode := GetProcAddress(GetModuleHandle(kernel32), 'GetThreadErrorMode');
   FSetThreadErrorMode := GetProcAddress(GetModuleHandle(kernel32), 'SetThreadErrorMode');
+  InvariantFormatSettings := TFormatSettings.Invariant;
   CheckWindowsVersion;
-
-  if IsValidLocale(LOCALE_INVARIANT, LCID_INSTALLED) then
-    InvariantFormatSettings := TFormatSettings.Create(LOCALE_INVARIANT)
-  else
-    InvariantFormatSettings := TFormatSettings.Create(1033); // English
-
-finalization
-{$IFDEF DEBUG}
-  FreeAndNil(FLogCritical);
-{$ENDIF}
 end.

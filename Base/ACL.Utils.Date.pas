@@ -69,12 +69,19 @@ type
     class procedure SetFirstDayInWeek(AValue: TWeekDay);
   end;
 
+function LocalDateTimeToUTC(const AValue: TDateTime): TDateTime;
+function UTCToLocalDateTime(const AValue: TDateTime): TDateTime;
 implementation
 
 uses
   System.Math,
   System.DateUtils,
   System.SysUtils;
+
+function TzSpecificLocalTimeToSystemTime(lpTimeZoneInformation: PTimeZoneInformation;
+  var lpLocalTime, lpUniversalTime: TSystemTime): BOOL; stdcall; external kernel32;
+function SystemTimeToTzSpecificLocalTime(lpTimeZoneInformation: PTimeZoneInformation;
+  var lpUniversalTime, lpLocalTime: TSystemTime): BOOL; stdcall; external kernel32;
 
 function GetCalendarID(Locale: LCID): TCalendarId; overload;
 begin
@@ -84,6 +91,30 @@ end;
 function GetCalendarID: TCalendarId; overload;
 begin
   Result := GetCalendarID(GetThreadLocale);
+end;
+
+function LocalDateTimeToUTC(const AValue: TDateTime): TDateTime;
+var
+  AInfo: TTimeZoneInformation;
+  ALocalTime: TSystemTime;
+  AUniversalTime: TSystemTime;
+begin
+  GetTimeZoneInformation(AInfo);
+  DateTimeToSystemTime(AValue, ALocalTime);
+  TzSpecificLocalTimeToSystemTime(@AInfo, ALocalTime, AUniversalTime);
+  Result := SystemTimeToDateTime(AUniversalTime);
+end;
+
+function UTCToLocalDateTime(const AValue: TDateTime):TDateTime;
+var
+  AInfo: TTimeZoneInformation;
+  ALocalTime: TSystemTime;
+  AUniversalTime: TSystemTime;
+begin
+  GetTimeZoneInformation(AInfo);
+  DateTimeToSystemTime(AValue, AUniversalTime);
+  SystemTimeToTzSpecificLocalTime(@AInfo, AUniversalTime, ALocalTime);
+  Result := SystemTimeToDateTime(ALocalTime);
 end;
 
 { TWeekDaysHelper }

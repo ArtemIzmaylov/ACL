@@ -59,6 +59,7 @@ uses
   ACL.Math,
   ACL.ObjectLinks,
   ACL.Threading,
+  ACL.UI.Application,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.ScrollBar,
   ACL.UI.Forms,
@@ -980,7 +981,7 @@ procedure TACLMenuPopupWindow.Popup(X, Y: Integer);
 begin
   if FItems.Count > 0 then
   begin
-    ParentWindow := TACLAppUtils.GetHandle;
+    ParentWindow := TACLApplication.GetHandle;
     RootMenu := Self;
     SetBounds(X, Y, Width, Height);
     Visible := True;

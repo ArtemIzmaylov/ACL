@@ -30,6 +30,7 @@ uses
   ACL.FileFormats.INI,
   ACL.Math,
   ACL.ObjectLinks,
+  ACL.UI.Controls.BaseControls,
   ACL.Threading,
   ACL.Utils.Clipboard,
   ACL.Utils.Common,

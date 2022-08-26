@@ -234,7 +234,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    
+
     procedure Popup(R: TRect); virtual;
     procedure PopupClose;
     procedure PopupUnderControl(Control: TControl; AAlignment: TAlignment = taLeftJustify); overload;
@@ -906,7 +906,7 @@ end;
 
 procedure TACLForm.ShowAndActivate;
 begin
-  if TACLAppUtils.IsMinimized then
+  if TACLApplication.IsMinimized then
     Visible := False;
   Show;
   SetForegroundWindow(Handle);

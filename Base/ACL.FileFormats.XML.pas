@@ -28,6 +28,7 @@ uses
   ACL.Classes.StringList,
   ACL.Hashes,
   ACL.Utils.Common,
+  ACL.Utils.Date,
   ACL.Utils.FileSystem,
   ACL.Utils.Stream,
   ACL.Utils.Strings;
@@ -1652,7 +1653,7 @@ function TACLTextXMLParser.DecodeValue(const S: AnsiString): UnicodeString;
 begin
   case Encoding.Encoding of
     mxeUTF8:
-      Result := DecodeUTF8(S);
+      Result := acDecodeUTF8(S);
     mxeWindows:
       Result := acStringFromAnsi(S, Encoding.CodePage);
   else
@@ -2000,7 +2001,7 @@ end;
 
 function TACLTextXMLBuilder.EncodeValue(const S: UnicodeString): AnsiString;
 begin
-  Result := EncodeUTF8(TACLXMLHelper.EncodeString(S));
+  Result := acEncodeUTF8(TACLXMLHelper.EncodeString(S));
 end;
 
 { TACLBinaryXMLBuilder }

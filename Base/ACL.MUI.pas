@@ -93,29 +93,6 @@ type
     procedure LangChanging;
   end;
 
-  { TACLCodePages }
-
-  TACLCodePages = class
-  strict private
-    FList: TStringList;
-    function GetCount: Integer;
-    function GetID(Index: Integer): Integer;
-    function GetName(Index: Integer): string;
-  protected
-    procedure AddCodePage(ID: Cardinal);
-    //
-    class function CompareCodePages(List: TStringList; Index1, Index2: Integer): Integer; static;
-    class function EnumCodePagesProc(lpCodePageString: PWideChar): Cardinal; stdcall; static;
-  public
-    constructor Create;
-    destructor Destroy; override;
-    function IndexOf(ACodePageID: Integer): Integer;
-    //
-    property ID[Index: Integer]: Integer read GetID;
-    property Name[Index: Integer]: string read GetName;
-    property Count: Integer read GetCount;
-  end;
-
   { TACLLocalizationInfo }
 
   TACLLocalizationInfo = packed record
@@ -157,7 +134,6 @@ type
 var
   LangFilePath: UnicodeString = '';
 
-function CodePages: TACLCodePages;
 function GetCodePageByLCID(LCID: Cardinal): UINT;
 function GetUserLangID: Integer;
 function LangFile: TACLLocalization;
@@ -202,15 +178,6 @@ const
 var
   FLangFile: TACLLocalization;
   FLangFileClass: TACLLocalizationCLass = TACLLocalization;
-  FCodePages: TACLCodePages;
-  LCodePages: TACLCodePages;
-
-function CodePages: TACLCodePages;
-begin
-  if FCodePages = nil then
-    FCodePages := TACLCodePages.Create;
-  Result := FCodePages;
-end;
 
 function LangGetComponentPath(const AComponent: TComponent): UnicodeString;
 var
@@ -577,71 +544,9 @@ begin
   WriteInteger(sLangMainSection, sLangID, Value);
 end;
 
-{ TACLCodePages }
-
-constructor TACLCodePages.Create;
-begin
-  inherited Create;
-  FList := TStringList.Create;
-  LCodePages := Self;
-  EnumSystemCodePagesW(@EnumCodePagesProc, CP_INSTALLED);
-  LCodePages := nil;
-  FList.CustomSort(CompareCodePages);
-end;
-
-destructor TACLCodePages.Destroy;
-begin
-  FreeAndNil(FList);
-  inherited Destroy;
-end;
-
-function TACLCodePages.IndexOf(ACodePageID: Integer): Integer;
-begin
-  Result := FList.IndexOfObject(TObject(ACodePageID));
-end;
-
-procedure TACLCodePages.AddCodePage(ID: Cardinal);
-var
-  AInfo: TCPInfoEx;
-begin
-  if GetCPInfoEx(ID, 0, AInfo) then
-    FList.AddObject(AInfo.CodePageName, TObject(ID));
-end;
-
-class function TACLCodePages.CompareCodePages(List: TStringList; Index1, Index2: Integer): Integer;
-begin
-  Result := acLogicalCompare(List[Index1], List[Index2]);
-end;
-
-class function TACLCodePages.EnumCodePagesProc(lpCodePageString: PWideChar): Cardinal; stdcall;
-var
-  ACodePage: Integer;
-begin
-  ACodePage := StrToIntDef(lpCodePageString, -1);
-  if ACodePage > 0 then
-    LCodePages.AddCodePage(ACodePage);
-  Result := 1;
-end;
-
-function TACLCodePages.GetCount: Integer;
-begin
-  Result := FList.Count;
-end;
-
-function TACLCodePages.GetID(Index: Integer): Integer;
-begin
-  Result := Integer(FList.Objects[Index]);
-end;
-
-function TACLCodePages.GetName(Index: Integer): string;
-begin
-  Result := FList[Index];
-end;
-
 initialization
   LangFilePath := acSelfPath + 'Langs' + PathDelim;
 
 finalization
   FreeAndNil(FLangFile);
-  FreeAndNil(FCodePages);
 end.

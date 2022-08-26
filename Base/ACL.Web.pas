@@ -162,6 +162,7 @@ uses
   ACL.Math,
   ACL.Parsers,
   ACL.Utils.Common,
+  ACL.Utils.Date,
   ACL.Utils.Registry,
   ACL.Utils.Stream,
   ACL.Utils.Strings;
