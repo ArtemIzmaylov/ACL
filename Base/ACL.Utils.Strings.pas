@@ -17,7 +17,14 @@ interface
 
 uses
   Winapi.Windows,
+  // Vcl
+{$IFNDEF ACL_BASE_NOVCL}
+  Vcl.Graphics,
+{$ENDIF}
   // System
+{$IFNDEF ACL_BASE_NOVCL}
+  System.UITypes,
+{$ENDIF}
   System.Types,
   System.Math,
   System.SysUtils,
@@ -192,10 +199,17 @@ type
     class function Get(const Name: string): TEncoding; overload;
   end;
 
+  TACLFontData = array[0..3] of UnicodeString;
+
 var
   DefaultCodePage: Integer = CP_ACP;
 
-function StrToIntDefA(const S: AnsiString; ADefault: Integer): Integer;
+  acLangSizeSuffixB: string = 'B';
+  acLangSizeSuffixKB: string = 'KB';
+  acLangSizeSuffixMB: string = 'MB';
+  acLangSizeSuffixGB: string = 'GB';
+
+function StrToIntDef(const S: AnsiString; ADefault: Integer): Integer; overload;
 
 // Text Conversions
 function acAnsiFromUnicode(const S: UnicodeString): AnsiString; overload;
@@ -282,6 +296,28 @@ function acEncodeLineBreaks(const S: UnicodeString): UnicodeString;
 function acRemoveLineBreaks(const S: UnicodeString): UnicodeString;
 function acReplaceLineBreaks(const S, ReplaceBy: UnicodeString): UnicodeString;
 
+// Conversion
+{$IFNDEF ACL_BASE_NOVCL}
+function acFontStyleDecode(const Style: TFontStyles): Byte;
+function acFontStyleEncode(Style: Integer): TFontStyles;
+function acFontToString(AFont: TFont): UnicodeString; overload;
+function acFontToString(const AName: UnicodeString; AColor: TColor; AHeight: Integer; AStyle: TFontStyles): UnicodeString; overload;
+procedure acStringToFont(const S: UnicodeString; const Font: TFont);
+procedure acStringToFontData(const S: UnicodeString; out AFontData: TACLFontData);
+{$ENDIF}
+function acPointToString(const P: TPoint): UnicodeString;
+function acRectToString(const R: TRect): UnicodeString;
+function acSizeToString(const S: TSize): UnicodeString;
+function acStringToPoint(const S: UnicodeString): TPoint;
+function acStringToRect(const S: UnicodeString): TRect;
+function acStringToSize(const S: UnicodeString): TSize;
+
+// Formatting
+function acFormatFloat(const AFormat: UnicodeString; const AValue: Double; AShowPlusSign: Boolean): UnicodeString; overload;
+function acFormatFloat(const AFormat: UnicodeString; const AValue: Double; const ADecimalSeparator: Char = '.'): UnicodeString; overload;
+function acFormatSize(const AValue: Int64; AAllowGigaBytes: Boolean = True): UnicodeString;
+function acFormatTrackNo(ATrack: Integer): UnicodeString;
+
 // Utils
 function IfThenW(AValue: Boolean; const ATrue: UnicodeString; const AFalse: UnicodeString = ''): UnicodeString; overload; inline;
 function IfThenW(const A, B: UnicodeString): UnicodeString; overload; inline;
@@ -307,14 +343,168 @@ const
 type
   TStringBuilderAccess = class(TStringBuilder);
 
-function StrToIntDefA(const S: AnsiString; ADefault: Integer): Integer;
+function StrToIntDef(const S: AnsiString; ADefault: Integer): Integer;
 begin
   Result := System.SysUtils.StrToIntDef(string(S), ADefault);
 end;
 
-//==============================================================================
+// ---------------------------------------------------------------------------------------------------------------------
+// Conversion
+// ---------------------------------------------------------------------------------------------------------------------
+
+function acStringToPoint(const S: UnicodeString): TPoint;
+begin
+  Result := NullPoint;
+  acExplodeStringAsIntegerArray(S, ',', @Result.X, 2);
+end;
+
+function acStringToSize(const S: UnicodeString): TSize;
+begin
+  Result := NullSize;
+  acExplodeStringAsIntegerArray(S, ',', @Result.cx, 2);
+end;
+
+function acStringToRect(const S: UnicodeString): TRect;
+begin
+  Result := NullRect;
+  acExplodeStringAsIntegerArray(S, ',', @Result.Left, 4);
+end;
+
+function acPointToString(const P: TPoint): UnicodeString;
+begin
+  Result := Format('%d,%d', [P.X, P.Y]);
+end;
+
+function acSizeToString(const S: TSize): UnicodeString;
+begin
+  Result := Format('%d,%d', [S.cx, S.cy]);
+end;
+
+function acRectToString(const R: TRect): UnicodeString;
+begin
+  Result := Format('%d,%d,%d,%d', [R.Left, R.Top, R.Right, R.Bottom]);
+end;
+
+{$IFNDEF ACL_BASE_NOVCL}
+function acFontStyleEncode(Style: Integer): TFontStyles;
+begin
+  Result := [];
+  if 1 and Style = 1 then
+    Result := Result + [fsItalic];
+  if 2 and Style = 2 then
+    Result := Result + [fsBold];
+  if 4 and Style = 4 then
+    Result := Result + [fsUnderline];
+  if 8 and Style = 8 then
+    Result := Result + [fsStrikeOut];
+end;
+
+function acFontStyleDecode(const Style: TFontStyles): Byte;
+begin
+  Result := 0;
+  if fsItalic in Style then
+    Result := 1;
+  if fsBold in Style then
+    Result := Result or 2;
+  if fsUnderline in Style then
+    Result := Result or 4;
+  if fsStrikeOut in Style then
+    Result := Result or 8;
+end;
+
+function acFontToString(const AName: UnicodeString;
+  AColor: TColor; AHeight: Integer; AStyle: TFontStyles): UnicodeString; overload;
+begin
+  Result := Format('%s,%d,%d,%d', [AName, AColor, AHeight, acFontStyleDecode(AStyle)]);
+end;
+
+function acFontToString(AFont: TFont): UnicodeString; overload;
+begin
+  Result := acFontToString(AFont.Name, AFont.Color, AFont.Height, AFont.Style);
+end;
+
+procedure acStringToFont(const S: UnicodeString; const Font: TFont);
+var
+  AFontData: TACLFontData;
+begin
+  acStringToFontData(S, AFontData);
+  Font.Name := AFontData[0];
+  Font.Color := StrToIntDef(AFontData[1], 0);
+  Font.Height := StrToIntDef(AFontData[2], 0);
+  Font.Style := acFontStyleEncode(StrToIntDef(AFontData[3], 0));
+end;
+
+procedure acStringToFontData(const S: UnicodeString; out AFontData: TACLFontData);
+var
+  ALen: Integer;
+  APos: Integer;
+  AStart, AScan: PWideChar;
+begin
+  AScan := PWideChar(S);
+  ALen := Length(S);
+  AStart := AScan;
+  APos := 0;
+  while (ALen >= 0) and (APos <= High(AFontData)) do
+  begin
+    if (AScan^ = ',') or (ALen = 0) then
+    begin
+      SetString(AFontData[APos], AStart, (NativeUInt(AScan) - NativeUInt(AStart)) div SizeOf(WideChar));
+      AStart := AScan;
+      Inc(AStart);
+      Inc(APos);
+    end;
+    Dec(ALen);
+    Inc(AScan);
+  end;
+end;
+{$ENDIF}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Formatting
+// ---------------------------------------------------------------------------------------------------------------------
+
+function acFormatSize(const AValue: Int64; AAllowGigaBytes: Boolean = True): UnicodeString;
+begin
+  if AValue < 0 then
+    Exit('-' + acFormatSize(-AValue, AAllowGigaBytes));
+
+  if AValue < SIZE_ONE_KILOBYTE then
+    Result := IntToStr(AValue) + ' ' + acLangSizeSuffixB
+  else if AValue < SIZE_ONE_MEGABYTE then
+    Result := FormatFloat('0.00', AValue / SIZE_ONE_KILOBYTE) + ' ' + acLangSizeSuffixKB
+  else if not AAllowGigaBytes or (AValue < SIZE_ONE_GIGABYTE)then
+    Result := FormatFloat('0.00', AValue / SIZE_ONE_MEGABYTE) + ' ' + acLangSizeSuffixMB
+  else
+    Result := FormatFloat('0.00', AValue / SIZE_ONE_GIGABYTE) + ' ' + acLangSizeSuffixGB;
+end;
+
+function acFormatTrackNo(ATrack: Integer): UnicodeString;
+begin
+  if (ATrack >= 0) and (ATrack < 10) then
+    Result := '0' + IntToStr(ATrack)
+  else
+    Result := IntToStr(ATrack);
+end;
+
+function acFormatFloat(const AFormat: UnicodeString; const AValue: Double; const ADecimalSeparator: Char = '.'): UnicodeString;
+var
+  AFormatSettings: TFormatSettings;
+begin
+  AFormatSettings := FormatSettings;
+  AFormatSettings.DecimalSeparator := ADecimalSeparator;
+  Result := FormatFloat(AFormat, AValue, AFormatSettings);
+end;
+
+function acFormatFloat(const AFormat: UnicodeString; const AValue: Double; AShowPlusSign: Boolean): UnicodeString;
+const
+  SignsMap: array[Boolean] of string = ('', '+');
+begin
+  Result := SignsMap[(AValue >= 0) and AShowPlusSign] + acFormatFloat(AFormat, AValue);
+end;
+
+// ---------------------------------------------------------------------------------------------------------------------
 // Text Conversions
-//==============================================================================
+// ---------------------------------------------------------------------------------------------------------------------
 
 function acAnsiFromUnicode(const S: UnicodeString): AnsiString; overload;
 begin

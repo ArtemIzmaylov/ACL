@@ -32,7 +32,8 @@ uses
   ACL.Classes,
   ACL.Classes.Collections,
   ACL.Utils.Common,
-  ACL.Utils.FileSystem;
+  ACL.Utils.FileSystem,
+  ACL.Utils.Strings;
 
 type
   TACLBorder = (mLeft, mTop, mRight, mBottom);
