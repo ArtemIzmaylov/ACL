@@ -256,8 +256,8 @@ begin
   FormattedText.Calculate;
   ABounds := ViewInfo.ClientBounds;
   ARowRect := FormattedText.FLayout[ARow].Bounds;
-  ViewInfo.ViewportY := ViewInfo.ViewportY + acCalculateMakeVisibleDelta(
-    ARowRect.Top, ARowRect.Bottom, ABounds.Top + ViewInfo.ViewportY, ABounds.Bottom + ViewInfo.ViewportY);
+  ViewInfo.ViewportY := ViewInfo.ViewportY + acCalculateScrollToDelta(ARowRect.Top, ARowRect.Bottom,
+    ABounds.Top + ViewInfo.ViewportY, ABounds.Bottom + ViewInfo.ViewportY, TACLScrollToMode.MakeVisible);
 end;
 
 function TACLFormattedLabelSubClass.CreateController: TACLCompoundControlSubClassController;

@@ -756,10 +756,10 @@ type
     constructor Create(ASubClass: TACLCompoundControlSubClass); override;
     destructor Destroy; override;
 
-    function CalculateMakeVisibleDelta(AObject: TObject;
+    function CalculateScrollToDelta(AObject: TObject; AMode: TACLScrollToMode;
       out ADelta: TPoint; AColumn: TACLTreeListColumn = nil): Boolean;
-    function CalculateMakeVisibleDeltaCore(ACell: TACLCompoundControlSubClassBaseContentCell;
-      const AViewItemsArea: TRect; AColumn: TACLTreeListColumn = nil): TPoint; virtual;
+    function CalculateScrollToDeltaCore(ACell: TACLCompoundControlSubClassBaseContentCell;
+      AMode: TACLScrollToMode; const AArea: TRect; AColumn: TACLTreeListSubClassColumnViewInfo = nil): TPoint; virtual;
     function GetContentCellForObject(AObject: TObject; out ACell: TACLCompoundControlSubClassBaseContentCell): Boolean;
 
     // Keyboard
@@ -775,11 +775,10 @@ type
     procedure MouseUp(AButton: TMouseButton; AShift: TShiftState); virtual;
 
     procedure ExpandTo(AObject: TObject);
-    procedure MakeTop(AObject: TObject); virtual;
-    procedure MakeVisible(AObject: TObject; AColumn: TACLTreeListColumn = nil);
     function IsVisible(AObject: TObject; AColumn: TACLTreeListColumn = nil): Boolean;
     procedure ScrollBy(ADeltaX, ADeltaY: Integer);
     procedure ScrollByLines(ALines: Integer; ADirection: TACLMouseWheelDirection);
+    procedure ScrollTo(AObject: TObject; AMode: TACLScrollToMode; AColumn: TACLTreeListColumn = nil);
 
     // IncrementalSearch
     function GetHighlightBounds(const AText: UnicodeString; AAbsoluteColumnIndex: Integer; out AHighlightStart, AHighlightFinish: Integer): Boolean;
@@ -1157,6 +1156,7 @@ type
     procedure MakeVisible(AObject: TObject);
     procedure ScrollBy(ADeltaX, ADeltaY: Integer);
     procedure ScrollByLines(ALines: Integer; ADirection: TACLMouseWheelDirection);
+    procedure ScrollTo(AObject: TObject; AMode: TACLScrollToMode; AColumn: TACLTreeListColumn = nil);
 
     // Groupping
     procedure GroupBy(AColumn: TACLTreeListColumn; AResetPrevSortingParams: Boolean = False);
@@ -3472,26 +3472,30 @@ begin
   inherited;
 end;
 
-function TACLTreeListSubClassNavigationController.CalculateMakeVisibleDelta(
-  AObject: TObject; out ADelta: TPoint; AColumn: TACLTreeListColumn = nil): Boolean;
+function TACLTreeListSubClassNavigationController.CalculateScrollToDelta(AObject: TObject;
+  AMode: TACLScrollToMode; out ADelta: TPoint; AColumn: TACLTreeListColumn = nil): Boolean;
 var
   ACell: TACLCompoundControlSubClassBaseContentCell;
+  AColumnViewInfo: TACLTreeListSubClassColumnViewInfo;
 begin
   Result := GetContentCellForObject(AObject, ACell);
   if Result then
-    ADelta := CalculateMakeVisibleDeltaCore(ACell, Content.ViewItemsArea, AColumn)
+  begin
+    if (AColumn = nil) or not Content.ColumnBarViewInfo.GetColumnViewInfo(AColumn, AColumnViewInfo) then
+      AColumnViewInfo := nil;
+    ADelta := CalculateScrollToDeltaCore(ACell, AMode, Content.ViewItemsArea, AColumnViewInfo);
+  end
   else
     ADelta := NullPoint;
 end;
 
-function TACLTreeListSubClassNavigationController.CalculateMakeVisibleDeltaCore(
-  ACell: TACLCompoundControlSubClassBaseContentCell; const AViewItemsArea: TRect; AColumn: TACLTreeListColumn = nil): TPoint;
-var
-  AColumnViewInfo: TACLTreeListSubClassColumnViewInfo;
+function TACLTreeListSubClassNavigationController.CalculateScrollToDeltaCore(
+  ACell: TACLCompoundControlSubClassBaseContentCell; AMode: TACLScrollToMode;
+  const AArea: TRect; AColumn: TACLTreeListSubClassColumnViewInfo = nil): TPoint;
 begin
-  Result.Y := acCalculateMakeVisibleDelta(ACell.Bounds.Top, ACell.Bounds.Bottom, AViewItemsArea.Top, AViewItemsArea.Bottom);
-  if (AColumn <> nil) and Content.ColumnBarViewInfo.GetColumnViewInfo(AColumn, AColumnViewInfo) then
-    Result.X := acCalculateMakeVisibleDelta(AColumnViewInfo.Bounds.Left, AColumnViewInfo.Bounds.Right, AViewItemsArea.Left, AViewItemsArea.Right)
+  Result.Y := acCalculateScrollToDelta(ACell.Bounds.Top, ACell.Bounds.Bottom, AArea.Top, AArea.Bottom, AMode);
+  if AColumn <> nil then
+    Result.X := acCalculateScrollToDelta(AColumn.Bounds.Left, AColumn.Bounds.Right, AArea.Left, AArea.Right, TACLScrollToMode.MakeVisible)
   else
     Result.X := 0;
 end;
@@ -3656,35 +3660,18 @@ begin
   end;
 end;
 
-procedure TACLTreeListSubClassNavigationController.MakeTop(AObject: TObject);
-var
-  ACell: TACLCompoundControlSubClassBaseContentCell;
-begin
-  ExpandTo(AObject);
-  if GetContentCellForObject(AObject, ACell) then
-    ScrollBy(0, ACell.Bounds.Top - Content.ViewItemsArea.Top);
-end;
-
-procedure TACLTreeListSubClassNavigationController.MakeVisible(AObject: TObject; AColumn: TACLTreeListColumn = nil);
-var
-  ADelta: TPoint;
-begin
-  ExpandTo(AObject);
-  if CalculateMakeVisibleDelta(AObject, ADelta, AColumn) then
-    ScrollBy(ADelta.X, ADelta.Y);
-end;
-
 function TACLTreeListSubClassNavigationController.IsVisible(AObject: TObject; AColumn: TACLTreeListColumn = nil): Boolean;
 var
   ADelta: TPoint;
 begin
-  Result := CalculateMakeVisibleDelta(AObject, ADelta, AColumn) and (ADelta = NullPoint);
+  Result := CalculateScrollToDelta(AObject, TACLScrollToMode.MakeVisible, ADelta, AColumn) and (ADelta = NullPoint);
 end;
 
 function TACLTreeListSubClassNavigationController.GetHighlightBounds(const AText: UnicodeString;
   AAbsoluteColumnIndex: Integer; out AHighlightStart, AHighlightFinish: Integer): Boolean;
 begin
-  Result := (AAbsoluteColumnIndex = IncSearchColumnIndex) and IncSearch.GetHighlightBounds(AText, AHighlightStart, AHighlightFinish);
+  Result := (AAbsoluteColumnIndex = IncSearchColumnIndex) and
+    IncSearch.GetHighlightBounds(AText, AHighlightStart, AHighlightFinish);
 end;
 
 procedure TACLTreeListSubClassNavigationController.SetFocusedObject(
@@ -3750,6 +3737,16 @@ end;
 procedure TACLTreeListSubClassNavigationController.ScrollByLines(ALines: Integer; ADirection: TACLMouseWheelDirection);
 begin
   Content.ScrollByLines(ALines, ADirection);
+end;
+
+procedure TACLTreeListSubClassNavigationController.ScrollTo(
+  AObject: TObject; AMode: TACLScrollToMode; AColumn: TACLTreeListColumn = nil);
+var
+  ADelta: TPoint;
+begin
+  ExpandTo(AObject);
+  if CalculateScrollToDelta(AObject, AMode, ADelta, AColumn) then
+    ScrollBy(ADelta.X, ADelta.Y);
 end;
 
 procedure TACLTreeListSubClassNavigationController.SelectAll;
@@ -3901,7 +3898,7 @@ begin
   if cccnStruct in AChanges then
     ValidateFocusedObject;
   if tlcnMakeVisible in AChanges then
-    MakeVisible(FocusedObject, FocusedColumn);
+    ScrollTo(FocusedObject, TACLScrollToMode.MakeVisible, FocusedColumn);
 end;
 
 function TACLTreeListSubClassNavigationController.CheckIncSearchColumn: Boolean;
@@ -4934,12 +4931,12 @@ end;
 
 procedure TACLTreeListSubClass.MakeTop(AObject: TObject);
 begin
-  NavigationController.MakeTop(AObject);
+  ScrollTo(AObject, TACLScrollToMode.MakeTop);
 end;
 
 procedure TACLTreeListSubClass.MakeVisible(AObject: TObject);
 begin
-  NavigationController.MakeVisible(AObject);
+  ScrollTo(AObject, TACLScrollToMode.MakeVisible);
 end;
 
 procedure TACLTreeListSubClass.ScrollBy(ADeltaX, ADeltaY: Integer);
@@ -4950,6 +4947,11 @@ end;
 procedure TACLTreeListSubClass.ScrollByLines(ALines: Integer; ADirection: TACLMouseWheelDirection);
 begin
   NavigationController.ScrollByLines(ALines, ADirection);
+end;
+
+procedure TACLTreeListSubClass.ScrollTo(AObject: TObject; AMode: TACLScrollToMode; AColumn: TACLTreeListColumn = nil);
+begin
+  NavigationController.ScrollTo(AObject, AMode, AColumn);
 end;
 
 procedure TACLTreeListSubClass.GroupBy(AColumn: TACLTreeListColumn; AResetPrevSortingParams: Boolean = False);
@@ -5913,5 +5915,3 @@ begin
 end;
 
 end.
-
-
