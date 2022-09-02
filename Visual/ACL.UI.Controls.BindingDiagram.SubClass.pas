@@ -889,7 +889,7 @@ function TACLBindingDiagramObjectViewInfo.CalculateCaptionSize: TSize;
 begin
   if (FCaptionSize = NullSize) and SubClass.OptionsView.ShowCaption then
   begin
-    FCaptionSize := acTextCalcSize(SubClass.CaptionFont, &Object.Caption, 0);
+    FCaptionSize := acTextSize(SubClass.CaptionFont, &Object.Caption);
     Inc(FCaptionSize.cx, 2 * ScaleFactor.Apply(acTextIndent));
     Inc(FCaptionSize.cy, 2 * ScaleFactor.Apply(acTextIndent));
     if HasRemoveButton then
@@ -981,7 +981,7 @@ begin
 
     ACanvas.Font := SubClass.CaptionFont;
     ACanvas.Font.Color := Style.ColorObjectCaptionText.AsColor;
-    acTextDraw(ACanvas.Handle, &Object.Caption, CaptionTextRect, taCenter, taVerticalCenter, True);
+    acTextDraw(ACanvas, &Object.Caption, CaptionTextRect, taCenter, taVerticalCenter, True);
   end;
 
   if not IsRectEmpty(RemoveButtonRect) then
@@ -1140,7 +1140,7 @@ procedure TACLBindingDiagramObjectPinViewInfo.DoDraw(ACanvas: TCanvas);
 begin
   DoDrawBackground(ACanvas);
 
-  acTextDraw(ACanvas.Handle, Pin.Caption, TextRect, taLeftJustify, taVerticalCenter);
+  acTextDraw(ACanvas, Pin.Caption, TextRect, taLeftJustify, taVerticalCenter);
 
   DoDrawConnector(ACanvas, InputConnectorRect, opmInput);
   DoDrawConnector(ACanvas, OutputConnectorRect, opmOutput);

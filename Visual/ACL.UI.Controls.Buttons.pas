@@ -39,6 +39,7 @@ uses
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.SkinImage,
+  ACL.Graphics.SkinImageSet,
   ACL.ObjectLinks,
   ACL.UI.Animation,
   ACL.UI.Controls.BaseControls,
@@ -884,13 +885,11 @@ begin
 end;
 
 procedure TACLCustomButtonViewInfo.DrawContent(ACanvas: TCanvas);
-const
-  Map: array[TAlignment] of DWORD = (DT_LEFT, DT_RIGHT, DT_CENTER);
 begin
   if Caption <> '' then
   begin
     AssignCanvasParameters(ACanvas);
-    acTextDraw(ACanvas.Handle, Caption, TextRect, Map[Alignment] or DT_VCENTER or DT_END_ELLIPSIS);
+    acTextDraw(ACanvas, Caption, TextRect, Alignment, taVerticalCenter, True);
   end;
 end;
 
@@ -1797,17 +1796,13 @@ begin
 
   if AHeight < 0 then
     AHeight := Max(TextureSize.cy, ATextSize.cy + 2 * acFocusRectIndent);
-
   if AWidth < 0 then
   begin
     AWidth := ATextSize.cx;
     if ShowCheckMark then
     begin
       if ATextSize.cx > 0 then
-      begin
-        Inc(AWidth, acTextIndent);
-        Inc(AWidth, GetIndentBetweenElements);
-      end;
+        Inc(AWidth, 2 * acTextIndent + GetIndentBetweenElements);
       Inc(AWidth, TextureSize.cx);
     end;
   end;
@@ -1878,13 +1873,19 @@ begin
 end;
 
 procedure TACLCheckBoxViewInfo.CalculateTextSize(var R: TRect; var ATextSize: TSize);
+var
+  ATextRect: TRect;
 begin
   MeasureCanvas.Font := Font;
   if ShowCheckMark then
     R := acRectInflate(R, -acTextIndent, -acFocusRectIndent);
-  ATextSize := acTextCalcSize(MeasureCanvas.Handle, Caption, acTextWordWrap[WordWrap], R.Width);
+
+  ATextRect := R;
+  acSysDrawText(MeasureCanvas, ATextRect, Caption, DT_CALCRECT or IfThen(WordWrap, DT_WORDBREAK));
+  ATextSize := acSize(ATextRect);
+
   if WordWrap or (FTextSize.cy = 0) then
-    ATextSize.cy := Max(ATextSize.cy, acFontHeight(MeasureCanvas.Handle));
+    ATextSize.cy := Max(ATextSize.cy, acFontHeight(MeasureCanvas));
 end;
 
 function TACLCheckBoxViewInfo.GetStyle: TACLStyleCheckBox;
@@ -1907,8 +1908,9 @@ begin
   if Caption <> '' then
   begin
     AssignCanvasParameters(ACanvas);
-    //#AI: DrawTextW is always used to make layout consistent between singleline and multiline checkboxes
-    DrawTextW(ACanvas.Handle, Caption, -1, FTextRect, acTextAligns[Alignment] or acTextWordWrap[WordWrap]);
+    //#AI: Use the acSysDrawText always to make layout consistent between singleline and multiline checkboxes
+    acSysDrawText(ACanvas, FTextRect, Caption,
+      DT_END_ELLIPSIS or DT_NOPREFIX or acTextAlignHorz[Alignment] or IfThen(WordWrap, DT_WORDBREAK));
   end;
   if ShowLine then
     acDrawLabelLine(ACanvas, FLineRect, TextRect, Style.ColorLine1.Value, Style.ColorLine2.Value);

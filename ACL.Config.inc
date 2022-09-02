@@ -22,6 +22,7 @@
 
 {$IFDEF DEBUG}
   {.$DEFINE ACL_LOG_CMDLINE}
+  {.$DEFINE ACL_LOG_FONTCACHE}
   {.$DEFINE ACL_LOG_REGISTRY}
 {$ENDIF}
 
@@ -30,13 +31,8 @@
 // ---------------------------------------------------------------------------------------------------------------------
 
 {$DEFINE ACL_BLURFILTER_USE_SHARED_RESOURCES}
-
 {$DEFINE ACL_TEXTLAYOUT_RTL_SUPPORT}
 {$DEFINE ACL_TEXTLAYOUT_USE_FONTCACHE}
-
-{$IFDEF ACL_TEXTLAYOUT_RTL_SUPPORT}
-  {$UNDEF ACL_TEXTLAYOUT_USE_FONTCACHE}
-{$ENDIF}
 
 // ---------------------------------------------------------------------------------------------------------------------
 // IDE Versions

@@ -204,11 +204,11 @@ procedure TACLCustomTextEdit.DrawText(ACanvas: TCanvas; const R: TRect);
 begin
   AssignTextDrawParams(ACanvas);
   if Focused or (Text <> '') then
-    acTextDraw(ACanvas.Handle, TextToDisplayText(Text), R, taLeftJustify, taVerticalCenter)
+    acTextDraw(ACanvas, TextToDisplayText(Text), R, taLeftJustify, taVerticalCenter)
   else
   begin
     ACanvas.Font.Color := Style.ColorTextDisabled.AsColor;
-    acTextDraw(ACanvas.Handle, TextHint, R, taLeftJustify, taVerticalCenter);
+    acTextDraw(ACanvas, TextHint, R, taLeftJustify, taVerticalCenter);
   end;
 end;
 

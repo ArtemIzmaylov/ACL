@@ -788,10 +788,10 @@ procedure TACLSliderViewInfo.CalculateLabels(ACanvas: TCanvas; var R: TRect);
       if ACustomTextWidth > 0 then
       begin
         AViewInfo.TextSize.cx := ACustomTextWidth;
-        AViewInfo.TextSize.cy := acFontHeight(ACanvas.Handle);
+        AViewInfo.TextSize.cy := acFontHeight(ACanvas);
       end
       else
-        AViewInfo.TextSize := acTextSize(ACanvas.Handle, AText);
+        AViewInfo.TextSize := acTextSize(ACanvas, AText);
     end;
   end;
 
@@ -823,12 +823,12 @@ begin
       if OptionsLabels.CurrentValueWidth > 0 then
       begin
         FLabelCurrentValue.TextSize.cx := OptionsLabels.CurrentValueWidth;
-        FLabelCurrentValue.TextSize.cy := acFontHeight(ACanvas.Handle);
+        FLabelCurrentValue.TextSize.cy := acFontHeight(ACanvas);
       end
       else
         FLabelCurrentValue.TextSize := acSizeMax(
-          acTextSize(ACanvas.Handle, OptionsLabels.FormatCurrentValue(OptionsValue.Max)),
-          acTextSize(ACanvas.Handle, OptionsLabels.FormatCurrentValue(OptionsValue.Min)));
+          acTextSize(ACanvas, OptionsLabels.FormatCurrentValue(OptionsValue.Max)),
+          acTextSize(ACanvas, OptionsLabels.FormatCurrentValue(OptionsValue.Min)));
     end;
 
     CalculateLabelsCore(R);
@@ -1655,7 +1655,7 @@ begin
     Canvas.Font := Font;
     Canvas.Font.Color := AViewInfo.TextColor;
     Canvas.Brush.Style := bsClear;
-    acTextDraw(ACanvas.Handle, AViewInfo.Text, AViewInfo.Bounds, AViewInfo.HorzAlignment, taAlignTop, True);
+    acTextDraw(ACanvas, AViewInfo.Text, AViewInfo.Bounds, AViewInfo.HorzAlignment, taAlignTop, True);
   end;
 end;
 

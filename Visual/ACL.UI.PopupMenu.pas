@@ -2741,10 +2741,10 @@ begin
   Result := 2 * GetTextIdent + ItemGutterWidth + ItemHeight;
   if AShortCut <> scNone then
   begin
-    Inc(Result, acTextSize(ACanvas.Handle, '  ').cx);
-    Inc(Result, acTextSize(ACanvas.Handle, ShortCutToText(AShortCut)).cx);
+    Inc(Result, acTextSize(ACanvas, '  ').cx);
+    Inc(Result, acTextSize(ACanvas, ShortCutToText(AShortCut)).cx);
   end;
-  Inc(Result, acTextSize(ACanvas.Handle, S).cx);
+  Inc(Result, acTextSize(ACanvas, S).cx);
 end;
 
 procedure TACLStyleMenu.DrawItem(ACanvas: TCanvas; R: TRect; const S: UnicodeString;
@@ -2758,7 +2758,7 @@ begin
     acDrawArrow(ACanvas.Handle, acRectSetLeft(R, acRectHeight(R)), ACanvas.Font.Color, makRight, TargetDPI)
   else
     if AShortCut <> scNone then
-      acTextDraw(ACanvas.Handle, ShortCutToText(AShortCut), R, taRightJustify, taVerticalCenter);
+      acTextDraw(ACanvas, ShortCutToText(AShortCut), R, taRightJustify, taVerticalCenter);
 end;
 
 procedure TACLStyleMenu.DrawItemImage(ACanvas: TCanvas; const R: TRect; AItem: TMenuItem; ASelected: Boolean);
@@ -2805,7 +2805,7 @@ begin
   if Result = 0 then
   begin
     AssignFontParams(MeasureCanvas, False, True, True);
-    Result := Max(2 * GetTextIdent + acFontHeight(MeasureCanvas.Handle), TextureGutter.FrameHeight);
+    Result := Max(2 * GetTextIdent + acFontHeight(MeasureCanvas), TextureGutter.FrameHeight);
   end;
 end;
 
@@ -2868,7 +2868,7 @@ end;
 
 procedure TACLStyleMenu.DoDrawText(ACanvas: TCanvas; const R: TRect; const S: UnicodeString);
 begin
-  acTextDraw(ACanvas.Handle, S, R, taLeftJustify, taVerticalCenter, True);
+  acTextDraw(ACanvas, S, R, taLeftJustify, taVerticalCenter, True);
 end;
 
 procedure TACLStyleMenu.DoSplitRect(const R: TRect; AGutterWidth: Integer; out AGutterRect, AContentRect: TRect);

@@ -593,7 +593,7 @@ begin
         else
           MeasureCanvas.Font.Assign(Style.HeaderFont);
 
-        ATextSize := acTextSize(MeasureCanvas.Handle, AItem.Tab.Caption);
+        ATextSize := acTextSize(MeasureCanvas, AItem.Tab.Caption);
         AContentRect := acRectContent(AItem.Bounds, CalculateTabTextOffsets(AItem));
         AItem.TextRect := acRectCenter(AContentRect, ATextSize);
         AItem.TextTruncated := ATextSize.cx > AContentRect.Width;
@@ -635,9 +635,9 @@ function TACLCustomTabControl.CalculateTextSize(const ACaption: UnicodeString): 
 begin
   Result := NullSize;
   Canvas.Font.Assign(Style.HeaderFont);
-  Result := acSizeMax(Result, acTextSize(Canvas.Handle, ACaption));
+  Result := acSizeMax(Result, acTextSize(Canvas, ACaption));
   Canvas.Font.Assign(Style.HeaderFontActive);
-  Result := acSizeMax(Result, acTextSize(Canvas.Handle, ACaption));
+  Result := acSizeMax(Result, acTextSize(Canvas, ACaption));
 end;
 
 procedure TACLCustomTabControl.SetTargetDPI(AValue: Integer);
@@ -712,7 +712,8 @@ begin
       ACanvas.Font.Assign(Style.HeaderFont);
 
     ACanvas.Brush.Style := bsClear;
-    acTextDraw(ACanvas.Handle, AViewItem.Tab.Caption, AViewItem.TextRect, taLeftJustify, taAlignTop, True);
+    acTextDraw(ACanvas, AViewItem.Tab.Caption,
+      AViewItem.TextRect, taLeftJustify, taAlignTop, AViewItem.TextTruncated);
   end;
 end;
 

@@ -63,13 +63,6 @@ const
   AnchorBottomLeft = [akLeft, akBottom];
   AnchorBottomRight = [akRight, akBottom];
 
-  acTextFlagsCenterV = DT_END_ELLIPSIS or DT_NOPREFIX or DT_VCENTER;
-  acTextFlagsCenter = acTextFlagsCenterV or DT_CENTER;
-  acTextFlagsMultiLine = DT_END_ELLIPSIS or DT_NOPREFIX or DT_WORDBREAK;
-
-  acTextAligns: array[TAlignment] of Integer = (DT_LEFT, DT_RIGHT, DT_CENTER);
-  acTextWordWrap: array[Boolean] of Integer = (acTextFlagsCenterV, acTextFlagsMultiLine);
-
 type
   TACLMouseWheelDirection = (
     mwdDown, // Scroll the mouse wheel down (to yourself), the list must be scrolled to next item. equals to LB_LINEDOWN.

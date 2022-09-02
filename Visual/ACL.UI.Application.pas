@@ -29,6 +29,7 @@ uses
   ACL.Classes.Collections,
   ACL.FileFormats.INI,
   ACL.Graphics,
+  ACL.Graphics.FontCache,
   ACL.Utils.Common;
 
 type
@@ -74,7 +75,7 @@ type
     class procedure ConfigSave(AConfig: TACLIniFile; const ASection: UnicodeString);
     class procedure ListenerAdd(AListener: IUnknown);
     class procedure ListenerRemove(AListener: IUnknown);
-    class procedure SetDefaultFont(const AName: TFontName; AHeight: Integer);
+    class procedure SetDefaultFont(AName: TFontName; AHeight: Integer);
     class procedure UpdateColorSet;
 
     class function GetHandle: HWND;
@@ -216,8 +217,9 @@ begin
       end);
 end;
 
-class procedure TACLApplication.SetDefaultFont(const AName: TFontName; AHeight: Integer);
+class procedure TACLApplication.SetDefaultFont(AName: TFontName; AHeight: Integer);
 begin
+  TACLFontCache.RemapFont(AName, AHeight);
   AHeight := MulDiv(AHeight, acSystemScaleFactor.TargetDPI, acDefaultDPI);
   Application.DefaultFont.Name := AName;
   Application.DefaultFont.Height := AHeight;

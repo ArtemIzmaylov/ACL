@@ -563,7 +563,7 @@ var
 begin
   R1 := R;
   R1.Right := R1.Left + R1.Height;
-  acTextDraw(ACanvas.Handle, Value, Rect(R1.Right + acTextIndent, R.Top, R.Right, R.Bottom), taLeftJustify, taVerticalCenter);
+  acTextDraw(ACanvas, Value, Rect(R1.Right + acTextIndent, R.Top, R.Right, R.Bottom), taLeftJustify, taVerticalCenter);
   FStyleSet.StyleHatch.DrawColorPreview(ACanvas, R1, ValueAsColor);
 end;
 
@@ -657,7 +657,7 @@ begin
     R1 := R;
     R1.Right := R1.Left + R1.Height;
     ACanvas.Font.Name := ATempFont.Name;
-    acTextDraw(ACanvas.Handle, Value, Rect(R1.Right + acTextIndent, R.Top, R.Right, R.Bottom), taLeftJustify, taVerticalCenter);
+    acTextDraw(ACanvas, Value, Rect(R1.Right + acTextIndent, R.Top, R.Right, R.Bottom), taLeftJustify, taVerticalCenter);
 
     ACanvas.Font.Color := ATempFont.Color;
     DrawPreview(ACanvas, R1);

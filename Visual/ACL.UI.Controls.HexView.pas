@@ -1098,7 +1098,7 @@ begin
   AWindowOrg := acMoveWindowOrg(ACanvas.Handle, AOrigin);
   try
     ACanvas.Font.Color := FLabelTextColor;
-    acTextOut(ACanvas.Handle, FLabelRect.Left, FLabelRect.Top, LabelText, 0);
+    acTextOut(ACanvas, FLabelRect.Left, FLabelRect.Top, LabelText, 0);
     HexView.Draw(ACanvas, AData, ADataSize);
     TextView.Draw(ACanvas, AData, ADataSize);
   finally

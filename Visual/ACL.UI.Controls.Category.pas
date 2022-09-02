@@ -116,7 +116,7 @@ procedure TACLStyleCategory.DrawHeaderText(ACanvas: TCanvas; const R: TRect; con
 begin
   ACanvas.Brush.Style := bsClear;
   ACanvas.Font.Assign(HeaderTextFont);
-  acTextDraw(ACanvas.Handle, AText, acRectInflate(R, -4, 0), HeaderTextAlignment, taVerticalCenter);
+  acTextDraw(ACanvas, AText, acRectInflate(R, -4, 0), HeaderTextAlignment, taVerticalCenter);
 end;
 
 procedure TACLStyleCategory.SetHeaderTextAlignment(AValue: TAlignment);
@@ -148,7 +148,7 @@ end;
 function TACLCategory.CalculateTextSize: TSize;
 begin
   MeasureCanvas.Font.Assign(Style.HeaderTextFont);
-  Result := acTextSize(MeasureCanvas.Handle, Caption);
+  Result := acTextSize(MeasureCanvas, Caption);
 end;
 
 function TACLCategory.CreatePadding: TACLPadding;

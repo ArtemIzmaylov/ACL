@@ -86,6 +86,7 @@ type
     function GetAssigned: Boolean;
   protected
     procedure Changed; virtual;
+    function GetDrawIterations: Integer; inline;
     function GetTextExtends: TRect;
     //
     function GetBlur: Integer; virtual;
@@ -196,7 +197,7 @@ type
     property Text: string read FText write SetText;
   end;
 
-procedure DrawText32(DC: HDC; const R: TRect; const AText: UnicodeString; AFont: TACLFont;
+procedure DrawText32(DC: HDC; const R: TRect; AText: UnicodeString; AFont: TACLFont;
   AAlignment: TAlignment = taLeftJustify; AVertAlignment: TVerticalAlignment = taVerticalCenter; AEndEllipsis: Boolean = True);
 procedure DrawText32Duplicated(DC: HDC; const R: TRect; const AText: UnicodeString;
   const ATextOffset: TPoint; ADuplicateOffset: Integer; AFont: TACLFont);
@@ -224,60 +225,11 @@ const
     (X:  0; Y:  0)
   );
 
-type
-
-  { TACLTextBuffer}
-
-  TACLTextBuffer = class
-  strict private
-    FBmpInfo: TBitmapInfo;
-    FClientRect: TRect;
-    FHandle: HBITMAP;
-    FHeight: Integer;
-    FPixels: PRGBQuad;
-    FPixelsCount: Integer;
-    FWidth: Integer;
-  public
-    constructor Create(AWidth, AHeight: Integer);
-    destructor Destroy; override;
-    function Compare(AWidth, AHeight: Integer): Boolean; inline;
-    //
-    property ClientRect: TRect read FClientRect;
-    property Handle: HBITMAP read FHandle;
-    property Height: Integer read FHeight;
-    property Pixels: PRGBQuad read FPixels;
-    property PixelsCount: Integer read FPixelsCount;
-    property Width: Integer read FWidth;
-  end;
-
-  { TACLTextRenderer }
-
-  TACLText32Renderer = class
-  strict private
-    class var FInstance: TACLText32Renderer;
-  strict private
-    FBuffer: TACLTextBuffer;
-    FGammaTable: array[Byte] of Byte;
-    FGammaTableInitialized: Boolean;
-
-    procedure BuildGammaTable;
-  protected
-    FBlur: TACLBlurFilter;
-
-    procedure DoDraw(DC, ATextDC: HDC; const AText: PWideChar; ALength: Integer;
-      ATextViewInfo: TACLTextViewInfo; AFont: TACLFont; const R: TRect; const ATextOffset: TPoint;
-      ATextDuplicateIndent: Integer; ATextColor: TAlphaColor = TAlphaColor.Default);
-    procedure RecoverAlphaChannel(Q: PRGBQuad; ACount: Integer; const ATextColor: TRGBQuad);
-    class procedure Finalize;
-  public
-    constructor Create;
-    destructor Destroy; override;
-    class procedure Draw(DC: HDC; const R: TRect; AText: UnicodeString; AFont: TACLFont;
-      AAlignment: TAlignment; AVertAlignment: TVerticalAlignment; AEndEllipsis: Boolean);
-    class procedure DrawDuplicated(DC: HDC; const R: TRect; const AText: UnicodeString;
-      const ATextOffset: TPoint; ADuplicateOffset: Integer; AFont: TACLFont);
-    class function Instance: TACLText32Renderer;
-  end;
+var
+  FGammaTable: array[Byte] of Byte;
+  FGammaTableInitialized: Boolean;
+  FTextBlur: TACLBlurFilter;
+  FTextBuffer: TACLBitmapLayer;
 
 function CheckCanDraw(DC: HDC; const R: TRect; AFont: TACLFont): Boolean; overload; inline;
 begin
@@ -295,65 +247,182 @@ begin
   Result := (AText.Size.cx > 0) and CheckCanDraw(DC, R, AFont);
 end;
 
-procedure DrawText32(DC: HDC; const R: TRect; const AText: UnicodeString; AFont: TACLFont;
-  AAlignment: TAlignment = taLeftJustify; AVertAlignment: TVerticalAlignment = taVerticalCenter; AEndEllipsis: Boolean = True);
+procedure Text32ApplyBlur(ALayer: TACLBitmapLayer; AShadow: TACLFontShadow);
+begin
+  if AShadow.Blur > 0 then
+  begin
+    if FTextBlur = nil then
+      FTextBlur := TACLBlurFilter.Create;
+    FTextBlur.Radius := Round(AShadow.Blur / BlurRadiusFactor);
+    FTextBlur.Apply(ALayer);
+  end;
+end;
+
+procedure Text32RecoverAlpha(ALayer: TACLBitmapLayer; const ATextColor: TRGBQuad);
+const
+  K = 700; // [1..5000]
+var
+  AAlpha: Integer;
+  Q: PRGBQuad;
+  I: Integer;
+begin
+  if not FGammaTableInitialized then
+  begin
+    for I := 0 to MaxByte do
+      FGammaTable[I] := FastTrunc(MaxByte * Power(I / MaxByte, 1000 / K));
+    FGammaTableInitialized := True;
+  end;
+  Q := PRGBQuad(ALayer.Colors);
+  for I := 1 to ALayer.ColorCount do
+  begin
+    if (Q^.rgbBlue <> 0) or (Q^.rgbGreen <> 0) or (Q^.rgbRed <> 0) then
+    begin
+      AAlpha := (128 +
+        FGammaTable[Q^.rgbRed] * 77 +
+        FGammaTable[Q^.rgbGreen] * 151 +
+        FGammaTable[Q^.rgbBlue] * 28) * ATextColor.rgbReserved shr 16;
+      Q^.rgbBlue := TACLColors.PremultiplyTable[ATextColor.rgbBlue, AAlpha];
+      Q^.rgbGreen := TACLColors.PremultiplyTable[ATextColor.rgbGreen, AAlpha];
+      Q^.rgbRed := TACLColors.PremultiplyTable[ATextColor.rgbRed, AAlpha];
+      Q^.rgbReserved := AAlpha;
+    end;
+    Inc(Q);
+  end;
+end;
+
+procedure DrawText32Core(DC: HDC; const AText: PWideChar; ALength: Integer;
+  ATextViewInfo: TACLTextViewInfo; AFont: TACLFont; const R: TRect; const ATextOffset: TPoint;
+  ATextDuplicateIndent: Integer; ATextColor: TAlphaColor = TAlphaColor.Default);
+
+  procedure Text32Output(DC: HDC; const Offset: TPoint);
+  begin
+    if ATextViewInfo <> nil then
+    begin
+      ATextViewInfo.DrawCore(DC, Offset.X, Offset.Y, ALength);
+      if ATextDuplicateIndent > 0 then
+        ATextViewInfo.DrawCore(DC, Offset.X + ATextDuplicateIndent, Offset.Y, ALength);
+    end
+    else
+    begin
+      ExtTextOutW(DC, Offset.X, Offset.Y, 0, nil, AText, ALength, nil);
+      if ATextDuplicateIndent > 0 then
+        ExtTextOutW(DC, Offset.X + ATextDuplicateIndent, Offset.Y, 0, nil, AText, ALength, nil);
+    end;
+  end;
+
+var
+  APoint: TPoint;
+  I, J, W, H: Integer;
+begin
+  W := acRectWidth(R);
+  H := acRectHeight(R);
+  if (W <= 0) or (H <= 0) then
+    Exit;
+
+  if (ATextViewInfo = nil) and (AFont.Shadow.GetDrawIterations > 2) then
+  begin
+    ATextViewInfo := TACLTextViewInfo.Create(DC, AFont, AText, ALength);
+    try
+      DrawText32Core(DC, AText, ALength, ATextViewInfo, AFont, R, ATextOffset, ATextDuplicateIndent, ATextColor);
+    finally
+      ATextViewInfo.Free;
+    end;
+    Exit;
+  end;
+
+  if (FTextBuffer = nil) or (FTextBuffer.Width <> W) or (FTextBuffer.Height <> H) then
+  begin
+    FreeAndNil(FTextBuffer);
+    FTextBuffer := TACLBitmapLayer.Create(W, H);
+  end;
+
+  SelectObject(FTextBuffer.Handle, AFont.Handle);
+  SetTextColor(FTextBuffer.Handle, clWhite);
+  SetBkColor(FTextBuffer.Handle, clBlack);
+  SetBkMode(FTextBuffer.Handle, TRANSPARENT);
+
+  if AFont.Shadow.Assigned then
+  begin
+    FTextBuffer.Reset;
+
+    if AFont.Shadow.Direction = mzClient then
+    begin
+      for I := -AFont.Shadow.Size to AFont.Shadow.Size do
+      for J := -AFont.Shadow.Size to AFont.Shadow.Size do
+        if I <> J then
+          Text32Output(FTextBuffer.Handle, acPointOffset(ATextOffset, I, J));
+    end
+    else
+    begin
+      APoint := ATextOffset;
+      for I := 1 to AFont.Shadow.Size do
+      begin
+        APoint := acPointOffset(APoint, MapTextOffsets[AFont.Shadow.Direction]);
+        Text32Output(FTextBuffer.Handle, APoint);
+      end;
+    end;
+    Text32ApplyBlur(FTextBuffer, AFont.Shadow);
+    Text32RecoverAlpha(FTextBuffer, TACLColors.ToQuad(AFont.Shadow.Color));
+    acAlphaBlend(DC, FTextBuffer.Handle, R, FTextBuffer.ClientRect);
+  end;
+
+  if ATextColor = TAlphaColor.Default then
+    ATextColor := TAlphaColor.FromColor(acGetActualColor(AFont.Color, clBlack), AFont.ColorAlpha);
+
+  if ATextColor.IsValid then
+  begin
+    FTextBuffer.Reset;
+    Text32Output(FTextBuffer.Handle, ATextOffset);
+    Text32RecoverAlpha(FTextBuffer, TACLColors.ToQuad(ATextColor));
+    acAlphaBlend(DC, FTextBuffer.Handle, R, FTextBuffer.ClientRect);
+  end;
+end;
+
+procedure DrawText32(DC: HDC; const R: TRect; AText: UnicodeString; AFont: TACLFont;
+  AAlignment: TAlignment; AVertAlignment: TVerticalAlignment; AEndEllipsis: Boolean);
+var
+  ATextExtends: TRect;
+  ATextOffset: TPoint;
+  ATextSize: TSize;
 begin
   if CheckCanDraw(DC, R, AText, AFont) then
-    TACLText32Renderer.Draw(DC, R, AText, AFont, AAlignment, AVertAlignment, AEndEllipsis);
+  begin
+    MeasureCanvas.Font := AFont;
+    ATextExtends := AFont.TextExtends;
+    acTextPrepare(MeasureCanvas, R, AEndEllipsis,
+      AAlignment, AVertAlignment, AText, ATextSize, ATextOffset, ATextExtends);
+    DrawText32Core(DC, PWideChar(AText), Length(AText), nil, AFont,
+      Bounds(ATextOffset.X, ATextOffset.Y, ATextSize.cx, ATextSize.cy), ATextExtends.TopLeft, 0);
+  end;
 end;
 
 procedure DrawText32Duplicated(DC: HDC; const R: TRect; const AText: UnicodeString;
   const ATextOffset: TPoint; ADuplicateOffset: Integer; AFont: TACLFont);
 begin
   if CheckCanDraw(DC, R, AText, AFont) then
-    TACLText32Renderer.DrawDuplicated(DC, R, AText, ATextOffset, ADuplicateOffset, AFont);
+  begin
+    DrawText32Core(DC, PWideChar(AText), Length(AText), nil, AFont, R,
+      acPointOffset(ATextOffset, AFont.TextExtends.TopLeft), ADuplicateOffset);
+  end;
 end;
 
 procedure DrawText32Prepared(DC: HDC; const R: TRect; const AText: UnicodeString; AFont: TACLFont);
-var
-  ATextDC: HDC;
 begin
   if CheckCanDraw(DC, R, AText, AFont) then
-  begin
-    ATextDC := CreateCompatibleDC(0);
-    try
-      TACLText32Renderer.Instance.DoDraw(DC, ATextDC, PChar(AText), Length(AText), nil, AFont, R, AFont.TextExtends.TopLeft, 0);
-    finally
-      DeleteDC(ATextDC);
-    end;
-  end;
+    DrawText32Core(DC, PWideChar(AText), Length(AText), nil, AFont, R, AFont.TextExtends.TopLeft, 0);
 end;
 
 procedure DrawText32Prepared(DC: HDC; const R: TRect;
   const ATextViewInfo: TACLTextViewInfo; AFont: TACLFont; AMaxLength: Integer; AColor: TAlphaColor);
-var
-  ATextDC: HDC;
 begin
   if CheckCanDraw(DC, R, ATextViewInfo, AFont) then
-  begin
-    ATextDC := CreateCompatibleDC(0);
-    try
-      TACLText32Renderer.Instance.DoDraw(DC, ATextDC, nil, AMaxLength,
-        ATextViewInfo, AFont, R, AFont.TextExtends.TopLeft, 0, AColor);
-    finally
-      DeleteDC(ATextDC);
-    end;
-  end;
+    DrawText32Core(DC, nil, AMaxLength, ATextViewInfo, AFont, R, AFont.TextExtends.TopLeft, 0, AColor);
 end;
 
 procedure DrawText32Prepared(DC: HDC; const R: TRect; const AText: PWideChar; ALength: Integer; AFont: TACLFont);
-var
-  ATextDC: HDC;
 begin
   if CheckCanDraw(DC, R, AText, AFont) then
-  begin
-    ATextDC := CreateCompatibleDC(0);
-    try
-      TACLText32Renderer.Instance.DoDraw(DC, ATextDC, AText, ALength, nil, AFont, R, AFont.TextExtends.TopLeft, 0);
-    finally
-      DeleteDC(ATextDC);
-    end;
-  end;
+    DrawText32Core(DC, AText, ALength, nil, AFont, R, AFont.TextExtends.TopLeft, 0);
 end;
 
 { TACLFont }
@@ -534,6 +603,17 @@ begin
   Result := FDirection;
 end;
 
+function TACLFontShadow.GetDrawIterations: Integer;
+begin
+  if not Assigned then
+    Result := 0
+  else
+    if Direction = mzClient then
+      Result := Size * 2
+    else
+      Result := Size;
+end;
+
 function TACLFontShadow.GetSize: Integer;
 begin
   Result := FSize;
@@ -575,213 +655,6 @@ begin
   begin
     FSize := AValue;
     Changed;
-  end;
-end;
-
-{ TACLTextBuffer }
-
-constructor TACLTextBuffer.Create(AWidth, AHeight: Integer);
-begin
-  inherited Create;
-  FWidth := AWidth;
-  FHeight := AHeight;
-  FPixelsCount := AWidth * AHeight;
-  FClientRect := Rect(0, 0, Width, Height);
-  acFillBitmapInfoHeader(FBmpInfo.bmiHeader, Width, Height);
-  FHandle := CreateDIBSection(0, FBmpInfo, DIB_RGB_COLORS, Pointer(FPixels), 0, 0);
-end;
-
-destructor TACLTextBuffer.Destroy;
-begin
-  DeleteObject(FHandle);
-  inherited Destroy;
-end;
-
-function TACLTextBuffer.Compare(AWidth, AHeight: Integer): Boolean;
-begin
-  Result := (AWidth = FWidth) and (AHeight = FHeight);
-end;
-
-{ TACLTextRenderer }
-
-constructor TACLText32Renderer.Create;
-begin
-  inherited Create;
-  FBlur := TACLBlurFilter.Create;
-  BuildGammaTable;
-end;
-
-destructor TACLText32Renderer.Destroy;
-begin
-  FreeAndNil(FBuffer);
-  FreeAndNil(FBlur);
-  inherited Destroy;
-end;
-
-class procedure TACLText32Renderer.Draw(DC: HDC; const R: TRect; AText: UnicodeString; AFont: TACLFont;
-  AAlignment: TAlignment; AVertAlignment: TVerticalAlignment; AEndEllipsis: Boolean);
-var
-  ATextDC: HDC;
-  ATextExtends: TRect;
-  ATextOffset: TPoint;
-  ATextSize: TSize;
-begin
-  ATextDC := CreateCompatibleDC(0);
-  try
-    SelectObject(ATextDC, AFont.Handle);
-    ATextExtends := AFont.TextExtends;
-    acTextPrepare(ATextDC, R, AEndEllipsis, AAlignment, AVertAlignment, AText, ATextSize, ATextOffset, ATextExtends);
-    Instance.DoDraw(DC, ATextDC, PChar(AText), Length(AText), nil, AFont,
-      Bounds(ATextOffset.X, ATextOffset.Y, ATextSize.cx, ATextSize.cy),
-      ATextExtends.TopLeft, 0);
-  finally
-    DeleteDC(ATextDC);
-  end;
-end;
-
-class procedure TACLText32Renderer.DrawDuplicated(DC: HDC; const R: TRect; const AText: UnicodeString;
-  const ATextOffset: TPoint; ADuplicateOffset: Integer; AFont: TACLFont);
-var
-  ATextDC: HDC;
-begin
-  ATextDC := CreateCompatibleDC(0);
-  try
-    Instance.DoDraw(DC, ATextDC, PChar(AText), Length(AText), nil,
-      AFont, R, acPointOffset(ATextOffset, AFont.TextExtends.TopLeft), ADuplicateOffset);
-  finally
-    DeleteDC(ATextDC);
-  end;
-end;
-
-class procedure TACLText32Renderer.Finalize;
-begin
-  FreeAndNil(FInstance);
-end;
-
-class function TACLText32Renderer.Instance: TACLText32Renderer;
-begin
-  if FInstance = nil then
-    FInstance := TACLText32Renderer.Create;
-  Result := FInstance;
-end;
-
-procedure TACLText32Renderer.DoDraw(DC, ATextDC: HDC; const AText: PWideChar; ALength: Integer;
-  ATextViewInfo: TACLTextViewInfo; AFont: TACLFont; const R: TRect; const ATextOffset: TPoint;
-  ATextDuplicateIndent: Integer; ATextColor: TAlphaColor = TAlphaColor.Default);
-
-  procedure DoTextOutput(const Offset: TPoint);
-  begin
-    if ATextViewInfo <> nil then
-    begin
-      ATextViewInfo.DrawCore(ATextDC, Offset.X, Offset.Y, ALength);
-      if ATextDuplicateIndent > 0 then
-        ATextViewInfo.DrawCore(ATextDC, Offset.X + ATextDuplicateIndent, Offset.Y, ALength);
-    end
-    else
-    begin
-      ExtTextOutW(ATextDC, Offset.X, Offset.Y, DT_NOPREFIX, nil, AText, ALength, nil);
-      if ATextDuplicateIndent > 0 then
-        ExtTextOutW(ATextDC, Offset.X + ATextDuplicateIndent, Offset.Y, DT_NOPREFIX, nil, AText, ALength, nil);
-    end;
-  end;
-
-var
-  AHandleOld: HBITMAP;
-  APoint: TPoint;
-  I, J, W, H: Integer;
-begin
-  W := acRectWidth(R);
-  H := acRectHeight(R);
-  if (W <= 0) or (H <= 0) then
-    Exit;
-
-  if (FBuffer = nil) or not FBuffer.Compare(W, H) then
-  begin
-    FreeAndNil(FBuffer);
-    FBuffer := TACLTextBuffer.Create(W, H);
-  end;
-
-  AHandleOld := SelectObject(ATextDC, FBuffer.Handle);
-  try
-    SelectObject(ATextDC, AFont.Handle);
-    SetTextColor(ATextDC, clWhite);
-    SetBkColor(ATextDC, clBlack);
-    SetBkMode(ATextDC, TRANSPARENT);
-
-    if AFont.Shadow.Assigned then
-    begin
-      acResetRect(ATextDC, FBuffer.ClientRect);
-
-      if AFont.Shadow.Direction = mzClient then
-      begin
-        for I := -AFont.Shadow.Size to AFont.Shadow.Size do
-        for J := -AFont.Shadow.Size to AFont.Shadow.Size do
-          if I <> J then
-            DoTextOutput(acPointOffset(ATextOffset, I, J));
-      end
-      else
-      begin
-        APoint := ATextOffset;
-        for I := 1 to AFont.Shadow.Size do
-        begin
-          APoint := acPointOffset(APoint, MapTextOffsets[AFont.Shadow.Direction]);
-          DoTextOutput(APoint);
-        end;
-      end;
-      if AFont.Shadow.Blur > 0 then
-      begin
-        FBlur.Radius := Round(AFont.Shadow.Blur / BlurRadiusFactor);
-        FBlur.Apply(ATextDC, FBuffer.Pixels, FBuffer.Width, FBuffer.Height);
-      end;
-      RecoverAlphaChannel(FBuffer.Pixels, FBuffer.PixelsCount, TACLColors.ToQuad(AFont.Shadow.Color));
-      acAlphaBlend(DC, ATextDC, R, FBuffer.ClientRect);
-    end;
-
-    if ATextColor = TAlphaColor.Default then
-      ATextColor := TAlphaColor.FromColor(acGetActualColor(AFont.Color, clBlack), AFont.ColorAlpha);
-    
-    if ATextColor.IsValid then
-    begin
-      acResetRect(ATextDC, FBuffer.ClientRect);
-      DoTextOutput(ATextOffset);
-      RecoverAlphaChannel(FBuffer.Pixels, FBuffer.PixelsCount, TACLColors.ToQuad(ATextColor));
-      acAlphaBlend(DC, ATextDC, R, FBuffer.ClientRect);
-    end;
-  finally
-    SelectObject(ATextDC, AHandleOld);
-  end;
-end;
-
-procedure TACLText32Renderer.BuildGammaTable;
-const
-  K = 700; // [1..5000]
-var
-  I: Integer;
-begin
-  if not FGammaTableInitialized then
-  begin
-    for I := 0 to MaxByte do
-      FGammaTable[I] := FastTrunc(MaxByte * Power(I / MaxByte, 1000 / K));
-    FGammaTableInitialized := True;
-  end;
-end;
-
-procedure TACLText32Renderer.RecoverAlphaChannel(Q: PRGBQuad; ACount: Integer; const ATextColor: TRGBQuad);
-var
-  AAlpha: Integer;
-  I: Integer;
-begin
-  for I := 1 to ACount do
-  begin
-    if (Q^.rgbBlue <> 0) or (Q^.rgbGreen <> 0) or (Q^.rgbRed <> 0) then
-    begin
-      AAlpha := (FGammaTable[Q^.rgbRed] * 77 + FGammaTable[Q^.rgbGreen] * 151 + FGammaTable[Q^.rgbBlue] * 28 + 128) * ATextColor.rgbReserved shr 16;
-      Q^.rgbBlue := TACLColors.PremultiplyTable[ATextColor.rgbBlue, AAlpha];
-      Q^.rgbGreen := TACLColors.PremultiplyTable[ATextColor.rgbGreen, AAlpha];
-      Q^.rgbRed := TACLColors.PremultiplyTable[ATextColor.rgbRed, AAlpha];
-      Q^.rgbReserved := AAlpha;
-    end;
-    Inc(Q);
   end;
 end;
 
@@ -918,16 +791,8 @@ end;
 procedure TACLTextLayoutShadowRender32.BeforeDestruction;
 begin
   inherited;
-
-  if Shadow.Blur > 0 then
-  begin
-    TACLText32Renderer.Instance.FBlur.Radius := Round(Shadow.Blur / BlurRadiusFactor);
-    TACLText32Renderer.Instance.FBlur.Apply(FBuffer);
-  end;
-
-  TACLText32Renderer.Instance.RecoverAlphaChannel(
-    PRGBQuad(FBuffer.Colors), FBuffer.ColorCount, TACLColors.ToQuad(Shadow.Color));
-
+  Text32ApplyBlur(FBuffer, Shadow);
+  Text32RecoverAlpha(FBuffer, TACLColors.ToQuad(Shadow.Color));
   FBuffer.DrawBlend(FTargetCanvas.Handle, FBufferOrigin);
 end;
 
@@ -1045,5 +910,6 @@ end;
 initialization
 
 finalization
-  TACLText32Renderer.Finalize;
+  FreeAndNil(FTextBuffer);
+  FreeAndNil(FTextBlur);
 end.

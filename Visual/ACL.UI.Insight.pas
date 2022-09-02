@@ -861,11 +861,11 @@ begin
 
   ACanvas.Font := Font;
   ACanvas.Font.Color := SearchResults.Style.RowColorsText[True];
-  acTextDraw(ACanvas.Handle, ANode.Caption, ARect, DT_LEFT or DT_TOP or DT_SINGLELINE or DT_END_ELLIPSIS);
+  acTextDraw(ACanvas, ANode.Caption, ARect, taLeftJustify, taAlignTop, True);
 
   ACanvas.Font := FHintFont;
   ACanvas.Font.Color := SearchResults.Style.RowColorsText[ANode.Selected];
-  acTextDraw(ACanvas.Handle, ANode.Values[1], ARect, DT_LEFT or DT_BOTTOM or DT_SINGLELINE or DT_END_ELLIPSIS);
+  acTextDraw(ACanvas, ANode.Caption, ARect, taLeftJustify, taAlignBottom, True);
 
   AHandled := True;
 end;

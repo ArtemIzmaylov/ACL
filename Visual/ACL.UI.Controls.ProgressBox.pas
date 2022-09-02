@@ -267,8 +267,6 @@ begin
 end;
 
 procedure TACLProgressBox.DrawTextArea(ACanvas: TCanvas; R: TRect);
-const
-  TextCustomFlags = DT_NOPREFIX or DT_VCENTER or DT_SINGLELINE or DT_END_ELLIPSIS;
 var
   L1, L2: TRect;
 begin
@@ -277,9 +275,9 @@ begin
   ACanvas.Brush.Style := bsClear;
   InflateRect(R, -4, -4);
   CalculateLineRects(R, ProgressTitle, ProgressMessage, L1, L2);
-  acTextDraw(ACanvas.Handle, ProgressMessage, L2, DT_LEFT or TextCustomFlags);
+  acTextDraw(ACanvas, ProgressMessage, L2, taLeftJustify, taVerticalCenter, True);
   ACanvas.Font.Style := [fsBold];
-  acTextDraw(ACanvas.Handle, ProgressTitle, L1, DT_CENTER or TextCustomFlags);
+  acTextDraw(ACanvas, ProgressTitle, L1, taCenter, taVerticalCenter, True);
 end;
 
 procedure TACLProgressBox.Paint;

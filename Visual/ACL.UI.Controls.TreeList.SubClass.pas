@@ -1427,7 +1427,7 @@ begin
   if Column.TextVisible then
   begin
     Painter.PrepareCanvasForColumn(MeasureCanvas);
-    Inc(Result, acTextSize(MeasureCanvas.Handle, Column.Caption).cx);
+    Inc(Result, acTextSize(MeasureCanvas, Column.Caption).cx);
   end
 end;
 
@@ -1590,7 +1590,7 @@ begin
     Painter.PrepareCanvasFontForSortingMark(ACanvas);
     Painter.DrawColumnSortArrow(ACanvas, SortArrowRect, Column.SortDirection <> sdDescending);
     if not acRectIsEmpty(SortArrowIndexRect) then
-      acTextOut(ACanvas.Handle, SortArrowIndexRect.Left, SortArrowIndexRect.Top, IntToStr(SortByIndex + 1), 0);
+      acTextOut(ACanvas, SortArrowIndexRect.Left, SortArrowIndexRect.Top, IntToStr(SortByIndex + 1), 0);
   end;
 end;
 
@@ -1630,7 +1630,7 @@ begin
     if (SortByIndex >= 0) and IsMultiColumnSorting then
     begin
       Painter.PrepareCanvasFontForSortingMark(MeasureCanvas);
-      FSortArrowIndexSize := acTextSize(MeasureCanvas.Handle, IntToStr(SortByIndex + 1));
+      FSortArrowIndexSize := acTextSize(MeasureCanvas, IntToStr(SortByIndex + 1));
     end
     else
       FSortArrowIndexSize := NullSize;
@@ -1709,7 +1709,7 @@ procedure TACLTreeListSubClassColumnBarViewInfo.CalculateAutoHeight(var AHeight:
 begin
   Painter.PrepareCanvasForColumn(MeasureCanvas);
   AHeight := acMarginHeight(Painter.GetColumnContentOffsets) +
-    Max(Painter.GetCheckBoxSize.cy, acFontHeight(MeasureCanvas.Handle));
+    Max(Painter.GetCheckBoxSize.cy, acFontHeight(MeasureCanvas));
 end;
 
 procedure TACLTreeListSubClassColumnBarViewInfo.CalculateAutoWidth(const R: TRect);
@@ -1896,7 +1896,7 @@ end;
 function TACLTreeListSubClassContentGroupCellViewInfo.CalculateAutoHeight: Integer;
 begin
   Painter.PrepareCanvasForGroup(MeasureCanvas);
-  Result := acFontHeight(MeasureCanvas.Handle) + acMarginHeight(Painter.GetGroupContentOffsets);
+  Result := acFontHeight(MeasureCanvas) + acMarginHeight(Painter.GetGroupContentOffsets);
 end;
 
 procedure TACLTreeListSubClassContentGroupCellViewInfo.Initialize(AData: TObject);
@@ -1941,7 +1941,7 @@ begin
     Painter.DrawCheckBox(ACanvas, CheckBoxRect, Group.CheckBoxState, True);
   if ExpandButtonVisible then
     Painter.DrawGroupExpandButton(ACanvas, ExpandButtonRect, Group.Expanded);
-  acTextDraw(ACanvas.Handle, Group.Caption, TextRect, taLeftJustify, taVerticalCenter, True);
+  acTextDraw(ACanvas, Group.Caption, TextRect, taLeftJustify, taVerticalCenter, True);
 end;
 
 function TACLTreeListSubClassContentGroupCellViewInfo.GetFocusRect: TRect;
@@ -1993,7 +1993,7 @@ begin
   Painter.PrepareCanvasForNode(ACanvas);
   SubClass.DoGetNodeCellDisplayText(ANode, AColumnIndex, AText);
   SubClass.DoGetNodeCellStyle(ACanvas.Font, ANode, GetColumnForViewInfo(AColumnViewInfo), ATextAlign);
-  Result := acTextSize(ACanvas.Handle, AText).cx + acMarginWidth(CellTextExtends[AColumnViewInfo]);
+  Result := acTextSize(ACanvas, AText).cx + acMarginWidth(CellTextExtends[AColumnViewInfo]);
 end;
 
 function TACLTreeListSubClassContentNodeCellViewInfo.CalculateCellAutoWidth(
@@ -2584,7 +2584,7 @@ begin
     if FMeasuredNodeHeight = -1 then
     begin
       Painter.PrepareCanvasForNode(MeasureCanvas);
-      FMeasuredNodeHeight := acFontHeight(MeasureCanvas.Handle) + acMarginHeight(Painter.GetNodeContentOffsets);
+      FMeasuredNodeHeight := acFontHeight(MeasureCanvas) + acMarginHeight(Painter.GetNodeContentOffsets);
     end;
     Result := FMeasuredNodeHeight;
   end
@@ -2958,7 +2958,7 @@ end;
 procedure TACLTreeListSubClassPainter.DrawHighlightedText(ACanvas: TCanvas; const AText: UnicodeString;
   ATextAlignment: TAlignment; const R: TRect; AHighlightStart, AHighlightFinish: Integer);
 begin
-  acTextDrawHighlight(ACanvas.Handle, AText, R,
+  acTextDrawHighlight(ACanvas, AText, R,
     ATextAlignment, taVerticalCenter, True, AHighlightStart, AHighlightFinish,
     Style.IncSearchColor.AsColor, Style.IncSearchColorText.AsColor);
 end;
@@ -2966,7 +2966,7 @@ end;
 procedure TACLTreeListSubClassPainter.DrawText(ACanvas: TCanvas;
   const AText: UnicodeString; ATextAlignment: TAlignment; const R: TRect);
 begin
-  acTextDraw(ACanvas.Handle, AText, R, ATextAlignment, taVerticalCenter, True);
+  acTextDraw(ACanvas, AText, R, ATextAlignment, taVerticalCenter, True);
 end;
 
 procedure TACLTreeListSubClassPainter.FlushCache;

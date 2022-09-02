@@ -337,6 +337,7 @@ type
     function ToStringCore: string; override;
   public
     destructor Destroy; override;
+
     procedure Assign(Source: TPersistent); override;
     procedure DrawPreview(ACanvas: TCanvas; const R: TRect); override;
     // IACLColorSchema
@@ -979,7 +980,7 @@ end;
 
 procedure TACLResource.DrawPreview(ACanvas: TCanvas; const R: TRect);
 begin
-  acTextDraw(ACanvas.Handle, ToString, acRectInflate(R, -acTextIndent, 0), taLeftJustify, taVerticalCenter, True);
+  acTextDraw(ACanvas, ToString, acRectInflate(R, -acTextIndent, 0), taLeftJustify, taVerticalCenter, True);
 end;
 
 procedure TACLResource.InitailizeDefaults(const DefaultID: string);
@@ -1684,7 +1685,8 @@ begin
     if Master <> nil then
       Result := TACLResourceFont(Master).Height
     else
-      Result := DefFontData.Height;
+      // У нас все размеры определяются для 100% масштаба
+      Result := MulDiv(DefFontData.Height, acDefaultDPI, acSystemScaleFactor.TargetDPI);
 end;
 
 function TACLResourceFont.GetSize: Integer;

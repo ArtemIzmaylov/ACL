@@ -1228,7 +1228,7 @@ begin
   ACanvas.Font := SubClass.Font;
   ACanvas.Font.Color := SubClass.Style.TextColors[SubClass.EnabledContent];
   ACanvas.Brush.Style := bsClear;
-  acTextDraw(ACanvas.Handle, GetCaption, Bounds, taLeftJustify, taVerticalCenter);
+  acTextDraw(ACanvas, GetCaption, Bounds, taLeftJustify, taVerticalCenter);
 end;
 
 function TACLColorPickerSubClassCustomEditCell.IsCaptured: Boolean;

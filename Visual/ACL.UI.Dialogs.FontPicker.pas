@@ -292,7 +292,7 @@ begin
   SaveFontParams(ACanvas.Font);
   DrawPreviewBackground(ACanvas, R);
   ACanvas.Brush.Style := bsClear;
-  acTextDraw(ACanvas.Handle, 'Sample', R, taCenter, taVerticalCenter);
+  acTextDraw(ACanvas, 'Sample', R, taCenter, taVerticalCenter);
 end;
 
 procedure TACLFontPickerDialog.DrawPreviewBackground(ACanvas: TCanvas; const R: TRect);

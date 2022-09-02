@@ -353,10 +353,11 @@ var
   ATextSize: TSize;
 begin
   FTextRect := R;
+  MeasureCanvas.Font := Font;
   if Style.WordWrap then
-    ATextSize := acTextCalcSize(Font, Caption, acTextFlagsMultiLine, FTextRect.Width)
+    ATextSize := acTextSizeMultiline(MeasureCanvas, Caption, FTextRect.Width)
   else
-    ATextSize := acTextSize(Font, Caption);
+    ATextSize := acTextSize(MeasureCanvas, Caption);
 
   if Style.Effect <> sleNone then
   begin
@@ -447,10 +448,11 @@ end;
 
 function TACLLabel.MeasureSize(AWidth: Integer = 0): TSize;
 begin
-  if AWidth > 0 then
-    Result := acTextCalcSize(Font, Caption, DT_WORDBREAK, AWidth)
+  MeasureCanvas.Font := Font;
+  if Style.WordWrap then
+    Result := acTextSizeMultiline(MeasureCanvas, Caption, AWidth)
   else
-    Result := acTextSize(Font, Caption);
+    Result := acTextSize(MeasureCanvas, Caption);
 
   if Style.Effect <> sleNone then
   begin
@@ -517,8 +519,10 @@ begin
     ACanvas.Font := Font;
     ACanvas.Font.Color := AColor;
     ACanvas.Brush.Style := bsClear;
-    acTextDraw(ACanvas.Handle, Caption, R,
-      acTextAligns[Alignment] or acTextWordWrap[Style.WordWrap] or IfThen(not Style.WordWrap, DT_END_ELLIPSIS));
+    if Style.WordWrap then
+      acTextDraw(ACanvas, Caption, R, taLeftJustify, taAlignTop, False, False, True)
+    else
+      acTextDraw(ACanvas, Caption, R, taLeftJustify, taVerticalCenter, True, True);
   end;
 end;
 

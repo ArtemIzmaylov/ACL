@@ -94,7 +94,7 @@ type
     procedure NCPaint(DC: HDC); override;
     procedure Paint; override;
     procedure PaintBackground(ACanvas: TCanvas; const R: TRect); virtual;
-    procedure PaintText(ACanvas: TCanvas; const R: TRect); virtual;
+    procedure PaintText(ACanvas: TCanvas; R: TRect); virtual;
     procedure ScaleForPPI(const ATargetPPI: Integer); reintroduce;
     //
     property PixelsPerInch: Integer read GetPixelsPerInch;
@@ -339,7 +339,10 @@ end;
 
 function TACLHintWindow.CalcHintRect(MaxWidth: Integer; const AHint: string; AData: TCustomData): TRect;
 begin
-  Result := acRect(acTextCalcSize(Font, AHint, HintTextDrawFlags, MaxWidth));
+  MeasureCanvas.Font := Font;
+  Result := Rect(0, 0, MaxWidth, 2);
+  acSysDrawText(MeasureCanvas, Result, AHint, DT_CALCRECT or HintTextDrawFlags);
+  Result := acRectOffsetNegative(Result, Result.TopLeft);
   Inc(Result.Right, 2 * ScaleFactor.Apply(HintTextIndentH));
   Inc(Result.Bottom, 2 * ScaleFactor.Apply(HintTextIndentV));
   Dec(Result.Bottom, 4);
@@ -414,7 +417,10 @@ end;
 procedure TACLHintWindow.Paint;
 begin
   PaintBackground(Canvas, ClientRect);
-  PaintText(Canvas, acRectInflate(ClientRect, -ScaleFactor.Apply(HintTextIndentH), -ScaleFactor.Apply(HintTextIndentV) + 1));
+  PaintText(Canvas,
+    acRectInflate(ClientRect,
+      -ScaleFactor.Apply(HintTextIndentH),
+      -ScaleFactor.Apply(HintTextIndentV) + 1));
 end;
 
 procedure TACLHintWindow.PaintBackground(ACanvas: TCanvas; const R: TRect);
@@ -422,11 +428,11 @@ begin
   Style.Draw(ACanvas, R);
 end;
 
-procedure TACLHintWindow.PaintText(ACanvas: TCanvas; const R: TRect);
+procedure TACLHintWindow.PaintText(ACanvas: TCanvas; R: TRect);
 begin
   ACanvas.Font := Font;
   ACanvas.Font.Color := Style.ColorText.AsColor;
-  acTextDraw(ACanvas.Handle, Caption, R, HintTextDrawFlags);
+  acSysDrawText(ACanvas, R, Caption, HintTextDrawFlags);
 end;
 
 procedure TACLHintWindow.ScaleForPPI(const ATargetPPI: Integer);

@@ -1033,7 +1033,7 @@ begin
   begin
     Painter.PrepareCanvasForNode(ACanvas, Node);
     SubClass.StyleInplaceEditButton.Draw(ACanvas.Handle, ButtonRect, absNormal);
-    acTextDraw(ACanvas.Handle, acEndEllipsis, ButtonRect, taCenter, taVerticalCenter);
+    acTextDraw(ACanvas, acEndEllipsis, ButtonRect, taCenter, taVerticalCenter);
   end;
 end;
 

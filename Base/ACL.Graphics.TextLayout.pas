@@ -963,8 +963,8 @@ begin
     Calculate;
     AClipRegion := acSaveClipRegion(ACanvas.Handle);
     try
-      acIntersectClipRegion(ACanvas.Handle, AClipRect);
-      DrawCore(ACanvas);
+      if acIntersectClipRegion(ACanvas.Handle, AClipRect) then
+        DrawCore(ACanvas);
     finally
       acRestoreClipRegion(ACanvas.Handle, AClipRegion);
     end;
@@ -1793,7 +1793,7 @@ end;
 
 function TACLTextLayoutCalculator.MeasureSpaceSize: TSize;
 begin
-  Result := acTextSize(Canvas.Handle, Space);
+  GetTextExtentPoint32W(Canvas.Handle, Space, 1, Result);
 end;
 
 procedure TACLTextLayoutCalculator.Reorder(ABlocks: TACLTextLayoutBlockList; const ARange: TACLRange);

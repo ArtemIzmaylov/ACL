@@ -515,7 +515,7 @@ end;
 procedure TACLCalendarSubClassViewCustomCell.DoDraw(ACanvas: TCanvas);
 begin
   PrepareCanvas(ACanvas);
-  acTextDraw(ACanvas.Handle, DisplayValue, Bounds, taCenter, taVerticalCenter);
+  acTextDraw(ACanvas, DisplayValue, Bounds, taCenter, taVerticalCenter);
   DoDrawSelection(ACanvas, GetActualFrameColor);
 end;
 
