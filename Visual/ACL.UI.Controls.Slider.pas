@@ -411,6 +411,7 @@ type
     property Transparent;
     //
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
+    property OnDblClick;
     property OnDrawBackground: TACLCustomDrawEvent read FOnDrawBackground write FOnDrawBackground;
     property OnDrawThumb: TACLCustomDrawEvent read FOnDrawThumb write FOnDrawThumb;
     property OnGetHint: TACLSliderGetHintEvent read FOnGetHint write FOnGetHint;
