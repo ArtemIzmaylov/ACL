@@ -18,8 +18,9 @@ interface
 uses
   Winapi.Windows,
   // System
-  System.SysUtils,
   System.Classes,
+  System.SysUtils,
+  System.Types,
   // ACL
   ACL.Classes,
   ACL.Classes.ByteBuffer,
@@ -156,6 +157,8 @@ type
 
   TACLStreamHelper = class helper for TStream
   public
+    procedure Assign(ASource: TStream);
+
     function Available: Int64; inline;
     function FindString(const S: AnsiString; AMaxSearchOffset: Cardinal = MaxWord): Boolean; overload;
     function FindString(const S: array of AnsiString;
@@ -311,32 +314,39 @@ var
 begin
   if AStream1 = AStream2 then
     Exit(True);
+  if AStream1.Size <> AStream2.Size then
+    Exit(False);
 
-  Result := AStream1.Size = AStream2.Size;
-  if Result then
-  begin
-    APosition1 := AStream1.Position;
-    APosition2 := AStream2.Position;
+  if (AStream1 is TCustomMemoryStream) and (AStream2 is TCustomMemoryStream) then
+    Exit(CompareMem(
+      TCustomMemoryStream(AStream1).Memory,
+      TCustomMemoryStream(AStream2).Memory,
+      TCustomMemoryStream(AStream1).Size));
+
+  Result := True;
+  APosition1 := AStream1.Position;
+  APosition2 := AStream2.Position;
+  try
+    ABuffer1 := AllocMem(BufferSize);
+    ABuffer2 := AllocMem(BufferSize);
     try
-      ABuffer1 := AllocMem(BufferSize);
-      ABuffer2 := AllocMem(BufferSize);
-      try
-        repeat
-          ABuffer1Remain := AStream1.Read(ABuffer1^, BufferSize);
-          ABuffer2Remain := AStream2.Read(ABuffer2^, BufferSize);
-          if ABuffer1Remain <> ABuffer2Remain then
-            Exit(False);
-          if not CompareMem(ABuffer1, ABuffer2, ABuffer1Remain) then
-            Exit(False);
-        until (ABuffer1Remain = 0) or (ABuffer2Remain = 0);
-      finally
-        FreeMem(ABuffer1);
-        FreeMem(ABuffer2);
-      end;
+      AStream1.Position := 0;
+      AStream2.Position := 0;
+      repeat
+        ABuffer1Remain := AStream1.Read(ABuffer1^, BufferSize);
+        ABuffer2Remain := AStream2.Read(ABuffer2^, BufferSize);
+        if ABuffer1Remain <> ABuffer2Remain then
+          Exit(False);
+        if not CompareMem(ABuffer1, ABuffer2, ABuffer1Remain) then
+          Exit(False);
+      until (ABuffer1Remain = 0) or (ABuffer2Remain = 0);
     finally
-      AStream1.Position := APosition1;
-      AStream2.Position := APosition2;
+      FreeMem(ABuffer1);
+      FreeMem(ABuffer2);
     end;
+  finally
+    AStream1.Position := APosition1;
+    AStream2.Position := APosition2;
   end;
 end;
 
@@ -1013,6 +1023,12 @@ begin
   Result := Swap16(ReadWord);
 end;
 
+procedure TACLStreamHelper.Assign(ASource: TStream);
+begin
+  Size := 0;
+  StreamCopy(Self, ASource);
+end;
+
 function TACLStreamHelper.Available: Int64;
 begin
   Result := Size - Position;
@@ -1107,7 +1123,7 @@ begin
     ABlockData := AllocMem(ABlockSize);
     if ABlockData <> nil then
     try
-      ZeroMemory(ABlockData, ABlockSize);
+      FastZeroMem(ABlockData, ABlockSize);
       AScanCount := CalculateScanCount(ABlockSize, AMaxStringLength);
       while AScanCount >= 0 do
       begin
@@ -1298,7 +1314,7 @@ begin
   begin
     P := AllocMem(ASize);
     try
-      ZeroMemory(P, ASize);
+      FastZeroMem(P, ASize);
       WriteBuffer(P^, ASize);
     finally
       FreeMem(P, ASize);
