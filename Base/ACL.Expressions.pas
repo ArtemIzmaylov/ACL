@@ -20,7 +20,6 @@ unit ACL.Expressions;
 interface
 
 uses
-  Winapi.Windows,
   // System
   System.Classes,
   System.Generics.Collections,
@@ -135,18 +134,6 @@ type
     //
     property Associativity: TACLExpressionOperatorInfoAssociativity read FAssociativity;
     property Priority: Integer read FPriority;
-  end;
-
-  { TACLExpressionVariableInfo }
-
-  TACLExpressionVariableInfo = class(TACLExpressionFunctionInfo)
-  strict private
-    function EvalProc(AContext: TObject; AParams: TACLExpressionElements): Variant;
-  protected
-    FValue: Variant;
-  public
-    constructor Create(const AName: UnicodeString; const AValue: Variant);
-    function ToString: string; override;
   end;
 
   { TACLExpressionElement }
@@ -304,6 +291,7 @@ type
     FRegisteredOperators: TACLExpressionFunctionInfoList;
 
     procedure ParseParametersList(AFunctionElement: TACLExpressionElementFunction);
+    function PushConstant(const AValue: Variant): Boolean; inline;
   protected
     ClassFunction: TACLExpressionElementFunctionClass;
     ClassOperator: TACLExpressionElementFunctionClass;
@@ -321,6 +309,7 @@ type
     function ProcessToken: Boolean; inline;
     function ProcessTokenAsDelimiter: Boolean; virtual;
     function ProcessTokenAsFunction: Boolean; inline;
+    function ProcessTokenAsIdent: Boolean; virtual;
     function ProcessTokenAsOperator: Boolean; inline;
     // Internal
     procedure OutputOperator(AOperator: TACLExpressionOperatorInfo);
@@ -524,24 +513,6 @@ begin
     Result := 'A ' + Name + ' B'
   else
     Result := Name + 'A';
-end;
-
-{ TACLExpressionVariableInfo }
-
-constructor TACLExpressionVariableInfo.Create(const AName: UnicodeString; const AValue: Variant);
-begin
-  inherited Create(AName, 0, True, EvalProc, TACLCustomExpressionFactory.CategoryGeneral);
-  FValue := AValue;
-end;
-
-function TACLExpressionVariableInfo.EvalProc(AContext: TObject; AParams: TACLExpressionElements): Variant;
-begin
-  Result := FValue;
-end;
-
-function TACLExpressionVariableInfo.ToString: string;
-begin
-  Result := Name;
 end;
 
 { TACLExpressionElements }
@@ -932,7 +903,7 @@ var
   ATempInstance: TObject;
 begin
   ATempInstance := Create;
-  if InterlockedCompareExchangePointer(Pointer(AInstance), Pointer(ATempInstance), nil) <> nil then
+  if AtomicCmpExchange(Pointer(AInstance), Pointer(ATempInstance), nil) <> nil then
     ATempInstance.Free;
 end;
 
@@ -1046,7 +1017,6 @@ var
   AValueD: Double;
   AValueI: Integer;
 begin
-  Result := False;
   case Token.TokenType of
     acTokenDelimiter:
       Result := ProcessTokenAsDelimiter;
@@ -1054,29 +1024,16 @@ begin
       Result := ProcessTokenAsOperator;
     acExprTokenFunction:
       Result := ProcessTokenAsFunction;
-
-    acTokenQuotedText:
-      begin
-        OutputBuffer.Push(TACLExpressionElementConstant.Create(Token.ToString));
-        PrevSolidToken := ecsttOperand;
-        Result := True;
-      end;
-
     acExprTokenConstantFloat:
-      if TryStrToFloat(Token.ToString, AValueD, InvariantFormatSettings) then
-      begin
-        OutputBuffer.Push(TACLExpressionElementConstant.Create(AValueD));
-        PrevSolidToken := ecsttOperand;
-        Result := True;
-      end;
-
+      Result := TryStrToFloat(Token.ToString, AValueD, InvariantFormatSettings) and PushConstant(AValueD);
     acExprTokenConstantInt:
-      if TryStrToInt(Token.ToString, AValueI) then
-      begin
-        OutputBuffer.Push(TACLExpressionElementConstant.Create(AValueI));
-        PrevSolidToken := ecsttOperand;
-        Result := True;
-      end;
+      Result := TryStrToInt(Token.ToString, AValueI) and PushConstant(AValueI);
+    acTokenQuotedText:
+      Result := PushConstant(Token.ToString);
+    acTokenIdent:
+      Result := ProcessTokenAsIdent;
+  else
+    Result := False;
   end;
 end;
 
@@ -1134,6 +1091,11 @@ begin
   OutputBuffer.Push(AFunctionElement);
   PrevSolidToken := ecsttOperand;
   Result := True;
+end;
+
+function TACLExpressionCompiler.ProcessTokenAsIdent: Boolean;
+begin
+  Result := False;
 end;
 
 function TACLExpressionCompiler.ProcessTokenAsOperator: Boolean;
@@ -1241,6 +1203,13 @@ begin
 
   if ABracketLevel <> 0 then
     Error(sErrorUnequalBrackets);
+end;
+
+function TACLExpressionCompiler.PushConstant(const AValue: Variant): Boolean;
+begin
+  OutputBuffer.Push(TACLExpressionElementConstant.Create(AValue));
+  PrevSolidToken := ecsttOperand;
+  Result := True;
 end;
 
 end.

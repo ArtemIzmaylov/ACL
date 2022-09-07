@@ -137,9 +137,11 @@ begin
   RegisterOperator('<', OperatorLess, 2, 9);
   RegisterOperator('<=', OperatorLessOrEqual, 2, 9);
   RegisterOperator('<>', OperatorNotEqual, 2, 9);
+  RegisterOperator('!=', OperatorNotEqual, 2, 9);
   RegisterOperator('=', OperatorEqual, 2, 9);
 
   RegisterOperator('not', OperatorNot, 1, 8);
+  RegisterOperator('!', OperatorNot, 1, 8);
 
   RegisterOperator('and', OperatorAnd, 2, 7);
   RegisterOperator('or', OperatorOr, 2, 7);
