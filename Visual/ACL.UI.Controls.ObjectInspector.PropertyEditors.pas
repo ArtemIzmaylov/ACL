@@ -941,6 +941,7 @@ initialization
   TACLPropertyEditors.Register(tkString, TACLPropertyEditor);
   TACLPropertyEditors.Register(tkUString, TACLPropertyEditor);
   TACLPropertyEditors.Register(tkWString, TACLPropertyEditor);
+  TACLPropertyEditors.Register(tkVariant, TACLPropertyEditor);
 
   TACLPropertyEditors.Register(TypeInfo(TComponent), TPersistent, '', TACLComponentPropertyEditor);
   TACLPropertyEditors.Register(TypeInfo(TAlphaColor), nil, '', TACLAlphaColorPropertyEditor);

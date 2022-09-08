@@ -729,7 +729,7 @@ begin
     else
 
     case AEditor.Info.PropType^^.Kind of
-      tkString, tkUString, tkWString, tkLString:
+      tkString, tkUString, tkWString, tkLString, tkVariant:
         Result := CreateEdit(eimText);
       tkInteger, tkInt64:
         Result := CreateEdit(eimInteger);
