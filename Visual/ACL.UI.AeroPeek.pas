@@ -21,7 +21,6 @@ uses
   Winapi.ActiveX,
   Winapi.ShlObj,
   Winapi.ObjectArray,
-  Winapi.PropSys,
   // System
   System.Types,
   System.SysUtils,
@@ -42,67 +41,8 @@ uses
   ACL.Utils.Common,
   ACL.Utils.FileSystem;
 
-const
-  IID_IObjectArray: TGUID = '{92CA9DCD-5622-4BBA-A805-5E9F541BD8C9}';
-  IID_IPropertyStorage: TGUID = '{886d8eeb-8cf2-4446-8d02-cdba1dbdcf99}';
-
 type
   TACLAeroPeek = class;
-
-  { TACLAeroPeekJumpToObjectListItem }
-
-  TACLAeroPeekJumpToObjectListItem = class
-  protected
-    FArguments: UnicodeString;
-    FDisplayName: UnicodeString;
-    FFileName: UnicodeString;
-    FIconFileName: UnicodeString;
-    FIconIndex: Integer;
-  public
-    function CreateLink: IShellLinkW;
-    //
-    property Arguments: UnicodeString read FArguments;
-    property DisplayName: UnicodeString read FDisplayName;
-    property FileName: UnicodeString read FFileName;
-    property IconFileName: UnicodeString read FIconFileName;
-    property IconIndex: Integer read FIconIndex;
-  end;
-
-  { TACLAeroPeekJumpToObjectList }
-
-  TACLAeroPeekJumpToObjectList = class(TACLUnknownObject, IObjectArray)
-  strict private
-    FList: TACLObjectList;
-
-    function GetItem(Index: Integer): TACLAeroPeekJumpToObjectListItem;
-  public
-    constructor Create; virtual;
-    destructor Destroy; override;
-    procedure Add(const AFileName, AArguments, ADisplayName, AIconFileName: UnicodeString; AIconIndex: Integer);
-    procedure Clear;
-    // IObjectArray
-    function GetAt(uiIndex: UINT; const riid: TIID; out ppv): HRESULT; stdcall;
-    function GetCount(var pcObjects: UINT): HRESULT; stdcall;
-    //
-    property Items[Index: Integer]: TACLAeroPeekJumpToObjectListItem read GetItem; default;
-  end;
-
-  { TACLAeroPeekJumpToList }
-
-  TACLAeroPeekJumpToList = class
-  strict private
-    FJumpList: ICustomDestinationList;
-    FList: TACLAeroPeekJumpToObjectList;
-  protected
-    property JumpList: ICustomDestinationList read FJumpList;
-    property List: TACLAeroPeekJumpToObjectList read FList;
-  public
-    constructor Create; virtual;
-    destructor Destroy; override;
-    procedure Add(const AFileName, ADisplayName: UnicodeString); overload;
-    procedure Add(const AFileName, AArguments, ADisplayName, AIconFileName: UnicodeString; AIconIndex: Integer); overload;
-    procedure Commit;
-  end;
 
   { TACLAeroPeekButton }
 
@@ -155,7 +95,6 @@ type
     FForceCustomPreview: Boolean;
     FImageList: TACLImageList;
     FInitialized: Boolean;
-    FJumpToList: TACLAeroPeekJumpToList;
     FLivePreviewTimer: TACLTimer;
     FOwnerWindow: HWND;
     FProgress: Int64;
@@ -225,7 +164,6 @@ type
     property Buttons: TACLAeroPeekButtons read FButtons;
     property ForceCustomPreview: Boolean read FForceCustomPreview write SetForceCustomPreview;
     property ImageList: TACLImageList read FImageList;
-    property JumpToList: TACLAeroPeekJumpToList read FJumpToList;
     property ProgressState: TACLAeroPeekProgressState read FProgressState write SetProgressState;
     property ShowProgress: Boolean read FShowProgress write SetShowProgress;
     property ShowProgressCanBeIndeterminate: Boolean read FShowProgressCanBeIndeterminate write SetShowProgressCanBeIndeterminate;
@@ -348,135 +286,6 @@ begin
   Result := TACLAeroPeekButton(inherited Items[Index]);
 end;
 
-{ TACLAeroPeekJumpToObjectListItem }
-
-function TACLAeroPeekJumpToObjectListItem.CreateLink: IShellLinkW;
-var
-  AKey: TPropertyKey;
-  AStorage: IPropertyStore;
-  AVar: TPropVariant;
-begin
-  CoCreateInstance(CLSID_ShellLink, nil, CLSCTX_INPROC_SERVER, IID_IShellLinkW, Result);
-  if Assigned(Result) then
-  begin
-    Result.SetPath(PWideChar(FFileName));
-    Result.SetArguments(PWideChar(FArguments));
-    Result.SetIconLocation(PWideChar(FIconFileName), IconIndex);
-
-    if Succeeded(Result.QueryInterface(IID_IPropertyStorage, AStorage)) then
-    try
-      AVar.vt := VT_LPWSTR;
-      AVar.pwszVal := PWideChar(FDisplayName);
-      AKey.fmtid := StringToGUID('{F29F85E0-4FF9-1068-AB91-08002B27B3D9}');
-      AKey.pid := 2;
-      AStorage.SetValue(AKey, AVar);
-      AStorage.Commit;
-    finally
-      AStorage := nil;
-    end;
-  end;
-end;
-
-{ TACLAeroPeekJumpToObjectList }
-
-constructor TACLAeroPeekJumpToObjectList.Create;
-begin
-  inherited Create;
-  FList := TACLObjectList.Create;
-end;
-
-destructor TACLAeroPeekJumpToObjectList.Destroy;
-begin
-  FreeAndNil(FList);
-  inherited Destroy;
-end;
-
-procedure TACLAeroPeekJumpToObjectList.Add(
-  const AFileName, AArguments, ADisplayName, AIconFileName: UnicodeString; AIconIndex: Integer);
-var
-  AItem: TACLAeroPeekJumpToObjectListItem;
-begin
-  AItem := TACLAeroPeekJumpToObjectListItem.Create;
-  AItem.FArguments := AArguments;
-  AItem.FDisplayName := ADisplayName;
-  AItem.FFileName := AFileName;
-  AItem.FIconFileName := AIconFileName;
-  AItem.FIconIndex := AIconIndex;
-  FList.Add(AItem);
-end;
-
-procedure TACLAeroPeekJumpToObjectList.Clear;
-begin
-  FList.Clear;
-end;
-
-function TACLAeroPeekJumpToObjectList.GetAt(uiIndex: UINT; const riid: TIID; out ppv): HRESULT; stdcall;
-begin
-  Result := Items[uiIndex].CreateLink.QueryInterface(riid, ppv);
-end;
-
-function TACLAeroPeekJumpToObjectList.GetCount(var pcObjects: UINT): HRESULT;
-begin
-  pcObjects := FList.Count;
-  Result := S_OK;
-end;
-
-function TACLAeroPeekJumpToObjectList.GetItem(Index: Integer): TACLAeroPeekJumpToObjectListItem;
-begin
-  Result := TACLAeroPeekJumpToObjectListItem(FList.Items[Index]);
-end;
-
-{ TACLAeroPeekJumpToList }
-
-constructor TACLAeroPeekJumpToList.Create;
-begin
-  inherited Create;
-  FList := TACLAeroPeekJumpToObjectList.Create;
-  CreateObj(CLSID_CustomDestinationList, ICustomDestinationList, FJumpList);
-end;
-
-destructor TACLAeroPeekJumpToList.Destroy;
-begin
-  FJumpList := nil;
-  FreeAndNil(FList);
-  inherited Destroy;
-end;
-
-procedure TACLAeroPeekJumpToList.Add(const AFileName, AArguments, ADisplayName, AIconFileName: UnicodeString; AIconIndex: Integer);
-begin
-  FList.Add(AFileName, AArguments, ADisplayName, AIconFileName, AIconIndex);
-end;
-
-procedure TACLAeroPeekJumpToList.Add(const AFileName, ADisplayName: UnicodeString);
-begin
-  Add(AFileName, '', ADisplayName, AFileName, 0);
-end;
-
-procedure TACLAeroPeekJumpToList.Commit;
-
-  // note: lock AObjArr while TaskList changing, otherthis - AV.
-  procedure DoAfterCommit(AOldObjects: IObjectArray);
-  begin
-    AOldObjects._AddRef;
-    AOldObjects._Release;
-  end;
-
-var
-  AMaxSlot: Cardinal;
-  AObjArr: IObjectArray;
-begin
-  if JumpList <> nil then
-  begin
-    if Succeeded(JumpList.BeginList(AMaxSlot, IID_IObjectArray, AObjArr)) then
-    try
-      JumpList.AddUserTasks(List);
-    finally
-      JumpList.CommitList;
-      DoAfterCommit(AObjArr);
-    end;
-  end;
-end;
-
 { TACLAeroPeek }
 
 constructor TACLAeroPeek.Create(AOwnerWindow: HWND);
@@ -491,7 +300,6 @@ begin
   FImageList.ColorDepth := cd32Bit;
   FImageList.OnChange := ImageListChanged;
   FButtons := TACLAeroPeekButtons.Create(Self);
-  FJumpToList := TACLAeroPeekJumpToList.Create;
   CreateObj(CLSID_TaskbarList, IID_ITaskbarList3, FTaskBarList);
   HookOwnerWindow;
 end;
@@ -502,7 +310,6 @@ begin
   StopLivePreviewTimer;
   FImageList.OnChange := nil;
   FTaskBarList := nil;
-  FreeAndNil(FJumpToList);
   FreeAndNil(FImageList);
   FreeAndNil(FButtons);
   inherited Destroy;
@@ -756,6 +563,7 @@ procedure TACLAeroPeek.SetOnDrawPreview(AValue: TACLAeroPeekDrawPreviewEvent);
 begin
   FOnDrawPreview := AValue;
   UpdateForceIconicRepresentation;
+  UpdatePreview;
 end;
 
 procedure TACLAeroPeek.SetProgressState(AValue: TACLAeroPeekProgressState);
@@ -838,14 +646,12 @@ procedure TACLAeroPeek.SyncProgress;
   begin
     if (ProgressTotal = 0) and ShowProgressCanBeIndeterminate then
       Result := TBPF_INDETERMINATE
+    else if ShowStatusAsColor then
+      Result := StateMap[ProgressState]
+    else if ProgressTotal = 0 then
+      Result := TBPF_NOPROGRESS
     else
-      if ShowStatusAsColor then
-        Result := StateMap[ProgressState]
-      else
-        if ProgressTotal = 0 then
-          Result := TBPF_NOPROGRESS
-        else
-          Result := TBPF_NORMAL;
+      Result := TBPF_NORMAL;
   end;
 
 var
