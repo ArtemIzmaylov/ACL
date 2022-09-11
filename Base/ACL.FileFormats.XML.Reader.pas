@@ -20,11 +20,15 @@ unit ACL.FileFormats.XML.Reader;
 interface
 
 uses
-  Windows,
-  Classes,
-  SysUtils,
-  Generics.Defaults,
-  Generics.Collections,
+{$IFDEF MSWINDOWS}
+  Winapi.Windows,
+{$ENDIF}
+  // System
+  System.Classes,
+  System.SysUtils,
+  System.Generics.Defaults,
+  System.Generics.Collections,
+  // ACL
   ACL.Classes,
   ACL.FileFormats.XML.Types,
   ACL.Utils.Common,
@@ -190,7 +194,6 @@ type
     function GetAttributeAsInt64(const AAttribute: string; const ADefaultValue: Int64 = 0): Int64; overload;
     function GetAttributeAsInteger(const AAttribute: string; ADefaultValue: Integer = 0): Integer; overload;
     function GetAttributeAsSingle(const AAttribute: string; ADefaultValue: Single = 0): Single; overload;
-    function GetProgress: Integer; virtual; abstract;
     function IsEmptyElement: Boolean; virtual; abstract;
     function LookupNamespace(const ANameSpace: string): string; overload; virtual; abstract;
     function MoveToElement: Boolean; virtual; abstract;
@@ -785,7 +788,6 @@ type
     destructor Destroy; override;
     procedure EnumAttributes(const AProc: TProc<string, string, string>); override;
     function GetAttribute(const AAttribute, ANamespaceURI: string): string; overload; override;
-    function GetProgress: Integer; override;
     function IsEmptyElement: Boolean; override;
     function TryGetAttribute(const AAttribute: string; out AValue: string): Boolean; override;
     function TryGetAttribute(const APrefix, ALocalName, ANamespaceURI: string; out AValue: string): Boolean; override;
@@ -1980,13 +1982,6 @@ begin
   Result := AAttrData <> nil;
   if Result then
     AValue := AAttrData.StringValue;
-end;
-
-function TACLXMLTextReader.GetProgress: Integer;
-begin
-  Result := MulDiv(100, FParsingState.Stream.Position -
-    (FParsingState.BytesUsed - FParsingState.BytePos) -
-    (FParsingState.CharsUsed - FParsingState.CharPos), FParsingState.Stream.Size);
 end;
 
 //# Stream input only: read bytes from stream and decodes them according to the current encoding

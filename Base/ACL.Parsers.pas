@@ -16,8 +16,6 @@ unit ACL.Parsers;
 interface
 
 uses
-  Winapi.Windows,
-  // System
   System.Generics.Collections,
   System.Generics.Defaults,
   System.Math,

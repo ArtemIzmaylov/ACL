@@ -41,6 +41,15 @@ const
   NullSize: TSize = (cx: 0; cy: 0);
   Signs: array[Boolean] of Integer = (-1, 1);
 
+  MaxWord = Word.MaxValue;
+
+{$IFDEF MSWINDOWS}
+  E_HANDLE = Winapi.Windows.E_HANDLE;
+{$ELSE}
+  E_HANDLE = HRESULT($80070006);
+{$ENDIF}
+
+
 type
 {$SCOPEDENUMS ON}
   TACLBoolean = (Default, False, True);
@@ -76,6 +85,8 @@ type
     class function From(AValue: Boolean): TACLBoolean; static;
   end;
 
+{$IFDEF MSWINDOWS}
+
   { TProcessHelper }
 
   TExecuteOption = (eoWaitForTerminate, eoShowGUI);
@@ -94,6 +105,8 @@ type
     class function IsWow64Window(AWindow: HWND): LongBool;
     class function Wow64SetFileSystemRedirection(AValue: Boolean): LongBool;
   end;
+
+{$ENDIF}
 
   { TACLInterfaceHelper }
 
@@ -122,26 +135,30 @@ var
   InvariantFormatSettings: TFormatSettings;
 
 // HMODULE
-function acGetProcessFileName(const AWindowHandle: HWND; out AFileName: UnicodeString): Boolean;
+function acGetProcessFileName(const AWindowHandle: THandle; out AFileName: UnicodeString): Boolean;
 function acGetProcAddress(ALibHandle: HMODULE; AProcName: PWideChar; var AResult: Boolean): Pointer;
 function acLoadLibrary(const AFileName: UnicodeString; AFlags: Cardinal = 0): HMODULE;
 function acModuleFileName(AModule: HMODULE): UnicodeString; inline;
 function acModuleHandle(const AFileName: UnicodeString): HMODULE;
 
 // Window Handles
+{$IFDEF MSWINDOWS}
 function acGetWindowRect(AHandle: HWND): TRect;
 function acFindWindow(const AClassName: UnicodeString): HWND;
 function acGetClassName(Handle: HWND): UnicodeString;
 function acGetWindowText(AHandle: HWND): UnicodeString;
 procedure acSwitchToWindow(AHandle: HWND);
 procedure acSetWindowText(AHandle: HWND; const AText: UnicodeString);
+{$ENDIF}
 
 // System
 procedure MinimizeMemoryUsage;
 
+{$IFDEF MSWINDOWS}
 function GetExactTickCount: Int64;
 function TickCountToTime(const ATicks: Int64): Cardinal;
 function TimeToTickCount(const ATime: Cardinal): Int64;
+{$ENDIF}
 
 // Interfaces
 procedure acGetInterface(const Instance: IInterface; const IID: TGUID; out Intf); overload;
@@ -155,7 +172,9 @@ procedure acExchangePointers(var AValue1, AValue2); inline;
 function acBoolToHRESULT(AValue: Boolean): HRESULT; inline;
 function acGenerateGUID: UnicodeString;
 function acObjectUID(AObject: TObject): string;
+{$IFDEF MSWINDOWS}
 function acSetThreadErrorMode(Mode: DWORD): DWORD;
+{$ENDIF}
 procedure FreeMemAndNil(var P: Pointer);
 function IfThen(AValue: Boolean; ATrue: TACLBoolean; AFalse: TACLBoolean): TACLBoolean; overload;
 implementation
@@ -172,6 +191,7 @@ uses
   ACL.Utils.FileSystem,
   ACL.Threading;
 
+{$IFDEF MSWINDOWS}
 type
   TGetThreadErrorMode = function: DWORD; stdcall;
   TSetThreadErrorMode = function (NewMode: DWORD; out OldMode: DWORD): LongBool; stdcall;
@@ -180,9 +200,11 @@ var
   FPerformanceCounterFrequency: Int64 = 0;
   FGetThreadErrorMode: TGetThreadErrorMode = nil;
   FSetThreadErrorMode: TSetThreadErrorMode = nil;
+{$ENDIF}
 
 procedure CheckWindowsVersion;
 begin
+{$IFDEF MSWINDOWS}
   IsWine := GetProcAddress(GetModuleHandle('ntdll.dll'), 'wine_get_version') <> nil;
   IsWinVistaOrLater := CheckWin32Version(6, 0);
   IsWinSevenOrLater := CheckWin32Version(6, 1);
@@ -191,8 +213,10 @@ begin
   IsWinSeven := IsWinSevenOrLater and not IsWin8OrLater;
   IsWin10OrLater := CheckWin32Version(10, 0);
   IsWin11OrLater := CheckWin32Version(10, 0) and (Win32BuildNumber >= 22000);
+{$ENDIF}
 end;
 
+{$IFDEF MSWINDOWS}
 function acSetThreadErrorMode(Mode: DWORD): DWORD;
 begin
   if Assigned(FSetThreadErrorMode) then
@@ -203,12 +227,14 @@ begin
   else
     Result := SetErrorMode(Mode);
 end;
+{$ENDIF}
 
 //==============================================================================
 // HMODULE
 //==============================================================================
 
-function acGetProcessFileName(const AWindowHandle: HWND; out AFileName: UnicodeString): Boolean;
+function acGetProcessFileName(const AWindowHandle: THandle; out AFileName: UnicodeString): Boolean;
+{$IFDEF MSWINDOWS}
 var
   AProcess: THandle;
   AProcessID: Cardinal;
@@ -227,6 +253,11 @@ begin
     end;
   end;
 end;
+{$ELSE}
+begin
+  Result := False;
+end;
+{$ENDIF}
 
 function acGetProcAddress(ALibHandle: HMODULE; AProcName: PWideChar; var AResult: Boolean): Pointer;
 begin
@@ -236,29 +267,34 @@ end;
 
 function acLoadLibrary(const AFileName: UnicodeString; AFlags: Cardinal = 0): HMODULE;
 var
-  AErrorMode: Integer;
   APrevCurPath: UnicodeString;
 begin
-  AErrorMode := SetErrorMode(SEM_FailCriticalErrors);
+{$IFDEF MSWINDOWS}
+  var AErrorMode := acSetThreadErrorMode(SEM_FailCriticalErrors);
   try
+{$ENDIF}
     APrevCurPath := acGetCurrentDir;
     try
       acSetCurrentDir(acExtractFilePath(AFileName));
+    {$IFDEF MSWINDOWS}
       if AFlags <> 0 then
-        Result := LoadLibraryExW(PWideChar(AFileName), 0, AFlags)
+        Result := LoadLibraryEx(PWideChar(AFileName), 0, AFlags)
       else
-        Result := LoadLibraryW(PWideChar(AFileName));
+    {$ENDIF}
+        Result := LoadLibrary(PWideChar(AFileName));
     finally
       acSetCurrentDir(APrevCurPath);
     end;
+{$IFDEF MSWINDOWS}
   finally
-    SetErrorMode(AErrorMode);
+    acSetThreadErrorMode(AErrorMode);
   end;
+{$ENDIF}
 end;
 
 function acModuleHandle(const AFileName: UnicodeString): HMODULE;
 begin
-  Result := GetModuleHandleW(PWideChar(AFileName));
+  Result := GetModuleHandle(PWideChar(AFileName));
 end;
 
 function acModuleFileName(AModule: HMODULE): UnicodeString;
@@ -270,6 +306,7 @@ end;
 // Internal Tools
 // ---------------------------------------------------------------------------------------------------------------------
 
+{$IFDEF MSWINDOWS}
 function GetExactTickCount: Int64;
 begin
   //# https://docs.microsoft.com/ru-ru/windows/win32/api/profileapi/nf-profileapi-queryperformancecounter?redirectedfrom=MSDN
@@ -291,6 +328,7 @@ begin
     QueryPerformanceFrequency(FPerformanceCounterFrequency);
   Result := (Int64(ATime) * FPerformanceCounterFrequency) div 1000;
 end;
+{$ENDIF}
 
 procedure FreeMemAndNil(var P: Pointer);
 begin
@@ -390,13 +428,15 @@ end;
 
 procedure MinimizeMemoryUsage;
 begin
+{$IFDEF MSWINDOWS}
   SetProcessWorkingSetSize(GetCurrentProcess, NativeUInt(-1), NativeUInt(-1));
+{$ENDIF}
 end;
 
 //==============================================================================
 // Window Handle
 //==============================================================================
-
+{$IFDEF MSWINDOWS}
 function acGetClassName(Handle: HWND): UnicodeString;
 var
   ABuf: array[0..64] of WideChar;
@@ -445,6 +485,7 @@ begin
   SetForegroundWindow(AHandle);
   SetFocus(AHandle);
 end;
+{$ENDIF}
 
 { TACLBooleanHelper }
 
@@ -458,6 +499,7 @@ end;
 
 { TProcessHelper }
 
+{$IFDEF MSWINDOWS}
 class function TProcessHelper.Execute(const ACmdLine: UnicodeString;
   AOptions: TExecuteOptions = [eoShowGUI]; AOutputData: TStream = nil; AErrorData: TStream = nil;
   AProcessInfo: PProcessInformation = nil; AExitCode: PCardinal = nil): LongBool;
@@ -649,6 +691,7 @@ begin
   AWow64SetProc := TWow64SetProc(GetProcAddress(ALibHandle, 'Wow64EnableWow64FsRedirection'));
   Result := Assigned(AWow64SetProc) and AWow64SetProc(AValue);
 end;
+{$ENDIF}
 
 { TACLInterfaceHelper }
 
@@ -669,8 +712,10 @@ begin
 end;
 
 initialization
+{$IFDEF MSWINDOWS}
   FGetThreadErrorMode := GetProcAddress(GetModuleHandle(kernel32), 'GetThreadErrorMode');
   FSetThreadErrorMode := GetProcAddress(GetModuleHandle(kernel32), 'SetThreadErrorMode');
-  InvariantFormatSettings := TFormatSettings.Invariant;
   CheckWindowsVersion;
+{$ENDIF}
+  InvariantFormatSettings := TFormatSettings.Invariant;
 end.

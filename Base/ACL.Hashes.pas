@@ -11,14 +11,11 @@
 
 unit ACL.Hashes;
 
-
 {$I ACL.Config.inc}
 
 interface
 
 uses
-  Winapi.Windows,
-  // System
   System.AnsiStrings,
   System.Classes,
   System.Generics.Defaults,
@@ -139,15 +136,17 @@ type
     class procedure UpdateCore(var AAccumulator: LongWord; AData: PByte; ASize: Integer; ATable: PCRC32Table);
   end;
 
+{$IFDEF MSWINDOWS}
+
   { TACLHashCryptoApiBased }
 
   TACLHashCryptoApiBased = class abstract(TACLHash)
   protected type
     PState = ^TState;
     TState = record
-      Handle: ULONG_PTR;
-      ProviderHandle: ULONG_PTR;
-      Reserved: ULONG_PTR;
+      Handle: NativeUInt;
+      ProviderHandle: NativeUInt;
+      Reserved: NativeUInt;
     end;
   protected
     class procedure CryptCheck(AResult: LongBool);
@@ -214,13 +213,22 @@ type
     class function GetAlgorithmId: Cardinal; override;
   end;
 
+{$ENDIF}
+
 // Elf
 function ElfHash(S: PWideChar; ACount: Integer; AIgnoryCase: Boolean): Integer; overload;
 function ElfHash(const S: UnicodeString; AIgnoryCase: Boolean = True): Integer; overload; inline;
 
 implementation
 
+{$R-} { Range-Checking }
+{$Q-} { Overflow checking }
+
 uses
+{$IFDEF MSWINDOWS}
+  Winapi.Windows,
+{$ENDIF}
+  // System
   System.Math,
   // ACL
   ACL.FastCode,
@@ -228,6 +236,8 @@ uses
   ACL.Utils.FileSystem,
   ACL.Utils.Strings,
   ACL.Utils.Strings.Transcode;
+
+{$IFDEF MSWINDOWS}
 
 {$REGION 'CryptoAPI Implemenation'}
 type
@@ -307,7 +317,7 @@ function CryptGetHashParam(hHash: HCRYPTHASH; dwParam: DWORD; pbData: LPBYTE; va
 {$EXTERNALSYM CryptGetHashParam}
 function CryptSetHashParam(hHash: HCRYPTHASH; dwParam: DWORD; pbData: LPBYTE; dwFlags: DWORD): BOOL; stdcall; external advapi32;
 {$EXTERNALSYM CryptSetHashParam}
-function CryptAcquireContextW(var phProv: HCRYPTPROV; pszContainer: LPCTSTR; pszProvider: LPCTSTR; dwProvType: DWORD; dwFlags: DWORD): BOOL; stdcall; external advapi32;
+function CryptAcquireContextW(var phProv: HCRYPTPROV; pszContainer: LPWSTR; pszProvider: LPWSTR; dwProvType: DWORD; dwFlags: DWORD): BOOL; stdcall; external advapi32;
 {$EXTERNALSYM CryptAcquireContextW}
 function CryptReleaseContext(hProv: HCRYPTPROV; dwFlags: ULONG_PTR): BOOL; stdcall; external advapi32;
 {$EXTERNALSYM CryptReleaseContext}
@@ -316,24 +326,31 @@ function CryptDeriveKey(hProv: HCRYPTPROV; Algid: Cardinal; hBaseData: HCRYPTHAS
 function CryptDestroyKey(hKey: HCRYPTKEY): BOOL; stdcall; external advapi32;
 {$EXTERNALSYM CryptDestroyKey}
 {$ENDREGION}
+{$ENDIF}
 
 //==============================================================================
 // ELF Hash
 //==============================================================================
 
+function ElfHash(S: PWideChar; ACount: Integer; AIgnoryCase: Boolean): Integer;
 const
   ElfHashUpCaseBufferSize = 64;
-
-function ElfHash(S: PWideChar; ACount: Integer; AIgnoryCase: Boolean): Integer;
 var
+{$IFDEF MSWINDOWS}
   ABuffer: array[0..ElfHashUpCaseBufferSize - 1] of WideChar;
+{$ENDIF}
   AIndex: Integer;
 begin
   if AIgnoryCase then
   begin
-    ACount := Min(ACount, Length(ABuffer));
+  {$IFDEF MSWINDOWS}
+    if ACount > Length(ABuffer) then
+  {$ENDIF}
+      Exit(ElfHash(acUpperCase(acMakeString(S, ACount)), False));
+  {$IFDEF MSWINDOWS}
     ACount := LCMapStringW(0, LCMAP_UPPERCASE, S, ACount, @ABuffer[0], ACount);
     S := @ABuffer[0];
+  {$ENDIF}
   end;
 
   Result := 0;
@@ -552,6 +569,8 @@ begin
   end;
 end;
 
+{$IFDEF MSWINDOWS}
+
 { TACLHashCryptoApiBased }
 
 class procedure TACLHashCryptoApiBased.Finalize(var AState: Pointer; out AHash: TBytes);
@@ -721,4 +740,5 @@ begin
   Result := CALG_SHA_512;
 end;
 
+{$ENDIF}
 end.

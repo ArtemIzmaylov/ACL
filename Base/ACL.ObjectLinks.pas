@@ -16,8 +16,6 @@ unit ACL.ObjectLinks;
 interface
 
 uses
-  Winapi.Windows,
-  // System
   System.Classes,
   System.Generics.Collections,
   System.SysUtils,
@@ -363,7 +361,7 @@ begin
   if FExtensions <> nil then
     for I := FExtensions.Count - 1 downto 0 do
     begin
-      if Succeeded(FExtensions.List[I].QueryInterface(IID, Obj)) then
+      if FExtensions.List[I].QueryInterface(IID, Obj) = 0 then
         Exit(True);
     end;
 

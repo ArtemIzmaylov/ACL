@@ -11,13 +11,12 @@
 
 unit ACL.Utils.Date;
 
+{$I ACL.Config.inc}
+
 interface
 
-uses
-  Winapi.Windows;
-
 type
-  TCalendarId = type DWORD;
+  TCalendarId = type Cardinal;
 
   TWeekDay = (wdMonday, wdTuesday, wdWednesday, wdThusday, wdFriday, wdSaturday, wdSunday);
   TWeekDays = set of TWeekDay;
@@ -74,47 +73,73 @@ function UTCToLocalDateTime(const AValue: TDateTime): TDateTime;
 implementation
 
 uses
+{$IFDEF MSWINDOWS}
+  Winapi.Windows,
+{$ENDIF}
+  // System
   System.Math,
   System.DateUtils,
   System.SysUtils;
 
-function TzSpecificLocalTimeToSystemTime(lpTimeZoneInformation: PTimeZoneInformation;
-  var lpLocalTime, lpUniversalTime: TSystemTime): BOOL; stdcall; external kernel32;
-function SystemTimeToTzSpecificLocalTime(lpTimeZoneInformation: PTimeZoneInformation;
-  var lpUniversalTime, lpLocalTime: TSystemTime): BOOL; stdcall; external kernel32;
+{$IFNDEF MSWINDOWS}
+const
+  CAL_GREGORIAN = 1;              { Gregorian (localized) calendar }
+  CAL_GREGORIAN_US = 2;           { Gregorian (U.S.) calendar }
+  CAL_JAPAN = 3;                  { Japanese Emperor Era calendar }
+  CAL_TAIWAN = 4;                 { Republic of China Era calendar }
+  CAL_KOREA = 5;                  { Korean Tangun Era calendar }
+  CAL_HIJRI = 6;                  { Hijri (Arabic Lunar) calendar }
+  CAL_THAI = 7;                   { Thai calendar }
+  CAL_HEBREW = 8;                 { Hebrew calendar }
+  CAL_GREGORIAN_ME_FRENCH = 9;    { Gregorian Middle East French calendar }
+  CAL_GREGORIAN_ARABIC = 10;      { Gregorian Arabic calendar }
+  CAL_GREGORIAN_XLIT_ENGLISH = 11;{ Gregorian Transliterated English calendar }
+  CAL_GREGORIAN_XLIT_FRENCH = 12; { Gregorian Transliterated French calendar }
+  CAL_UMALQURA = 23;              { UmAlQura Hijri (Arabic Lunar) calendar }
+{$ENDIF}
 
-function GetCalendarID(Locale: LCID): TCalendarId; overload;
-begin
-  GetLocaleInfo(Locale, LOCALE_ICALENDARTYPE or CAL_RETURN_NUMBER, @Result, SizeOf(Result));
-end;
+//function TzSpecificLocalTimeToSystemTime(lpTimeZoneInformation: PTimeZoneInformation;
+//  var lpLocalTime, lpUniversalTime: TSystemTime): BOOL; stdcall; external kernel32;
+//function SystemTimeToTzSpecificLocalTime(lpTimeZoneInformation: PTimeZoneInformation;
+//  var lpUniversalTime, lpLocalTime: TSystemTime): BOOL; stdcall; external kernel32;
 
-function GetCalendarID: TCalendarId; overload;
+function GetCalendarID: TCalendarId;
 begin
-  Result := GetCalendarID(GetThreadLocale);
+{$IFDEF MSWINDOWS}
+  GetLocaleInfo(GetThreadLocale, LOCALE_ICALENDARTYPE or CAL_RETURN_NUMBER, @Result, SizeOf(Result));
+{$ELSE}
+  Result := CAL_GREGORIAN;
+{$ENDIF}
 end;
 
 function LocalDateTimeToUTC(const AValue: TDateTime): TDateTime;
-var
-  AInfo: TTimeZoneInformation;
-  ALocalTime: TSystemTime;
-  AUniversalTime: TSystemTime;
+//var
+//  AInfo: TTimeZoneInformation;
+//  ALocalTime: TSystemTime;
+//  AUniversalTime: TSystemTime;
+//begin
+//  GetTimeZoneInformation(AInfo);
+//  DateTimeToSystemTime(AValue, ALocalTime);
+//  TzSpecificLocalTimeToSystemTime(@AInfo, ALocalTime, AUniversalTime);
+//  Result := SystemTimeToDateTime(AUniversalTime);
+//end;
 begin
-  GetTimeZoneInformation(AInfo);
-  DateTimeToSystemTime(AValue, ALocalTime);
-  TzSpecificLocalTimeToSystemTime(@AInfo, ALocalTime, AUniversalTime);
-  Result := SystemTimeToDateTime(AUniversalTime);
+  Result := TTimeZone.Local.ToUniversalTime(AValue);
 end;
 
-function UTCToLocalDateTime(const AValue: TDateTime):TDateTime;
-var
-  AInfo: TTimeZoneInformation;
-  ALocalTime: TSystemTime;
-  AUniversalTime: TSystemTime;
+function UTCToLocalDateTime(const AValue: TDateTime): TDateTime;
+//var
+//  AInfo: TTimeZoneInformation;
+//  ALocalTime: TSystemTime;
+//  AUniversalTime: TSystemTime;
+//begin
+//  GetTimeZoneInformation(AInfo);
+//  DateTimeToSystemTime(AValue, AUniversalTime);
+//  SystemTimeToTzSpecificLocalTime(@AInfo, AUniversalTime, ALocalTime);
+//  Result := SystemTimeToDateTime(ALocalTime);
+//end;
 begin
-  GetTimeZoneInformation(AInfo);
-  DateTimeToSystemTime(AValue, AUniversalTime);
-  SystemTimeToTzSpecificLocalTime(@AInfo, AUniversalTime, ALocalTime);
-  Result := SystemTimeToDateTime(ALocalTime);
+  Result := TTimeZone.Local.ToLocalTime(AValue);
 end;
 
 { TWeekDaysHelper }

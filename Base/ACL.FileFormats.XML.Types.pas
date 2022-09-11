@@ -18,11 +18,12 @@ unit ACL.FileFormats.XML.Types;
 interface
 
 uses
-  Types,
-  Windows,
-  SysUtils,
-  Generics.Defaults,
-  Generics.Collections;
+  System.Character,
+  System.Math,
+  System.Generics.Defaults,
+  System.Generics.Collections,
+  System.SysUtils,
+  System.Types;
 
 const
   sGSXMLBoolValues: array[Boolean] of string = ('false', 'true');
@@ -215,7 +216,7 @@ type
 implementation
 
 uses
-  Character, Math;
+  ACL.Utils.Common;
 
 const
   SXMLMessageWithErrorPosition = '%s Line %d, position %d';
@@ -748,7 +749,7 @@ var
   I, X: Integer;
 begin
   ALength := Length(S);
-  ABuilder := TStringBuilder.Create(MulDiv(ALength, 3, 2));
+  ABuilder := TStringBuilder.Create((ALength * 3) div 2);
   try
     for I := 1 to ALength do
     begin

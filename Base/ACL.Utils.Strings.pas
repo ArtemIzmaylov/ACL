@@ -16,8 +16,9 @@ unit ACL.Utils.Strings;
 interface
 
 uses
+{$IFDEF MSWINDOWS}
   Winapi.Windows,
-  // Vcl
+{$ENDIF}
 {$IFNDEF ACL_BASE_NOVCL}
   Vcl.Graphics,
 {$ENDIF}
@@ -30,9 +31,7 @@ uses
   System.SysUtils,
   System.Character,
   System.Classes,
-  System.Generics.Collections,
-  // ACL
-  ACL.Threading;
+  System.Generics.Collections;
 
 const
   acCRLF = UnicodeString(#13#10);
@@ -89,7 +88,6 @@ type
   strict private
     FEmpty: Boolean;
     FIgnoreCase: Boolean;
-    FLock: TACLCriticalSection;
     FMask: TStringDynArray;
     FMaskResult: array of Boolean;
     FSeparator: Char;
@@ -102,8 +100,6 @@ type
   public
     constructor Create; overload;
     constructor Create(const AMask: UnicodeString; AIgnoreCase: Boolean = True); overload;
-    destructor Destroy; override;
-
     function Compare(const S: UnicodeString): Boolean;
 
     procedure BeginComparing;
@@ -517,9 +513,9 @@ var
   ATemp: PWideChar;
 begin
   ATemp := PWideChar(S);
-  ALen := WideCharToMultiByte(CodePage, 0, ATemp, Length(S), nil, 0, nil, nil);
+  ALen := LocaleCharsFromUnicode(CodePage, 0, ATemp, Length(S), nil, 0, nil, nil);
   SetLength(Result, ALen);
-  WideCharToMultiByte(CodePage, 0, ATemp, Length(S), PAnsiChar(Result), ALen, nil, nil);
+  LocaleCharsFromUnicode(CodePage, 0, ATemp, Length(S), PAnsiChar(Result), ALen, nil, nil);
 end;
 
 function acBytesFromUnicode(W: PWideChar; ACount: Integer): RawByteString;
@@ -547,16 +543,16 @@ end;
 
 function acStringFromAnsi(const S: AnsiChar): WideChar;
 begin
-  MultiByteToWideChar(DefaultCodePage, 0, @S, 1, @Result, 1);
+  UnicodeFromLocaleChars(DefaultCodePage, 0, @S, 1, @Result, 1);
 end;
 
 function acStringFromAnsi(const S: PAnsiChar; ALength, ACodePage: Integer): UnicodeString;
 var
   ATargetLength: Integer;
 begin
-  ATargetLength := MultiByteToWideChar(ACodePage, 0, S, ALength, nil, 0);
+  ATargetLength := UnicodeFromLocaleChars(ACodePage, 0, S, ALength, nil, 0);
   SetLength(Result, ATargetLength);
-  MultiByteToWideChar(ACodePage, 0, S, ALength, PWideChar(Result), ATargetLength);
+  UnicodeFromLocaleChars(ACodePage, 0, S, ALength, PWideChar(Result), ATargetLength);
 end;
 
 function acStringFromAnsi(const S: AnsiString; CodePage: Integer): UnicodeString;
@@ -799,7 +795,7 @@ begin
 
   Count := 0;
   Result := -1;
-  ZeroMemory(Dest, MaxDestChars * SizeOf(WideChar));
+  FastZeroMem(Dest, MaxDestChars * SizeOf(WideChar));
   while (SourceBytes > 0) and (Count < MaxDestChars) do
   begin
     WC := Cardinal(Source^);
@@ -1109,15 +1105,28 @@ end;
 
 function acCompareStrings(const S1, S2: UnicodeString; AIgnoreCase: Boolean = True): Integer;
 begin
+{$IFDEF MSWINDOWS}
   Result := acCompareStrings(PWideChar(S1), PWideChar(S2), Length(S1), Length(S2), AIgnoreCase);
+{$ELSE}
+  if AIgnoreCase then
+    Result := AnsiCompareStr(S1, S2)
+  else
+    Result := AnsiCompareText(S1, S2);
+{$ENDIF}
 end;
 
 function acCompareStrings(P1, P2: PWideChar; L1, L2: Integer; AIgnoreCase: Boolean = True): Integer;
+{$IFDEF MSWINDOWS}
 const
   CaseMap: array[Boolean] of Integer = (0, NORM_IGNORECASE);
 begin
   Result := CompareStringW(LOCALE_USER_DEFAULT, CaseMap[AIgnoreCase], P1, L1, P2, L2) - CSTR_EQUAL;
 end;
+{$ELSE}
+begin
+  Result := acCompareStrings(acMakeString(P1, L1), acMakeString(P2, L2), AIgnoreCase);
+end;
+{$ENDIF}
 
 function acLogicalCompare(const S1, S2: UnicodeString; AIgnoreCase: Boolean = True): Integer;
 begin
@@ -1430,7 +1439,7 @@ end;
 
 procedure acStrLCopy(ADest: PWideChar; const ASource: UnicodeString; AMax: Integer);
 begin
-  ZeroMemory(ADest, AMax * SizeOf(WideChar));
+  FastZeroMem(ADest, AMax * SizeOf(WideChar));
   FastMove(PWideChar(ASource)^, ADest^, SizeOf(WideChar) * Min(AMax, Length(ASource)));
 end;
 
@@ -1740,7 +1749,6 @@ begin
   FEmpty := True;
   FIgnoreCase := True;
   FSeparator := ' ';
-  FLock := TACLCriticalSection.Create;
 end;
 
 constructor TACLSearchString.Create(const AMask: UnicodeString; AIgnoreCase: Boolean = True);
@@ -1748,12 +1756,6 @@ begin
   Create;
   IgnoreCase := AIgnoreCase;
   Value := AMask;
-end;
-
-destructor TACLSearchString.Destroy;
-begin
-  FreeAndNil(FLock);
-  inherited Destroy;
 end;
 
 function TACLSearchString.Compare(const S: UnicodeString): Boolean;
@@ -1767,7 +1769,7 @@ procedure TACLSearchString.BeginComparing;
 var
   I: Integer;
 begin
-  FLock.Enter;
+  TMonitor.Enter(Self);
   for I := 0 to Length(FMaskResult) - 1 do
     FMaskResult[I] := False;
 end;
@@ -1791,7 +1793,7 @@ begin
       AMask := FMask[I];
       if acFindStringInMemoryW(AMask, AScan, ASize, 0, ACur) then
       begin
-        ZeroMemory(AScan + ACur, Length(AMask) * SizeOf(WideChar));
+        FastZeroMem(AScan + ACur, Length(AMask) * SizeOf(WideChar));
         FMaskResult[I] := True;
       end
       else
@@ -1807,7 +1809,7 @@ begin
   Result := True;
   for I := 0 to Length(FMaskResult) - 1 do
     Result := Result and FMaskResult[I];
-  FLock.Leave;
+  TMonitor.Exit(Self);
 end;
 
 function TACLSearchString.GetValueIsNumeric: Boolean;
@@ -1836,7 +1838,7 @@ end;
 
 procedure TACLSearchString.SetValue(const AValue: UnicodeString);
 begin
-  FLock.Enter;
+  TMonitor.Enter(Self);
   try
     FValue := AValue;
     FEmpty := AValue = '';
@@ -1851,7 +1853,7 @@ begin
       SetLength(FMaskResult, Length(FMask));
     end;
   finally
-    FLock.Leave;
+    TMonitor.Exit(Self);
   end;
 end;
 
@@ -2050,7 +2052,7 @@ begin
   Result := nil;
   while (Result = nil) and (AIndex < CacheSize) do
   begin
-    Result := InterlockedExchangePointer(Pointer(Cache[AIndex]), nil);
+    Result := AtomicExchange(Pointer(Cache[AIndex]), nil);
     Inc(AIndex);
   end;
 
@@ -2078,7 +2080,7 @@ begin
     AIndex := 0;
     while (ABuilder <> nil) and (AIndex < CacheSize) do
     begin
-      ABuilder := InterlockedExchangePointer(Pointer(Cache[AIndex]), ABuilder);
+      ABuilder := AtomicExchange(Pointer(Cache[AIndex]), Pointer(ABuilder));
       Inc(AIndex);
     end;
   end;
@@ -2160,8 +2162,11 @@ begin
     ABuffer.Append('.');
     ABuffer.Append(MinorVersion1);
     ABuffer.Append(MinorVersion2);
-    ABuffer.Append('.');
-    ABuffer.Append(BuildNumber);
+    if BuildNumber > 0 then
+    begin
+      ABuffer.Append('.');
+      ABuffer.Append(BuildNumber);
+    end;
     if BuildSuffix <> '' then
       ABuffer.Append(' ').Append(BuildSuffix);
     Result := ABuffer.ToString;

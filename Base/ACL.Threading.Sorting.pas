@@ -16,8 +16,6 @@ unit ACL.Threading.Sorting;
 interface
 
 uses
-  Winapi.Windows,
-  // System
   System.Classes,
   System.Generics.Defaults,
   System.SysUtils,
@@ -203,7 +201,7 @@ end;
 
 procedure TACLCustomMultithreadedSorter.CheckDone;
 begin
-  if InterlockedDecrement(FActiveThreadCount) = 0 then
+  if AtomicDecrement(FActiveThreadCount) = 0 then
     FEvent.Signal;
 end;
 

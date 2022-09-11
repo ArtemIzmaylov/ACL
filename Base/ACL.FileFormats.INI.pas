@@ -16,8 +16,8 @@ unit ACL.FileFormats.INI;
 interface
 
 uses
-  Winapi.Windows,
 {$IFNDEF ACL_BASE_NOVCL}
+  Winapi.Windows,
   Vcl.Graphics,
 {$ENDIF}
   // System

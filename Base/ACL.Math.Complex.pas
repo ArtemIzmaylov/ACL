@@ -19,9 +19,6 @@ unit ACL.Math.Complex;
 
 interface
 
-uses
-  Winapi.Windows;
-
 const
   PowerOfTwoMax = 15; // supported by FFT Engine
 
@@ -106,6 +103,7 @@ implementation
 uses
   System.SysUtils,
   // ACL
+  ACL.FastCode,
   ACL.Utils.Common;
 
 const
@@ -251,7 +249,7 @@ end;
 
 procedure TFastFourierTransform.Flush;
 begin
-  ZeroMemory(Buffer, BufferLength * SizeOf(TComplex));
+  FastZeroMem(Buffer, BufferLength * SizeOf(TComplex));
 end;
 
 procedure TFastFourierTransform.Transform(AInverse: Boolean);
@@ -409,7 +407,7 @@ begin
     Inc(O);
     Inc(T);
   end;
-  ZeroMemory(T, (Count - BufferLength) * SizeOf(TComplex));
+  FastZeroMem(T, (Count - BufferLength) * SizeOf(TComplex));
 
   // Transform
   TransformStep(FTempBuffer, False);

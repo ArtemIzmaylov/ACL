@@ -16,8 +16,6 @@ unit ACL.Classes.ByteBuffer;
 interface
 
 uses
-  Winapi.Windows,
-  // System
   System.Classes,
   System.SysUtils,
   // ACL
@@ -311,7 +309,7 @@ begin
   inherited Create;
   FDataSize := ASize;
   FData := AllocMem(FDataSize);
-  FWriteChunkSize := MulDiv(FDataSize, 1, 4);
+  FWriteChunkSize := FDataSize div 4;
   FLock := TACLCriticalSection.Create(Self);
 end;
 

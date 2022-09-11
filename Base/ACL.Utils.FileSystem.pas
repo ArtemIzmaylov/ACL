@@ -11,19 +11,23 @@
 
 unit ACL.Utils.FileSystem;
 
-{$I ACL.Config.INC}
+{$I ACL.Config.inc}
 {$WARN SYMBOL_PLATFORM OFF}
 
 interface
 
 uses
+{$IFDEF MSWINDOWS}
   Winapi.Windows,
+{$ELSE}
+  System.IOUtils,
+{$ENDIF}
   // System
-  System.Types,
   System.Classes,
-  System.SysUtils,
-  System.SyncObjs,
   System.Generics.Collections,
+  System.SyncObjs,
+  System.SysUtils,
+  System.Types,
   // ACL
   ACL.Classes,
   ACL.Classes.ByteBuffer,
@@ -41,7 +45,11 @@ const
   sUnixPathDelim = '/';
   sWindowPathDelim = '\';
 
-  MAX_LONG_PATH = MAXSHORT;
+{$IFNDEF MSWINDOWS}
+  INVALID_FILE_ATTRIBUTES = DWORD($FFFFFFFF);
+{$ENDIF}
+
+  MAX_LONG_PATH = Word.MaxValue;
 
 type
   TFileLongPath = array [0..MAX_LONG_PATH - 1] of WideChar;
@@ -57,9 +65,13 @@ type
     FFileName: UnicodeString;
     FFileObject: TACLFindFileObject;
     FFilePath: UnicodeString;
+  {$IFDEF MSWINDOWS}
     FFindData: WIN32_FIND_DATAW;
-    FFindExts: UnicodeString;
     FFindHandle: THandle;
+  {$ELSE}
+    FFindData: TSearchRec;
+  {$ENDIF}
+    FFindExts: UnicodeString;
     FFindObjects: TACLFindFileObjects;
 
     function Check: Boolean;
@@ -69,14 +81,18 @@ type
   public
     destructor Destroy; override;
     //
-    property FileAttrs: Cardinal read FFindData.dwFileAttributes;
     property FileName: UnicodeString read FFileName;
     property FileObject: TACLFindFileObject read FFileObject;
     property FileSize: Int64 read GetFileSize;
     property FullFileName: UnicodeString read GetFullFileName;
+  {$IFDEF MSWINDOWS}
+    property FileAttrs: Cardinal read FFindData.dwFileAttributes;
     property FileCreationTime: TFileTime read FFindData.ftCreationTime;
     property FileLastAccessTime: TFileTime read FFindData.ftLastAccessTime;
     property FileLastWriteTime: TFileTime read FFindData.ftLastWriteTime;
+  {$ELSE}
+    property FileAttrs: Integer read FFindData.Attr;
+  {$ENDIF}
   end;
 
   TACLEnumFileProc = reference to procedure (const Info: TACLFindFileInfo);
@@ -152,7 +168,9 @@ type
   strict private
     FFileName: string;
   protected
+  {$IFDEF MSWINDOWS}
     function GetSize: Int64; override;
+  {$ENDIF}
   public
     constructor Create(const AHandle: THandle); overload;
     constructor Create(const AFileName: string; Mode: Word); overload;
@@ -186,6 +204,8 @@ type
     destructor Destroy; override;
   end;
 
+{$IFDEF MSWINDOWS}
+
   { TACLFileDateTimeHelper }
 
   TACLFileDateTimeHelper = class
@@ -197,10 +217,14 @@ type
     class function GetLastEditingTime(const AFileName: UnicodeString): TDateTime;
   end;
 
+{$ENDIF}
+
 // Paths
 function acChangeFileExt(const FileName, Extension: UnicodeString; ADoubleExt: Boolean = False): UnicodeString;
 function acCompareFileNames(const AFileName1, AFileName2: UnicodeString): Integer;
+{$IFDEF MSWINDOWS}
 function acExpandEnvironmentStrings(const AFileName: UnicodeString): UnicodeString;
+{$ENDIF}
 function acExpandFileName(const AFileName: UnicodeString): UnicodeString;
 function acExtractDirName(const APath: UnicodeString; ADepth: Integer = 1): UnicodeString;
 function acExtractFileDir(const FileName: UnicodeString): UnicodeString;
@@ -256,13 +280,17 @@ function acFileCreate(const AFileName: UnicodeString; AMode, ARights: LongWord):
 function acFileExists(const FileName: UnicodeString): Boolean;
 function acFileGetAttr(const FileName: UnicodeString): Cardinal; overload;
 function acFileGetAttr(const FileName: UnicodeString; out AAttrs: Cardinal): Boolean; overload;
+{$IFDEF MSWINDOWS}
 function acFileGetLastWriteTime(const FileName: UnicodeString): Cardinal;
+{$ENDIF}
 function acFileSetAttr(const FileName: UnicodeString; AAttr: Cardinal): Boolean;
 function acFileSize(const FileName: UnicodeString): Int64;
+{$IFDEF MSWINDOWS}
 function acVolumeGetSerial(const ADrive: WideChar; out ASerialNumber: Cardinal): Boolean;
 function acVolumeGetTitle(const ADrive, ADefaultTitle: UnicodeString): UnicodeString; overload;
 function acVolumeGetTitle(const ADrive: UnicodeString): UnicodeString; overload;
 function acVolumeGetType(const ADrive: WideChar): Cardinal;
+{$ENDIF}
 
 // Removing, Copying, Renaming
 function acCopyDirectory(const ASourcePath, ATargetPath: UnicodeString; const AExts: UnicodeString = ''; ARecursive: Boolean = True): Boolean;
@@ -285,6 +313,10 @@ procedure acClearFileLongPath(out W: TFileLongPath);
 implementation
 
 uses
+{$IFDEF POSIX}
+  Posix.Unistd,
+{$ENDIF}
+  // System
   System.Character,
   System.Math,
   System.RTLConsts,
@@ -294,16 +326,19 @@ uses
   ACL.Math,
   ACL.Utils.Strings;
 
-function GetFileAttributesExW(AFileName: PChar; AInfoLevelId: TGetFileExInfoLevels; AFileInformation: Pointer): BOOL; stdcall; external kernel32;
+{$IFDEF MSWINDOWS}
+function GetFileAttributesExW(AFileName: PChar;
+  AInfoLevelId: TGetFileExInfoLevels; AFileInformation: Pointer): BOOL; stdcall; external kernel32;
+{$ENDIF}
 
 procedure acClearFilePath(out W: TFilePath);
 begin
-  ZeroMemory(@W[0], SizeOf(WideChar) * Length(W));
+  FastZeroMem(@W[0], SizeOf(WideChar) * Length(W));
 end;
 
 procedure acClearFileLongPath(out W: TFileLongPath);
 begin
-  ZeroMemory(@W[0], SizeOf(WideChar) * Length(W));
+  FastZeroMem(@W[0], SizeOf(WideChar) * Length(W));
 end;
 
 function MakeInt64(ALow, AHigh: Cardinal): Int64; inline;
@@ -344,6 +379,7 @@ end;
 
 function acPrepareFileName(const AFileName: UnicodeString): UnicodeString; inline;
 begin
+{$IFDEF MSWINDOWS}
   //#AI: https://docs.microsoft.com/en-us/windows/desktop/fileio/naming-a-file
   if Length(AFileName) >= MAX_PATH then
   begin
@@ -355,6 +391,7 @@ begin
       Result := sLongFileNamePrefix + AFileName;
   end
   else
+{$ENDIF}
     Result := AFileName;
 end;
 
@@ -389,6 +426,7 @@ begin
     Result := acLogicalCompare(acExtractFileName(AFileName1), acExtractFileName(AFileName2));
 end;
 
+{$IFDEF MSWINDOWS}
 function acExpandEnvironmentStrings(const AFileName: UnicodeString): UnicodeString;
 var
   L: Integer;
@@ -404,8 +442,10 @@ begin
   else
     Result := AFileName;
 end;
+{$ENDIF}
 
 function acExpandFileName(const AFileName: UnicodeString): UnicodeString;
+{$IFDEF MSWINDOWS}
 var
   AName: UnicodeString;
   L: Integer;
@@ -429,11 +469,16 @@ begin
         Result := AName;
   end;
 end;
+{$ELSE}
+begin
+  Result := System.SysUtils.ExpandFileName(AFileName);
+end;
+{$ENDIF}
 
 function acValidateFileName(const Name: UnicodeString; const ReplacementForInvalidChars: Char = #0): UnicodeString;
 const
   InvalidChars = '\"<>*:?|/';
-  MaxNameLength = MaxByte;
+  MaxNameLength = MAX_PATH;
 var
   ABuffer: TStringBuilder;
   AChar: Char;
@@ -583,7 +628,9 @@ var
   I: Integer;
 begin
   I := acLastDelimiter(sFilePathDelims, Filename);
-  if (I > 1) and (FileName[I] = PathDelim) and not CharInSet(FileName[I - 1], [PathDelim, DriveDelim]) then
+  if (I > 1) and (FileName[I] = PathDelim) and
+    not CharInSet(FileName[I - 1], [PathDelim{$IFDEF MSWINDOWS}, DriveDelim{$ENDIF}])
+  then
     Dec(I);
   Result := Copy(FileName, 1, I);
 end;
@@ -676,12 +723,18 @@ begin
 end;
 
 function acGetCurrentDir: UnicodeString;
+{$IFDEF MSWINDOWS}
 var
   W: TFileLongPath;
 begin
   SetString(Result, W, GetCurrentDirectoryW(Length(W), W));
   Result := acIncludeTrailingPathDelimiter(Result);
 end;
+{$ELSE}
+begin
+  Result := acIncludeTrailingPathDelimiter(GetCurrentDir);
+end;
+{$ENDIF}
 
 function acGetFreeFileName(const AFileName: UnicodeString): UnicodeString;
 var
@@ -724,9 +777,12 @@ begin
 end;
 
 function acGetShortFileName(const APath: UnicodeString): UnicodeString;
+{$IFDEF MSWINDOWS}
 var
   ALength, ASkipCount: Integer;
+{$ENDIF}
 begin
+{$IFDEF MSWINDOWS}
   ALength := GetShortPathNameW(PWideChar(acPrepareFileName(APath)), nil, 0);
   if ALength > 0 then
   begin
@@ -741,6 +797,7 @@ begin
     Result := Copy(Result, 1 + ASkipCount, ALength - ASkipCount);
   end
   else
+{$ENDIF}
     Result := APath;
 end;
 
@@ -806,6 +863,7 @@ begin
 end;
 
 function acTempPath: UnicodeString;
+{$IFDEF MSWINDOWS}
 var
   W: TFilePath;
 begin
@@ -814,8 +872,14 @@ begin
   else
     RaiseLastOSError;
 end;
+{$ELSE}
+begin
+  Result := acIncludeTrailingPathDelimiter(TPath.GetTempPath);
+end;
+{$ENDIF}
 
 function acTempFileName(const APrefix: UnicodeString): UnicodeString;
+{$IFDEF MSWINDOWS}
 var
   W: TFilePath;
 begin
@@ -824,10 +888,19 @@ begin
   else
     RaiseLastOSError;
 end;
+{$ELSE}
+begin
+  Result := acGetFreeFileName(acTempPath + IfThenW(APrefix, 'file') + '.tmp');
+end;
+{$ENDIF}
 
 function acSetCurrentDir(const ADir: UnicodeString): Boolean;
 begin
+{$IFDEF MSWINDOWS}
   Result := SetCurrentDirectoryW(PWideChar(ADir));
+{$ELSE}
+  Result := SetCurrentDir(ADir);
+{$ENDIF}
 end;
 
 //==============================================================================
@@ -835,6 +908,7 @@ end;
 //==============================================================================
 
 function acFileCreate(const AFileName: UnicodeString; AMode, ARights: LongWord): THandle;
+{$IFDEF MSWINDOWS}
 const
   AccessMode: array[0..2] of LongWord = (
     GENERIC_READ, GENERIC_WRITE, GENERIC_READ or GENERIC_WRITE
@@ -869,34 +943,55 @@ begin
     SetErrorMode(AErrorMode);
   end;
 end;
+{$ELSE}
+begin
+  if AMode and fmCreate = fmCreate then
+    Result := System.SysUtils.FileCreate(AFileName, ARights)
+  else
+    Result := System.SysUtils.FileOpen(AFileName, AMode);
+end;
+{$ENDIF}
 
 function acFileExists(const FileName: UnicodeString): Boolean;
 var
   AAttr: Cardinal;
 begin
-  Result := acFileGetAttr(FileName, AAttr) and (AAttr and FILE_ATTRIBUTE_DIRECTORY = 0);
+  Result := acFileGetAttr(FileName, AAttr) and (AAttr and faDirectory = 0);
 end;
 
 function acDirectoryExists(const APath: UnicodeString): Boolean;
 var
   AAttr: Cardinal;
 begin
-  Result := acFileGetAttr(APath, AAttr) and (AAttr and FILE_ATTRIBUTE_DIRECTORY <> 0);
+  Result := acFileGetAttr(APath, AAttr) and (AAttr and faDirectory <> 0);
 end;
 
 function acFileGetAttr(const FileName: UnicodeString): Cardinal;
 var
-  AErrorMode: Integer;
+{$IFDEF MSWINDOWS}
+  AErrorMode: Cardinal;
+{$ELSE}
+  AFileInfo: TACLFindFileInfo;
+{$ENDIF}
 begin
   Result := INVALID_FILE_ATTRIBUTES;
   if FileName <> '' then
   begin
+  {$IFDEF MSWINDOWS}
     AErrorMode := SetErrorMode(SEM_FailCriticalErrors);
     try
       Result := GetFileAttributesW(PWideChar(acPrepareFileName(FileName)));
     finally
       SetErrorMode(AErrorMode);
     end;
+  {$ELSE}
+    if acFindFileFirst(FileName, [ffoFile, ffoFolder], AFileInfo) then
+    try
+      Result := AFileInfo.FileAttrs;
+    finally
+      acFindFileClose(AFileInfo);
+    end;
+  {$ENDIF}
   end;
 end;
 
@@ -906,28 +1001,38 @@ begin
   Result := AAttrs <> INVALID_FILE_ATTRIBUTES;
 end;
 
+{$IFDEF MSWINDOWS}
 function acFileGetLastWriteTime(const FileName: UnicodeString): Cardinal;
 begin
   Result := DateTimeToFileDate(TACLFileDateTimeHelper.GetLastEditingTime(FileName));
 end;
+{$ENDIF}
 
 function acFileSetAttr(const FileName: UnicodeString; AAttr: Cardinal): Boolean;
 begin
+{$IFDEF MSWINDOWS}
   Result := SetFileAttributesW(PWideChar(acPrepareFileName(FileName)), AAttr)
+{$ELSE}
+  Result := False;
+{$ENDIF}
 end;
 
 function acFileSize(const FileName: UnicodeString): Int64;
+{$IFDEF MSWINDOWS}
 var
   AData: WIN32_FILE_ATTRIBUTE_DATA;
+{$ENDIF}
 begin
+{$IFDEF MSWINDOWS}
   //#AI: GetFileAttributesExW works fine with locked files too
   if GetFileAttributesExW(PWideChar(acPrepareFileName(FileName)), GetFileExInfoStandard, @AData) then
-    Result := MakeInt64(AData.nFileSizeLow, AData.nFileSizeHigh)
-  else
-    if not acFindFile(FileName, nil, @Result) then
-      Result := 0;
+    Exit(MakeInt64(AData.nFileSizeLow, AData.nFileSizeHigh));
+{$ENDIF}
+  if not acFindFile(FileName, nil, @Result) then
+    Result := 0;
 end;
 
+{$IFDEF MSWINDOWS}
 function acVolumeGetSerial(const ADrive: WideChar; out ASerialNumber: Cardinal): Boolean;
 var
   X: Cardinal;
@@ -968,6 +1073,7 @@ function acVolumeGetType(const ADrive: WideChar): Cardinal;
 begin
   Result := GetDriveTypeW(PWideChar(ADrive + ':'));
 end;
+{$ENDIF}
 
 //==============================================================================
 // Removing, Copying, Renaming
@@ -1008,19 +1114,36 @@ end;
 
 function acCopyFile(const ASourceFileName, ATargetFileName: UnicodeString; AFailIfExists: Boolean = True): Boolean;
 begin
+{$IFDEF MSWINDOWS}
   Result := CopyFileW(
     PWideChar(acPrepareFileName(ASourceFileName)),
     PWideChar(acPrepareFileName(ATargetFileName)), AFailIfExists);
+{$ELSE}
+  try
+    TFile.Copy(ASourceFilename, ATargetFileName, not AFailIfExists);
+    Result := True;
+  except
+    Result := False;
+  end;
+{$ENDIF}
 end;
 
 function acDeleteFile(const AFileName: UnicodeString): Boolean;
 begin
+{$IFDEF MSWINDOWS}
   Result := DeleteFileW(PWideChar(acPrepareFileName(AFileName)));
+{$ELSE}
+  Result := System.SysUtils.DeleteFile(AFileName);
+{$ENDIF}
 end;
 
 function acDeleteDirectory(const APath: UnicodeString): Boolean;
 begin
+{$IFDEF MSWINDOWS}
   Result := RemoveDirectoryW(PWideChar(acPrepareFileName(APath)));
+{$ELSE}
+  Result := System.SysUtils.RemoveDir(APath);
+{$ENDIF}
 end;
 
 function acDeleteDirectoryFull(APath: UnicodeString; ARecursive: Boolean = True): Boolean;
@@ -1060,9 +1183,18 @@ end;
 
 function acMoveFile(const ASourceFileName, ATargetFileName: UnicodeString): Boolean;
 begin
+{$IFDEF MSWINDOWS}
   Result := MoveFileW(
     PWideChar(acPrepareFileName(ASourceFileName)),
     PWideChar(acPrepareFileName(ATargetFileName)));
+{$ELSE}
+  try
+    TFile.Move(ASourceFileName, ATargetFileName);
+    Result := True;
+  except
+    Result := False;
+  end;
+{$ENDIF}
 end;
 
 function acReplaceFile(const ASourceFileName, ATargetFileName: UnicodeString): Boolean;
@@ -1074,6 +1206,7 @@ function acReplaceFile(const ASourceFileName, ATargetFileName, ABackupFileName: 
 begin
   if acFileExists(ATargetFileName) then
   begin
+  {$IFDEF MSWINDOWS}
     if ABackupFileName <> '' then
       Result := ReplaceFileW(
         PWideChar(acPrepareFileName(ATargetFileName)),
@@ -1085,6 +1218,14 @@ begin
         PWideChar(acPrepareFileName(ATargetFileName)),
         PWideChar(acPrepareFileName(ASourceFileName)),
         nil, 0, nil, nil);
+  {$ELSE}
+    try
+      TFile.Replace(ASourceFileName, ATargetFileName, ABackupFileName);
+      Result := True;
+    except
+      Result := False;
+    end;
+  {$ENDIF}
   end
   else
     Result := acMoveFile(ASourceFileName, ATargetFileName);
@@ -1194,8 +1335,17 @@ begin
     AInfo.FFindExts := AExts;
     AInfo.FFilePath := APath;
     AInfo.FFindObjects := AObjects;
+  {$IFDEF MSWINDOWS}
     AInfo.FFindHandle := FindFirstFileW(PWideChar(acPrepareFileName(APath + AMask)), AInfo.FFindData);
     if AInfo.FFindHandle = INVALID_HANDLE_VALUE then
+  {$ELSE}
+    var AAttrs := 0;
+    if ffoFile in AObjects then
+      AAttrs := AAttrs or faAnyFile;
+    if ffoFolder in AObjects then
+      AAttrs := AAttrs or faDirectory;
+    if FindFirst(APath + AMask, AAttrs, AInfo.FFindData) <> 0 then
+  {$ENDIF}
       acFindFileClose(AInfo)
     else
       if not AInfo.Check then
@@ -1208,12 +1358,13 @@ function acFindFileNext(var AInfo: TACLFindFileInfo): Boolean;
 begin
   if AInfo <> nil then
   begin
+  {$IFDEF MSWINDOWS}
     while FindNextFileW(AInfo.FFindHandle, AInfo.FFindData) do
+  {$ELSE}
+    while FindNext(AInfo.FFindData) = 0 do
+  {$ENDIF}
       if AInfo.Check then
-      begin
-        Result := True;
-        Exit;
-      end;
+        Exit(True);
   end;
   acFindFileClose(AInfo);
   Result := False;
@@ -1228,11 +1379,15 @@ end;
 
 destructor TACLFindFileInfo.Destroy;
 begin
+{$IFDEF MSWINDOWS}
   if FFindHandle <> INVALID_HANDLE_VALUE then
   begin
     Winapi.Windows.FindClose(FFindHandle);
     FFindHandle := INVALID_HANDLE_VALUE;
   end;
+{$ELSE}
+  FindClose(FFindData);
+{$ENDIF}
   inherited Destroy;
 end;
 
@@ -1240,8 +1395,12 @@ function TACLFindFileInfo.Check: Boolean;
 const
   Map: array[Boolean] of TACLFindFileObject = (ffoFile, ffoFolder);
 begin
+{$IFDEF MSWINDOWS}
   FFileName := FFindData.cFileName;
-  FFileObject := Map[FileAttrs and FILE_ATTRIBUTE_DIRECTORY <> 0];
+{$ELSE}
+  FFileName := FFindData.Name;
+{$ENDIF}
+  FFileObject := Map[FileAttrs and faDirectory <> 0];
   if not IsInternal and (FileObject in FFindObjects) then
   begin
     if FileObject = ffoFile then
@@ -1255,7 +1414,11 @@ end;
 
 function TACLFindFileInfo.GetFileSize: Int64;
 begin
+{$IFDEF MSWINDOWS}
   Result := MakeInt64(FFindData.nFileSizeLow, FFindData.nFileSizeHigh);
+{$ELSE}
+  Result := FFindData.Size;
+{$ENDIF}
 end;
 
 function TACLFindFileInfo.GetFullFileName: UnicodeString;
@@ -1265,7 +1428,10 @@ end;
 
 function TACLFindFileInfo.IsInternal: Boolean;
 begin
-  Result := (FileName = '.') or (FileName = '..') or (FileAttrs and faSysFile = faSysFile);
+  Result := (FileName = '.') or (FileName = '..')
+  {$IFDEF MSWINDOWS}
+    or (FileAttrs and faSysFile = faSysFile)
+  {$ENDIF}
 end;
 
 { TACLSearchPaths }
@@ -1463,21 +1629,21 @@ begin
   AStream := TACLStreamWrapper.Unwrap(AStream);
   if AStream is TFileStream then
     AFileName := TFileStream(AStream).FileName
+  else if AStream is TACLFileStream then
+    AFileName := TACLFileStream(AStream).FileName
   else
-    if AStream is TACLFileStream then
-      AFileName := TACLFileStream(AStream).FileName
-    else
-      Result := False;
+    Result := False;
 end;
 
+{$IFDEF MSWINDOWS}
 function TACLFileStream.GetSize: Int64;
 var
   ASizeHigh: Cardinal;
 begin
   Result := GetFileSize(Handle, @ASizeHigh);
-  if ASizeHigh <> 0 then
-    Result := Int64(ASizeHigh) shl 32 or Result;
+  Result := MakeInt64(Result, ASizeHigh);
 end;
+{$ENDIF}
 
 { TACLBufferedFileStream }
 
@@ -1586,6 +1752,8 @@ begin
   acDeleteFile(FileName);
 end;
 
+{$IFDEF MSWINDOWS}
+
 { TACLFileDateTimeHelper }
 
 class function TACLFileDateTimeHelper.DecodeTime(const ATime: TFileTime): TDateTime;
@@ -1645,4 +1813,5 @@ begin
     Result := 0;
 end;
 
+{$ENDIF}
 end.

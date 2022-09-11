@@ -16,7 +16,9 @@ unit ACL.Utils.Stream;
 interface
 
 uses
+{$IFDEF MSWINDOWS}
   Winapi.Windows,
+{$ENDIF}
   // System
   System.Classes,
   System.SysUtils,
@@ -84,7 +86,7 @@ type
     function Read(var Buffer; Count: Longint): Longint; override;
     function Read(Buffer: TBytes; Offset, Count: Longint): Longint; override; final;
     function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; override;
-    function Write(const Buffer; Count: Integer): Integer; override;
+    function Write(const Buffer; Count: LongInt): LongInt; override;
     function Write(const Buffer: TBytes; Offset, Count: Longint): Longint; override; final;
 
     class function Unwrap(AStream: TStream): TStream;
@@ -112,7 +114,7 @@ type
     destructor Destroy; override;
     function Read(var Buffer; Count: Longint): Longint; override;
     function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; override;
-    function Write(const Buffer; Count: Integer): Integer; override;
+    function Write(const Buffer; Count: LongInt): LongInt; override;
   end;
 
   { TACLSubStream }
@@ -240,6 +242,8 @@ type
     property Data: AnsiString read FData;
   end;
 
+{$IFDEF MSWINDOWS}
+
   { TACLHGlobalReadOnlyStream }
 
   TACLHGlobalReadOnlyStream = class(TCustomMemoryStream)
@@ -251,8 +255,10 @@ type
   public
     constructor Create(AData: THandle; ADataOwnership: TStreamOwnership = soReference);
     destructor Destroy; override;
-    function Write(const Buffer; Count: Integer): Integer; override;
+    function Write(const Buffer; Count: LongInt): LongInt; override;
   end;
+
+{$ENDIF}
 
 // Equals
 function StreamEquals(const AStream1, AStream2: TStream): Boolean;
@@ -456,7 +462,7 @@ end;
 
 function StreamResourceExists(AInstance: HINST; const AResourceName: UnicodeString; AResourceType: PWideChar): Boolean;
 begin
-  Result := FindResourceW(AInstance, PWideChar(AResourceName), AResourceType) <> 0;
+  Result := FindResource(AInstance, PWideChar(AResourceName), AResourceType) <> 0;
 end;
 
 function StreamLoadFromFile(AStream: TStream; const AFileName: UnicodeString): Boolean;
@@ -690,7 +696,7 @@ begin
   Result := Source.Seek(Offset, Origin);
 end;
 
-function TACLStreamWrapper.Write(const Buffer; Count: Integer): Integer;
+function TACLStreamWrapper.Write(const Buffer; Count: LongInt): LongInt;
 begin
   Result := Source.Write(Buffer, Count);
 end;
@@ -780,7 +786,7 @@ begin
   Result := FBufferPosition;
 end;
 
-function TACLBufferedStream.Write(const Buffer; Count: Integer): Integer;
+function TACLBufferedStream.Write(const Buffer; Count: LongInt): LongInt;
 
   procedure BlockWrite(ASource: PByte; var ACount: LongInt);
   var
@@ -1421,6 +1427,8 @@ begin
   Result := PAnsiChar(FData);
 end;
 
+{$IFDEF MSWINDOWS}
+
 { TACLHGlobalReadOnlyStream }
 
 constructor TACLHGlobalReadOnlyStream.Create(AData: THandle; ADataOwnership: TStreamOwnership);
@@ -1447,5 +1455,7 @@ function TACLHGlobalReadOnlyStream.Write(const Buffer; Count: Integer): Integer;
 begin
   raise EACLCannotModifyReadOnlyStream.Create;
 end;
+
+{$ENDIF}
 
 end.

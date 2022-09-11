@@ -16,9 +16,6 @@ unit ACL.Utils.RTTI;
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
-  // System
   System.Classes,
   System.Variants,
   System.TypInfo,

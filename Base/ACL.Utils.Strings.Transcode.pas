@@ -16,15 +16,13 @@ unit ACL.Utils.Strings.Transcode;
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
-  Winapi.MultiMon,
   // System
   System.SysUtils,
   System.Types,
   System.Classes,
   // ACL
-  ACL.Classes;
+  ACL.Classes,
+  ACL.Utils.Common;
 
 type
 
@@ -133,9 +131,9 @@ type
 implementation
 
 uses
-  System.Math,
-  System.Character,
   System.AnsiStrings,
+  System.Character,
+  System.Math,
   // ACL
   ACL.FastCode,
   ACL.Hashes,
@@ -465,7 +463,7 @@ end;
 class function TACLMimecode.Encode(P: PByteArray; ASize: Integer): TMemoryStream;
 begin
   Result := TMemoryStream.Create;
-  Result.Size := MulDiv(ASize, 14, 10); // 137% max
+  Result.Size := (ASize * 14) div 10; // 137% max
   Result.Size := Encode(@P^[0], ASize, Result);
   Result.Position := 0;
 end;

@@ -16,8 +16,6 @@ unit ACL.Classes.Collections;
 interface
 
 uses
-  Winapi.Windows,
-  // System
   System.Classes,
   System.Contnrs,
   System.Generics.Collections,
@@ -3027,7 +3025,7 @@ end;
 constructor TACLStringSharedTable.Create;
 begin
   inherited Create;
-  FTableSize := MaxWord;
+  FTableSize := Word.MaxValue;
   SetLength(FTable, FTableSize);
 end;
 

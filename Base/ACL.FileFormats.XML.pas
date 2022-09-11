@@ -16,16 +16,16 @@ unit ACL.FileFormats.XML;
 interface
 
 uses
-  Winapi.Windows,
-  // System
   System.Classes,
   System.SysUtils,
   System.AnsiStrings,
   System.Variants,
+  System.Types,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
   ACL.Classes.StringList,
+  ACL.FastCode,
   ACL.Hashes,
   ACL.Utils.Common,
   ACL.Utils.Date,
@@ -287,7 +287,6 @@ type
 implementation
 
 uses
-  System.Types,
   System.Math,
   System.StrUtils,
   // ACL
@@ -1199,7 +1198,7 @@ end;
 
 class function TACLXMLDocumentFormatSettings.Binary: TACLXMLDocumentFormatSettings;
 begin
-  ZeroMemory(@Result, SizeOf(Result));
+  FastZeroMem(@Result, SizeOf(Result));
   Result.TextMode := False;
 end;
 

@@ -37,6 +37,7 @@ procedure FastZeroMem(Destination: Pointer; Length: LongWord);
 function GetCPUInstructions: TCPUInstructions;
 implementation
 
+{$IF DEFINED(MSWINDOWS)}
 function GetCPUFeatures: Integer;
 asm
 {$IFDEF CPUX64}
@@ -53,13 +54,13 @@ asm
   MOV       EAX,EDX
 {$ENDIF}
 end;
+{$IFEND}
 
 function GetCPUInstructions: TCPUInstructions;
-var
-  AFeatures: Integer;
 begin
   Result := [];
-  AFeatures := GetCPUFeatures;
+{$IF DEFINED(MSWINDOWS)}
+  var AFeatures := GetCPUFeatures;
   if AFeatures and $0800000  <> 0 then
     Include(Result, cpuMMX);
   if AFeatures and $2000000  <> 0 then
@@ -70,6 +71,7 @@ begin
     Include(Result, ci3DNow);
   if AFeatures and $40000000 <> 0 then
     Include(Result, ci3DNowExt);
+{$IFEND}
 end;
 
 { Fast Routines }
@@ -122,7 +124,7 @@ begin
   FillChar(Destination^, Length, 0);
 end;
 
-{$IFNDEF CPUX64}
+{$IF NOT DEFINED(CPUX64) AND DEFINED(MSWINDOWS)}
 const
   TINYSIZE = 36;
 var
@@ -1408,9 +1410,9 @@ asm
 @@Done:
 end; {MoveJOH_SSE2}
 
-{$ENDIF}
+{$IFEND}
 
-{$IFDEF CPUX64}
+{$IF DEFINED(CPUX64) OR NOT DEFINED(MSWINDOWS)}
 
 procedure FastMoveInitialize(out AMethod: TACLMoveMethod);
 begin
@@ -1433,7 +1435,7 @@ begin
   else
     AMethod := MoveJOH_IA32_10;
 end;
-{$ENDIF}
+{$IFEND}
 
 initialization
   FastMoveInitialize(FastMove);

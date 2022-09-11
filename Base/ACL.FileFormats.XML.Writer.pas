@@ -20,12 +20,13 @@ unit ACL.FileFormats.XML.Writer;
 interface
 
 uses
-  Rtti,
-  Types,
-  Classes,
-  SysUtils,
-  Generics.Defaults,
-  Generics.Collections,
+  System.Rtti,
+  System.Types,
+  System.Classes,
+  System.SysUtils,
+  System.Generics.Defaults,
+  System.Generics.Collections,
+  // ACL
   ACL.Classes,
   ACL.FileFormats.XML.Types;
 
@@ -182,7 +183,7 @@ type
 implementation
 
 uses
-  Windows, Character;
+  System.Character;
 
 const
   SXmlInvalidSurrogatePair =
@@ -2903,12 +2904,12 @@ var
 begin
   if FSingleStringValue <> '' then
   begin
-    FSingleStringValue := SysUtils.Trim(FSingleStringValue); //#TODO:  XmlConvert.TrimString(FSingleStringValue);
+    FSingleStringValue := System.SysUtils.Trim(FSingleStringValue); //#TODO:  XmlConvert.TrimString(FSingleStringValue);
     Exit;
   end;
 
   AValBefore := FStringValue.ToString;
-  AValAfter := SysUtils.Trim(FSingleStringValue); //#TODO:  XmlConvert.TrimString(AValBefore);
+  AValAfter := System.SysUtils.Trim(FSingleStringValue); //#TODO:  XmlConvert.TrimString(AValBefore);
   if AValBefore <> AValAfter then
   begin
     FStringValue.Free;
@@ -2926,7 +2927,7 @@ begin
       TItemType.Raw,
       TItemType.ValueString:
         begin
-          AItem.Data := SysUtils.TrimLeft(AItem.Data.AsString); //# XmlConvert.TrimStringStart(string(AItem.data));
+          AItem.Data := TrimLeft(AItem.Data.AsString); //# XmlConvert.TrimStringStart(string(AItem.data));
           if AItem.Data.AsString = '' then
             Inc(FFirstItem);
         end;
@@ -2959,7 +2960,7 @@ begin
       TItemType.Raw,
       TItemType.ValueString:
         begin
-          AItem.Data := SysUtils.TrimRight(AItem.Data.AsString); //# XmlConvert.TrimStringEnd(string(AItem.data));
+          AItem.Data := TrimRight(AItem.Data.AsString); //# XmlConvert.TrimStringEnd(string(AItem.data));
           if AItem.Data.AsString = '' then
             Dec(FLastItem);
         end;
