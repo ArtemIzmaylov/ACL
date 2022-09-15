@@ -860,9 +860,14 @@ end;
 class function TACLImageFormat.Load(AStream: TStream): GpBitmap;
 var
   AGdiPlusStream: IStream;
+  ANewPosition: UInt64;
 begin
   AGdiPlusStream := TACLGdiplusStream.Create(AStream, soReference);
-  GdipCheck(GdipCreateBitmapFromStream(AGdiPlusStream, Result));
+  if GdipLoadImageFromStreamICM(AGdiPlusStream, Result) <> Ok then
+  begin
+    AGdiPlusStream.Seek(0, STREAM_SEEK_SET, ANewPosition);
+    GdipCheck(GdipCreateBitmapFromStream(AGdiPlusStream, Result));
+  end;
 end;
 
 class procedure TACLImageFormat.Save(AStream: TStream; ABitmap: GpBitmap);
