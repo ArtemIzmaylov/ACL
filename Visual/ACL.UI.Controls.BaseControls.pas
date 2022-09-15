@@ -628,6 +628,10 @@ type
   { TACLMouseWheel }
 
   TACLMouseWheel = class
+  public const
+    DefaultScrollLines = 1;
+    DefaultScrollLinesAlt = 2;
+    DefaultScrollLinesCtrl = 4;
   public
     class var ScrollLines: Integer;
     class var ScrollLinesAlt: Integer;
@@ -637,6 +641,7 @@ type
     DirectionToScrollCode: array[TACLMouseWheelDirection] of TScrollCode = (scLineDown, scLineUp);
     DirectionToScrollCodeI: array[TACLMouseWheelDirection] of Integer = (SB_LINEDOWN, SB_LINEUP);
   public
+    class constructor Create;
     class function GetDirection(AValue: Integer): TACLMouseWheelDirection;
     class function GetScrollLines(AState: TShiftState): Integer;
     class function HWheelToVWheel(const AMessage: TWMMouseWheel): TWMMouseWheel;
@@ -664,8 +669,11 @@ type
   TACLScrollToMode = (MakeVisible, MakeTop, MakeCenter);
   {$SCOPEDENUMS OFF}
 
+const
+  acDefaultUIFadingEnabled = True;
+
 var
-  acUIFadingEnabled: Boolean = True;
+  acUIFadingEnabled: Boolean = acDefaultUIFadingEnabled;
   acUIFadingTime: Integer = 200;
 
 function CallCustomDrawEvent(Sender: TObject; AEvent: TACLCustomDrawEvent; ACanvas: TCanvas; const R: TRect): Boolean;
@@ -2524,6 +2532,13 @@ begin
 end;
 
 { TACLMouseWheel }
+
+class constructor TACLMouseWheel.Create;
+begin
+  ScrollLines := DefaultScrollLines;
+  ScrollLinesAlt := DefaultScrollLinesAlt;
+  ScrollLinesCtrl := DefaultScrollLinesCtrl;
+end;
 
 class function TACLMouseWheel.GetDirection(AValue: Integer): TACLMouseWheelDirection;
 begin

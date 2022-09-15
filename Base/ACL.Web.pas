@@ -27,7 +27,11 @@ uses
   ACL.FileFormats.INI,
   ACL.FileFormats.XML;
 
+type
+  TACLWebConnectionMode = (ncmDirect, ncmSystemDefaults, ncmUserDefined);
+
 const
+  acWebDefaultConnectionMode = ncmSystemDefaults;
   acWebTimeOutDefault = 5000;
   acWebTimeOutMax = 30000;
   acWebTimeOutMin = 1000;
@@ -125,8 +129,6 @@ type
   end;
 
   { TACLWebSettings }
-
-  TACLWebConnectionMode = (ncmDirect, ncmSystemDefaults, ncmUserDefined);
 
   TACLWebSettings = class
   strict private
@@ -511,7 +513,7 @@ end;
 
 class constructor TACLWebSettings.Create;
 begin
-  ConnectionMode := ncmSystemDefaults;
+  ConnectionMode := acWebDefaultConnectionMode;
   ConnectionTimeOut := acWebTimeOutDefault;
   UserAgent := acWebUserAgent;
 end;
@@ -528,7 +530,7 @@ class procedure TACLWebSettings.ConfigLoad(AConfig: TACLIniFile);
   function ReadConnectionMode: TACLWebConnectionMode;
   begin
     Result := TACLWebConnectionMode(
-      MinMax(AConfig.ReadInteger(sWebConfigSection, 'Mode', Ord(ncmSystemDefaults)),
+      MinMax(AConfig.ReadInteger(sWebConfigSection, 'Mode', Ord(acWebDefaultConnectionMode)),
         Ord(Low(TACLWebConnectionMode)), Ord(High(TACLWebConnectionMode))));
   end;
 
@@ -591,7 +593,7 @@ class procedure TACLWebSettings.ConfigSave(AConfig: TACLIniFile);
 begin
   WriteProxyData;
   AConfig.WriteInteger(sWebConfigSection, 'TimeOut', ConnectionTimeOut, acWebTimeOutDefault);
-  AConfig.WriteInteger(sWebConfigSection, 'Mode', Ord(ConnectionMode), Ord(ncmSystemDefaults));
+  AConfig.WriteInteger(sWebConfigSection, 'Mode', Ord(ConnectionMode), Ord(acWebDefaultConnectionMode));
 end;
 
 class procedure TACLWebSettings.SetConnectionTimeOut(AValue: Integer);
