@@ -16,6 +16,10 @@ unit ACL.Classes.Collections;
 interface
 
 uses
+{$IFDEF MSWINDOWS}
+  Winapi.Windows, // inlining
+{$ENDIF}
+  // System
   System.Classes,
   System.Contnrs,
   System.Generics.Collections,

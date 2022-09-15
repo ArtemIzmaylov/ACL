@@ -259,6 +259,8 @@ type
     // IACLLocalizableComponentRoot
     function GetLangSection: UnicodeString; virtual;
     procedure LangChange; virtual;
+    function LangValue(const AKey: string): string; overload;
+    function LangValue(const AKey: string; APartIndex: Integer): string; overload;
   public
     procedure AfterConstruction; override;
   end;
@@ -1371,6 +1373,16 @@ procedure TACLLocalizableForm.LangChange;
 begin
   Caption := LangFile.ReadString(GetLangSection, 'Caption', Caption);
   LangApplyTo(GetLangSection, Self);
+end;
+
+function TACLLocalizableForm.LangValue(const AKey: string): string;
+begin
+  Result := LangGet(GetLangSection, AKey);
+end;
+
+function TACLLocalizableForm.LangValue(const AKey: string; APartIndex: Integer): string;
+begin
+  Result := LangExtractPart(LangValue(AKey), APartIndex);
 end;
 
 procedure TACLLocalizableForm.WMLANG(var Msg: TMessage);

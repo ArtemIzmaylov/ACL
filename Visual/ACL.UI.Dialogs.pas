@@ -1827,6 +1827,8 @@ begin
   end;
 end;
 
+{ TACLExceptionMessageDialog }
+
 class procedure TACLExceptionMessageDialog.Register;
 begin
   ApplicationShowException := ShowException;

@@ -135,7 +135,6 @@ var
   LangFilePath: UnicodeString = '';
 
 function GetCodePageByLCID(LCID: Cardinal): UINT;
-function GetUserLangID: Integer;
 function LangFile: TACLLocalization;
 
 procedure LangApplyTo(const AParentSection: UnicodeString; AComponent: TComponent);
@@ -199,15 +198,6 @@ end;
 function GetCodePageByLCID(LCID: Cardinal): UINT;
 begin
   GetLocaleInfo(LCID, LOCALE_IDEFAULTANSICODEPAGE or LOCALE_RETURN_NUMBER, @Result, SizeOf(Result) div SizeOf(Char));
-end;
-
-function GetUserLangID: Integer;
-begin
-  Result := Word(GetUserDefaultUILanguage);
-  if Result <> 0 then
-    Result := Result and $3FF
-  else
-    Result := 0;
 end;
 
 function LangFile: TACLLocalization;
