@@ -131,7 +131,7 @@ end;
 class procedure TACLApplication.ConfigLoad(AConfig: TACLIniFile; const ASection: UnicodeString);
 begin
   TargetDPI := AConfig.ReadInteger(ASection, 'TargetDPI');
-  DarkMode := TACLBoolean(AConfig.ReadInteger(ASection, 'DarkMode', Ord(TACLBoolean.Default)));
+  DarkMode := AConfig.ReadEnum(ASection, 'DarkMode', TACLBoolean.Default);
   ColorSchema := DecodeColorScheme(AConfig.ReadInteger(ASection, 'ColorSchema'));
   ColorSchemaUseNative := AConfig.ReadBool(ASection, 'UseNativeColorSchema');
   Application.HintHidePause := AConfig.ReadInteger(ASection, 'HideHintPause', DefaultHideHintPause);
@@ -142,8 +142,8 @@ class procedure TACLApplication.ConfigSave(AConfig: TACLIniFile; const ASection:
 begin
   AConfig.WriteInteger(ASection, 'ColorSchema', EncodeColorScheme(ColorSchema), 0);
   AConfig.WriteInteger(ASection, 'TargetDPI', TargetDPI, 0);
-  AConfig.WriteInteger(ASection, 'DarkMode', Ord(DarkMode), Ord(TACLBoolean.Default));
   AConfig.WriteInteger(ASection, 'HideHintPause', Application.HintHidePause, DefaultHideHintPause);
+  AConfig.WriteEnum(ASection, 'DarkMode', DarkMode, TACLBoolean.Default);
   AConfig.WriteBool(ASection, 'UseNativeColorSchema', ColorSchemaUseNative, False);
 end;
 

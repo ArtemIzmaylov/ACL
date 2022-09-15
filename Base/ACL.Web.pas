@@ -527,13 +527,6 @@ class procedure TACLWebSettings.ConfigLoad(AConfig: TACLIniFile);
       acCryptStringXOR(Result, 'ProxySettings');
   end;
 
-  function ReadConnectionMode: TACLWebConnectionMode;
-  begin
-    Result := TACLWebConnectionMode(
-      MinMax(AConfig.ReadInteger(sWebConfigSection, 'Mode', Ord(acWebDefaultConnectionMode)),
-        Ord(Low(TACLWebConnectionMode)), Ord(High(TACLWebConnectionMode))));
-  end;
-
   procedure ReadProxyData;
   var
     AStream: TStream;
@@ -558,7 +551,7 @@ class procedure TACLWebSettings.ConfigLoad(AConfig: TACLIniFile);
 
 begin
   ReadProxyData;
-  ConnectionMode := ReadConnectionMode;
+  ConnectionMode := AConfig.ReadEnum(sWebConfigSection, 'Mode', acWebDefaultConnectionMode);
   ConnectionTimeOut := AConfig.ReadInteger(sWebConfigSection, 'TimeOut', acWebTimeOutDefault);
 end;
 
@@ -592,8 +585,8 @@ class procedure TACLWebSettings.ConfigSave(AConfig: TACLIniFile);
 
 begin
   WriteProxyData;
+  AConfig.WriteEnum(sWebConfigSection, 'Mode', ConnectionMode, acWebDefaultConnectionMode);
   AConfig.WriteInteger(sWebConfigSection, 'TimeOut', ConnectionTimeOut, acWebTimeOutDefault);
-  AConfig.WriteInteger(sWebConfigSection, 'Mode', Ord(ConnectionMode), Ord(acWebDefaultConnectionMode));
 end;
 
 class procedure TACLWebSettings.SetConnectionTimeOut(AValue: Integer);

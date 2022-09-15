@@ -25,6 +25,7 @@ uses
   System.Generics.Collections,
   System.SysUtils,
   System.Types,
+  System.TypInfo,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -61,9 +62,11 @@ type
   public
     procedure BeginUpdate; override;
     procedure EndUpdate; override;
+    // Deleting
     function Delete(const AKey: UnicodeString): Boolean; overload;
     // Reading
     function ReadBool(const AKey: UnicodeString; ADefault: Boolean = False): Boolean;
+    function ReadEnum<T>(const AKey: UnicodeString; const ADefault: T): T;
     function ReadFloat(const AKey: UnicodeString; const ADefault: Double = 0): Double;
     function ReadInt32(const AKey: UnicodeString; ADefault: Integer = 0): Integer; virtual;
     function ReadInt64(const AKey: UnicodeString; const ADefault: Int64 = 0): Int64;
@@ -80,6 +83,8 @@ type
     // Writing
     procedure WriteBool(const AKey: UnicodeString; const AValue: Boolean); overload;
     procedure WriteBool(const AKey: UnicodeString; const AValue, ADefaultValue: Boolean); overload;
+    procedure WriteEnum<T>(const AKey: UnicodeString; const AValue: T); overload;
+    procedure WriteEnum<T>(const AKey: UnicodeString; const AValue, ADefaultValue: T); overload;
     procedure WriteFloat(const AKey: UnicodeString; const AValue: Double);
     procedure WriteInt64(const AKey: UnicodeString; const AValue: Int64); overload;
     procedure WriteInt64(const AKey: UnicodeString; const AValue, ADefaultValue: Int64); overload;
@@ -145,6 +150,7 @@ type
 
     // Reading
     function ReadBool(const ASection, AKey: UnicodeString; ADefault: Boolean = False): Boolean;
+    function ReadEnum<T>(const ASection, AKey: UnicodeString; const ADefault: T): T;
     function ReadFloat(const ASection, AKey: UnicodeString; const ADefault: Double = 0): Double;
     function ReadInteger(const ASection, AKey: UnicodeString; ADefault: Integer = 0): Integer; virtual;
     function ReadInt64(const ASection, AKey: UnicodeString; const ADefault: Int64 = 0): Int64;
@@ -167,6 +173,8 @@ type
     // Writing
     procedure WriteBool(const ASection, AKey: UnicodeString; AValue, ADefaultValue: Boolean); overload;
     procedure WriteBool(const ASection, AKey: UnicodeString; AValue: Boolean); overload;
+    procedure WriteEnum<T>(const ASection, AKey: UnicodeString; const AValue: T); overload;
+    procedure WriteEnum<T>(const ASection, AKey: UnicodeString; const AValue, ADefaultValue: T); overload;
     procedure WriteFloat(const ASection, AKey: UnicodeString; const AValue: Double);
     procedure WriteInt64(const ASection, AKey: UnicodeString; const AValue, ADefaultValue: Int64); overload;
     procedure WriteInt64(const ASection, AKey: UnicodeString; const AValue: Int64); overload;
@@ -266,6 +274,16 @@ begin
     Result := ADefault;
 end;
 
+function TACLIniFileSection.ReadEnum<T>(const AKey: UnicodeString; const ADefault: T): T;
+var
+  AValue: Integer;
+begin
+  if FindValue(AKey, AValue) and TryStrToInt(ValueFromIndex[AValue], AValue) then
+    Result := TACLEnumHelper.SetValue<T>(AValue)
+  else
+    Result := ADefault;
+end;
+
 function TACLIniFileSection.ReadFloat(const AKey: UnicodeString; const ADefault: Double): Double;
 var
   AData: UnicodeString;
@@ -359,6 +377,19 @@ procedure TACLIniFileSection.WriteBool(const AKey: UnicodeString; const AValue, 
 begin
   if AValue <> ADefaultValue then
     WriteBool(AKey, AValue)
+  else
+    Delete(AKey);
+end;
+
+procedure TACLIniFileSection.WriteEnum<T>(const AKey: UnicodeString; const AValue: T);
+begin
+  WriteInt32(AKey, TACLEnumHelper.GetValue(AValue));
+end;
+
+procedure TACLIniFileSection.WriteEnum<T>(const AKey: UnicodeString; const AValue, ADefaultValue: T);
+begin
+  if TACLEnumHelper.GetValue(AValue) <> TACLEnumHelper.GetValue(ADefaultValue) then
+    WriteEnum(AKey, AValue)
   else
     Delete(AKey);
 end;
@@ -676,6 +707,17 @@ begin
     Result := ADefault;
 end;
 
+function TACLIniFile.ReadEnum<T>(const ASection, AKey: UnicodeString; const ADefault: T): T;
+var
+  ASectionObj: TACLIniFileSection;
+begin
+  ASectionObj := GetSection(ASection);
+  if ASectionObj <> nil then
+    Result := ASectionObj.ReadEnum(AKey, ADefault)
+  else
+    Result := ADefault;
+end;
+
 function TACLIniFile.ReadFloat(const ASection, AKey: UnicodeString; const ADefault: Double = 0): Double;
 var
   ASectionObj: TACLIniFileSection;
@@ -879,6 +921,19 @@ end;
 procedure TACLIniFile.WriteBool(const ASection, AKey: UnicodeString; AValue: Boolean);
 begin
   WriteInteger(ASection, AKey, Ord(AValue));
+end;
+
+procedure TACLIniFile.WriteEnum<T>(const ASection, AKey: UnicodeString; const AValue: T);
+begin
+  GetSection(ASection, True).WriteEnum(AKey, AValue);
+end;
+
+procedure TACLIniFile.WriteEnum<T>(const ASection, AKey: UnicodeString; const AValue, ADefaultValue: T);
+begin
+  if TACLEnumHelper.GetValue(AValue) <> TACLEnumHelper.GetValue(ADefaultValue) then
+    WriteEnum(ASection, AKey, AValue)
+  else
+    DeleteKey(ASection, AKey);
 end;
 
 procedure TACLIniFile.WriteBool(const ASection, AKey: UnicodeString; AValue, ADefaultValue: Boolean);

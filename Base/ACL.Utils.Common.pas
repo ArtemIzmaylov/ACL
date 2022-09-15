@@ -115,6 +115,14 @@ type
     class function GetGuid: TGUID; static;
   end;
 
+  { TACLEnumHelper }
+
+  TACLEnumHelper = class
+  public
+    class function GetValue<T>(const Value: T): Integer; static;
+    class function SetValue<T>(const Value: Integer): T; static;
+  end;
+
   { Safe }
 
   Safe = class
@@ -698,6 +706,49 @@ end;
 class function TACLInterfaceHelper<T>.GetGuid: TGUID;
 begin
   Result := GetTypeData(TypeInfo(T))^.GUID;
+end;
+
+{ TACLEnumHelper }
+
+class function TACLEnumHelper.GetValue<T>(const Value: T): Integer;
+var
+  ATypeInfo: PTypeInfo;
+begin
+  ATypeInfo := TypeInfo(T);
+  if ATypeInfo^.Kind = tkEnumeration then
+    case GetTypeData(ATypeInfo).OrdType of
+      otUByte, otSByte:
+        Exit(PByte(@Value)^);
+      otUWord, otSWord:
+        Exit(PWord(@Value)^);
+      otULong, otSLong:
+        Exit(PInteger(@Value)^);
+    end;
+  raise EInvalidArgument.Create('Unexpected ordinal type');
+end;
+
+class function TACLEnumHelper.SetValue<T>(const Value: Integer): T;
+var
+  ATypeData: PTypeData;
+  ATypeInfo: PTypeInfo;
+  AValue: Integer;
+begin
+  ATypeInfo := TypeInfo(T);
+  if ATypeInfo^.Kind <> tkEnumeration then
+    raise EInvalidArgument.Create('Unexpected type');
+
+  ATypeData := GetTypeData(ATypeInfo);
+  AValue := EnsureRange(Value, ATypeData.MinValue, ATypeData.MaxValue);
+  case ATypeData.OrdType of
+    otUByte, otSByte:
+      PByte(@Result)^ := AValue;
+    otUWord, otSWord:
+      PWord(@Result)^ := AValue;
+    otULong, otSLong:
+      PInteger(@Result)^ := AValue;
+  else
+    raise EInvalidArgument.Create('Unexpected ordinal type');
+  end;
 end;
 
 { Safe }
