@@ -70,6 +70,7 @@ contains
   ACL.ObjectLinks in 'Base\ACL.ObjectLinks.pas',
   ACL.Parsers in 'Base\ACL.Parsers.pas',
   ACL.Parsers.Ripper in 'Base\ACL.Parsers.Ripper.pas',
+  ACL.RecentList in 'Base\ACL.RecentList.pas',
   ACL.SQLite3 in 'Base\ACL.SQLite3.pas',
   ACL.Threading in 'Base\ACL.Threading.pas',
   ACL.Threading.Pool in 'Base\ACL.Threading.Pool.pas',
