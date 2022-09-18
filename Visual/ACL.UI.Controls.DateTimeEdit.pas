@@ -738,18 +738,18 @@ begin
 
   CreateControl(TACLButton, FButtonOk);
   FButtonOk.Caption := TACLDialogsStrs.MsgDlgButtons[mbOK];
-  FButtonOk.Width := ButtonWidth;
+  FButtonOk.Width := ScaleFactor.Apply(ButtonWidth);
   FButtonOk.Style := FOwner.StylePushButton;
   FButtonOk.OnClick := HandlerApply;
 
   CreateControl(TACLButton, FButtonCancel);
   FButtonCancel.Caption := TACLDialogsStrs.MsgDlgButtons[mbCancel];
   FButtonCancel.OnClick := HandlerCancel;
-  FButtonCancel.Width := ButtonWidth;
+  FButtonCancel.Width := ScaleFactor.Apply(ButtonWidth);
   FButtonCancel.Style := FOwner.StylePushButton;
 
-  Constraints.MinWidth := 290;
-  Constraints.MinHeight := 320;
+  Constraints.MinWidth := ScaleFactor.Apply(290);
+  Constraints.MinHeight := ScaleFactor.Apply(320);
   Constraints.MaxHeight := Constraints.MinHeight;
   Constraints.MaxWidth := Constraints.MinWidth;
   SetBounds(0, 0, Constraints.MinWidth, Constraints.MinHeight);
