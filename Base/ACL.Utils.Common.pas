@@ -185,12 +185,19 @@ function acSetThreadErrorMode(Mode: DWORD): DWORD;
 {$ENDIF}
 procedure FreeMemAndNil(var P: Pointer);
 function IfThen(AValue: Boolean; ATrue: TACLBoolean; AFalse: TACLBoolean): TACLBoolean; overload;
+
+{$IFDEF MSWINDOWS}
+// Wine
+function WineGetVersion(out AMajor, AMinor: Integer): Boolean;
+{$ENDIF}
 implementation
 
 uses
 {$IFNDEF ACL_BASE_NOVCL}
   Vcl.Forms,
 {$ENDIF}
+  // System
+  System.AnsiStrings,
   System.TypInfo,
   // ACL
   ACL.Math,
@@ -203,24 +210,53 @@ uses
 type
   TGetThreadErrorMode = function: DWORD; stdcall;
   TSetThreadErrorMode = function (NewMode: DWORD; out OldMode: DWORD): LongBool; stdcall;
+  TWineGetVersion = function: PAnsiChar; stdcall;
 
 var
   FPerformanceCounterFrequency: Int64 = 0;
   FGetThreadErrorMode: TGetThreadErrorMode = nil;
   FSetThreadErrorMode: TSetThreadErrorMode = nil;
+  FWineGetVersion: TWineGetVersion = nil;
+
+function WineGetVersion(out AMajor, AMinor: Integer): Boolean;
+var
+  P0, P1: PAnsiChar;
+begin
+  Result := False;
+  if Assigned(FWineGetVersion) then
+  begin
+    P0 := FWineGetVersion;
+    if P0 = nil then Exit;
+
+    // extract major
+    P1 := P0;
+    while CharInSet(P1^, ['0'..'9']) do Inc(P1);
+    AMajor := StrToIntDef(acMakeString(P0, P1 - P0), 0);
+
+    // skip delimiters
+    while (P1^ <> #0) and not CharInSet(P1^, ['0'..'9']) do Inc(P1);
+
+    // extract minor
+    P0 := P1;
+    while CharInSet(P1^, ['0'..'9']) do Inc(P1);
+    AMinor := StrToIntDef(acMakeString(P0, P1 - P0), 0);
+
+    Result := AMajor > 0;
+  end;
+end;
 {$ENDIF}
 
-procedure CheckWindowsVersion;
+procedure CheckOSVersion;
 begin
 {$IFDEF MSWINDOWS}
-  IsWine := GetProcAddress(GetModuleHandle('ntdll.dll'), 'wine_get_version') <> nil;
-  IsWinVistaOrLater := CheckWin32Version(6, 0);
-  IsWinSevenOrLater := CheckWin32Version(6, 1);
-  IsWin8OrLater := CheckWin32Version(6, 2);
-  IsWinXP := CheckWin32Version(5, 1) and not IsWinVistaOrLater;
-  IsWinSeven := IsWinSevenOrLater and not IsWin8OrLater;
-  IsWin10OrLater := CheckWin32Version(10, 0);
-  IsWin11OrLater := CheckWin32Version(10, 0) and (Win32BuildNumber >= 22000);
+  IsWine := Assigned(FWineGetVersion);
+  IsWinXP := (TOSVersion.Major = 5) and (TOSVersion.Minor = 1);
+  IsWinVistaOrLater := TOSVersion.Check(6, 0);
+  IsWinSeven := (TOSVersion.Major = 6) and (TOSVersion.Minor = 1);
+  IsWinSevenOrLater := TOSVersion.Check(6, 1);
+  IsWin8OrLater := TOSVersion.Check(6, 2);
+  IsWin10OrLater := TOSVersion.Check(10, 0);
+  IsWin11OrLater := TOSVersion.Check(10, 0) and (TOSVersion.Build >= 22000);
 {$ENDIF}
 end;
 
@@ -764,9 +800,10 @@ end;
 
 initialization
 {$IFDEF MSWINDOWS}
+  FWineGetVersion := GetProcAddress(GetModuleHandle('ntdll.dll'), 'wine_get_version');
   FGetThreadErrorMode := GetProcAddress(GetModuleHandle(kernel32), 'GetThreadErrorMode');
   FSetThreadErrorMode := GetProcAddress(GetModuleHandle(kernel32), 'SetThreadErrorMode');
-  CheckWindowsVersion;
+  CheckOSVersion;
 {$ENDIF}
   InvariantFormatSettings := TFormatSettings.Invariant;
 end.
