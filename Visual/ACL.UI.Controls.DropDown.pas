@@ -24,6 +24,8 @@ uses
   Vcl.ImgList,
   // System
   System.Classes,
+  System.Math,
+  System.SysUtils,
   System.Types,
   System.UITypes,
   // ACL
@@ -65,11 +67,11 @@ type
 
     function CanDropDown(X, Y: Integer): Boolean; virtual;
     function CanOpenEditor: Boolean; override;
+    procedure CalculateButtons(var R: TRect); override;
     function CreateButtonViewInfo: TACLCustomDropDownEditButtonViewInfo; virtual;
     procedure DoDropDown; virtual;
-    function GetCursor(const P: TPoint): TCursor; override;
-    procedure CalculateButtons(var R: TRect); override;
     procedure DrawContent(ACanvas: TCanvas); override;
+    function GetCursor(const P: TPoint): TCursor; override;
     procedure SetDefaultSize; override;
     // Dropdown
     procedure CreateDropDownWindow; virtual;
@@ -82,6 +84,7 @@ type
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
     procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     // Messages
+    procedure CMCancelMode(var Message: TCMCancelMode); message CM_CANCELMODE;
     procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
     procedure WndProc(var Message: TMessage); override;
     // Properties
@@ -179,8 +182,6 @@ type
 implementation
 
 uses
-  SysUtils, Math,
-  // ACL
   ACL.UI.Insight;
 
 type
@@ -353,6 +354,16 @@ procedure TACLCustomDropDownEdit.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
   inherited MouseMove(Shift, X, Y);
   ButtonViewInfo.MouseMove(Point(X, Y));
+end;
+
+procedure TACLCustomDropDownEdit.CMCancelMode(var Message: TCMCancelMode);
+begin
+  if FDropDown <> nil then
+  begin
+    if (Message.Sender <> FDropDown) and not FDropDown.ContainsControl(Message.Sender) then
+      CloseDropDown;
+  end;
+  inherited;
 end;
 
 procedure TACLCustomDropDownEdit.CMEnabledChanged(var Message: TMessage);

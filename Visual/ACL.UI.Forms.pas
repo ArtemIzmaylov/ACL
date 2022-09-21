@@ -208,7 +208,6 @@ type
   TACLCustomPopupFormClass = class of TACLCustomPopupForm;
   TACLCustomPopupForm = class(TACLForm)
   strict private
-    FControl: TControl;
     FPopuped: Boolean;
     FPrevHandle: THandle;
 
@@ -223,7 +222,6 @@ type
     procedure Deactivate; override;
     procedure WndProc(var Message: TMessage); override;
 
-    function GetControlClass: TControlClass; virtual;
     procedure DoClosePopup; virtual;
     procedure DoPopup; virtual;
     procedure Initialize; virtual;
@@ -234,14 +232,12 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-
     procedure Popup(R: TRect); virtual;
     procedure PopupClose;
-    procedure PopupUnderControl(Control: TControl; AAlignment: TAlignment = taLeftJustify); overload;
+    procedure PopupUnderControl(Control: TControl; Alignment: TAlignment = taLeftJustify); overload;
     procedure PopupUnderControl(const AControlBounds: TRect; const AControlOrigin: TPoint;
       AAlignment: TAlignment = taLeftJustify; AScaleFactor: TACLScaleFactor = nil); overload;
     //
-    property Control: TControl read FControl;
     property Popuped: Boolean read FPopuped;
     //
     property OnClosePopup: TNotifyEvent read FOnClosePopup write FOnClosePopup;
@@ -1130,11 +1126,6 @@ destructor TACLCustomPopupForm.Destroy;
 begin
   TACLMainThread.Unsubscribe(Self);
   TACLObjectLinks.Release(Self);
-  if Assigned(FControl) then
-  begin
-    FControl.Parent := nil;
-    FreeAndNil(FControl);
-  end;
   inherited Destroy;
 end;
 
@@ -1158,9 +1149,9 @@ begin
   end;
 end;
 
-procedure TACLCustomPopupForm.PopupUnderControl(Control: TControl; AAlignment: TAlignment = taLeftJustify);
+procedure TACLCustomPopupForm.PopupUnderControl(Control: TControl; Alignment: TAlignment = taLeftJustify);
 begin
-  PopupUnderControl(Control.BoundsRect, Control.ClientToScreen(NullPoint), AAlignment, acGetScaleFactor(Control));
+  PopupUnderControl(Control.BoundsRect, Control.ClientToScreen(NullPoint), Alignment, acGetScaleFactor(Control));
 end;
 
 procedure TACLCustomPopupForm.PopupUnderControl(const AControlBounds: TRect;
@@ -1248,11 +1239,6 @@ begin
     end;
 end;
 
-function TACLCustomPopupForm.GetControlClass: TControlClass;
-begin
-  Result := nil;
-end;
-
 procedure TACLCustomPopupForm.DoClosePopup;
 begin
   CallNotifyEvent(Self, OnClosePopup);
@@ -1273,15 +1259,6 @@ begin
   DefaultMonitor := dmDesktop;
   Position := poDesigned;
   FormStyle := fsStayOnTop;
-
-  if GetControlClass <> nil then
-  begin
-    FControl := GetControlClass.Create(nil);
-    FControl.Parent := Self;
-    FControl.Align := alClient;
-  end
-  else
-    FControl := nil;
 
   if Supports(Owner, IACLScaleFactor, AScaleFactor) then
   begin
