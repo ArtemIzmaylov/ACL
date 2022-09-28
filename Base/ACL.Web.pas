@@ -176,9 +176,9 @@ const
 
 function acURLEscape(const S: UnicodeString): UnicodeString;
 const
-  ReservedChars: array[0..21] of WideChar = (
-    '%', ' ', '<', '>', '#', '{', '}', '|', '\', '^', '~',
-    '[', ']', '`', ';', '/', '?', ':', '@', '=', '&', '$'
+  ReservedChars: array[0..23] of WideChar = (
+    '%', ' ', '<', '>', '#', '{', '}', '|', '\', '^', '~', #13,
+    '[', ']', '`', ';', '/', '?', ':', '@', '=', '&', '$', #10
   );
 var
   I: Integer;
