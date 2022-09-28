@@ -26,7 +26,9 @@ uses
   ACL.Classes.StringList,
   ACL.Expressions,
   ACL.Parsers,
-  ACL.Utils.Common;
+  ACL.Utils.Common,
+  ACL.Utils.Strings,
+  ACL.Utils.Strings.Transcode;
 
 type
   TACLFormatStringMacroProc = function (AContext: TObject): string of object;
@@ -41,13 +43,17 @@ type
     FTemplate: string;
   public
     constructor Create(AFactory: TACLCustomExpressionFactory; ARoot: TACLExpressionElement; const ATemplate: string);
+    function Compare(AContext1, AContext2: TObject): Integer;
     function Evaluate(AContext: TObject): Variant; override;
+    function InvertComparingOrder: Boolean;
     function ToString: string; override;
   end;
 
   { TACLFormatStringFactory }
 
   TACLFormatStringFactory = class(TACLCustomExpressionFactory)
+  protected const
+    ReverseComparingOrderMacro = '!';
   public const
     CategoryChangeCase = 1;
     CategoryConditional = 2;
@@ -99,6 +105,8 @@ type
   { TACLFormatStringCompiler }
 
   TACLFormatStringCompiler = class(TACLExpressionCompiler)
+  strict private const
+    acExprTokenReverse = -1;
   strict private
     function GetFactory: TACLFormatStringFactory; inline;
   protected
@@ -106,6 +114,7 @@ type
     function FetchToken(var P: PWideChar; var C: Integer; var AToken: TACLParserToken): Boolean; override;
     function ParserGetDelimiters: UnicodeString; override;
     procedure PopulateOutputBuffer;
+    function ProcessToken: Boolean; override;
     function ProcessTokenAsDelimiter: Boolean; override;
     //
     property Factory: TACLFormatStringFactory read GetFactory;
@@ -119,7 +128,8 @@ type
   strict private
     FParams: TACLExpressionElements;
   public
-    constructor Create(AStack: TACLExpressionFastStack<TACLExpressionElement>);
+    constructor Create; overload;
+    constructor Create(AStack: TACLExpressionFastStack<TACLExpressionElement>); overload;
     destructor Destroy; override;
     procedure Optimize; override;
     function Evaluate(AContext: TObject): Variant; override;
@@ -147,11 +157,16 @@ type
     constructor Create(const AName: UnicodeString; AMacroProc: TACLFormatStringMacroProc; ACategory: Byte);
   end;
 
-implementation
+  { TACLFormatStringReverseMacro }
 
-uses
-  ACL.Utils.Strings,
-  ACL.Utils.Strings.Transcode;
+  TACLFormatStringReverseMacro = class(TACLExpressionElement)
+  public
+    function Evaluate(AContext: TObject): Variant; override;
+    function IsConstant: Boolean; override;
+    procedure ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory); override;
+  end;
+
+implementation
 
 const
   sErrorClosingTag = 'Syntax Error: macro closing tag is missing';
@@ -170,17 +185,105 @@ begin
   FTemplate := ATemplate;
 end;
 
+function TACLFormatString.Compare(AContext1, AContext2: TObject): Integer;
+
+  function CompareCore(AElement: TACLExpressionElement): Integer;
+  begin
+    Result := acLogicalCompare(AElement.Evaluate(AContext1), AElement.Evaluate(AContext2));
+  end;
+
+var
+  AElement: TACLExpressionElement;
+  AReversed: Boolean;
+begin
+  Result := 0;
+  if FRoot = nil then
+    Exit;
+  if FRoot is TACLFormatStringConcatenateFunction then
+  begin
+    AReversed := False;
+    for var I := 0 to TACLFormatStringConcatenateFunction(FRoot).Params.Count - 1 do
+    begin
+      AElement := TACLFormatStringConcatenateFunction(FRoot).Params[I];
+      if AElement is TACLFormatStringReverseMacro then
+        AReversed := True;
+      if AElement is TACLFormatStringFunction then
+      begin
+        Result := CompareCore(AElement);
+        if AReversed then
+          Result := -Result;
+        if Result <> 0 then
+          Exit;
+        AReversed := False;
+      end;
+    end;
+  end
+  else
+    Result := CompareCore(FRoot);
+end;
+
 function TACLFormatString.Evaluate(AContext: TObject): Variant;
 begin
-  if Root <> nil then
-    Result := Root.Evaluate(AContext)
+  if FRoot <> nil then
+    Result := FRoot.Evaluate(AContext)
   else
     Result := FTemplate;
 end;
 
+function TACLFormatString.InvertComparingOrder: Boolean;
+var
+  AElement: TACLExpressionElement;
+  AFunction: TACLFormatStringConcatenateFunction;
+  AIndex: Integer;
+  AParams: TACLExpressionElementsAccess;
+  AReversed: Boolean;
+begin
+  Result := False;
+  if FRoot is TACLFormatStringConcatenateFunction then
+  begin
+    AIndex := 0;
+    AReversed := False;
+    AParams := TACLExpressionElementsAccess(TACLFormatStringConcatenateFunction(FRoot).Params);
+    while AIndex < AParams.Count do
+    begin
+      AElement := AParams[AIndex];
+      if AElement is TACLFormatStringReverseMacro then
+      begin
+        AElement.Free;
+        AParams.FList.Delete(AIndex);
+        AReversed := True;
+      end
+      else
+      begin
+        if AElement is TACLFormatStringFunction then
+        begin
+          if AReversed then
+            AReversed := False
+          else
+          begin
+            AParams.FList.Insert(AIndex, TACLFormatStringReverseMacro.Create);
+            Inc(AIndex);
+          end;
+          Result := True;
+        end;
+        Inc(AIndex);
+      end;
+    end;
+  end
+  else
+    if FRoot <> nil then
+    begin
+      AFunction := TACLFormatStringConcatenateFunction.Create;
+      TACLExpressionElementsAccess(AFunction.Params).FList.Add(TACLFormatStringReverseMacro.Create);
+      TACLExpressionElementsAccess(AFunction.Params).FList.Add(FRoot);
+      FRoot := AFunction;
+      Result := True;
+    end;
+end;
+
 function TACLFormatString.ToString: string;
 begin
-  if Root <> nil then
+  if FRoot <> nil then
     Result := inherited
   else
     Result := FTemplate;
@@ -532,19 +635,22 @@ var
   K: PWideChar;
   T: TACLParserToken;
 begin
-  if C <= 0 then
-    Exit(False);
-
-  Result := inherited FetchToken(P, C, AToken);
-  if Result and (AToken.TokenType = acTokenDelimiter) and (AToken.Data^ = Factory.MacroDelimiter) then
+  Result := (C > 0) and inherited FetchToken(P, C, AToken);
+  if Result and (AToken.TokenType = acTokenDelimiter) and (Ord(AToken.Data^) = Ord(Factory.MacroDelimiter)) then
   begin
     K := P;
     D := C;
     T.Reset;
-    if inherited FetchToken(K, D, T) {and (T.TokenType = acTokenIdent)} then
+    if inherited FetchToken(K, D, T) then
     begin
       P := K;
       C := D;
+      if T.Compare(TACLFormatStringFactory.ReverseComparingOrderMacro, False) then
+      begin
+        AToken.TokenType := acExprTokenReverse;
+        Exit;
+      end;
+
       if RegisteredFunctions.Find(T.Data, T.DataLength, AEvalFunction) then
       begin
         AToken.Context := AEvalFunction;
@@ -591,6 +697,18 @@ begin
   end;
 end;
 
+function TACLFormatStringCompiler.ProcessToken: Boolean;
+begin
+  if Token.TokenType = acExprTokenReverse then
+  begin
+    OutputBuffer.Push(TACLFormatStringReverseMacro.Create);
+    PrevSolidToken := ecsttOperand;
+    Result := True;
+  end
+  else
+    Result := inherited;
+end;
+
 function TACLFormatStringCompiler.ProcessTokenAsDelimiter: Boolean;
 begin
   OutputBuffer.Push(TACLExpressionElementConstant.Create(Token.ToString));
@@ -605,10 +723,15 @@ end;
 
 { TACLFormatStringConcatenateFunction }
 
-constructor TACLFormatStringConcatenateFunction.Create(AStack: TACLExpressionFastStack<TACLExpressionElement>);
+constructor TACLFormatStringConcatenateFunction.Create;
 begin
   inherited Create;
   FParams := TACLExpressionElements.Create;
+end;
+
+constructor TACLFormatStringConcatenateFunction.Create(AStack: TACLExpressionFastStack<TACLExpressionElement>);
+begin
+  Create;
   TACLExpressionElementsAccess(Params).AddFromStack(AStack, AStack.Count);
 end;
 
@@ -633,7 +756,7 @@ begin
     if AParams[I].IsConstant then
     begin
       J := I + 1;
-      while (J < AParams.Count) and AParams[J].IsConstant  do
+      while (J < AParams.Count) and AParams[J].IsConstant do
         Inc(J);
       Dec(J);
       if I < J then
@@ -711,6 +834,26 @@ end;
 function TACLFormatStringMacroEvalFunction.EvalProc(AContext: TObject; AParams: TACLExpressionElements): Variant;
 begin
   Result := FMacroProc(AContext);
+end;
+
+{ TACLFormatStringReverseMacro }
+
+function TACLFormatStringReverseMacro.Evaluate(AContext: TObject): Variant;
+begin
+  Result := EmptyStr;
+end;
+
+function TACLFormatStringReverseMacro.IsConstant: Boolean;
+begin
+  Result := False;
+end;
+
+procedure TACLFormatStringReverseMacro.ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory);
+var
+  AFormatStringFactory: TACLFormatStringFactory absolute AFactory;
+begin
+  ABuffer.Append(AFormatStringFactory.MacroDelimiter);
+  ABuffer.Append(AFormatStringFactory.ReverseComparingOrderMacro);
 end;
 
 end.

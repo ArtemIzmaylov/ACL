@@ -33,12 +33,11 @@ uses
   ACL.Classes.StringList;
 
 const
-  acExprTokenFunction   = acTokenMax + 1;
-  acExprTokenOperator   = acExprTokenFunction + 1;
+  acExprTokenFunction      = acTokenMax + 1;
+  acExprTokenOperator      = acExprTokenFunction + 1;
   acExprTokenConstantFloat = acExprTokenOperator + 1;
   acExprTokenConstantInt   = acExprTokenConstantFloat + 1;
-
-  acExprTokenMax = acExprTokenConstantInt;
+  acExprTokenMax           = acExprTokenConstantInt;
 
 const
   sErrorCursorInfo = 'Token: "%s", Scan Cursor: "%s"';
@@ -140,7 +139,7 @@ type
 
   TACLExpressionElement = class abstract
   public
-    procedure Optimize; virtual; abstract;
+    procedure Optimize; virtual;
     function Evaluate(AContext: TObject): Variant; virtual; abstract;
     function IsConstant: Boolean; virtual; abstract;
     procedure ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory); reintroduce; virtual; abstract;
@@ -157,7 +156,6 @@ type
 
     procedure Add(AElement: TACLExpressionElement);
     procedure AddFromStack(AStack: TACLExpressionFastStack<TACLExpressionElement>; ACount: Integer);
-    procedure Clear;
     procedure Optimize;
   public
     constructor Create; virtual;
@@ -176,7 +174,6 @@ type
     FValue: Variant;
   public
     constructor Create(const AValue: Variant); virtual;
-    procedure Optimize; override;
     function Evaluate(AContext: TObject): Variant; override;
     function IsConstant: Boolean; override;
     procedure ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory); override;
@@ -215,12 +212,9 @@ type
   { TACLExpression }
 
   TACLExpression = class
-  private private
+  protected
     FFactory: TACLCustomExpressionFactory;
     FRoot: TACLExpressionElement;
-  protected
-    property Factory: TACLCustomExpressionFactory read FFactory;
-    property Root: TACLExpressionElement read FRoot;
   public
     constructor Create(AFactory: TACLCustomExpressionFactory; ARoot: TACLExpressionElement);
     destructor Destroy; override;
@@ -306,7 +300,7 @@ type
     function ParserGetSpaces: UnicodeString; virtual;
     // Compiler
     function CompileCore: TACLExpressionElement; virtual;
-    function ProcessToken: Boolean; inline;
+    function ProcessToken: Boolean; virtual;
     function ProcessTokenAsDelimiter: Boolean; virtual;
     function ProcessTokenAsFunction: Boolean; inline;
     function ProcessTokenAsIdent: Boolean; virtual;
@@ -515,6 +509,13 @@ begin
     Result := Name + 'A';
 end;
 
+{ TACLExpressionElement }
+
+procedure TACLExpressionElement.Optimize;
+begin
+  // do nothing
+end;
+
 { TACLExpressionElements }
 
 constructor TACLExpressionElements.Create;
@@ -525,7 +526,8 @@ end;
 
 destructor TACLExpressionElements.Destroy;
 begin
-  Clear;
+  for var I := 0 to Count - 1 do
+    TObject(FList.List[I]).Free;
   FreeAndNil(FList);
   inherited Destroy;
 end;
@@ -550,15 +552,8 @@ begin
   end;
 end;
 
-procedure TACLExpressionElements.Clear;
-var
-  I: Integer;
-begin
-  for I := 0 to Count - 1 do
-    Items[I].Free;
-end;
-
-procedure TACLExpressionElements.ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory; const ASeparator: string = ',');
+procedure TACLExpressionElements.ToString(ABuffer: TStringBuilder;
+  AFactory: TACLCustomExpressionFactory; const ASeparator: string = ',');
 var
   I: Integer;
 begin
@@ -602,11 +597,6 @@ end;
 constructor TACLExpressionElementConstant.Create(const AValue: Variant);
 begin
   FValue := AValue;
-end;
-
-procedure TACLExpressionElementConstant.Optimize;
-begin
-  // do nothing
 end;
 
 function TACLExpressionElementConstant.Evaluate(AContext: TObject): Variant;
