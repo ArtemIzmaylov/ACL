@@ -173,6 +173,7 @@ type
     class function Create(AVersion: Integer; ABuildNumber: Integer = 0;
       const ABuildSuffix: string = ''; ABuildDate: TDateTime = 0): TACLAppVersion; static;
     class function FormatBuildDate(const ADate: TDateTime): string; static;
+    function ID: Integer;
     function ToDisplayString: string;
     function ToScriptString: string;
     function ToString: string;
@@ -2110,27 +2111,16 @@ begin
   Result := FormatDateTime('(dd.MM.yyyy)', ADate);
 end;
 
-function TACLAppVersion.ToDisplayString: string;
-var
-  ABuffer: TStringBuilder;
+function TACLAppVersion.ID: Integer;
 begin
-  ABuffer := TACLStringBuilderManager.Get;
-  try
-    ABuffer.Append('v');
-    ABuffer.Append(MajorVersion);
-    ABuffer.Append('.');
-    ABuffer.Append(MinorVersion1);
-    ABuffer.Append(MinorVersion2);
-    if BuildSuffix <> '' then
-      ABuffer.Append(' ').Append(BuildSuffix);
-    if BuildNumber > 0 then
-      ABuffer.Append(', build ').Append(BuildNumber);
-    if BuildDate > 0 then
-      ABuffer.Append(' ').Append(FormatBuildDate(BuildDate));
-    Result := ABuffer.ToString;
-  finally
-    TACLStringBuilderManager.Release(ABuffer);
-  end;
+  Result := MajorVersion * 1000 + MinorVersion1 * 100 + MinorVersion2 * 10;
+end;
+
+function TACLAppVersion.ToDisplayString: string;
+begin
+  Result := 'v' + ToString;
+  if BuildDate > 0 then
+    Result := Result + ' ' + FormatBuildDate(BuildDate);
 end;
 
 function TACLAppVersion.ToScriptString: string;
@@ -2163,10 +2153,7 @@ begin
     ABuffer.Append(MinorVersion1);
     ABuffer.Append(MinorVersion2);
     if BuildNumber > 0 then
-    begin
-      ABuffer.Append('.');
-      ABuffer.Append(BuildNumber);
-    end;
+      ABuffer.Append('.').Append(BuildNumber);
     if BuildSuffix <> '' then
       ABuffer.Append(' ').Append(BuildSuffix);
     Result := ABuffer.ToString;
