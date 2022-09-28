@@ -539,6 +539,7 @@ type
     FControl: TControl;
     FOwner: TControl;
     FPosition: TACLBorder;
+    FPrevBounds: TRect;
     FPrevWndProc: TWndMethod;
 
     function GetActualIndentBetweenElements: Integer;
@@ -2636,12 +2637,19 @@ begin
 end;
 
 procedure TACLSubControlOptions.Changed;
+var
+  ABounds: TRect;
 begin
   if not (csDestroying in FOwner.ComponentState) then
   begin
-    TControlAccess(FOwner).AdjustSize;
-    TControlAccess(FOwner).Resize;
-    TControlAccess(FOwner).Invalidate;
+    ABounds := TControlAccess(FOwner).BoundsRect;
+    if FPrevBounds <> ABounds then
+    begin
+      FPrevBounds := ABounds;
+      TControlAccess(FOwner).AdjustSize;
+      TControlAccess(FOwner).Resize;
+      TControlAccess(FOwner).Invalidate;
+    end;
   end;
 end;
 
