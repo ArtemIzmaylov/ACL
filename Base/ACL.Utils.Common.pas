@@ -82,6 +82,7 @@ type
 
   TACLBooleanHelper = record helper for TACLBoolean
   public
+    function ActualValue(ADefault: Boolean): Boolean;
     class function From(AValue: Boolean): TACLBoolean; static;
   end;
 
@@ -532,6 +533,14 @@ end;
 {$ENDIF}
 
 { TACLBooleanHelper }
+
+function TACLBooleanHelper.ActualValue(ADefault: Boolean): Boolean;
+begin
+  if Self = TACLBoolean.Default then
+    Result := ADefault
+  else
+    Result := Self = TACLBoolean.True;
+end;
 
 class function TACLBooleanHelper.From(AValue: Boolean): TACLBoolean;
 begin
