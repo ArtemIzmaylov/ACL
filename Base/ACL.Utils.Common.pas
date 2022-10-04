@@ -189,7 +189,7 @@ function IfThen(AValue: Boolean; ATrue: TACLBoolean; AFalse: TACLBoolean): TACLB
 
 {$IFDEF MSWINDOWS}
 // Wine
-function WineGetVersion(out AMajor, AMinor: Integer): Boolean;
+function WineGetVersion(out AVersion: string): Boolean;
 {$ENDIF}
 implementation
 
@@ -217,33 +217,14 @@ var
   FPerformanceCounterFrequency: Int64 = 0;
   FGetThreadErrorMode: TGetThreadErrorMode = nil;
   FSetThreadErrorMode: TSetThreadErrorMode = nil;
+  FWineGetBuildId: TWineGetVersion = nil;
   FWineGetVersion: TWineGetVersion = nil;
 
-function WineGetVersion(out AMajor, AMinor: Integer): Boolean;
-var
-  P0, P1: PAnsiChar;
+function WineGetVersion(out AVersion: string): Boolean;
 begin
-  Result := False;
-  if Assigned(FWineGetVersion) then
-  begin
-    P0 := FWineGetVersion;
-    if P0 = nil then Exit;
-
-    // extract major
-    P1 := P0;
-    while CharInSet(P1^, ['0'..'9']) do Inc(P1);
-    AMajor := StrToIntDef(acMakeString(P0, P1 - P0), 0);
-
-    // skip delimiters
-    while (P1^ <> #0) and not CharInSet(P1^, ['0'..'9']) do Inc(P1);
-
-    // extract minor
-    P0 := P1;
-    while CharInSet(P1^, ['0'..'9']) do Inc(P1);
-    AMinor := StrToIntDef(acMakeString(P0, P1 - P0), 0);
-
-    Result := AMajor > 0;
-  end;
+  Result := Assigned(FWineGetVersion) and Assigned(FWineGetBuildId);
+  if Result then
+    AVersion := Format('%s (%s)', [FWineGetVersion, FWineGetBuildId])
 end;
 {$ENDIF}
 
@@ -809,9 +790,14 @@ end;
 
 initialization
 {$IFDEF MSWINDOWS}
-  FWineGetVersion := GetProcAddress(GetModuleHandle('ntdll.dll'), 'wine_get_version');
-  FGetThreadErrorMode := GetProcAddress(GetModuleHandle(kernel32), 'GetThreadErrorMode');
-  FSetThreadErrorMode := GetProcAddress(GetModuleHandle(kernel32), 'SetThreadErrorMode');
+  var ALibHandle := GetModuleHandle('ntdll.dll');
+  FWineGetBuildId := GetProcAddress(ALibHandle, 'wine_get_build_id');
+  FWineGetVersion := GetProcAddress(ALibHandle, 'wine_get_version');
+
+  ALibHandle := GetModuleHandle(kernel32);
+  FGetThreadErrorMode := GetProcAddress(ALibHandle, 'GetThreadErrorMode');
+  FSetThreadErrorMode := GetProcAddress(ALibHandle, 'SetThreadErrorMode');
+
   CheckOSVersion;
 {$ENDIF}
   InvariantFormatSettings := TFormatSettings.Invariant;

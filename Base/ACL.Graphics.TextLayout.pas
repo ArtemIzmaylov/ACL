@@ -40,6 +40,7 @@ uses
 {$ENDIF}
   ACL.Utils.Common,
   ACL.Utils.FileSystem,
+  ACL.Utils.Shell,
   ACL.Utils.Strings;
 
 type
@@ -2141,7 +2142,7 @@ begin
       ScanUntilDelimiter(ATempScan, ATempLength, UrlEndDelimiters);
       if FEmailValidator.IsMatch(acMakeString(AFirstTextBlock.FText, acStringLength(AFirstTextBlock.FText, ATempScan))) then
       begin
-        ReplaceWithHyperlink(ATarget, AFirstTextBlock, ATempScan, 'mailto:');
+        ReplaceWithHyperlink(ATarget, AFirstTextBlock, ATempScan, acMailToPrefix);
         AScan := ATempScan;
         ALength := ATempLength;
       end;

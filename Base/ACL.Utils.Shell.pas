@@ -30,6 +30,9 @@ uses
   ACL.Utils.Common,
   ACL.Utils.FileSystem;
 
+const
+  acMailToPrefix = 'mailto:';
+
 type
   TShellOperation = (soMove, soCopy, soDelete, soRename);
   TShellOperationFlag = (sofCanUndo, sofNoDialog, sofNoConfirmation);
@@ -311,7 +314,12 @@ end;
 
 function ShellExecute(const AFileName, AParameters: UnicodeString): Boolean; overload;
 begin
-  Result := (AFileName <> '') and (ShellExecuteW(0, 'open', PWideChar(AFileName), PWideChar(AParameters), '', SW_SHOW) >= 32);
+  if AFileName = '' then
+    Exit(False);
+  if IsWine and (acIsUrlFileName(AFileName) or acBeginsWith(AFileName, acMailToPrefix)) then
+    Result := ShellExecute('winebrowser', AFileName)
+  else
+    Result := ShellExecuteW(0, 'open', PWideChar(AFileName), PWideChar(AParameters), '', SW_SHOW) >= 32;
 end;
 
 function ShellExecuteURL(const ALink: UnicodeString): Boolean;
