@@ -286,10 +286,15 @@ type
   protected
     procedure PrepareForShowing;
   public
-    function AddItem(const ACaption, AHint: UnicodeString; ATag: NativeInt; AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem; overload;
-    function AddItem(const ACaption: UnicodeString; AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem; overload;
-    function AddItem(const ACaption: UnicodeString; ATag: NativeInt; AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem; overload;
+    function AddItem(const ACaption, AHint: UnicodeString; ATag: NativeInt = 0;
+      AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem; overload;
+    function AddItem(const ACaption: UnicodeString;
+      AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem; overload;
+    function AddItem(const ACaption: UnicodeString; ATag: NativeInt;
+      AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem; overload;
     function AddLink(const AMenuItemOrMenu: TComponent): TACLMenuItemLink;
+    function AddRadioItem(const ACaption, AHint: UnicodeString; ATag: NativeInt = 0;
+      AEvent: TNotifyEvent = nil; AGroupIndex: Integer = 0; AShortCut: TShortCut = 0): TMenuItem; overload;
     function AddSeparator: TMenuItem;
     function CanBeParent(AParent: TMenuItem): Boolean;
     function FindByTag(const ATag: NativeInt): TMenuItem;
@@ -599,7 +604,7 @@ end;
 { TMenuItemHelper }
 
 function TMenuItemHelper.AddItem(const ACaption, AHint: UnicodeString;
-  ATag: NativeInt; AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem;
+  ATag: NativeInt; AEvent: TNotifyEvent; AShortCut: TShortCut): TMenuItem;
 begin
   Result := TMenuItem.Create(Self);
   Result.ShortCut := AShortCut;
@@ -625,6 +630,14 @@ begin
   Result := TACLMenuItemLink.Create(Self);
   Result.Link := AMenuItemOrMenu;
   Add(Result);
+end;
+
+function TMenuItemHelper.AddRadioItem(const ACaption, AHint: UnicodeString;
+  ATag: NativeInt; AEvent: TNotifyEvent; AGroupIndex: Integer; AShortCut: TShortCut): TMenuItem;
+begin
+  Result := AddItem(ACaption, AHint, Atag, AEvent, AShortCut);
+  Result.RadioItem := True;
+  Result.GroupIndex := AGroupIndex;
 end;
 
 function TMenuItemHelper.AddSeparator: TMenuItem;

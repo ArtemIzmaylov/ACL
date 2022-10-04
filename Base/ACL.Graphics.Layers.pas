@@ -65,6 +65,7 @@ type
     constructor Create(const S: TSize); overload;
     constructor Create(const W, H: Integer); overload; virtual;
     destructor Destroy; override;
+    procedure Assign(ALayer: TACLBitmapLayer);
     procedure AssignParams(DC: HDC);
     function Clone(out AData: PRGBQuadArray): Boolean;
     function CoordToFlatIndex(X, Y: Integer): Integer;
@@ -255,6 +256,15 @@ destructor TACLBitmapLayer.Destroy;
 begin
   FreeHandles;
   inherited Destroy;
+end;
+
+procedure TACLBitmapLayer.Assign(ALayer: TACLBitmapLayer);
+begin
+  if ALayer <> Self then
+  begin
+    Resize(ALayer.Width, ALayer.Height);
+    FastMove(ALayer.Colors^, Colors^, ColorCount * SizeOf(TRGBQuad));
+  end;
 end;
 
 procedure TACLBitmapLayer.AssignParams(DC: HDC);
