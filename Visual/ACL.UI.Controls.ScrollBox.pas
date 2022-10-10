@@ -441,8 +441,8 @@ begin
     Exit;
   end;
 
-  SubClass.Controller.UpdateHitTest(TranslatePoint(Message.XPos, Message.YPos));
-  if SubClass.Controller.HitTest.HitObject = SubClass.ViewInfo then
+  SubClass.UpdateHitTest(TranslatePoint(Message.XPos, Message.YPos));
+  if SubClass.HitTest.HitObject = SubClass.ViewInfo then
     Message.Result := HTCLIENT
   else
     Message.Result := HTOBJECT;
@@ -453,7 +453,8 @@ begin
   if IsDesigning then
     inherited
   else
-    SubClass.Controller.MouseDown(mbLeft, KeyboardStateToShiftState, TranslatePoint(Message.XCursor, Message.YCursor));
+    with TranslatePoint(Message.XCursor, Message.YCursor) do
+      SubClass.MouseDown(mbLeft, KeyboardStateToShiftState, X, Y);
 end;
 
 procedure TACLCustomScrollBox.WMNCLButtonUp(var Message: TWMNCLButtonUp);
@@ -461,7 +462,8 @@ begin
   if IsDesigning then
     inherited
   else
-    SubClass.Controller.MouseUp(mbLeft, KeyboardStateToShiftState, TranslatePoint(Message.XCursor, Message.YCursor));
+    with TranslatePoint(Message.XCursor, Message.YCursor) do
+      SubClass.MouseUp(mbLeft, KeyboardStateToShiftState, X, Y);
 end;
 
 procedure TACLCustomScrollBox.WMNCMouseMove(var Message: TWMNCMouseMove);
@@ -470,7 +472,8 @@ begin
     inherited
   else
   begin
-    SubClass.Controller.MouseMove(KeyboardStateToShiftState, TranslatePoint(Message.XCursor, Message.YCursor));
+    with TranslatePoint(Message.XCursor, Message.YCursor) do
+      SubClass.MouseMove(KeyboardStateToShiftState, X, Y);
     MouseTracker.Add(Self);
   end;
 end;

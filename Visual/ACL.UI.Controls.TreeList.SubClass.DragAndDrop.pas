@@ -315,7 +315,7 @@ begin
     CheckContentScrolling(ScreenToClient(ScreenPoint));
     AObject := nil;
     AMode := dtimInto;
-    SubClass.Controller.UpdateHitTest;
+    SubClass.UpdateHitTest;
     Allow := CalculateDropTarget(AObject, AMode);
 
     if Allow and not DragAndDropController.IsActive then
@@ -401,12 +401,12 @@ end;
 
 function TACLTreeListSubClassDropTarget.GetDragAndDropController: TACLTreeListSubClassDragAndDropController;
 begin
-  Result := SubClass.Controller.DragAndDropController;
+  Result := SubClass.DragAndDropController;
 end;
 
 function TACLTreeListSubClassDropTarget.GetHitTest: TACLTreeListSubClassHitTest;
 begin
-  Result := SubClass.Controller.HitTest;
+  Result := SubClass.HitTest;
 end;
 
 function TACLTreeListSubClassDropTarget.GetNodeViewInfo: TACLTreeListSubClassContentNodeCellViewInfo;
@@ -729,7 +729,7 @@ end;
 
 function TACLTreeListSubClassCustomDragSortingObject.GetHitTest: TACLTreeListSubClassHitTest;
 begin
-  Result := SubClass.Controller.HitTest;
+  Result := SubClass.HitTest;
 end;
 
 { TACLTreeListSubClassColumnCustomDragObject }
@@ -834,7 +834,7 @@ end;
 
 function TACLTreeListSubClassColumnDragMoveObject.GetHitTest: TACLTreeListSubClassHitTest;
 begin
-  Result := SubClass.Controller.HitTest;
+  Result := SubClass.HitTest;
 end;
 
 { TACLTreeListSubClassColumnDragResizeObject }
@@ -969,11 +969,11 @@ begin
     begin
       FLastHitNode := AHitNode;
       if (AHitNode <> nil) and (StartNode <> nil) then
-        SubClass.Controller.NavigationController.SelectRange(StartNode, AHitNode, False, True, smSelect)
+        SubClass.SelectRange(StartNode, AHitNode, False, True, smSelect)
       else if (AHitNode <> nil) and (StartNodeNearest <> nil) then
-        SubClass.Controller.NavigationController.SelectRange(StartNodeNearest, AHitNode, False, True, smSelect)
+        SubClass.SelectRange(StartNodeNearest, AHitNode, False, True, smSelect)
       else
-        SubClass.Controller.NavigationController.SelectNone;
+        SubClass.SelectNone;
     end;
   end;
 end;

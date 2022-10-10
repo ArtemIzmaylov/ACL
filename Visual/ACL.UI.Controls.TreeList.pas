@@ -370,8 +370,8 @@ end;
 
 function TACLCustomTreeList.ObjectAtPos(const X, Y: Integer): TObject;
 begin
-  SubClass.Controller.UpdateHitTest(X, Y);
-  Result := SubClass.Controller.HitTest.HitObject;
+  SubClass.UpdateHitTest(X, Y);
+  Result := SubClass.HitTest.HitObject;
 end;
 
 procedure TACLCustomTreeList.ReloadData;
@@ -559,7 +559,7 @@ end;
 
 function TACLCustomTreeList.GetHitTest: TACLTreeListSubClassHitTest;
 begin
-  Result := SubClass.Controller.HitTest;
+  Result := SubClass.HitTest;
 end;
 
 function TACLCustomTreeList.GetOnCanDeleteSelected: TACLTreeListConfirmationEvent;

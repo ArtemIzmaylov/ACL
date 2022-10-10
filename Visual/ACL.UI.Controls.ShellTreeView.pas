@@ -113,7 +113,6 @@ type
     procedure SetOptionsView(AValue: TACLShellTreeViewOptionsView);
     procedure SetSelectedPath(AValue: UnicodeString);
   protected
-    function CreateController: TACLCompoundControlSubClassController; override;
     function CreateOptionsBehavior: TACLShellTreeViewOptionsBehavior; reintroduce; virtual;
     function CreateOptionsView: TACLShellTreeViewOptionsView; reintroduce; virtual;
     function CreateShellImageList: TCustomImageList;
@@ -124,7 +123,10 @@ type
     procedure DoGetPathChildren(ANode: TACLTreeListNode); virtual;
     procedure DoGetRootChildren(ANode: TACLTreeListNode); virtual;
 
+    procedure InvokeSystemMenu(AOwnerWindow: HWND; ANode: TACLTreeListNode);
     procedure NodeRemoving(ANode: TACLTreeListNode); override;
+    procedure ProcessContextPopup(var AHandled: Boolean); override;
+    procedure ProcessKeyDown(AKey: Word; AShift: TShiftState); override;
 
     function AddFolderNode(ID: PItemIDList; AParent: TACLTreeListNode): TACLTreeListNode;
     function FindNodeByPIDL(ID: PItemIDList; ANode: TACLTreeListNode): TACLTreeListNode;
@@ -139,19 +141,6 @@ type
     property SelectedShellFolder: TACLShellFolder read GetSelectedShellFolder;
     property OptionsBehavior: TACLShellTreeViewOptionsBehavior read FOptionsBehavior write SetOptionsBehavior;
     property OptionsView: TACLShellTreeViewOptionsView read FOptionsView write SetOptionsView;
-  end;
-
-  { TACLShellTreeViewSubClassController }
-
-  TACLShellTreeViewSubClassController = class(TACLTreeListSubClassController)
-  strict private
-    function GetSubClass: TACLShellTreeViewSubClass;
-  protected
-    procedure InvokeSystemMenu(AOwnerWindow: HWND; ANode: TACLTreeListNode);
-    procedure ProcessContextPopup(var AHandled: Boolean); override;
-    procedure ProcessKeyDown(AKey: Word; AShift: TShiftState); override;
-  public
-    property SubClass: TACLShellTreeViewSubClass read GetSubClass;
   end;
 
   { TACLShellTreeView }
@@ -395,11 +384,6 @@ begin
   end
 end;
 
-function TACLShellTreeViewSubClass.CreateController: TACLCompoundControlSubClassController;
-begin
-  Result := TACLShellTreeViewSubClassController.Create(Self);
-end;
-
 function TACLShellTreeViewSubClass.CreateOptionsBehavior: TACLShellTreeViewOptionsBehavior;
 begin
   Result := TACLShellTreeViewOptionsBehavior.Create(inherited OptionsBehavior);
@@ -609,29 +593,27 @@ begin
   end;
 end;
 
-{ TACLShellTreeViewSubClassController }
-
-procedure TACLShellTreeViewSubClassController.ProcessContextPopup(var AHandled: Boolean);
+procedure TACLShellTreeViewSubClass.ProcessContextPopup(var AHandled: Boolean);
 begin
   inherited ProcessContextPopup(AHandled);
   if not AHandled and HitTest.HitAtNode then
-    InvokeSystemMenu(SubClass.Container.GetControl.Handle, HitTest.Node);
+    InvokeSystemMenu(Container.GetControl.Handle, HitTest.Node);
 end;
 
-procedure TACLShellTreeViewSubClassController.ProcessKeyDown(AKey: Word; AShift: TShiftState);
+procedure TACLShellTreeViewSubClass.ProcessKeyDown(AKey: Word; AShift: TShiftState);
 begin
   if AShift * [ssShift, ssAlt, ssCtrl] = [] then
     case AKey of
       VK_F5:
         begin
-          SubClass.ReloadData;
+          ReloadData;
           Exit;
         end;
 
       VK_DELETE:
         begin
-          if ShellDeleteDirectory(SubClass.SelectedPath) then
-            SubClass.ReloadData;
+          if ShellDeleteDirectory(SelectedPath) then
+            ReloadData;
           Exit;
         end;
     end;
@@ -639,7 +621,7 @@ begin
   inherited ProcessKeyDown(AKey, AShift);
 end;
 
-procedure TACLShellTreeViewSubClassController.InvokeSystemMenu(AOwnerWindow: HWND; ANode: TACLTreeListNode);
+procedure TACLShellTreeViewSubClass.InvokeSystemMenu(AOwnerWindow: HWND; ANode: TACLTreeListNode);
 const
   TRACKMENU_FLAGS = TPM_LEFTALIGN or TPM_LEFTBUTTON or TPM_RIGHTBUTTON or TPM_RETURNCMD;
 var
@@ -649,7 +631,7 @@ var
   CM: IContextMenu;
   ZVerb: array[0..255] of AnsiChar;
 begin
-  if SubClass.OptionsBehavior.SystemMenu then
+  if OptionsBehavior.SystemMenu then
   begin
     if TACLShellFolder(ANode.Data).GetUIObjectOf(AOwnerWindow, IID_IContextMenu, CM) then
     begin
@@ -671,18 +653,13 @@ begin
           ACmdInfo.lpVerb := MakeIntResourceA(LongInt(ACommand) - 1);
           ACmdInfo.nShow := SW_SHOWNORMAL;
           CM.InvokeCommand(ACmdInfo);
-          SubClass.ReloadData;
+          ReloadData;
         end;
       finally
         DestroyMenu(AMenu);
       end;
     end;
   end;
-end;
-
-function TACLShellTreeViewSubClassController.GetSubClass: TACLShellTreeViewSubClass;
-begin
-  Result := TACLShellTreeViewSubClass(inherited SubClass);
 end;
 
 { TACLShellTreeView }

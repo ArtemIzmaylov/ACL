@@ -399,20 +399,19 @@ end;
 
 function TACLCustomComboBoxDropDownForm.CalculateHeight: Integer;
 var
-  AController: TACLTreeListSubClassNavigationController;
   AFirstNode: TACLTreeListNode;
   AFirstNodeCell: TACLCompoundControlSubClassBaseContentCell;
   ALastNode: TACLTreeListNode;
   ALastNodeCell: TACLCompoundControlSubClassBaseContentCell;
+  AViewItems: TACLCompoundControlSubClassContentCellList;
 begin
   Result := 0;
   if Control.RootNode.ChildrenCount > 0 then
   begin
     AFirstNode := Control.RootNode.Children[0];
     ALastNode := Control.RootNode.Children[Min(Control.RootNode.ChildrenCount, Owner.DropDownListSize) - 1];
-    AController := Control.SubClass.Controller.NavigationController;
-    if AController.GetContentCellForObject(AFirstNode, AFirstNodeCell) and
-       AController.GetContentCellForObject(ALastNode, ALastNodeCell)
+    AViewItems := Control.SubClass.ContentViewInfo.ViewItems;
+    if AViewItems.Find(AFirstNode, AFirstNodeCell) and AViewItems.Find(ALastNode, ALastNodeCell)
     then
       Result := ALastNodeCell.Bounds.Bottom - AFirstNodeCell.Bounds.Top +
         Control.SubClass.ViewInfo.Bounds.Height -
@@ -440,7 +439,7 @@ procedure TACLCustomComboBoxDropDownForm.MouseUpHandler(
   Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   if FCapturedObject = Control.ObjectAtPos(X, Y) then
-    ClickAtObject(Control.SubClass.Controller.HitTest);
+    ClickAtObject(Control.SubClass.HitTest);
 end;
 
 procedure TACLCustomComboBoxDropDownForm.Initialize;

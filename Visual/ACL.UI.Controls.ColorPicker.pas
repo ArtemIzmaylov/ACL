@@ -120,8 +120,8 @@ type
     procedure ColorChangeHandler(Sender: TObject);
     procedure OptionsChangeHandler(Sender: TObject);
   protected
-    function CreateController: TACLCompoundControlSubClassController; override;
     function CreateViewInfo: TACLCompoundControlSubClassCustomViewInfo; override;
+    procedure ProcessMouseDown(AButton: TMouseButton; AShift: TShiftState); override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -138,13 +138,6 @@ type
     property TargetDPI: Integer read FTargetDPI;
     //
     property OnColorChanged: TNotifyEvent read FOnColorChanged write FOnColorChanged;
-  end;
-
-  { TACLColorPickerSubClassController }
-
-  TACLColorPickerSubClassController = class(TACLCompoundControlSubClassController)
-  protected
-    procedure ProcessMouseDown(AButton: TMouseButton; AShift: TShiftState); override;
   end;
 
   { TACLColorPickerSubClassPainter }
@@ -619,7 +612,7 @@ end;
 
 function TACLColorPickerSubClassColorModifierCell.IsCaptured: Boolean;
 begin
-  Result := Self = SubClass.Controller.PressedObject;
+  Result := Self = SubClass.PressedObject;
 end;
 
 procedure TACLColorPickerSubClassColorModifierCell.DragMove(X, Y: Integer);
@@ -799,11 +792,6 @@ begin
   inherited SetTargetDPI(AValue);
 end;
 
-function TACLColorPickerSubClass.CreateController: TACLCompoundControlSubClassController;
-begin
-  Result := TACLColorPickerSubClassController.Create(Self);
-end;
-
 function TACLColorPickerSubClass.CreateViewInfo: TACLCompoundControlSubClassCustomViewInfo;
 begin
   Result := TACLColorPickerSubClassViewInfo.Create(Self);
@@ -822,9 +810,7 @@ begin
   Container.GetControl.Realign;
 end;
 
-{ TACLColorPickerSubClassController }
-
-procedure TACLColorPickerSubClassController.ProcessMouseDown(AButton: TMouseButton; AShift: TShiftState);
+procedure TACLColorPickerSubClass.ProcessMouseDown(AButton: TMouseButton; AShift: TShiftState);
 begin
   inherited;
   if HitTest.HitObject is TACLColorPickerSubClassColorModifierCell then

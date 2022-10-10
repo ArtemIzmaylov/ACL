@@ -81,9 +81,7 @@ type
   TACLTreeListSubClassContentCellViewInfo = class;
   TACLTreeListSubClassContentNodeCellViewInfo = class;
   TACLTreeListSubClassContentViewInfo = class;
-  TACLTreeListSubClassController = class;
   TACLTreeListSubClassDragAndDropController = class;
-  TACLTreeListSubClassNavigationController = class;
   TACLTreeListSubClassPainter = class;
 
   TACLTreeListDropTargetInsertMode = (dtimBefore, dtimAfter, dtimInto, dtimOver);
@@ -486,7 +484,12 @@ type
     constructor Create(AOwner: TACLCompoundControlSubClass); override;
     destructor Destroy; override;
     function CalculateHitTest(const AInfo: TACLHitTestInfo): Boolean; override;
+    function CalculateScrollDelta(AObject: TObject; AMode: TACLScrollToMode;
+      out ADelta: TPoint; AColumn: TACLTreeListColumn = nil): Boolean;
+    function CalculateScrollDeltaCore(ACell: TACLCompoundControlSubClassBaseContentCell;
+      AMode: TACLScrollToMode; const AArea: TRect; AColumn: TACLTreeListSubClassColumnViewInfo = nil): TPoint; virtual;
     function FindNearestNode(const P: TPoint; ADirection: Integer): TACLTreeListNode;
+    function IsObjectVisible(AObject: TObject; AColumn: TACLTreeListColumn = nil): Boolean;
     procedure ScrollByLines(ALines: Integer; ADirection: TACLMouseWheelDirection);
     // Actual Heights
     function GetActualColumnBarHeight: Integer; virtual;
@@ -703,174 +706,6 @@ type
     function CanShowHint(AHintOwner: TObject; const AHintData: TACLHintData): Boolean; override;
   end;
 
-  { TACLTreeListSubClassNavigationController }
-
-  TACLTreeListSubClassNavigationController = class(TACLCompoundControlSubClassPersistent)
-  strict private
-    FFocusedColumn: TACLTreeListColumn;
-    FFocusedObject: TObject;
-    FFocusing: Boolean;
-    FIncSearch: TACLIncrementalSearch;
-    FIncSearchColumnIndex: Integer;
-
-    function GetColumns: TACLTreeListColumns; inline;
-    function GetContent: TACLTreeListSubClassContentViewInfo; inline;
-    function GetContentCells: TACLCompoundControlSubClassContentCellList; inline;
-    function GetController: TACLTreeListSubClassController; inline;
-    function GetHitTest: TACLTreeListSubClassHitTest; inline;
-    function GetMultiSelect: Boolean;
-    function GetOptionsBehavior: TACLTreeListOptionsBehavior; inline;
-    function GetOptionsSelection: TACLTreeListOptionsSelection; inline;
-    function GetSubClass: TACLTreeListSubClass; inline;
-    function GetVisibleNodes: TACLTreeListNodeList; inline;
-    procedure SetFocusedColumn(AValue: TACLTreeListColumn);
-  protected
-    FStartObject: TObject;
-    FTapLocation: TPoint;
-    FWasSelected: Boolean;
-
-    function GetObjectChild(AObject: TObject): TObject;
-    function GetObjectParent(AObject: TObject): TObject;
-
-    // Incremental Search
-    function CheckIncSearchColumn: Boolean;
-    procedure IncSearchChanged(Sender: TObject);
-    function IncSearchContains(ANode: TACLTreeListNode): Boolean;
-    procedure IncSearchFindCore(Sender: TObject; var AFound: Boolean);
-
-    function IsMultiSelectOperation(AShift: TShiftState): Boolean;
-    function IsSelected(AObject: TObject): Boolean;
-
-    // Keyboard
-    function CheckFocusedObject: BOolean;
-    function GetNextColumn(out AColumn: TACLTreeListColumn): Boolean;
-    function GetPrevColumn(out AColumn: TACLTreeListColumn): Boolean;
-    function GetNextObject(AObject: TObject; AKey: Word): TObject;
-    procedure NavigateTo(AObject: TObject; AShift: TShiftState);
-    procedure ToggleCheckboxes;
-
-    property Columns: TACLTreeListColumns read GetColumns;
-    property Content: TACLTreeListSubClassContentViewInfo read GetContent;
-    property ContentCells: TACLCompoundControlSubClassContentCellList read GetContentCells;
-  public
-    constructor Create(ASubClass: TACLCompoundControlSubClass); override;
-    destructor Destroy; override;
-
-    function CalculateScrollToDelta(AObject: TObject; AMode: TACLScrollToMode;
-      out ADelta: TPoint; AColumn: TACLTreeListColumn = nil): Boolean;
-    function CalculateScrollToDeltaCore(ACell: TACLCompoundControlSubClassBaseContentCell;
-      AMode: TACLScrollToMode; const AArea: TRect; AColumn: TACLTreeListSubClassColumnViewInfo = nil): TPoint; virtual;
-    function GetContentCellForObject(AObject: TObject; out ACell: TACLCompoundControlSubClassBaseContentCell): Boolean;
-
-    // Keyboard
-    procedure KeyDown(AKey: Word; AShift: TShiftState); virtual;
-    procedure KeyPress(AKey: Char); virtual;
-    procedure KeyUp(AKey: Word; AShift: TShiftState); virtual;
-
-    // Gestures
-    procedure Gesture(const AEventInfo: TGestureEventInfo; var AHandled: Boolean); virtual;
-
-    // Mouse
-    procedure MouseDown(AButton: TMouseButton; AShift: TShiftState); virtual;
-    procedure MouseUp(AButton: TMouseButton; AShift: TShiftState); virtual;
-
-    procedure ExpandTo(AObject: TObject);
-    function IsVisible(AObject: TObject; AColumn: TACLTreeListColumn = nil): Boolean;
-    procedure ScrollBy(ADeltaX, ADeltaY: Integer);
-    procedure ScrollByLines(ALines: Integer; ADirection: TACLMouseWheelDirection);
-    procedure ScrollTo(AObject: TObject; AMode: TACLScrollToMode; AColumn: TACLTreeListColumn = nil);
-
-    // IncrementalSearch
-    function GetHighlightBounds(const AText: UnicodeString; AAbsoluteColumnIndex: Integer; out AHighlightStart, AHighlightFinish: Integer): Boolean;
-
-    // Focus
-    procedure SetFocusedObject(AObject: TObject; ADropSelection: Boolean = True; AMakeVisible: Boolean = True);
-    procedure ValidateFocusedObject;
-
-    // Selection
-    procedure SelectAll; virtual;
-    procedure SelectInvert; virtual;
-    procedure SelectNone; virtual;
-    procedure SelectObject(AObject: TObject; AMode: TACLSelectionMode; AIsMedium: Boolean); virtual;
-    procedure SelectOnMouseDown(AButton: TMouseButton; AShift: TShiftState); virtual;
-    procedure SelectRange(AFirstObject, ALastObject: TObject; AShift: TShiftState); overload;
-    procedure SelectRange(AFirstObject, ALastObject: TObject; AMakeVisible, ADropSelection: Boolean; AMode: TACLSelectionMode); overload;
-    procedure SelectRange(AFirstObject, ALastObject, AObjectToFocus: TObject; AMakeVisible, ADropSelection: Boolean; AMode: TACLSelectionMode); overload;
-    //
-    procedure ProcessChanges(const AChanges: TIntegerSet);
-    //
-    property Controller: TACLTreeListSubClassController read GetController;
-    property FocusedColumn: TACLTreeListColumn read FFocusedColumn write SetFocusedColumn;
-    property FocusedObject: TObject read FFocusedObject;
-    property HitTest: TACLTreeListSubClassHitTest read GetHitTest;
-    property IncSearch: TACLIncrementalSearch read FIncSearch;
-    property IncSearchColumnIndex: Integer read FIncSearchColumnIndex;
-    property MultiSelect: Boolean read GetMultiSelect;
-    property OptionsBehavior: TACLTreeListOptionsBehavior read GetOptionsBehavior;
-    property OptionsSelection: TACLTreeListOptionsSelection read GetOptionsSelection;
-    property SubClass: TACLTreeListSubClass read GetSubClass;
-    property VisibleNodes: TACLTreeListNodeList read GetVisibleNodes;
-  end;
-
-  { TACLTreeListSubClassController }
-
-  TACLTreeListSubClassController = class(TACLCompoundControlSubClassController)
-  strict private
-    FNavigationController: TACLTreeListSubClassNavigationController;
-
-    function GetColumns: TACLTreeListColumns; inline;
-    function GetContentViewInfo: TACLTreeListSubClassContentViewInfo;
-    function GetDragAndDropController: TACLTreeListSubClassDragAndDropController;
-    function GetEditingController: TACLTreeListSubClassEditingController; inline;
-    function GetHitTest: TACLTreeListSubClassHitTest; inline;
-    function GetSubClass: TACLTreeListSubClass; inline;
-  protected
-    FColumnsOrderCustomizationMenu: TACLPopupMenu;
-
-    function CreateColumnsOrderCustomizationMenu: TACLPopupMenu; virtual;
-    function CreateDragAndDropController: TACLCompoundControlSubClassDragAndDropController; override;
-    function CreateHintController: TACLCompoundControlSubClassHintController; override;
-    function CreateHitTest: TACLHitTestInfo; override;
-    function CreateNavigationController: TACLTreeListSubClassNavigationController; virtual;
-    // ColumnOrderCustomizationMenu
-    procedure ColumnOrderCustomizationMenuClickHandler(Sender: TObject); virtual;
-    procedure ColumnOrderCustomizationMenuRebuild; virtual;
-    procedure ColumnOrderCustomizationMenuShow(const P: TPoint); virtual;
-    // Gestures
-    procedure ProcessGesture(const AEventInfo: TGestureEventInfo; var AHandled: Boolean); override;
-    // Keyboard
-    procedure ProcessKeyDown(AKey: Word; AShift: TShiftState); override;
-    procedure ProcessKeyPress(AKey: Char); override;
-    procedure ProcessKeyUp(AKey: Word; AShift: TShiftState); override;
-    // Mouse
-    procedure ProcessContextPopup(var AHandled: Boolean); override;
-    procedure ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState); override;
-    procedure ProcessMouseClickAtColumn(AButton: TMouseButton; AShift: TShiftState; AColumn: TACLTreeListColumn); virtual;
-    procedure ProcessMouseClickAtGroup(AButton: TMouseButton; AShift: TShiftState; AGroup: TACLTreeListGroup); virtual;
-    procedure ProcessMouseDblClick(AButton: TMouseButton; AShift: TShiftState); override;
-    procedure ProcessMouseDown(AButton: TMouseButton; AShift: TShiftState); override;
-    procedure ProcessMouseUp(AButton: TMouseButton; AShift: TShiftState); override;
-    procedure ProcessMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState); override;
-    //
-    procedure ToggleGroupExpanded(AGroup: TACLTreeListGroup; AShift: TShiftState);
-  public
-    constructor Create(AControl: TACLCompoundControlSubClass); override;
-    destructor Destroy; override;
-    // Keyboard
-    function WantSpecialKey(Key: Word; Shift: TShiftState): Boolean; override;
-    // Scrolling
-    procedure ScrollHorizontally(const AScrollCode: TScrollCode); override;
-    procedure ScrollVertically(const AScrollCode: TScrollCode); override;
-    //
-    property Columns: TACLTreeListColumns read GetColumns;
-    property ContentViewInfo: TACLTreeListSubClassContentViewInfo read GetContentViewInfo;
-    property DragAndDropController: TACLTreeListSubClassDragAndDropController read GetDragAndDropController;
-    property EditingController: TACLTreeListSubClassEditingController read GetEditingController;
-    property HitTest: TACLTreeListSubClassHitTest read GetHitTest;
-    property NavigationController: TACLTreeListSubClassNavigationController read FNavigationController;
-    property SubClass: TACLTreeListSubClass read GetSubClass;
-  end;
-
   { TACLTreeListSubClassSortByList }
 
   TACLTreeListSubClassSortByList = class(TACLTreeListColumnList)
@@ -964,7 +799,12 @@ type
   strict private
     FColumns: TACLTreeListColumns;
     FEditingController: TACLTreeListSubClassEditingController;
+    FFocusedColumn: TACLTreeListColumn;
+    FFocusedObject: TObject;
+    FFocusing: Boolean;
     FGroups: TACLTreeListGroups;
+    FIncSearch: TACLIncrementalSearch;
+    FIncSearchColumnIndex: Integer;
     FOptionsBehavior: TACLTreeListOptionsBehavior;
     FOptionsCustomizing: TACLTreeListOptionsCustomizing;
     FOptionsSelection: TACLTreeListOptionsSelection;
@@ -1012,17 +852,15 @@ type
     FOnSorting: TNotifyEvent;
     FOnSortReset: TNotifyEvent;
 
-    function GetController: TACLTreeListSubClassController;
+    function GetContentViewInfo: TACLTreeListSubClassContentViewInfo; inline;
     function GetDragAndDropController: TACLTreeListSubClassDragAndDropController;
-    function GetFocusedColumn: TACLTreeListColumn;
     function GetFocusedGroup: TACLTreeListGroup;
     function GetFocusedNode: TACLTreeListNode;
     function GetFocusedNodeData: Pointer;
-    function GetFocusedObject: TObject;
     function GetGroup(Index: Integer): TACLTreeListGroup;
     function GetGroupCount: Integer;
     function GetHasSelection: Boolean;
-    function GetNavigationController: TACLTreeListSubClassNavigationController; inline;
+    function GetHitTest: TACLTreeListSubClassHitTest;
     function GetSelected(Index: Integer): TACLTreeListNode;
     function GetSelectedCheckState: TCheckBoxState;
     function GetSelectedCount: Integer;
@@ -1036,7 +874,7 @@ type
     procedure SetFocusedGroup(AValue: TACLTreeListGroup);
     procedure SetFocusedNode(AValue: TACLTreeListNode);
     procedure SetFocusedNodeData(const Value: Pointer);
-    procedure SetFocusedObject(AValue: TObject);
+    procedure SetFocusedObject(AValue: TObject); overload;
     procedure SetOnGetNodeClass(const Value: TACLTreeListGetNodeClassEvent);
     procedure SetOptionsBehavior(AValue: TACLTreeListOptionsBehavior);
     procedure SetOptionsCustomizing(AValue: TACLTreeListOptionsCustomizing);
@@ -1049,10 +887,17 @@ type
     procedure SetViewportX(const Value: Integer);
     procedure SetViewportY(const Value: Integer);
   protected
+    FColumnsOrderCustomizationMenu: TACLPopupMenu;
     FNodeClass: TACLTreeListNodeClass;
+    FStartObject: TObject;
+    FTapLocation: TPoint;
+    FWasSelected: Boolean;
 
+    function CreateColumnsOrderCustomizationMenu: TACLPopupMenu; virtual;
+    function CreateDragAndDropController: TACLCompoundControlSubClassDragAndDropController; override;
+    function CreateHintController: TACLCompoundControlSubClassHintController; override;
+    function CreateHitTest: TACLHitTestInfo; override;
     function CreateColumns: TACLTreeListColumns; virtual;
-    function CreateController: TACLCompoundControlSubClassController; override;
     function CreateEditingController: TACLTreeListSubClassEditingController; virtual;
     function CreateGroups: TACLTreeListGroups; virtual;
     function CreateInplaceEdit(const AParams: TACLInplaceInfo; out AEdit: TComponent): Boolean; virtual;
@@ -1105,9 +950,57 @@ type
     procedure DoEditInitialize(const AParams: TACLInplaceInfo; AEdit: TComponent); virtual;
     procedure DoEditKeyDown(var AKey: Word; AShiftState: TShiftState); virtual;
 
+    // ColumnOrderCustomizationMenu
+    procedure ColumnOrderCustomizationMenuClickHandler(Sender: TObject); virtual;
+    procedure ColumnOrderCustomizationMenuRebuild; virtual;
+    procedure ColumnOrderCustomizationMenuShow(const P: TPoint); virtual;
+
     // Changes
-    procedure FocusChanged; override;
     procedure ProcessChanges(AChanges: TIntegerSet = []); override;
+
+    // Focus
+    function CheckFocusedObject: BOolean;
+    procedure FocusChanged; override;
+    procedure SetFocusedObject(AObject: TObject; ADropSelection: Boolean; AMakeVisible: Boolean = True); overload;
+    procedure ValidateFocusedObject;
+
+    // Incremental Search
+    function CheckIncSearchColumn: Boolean;
+    function GetHighlightBounds(const AText: UnicodeString;
+      AAbsoluteColumnIndex: Integer; out AHighlightStart, AHighlightFinish: Integer): Boolean;
+    procedure IncSearchChanged(Sender: TObject);
+    function IncSearchContains(ANode: TACLTreeListNode): Boolean;
+    procedure IncSearchFindCore(Sender: TObject; var AFound: Boolean);
+
+    // Gestures
+    procedure ProcessGesture(const AEventInfo: TGestureEventInfo; var AHandled: Boolean); override;
+
+    // Keyboard
+    function GetNextColumn(out AColumn: TACLTreeListColumn): Boolean;
+    function GetNextObject(AObject: TObject; AKey: Word): TObject; virtual;
+    function GetPrevColumn(out AColumn: TACLTreeListColumn): Boolean;
+    function IsMultiSelectOperation(AShift: TShiftState): Boolean;
+    procedure NavigateTo(AObject: TObject; AShift: TShiftState);
+    procedure ProcessKeyDown(AKey: Word; AShift: TShiftState); override;
+    procedure ProcessKeyPress(AKey: Char); override;
+    procedure ProcessKeyUp(AKey: Word; AShift: TShiftState); override;
+
+    // Mouse
+    procedure ProcessContextPopup(var AHandled: Boolean); override;
+    procedure ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState); override;
+    procedure ProcessMouseClickAtColumn(AButton: TMouseButton; AShift: TShiftState; AColumn: TACLTreeListColumn); virtual;
+    procedure ProcessMouseClickAtGroup(AButton: TMouseButton; AShift: TShiftState; AGroup: TACLTreeListGroup); virtual;
+    procedure ProcessMouseDblClick(AButton: TMouseButton; AShift: TShiftState); override;
+    procedure ProcessMouseDown(AButton: TMouseButton; AShift: TShiftState); override;
+    procedure ProcessMouseUp(AButton: TMouseButton; AShift: TShiftState); override;
+    procedure ProcessMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState); override;
+
+    // General
+    function GetObjectChild(AObject: TObject): TObject;
+    function GetObjectParent(AObject: TObject): TObject;
+    function IsSelected(AObject: TObject): Boolean;
+    procedure ToggleCheckboxes;
+    procedure ToggleGroupExpanded(AGroup: TACLTreeListGroup; AShift: TShiftState);
 
     // IACLTreeList
     procedure IACLTreeList.NodeChecked = DoNodeChecked;
@@ -1139,6 +1032,7 @@ type
     procedure DeleteSelected; virtual;
     procedure ReloadData; virtual;
     procedure SetTargetDPI(AValue: Integer); override;
+    function WantSpecialKey(Key: Word; Shift: TShiftState): Boolean;
 
     // MUI
     procedure Localize(const ASection: string); override;
@@ -1152,11 +1046,14 @@ type
     procedure StopEditing;
 
     // Scrolling
+    procedure ExpandTo(AObject: TObject);
     procedure MakeTop(AObject: TObject);
     procedure MakeVisible(AObject: TObject);
     procedure ScrollBy(ADeltaX, ADeltaY: Integer);
     procedure ScrollByLines(ALines: Integer; ADirection: TACLMouseWheelDirection);
     procedure ScrollTo(AObject: TObject; AMode: TACLScrollToMode; AColumn: TACLTreeListColumn = nil);
+    procedure ScrollHorizontally(const AScrollCode: TScrollCode); override;
+    procedure ScrollVertically(const AScrollCode: TScrollCode); override;
 
     // Groupping
     procedure GroupBy(AColumn: TACLTreeListColumn; AResetPrevSortingParams: Boolean = False);
@@ -1176,8 +1073,14 @@ type
     procedure SetPath(const APath: UnicodeString); virtual;
 
     // Selection
-    procedure SelectAll;
-    procedure SelectNone;
+    procedure SelectAll; virtual;
+    procedure SelectInvert; virtual;
+    procedure SelectNone; virtual;
+    procedure SelectObject(AObject: TObject; AMode: TACLSelectionMode; AIsMedium: Boolean); virtual;
+    procedure SelectOnMouseDown(AButton: TMouseButton; AShift: TShiftState); virtual;
+    procedure SelectRange(AFirstObject, ALastObject, AObjectToFocus: TObject; AMakeVisible, ADropSelection: Boolean; AMode: TACLSelectionMode); overload;
+    procedure SelectRange(AFirstObject, ALastObject: TObject; AMakeVisible, ADropSelection: Boolean; AMode: TACLSelectionMode); overload;
+    procedure SelectRange(AFirstObject, ALastObject: TObject; AShift: TShiftState); overload;
 
     // Styles
     function StyleGetNodeBackgroundColor(AOdd: Boolean; ANode: TACLTreeListNode = nil): TAlphaColor; virtual;
@@ -1186,18 +1089,22 @@ type
     // Data Properties
     property AbsoluteVisibleNodes: TACLTreeListNodeList read GetAbsoluteVisibleNodes;
     property Columns: TACLTreeListColumns read FColumns write SetColumns;
-    property Controller: TACLTreeListSubClassController read GetController;
     property DragAndDropController: TACLTreeListSubClassDragAndDropController read GetDragAndDropController;
     property EditingController: TACLTreeListSubClassEditingController read FEditingController;
-    property FocusedColumn: TACLTreeListColumn read GetFocusedColumn write SetFocusedColumn;
+    property FocusedColumn: TACLTreeListColumn read FFocusedColumn write SetFocusedColumn;
     property FocusedGroup: TACLTreeListGroup read GetFocusedGroup write SetFocusedGroup;
     property FocusedNode: TACLTreeListNode read GetFocusedNode write SetFocusedNode;
     property FocusedNodeData: Pointer read GetFocusedNodeData write SetFocusedNodeData;
-    property FocusedObject: TObject read GetFocusedObject write SetFocusedObject;
+    property FocusedObject: TObject read FFocusedObject write SetFocusedObject;
     property Group[Index: Integer]: TACLTreeListGroup read GetGroup;
     property GroupCount: Integer read GetGroupCount;
+
     property HasSelection: Boolean read GetHasSelection;
-    property NavigationController: TACLTreeListSubClassNavigationController read GetNavigationController;
+    property IncSearch: TACLIncrementalSearch read FIncSearch;
+    property IncSearchColumnIndex: Integer read FIncSearchColumnIndex;
+
+    property ContentViewInfo: TACLTreeListSubClassContentViewInfo read GetContentViewInfo;
+    property HitTest: TACLTreeListSubClassHitTest read GetHitTest;
     property RootNode: TACLTreeListNode read GetRootNode;
     property Selected[Index: Integer]: TACLTreeListNode read GetSelected;
     property SelectedCheckState: TCheckBoxState read GetSelectedCheckState;
@@ -1257,7 +1164,8 @@ type
 implementation
 
 uses
-  Math, Character,
+  System.Character,
+  System.Math,
   // ACL
   ACL.Graphics.Gdiplus,
   ACL.Math,
@@ -1866,7 +1774,7 @@ end;
 
 function TACLTreeListSubClassContentCellViewInfo.GetIsFocused: Boolean;
 begin
-  Result := (FData <> nil) and (FData = SubClass.NavigationController.FocusedObject);
+  Result := (FData <> nil) and (FData = SubClass.FocusedObject);
 end;
 
 function TACLTreeListSubClassContentCellViewInfo.GetPainter: TACLTreeListSubClassPainter;
@@ -2247,7 +2155,7 @@ var
 begin
   if not SubClass.DoCustomDrawNodeCellValue(ACanvas, R, Node, AValue, AValueIndex, AAlignment) then
   begin
-    if IsFocused and SubClass.NavigationController.GetHighlightBounds(AValue, AValueIndex, AHighlightStart, AHighlightFinish) then
+    if IsFocused and SubClass.GetHighlightBounds(AValue, AValueIndex, AHighlightStart, AHighlightFinish) then
       Painter.DrawHighlightedText(ACanvas, AValue, AAlignment, R, AHighlightStart, AHighlightFinish)
     else
       Painter.DrawText(ACanvas, AValue, AAlignment, R);
@@ -2456,7 +2364,7 @@ end;
 
 function TACLTreeListDropTargetViewInfo.GetDragAndDropController: TACLTreeListSubClassDragAndDropController;
 begin
-  Result := FOwner.SubClass.Controller.DragAndDropController;
+  Result := FOwner.SubClass.DragAndDropController;
 end;
 
 function TACLTreeListDropTargetViewInfo.GetDropTargetObject: TObject;
@@ -2505,6 +2413,34 @@ begin
   end;
 end;
 
+function TACLTreeListSubClassContentViewInfo.CalculateScrollDelta(AObject: TObject;
+  AMode: TACLScrollToMode; out ADelta: TPoint; AColumn: TACLTreeListColumn = nil): Boolean;
+var
+  ACell: TACLCompoundControlSubClassBaseContentCell;
+  AColumnViewInfo: TACLTreeListSubClassColumnViewInfo;
+begin
+  Result := ViewItems.Find(AObject, ACell);
+  if Result then
+  begin
+    if (AColumn = nil) or not ColumnBarViewInfo.GetColumnViewInfo(AColumn, AColumnViewInfo) then
+      AColumnViewInfo := nil;
+    ADelta := CalculateScrollDeltaCore(ACell, AMode, ViewItemsArea, AColumnViewInfo);
+  end
+  else
+    ADelta := NullPoint;
+end;
+
+function TACLTreeListSubClassContentViewInfo.CalculateScrollDeltaCore(
+  ACell: TACLCompoundControlSubClassBaseContentCell; AMode: TACLScrollToMode;
+  const AArea: TRect; AColumn: TACLTreeListSubClassColumnViewInfo = nil): TPoint;
+begin
+  Result.Y := acCalculateScrollToDelta(ACell.Bounds.Top, ACell.Bounds.Bottom, AArea.Top, AArea.Bottom, AMode);
+  if AColumn <> nil then
+    Result.X := acCalculateScrollToDelta(AColumn.Bounds.Left, AColumn.Bounds.Right, AArea.Left, AArea.Right, TACLScrollToMode.MakeVisible)
+  else
+    Result.X := 0;
+end;
+
 function TACLTreeListSubClassContentViewInfo.FindNearestNode(const P: TPoint; ADirection: Integer): TACLTreeListNode;
 var
   ACell: TACLCompoundControlSubClassBaseContentCell;
@@ -2536,6 +2472,13 @@ begin
       Result := TACLTreeListNode(ACell.Data);
     end;
   end;
+end;
+
+function TACLTreeListSubClassContentViewInfo.IsObjectVisible(AObject: TObject; AColumn: TACLTreeListColumn = nil): Boolean;
+var
+  ADelta: TPoint;
+begin
+  Result := CalculateScrollDelta(AObject, TACLScrollToMode.MakeVisible, ADelta, AColumn) and (ADelta = NullPoint);
 end;
 
 procedure TACLTreeListSubClassContentViewInfo.ScrollByLines(ALines: Integer; ADirection: TACLMouseWheelDirection);
@@ -2758,8 +2701,8 @@ begin
   AGroup := nil;
   AGroupsAllowCollapse := SubClass.OptionsBehavior.GroupsAllowCollapse;
 
-  if (SubClass.OptionsBehavior.IncSearchMode = ismFilter) and SubClass.NavigationController.IncSearch.Active then
-    AFilterProc := SubClass.NavigationController.IncSearchContains
+  if (SubClass.OptionsBehavior.IncSearchMode = ismFilter) and SubClass.IncSearch.Active then
+    AFilterProc := SubClass.IncSearchContains
   else
     AFilterProc := nil;
 
@@ -3258,7 +3201,7 @@ begin
     Inc(FApplyLockCount);
     try
       SubClass.FocusedColumn := AColumn;
-      SubClass.Controller.HintController.Cancel;
+      SubClass.HintController.Cancel;
       InitializeParams(ANode, AColumn);
       if SubClass.CreateInplaceEdit(FParams, FEdit) then
       begin
@@ -3382,8 +3325,8 @@ begin
         if not ((Edit is TControl) and (TControl(Edit).Perform(WM_GETDLGCODE, 0, 0) and DLGC_WANTARROWS <> 0)) then
         begin
           EditApplyHandler(Sender);
-          SubClass.NavigationController.KeyDown(Key, Shift);
-          SubClass.NavigationController.KeyUp(Key, Shift);
+          SubClass.KeyDown(Key, Shift);
+          SubClass.KeyUp(Key, Shift);
         end;
     end;
   end;
@@ -3454,1058 +3397,6 @@ begin
     if AHintOwner is TACLTreeListNode then
       Result := TACLTreeListSubClass(SubClass).OptionsBehavior.CellHints;
   end;
-end;
-
-{ TACLTreeListSubClassNavigationController }
-
-constructor TACLTreeListSubClassNavigationController.Create(ASubClass: TACLCompoundControlSubClass);
-begin
-  inherited;
-  FIncSearch := TACLIncrementalSearch.Create;
-  FIncSearch.OnChange := IncSearchChanged;
-  FIncSearch.OnLookup := IncSearchFindCore;
-end;
-
-destructor TACLTreeListSubClassNavigationController.Destroy;
-begin
-  FreeAndNil(FIncSearch);
-  inherited;
-end;
-
-function TACLTreeListSubClassNavigationController.CalculateScrollToDelta(AObject: TObject;
-  AMode: TACLScrollToMode; out ADelta: TPoint; AColumn: TACLTreeListColumn = nil): Boolean;
-var
-  ACell: TACLCompoundControlSubClassBaseContentCell;
-  AColumnViewInfo: TACLTreeListSubClassColumnViewInfo;
-begin
-  Result := GetContentCellForObject(AObject, ACell);
-  if Result then
-  begin
-    if (AColumn = nil) or not Content.ColumnBarViewInfo.GetColumnViewInfo(AColumn, AColumnViewInfo) then
-      AColumnViewInfo := nil;
-    ADelta := CalculateScrollToDeltaCore(ACell, AMode, Content.ViewItemsArea, AColumnViewInfo);
-  end
-  else
-    ADelta := NullPoint;
-end;
-
-function TACLTreeListSubClassNavigationController.CalculateScrollToDeltaCore(
-  ACell: TACLCompoundControlSubClassBaseContentCell; AMode: TACLScrollToMode;
-  const AArea: TRect; AColumn: TACLTreeListSubClassColumnViewInfo = nil): TPoint;
-begin
-  Result.Y := acCalculateScrollToDelta(ACell.Bounds.Top, ACell.Bounds.Bottom, AArea.Top, AArea.Bottom, AMode);
-  if AColumn <> nil then
-    Result.X := acCalculateScrollToDelta(AColumn.Bounds.Left, AColumn.Bounds.Right, AArea.Left, AArea.Right, TACLScrollToMode.MakeVisible)
-  else
-    Result.X := 0;
-end;
-
-function TACLTreeListSubClassNavigationController.GetContentCellForObject(
-  AObject: TObject; out ACell: TACLCompoundControlSubClassBaseContentCell): Boolean;
-begin
-  Result := (AObject <> nil) and ContentCells.Find(AObject, ACell);
-end;
-
-procedure TACLTreeListSubClassNavigationController.KeyDown(AKey: Word; AShift: TShiftState);
-var
-  AColumn: TACLTreeListColumn;
-  AExpandable: IACLExpandableObject;
-begin
-  case AKey of
-    65: // A
-      if [ssAlt, ssShift, ssCtrl] * AShift = [ssCtrl] then
-        SelectAll;
-
-    106: // Num *
-      SelectInvert;
-
-    107: // Num +
-      if ssCtrl in AShift then
-        SubClass.Columns.ApplyBestFit;
-
-    VK_SHIFT:
-      if FStartObject = nil then
-        FStartObject := FocusedObject;
-
-    VK_SPACE:
-      if not IncSearch.ProcessKey(AKey, AShift) then
-        ToggleCheckboxes;
-
-    VK_DELETE:
-      if OptionsBehavior.Deleting then
-        SubClass.DeleteSelected;
-
-    VK_RETURN:
-      if OptionsBehavior.Editing then
-      begin
-        if FocusedObject is TACLTreeListNode then
-          SubClass.StartEditing(TACLTreeListNode(FocusedObject), FocusedColumn);
-      end;
-
-    VK_UP, VK_DOWN, VK_NEXT, VK_PRIOR, VK_HOME, VK_END:
-      if CheckFocusedObject then
-      begin
-        SubClass.BeginUpdate;
-        try
-          AColumn := FocusedColumn;
-          NavigateTo(GetNextObject(FocusedObject, AKey), AShift);
-          FocusedColumn := AColumn;
-        finally
-          SubClass.EndUpdate;
-        end;
-        Controller.UpdateHotTrack;
-      end;
-
-    VK_LEFT:
-      if CheckFocusedObject then
-      begin
-        if OptionsSelection.FocusCell and GetPrevColumn(AColumn) then
-          FocusedColumn := AColumn
-        else
-          if Supports(FocusedObject, IACLExpandableObject, AExpandable) and AExpandable.CanToggle and AExpandable.Expanded then
-            AExpandable.Expanded := False
-          else
-            NavigateTo(GetObjectParent(FocusedObject), AShift);
-      end;
-
-    VK_RIGHT:
-      if CheckFocusedObject then
-      begin
-        if OptionsSelection.FocusCell and GetNextColumn(AColumn) then
-          FocusedColumn := AColumn
-        else
-          if Supports(FocusedObject, IACLExpandableObject, AExpandable) and AExpandable.CanToggle and not AExpandable.Expanded then
-            AExpandable.Expanded := True
-          else
-            NavigateTo(GetObjectChild(FocusedObject), AShift);
-      end;
-  else
-    IncSearch.ProcessKey(AKey, AShift);
-  end;
-end;
-
-procedure TACLTreeListSubClassNavigationController.KeyPress(AKey: Char);
-begin
-  if OptionsBehavior.IncSearchColumnIndex >= 0 then
-    IncSearch.ProcessKey(AKey);
-end;
-
-procedure TACLTreeListSubClassNavigationController.KeyUp(AKey: Word; AShift: TShiftState);
-begin
-  case AKey of
-    VK_SHIFT:
-      FStartObject := nil;
-  end;
-end;
-
-procedure TACLTreeListSubClassNavigationController.Gesture(const AEventInfo: TGestureEventInfo; var AHandled: Boolean);
-begin
-  if AEventInfo.GestureID = igiPan then
-  begin
-    if gfBegin in AEventInfo.Flags then
-      FTapLocation := AEventInfo.Location;
-    ScrollBy(FTapLocation.X - AEventInfo.Location.X, FTapLocation.Y - AEventInfo.Location.Y);
-    FTapLocation := AEventInfo.Location;
-    AHandled := True;
-  end;
-end;
-
-procedure TACLTreeListSubClassNavigationController.MouseDown(AButton: TMouseButton; AShift: TShiftState);
-begin
-  FWasSelected := False;
-  if not HitTest.HasAction then
-  begin
-    if Supports(HitTest.HitObject, IACLSelectableObject) then
-      SelectOnMouseDown(AButton, AShift)
-    else
-      if HitTest.HitAtContentArea and (AButton = mbLeft) then
-        SelectNone;
-  end;
-end;
-
-procedure TACLTreeListSubClassNavigationController.MouseUp(AButton: TMouseButton; AShift: TShiftState);
-begin
-  if (AButton = mbLeft) and (HitTest.HitObject = Controller.PressedObject) then
-  begin
-    if FWasSelected then
-    begin
-      if not IsMultiSelectOperation(AShift) then
-      begin
-        if not (HitTest.HitAtNode and SubClass.EditingController.IsEditing(HitTest.Node)) then
-          SetFocusedObject(HitTest.HitObject, True, not HitTest.HasAction);
-      end;
-    end;
-    if SubClass.OptionsBehavior.EditingStartingMode = esmOnSingleClick then
-    begin
-      if HitTest.HitAtNode and not HitTest.HasAction then
-        SubClass.StartEditing(HitTest.Node, HitTest.Column);
-    end;
-  end;
-  FWasSelected := False;
-end;
-
-procedure TACLTreeListSubClassNavigationController.ExpandTo(AObject: TObject);
-var
-  AExpandable: IACLExpandableObject;
-begin
-  SubClass.BeginUpdate;
-  try
-    repeat
-      AObject := GetObjectParent(AObject);
-      if Supports(AObject, IACLExpandableObject, AExpandable) then
-        AExpandable.Expanded := True;
-    until AObject = nil;
-  finally
-    SubClass.EndUpdate;
-  end;
-end;
-
-function TACLTreeListSubClassNavigationController.IsVisible(AObject: TObject; AColumn: TACLTreeListColumn = nil): Boolean;
-var
-  ADelta: TPoint;
-begin
-  Result := CalculateScrollToDelta(AObject, TACLScrollToMode.MakeVisible, ADelta, AColumn) and (ADelta = NullPoint);
-end;
-
-function TACLTreeListSubClassNavigationController.GetHighlightBounds(const AText: UnicodeString;
-  AAbsoluteColumnIndex: Integer; out AHighlightStart, AHighlightFinish: Integer): Boolean;
-begin
-  Result := (AAbsoluteColumnIndex = IncSearchColumnIndex) and
-    IncSearch.GetHighlightBounds(AText, AHighlightStart, AHighlightFinish);
-end;
-
-procedure TACLTreeListSubClassNavigationController.SetFocusedObject(
-  AObject: TObject; ADropSelection: Boolean = True; AMakeVisible: Boolean = True);
-var
-  APrevFocusedColumn: TObject;
-  APrevFocusedObject: TObject;
-begin
-  if AObject = SubClass.RootNode then
-    Exit;
-
-  if not FFocusing then
-  begin
-    FFocusing := True;
-    SubClass.BeginUpdate;
-    try
-      APrevFocusedObject := FFocusedObject;
-      APrevFocusedColumn := FFocusedColumn;
-
-      if IncSearch.Mode <> ismFilter then
-        IncSearch.Cancel;
-      if ADropSelection then
-        SelectNone;
-      ExpandTo(AObject);
-      SelectObject(AObject, smSelect, False);
-      FFocusedColumn := nil;
-      FFocusedObject := AObject; // after SelectObject
-
-      SubClass.Changed([cccnContent]);
-      if APrevFocusedObject <> FFocusedObject then
-        SubClass.Changed([tlcnFocusedNode]);
-      if APrevFocusedColumn <> FFocusedColumn then
-        SubClass.Changed([tlcnFocusedColumn]);
-      if AMakeVisible and (FFocusedObject <> nil) then
-        SubClass.Changed([tlcnMakeVisible]);
-    finally
-      SubClass.EndUpdate;
-      FFocusing := False;
-    end;
-  end;
-end;
-
-procedure TACLTreeListSubClassNavigationController.ValidateFocusedObject;
-var
-  ACell: TACLCompoundControlSubClassBaseContentCell;
-  ANewFocusedObject: TObject;
-begin
-  ANewFocusedObject := FocusedObject;
-  while (ANewFocusedObject <> nil) and not GetContentCellForObject(ANewFocusedObject, ACell) do
-    ANewFocusedObject := GetObjectParent(ANewFocusedObject);
-  if ANewFocusedObject <> FocusedObject then
-    SetFocusedObject(ANewFocusedObject, False, False);
-  if not (Columns.IsValid(FocusedColumn) and FocusedColumn.Visible) then
-    FocusedColumn := nil;
-end;
-
-procedure TACLTreeListSubClassNavigationController.ScrollBy(ADeltaX, ADeltaY: Integer);
-begin
-  Content.ViewportX := Content.ViewportX + ADeltaX;
-  Content.ViewportY := Content.ViewportY + ADeltaY;
-end;
-
-procedure TACLTreeListSubClassNavigationController.ScrollByLines(ALines: Integer; ADirection: TACLMouseWheelDirection);
-begin
-  Content.ScrollByLines(ALines, ADirection);
-end;
-
-procedure TACLTreeListSubClassNavigationController.ScrollTo(
-  AObject: TObject; AMode: TACLScrollToMode; AColumn: TACLTreeListColumn = nil);
-var
-  ADelta: TPoint;
-begin
-  ExpandTo(AObject);
-  if CalculateScrollToDelta(AObject, AMode, ADelta, AColumn) then
-    ScrollBy(ADelta.X, ADelta.Y);
-end;
-
-procedure TACLTreeListSubClassNavigationController.SelectAll;
-var
-  AObjectToFocus: TObject;
-begin
-  if VisibleNodes.Count > 0 then
-  begin
-    AObjectToFocus := FocusedObject;
-    if AObjectToFocus = nil then
-      AObjectToFocus := VisibleNodes.First;
-    SelectRange(VisibleNodes.First, VisibleNodes.Last, AObjectToFocus, True, False, smSelect);
-  end;
-end;
-
-procedure TACLTreeListSubClassNavigationController.SelectInvert;
-begin
-  if (VisibleNodes.Count > 0) and MultiSelect then
-  begin
-    SubClass.BeginUpdate;
-    try
-      SelectRange(VisibleNodes.First, VisibleNodes.Last, nil, False, False, smInvert);
-      if SubClass.Selection.Count > 0 then
-        SetFocusedObject(SubClass.Selection.First, False);
-    finally
-      SubClass.EndUpdate;
-    end;
-  end;
-end;
-
-procedure TACLTreeListSubClassNavigationController.SelectNone;
-begin
-  while SubClass.Selection.Count > 0 do
-    SubClass.Selection.Last.Selected := False;
-end;
-
-procedure TACLTreeListSubClassNavigationController.SelectObject(AObject: TObject; AMode: TACLSelectionMode; AIsMedium: Boolean);
-var
-  ASelectable: IACLSelectableObject;
-begin
-  if (AObject is TACLTreeListGroup) and AIsMedium then
-    Exit;
-  if Supports(AObject, IACLSelectableObject, ASelectable) then
-    case AMode of
-      smSelect:
-        ASelectable.Selected := True;
-      smUnselect:
-        ASelectable.Selected := False;
-      smInvert:
-        ASelectable.Selected := not ASelectable.Selected;
-    end;
-end;
-
-procedure TACLTreeListSubClassNavigationController.SelectOnMouseDown(AButton: TMouseButton; AShift: TShiftState);
-
-  procedure SetFocusCore(ASelected: Boolean; ADropSelection: Boolean = True; AMakeVisible: Boolean = True);
-  var
-    AObjectToFocus: TObject;
-  begin
-    SubClass.BeginUpdate;
-    try
-      if HitTest.HitAtGroup then
-      begin
-        if SubClass.OptionsBehavior.GroupsFocusOnClick or not HitTest.Group.Expanded then
-          AObjectToFocus := HitTest.Group
-        else
-          AObjectToFocus := HitTest.Group.Links.First;
-      end
-      else
-        AObjectToFocus := HitTest.HitObject;
-
-      SetFocusedObject(AObjectToFocus, ADropSelection, AMakeVisible);
-      SelectObject(HitTest.HitObject, TACLSelectionMode(Ord(ASelected)), False);
-    finally
-      SubClass.EndUpdate;
-    end;
-  end;
-
-begin
-  FWasSelected := IsSelected(HitTest.HitObject);
-  case AButton of
-    mbRight, mbMiddle:
-      if not FWasSelected then
-        SetFocusCore(True);
-
-    mbLeft:
-      if MultiSelect and (IsMultiSelectOperation(AShift) or FWasSelected) then
-      begin
-        if ssShift in AShift then
-          SelectRange(FStartObject, HitTest.HitObject, AShift)
-        else
-          if ssCtrl in AShift then
-            SetFocusCore(not FWasSelected, False, False)
-          else
-            SetFocusCore(True, False, False);
-      end
-      else
-        SetFocusCore(True);
-  end;
-end;
-
-procedure TACLTreeListSubClassNavigationController.SelectRange(AFirstObject, ALastObject: TObject; AShift: TShiftState);
-begin
-  SelectRange(AFirstObject, ALastObject, True, [ssCtrl] * AShift = [],
-    TACLSelectionMode(([ssCtrl] * AShift = []) or IsSelected(AFirstObject)));
-end;
-
-procedure TACLTreeListSubClassNavigationController.SelectRange(
-  AFirstObject, ALastObject: TObject; AMakeVisible, ADropSelection: Boolean; AMode: TACLSelectionMode);
-begin
-  SelectRange(AFirstObject, ALastObject, ALastObject, AMakeVisible, ADropSelection, AMode);
-end;
-
-procedure TACLTreeListSubClassNavigationController.SelectRange(
-  AFirstObject, ALastObject, AObjectToFocus: TObject; AMakeVisible, ADropSelection: Boolean; AMode: TACLSelectionMode);
-var
-  AFirstCell: TACLCompoundControlSubClassBaseContentCell;
-  AIndex1, AIndex2: Integer;
-  ALastCell: TACLCompoundControlSubClassBaseContentCell;
-  I: Integer;
-begin
-  if GetContentCellForObject(AFirstObject, AFirstCell) and GetContentCellForObject(ALastObject, ALastCell) then
-  begin
-    AIndex1 := ContentCells.IndexOf(AFirstCell);
-    AIndex2 := ContentCells.IndexOf(ALastCell);
-
-    SubClass.BeginUpdate;
-    try
-      if ADropSelection then
-        SelectNone;
-      for I := Min(AIndex1, AIndex2) to Max(AIndex1, AIndex2) do
-        SelectObject(ContentCells[I].Data, AMode, (I <> AIndex1) and (I <> AIndex2));
-      SetFocusedObject(AObjectToFocus, False, AMakeVisible);
-    finally
-      SubClass.EndUpdate;
-    end;
-  end;
-end;
-
-procedure TACLTreeListSubClassNavigationController.ProcessChanges(const AChanges: TIntegerSet);
-begin
-  if tlcnSettingsFocus in AChanges then
-    SetFocusedObject(nil);
-  if tlcnSettingsIncSearch in AChanges then
-  begin
-    IncSearch.Cancel;
-    IncSearch.Mode := OptionsBehavior.IncSearchMode;
-  end;
-  if cccnStruct in AChanges then
-    ValidateFocusedObject;
-  if tlcnMakeVisible in AChanges then
-    ScrollTo(FocusedObject, TACLScrollToMode.MakeVisible, FocusedColumn);
-end;
-
-function TACLTreeListSubClassNavigationController.CheckIncSearchColumn: Boolean;
-var
-  AIndex: Integer;
-begin
-  AIndex := SubClass.OptionsBehavior.IncSearchColumnIndex;
-  if InRange(AIndex, 0, Content.ColumnBarViewInfo.ChildCount - 1) then
-    FIncSearchColumnIndex := Content.ColumnBarViewInfo.Children[AIndex].AbsoluteIndex
-  else
-    FIncSearchColumnIndex := IfThen(AIndex < 0, -1);
-
-  Result := IncSearchColumnIndex >= 0;
-end;
-
-procedure TACLTreeListSubClassNavigationController.IncSearchChanged(Sender: TObject);
-begin
-  if OptionsBehavior.IncSearchMode = ismFilter then
-  begin
-    SubClass.Changed([cccnStruct]);
-    if VisibleNodes.Count > 0 then
-      SetFocusedObject(VisibleNodes.First);
-  end;
-  SubClass.Changed([cccnContent]);
-end;
-
-function TACLTreeListSubClassNavigationController.IncSearchContains(ANode: TACLTreeListNode): Boolean;
-var
-  I: Integer;
-begin
-  Result := IncSearch.Contains(ANode.Values[IncSearchColumnIndex]);
-
-  if not Result and ANode.HasChildren then
-  begin
-    for I := 0 to ANode.ChildrenCount - 1 do
-      if IncSearchContains(ANode.Children[I]) then
-        Exit(True);
-  end;
-end;
-
-procedure TACLTreeListSubClassNavigationController.IncSearchFindCore(Sender: TObject; var AFound: Boolean);
-
-  function FindNode(AStartIndex, AFinishIndex: Integer): TACLTreeListNode; overload;
-  var
-    I: Integer;
-  begin
-    for I := AStartIndex to AFinishIndex do
-    begin
-      if IncSearch.Contains(VisibleNodes[I].Values[IncSearchColumnIndex]) then
-        Exit(VisibleNodes[I]);
-    end;
-    Result := nil;
-  end;
-
-  function FindNode(out ANode: TACLTreeListNode): Boolean; overload;
-  var
-    AIndex: Integer;
-  begin
-    AIndex := Max(0, VisibleNodes.IndexOf(FocusedObject));
-    ANode := FindNode(AIndex, VisibleNodes.Count - 1);
-    if ANode = nil then
-      ANode := FindNode(0, AIndex - 1);
-    Result := ANode <> nil;
-  end;
-
-var
-  ANode: TACLTreeListNode;
-begin
-  AFound := CheckIncSearchColumn and FindNode(ANode);
-  if AFound then
-    SetFocusedObject(ANode);
-end;
-
-function TACLTreeListSubClassNavigationController.IsMultiSelectOperation(AShift: TShiftState): Boolean;
-begin
-  Result := MultiSelect and ([ssShift, ssCtrl] * AShift <> []);
-end;
-
-function TACLTreeListSubClassNavigationController.IsSelected(AObject: TObject): Boolean;
-var
-  ASelectable: IACLSelectableObject;
-begin
-  if Supports(AObject, IACLSelectableObject, ASelectable) then
-    Result := ASelectable.Selected
-  else
-    Result := False;
-end;
-
-function TACLTreeListSubClassNavigationController.CheckFocusedObject: BOolean;
-begin
-  Result := FocusedObject <> nil;
-  if not Result and (ContentCells.Count > 0) then
-    SetFocusedObject(ContentCells.First.Data);
-end;
-
-function TACLTreeListSubClassNavigationController.GetNextColumn(out AColumn: TACLTreeListColumn): Boolean;
-begin
-  if FocusedColumn <> nil then
-    AColumn := FocusedColumn
-  else
-    if Columns.Count > 0 then
-      AColumn := Columns.First
-    else
-      AColumn := nil;
-
-  if AColumn <> nil then
-  repeat
-    AColumn := AColumn.NextSibling;
-  until (AColumn = nil) or AColumn.Visible;
-
-  Result := AColumn <> nil;
-end;
-
-function TACLTreeListSubClassNavigationController.GetPrevColumn(out AColumn: TACLTreeListColumn): Boolean;
-begin
-  AColumn := FocusedColumn;
-  if AColumn <> nil then
-  repeat
-    AColumn := AColumn.PrevSibling;
-  until (AColumn = nil) or AColumn.Visible;
-  Result := AColumn <> nil;
-end;
-
-function TACLTreeListSubClassNavigationController.GetNextObject(AObject: TObject; AKey: Word): TObject;
-
-  function CanFocus(AData: TObject): Boolean;
-  begin
-    if AData is TACLTreeListGroup then
-      Result := OptionsBehavior.GroupsFocus and not ((AKey = VK_HOME) and TACLTreeListGroup(AData).Expanded)
-    else
-      Result := True;
-  end;
-
-  function GetNextCellIndex(var ACellIndex: Integer; AKey: Word): Boolean;
-  var
-    APrevCellIndex: Integer;
-  begin
-    APrevCellIndex := ACellIndex;
-    case AKey of
-      VK_UP:
-        Dec(ACellIndex);
-      VK_DOWN:
-        Inc(ACellIndex);
-      VK_NEXT:
-        Inc(ACellIndex, ContentCells.LastVisible - ContentCells.FirstVisible);
-      VK_PRIOR:
-        Dec(ACellIndex, ContentCells.LastVisible - ContentCells.FirstVisible);
-      VK_HOME:
-        ACellIndex := 0;
-      VK_END:
-        ACellIndex := ContentCells.Count - 1;
-    end;
-    ACellIndex := MinMax(ACellIndex, 0, ContentCells.Count - 1);
-    Result := ACellIndex <> APrevCellIndex;
-  end;
-
-var
-  ACell: TACLCompoundControlSubClassBaseContentCell;
-  ACellIndex: Integer;
-begin
-  Result := nil;
-  if GetContentCellForObject(AObject, ACell) then
-  begin
-    ACellIndex := ContentCells.IndexOf(ACell);
-    GetNextCellIndex(ACellIndex, AKey);
-
-    while not CanFocus(ContentCells[ACellIndex].Data) do
-    begin
-      case AKey of
-        VK_HOME, VK_DOWN, VK_NEXT:
-          AKey := VK_DOWN;
-        VK_END, VK_UP, VK_PRIOR:
-          AKey := VK_UP;
-      end;
-      if not GetNextCellIndex(ACellIndex, AKey) then
-      begin
-        ACellIndex := -1;
-        Break;
-      end;
-    end;
-
-    if InRange(ACellIndex, 0, ContentCells.Count - 1) then
-      Result := ContentCells[ACellIndex].Data
-    else
-      Result := AObject;
-
-    if not CanFocus(Result) then
-      Result := nil;
-  end;
-end;
-
-procedure TACLTreeListSubClassNavigationController.NavigateTo(AObject: TObject; AShift: TShiftState);
-begin
-  if (AObject <> nil) and (AObject <> SubClass.RootNode) then
-  begin
-    if IsMultiSelectOperation(AShift) then
-      SelectRange(FStartObject, AObject, AShift)
-    else
-      SetFocusedObject(AObject);
-  end;
-end;
-
-procedure TACLTreeListSubClassNavigationController.ToggleCheckboxes;
-var
-  ACheckable: IACLCheckableObject;
-begin
-  SubClass.BeginUpdate;
-  try
-    if Supports(FocusedObject, IACLCheckableObject, ACheckable) then
-    try
-      if ACheckable.CanCheck then
-        ACheckable.Checked := not ACheckable.Checked;
-      SubClass.Selection.CheckState := TCheckBoxState(Ord(ACheckable.Checked));
-    finally
-      ACheckable := nil;
-    end;
-  finally
-    SubClass.EndUpdate;
-  end;
-end;
-
-function TACLTreeListSubClassNavigationController.GetColumns: TACLTreeListColumns;
-begin
-  Result := SubClass.Columns;
-end;
-
-function TACLTreeListSubClassNavigationController.GetContent: TACLTreeListSubClassContentViewInfo;
-begin
-  Result := SubClass.ViewInfo.Content;
-end;
-
-function TACLTreeListSubClassNavigationController.GetContentCells: TACLCompoundControlSubClassContentCellList;
-begin
-  Result := Content.ViewItems;
-end;
-
-function TACLTreeListSubClassNavigationController.GetController: TACLTreeListSubClassController;
-begin
-  Result := SubClass.Controller;
-end;
-
-function TACLTreeListSubClassNavigationController.GetHitTest: TACLTreeListSubClassHitTest;
-begin
-  Result := SubClass.Controller.HitTest;
-end;
-
-function TACLTreeListSubClassNavigationController.GetMultiSelect: Boolean;
-begin
-  Result := OptionsSelection.MultiSelect;
-end;
-
-function TACLTreeListSubClassNavigationController.GetSubClass: TACLTreeListSubClass;
-begin
-  Result := TACLTreeListSubClass(inherited SubClass);
-end;
-
-function TACLTreeListSubClassNavigationController.GetObjectChild(AObject: TObject): TObject;
-var
-  ATreeNodeLink: IACLTreeNodeLink;
-begin
-  if Supports(AObject, IACLTreeNodeLink, ATreeNodeLink) then
-    Result := ATreeNodeLink.GetChild
-  else
-    Result := nil;
-end;
-
-function TACLTreeListSubClassNavigationController.GetObjectParent(AObject: TObject): TObject;
-var
-  ATreeNodeLink: IACLTreeNodeLink;
-begin
-  if Supports(AObject, IACLTreeNodeLink, ATreeNodeLink) then
-    Result := ATreeNodeLink.GetParent
-  else
-    Result := nil;
-end;
-
-function TACLTreeListSubClassNavigationController.GetOptionsBehavior: TACLTreeListOptionsBehavior;
-begin
-  Result := SubClass.OptionsBehavior;
-end;
-
-function TACLTreeListSubClassNavigationController.GetOptionsSelection: TACLTreeListOptionsSelection;
-begin
-  Result := SubClass.OptionsSelection;
-end;
-
-function TACLTreeListSubClassNavigationController.GetVisibleNodes: TACLTreeListNodeList;
-begin
-  Result := Content.AbsoluteVisibleNodes;
-end;
-
-procedure TACLTreeListSubClassNavigationController.SetFocusedColumn(AValue: TACLTreeListColumn);
-begin
-  if (AValue <> nil) and not AValue.Visible then
-    AValue := nil;
-  if FFocusedColumn <> AValue then
-  begin
-    SubClass.BeginUpdate;
-    try
-      FFocusedColumn := AValue;
-      SubClass.Changed([cccnContent, tlcnFocusedColumn]);
-      if FocusedColumn <> nil then
-        SubClass.Changed([tlcnMakeVisible]);
-    finally
-      SubClass.EndUpdate;
-    end;
-  end;
-end;
-
-{ TACLTreeListSubClassController }
-
-constructor TACLTreeListSubClassController.Create(AControl: TACLCompoundControlSubClass);
-begin
-  inherited Create(AControl);
-  FNavigationController := CreateNavigationController;
-end;
-
-destructor TACLTreeListSubClassController.Destroy;
-begin
-  FreeAndNil(FColumnsOrderCustomizationMenu);
-  FreeAndNil(FNavigationController);
-  inherited Destroy;
-end;
-
-function TACLTreeListSubClassController.WantSpecialKey(Key: Word; Shift: TShiftState): Boolean;
-begin
-  Result := (Key = VK_ESCAPE) and (EditingController.IsEditing or NavigationController.IncSearch.Active);
-end;
-
-procedure TACLTreeListSubClassController.ScrollHorizontally(const AScrollCode: TScrollCode);
-begin
-  ContentViewInfo.ScrollHorizontally(AScrollCode);
-end;
-
-procedure TACLTreeListSubClassController.ScrollVertically(const AScrollCode: TScrollCode);
-begin
-  ContentViewInfo.ScrollVertically(AScrollCode);
-end;
-
-function TACLTreeListSubClassController.CreateColumnsOrderCustomizationMenu: TACLPopupMenu;
-begin
-  Result := TACLTreeListColumnCustomizationPopup.Create(SubClass);
-end;
-
-function TACLTreeListSubClassController.CreateDragAndDropController: TACLCompoundControlSubClassDragAndDropController;
-begin
-  Result := TACLTreeListSubClassDragAndDropController.Create(SubClass);
-end;
-
-function TACLTreeListSubClassController.CreateHintController: TACLCompoundControlSubClassHintController;
-begin
-  Result := TACLTreeListSubClassHintController.Create(SubClass);
-end;
-
-function TACLTreeListSubClassController.CreateHitTest: TACLHitTestInfo;
-begin
-  Result := TACLTreeListSubClassHitTest.Create;
-end;
-
-function TACLTreeListSubClassController.CreateNavigationController: TACLTreeListSubClassNavigationController;
-begin
-  Result := TACLTreeListSubClassNavigationController.Create(SubClass);
-end;
-
-procedure TACLTreeListSubClassController.ColumnOrderCustomizationMenuClickHandler(Sender: TObject);
-var
-  AIndex: Integer;
-begin
-  AIndex := (Sender as TComponent).Tag;
-  if Columns.IsValid(AIndex) then
-    Columns[AIndex].Visible := (Sender as TMenuItem).Checked;
-end;
-
-procedure TACLTreeListSubClassController.ColumnOrderCustomizationMenuRebuild;
-var
-  AColumn: TACLTreeListColumn;
-  I: Integer;
-  M: TMenuItem;
-begin
-  if FColumnsOrderCustomizationMenu = nil then
-    FColumnsOrderCustomizationMenu := CreateColumnsOrderCustomizationMenu;
-  FColumnsOrderCustomizationMenu.Items.Clear;
-  FColumnsOrderCustomizationMenu.Style.Assign(SubClass.StyleMenu);
-  FColumnsOrderCustomizationMenu.Style.Collection := SubClass.StyleMenu.Collection;
-  for I := 0 to Columns.Count - 1 do
-  begin
-    AColumn := Columns.ItemsByDrawingIndex[I];
-    M := FColumnsOrderCustomizationMenu.Items.AddItem(AColumn.Caption, AColumn.Index, ColumnOrderCustomizationMenuClickHandler);
-    M.Checked := AColumn.Visible;
-    M.AutoCheck := True;
-  end;
-end;
-
-procedure TACLTreeListSubClassController.ColumnOrderCustomizationMenuShow(const P: TPoint);
-begin
-  ColumnOrderCustomizationMenuRebuild;
-  FColumnsOrderCustomizationMenu.Popup(SubClass.ClientToScreen(P));
-end;
-
-procedure TACLTreeListSubClassController.ProcessGesture(const AEventInfo: TGestureEventInfo; var AHandled: Boolean);
-begin
-  NavigationController.Gesture(AEventInfo, AHandled);
-end;
-
-procedure TACLTreeListSubClassController.ProcessKeyDown(AKey: Word; AShift: TShiftState);
-begin
-  inherited ProcessKeyDown(AKey, AShift);
-  NavigationController.KeyDown(AKey, AShift);
-end;
-
-procedure TACLTreeListSubClassController.ProcessKeyPress(AKey: Char);
-begin
-  inherited ProcessKeyPress(AKey);
-  NavigationController.KeyPress(AKey);
-end;
-
-procedure TACLTreeListSubClassController.ProcessKeyUp(AKey: Word; AShift: TShiftState);
-begin
-  inherited ProcessKeyUp(AKey, AShift);
-  NavigationController.KeyUp(AKey, AShift);
-end;
-
-procedure TACLTreeListSubClassController.ProcessContextPopup(var AHandled: Boolean);
-begin
-  inherited ProcessContextPopup(AHandled);
-  if not AHandled and (SubClass.OptionsCustomizing.ColumnVisibility and (HitTest.HitAtColumn or HitTest.HitAtColumnBar)) then
-  begin
-    ColumnOrderCustomizationMenuShow(HitTest.HitPoint);
-    AHandled := True;
-  end;
-end;
-
-procedure TACLTreeListSubClassController.ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState);
-begin
-  if HitTest.HitAtColumn then
-    ProcessMouseClickAtColumn(AButton, AShift, HitTest.Column)
-  else
-    if HitTest.HitAtGroup then
-      ProcessMouseClickAtGroup(AButton, AShift, HitTest.Group)
-    else
-      inherited ProcessMouseClick(AButton, AShift);
-end;
-
-procedure TACLTreeListSubClassController.ProcessMouseClickAtColumn(
-  AButton: TMouseButton; AShift: TShiftState; AColumn: TACLTreeListColumn);
-begin
-  if AButton <> mbLeft then
-    Exit;
-
-  if HitTest.IsCheckable then
-    SubClass.RootNode.ChildrenCheckState := TCheckBoxState(SubClass.RootNode.ChildrenCheckState <> cbChecked)
-  else
-    if not HitTest.IsResizable and not SubClass.DoColumnClick(AColumn) then
-    begin
-      if SubClass.OptionsBehavior.SortingMode <> tlsmDisabled then
-        SubClass.SortBy(AColumn, not (ssCtrl in AShift));
-    end;
-end;
-
-procedure TACLTreeListSubClassController.ProcessMouseClickAtGroup(
-  AButton: TMouseButton; AShift: TShiftState; AGroup: TACLTreeListGroup);
-begin
-  if AButton <> mbLeft then
-    Exit;
-
-  if HitTest.IsCheckable then
-    ToggleChecked(AGroup)
-  else
-    if HitTest.IsExpandable then
-    begin
-      if ssAlt in AShift then
-        SubClass.Groups.SetExpanded(not AGroup.Expanded)
-      else
-        ToggleExpanded(AGroup);
-    end;
-end;
-
-procedure TACLTreeListSubClassController.ProcessMouseDblClick(AButton: TMouseButton; AShift: TShiftState);
-var
-  AGroup: TACLTreeListGroup;
-begin
-  if AButton <> mbLeft then
-  begin
-    inherited ProcessMouseDblClick(AButton, AShift);
-    Exit;
-  end;
-
-  if HitTest.HitAtColumn then
-  begin
-    if HitTest.IsResizable then
-      HitTest.Column.ApplyBestFit
-    else
-      ProcessMouseClickAtColumn(AButton, AShift, HitTest.Column);
-  end
-  else
-
-  if HitTest.HitAtGroup then
-  begin
-    AGroup := HitTest.Group;
-    if HitTest.HasAction then
-      ProcessMouseClickAtGroup(AButton, AShift, AGroup)
-    else
-    begin
-      ToggleGroupExpanded(AGroup, AShift);
-      if not SubClass.OptionsBehavior.GroupsFocusOnClick and AGroup.Expanded then
-        NavigationController.SetFocusedObject(AGroup.Links.First);
-    end;
-  end
-  else
-
-  if HitTest.HitAtNode and not HitTest.HasAction then
-  begin
-    if SubClass.OptionsBehavior.EditingStartingMode = esmOnDoubleClick then
-      EditingController.StartEditing(HitTest.Node, HitTest.Column);
-    if not EditingController.IsEditing then
-    begin
-      if not SubClass.DoNodeDblClicked(HitTest.Node) then
-        ToggleExpanded(HitTest.HitObject);
-    end;
-  end
-  else
-    inherited ProcessMouseDblClick(AButton, AShift);
-end;
-
-procedure TACLTreeListSubClassController.ProcessMouseDown(AButton: TMouseButton; AShift: TShiftState);
-begin
-  inherited ProcessMouseDown(AButton, AShift);
-  NavigationController.MouseDown(AButton, AShift);
-end;
-
-procedure TACLTreeListSubClassController.ProcessMouseUp(AButton: TMouseButton; AShift: TShiftState);
-begin
-  NavigationController.MouseUp(AButton, AShift);
-  inherited ProcessMouseUp(AButton, AShift);
-end;
-
-procedure TACLTreeListSubClassController.ProcessMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState);
-var
-  ACount: Integer;
-begin
-  ACount := TACLMouseWheel.GetScrollLines(AShift);
-  if ssShift in AShift then
-  begin
-    while ACount > 0 do
-    begin
-      ContentViewInfo.ScrollHorizontally(TACLMouseWheel.DirectionToScrollCode[ADirection]);
-      Dec(ACount);
-    end
-  end
-  else
-  begin
-    if SubClass.OptionsBehavior.MouseWheelScrollLines > 0 then
-      ACount := SubClass.OptionsBehavior.MouseWheelScrollLines;
-    ContentViewInfo.ScrollByLines(ACount, ADirection);
-  end;
-end;
-
-procedure TACLTreeListSubClassController.ToggleGroupExpanded(AGroup: TACLTreeListGroup; AShift: TShiftState);
-var
-  AState: Boolean;
-  I: Integer;
-begin
-  if ssAlt in AShift then
-  begin
-    SubClass.BeginLongOperation;
-    SubClass.BeginUpdate;
-    try
-      AState := AGroup.Expanded;
-      for I := 0 to SubClass.Groups.Count - 1 do
-        SubClass.Groups[I].Expanded := AState;
-    finally
-      SubClass.EndUpdate;
-      SubClass.EndLongOperation;
-    end;
-  end
-  else
-    AGroup.Expanded := not AGroup.Expanded;
-end;
-
-function TACLTreeListSubClassController.GetColumns: TACLTreeListColumns;
-begin
-  Result := SubClass.Columns;
-end;
-
-function TACLTreeListSubClassController.GetContentViewInfo: TACLTreeListSubClassContentViewInfo;
-begin
-  Result := SubClass.ViewInfo.Content;
-end;
-
-function TACLTreeListSubClassController.GetDragAndDropController: TACLTreeListSubClassDragAndDropController;
-begin
-  Result := TACLTreeListSubClassDragAndDropController(inherited DragAndDropController);
-end;
-
-function TACLTreeListSubClassController.GetEditingController: TACLTreeListSubClassEditingController;
-begin
-  Result := SubClass.EditingController;
-end;
-
-function TACLTreeListSubClassController.GetHitTest: TACLTreeListSubClassHitTest;
-begin
-  Result := TACLTreeListSubClassHitTest(inherited HitTest);
-end;
-
-function TACLTreeListSubClassController.GetSubClass: TACLTreeListSubClass;
-begin
-  Result := TACLTreeListSubClass(inherited SubClass);
 end;
 
 { TACLTreeListSubClassSortByList }
@@ -4803,6 +3694,9 @@ begin
   FOptionsSelection := CreateOptionsSelection;
   FOptionsView := CreateOptionsView;
   FGroups := CreateGroups;
+  FIncSearch := TACLIncrementalSearch.Create;
+  FIncSearch.OnChange := IncSearchChanged;
+  FIncSearch.OnLookup := IncSearchFindCore;
   FSelection := TACLTreeListNodeList.Create;
   FStyleInplaceEdit := TACLStyleEdit.Create(Self);
   FStyleInplaceEditButton := TACLStyleEditButton.Create(Self);
@@ -4826,6 +3720,8 @@ begin
   FreeAndNil(FOptionsCustomizing);
   FreeAndNil(FOptionsSelection);
   FreeAndNil(FEditingController);
+  FreeAndNil(FColumnsOrderCustomizationMenu);
+  FreeAndNil(FIncSearch);
   FreeAndNil(FSelection);
   FreeAndNil(FPainter);
   inherited Destroy;
@@ -4870,6 +3766,11 @@ begin
   finally
     EndUpdate;
   end;
+end;
+
+function TACLTreeListSubClass.WantSpecialKey(Key: Word; Shift: TShiftState): Boolean;
+begin
+  Result := (Key = VK_ESCAPE) and (EditingController.IsEditing or IncSearch.Active);
 end;
 
 procedure TACLTreeListSubClass.SetTargetDPI(AValue: Integer);
@@ -4929,6 +3830,22 @@ begin
   EditingController.Cancel;
 end;
 
+procedure TACLTreeListSubClass.ExpandTo(AObject: TObject);
+var
+  AExpandable: IACLExpandableObject;
+begin
+  BeginUpdate;
+  try
+    repeat
+      AObject := GetObjectParent(AObject);
+      if Supports(AObject, IACLExpandableObject, AExpandable) then
+        AExpandable.Expanded := True;
+    until AObject = nil;
+  finally
+    EndUpdate;
+  end;
+end;
+
 procedure TACLTreeListSubClass.MakeTop(AObject: TObject);
 begin
   ScrollTo(AObject, TACLScrollToMode.MakeTop);
@@ -4941,17 +3858,32 @@ end;
 
 procedure TACLTreeListSubClass.ScrollBy(ADeltaX, ADeltaY: Integer);
 begin
-  NavigationController.ScrollBy(ADeltaX, ADeltaY);
+  ContentViewInfo.ViewportX := ContentViewInfo.ViewportX + ADeltaX;
+  ContentViewInfo.ViewportY := ContentViewInfo.ViewportY + ADeltaY;
 end;
 
 procedure TACLTreeListSubClass.ScrollByLines(ALines: Integer; ADirection: TACLMouseWheelDirection);
 begin
-  NavigationController.ScrollByLines(ALines, ADirection);
+  ContentViewInfo.ScrollByLines(ALines, ADirection);
 end;
 
 procedure TACLTreeListSubClass.ScrollTo(AObject: TObject; AMode: TACLScrollToMode; AColumn: TACLTreeListColumn = nil);
+var
+  ADelta: TPoint;
 begin
-  NavigationController.ScrollTo(AObject, AMode, AColumn);
+  ExpandTo(AObject);
+  if ContentViewInfo.CalculateScrollDelta(AObject, AMode, ADelta, AColumn) then
+    ScrollBy(ADelta.X, ADelta.Y);
+end;
+
+procedure TACLTreeListSubClass.ScrollHorizontally(const AScrollCode: TScrollCode);
+begin
+  ContentViewInfo.ScrollHorizontally(AScrollCode);
+end;
+
+procedure TACLTreeListSubClass.ScrollVertically(const AScrollCode: TScrollCode);
+begin
+  ContentViewInfo.ScrollVertically(AScrollCode);
 end;
 
 procedure TACLTreeListSubClass.GroupBy(AColumn: TACLTreeListColumn; AResetPrevSortingParams: Boolean = False);
@@ -5115,18 +4047,145 @@ begin
 end;
 
 procedure TACLTreeListSubClass.SelectAll;
+var
+  AObjectToFocus: TObject;
 begin
-  NavigationController.SelectAll;
+  if AbsoluteVisibleNodes.Count > 0 then
+  begin
+    AObjectToFocus := FocusedObject;
+    if AObjectToFocus = nil then
+      AObjectToFocus := AbsoluteVisibleNodes.First;
+    SelectRange(AbsoluteVisibleNodes.First, AbsoluteVisibleNodes.Last, AObjectToFocus, True, False, smSelect);
+  end;
+end;
+
+procedure TACLTreeListSubClass.SelectInvert;
+begin
+  if (AbsoluteVisibleNodes.Count > 0) and OptionsSelection.MultiSelect then
+  begin
+    BeginUpdate;
+    try
+      SelectRange(AbsoluteVisibleNodes.First, AbsoluteVisibleNodes.Last, nil, False, False, smInvert);
+      if Selection.Count > 0 then
+        SetFocusedObject(Selection.First, False);
+    finally
+      EndUpdate;
+    end;
+  end;
 end;
 
 procedure TACLTreeListSubClass.SelectNone;
 begin
   BeginUpdate;
   try
-    NavigationController.SelectNone;
+    while Selection.Count > 0 do
+      Selection.Last.Selected := False;
     FocusedNode := nil;
   finally
     EndUpdate;
+  end;
+end;
+
+procedure TACLTreeListSubClass.SelectObject(AObject: TObject; AMode: TACLSelectionMode; AIsMedium: Boolean);
+var
+  ASelectable: IACLSelectableObject;
+begin
+  if (AObject is TACLTreeListGroup) and AIsMedium then
+    Exit;
+  if Supports(AObject, IACLSelectableObject, ASelectable) then
+    case AMode of
+      smSelect:
+        ASelectable.Selected := True;
+      smUnselect:
+        ASelectable.Selected := False;
+      smInvert:
+        ASelectable.Selected := not ASelectable.Selected;
+    end;
+end;
+
+procedure TACLTreeListSubClass.SelectOnMouseDown(AButton: TMouseButton; AShift: TShiftState);
+
+  procedure SetFocusCore(ASelected: Boolean; ADropSelection: Boolean = True; AMakeVisible: Boolean = True);
+  var
+    AObjectToFocus: TObject;
+  begin
+    BeginUpdate;
+    try
+      if HitTest.HitAtGroup then
+      begin
+        if OptionsBehavior.GroupsFocusOnClick or not HitTest.Group.Expanded then
+          AObjectToFocus := HitTest.Group
+        else
+          AObjectToFocus := HitTest.Group.Links.First;
+      end
+      else
+        AObjectToFocus := HitTest.HitObject;
+
+      SetFocusedObject(AObjectToFocus, ADropSelection, AMakeVisible);
+      SelectObject(HitTest.HitObject, TACLSelectionMode(Ord(ASelected)), False);
+    finally
+      EndUpdate;
+    end;
+  end;
+
+begin
+  FWasSelected := IsSelected(HitTest.HitObject);
+  case AButton of
+    mbRight, mbMiddle:
+      if not FWasSelected then
+        SetFocusCore(True);
+
+    mbLeft:
+      if OptionsSelection.MultiSelect and (IsMultiSelectOperation(AShift) or FWasSelected) then
+      begin
+        if ssShift in AShift then
+          SelectRange(FStartObject, HitTest.HitObject, AShift)
+        else
+          if ssCtrl in AShift then
+            SetFocusCore(not FWasSelected, False, False)
+          else
+            SetFocusCore(True, False, False);
+      end
+      else
+        SetFocusCore(True);
+  end;
+end;
+
+procedure TACLTreeListSubClass.SelectRange(AFirstObject, ALastObject: TObject; AShift: TShiftState);
+begin
+  SelectRange(AFirstObject, ALastObject, True, [ssCtrl] * AShift = [],
+    TACLSelectionMode(([ssCtrl] * AShift = []) or IsSelected(AFirstObject)));
+end;
+
+procedure TACLTreeListSubClass.SelectRange(AFirstObject, ALastObject: TObject;
+  AMakeVisible, ADropSelection: Boolean; AMode: TACLSelectionMode);
+begin
+  SelectRange(AFirstObject, ALastObject, ALastObject, AMakeVisible, ADropSelection, AMode);
+end;
+
+procedure TACLTreeListSubClass.SelectRange(AFirstObject, ALastObject, AObjectToFocus: TObject;
+  AMakeVisible, ADropSelection: Boolean; AMode: TACLSelectionMode);
+var
+  AFirstCell: TACLCompoundControlSubClassBaseContentCell;
+  AIndex1, AIndex2: Integer;
+  ALastCell: TACLCompoundControlSubClassBaseContentCell;
+  I: Integer;
+begin
+  if ContentViewInfo.ViewItems.Find(AFirstObject, AFirstCell) and ContentViewInfo.ViewItems.Find(ALastObject, ALastCell) then
+  begin
+    AIndex1 := ContentViewInfo.ViewItems.IndexOf(AFirstCell);
+    AIndex2 := ContentViewInfo.ViewItems.IndexOf(ALastCell);
+
+    BeginUpdate;
+    try
+      if ADropSelection then
+        SelectNone;
+      for I := Min(AIndex1, AIndex2) to Max(AIndex1, AIndex2) do
+        SelectObject(ContentViewInfo.ViewItems[I].Data, AMode, (I <> AIndex1) and (I <> AIndex2));
+      SetFocusedObject(AObjectToFocus, False, AMakeVisible);
+    finally
+      EndUpdate;
+    end;
   end;
 end;
 
@@ -5137,12 +4196,12 @@ begin
   begin
     if ANode.Selected then
     begin
-      if Focused and (ANode = NavigationController.FocusedObject) and (not OptionsSelection.FocusCell or (FocusedColumn = nil)) then
+      if Focused and (ANode = FocusedObject) and (not OptionsSelection.FocusCell or (FocusedColumn = nil)) then
         Result := Style.RowColorFocused.Value
       else
         Result := acGetActualColor(Style.RowColorsSelected[Focused], Result);
     end;
-    if OptionsBehavior.HotTrack and (ANode = Controller.HoveredObject) then
+    if OptionsBehavior.HotTrack and (ANode = HoveredObject) then
     begin
       if Style.RowColorHovered.Value.IsValid then
         Result := Style.RowColorHovered.Value;
@@ -5163,14 +4222,14 @@ begin
   begin
     if ANode.Selected and Focused then
       Result := acGetActualColor(Style.RowColorSelectedText.AsColor, Result);
-    if OptionsBehavior.HotTrack and (ANode = Controller.HoveredObject) then
+    if OptionsBehavior.HotTrack and (ANode = HoveredObject) then
     begin
       if Style.RowColorHoveredText.Value.IsValid then
         Result := Style.RowColorHoveredText.AsColor;
     end;
     if ANode.Selected then
     begin
-      if ANode = NavigationController.FocusedObject then
+      if ANode = FocusedObject then
         Result := acGetActualColor(Style.RowColorFocusedText.AsColor, Result);
       if not Focused then
         Result := acGetActualColor(Style.RowColorSelectedTextInactive.AsColor, Result);
@@ -5178,14 +4237,29 @@ begin
   end;
 end;
 
+function TACLTreeListSubClass.CreateColumnsOrderCustomizationMenu: TACLPopupMenu;
+begin
+  Result := TACLTreeListColumnCustomizationPopup.Create(Self);
+end;
+
+function TACLTreeListSubClass.CreateDragAndDropController: TACLCompoundControlSubClassDragAndDropController;
+begin
+  Result := TACLTreeListSubClassDragAndDropController.Create(Self);
+end;
+
+function TACLTreeListSubClass.CreateHintController: TACLCompoundControlSubClassHintController;
+begin
+  Result := TACLTreeListSubClassHintController.Create(Self);
+end;
+
+function TACLTreeListSubClass.CreateHitTest: TACLHitTestInfo;
+begin
+  Result := TACLTreeListSubClassHitTest.Create;
+end;
+
 function TACLTreeListSubClass.CreateColumns: TACLTreeListColumns;
 begin
   Result := TACLTreeListColumns.Create(Self);
-end;
-
-function TACLTreeListSubClass.CreateController: TACLCompoundControlSubClassController;
-begin
-  Result := TACLTreeListSubClassController.Create(Self);
 end;
 
 function TACLTreeListSubClass.CreateEditingController: TACLTreeListSubClassEditingController;
@@ -5481,11 +4555,110 @@ begin
     OnEditInitialize(Self, AParams, AEdit);
 end;
 
+function TACLTreeListSubClass.CheckFocusedObject: BOolean;
+begin
+  Result := FocusedObject <> nil;
+  if not Result and (ContentViewInfo.ViewItems.Count > 0) then
+    SetFocusedObject(ContentViewInfo.ViewItems.First.Data);
+end;
+
 procedure TACLTreeListSubClass.FocusChanged;
 begin
   inherited;
   if not Focused then
     EditingController.Apply;
+end;
+
+procedure TACLTreeListSubClass.SetFocusedObject(
+  AObject: TObject; ADropSelection: Boolean; AMakeVisible: Boolean = True);
+var
+  APrevFocusedColumn: TObject;
+  APrevFocusedObject: TObject;
+begin
+  if not EnabledContent then
+    AObject := nil;
+
+  if AObject = RootNode then
+    Exit;
+
+  if not FFocusing then
+  begin
+    FFocusing := True;
+    BeginUpdate;
+    try
+      APrevFocusedObject := FFocusedObject;
+      APrevFocusedColumn := FFocusedColumn;
+
+      if IncSearch.Mode <> ismFilter then
+        IncSearch.Cancel;
+      if ADropSelection then
+        SelectNone;
+      ExpandTo(AObject);
+      SelectObject(AObject, smSelect, False);
+      FFocusedColumn := nil;
+      FFocusedObject := AObject; // after SelectObject
+
+      Changed([cccnContent]);
+      if APrevFocusedObject <> FFocusedObject then
+        Changed([tlcnFocusedNode]);
+      if APrevFocusedColumn <> FFocusedColumn then
+        Changed([tlcnFocusedColumn]);
+      if AMakeVisible and (FFocusedObject <> nil) then
+        Changed([tlcnMakeVisible]);
+    finally
+      EndUpdate;
+      FFocusing := False;
+    end;
+  end;
+end;
+
+procedure TACLTreeListSubClass.ValidateFocusedObject;
+var
+  ACell: TACLCompoundControlSubClassBaseContentCell;
+  ANewFocusedObject: TObject;
+begin
+  ANewFocusedObject := FocusedObject;
+  while (ANewFocusedObject <> nil) and not ContentViewInfo.ViewItems.Find(ANewFocusedObject, ACell) do
+    ANewFocusedObject := GetObjectParent(ANewFocusedObject);
+  if ANewFocusedObject <> FocusedObject then
+    SetFocusedObject(ANewFocusedObject, False, False);
+  if not (Columns.IsValid(FocusedColumn) and FocusedColumn.Visible) then
+    FocusedColumn := nil;
+end;
+
+procedure TACLTreeListSubClass.ColumnOrderCustomizationMenuClickHandler(Sender: TObject);
+var
+  AIndex: Integer;
+begin
+  AIndex := (Sender as TComponent).Tag;
+  if Columns.IsValid(AIndex) then
+    Columns[AIndex].Visible := (Sender as TMenuItem).Checked;
+end;
+
+procedure TACLTreeListSubClass.ColumnOrderCustomizationMenuRebuild;
+var
+  AColumn: TACLTreeListColumn;
+  I: Integer;
+  M: TMenuItem;
+begin
+  if FColumnsOrderCustomizationMenu = nil then
+    FColumnsOrderCustomizationMenu := CreateColumnsOrderCustomizationMenu;
+  FColumnsOrderCustomizationMenu.Items.Clear;
+  FColumnsOrderCustomizationMenu.Style.Assign(StyleMenu);
+  FColumnsOrderCustomizationMenu.Style.Collection := StyleMenu.Collection;
+  for I := 0 to Columns.Count - 1 do
+  begin
+    AColumn := Columns.ItemsByDrawingIndex[I];
+    M := FColumnsOrderCustomizationMenu.Items.AddItem(AColumn.Caption, AColumn.Index, ColumnOrderCustomizationMenuClickHandler);
+    M.Checked := AColumn.Visible;
+    M.AutoCheck := True;
+  end;
+end;
+
+procedure TACLTreeListSubClass.ColumnOrderCustomizationMenuShow(const P: TPoint);
+begin
+  ColumnOrderCustomizationMenuRebuild;
+  FColumnsOrderCustomizationMenu.Popup(ClientToScreen(P));
 end;
 
 procedure TACLTreeListSubClass.ProcessChanges(AChanges: TIntegerSet);
@@ -5521,6 +4694,18 @@ begin
     Include(AChanges, cccnStruct);
   end;
 
+  if tlcnSettingsFocus in AChanges then
+    SetFocusedObject(nil);
+  if tlcnSettingsIncSearch in AChanges then
+  begin
+    IncSearch.Cancel;
+    IncSearch.Mode := OptionsBehavior.IncSearchMode;
+  end;
+  if cccnStruct in AChanges then
+    ValidateFocusedObject;
+  if tlcnMakeVisible in AChanges then
+    ScrollTo(FocusedObject, TACLScrollToMode.MakeVisible, FocusedColumn);
+
   inherited ProcessChanges(AChanges);
 
   if [cccnStruct, cccnLayout, tlcnData] * AChanges <> [] then
@@ -5529,7 +4714,6 @@ begin
       Columns.ApplyBestFit(True);
   end;
 
-  NavigationController.ProcessChanges(AChanges);
   if tlcnSelection in AChanges then
     DoSelectionChanged;
   if tlcnFocusedNode in AChanges then
@@ -5540,6 +4724,528 @@ begin
   begin
     Sorter.SortBy.Clear;
     Resort;
+  end;
+end;
+
+function TACLTreeListSubClass.CheckIncSearchColumn: Boolean;
+var
+  AIndex: Integer;
+begin
+  AIndex := OptionsBehavior.IncSearchColumnIndex;
+  if InRange(AIndex, 0, ContentViewInfo.ColumnBarViewInfo.ChildCount - 1) then
+    FIncSearchColumnIndex := ContentViewInfo.ColumnBarViewInfo.Children[AIndex].AbsoluteIndex
+  else
+    FIncSearchColumnIndex := IfThen(AIndex < 0, -1);
+
+  Result := IncSearchColumnIndex >= 0;
+end;
+
+function TACLTreeListSubClass.GetHighlightBounds(const AText: UnicodeString;
+  AAbsoluteColumnIndex: Integer; out AHighlightStart, AHighlightFinish: Integer): Boolean;
+begin
+  Result := (AAbsoluteColumnIndex = IncSearchColumnIndex) and
+    IncSearch.GetHighlightBounds(AText, AHighlightStart, AHighlightFinish);
+end;
+
+procedure TACLTreeListSubClass.IncSearchChanged(Sender: TObject);
+begin
+  if OptionsBehavior.IncSearchMode = ismFilter then
+  begin
+    Changed([cccnStruct]);
+    if AbsoluteVisibleNodes.Count > 0 then
+      SetFocusedObject(AbsoluteVisibleNodes.First);
+  end;
+  Changed([cccnContent]);
+end;
+
+function TACLTreeListSubClass.IncSearchContains(ANode: TACLTreeListNode): Boolean;
+var
+  I: Integer;
+begin
+  Result := IncSearch.Contains(ANode.Values[IncSearchColumnIndex]);
+
+  if not Result and ANode.HasChildren then
+  begin
+    for I := 0 to ANode.ChildrenCount - 1 do
+      if IncSearchContains(ANode.Children[I]) then
+        Exit(True);
+  end;
+end;
+
+procedure TACLTreeListSubClass.ProcessGesture(const AEventInfo: TGestureEventInfo; var AHandled: Boolean);
+begin
+  if AEventInfo.GestureID = igiPan then
+  begin
+    if gfBegin in AEventInfo.Flags then
+      FTapLocation := AEventInfo.Location;
+    ScrollBy(FTapLocation.X - AEventInfo.Location.X, FTapLocation.Y - AEventInfo.Location.Y);
+    FTapLocation := AEventInfo.Location;
+    AHandled := True;
+  end;
+end;
+
+procedure TACLTreeListSubClass.IncSearchFindCore(Sender: TObject; var AFound: Boolean);
+
+  function FindNode(AStartIndex, AFinishIndex: Integer): TACLTreeListNode; overload;
+  var
+    I: Integer;
+  begin
+    for I := AStartIndex to AFinishIndex do
+    begin
+      if IncSearch.Contains(AbsoluteVisibleNodes[I].Values[IncSearchColumnIndex]) then
+        Exit(AbsoluteVisibleNodes[I]);
+    end;
+    Result := nil;
+  end;
+
+  function FindNode(out ANode: TACLTreeListNode): Boolean; overload;
+  var
+    AIndex: Integer;
+  begin
+    AIndex := Max(0, AbsoluteVisibleNodes.IndexOf(FocusedObject));
+    ANode := FindNode(AIndex, AbsoluteVisibleNodes.Count - 1);
+    if ANode = nil then
+      ANode := FindNode(0, AIndex - 1);
+    Result := ANode <> nil;
+  end;
+
+var
+  ANode: TACLTreeListNode;
+begin
+  AFound := CheckIncSearchColumn and FindNode(ANode);
+  if AFound then
+    SetFocusedObject(ANode);
+end;
+
+function TACLTreeListSubClass.GetObjectChild(AObject: TObject): TObject;
+var
+  ATreeNodeLink: IACLTreeNodeLink;
+begin
+  if Supports(AObject, IACLTreeNodeLink, ATreeNodeLink) then
+    Result := ATreeNodeLink.GetChild
+  else
+    Result := nil;
+end;
+
+function TACLTreeListSubClass.GetObjectParent(AObject: TObject): TObject;
+var
+  ATreeNodeLink: IACLTreeNodeLink;
+begin
+  if Supports(AObject, IACLTreeNodeLink, ATreeNodeLink) then
+    Result := ATreeNodeLink.GetParent
+  else
+    Result := nil;
+end;
+
+function TACLTreeListSubClass.GetNextColumn(out AColumn: TACLTreeListColumn): Boolean;
+begin
+  if FocusedColumn <> nil then
+    AColumn := FocusedColumn
+  else if Columns.Count > 0 then
+    AColumn := Columns.First
+  else
+    AColumn := nil;
+
+  if AColumn <> nil then
+  repeat
+    AColumn := AColumn.NextSibling;
+  until (AColumn = nil) or AColumn.Visible;
+
+  Result := AColumn <> nil;
+end;
+
+function TACLTreeListSubClass.GetNextObject(AObject: TObject; AKey: Word): TObject;
+
+  function CanFocus(AData: TObject): Boolean;
+  begin
+    if AData is TACLTreeListGroup then
+      Result := OptionsBehavior.GroupsFocus and not ((AKey = VK_HOME) and TACLTreeListGroup(AData).Expanded)
+    else
+      Result := True;
+  end;
+
+  function GetNextCellIndex(var ACellIndex: Integer; AKey: Word): Boolean;
+  var
+    APrevCellIndex: Integer;
+  begin
+    APrevCellIndex := ACellIndex;
+    case AKey of
+      VK_UP:
+        Dec(ACellIndex);
+      VK_DOWN:
+        Inc(ACellIndex);
+      VK_NEXT:
+        Inc(ACellIndex, ContentViewInfo.ViewItems.LastVisible - ContentViewInfo.ViewItems.FirstVisible);
+      VK_PRIOR:
+        Dec(ACellIndex, ContentViewInfo.ViewItems.LastVisible - ContentViewInfo.ViewItems.FirstVisible);
+      VK_HOME:
+        ACellIndex := 0;
+      VK_END:
+        ACellIndex := ContentViewInfo.ViewItems.Count - 1;
+    end;
+    ACellIndex := MinMax(ACellIndex, 0, ContentViewInfo.ViewItems.Count - 1);
+    Result := ACellIndex <> APrevCellIndex;
+  end;
+
+var
+  ACell: TACLCompoundControlSubClassBaseContentCell;
+  ACellIndex: Integer;
+begin
+  Result := nil;
+  if ContentViewInfo.ViewItems.Find(AObject, ACell) then
+  begin
+    ACellIndex := ContentViewInfo.ViewItems.IndexOf(ACell);
+    GetNextCellIndex(ACellIndex, AKey);
+
+    while not CanFocus(ContentViewInfo.ViewItems[ACellIndex].Data) do
+    begin
+      case AKey of
+        VK_HOME, VK_DOWN, VK_NEXT:
+          AKey := VK_DOWN;
+        VK_END, VK_UP, VK_PRIOR:
+          AKey := VK_UP;
+      end;
+      if not GetNextCellIndex(ACellIndex, AKey) then
+      begin
+        ACellIndex := -1;
+        Break;
+      end;
+    end;
+
+    if InRange(ACellIndex, 0, ContentViewInfo.ViewItems.Count - 1) then
+      Result := ContentViewInfo.ViewItems[ACellIndex].Data
+    else
+      Result := AObject;
+
+    if not CanFocus(Result) then
+      Result := nil;
+  end;
+end;
+
+function TACLTreeListSubClass.GetPrevColumn(out AColumn: TACLTreeListColumn): Boolean;
+begin
+  AColumn := FocusedColumn;
+  if AColumn <> nil then
+  repeat
+    AColumn := AColumn.PrevSibling;
+  until (AColumn = nil) or AColumn.Visible;
+  Result := AColumn <> nil;
+end;
+
+function TACLTreeListSubClass.IsMultiSelectOperation(AShift: TShiftState): Boolean;
+begin
+  Result := OptionsSelection.MultiSelect and ([ssShift, ssCtrl] * AShift <> []);
+end;
+
+function TACLTreeListSubClass.IsSelected(AObject: TObject): Boolean;
+var
+  ASelectable: IACLSelectableObject;
+begin
+  Result := Supports(AObject, IACLSelectableObject, ASelectable) and ASelectable.Selected;
+end;
+
+procedure TACLTreeListSubClass.ToggleCheckboxes;
+var
+  ACheckable: IACLCheckableObject;
+begin
+  BeginUpdate;
+  try
+    if Supports(FocusedObject, IACLCheckableObject, ACheckable) then
+    try
+      if ACheckable.CanCheck then
+        ACheckable.Checked := not ACheckable.Checked;
+      Selection.CheckState := TCheckBoxState(Ord(ACheckable.Checked));
+    finally
+      ACheckable := nil;
+    end;
+  finally
+    EndUpdate;
+  end;
+end;
+
+procedure TACLTreeListSubClass.ToggleGroupExpanded(AGroup: TACLTreeListGroup; AShift: TShiftState);
+var
+  AState: Boolean;
+begin
+  if ssAlt in AShift then
+  begin
+    BeginLongOperation;
+    BeginUpdate;
+    try
+      AState := AGroup.Expanded;
+      for var I := 0 to Groups.Count - 1 do
+        Groups[I].Expanded := AState;
+    finally
+      EndUpdate;
+      EndLongOperation;
+    end;
+  end
+  else
+    AGroup.Expanded := not AGroup.Expanded;
+end;
+
+procedure TACLTreeListSubClass.NavigateTo(AObject: TObject; AShift: TShiftState);
+begin
+  if (AObject <> nil) and (AObject <> RootNode) then
+  begin
+    if IsMultiSelectOperation(AShift) then
+      SelectRange(FStartObject, AObject, AShift)
+    else
+      SetFocusedObject(AObject);
+  end;
+end;
+
+procedure TACLTreeListSubClass.ProcessKeyDown(AKey: Word; AShift: TShiftState);
+var
+  AColumn: TACLTreeListColumn;
+  AExpandable: IACLExpandableObject;
+begin
+  case AKey of
+    65: // A
+      if [ssAlt, ssShift, ssCtrl] * AShift = [ssCtrl] then
+        SelectAll;
+
+    106: // Num *
+      SelectInvert;
+
+    107: // Num +
+      if ssCtrl in AShift then
+        Columns.ApplyBestFit;
+
+    VK_SHIFT:
+      if FStartObject = nil then
+        FStartObject := FocusedObject;
+
+    VK_SPACE:
+      if not IncSearch.ProcessKey(AKey, AShift) then
+        ToggleCheckboxes;
+
+    VK_DELETE:
+      if OptionsBehavior.Deleting then
+        DeleteSelected;
+
+    VK_RETURN:
+      if OptionsBehavior.Editing then
+      begin
+        if FocusedObject is TACLTreeListNode then
+          StartEditing(TACLTreeListNode(FocusedObject), FocusedColumn);
+      end;
+
+    VK_UP, VK_DOWN, VK_NEXT, VK_PRIOR, VK_HOME, VK_END:
+      if CheckFocusedObject then
+      begin
+        BeginUpdate;
+        try
+          AColumn := FocusedColumn;
+          NavigateTo(GetNextObject(FocusedObject, AKey), AShift);
+          FocusedColumn := AColumn;
+        finally
+          EndUpdate;
+        end;
+        UpdateHotTrack;
+      end;
+
+    VK_LEFT:
+      if CheckFocusedObject then
+      begin
+        if OptionsSelection.FocusCell and GetPrevColumn(AColumn) then
+          FocusedColumn := AColumn
+        else
+          if Supports(FocusedObject, IACLExpandableObject, AExpandable) and AExpandable.CanToggle and AExpandable.Expanded then
+            AExpandable.Expanded := False
+          else
+            NavigateTo(GetObjectParent(FocusedObject), AShift);
+      end;
+
+    VK_RIGHT:
+      if CheckFocusedObject then
+      begin
+        if OptionsSelection.FocusCell and GetNextColumn(AColumn) then
+          FocusedColumn := AColumn
+        else
+          if Supports(FocusedObject, IACLExpandableObject, AExpandable) and AExpandable.CanToggle and not AExpandable.Expanded then
+            AExpandable.Expanded := True
+          else
+            NavigateTo(GetObjectChild(FocusedObject), AShift);
+      end;
+  else
+    IncSearch.ProcessKey(AKey, AShift);
+  end;
+  inherited ProcessKeyDown(AKey, AShift);
+end;
+
+procedure TACLTreeListSubClass.ProcessKeyPress(AKey: Char);
+begin
+  if OptionsBehavior.IncSearchColumnIndex >= 0 then
+    IncSearch.ProcessKey(AKey);
+  inherited ProcessKeyPress(AKey);
+end;
+
+procedure TACLTreeListSubClass.ProcessKeyUp(AKey: Word; AShift: TShiftState);
+begin
+  case AKey of
+    VK_SHIFT:
+      FStartObject := nil;
+  end;
+  inherited ProcessKeyUp(AKey, AShift);
+end;
+
+procedure TACLTreeListSubClass.ProcessContextPopup(var AHandled: Boolean);
+begin
+  inherited ProcessContextPopup(AHandled);
+  if not AHandled and (OptionsCustomizing.ColumnVisibility and (HitTest.HitAtColumn or HitTest.HitAtColumnBar)) then
+  begin
+    ColumnOrderCustomizationMenuShow(HitTest.HitPoint);
+    AHandled := True;
+  end;
+end;
+
+procedure TACLTreeListSubClass.ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState);
+begin
+  if HitTest.HitAtColumn then
+    ProcessMouseClickAtColumn(AButton, AShift, HitTest.Column)
+  else
+    if HitTest.HitAtGroup then
+      ProcessMouseClickAtGroup(AButton, AShift, HitTest.Group)
+    else
+      inherited ProcessMouseClick(AButton, AShift);
+end;
+
+procedure TACLTreeListSubClass.ProcessMouseClickAtColumn(
+  AButton: TMouseButton; AShift: TShiftState; AColumn: TACLTreeListColumn);
+begin
+  if AButton <> mbLeft then
+    Exit;
+
+  if HitTest.IsCheckable then
+    RootNode.ChildrenCheckState := TCheckBoxState(RootNode.ChildrenCheckState <> cbChecked)
+  else
+    if not HitTest.IsResizable and not DoColumnClick(AColumn) then
+    begin
+      if OptionsBehavior.SortingMode <> tlsmDisabled then
+        SortBy(AColumn, not (ssCtrl in AShift));
+    end;
+end;
+
+procedure TACLTreeListSubClass.ProcessMouseClickAtGroup(
+  AButton: TMouseButton; AShift: TShiftState; AGroup: TACLTreeListGroup);
+begin
+  if AButton <> mbLeft then
+    Exit;
+
+  if HitTest.IsCheckable then
+    ToggleChecked(AGroup)
+  else
+    if HitTest.IsExpandable then
+    begin
+      if ssAlt in AShift then
+        Groups.SetExpanded(not AGroup.Expanded)
+      else
+        ToggleExpanded(AGroup);
+    end;
+end;
+
+procedure TACLTreeListSubClass.ProcessMouseDblClick(AButton: TMouseButton; AShift: TShiftState);
+var
+  AGroup: TACLTreeListGroup;
+begin
+  if AButton <> mbLeft then
+  begin
+    inherited ProcessMouseDblClick(AButton, AShift);
+    Exit;
+  end;
+
+  if HitTest.HitAtColumn then
+  begin
+    if HitTest.IsResizable then
+      HitTest.Column.ApplyBestFit
+    else
+      ProcessMouseClickAtColumn(AButton, AShift, HitTest.Column);
+  end
+  else
+
+  if HitTest.HitAtGroup then
+  begin
+    AGroup := HitTest.Group;
+    if HitTest.HasAction then
+      ProcessMouseClickAtGroup(AButton, AShift, AGroup)
+    else
+    begin
+      ToggleGroupExpanded(AGroup, AShift);
+      if not OptionsBehavior.GroupsFocusOnClick and AGroup.Expanded then
+        SetFocusedObject(AGroup.Links.First);
+    end;
+  end
+  else
+
+  if HitTest.HitAtNode and not HitTest.HasAction then
+  begin
+    if OptionsBehavior.EditingStartingMode = esmOnDoubleClick then
+      EditingController.StartEditing(HitTest.Node, HitTest.Column);
+    if not EditingController.IsEditing then
+    begin
+      if not DoNodeDblClicked(HitTest.Node) then
+        ToggleExpanded(HitTest.HitObject);
+    end;
+  end
+  else
+    inherited ProcessMouseDblClick(AButton, AShift);
+end;
+
+procedure TACLTreeListSubClass.ProcessMouseDown(AButton: TMouseButton; AShift: TShiftState);
+begin
+  inherited ProcessMouseDown(AButton, AShift);
+  FWasSelected := False;
+  if not HitTest.HasAction then
+  begin
+    if Supports(HitTest.HitObject, IACLSelectableObject) then
+      SelectOnMouseDown(AButton, AShift)
+    else
+      if HitTest.HitAtContentArea and (AButton = mbLeft) then
+        SelectNone;
+  end;
+end;
+
+procedure TACLTreeListSubClass.ProcessMouseUp(AButton: TMouseButton; AShift: TShiftState);
+begin
+  if (AButton = mbLeft) and (HitTest.HitObject = PressedObject) then
+  begin
+    if FWasSelected then
+    begin
+      if not IsMultiSelectOperation(AShift) then
+      begin
+        if not (HitTest.HitAtNode and EditingController.IsEditing(HitTest.Node)) then
+          SetFocusedObject(HitTest.HitObject, True, not HitTest.HasAction);
+      end;
+    end;
+    if OptionsBehavior.EditingStartingMode = esmOnSingleClick then
+    begin
+      if HitTest.HitAtNode and not HitTest.HasAction then
+        StartEditing(HitTest.Node, HitTest.Column);
+    end;
+  end;
+  FWasSelected := False;
+  inherited ProcessMouseUp(AButton, AShift);
+end;
+
+procedure TACLTreeListSubClass.ProcessMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState);
+var
+  ACount: Integer;
+begin
+  ACount := TACLMouseWheel.GetScrollLines(AShift);
+  if ssShift in AShift then
+  begin
+    while ACount > 0 do
+    begin
+      ScrollHorizontally(TACLMouseWheel.DirectionToScrollCode[ADirection]);
+      Dec(ACount);
+    end
+  end
+  else
+  begin
+    if OptionsBehavior.MouseWheelScrollLines > 0 then
+      ACount := OptionsBehavior.MouseWheelScrollLines;
+    ScrollByLines(ACount, ADirection);
   end;
 end;
 
@@ -5613,10 +5319,10 @@ end;
 
 procedure TACLTreeListSubClass.GroupRemoving(AGroup: TACLTreeListGroup);
 begin
-  if AGroup = Controller.HoveredObject then
-    Controller.HoveredObject := nil;
-  if AGroup = NavigationController.FocusedObject then
-    NavigationController.SetFocusedObject(nil);
+  if AGroup = HoveredObject then
+    HoveredObject := nil;
+  if AGroup = FocusedObject then
+    FocusedObject := nil;
 end;
 
 procedure TACLTreeListSubClass.NodeRemoving(ANode: TACLTreeListNode);
@@ -5627,21 +5333,21 @@ begin
     DragAndDropController.Cancel;
   if Selection.RemoveItem(ANode, FromEnd) >= 0 then
     Changed([tlcnSelection]);
-  if ANode = Controller.HoveredObject then
-    Controller.HoveredObject := nil;
+  if ANode = HoveredObject then
+    HoveredObject := nil;
 
   if not IsDestroying then
   begin
-    if ANode = NavigationController.FocusedObject then
+    if ANode = FocusedObject then
     begin
       ANewFocusedObject := ANode.NextSibling;
       if ANewFocusedObject = nil then
         ANewFocusedObject := ANode.PrevSibling;
       if ANewFocusedObject = nil then
-        ANewFocusedObject := NavigationController.GetObjectParent(ANode);
+        ANewFocusedObject := GetObjectParent(ANode);
       if ANewFocusedObject = RootNode then
         ANewFocusedObject := nil;
-      NavigationController.SetFocusedObject(ANewFocusedObject);
+      SetFocusedObject(ANewFocusedObject);
     end;
   end;
 
@@ -5688,47 +5394,40 @@ function TACLTreeListSubClass.QueryChildInterface(AChild: TObject; const IID: TG
 var
   ACell: TACLCompoundControlSubClassBaseContentCell;
 begin
-  if NavigationController.GetContentCellForObject(AChild, ACell) and Supports(ACell, IID, Obj) then
+  if ContentViewInfo.ViewItems.Find(AChild, ACell) and Supports(ACell, IID, Obj) then
     Result := S_OK
   else
     Result := E_NOINTERFACE;
 end;
 
-function TACLTreeListSubClass.GetController: TACLTreeListSubClassController;
+function TACLTreeListSubClass.GetContentViewInfo: TACLTreeListSubClassContentViewInfo;
 begin
-  Result := inherited Controller as TACLTreeListSubClassController;
+  Result := ViewInfo.Content;
 end;
 
 function TACLTreeListSubClass.GetDragAndDropController: TACLTreeListSubClassDragAndDropController;
 begin
-  Result := Controller.DragAndDropController;
-end;
-
-function TACLTreeListSubClass.GetFocusedColumn: TACLTreeListColumn;
-begin
-  Result := NavigationController.FocusedColumn;
+  Result := inherited DragAndDropController as TACLTreeListSubClassDragAndDropController;
 end;
 
 function TACLTreeListSubClass.GetFocusedGroup: TACLTreeListGroup;
 begin
-  if NavigationController.FocusedObject is TACLTreeListGroup then
-    Result := TACLTreeListGroup(NavigationController.FocusedObject)
+  if FocusedObject is TACLTreeListGroup then
+    Result := TACLTreeListGroup(FocusedObject)
   else
     Result := nil;
 end;
 
 function TACLTreeListSubClass.GetFocusedNode: TACLTreeListNode;
 begin
-  if NavigationController.FocusedObject is TACLTreeListNode then
-    Result := TACLTreeListNode(NavigationController.FocusedObject)
+  if FocusedObject is TACLTreeListNode then
+    Result := TACLTreeListNode(FocusedObject)
+  else if FocusedObject is TACLTreeListGroup then
+    Result := TACLTreeListGroup(FocusedObject).Links.First
+  else if SelectedCount > 0 then
+    Result := Selected[0]
   else
-    if NavigationController.FocusedObject is TACLTreeListGroup then
-      Result := TACLTreeListGroup(NavigationController.FocusedObject).Links.First
-    else
-      if SelectedCount > 0 then
-        Result := Selected[0]
-      else
-        Result := nil;
+    Result := nil;
 end;
 
 function TACLTreeListSubClass.GetFocusedNodeData: Pointer;
@@ -5737,11 +5436,6 @@ begin
     Result := FocusedNode.Data
   else
     Result := nil;
-end;
-
-function TACLTreeListSubClass.GetFocusedObject: TObject;
-begin
-  Result := NavigationController.FocusedObject;
 end;
 
 function TACLTreeListSubClass.GetGroup(Index: Integer): TACLTreeListGroup;
@@ -5759,9 +5453,9 @@ begin
   Result := (SelectedCount > 0) and (FocusedNode <> nil);
 end;
 
-function TACLTreeListSubClass.GetNavigationController: TACLTreeListSubClassNavigationController;
+function TACLTreeListSubClass.GetHitTest: TACLTreeListSubClassHitTest;
 begin
-  Result := Controller.NavigationController;
+  Result := TACLTreeListSubClassHitTest(inherited HitTest);
 end;
 
 function TACLTreeListSubClass.GetSelected(Index: Integer): TACLTreeListNode;
@@ -5815,7 +5509,20 @@ procedure TACLTreeListSubClass.SetFocusedColumn(AValue: TACLTreeListColumn);
 begin
   if not EnabledContent then
     AValue := nil;
-  NavigationController.FocusedColumn := AValue;
+  if (AValue <> nil) and not AValue.Visible then
+    AValue := nil;
+  if FFocusedColumn <> AValue then
+  begin
+    BeginUpdate;
+    try
+      FFocusedColumn := AValue;
+      Changed([cccnContent, tlcnFocusedColumn]);
+      if FocusedColumn <> nil then
+        Changed([tlcnMakeVisible]);
+    finally
+      EndUpdate;
+    end;
+  end;
 end;
 
 procedure TACLTreeListSubClass.SetFocusedGroup(AValue: TACLTreeListGroup);
@@ -5835,9 +5542,7 @@ end;
 
 procedure TACLTreeListSubClass.SetFocusedObject(AValue: TObject);
 begin
-  if not EnabledContent then
-    AValue := nil;
-  NavigationController.SetFocusedObject(AValue);
+  SetFocusedObject(AValue, True);
 end;
 
 procedure TACLTreeListSubClass.SetOnGetNodeClass(const Value: TACLTreeListGetNodeClassEvent);

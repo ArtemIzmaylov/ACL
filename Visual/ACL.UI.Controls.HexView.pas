@@ -52,7 +52,6 @@ const
   hvcLast = hvcMakeVisible;
 
 type
-  TACLHexViewSubClassController = class;
   TACLHexViewSubClassViewInfo = class;
 
   { TACLHexViewStyle }
@@ -127,19 +126,24 @@ type
 
     FOnSelect: TNotifyEvent;
 
-    function GetController: TACLHexViewSubClassController; inline;
     function GetSelFinish: Int64;
     function GetViewInfo: TACLHexViewSubClassViewInfo; inline;
     procedure SetCursor(AValue: Int64);
     procedure SetData(AValue: TStream);
   protected
-    function CreateController: TACLCompoundControlSubClassController; override;
+    FSelectionStart: Int64;
+
     function CreateStyle: TACLHexViewStyle; virtual;
     function CreateViewInfo: TACLCompoundControlSubClassCustomViewInfo; override;
     procedure DoSelectionChanged; virtual;
     function GetPositionFromHitTest(AHitTestInfo: TACLHitTestInfo): Int64;
     procedure ProcessChanges(AChanges: TIntegerSet = []); override;
+    procedure ProcessKeyDown(AKey: Word; AShift: TShiftState); override;
+    procedure ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState); override;
+    procedure ProcessMouseDown(AButton: TMouseButton; AShift: TShiftState); override;
+    procedure ProcessMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState); override;
     procedure ResourceChanged; override;
+    procedure Select(AStart, ATarget: Int64);
     procedure UpdateCharacters;
   public
     constructor Create(AOwner: TComponent); override;
@@ -156,7 +160,6 @@ type
     //
     property Characters: TACLHexViewCharacterSet read FCharacters;
     property CharactersHex: TACLHexViewHexCharacterSet read FCharactersHex;
-    property Controller: TACLHexViewSubClassController read GetController;
     property Cursor: Int64 read FCursor write SetCursor;
     property Data: TStream read FData write SetData;
     property DataSize: Int64 read FDataSize;
@@ -167,31 +170,6 @@ type
     property ViewInfo: TACLHexViewSubClassViewInfo read GetViewInfo;
     //
     property OnSelect: TNotifyEvent read FOnSelect write FOnSelect;
-  end;
-
-  { TACLHexViewSubClassController }
-
-  TACLHexViewSubClassController = class(TACLCompoundControlSubClassController)
-  strict private
-    FSelectionStart: Int64;
-
-    function GetSubClass: TACLHexViewSubClass; inline;
-    function GetViewInfo: TACLHexViewSubClassViewInfo; inline;
-  private
-    function GetSelStart: Int64;
-    function GetCursor: Int64;
-  protected
-    procedure ProcessKeyDown(AKey: Word; AShift: TShiftState); override;
-    procedure ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState); override;
-    procedure ProcessMouseDown(AButton: TMouseButton; AShift: TShiftState); override;
-    procedure ProcessMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState); override;
-  public
-    procedure SetSelection(AStart, ATarget: Int64);
-
-    property Cursor: Int64 read GetCursor;
-    property SelStart: Int64 read GetSelStart;
-    property SubClass: TACLHexViewSubClass read GetSubClass;
-    property ViewInfo: TACLHexViewSubClassViewInfo read GetViewInfo;
   end;
 
   { TACLHexViewSubClassChararterSetViewViewInfo }
@@ -790,11 +768,6 @@ begin
   Result := TACLHexViewStyle.Create(Self);
 end;
 
-function TACLHexViewSubClass.CreateController: TACLCompoundControlSubClassController;
-begin
-  Result := TACLHexViewSubClassController.Create(Self);
-end;
-
 function TACLHexViewSubClass.CreateViewInfo: TACLCompoundControlSubClassCustomViewInfo;
 begin
   Result := TACLHexViewSubClassViewInfo.Create(Self);
@@ -803,11 +776,6 @@ end;
 procedure TACLHexViewSubClass.DoSelectionChanged;
 begin
   CallNotifyEvent(Self, OnSelect);
-end;
-
-function TACLHexViewSubClass.GetController: TACLHexViewSubClassController;
-begin
-  Result := TACLHexViewSubClassController(inherited Controller);
 end;
 
 function TACLHexViewSubClass.GetPositionFromHitTest(AHitTestInfo: TACLHitTestInfo): Int64;
@@ -872,22 +840,20 @@ begin
   end;
 end;
 
-{ TACLHexViewSubClassController }
-
-procedure TACLHexViewSubClassController.ProcessKeyDown(AKey: Word; AShift: TShiftState);
+procedure TACLHexViewSubClass.ProcessKeyDown(AKey: Word; AShift: TShiftState);
 
   procedure MoveCursor(ACursor: Int64; AGranularity: Integer = 0);
   begin
     while (ACursor < 0) and (AGranularity > 0) do
       Inc(ACursor, AGranularity);
-    while (ACursor > SubClass.DataSize) and (AGranularity > 0) do
+    while (ACursor > DataSize) and (AGranularity > 0) do
       Dec(ACursor, AGranularity);
-    if InRange(ACursor, 0, SubClass.DataSize) then
+    if InRange(ACursor, 0, DataSize) then
     begin
       if ssShift in AShift then
-        SetSelection(FSelectionStart, ACursor)
+        Select(FSelectionStart, ACursor)
       else
-        SetSelection(ACursor, ACursor);
+        Select(ACursor, ACursor);
     end;
   end;
 
@@ -913,7 +879,7 @@ begin
 
     VK_END:
       if ssCtrl in AShift then
-        MoveCursor(SubClass.DataSize)
+        MoveCursor(DataSize)
       else
         MoveCursor(Cursor - Cursor mod acHexViewBytesPerRow + acHexViewBytesPerRow - 1);
 
@@ -925,44 +891,44 @@ begin
 
     Ord('A'):
       if ssCtrl in AShift then
-        SubClass.SelectAll;
+        SelectAll;
   end;
 end;
 
-procedure TACLHexViewSubClassController.ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState);
+procedure TACLHexViewSubClass.ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState);
 var
   ACursor: Integer;
 begin
   if (AButton = mbLeft) and (HitTest.HitObject is TACLHexViewSubClassChararterSetViewViewInfo) then
   begin
-    ACursor := SubClass.GetPositionFromHitTest(HitTest);
+    ACursor := GetPositionFromHitTest(HitTest);
     if ssShift in AShift then
-      SetSelection(FSelectionStart, ACursor)
+      Select(FSelectionStart, ACursor)
     else
-      SetSelection(ACursor, ACursor);
+      Select(ACursor, ACursor);
   end;
   inherited;
 end;
 
-procedure TACLHexViewSubClassController.ProcessMouseDown(AButton: TMouseButton; AShift: TShiftState);
+procedure TACLHexViewSubClass.ProcessMouseDown(AButton: TMouseButton; AShift: TShiftState);
 begin
   inherited;
 
   if HitTest.HitObject is TACLHexViewSubClassChararterSetViewViewInfo then
   begin
-    if TACLHexViewSubClassChararterSetViewViewInfo(HitTest.HitObject).CharacterSet = SubClass.CharactersHex then
+    if TACLHexViewSubClassChararterSetViewViewInfo(HitTest.HitObject).CharacterSet = CharactersHex then
       ViewInfo.FocusedPane := pHex
     else
       ViewInfo.FocusedPane := pText;
   end;
 end;
 
-procedure TACLHexViewSubClassController.ProcessMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState);
+procedure TACLHexViewSubClass.ProcessMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState);
 begin
   ViewInfo.ScrollByMouseWheel(ADirection, AShift);
 end;
 
-procedure TACLHexViewSubClassController.SetSelection(AStart, ATarget: Int64);
+procedure TACLHexViewSubClass.Select(AStart, ATarget: Int64);
 var
   ACursor: Int64;
 begin
@@ -970,33 +936,13 @@ begin
   if ATarget < AStart then
     acExchangeInt64(AStart, ATarget);
 
-  SubClass.BeginUpdate;
+  BeginUpdate;
   try
-    SubClass.SetSelection(AStart, ATarget - AStart + 1);
-    SubClass.Cursor := ACursor;
+    SetSelection(AStart, ATarget - AStart + 1);
+    Cursor := ACursor;
   finally
-    SubClass.EndUpdate;
+    EndUpdate;
   end;
-end;
-
-function TACLHexViewSubClassController.GetCursor: Int64;
-begin
-  Result := SubClass.Cursor;
-end;
-
-function TACLHexViewSubClassController.GetSelStart: Int64;
-begin
-  Result := SubClass.SelStart;
-end;
-
-function TACLHexViewSubClassController.GetSubClass: TACLHexViewSubClass;
-begin
-  Result := TACLHexViewSubClass(inherited SubClass);
-end;
-
-function TACLHexViewSubClassController.GetViewInfo: TACLHexViewSubClassViewInfo;
-begin
-  Result := SubClass.ViewInfo;
 end;
 
 { TACLHexViewSubClassChararterSetViewViewInfo }
@@ -1306,7 +1252,7 @@ begin
   begin
     AHitPoint.X := EnsureRange(P.X, FContentArea.Left, FContentArea.Right - 1);
     AHitPoint.Y := EnsureRange(P.Y, FContentArea.Top, FContentArea.Bottom - 1);
-    SubClass.Controller.UpdateHitTest(AHitPoint);
+    SubClass.UpdateHitTest(AHitPoint);
   end;
 
   UpdateAutoScrollDirection(P, FScrollableArea);
@@ -1326,13 +1272,13 @@ end;
 
 function TACLHexViewSubClassSelectionDragObject.GetHitTest: TACLHitTestInfo;
 begin
-  Result := FSubClass.Controller.HitTest;
+  Result := FSubClass.HitTest;
 end;
 
 procedure TACLHexViewSubClassSelectionDragObject.UpdateSelection;
 begin
   if HitTest.HitObject is TACLHexViewSubClassChararterSetViewViewInfo then
-    SubClass.Controller.SetSelection(FStartPosition, SubClass.GetPositionFromHitTest(HitTest));
+    SubClass.Select(FStartPosition, SubClass.GetPositionFromHitTest(HitTest));
 end;
 
 { TACLHexViewSubClassViewInfo }

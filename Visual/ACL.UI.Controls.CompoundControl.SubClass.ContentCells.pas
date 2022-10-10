@@ -353,12 +353,13 @@ function TACLCompoundControlSubClassContentCellList<T>.Find(AData: TObject; out 
 var
   I: Integer;
 begin
-  for I := 0 to Count - 1 do
-    if List[I].Data = AData then
-    begin
-      ACell := List[I];
-      Exit(True);
-    end;
+  if AData <> nil then
+    for I := 0 to Count - 1 do
+      if List[I].Data = AData then
+      begin
+        ACell := List[I];
+        Exit(True);
+      end;
   Result := False;
 end;
 

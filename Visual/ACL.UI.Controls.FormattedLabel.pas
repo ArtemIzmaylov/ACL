@@ -86,9 +86,11 @@ type
     procedure SetText(const AValue: UnicodeString);
     procedure SetWordWrap(const AValue: Boolean);
   protected
-    function CreateController: TACLCompoundControlSubClassController; override;
     function CreateViewInfo: TACLCompoundControlSubClassCustomViewInfo; override;
     function DoLinkExecute(const ALink: UnicodeString): Boolean;
+    procedure ExecuteLink(const ALink: UnicodeString);
+    procedure ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState); override;
+    procedure ProcessMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState); override;
     //
     property FormattedText: TACLFormattedLabelFormattedText read FFormattedText;
     property ViewInfo: TACLFormattedLabelSubClassViewInfo read GetViewInfo;
@@ -104,19 +106,6 @@ type
     property WordWrap: Boolean read GetWordWrap write SetWordWrap;
     //
     property OnLinkExecute: TACLFormattedLabelLinkExecuteEvent read FOnLinkExecute write FOnLinkExecute;
-  end;
-
-  { TACLFormattedLabelSubClassController }
-
-  TACLFormattedLabelSubClassController = class(TACLCompoundControlSubClassController)
-  strict private
-    function GetSubClass: TACLFormattedLabelSubClass; inline;
-  protected
-    procedure ExecuteLink(const ALink: UnicodeString);
-    procedure ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState); override;
-    procedure ProcessMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState); override;
-  public
-    property SubClass: TACLFormattedLabelSubClass read GetSubClass;
   end;
 
   { TACLFormattedLabelSubClassViewInfo }
@@ -260,11 +249,6 @@ begin
     ABounds.Top + ViewInfo.ViewportY, ABounds.Bottom + ViewInfo.ViewportY, TACLScrollToMode.MakeVisible);
 end;
 
-function TACLFormattedLabelSubClass.CreateController: TACLCompoundControlSubClassController;
-begin
-  Result := TACLFormattedLabelSubClassController.Create(Self);
-end;
-
 function TACLFormattedLabelSubClass.CreateViewInfo: TACLCompoundControlSubClassCustomViewInfo;
 begin
   Result := TACLFormattedLabelSubClassViewInfo.Create(Self);
@@ -333,15 +317,13 @@ begin
   end;
 end;
 
-{ TACLFormattedLabelSubClassController }
-
-procedure TACLFormattedLabelSubClassController.ExecuteLink(const ALink: UnicodeString);
+procedure TACLFormattedLabelSubClass.ExecuteLink(const ALink: UnicodeString);
 begin
-  if not SubClass.DoLinkExecute(ALink) then
+  if not DoLinkExecute(ALink) then
     ShellExecuteURL(ALink);
 end;
 
-procedure TACLFormattedLabelSubClassController.ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState);
+procedure TACLFormattedLabelSubClass.ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState);
 var
   AHyperlink: TACLTextLayoutBlockStyleHyperlink;
 begin
@@ -352,14 +334,9 @@ begin
     inherited ProcessMouseClick(AButton, AShift);
 end;
 
-procedure TACLFormattedLabelSubClassController.ProcessMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState);
+procedure TACLFormattedLabelSubClass.ProcessMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState);
 begin
-  TACLFormattedLabelSubClassViewInfo(SubClass.ViewInfo).ScrollByMouseWheel(ADirection, AShift);
-end;
-
-function TACLFormattedLabelSubClassController.GetSubClass: TACLFormattedLabelSubClass;
-begin
-  Result := TACLFormattedLabelSubClass(inherited SubClass);
+  TACLFormattedLabelSubClassViewInfo(ViewInfo).ScrollByMouseWheel(ADirection, AShift);
 end;
 
 { TACLFormattedLabelSubClassViewInfo }

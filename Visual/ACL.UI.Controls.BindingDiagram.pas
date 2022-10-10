@@ -196,7 +196,7 @@ end;
 
 function TACLBindingDiagram.GetSelectedObject: TObject;
 begin
-  Result := SubClass.Controller.SelectedObject;
+  Result := SubClass.SelectedObject;
 end;
 
 function TACLBindingDiagram.GetSelectedObjectAsLink: TACLBindingDiagramLink;
@@ -286,7 +286,7 @@ end;
 
 procedure TACLBindingDiagram.SetSelectedObject(const Value: TObject);
 begin
-  SubClass.Controller.SelectedObject := Value;
+  SubClass.SelectedObject := Value;
 end;
 
 procedure TACLBindingDiagram.SetStyle(const Value: TACLStyleBindingDiagram);

@@ -158,10 +158,15 @@ type
     procedure SetSearchString(const Value: string);
   protected
     function CanAddProperty(AObject: TObject; APropInfo: PPropInfo): Boolean;
-    function CreateController: TACLCompoundControlSubClassController; override;
     function CreateEditingController: TACLTreeListSubClassEditingController; override;
     function CreateNode: TACLTreeListNode; override;
     function CreateViewInfo: TACLCompoundControlSubClassCustomViewInfo; override;
+
+    function CanStartEditingByMouse(AButton: TMouseButton): Boolean;
+    procedure ProcessKeyDown(AKey: Word; AShift: TShiftState); override;
+    procedure ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState); override;
+    procedure ProcessMouseClickAtNodeButton(ANode: TACLTreeListNode);
+    procedure ProcessMouseDblClick(AButton: TMouseButton; AShift: TShiftState); override;
 
     // IACLObjectInspector
     function GetInspectedObject: TPersistent;
@@ -199,21 +204,6 @@ type
     property OnPropertyChanging: TACLObjectInspectorPropertyChangingEvent read FOnPropertyChanging write FOnPropertyChanging;
     property OnPropertyChanged: TACLObjectInspectorPropertyChangedEvent read FOnPropertyChanged write FOnPropertyChanged;
     property OnPropertyGetGroupName: TACLObjectInspectorPropertyGetGroupNameEvent read FOnPropertyGetGroupName write FOnPropertyGetGroupName;
-  end;
-
-  { TACLObjectInspectorSubClassController }
-
-  TACLObjectInspectorSubClassController = class(TACLTreeListSubClassController)
-  strict private
-    function GetFocusedNode: TACLObjectInspectorNode;
-  protected
-    function CanStartEditingByMouse(AButton: TMouseButton): Boolean;
-    procedure ProcessKeyDown(AKey: Word; AShift: TShiftState); override;
-    procedure ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState); override;
-    procedure ProcessMouseClickAtNodeButton(ANode: TACLTreeListNode);
-    procedure ProcessMouseDblClick(AButton: TMouseButton; AShift: TShiftState); override;
-  public
-    property FocusedNode: TACLObjectInspectorNode read GetFocusedNode;
   end;
 
   { TACLObjectInspectorSubClassEditingController }
@@ -635,11 +625,6 @@ begin
     OnPropertyAdd(Self, AObject, APropInfo, Result);
 end;
 
-function TACLObjectInspectorSubClass.CreateController: TACLCompoundControlSubClassController;
-begin
-  Result := TACLObjectInspectorSubClassController.Create(Self);
-end;
-
 function TACLObjectInspectorSubClass.CreateEditingController: TACLTreeListSubClassEditingController;
 begin
   Result := TACLObjectInspectorSubClassEditingController.Create(Self);
@@ -915,14 +900,12 @@ begin
   end;
 end;
 
-{ TACLObjectInspectorSubClassController }
-
-function TACLObjectInspectorSubClassController.CanStartEditingByMouse(AButton: TMouseButton): Boolean;
+function TACLObjectInspectorSubClass.CanStartEditingByMouse(AButton: TMouseButton): Boolean;
 begin
   Result := (AButton = mbLeft) and HitTest.HitAtNode and not HitTest.HasAction;
 end;
 
-procedure TACLObjectInspectorSubClassController.ProcessKeyDown(AKey: Word; AShift: TShiftState);
+procedure TACLObjectInspectorSubClass.ProcessKeyDown(AKey: Word; AShift: TShiftState);
 const
   Modifiers = [ssAlt, ssCtrl, ssShift];
 begin
@@ -931,14 +914,14 @@ begin
     case AKey of
       VK_RETURN:
         begin
-          SubClass.StartEditing(FocusedNode, Columns[1]);
-          if not SubClass.EditingController.IsEditing then
+          StartEditing(FocusedNode, Columns[1]);
+          if not EditingController.IsEditing then
             TACLObjectInspectorNode(FocusedNode).Edit;
         end;
     end;
 end;
 
-procedure TACLObjectInspectorSubClassController.ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState);
+procedure TACLObjectInspectorSubClass.ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState);
 var
   AInplaceControl: TWinControl;
   AInplaceControlPoint: TPoint;
@@ -964,21 +947,16 @@ begin
       inherited ProcessMouseClick(AButton, AShift);
 end;
 
-procedure TACLObjectInspectorSubClassController.ProcessMouseClickAtNodeButton(ANode: TACLTreeListNode);
+procedure TACLObjectInspectorSubClass.ProcessMouseClickAtNodeButton(ANode: TACLTreeListNode);
 begin
   TACLObjectInspectorNode(ANode).Edit;
 end;
 
-procedure TACLObjectInspectorSubClassController.ProcessMouseDblClick(AButton: TMouseButton; AShift: TShiftState);
+procedure TACLObjectInspectorSubClass.ProcessMouseDblClick(AButton: TMouseButton; AShift: TShiftState);
 begin
   inherited ProcessMouseDblClick(AButton, AShift);
   if CanStartEditingByMouse(AButton) and not EditingController.IsEditing and (HitTest.Node.ChildrenCount = 0) then
     ProcessMouseClickAtNodeButton(HitTest.Node)
-end;
-
-function TACLObjectInspectorSubClassController.GetFocusedNode: TACLObjectInspectorNode;
-begin
-  Result := TACLObjectInspectorNode(SubClass.FocusedNode);
 end;
 
 { TACLObjectInspectorSubClassEditingController }

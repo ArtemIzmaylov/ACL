@@ -76,11 +76,12 @@ type
     function GetViewInfo: TACLCalendarSubClassViewInfo; inline;
     procedure SetValue(const AValue: TDate);
   protected
-    function CreateController: TACLCompoundControlSubClassController; override;
     function CreateStyle: TACLStyleCalendar; virtual;
     function CreateViewInfo: TACLCompoundControlSubClassCustomViewInfo; override;
     function GetFullRefreshChanges: TIntegerSet; override;
     procedure DoSelected; virtual;
+    procedure ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState); override;
+    procedure ProcessMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState); override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -91,18 +92,6 @@ type
     property ViewInfo: TACLCalendarSubClassViewInfo read GetViewInfo;
     //
     property OnSelect: TNotifyEvent read FOnSelect write FOnSelect;
-  end;
-
-  { TACLCalendarSubClassController }
-
-  TACLCalendarSubClassController = class(TACLCompoundControlSubClassController)
-  strict private
-    function GetSubClass: TACLCalendarSubClass; inline;
-  protected
-    procedure ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState); override;
-    procedure ProcessMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState); override;
-  public
-    property SubClass: TACLCalendarSubClass read GetSubClass;
   end;
 
   { TACLCalendarSubClassCustomViewInfo }
@@ -430,11 +419,6 @@ begin
   end;
 end;
 
-function TACLCalendarSubClass.CreateController: TACLCompoundControlSubClassController;
-begin
-  Result := TACLCalendarSubClassController.Create(Self);
-end;
-
 function TACLCalendarSubClass.CreateStyle: TACLStyleCalendar;
 begin
   Result := TACLStyleCalendar.Create(Self);
@@ -450,9 +434,7 @@ begin
   Result := TACLCalendarSubClassViewInfo(inherited ViewInfo);
 end;
 
-{ TACLCalendarSubClassController }
-
-procedure TACLCalendarSubClassController.ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState);
+procedure TACLCalendarSubClass.ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState);
 begin
   inherited;
 
@@ -460,25 +442,20 @@ begin
     Exit;
 
   if HitTest.HitObject is TACLCalendarSubClassMonthCell then
-    SubClass.ViewInfo.ActivateDayView(TACLCalendarSubClassMonthCell(HitTest.HitObject).Value)
+    ViewInfo.ActivateDayView(TACLCalendarSubClassMonthCell(HitTest.HitObject).Value)
   else if HitTest.HitObject is TACLCalendarSubClassDayCell then
-    SubClass.Value := TACLCalendarSubClassDayCell(HitTest.HitObject).Value + TimeOf(SubClass.Value)
+    Value := TACLCalendarSubClassDayCell(HitTest.HitObject).Value + TimeOf(Value)
   else if HitTest.HitObject is TACLCalendarSubClassScrollButtonCell then
-    SubClass.ViewInfo.NextPage(TACLCalendarSubClassScrollButtonCell(HitTest.HitObject).Direction)
+    ViewInfo.NextPage(TACLCalendarSubClassScrollButtonCell(HitTest.HitObject).Direction)
   else if HitTest.HitObject is TACLCalendarSubClassTitleCell then
-    SubClass.ViewInfo.ActivateMonthView
+    ViewInfo.ActivateMonthView
   else if HitTest.HitObject is TACLCalendarSubClassTodayCell then
-    SubClass.ViewInfo.Select(Now);
+    ViewInfo.Select(Now);
 end;
 
-procedure TACLCalendarSubClassController.ProcessMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState);
+procedure TACLCalendarSubClass.ProcessMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState);
 begin
-  SubClass.ViewInfo.NextRow(ADirection);
-end;
-
-function TACLCalendarSubClassController.GetSubClass: TACLCalendarSubClass;
-begin
-  Result := TACLCalendarSubClass(inherited SubClass);
+  ViewInfo.NextRow(ADirection);
 end;
 
 { TACLCalendarSubClassCustomViewInfo }
@@ -582,7 +559,7 @@ begin
     Result.A := Trunc(Result.A * (1 - AAnimation.Progress));
   end
   else
-    if (SubClass.Controller.HoveredObject = Self) or IsSelected then
+    if (SubClass.HoveredObject = Self) or IsSelected then
       Result := Style.ColorFrame.Value
     else
       Result := TAlphaColor.None;

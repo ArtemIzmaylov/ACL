@@ -221,17 +221,17 @@ end;
 
 procedure TACLCompoundControl.UpdateHitTest(X, Y: Integer);
 begin
-  SubClass.Controller.UpdateHitTest(X, Y);
+  SubClass.UpdateHitTest(X, Y);
 end;
 
 procedure TACLCompoundControl.UpdateHitTest(const P: TPoint);
 begin
-  SubClass.Controller.UpdateHitTest(P);
+  SubClass.UpdateHitTest(P);
 end;
 
 procedure TACLCompoundControl.UpdateHitTest;
 begin
-  SubClass.Controller.UpdateHitTest;
+  SubClass.UpdateHitTest;
 end;
 
 procedure TACLCompoundControl.FocusChanged;

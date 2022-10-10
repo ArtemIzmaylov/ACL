@@ -494,7 +494,7 @@ end;
 
 function TACLCompoundControlSubClassScrollBarViewInfo.GetHitTest: TACLHitTestInfo;
 begin
-  Result := SubClass.Controller.HitTest;
+  Result := SubClass.HitTest;
 end;
 
 function TACLCompoundControlSubClassScrollBarViewInfo.GetStyle: TACLStyleScrollBox;
@@ -542,9 +542,9 @@ end;
 
 procedure TACLCompoundControlSubClassScrollBarPartViewInfo.UpdateState;
 begin
-  if SubClass.Controller.PressedObject = Self then
+  if SubClass.PressedObject = Self then
     State := absPressed
-  else if SubClass.Controller.HoveredObject = Self then
+  else if SubClass.HoveredObject = Self then
     State := absHover
   else
     State := absNormal;
