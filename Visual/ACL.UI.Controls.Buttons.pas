@@ -885,11 +885,14 @@ begin
 end;
 
 procedure TACLCustomButtonViewInfo.DrawContent(ACanvas: TCanvas);
+var
+  ATextRect: TRect;
 begin
   if Caption <> '' then
   begin
     AssignCanvasParameters(ACanvas);
-    acTextDraw(ACanvas, Caption, TextRect, Alignment, taVerticalCenter, True);
+    ATextRect := TextRect;
+    acSysDrawText(ACanvas, ATextRect, Caption, acTextAlignHorz[Alignment] or DT_VCENTER or DT_END_ELLIPSIS); // Keep the "&" Prefix in mind
   end;
 end;
 
