@@ -56,7 +56,7 @@ type
     function GetContentViewInfo: TACLTreeListSubClassContentViewInfo;
     function GetDragAndDropController: TACLTreeListSubClassDragAndDropController;
     function GetHitTest: TACLTreeListSubClassHitTest;
-    function GetNodeViewInfo: TACLTreeListSubClassContentNodeCellViewInfo;
+    function GetNodeViewInfo: TACLTreeListSubClassNodeViewInfo;
   protected
     function CalculateDropTarget(var AObject: TObject; var AMode: TACLTreeListDropTargetInsertMode): Boolean; virtual;
     function CalculateInsertMode(ANode: TACLTreeListNode): TACLTreeListDropTargetInsertMode;
@@ -79,7 +79,7 @@ type
     property ContentViewInfo: TACLTreeListSubClassContentViewInfo read GetContentViewInfo;
     property DragAndDropController: TACLTreeListSubClassDragAndDropController read GetDragAndDropController;
     property HitTest: TACLTreeListSubClassHitTest read GetHitTest;
-    property NodeViewInfo: TACLTreeListSubClassContentNodeCellViewInfo read GetNodeViewInfo;
+    property NodeViewInfo: TACLTreeListSubClassNodeViewInfo read GetNodeViewInfo;
     property SubClass: TACLTreeListSubClass read FSubClass;
   end;
 
@@ -409,7 +409,7 @@ begin
   Result := SubClass.HitTest;
 end;
 
-function TACLTreeListSubClassDropTarget.GetNodeViewInfo: TACLTreeListSubClassContentNodeCellViewInfo;
+function TACLTreeListSubClassDropTarget.GetNodeViewInfo: TACLTreeListSubClassNodeViewInfo;
 begin
   Result := ContentViewInfo.NodeViewInfo;
 end;

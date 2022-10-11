@@ -220,12 +220,12 @@ type
 
   TACLObjectInspectorSubClassContentViewInfo = class(TACLTreeListSubClassContentViewInfo)
   protected
-    function CreateNodeCellViewInfo: TACLTreeListSubClassContentNodeCellViewInfo; override;
+    function CreateNodeViewInfo: TACLTreeListSubClassNodeViewInfo; override;
   end;
 
-  { TACLObjectInspectorSubClassContentNodeCellViewInfo }
+  { TACLObjectInspectorSubClassNodeViewInfo }
 
-  TACLObjectInspectorSubClassContentNodeCellViewInfo = class(TACLTreeListSubClassContentNodeCellViewInfo)
+  TACLObjectInspectorSubClassNodeViewInfo = class(TACLTreeListSubClassNodeViewInfo)
   strict private
     FButtonRect: TRect;
     FLastCellTextExtends: TRect;
@@ -985,14 +985,14 @@ end;
 
 { TACLObjectInspectorSubClassContentViewInfo }
 
-function TACLObjectInspectorSubClassContentViewInfo.CreateNodeCellViewInfo: TACLTreeListSubClassContentNodeCellViewInfo;
+function TACLObjectInspectorSubClassContentViewInfo.CreateNodeViewInfo: TACLTreeListSubClassNodeViewInfo;
 begin
-  Result := TACLObjectInspectorSubClassContentNodeCellViewInfo.Create(Self);
+  Result := TACLObjectInspectorSubClassNodeViewInfo.Create(Self);
 end;
 
-{ TACLObjectInspectorSubClassContentNodeCellViewInfo }
+{ TACLObjectInspectorSubClassNodeViewInfo }
 
-procedure TACLObjectInspectorSubClassContentNodeCellViewInfo.Calculate(AWidth, AHeight: Integer);
+procedure TACLObjectInspectorSubClassNodeViewInfo.Calculate(AWidth, AHeight: Integer);
 begin
   inherited Calculate(AWidth, AHeight);
 
@@ -1003,19 +1003,20 @@ begin
   Inc(FLastCellTextExtends.Right, FButtonRect.Width);
 end;
 
-procedure TACLObjectInspectorSubClassContentNodeCellViewInfo.DoDraw(ACanvas: TCanvas);
+procedure TACLObjectInspectorSubClassNodeViewInfo.DoDraw(ACanvas: TCanvas);
 begin
   inherited DoDraw(ACanvas);
 
   if HasButton then
   begin
-    Painter.PrepareCanvasForNode(ACanvas, Node);
+    SubClass.StylePrepareFont(ACanvas);
+    ACanvas.Font.Color := SubClass.StyleGetNodeTextColor(Node);
     SubClass.StyleInplaceEditButton.Draw(ACanvas.Handle, ButtonRect, absNormal);
     acTextDraw(ACanvas, acEndEllipsis, ButtonRect, taCenter, taVerticalCenter);
   end;
 end;
 
-procedure TACLObjectInspectorSubClassContentNodeCellViewInfo.DoDrawCellContent(
+procedure TACLObjectInspectorSubClassNodeViewInfo.DoDrawCellContent(
   ACanvas: TCanvas; const R: TRect; AColumnViewInfo: TACLTreeListSubClassColumnViewInfo);
 var
   AIntf: IACLPropertyEditorCustomDraw;
@@ -1030,16 +1031,16 @@ begin
       Exit;
     end;
     if not Node.PropertyEditor.HasData then
-      ACanvas.Font.Color := Painter.Style.RowColorDisabledText.AsColor;
+      ACanvas.Font.Color := SubClass.Style.RowColorDisabledText.AsColor;
   end;
 
   if Node.PropertyEditor.IsReadOnly or Node.PropertyEditor.IsNonStorable and OptionsView.HighlightNonStorableProperties then
-    ACanvas.Font.Color := Painter.Style.RowColorDisabledText.AsColor;
+    ACanvas.Font.Color := SubClass.Style.RowColorDisabledText.AsColor;
 
   inherited DoDrawCellContent(ACanvas, R, AColumnViewInfo);
 end;
 
-procedure TACLObjectInspectorSubClassContentNodeCellViewInfo.DoGetHitTest(const P, AOrigin: TPoint; AInfo: TACLHitTestInfo);
+procedure TACLObjectInspectorSubClassNodeViewInfo.DoGetHitTest(const P, AOrigin: TPoint; AInfo: TACLHitTestInfo);
 begin
   inherited DoGetHitTest(P, AOrigin, AInfo);
   if HasButton and PtInRect(ButtonRect, P) then
@@ -1049,7 +1050,7 @@ begin
   end;
 end;
 
-function TACLObjectInspectorSubClassContentNodeCellViewInfo.GetCellTextExtends(AColumn: TACLTreeListSubClassColumnViewInfo): TRect;
+function TACLObjectInspectorSubClassNodeViewInfo.GetCellTextExtends(AColumn: TACLTreeListSubClassColumnViewInfo): TRect;
 begin
   if ((AColumn = nil) or AColumn.IsLast) and HasButton then
     Result := FLastCellTextExtends
@@ -1057,17 +1058,17 @@ begin
     Result := inherited GetCellTextExtends(AColumn);
 end;
 
-function TACLObjectInspectorSubClassContentNodeCellViewInfo.HasButton: Boolean;
+function TACLObjectInspectorSubClassNodeViewInfo.HasButton: Boolean;
 begin
   Result := (Node <> nil) and Node.Selected and Supports(Node.PropertyEditor, IACLPropertyEditorDialog);
 end;
 
-function TACLObjectInspectorSubClassContentNodeCellViewInfo.GetNode: TACLObjectInspectorNode;
+function TACLObjectInspectorSubClassNodeViewInfo.GetNode: TACLObjectInspectorNode;
 begin
   Result := TACLObjectInspectorNode(inherited Node);
 end;
 
-function TACLObjectInspectorSubClassContentNodeCellViewInfo.GetOptionsView: TACLObjectInspectorOptionsView;
+function TACLObjectInspectorSubClassNodeViewInfo.GetOptionsView: TACLObjectInspectorOptionsView;
 begin
   Result := TACLObjectInspectorSubClass(SubClass).OptionsView;
 end;

@@ -79,16 +79,18 @@ type
   TACLTreeListSubClassColumnViewInfo = class;
   TACLTreeListSubClassContentCell = class;
   TACLTreeListSubClassContentCellViewInfo = class;
-  TACLTreeListSubClassContentNodeCellViewInfo = class;
   TACLTreeListSubClassContentViewInfo = class;
   TACLTreeListSubClassDragAndDropController = class;
-  TACLTreeListSubClassPainter = class;
+  TACLTreeListSubClassNodeViewInfo = class;
 
   TACLTreeListDropTargetInsertMode = (dtimBefore, dtimAfter, dtimInto, dtimOver);
 
   { TACLStyleTreeList }
 
   TACLStyleTreeList = class(TACLStyle)
+  public const
+    IndexColumnHeaderFont = 0;
+    IndexGroupHeaderFont = 1;
   strict private
     function GetRowColor(Odd: Boolean): TAlphaColor;
     function GetRowColorSelected(Focused: Boolean): TAlphaColor;
@@ -98,10 +100,13 @@ type
     procedure InitializeResources; override;
   public
     procedure DrawBackground(ACanvas: TCanvas; const R: TRect; AEnabled: Boolean; ABorders: TACLBorders);
-    procedure DrawCheckMark(ACanvas: TCanvas; const R: TRect; AState: TACLButtonState; ACheckBoxState: TCheckBoxState);
-    procedure DrawGroupHeader(ACanvas: TCanvas; const R: TRect; ABorders: TACLBorders);
+    procedure DrawCheckMark(ACanvas: TCanvas; const R: TRect; AEnabled: Boolean; ACheckBoxState: TCheckBoxState);
+    procedure DrawGridline(ACanvas: TCanvas; const R: TRect; ASide: TACLBorder);
+    procedure DrawGroupExpandButton(ACanvas: TCanvas; const R: TRect; AExpanded: Boolean);
+    procedure DrawGroupHeader(ACanvas: TCanvas; const R: TRect; ABorders: TACLBorders = [mTop, mBottom]);
     procedure DrawHeader(ACanvas: TCanvas; const R: TRect; ABorders: TACLBorders);
     procedure DrawHeaderSortingArrow(ACanvas: TCanvas; const R: TRect; ADirection, AEnabled: Boolean);
+    procedure DrawRowExpandButton(ACanvas: TCanvas; const R: TRect; AExpanded, ASelected: Boolean);
     //
     property RowColors[Odd: Boolean]: TAlphaColor read GetRowColor;
     property RowColorsSelected[Focused: Boolean]: TAlphaColor read GetRowColorSelected;
@@ -119,14 +124,14 @@ type
     property SelectionRectColor: TACLResourceColor index 7 read GetColor write SetColor stored IsColorStored;
 
     property ColumnHeader: TACLResourceTexture index 1 read GetTexture write SetTexture stored IsTextureStored;
-    property ColumnHeaderFont: TACLResourceFont index 0 read GetFont write SetFont stored IsFontStored;
+    property ColumnHeaderFont: TACLResourceFont index IndexColumnHeaderFont read GetFont write SetFont stored IsFontStored;
     property ColumnHeaderSortingArrow: TACLResourceTexture index 2 read GetTexture write SetTexture stored IsTextureStored;
 
     property GroupHeaderColor: TACLResourceColor index 8 read GetColor write SetColor stored IsColorStored;
     property GroupHeaderColorBorder: TACLResourceColor index 9 read GetColor write SetColor stored IsColorStored;
     property GroupHeaderContentOffsets: TACLResourceMargins index 0 read GetMargins write SetMargins stored IsMarginsStored;
     property GroupHeaderExpandButton: TACLResourceTexture index 3 read GetTexture write SetTexture stored IsTextureStored;
-    property GroupHeaderFont: TACLResourceFont index 1 read GetFont write SetFont stored IsFontStored;
+    property GroupHeaderFont: TACLResourceFont index IndexGroupHeaderFont read GetFont write SetFont stored IsFontStored;
 
     property RowColor1: TACLResourceColor index 10 read GetColor write SetColor stored IsColorStored;
     property RowColor2: TACLResourceColor index 11 read GetColor write SetColor stored IsColorStored;
@@ -148,10 +153,8 @@ type
 
   TACLTreeListSubClassCustomViewInfo = class(TACLCompoundControlSubClassCustomViewInfo)
   strict private
-    function GetPainter: TACLTreeListSubClassPainter; inline;
     function GetSubClass: TACLTreeListSubClass; inline;
   public
-    property Painter: TACLTreeListSubClassPainter read GetPainter;
     property SubClass: TACLTreeListSubClass read GetSubClass;
   end;
 
@@ -168,7 +171,7 @@ type
     function GetIsFirst: Boolean;
     function GetIsLast: Boolean;
     function GetIsMultiColumnSorting: Boolean;
-    function GetNodeViewInfo: TACLTreeListSubClassContentNodeCellViewInfo; inline;
+    function GetNodeViewInfo: TACLTreeListSubClassNodeViewInfo; inline;
     function GetOptionsColumns: TACLTreeListOptionsViewColumns; inline;
     function GetSortArrowIndexSize: TSize;
     procedure SetSortByIndex(AValue: Integer);
@@ -195,7 +198,7 @@ type
     procedure InitializeActualWidth; virtual;
     //
     property ColumnBarViewInfo: TACLTreeListSubClassColumnBarViewInfo read GetColumnBarViewInfo;
-    property NodeViewInfo: TACLTreeListSubClassContentNodeCellViewInfo read GetNodeViewInfo;
+    property NodeViewInfo: TACLTreeListSubClassNodeViewInfo read GetNodeViewInfo;
     property OptionsColumns: TACLTreeListOptionsViewColumns read GetOptionsColumns;
   public
     constructor Create(ASubClass: TACLCompoundControlSubClass; AColumn: TACLTreeListColumn); reintroduce; virtual;
@@ -230,14 +233,13 @@ type
   strict private
     function GetChild(Index: Integer): TACLTreeListSubClassColumnViewInfo; inline;
     function GetFreeSpaceArea: TRect;
-    function GetPainter: TACLTreeListSubClassPainter; inline;
     function GetResizableColumnsList: TList;
     function GetSubClass: TACLTreeListSubClass; inline;
   protected
     function AddColumnCell(AColumn: TACLTreeListColumn): TACLTreeListSubClassColumnViewInfo;
     function CreateColumnViewInfo(AColumn: TACLTreeListColumn): TACLTreeListSubClassColumnViewInfo; virtual;
     //
-    procedure CalculateAutoHeight(var AHeight: Integer); virtual;
+    function CalculateAutoHeight: Integer; virtual;
     procedure CalculateAutoWidth(const R: TRect); virtual;
     procedure CalculateChildren(R: TRect; const AChanges: TIntegerSet); virtual;
     procedure DoCalculate(AChanges: TIntegerSet); override;
@@ -252,7 +254,6 @@ type
     //
     property Children[Index: Integer]: TACLTreeListSubClassColumnViewInfo read GetChild;
     property SubClass: TACLTreeListSubClass read GetSubClass;
-    property Painter: TACLTreeListSubClassPainter read GetPainter;
   end;
 
   { TACLTreeListSubClassContentCell }
@@ -274,24 +275,20 @@ type
   TACLTreeListSubClassContentCellViewInfo = class(TACLCompoundControlSubClassBaseCheckableContentCellViewInfo)
   strict private
     FOwner: TACLTreeListSubClassContentViewInfo;
-
-    function GetIsFocused: Boolean;
-    function GetPainter: TACLTreeListSubClassPainter; inline;
-    function GetSubClass: TACLTreeListSubClass; inline;
+    FSubClass: TACLTreeListSubClass;
   protected
     function GetFocusRectColor: TColor; override;
   public
     constructor Create(AOwner: TACLTreeListSubClassContentViewInfo);
+    function IsFocused: Boolean;
     //
-    property IsFocused: Boolean read GetIsFocused;
     property Owner: TACLTreeListSubClassContentViewInfo read FOwner;
-    property Painter: TACLTreeListSubClassPainter read GetPainter;
-    property SubClass: TACLTreeListSubClass read GetSubClass;
+    property SubClass: TACLTreeListSubClass read FSubClass;
   end;
 
-  { TACLTreeListSubClassContentGroupCellViewInfo }
+  { TACLTreeListSubClassGroupViewInfo }
 
-  TACLTreeListSubClassContentGroupCellViewInfo = class(TACLTreeListSubClassContentCellViewInfo, IACLDraggableObject)
+  TACLTreeListSubClassGroupViewInfo = class(TACLTreeListSubClassContentCellViewInfo, IACLDraggableObject)
   strict private
     function GetGroup: TACLTreeListGroup; inline;
   protected
@@ -301,6 +298,7 @@ type
     procedure CalculateCheckBox(var R: TRect); virtual;
     procedure CalculateExpandButton(var R: TRect); virtual;
     procedure DoDraw(ACanvas: TCanvas); override;
+    function GetContentOffsets: TRect; virtual;
     function GetFocusRect: TRect; override;
     function HasFocusRect: Boolean; override;
 
@@ -316,9 +314,9 @@ type
     property TextRect: TRect read FTextRect;
   end;
 
-  { TACLTreeListSubClassContentNodeCellViewInfo }
+  { TACLTreeListSubClassNodeViewInfo }
 
-  TACLTreeListSubClassContentNodeCellViewInfo = class(TACLTreeListSubClassContentCellViewInfo, IACLDraggableObject)
+  TACLTreeListSubClassNodeViewInfo = class(TACLTreeListSubClassContentCellViewInfo, IACLDraggableObject)
   strict private
     function GetAbsoluteNodeIndex: Integer;
     function GetCellColumnViewInfo(Index: Integer): TACLTreeListSubClassColumnViewInfo;
@@ -347,8 +345,10 @@ type
     procedure DoGetHitTest(const P, AOrigin: TPoint; AInfo: TACLHitTestInfo); override;
     procedure DoGetHitTestSubPart(const P, AOrigin: TPoint; AInfo: TACLHitTestInfo; ACellTextWidth: Integer;
       const ACellRect, ACellTextRect: TRect; AColumnViewInfo: TACLTreeListSubClassColumnViewInfo); virtual;
+    function GetBottomSeparatorRect: TRect; inline;
     function GetCellTextExtends(AColumn: TACLTreeListSubClassColumnViewInfo): TRect; virtual;
     function GetColumnAbsoluteIndex(AColumnViewInfo: TACLTreeListSubClassColumnViewInfo): Integer; inline;
+    function GetContentOffsets: TRect; virtual;
     function GetFocusRect: TRect; override;
     function HasFocusRect: Boolean; override;
     function IsCheckBoxEnabled: Boolean; override;
@@ -358,7 +358,8 @@ type
     procedure DoDraw(ACanvas: TCanvas); override;
     procedure DoDrawCell(ACanvas: TCanvas; const R: TRect; AColumnViewInfo: TACLTreeListSubClassColumnViewInfo);
     procedure DoDrawCellContent(ACanvas: TCanvas; const R: TRect; AColumnViewInfo: TACLTreeListSubClassColumnViewInfo); virtual;
-    procedure DoDrawCellValue(ACanvas: TCanvas; const R: TRect;
+    procedure DoDrawCellImage(ACanvas: TCanvas; const ABounds: TRect); virtual;
+    procedure DoDrawCellValue(ACanvas: TCanvas; const ABounds: TRect;
       const AValue: string; AValueIndex: Integer; AAlignment: TAlignment); virtual;
 
     // IACLDraggableObject
@@ -370,6 +371,7 @@ type
     property Node: TACLTreeListNode read GetNode;
   public
     procedure Calculate(AWidth, AHeight: Integer); override;
+    function CalculateAutoHeight: Integer; virtual;
     function CalculateCellAutoWidth(ACanvas: TCanvas; ANode: TACLTreeListNode;
       AColumnIndex: Integer; AColumnViewInfo: TACLTreeListSubClassColumnViewInfo = nil): Integer; overload; virtual;
     function CalculateCellAutoWidth(ANode: TACLTreeListNode; AColumn: TACLTreeListColumn): Integer; overload;
@@ -393,19 +395,19 @@ type
 
   { TACLTreeListDropTargetViewInfo }
 
-  TACLTreeListDropTargetViewInfo = class(TObject)
+  TACLTreeListDropTargetViewInfo = class
   strict private
     FOwner: TACLTreeListSubClassContentViewInfo;
 
     function GetDragAndDropController: TACLTreeListSubClassDragAndDropController;
     function GetDropTargetObject: TObject;
-    function GetPainter: TACLTreeListSubClassPainter;
   protected
     FBounds: TRect;
     FInsertMode: TACLTreeListDropTargetInsertMode;
 
     function CalculateActualTargetObject: TObject;
     procedure CalculateBounds(const ACellBounds: TRect); virtual;
+    function MeasureHeight: Integer; virtual;
   public
     constructor Create(AOwner: TACLTreeListSubClassContentViewInfo);
     procedure Calculate; virtual;
@@ -416,7 +418,6 @@ type
     property DragAndDropController: TACLTreeListSubClassDragAndDropController read GetDragAndDropController;
     property DropTargetObject: TObject read GetDropTargetObject;
     property Owner: TACLTreeListSubClassContentViewInfo read FOwner;
-    property Painter: TACLTreeListSubClassPainter read GetPainter;
   end;
 
   { TACLTreeListSubClassContentViewInfo }
@@ -428,11 +429,11 @@ type
     FAbsoluteVisibleNodes: TACLTreeListNodeList;
     FColumnBarViewInfo: TACLTreeListSubClassColumnBarViewInfo;
     FDropTargetViewInfo: TACLTreeListDropTargetViewInfo;
-    FGroupViewInfo: TACLTreeListSubClassContentGroupCellViewInfo;
+    FGroupViewInfo: TACLTreeListSubClassGroupViewInfo;
     FLockViewItemsPlacement: Integer;
     FMeasuredGroupHeight: Integer;
     FMeasuredNodeHeight: Integer;
-    FNodeViewInfo: TACLTreeListSubClassContentNodeCellViewInfo;
+    FNodeViewInfo: TACLTreeListSubClassNodeViewInfo;
     FSelectionRect: TRect;
     FViewItems: TACLCompoundControlSubClassContentCellList;
 
@@ -440,7 +441,6 @@ type
     function GetLastVisibleNode: TACLTreeListNode;
     function GetOptionsBehavior: TACLTreeListOptionsBehavior;
     function GetOptionsView: TACLTreeListOptionsView; inline;
-    function GetPainter: TACLTreeListSubClassPainter; inline;
     function GetSubClass: TACLTreeListSubClass; inline;
     procedure SetSelectionRect(const AValue: TRect);
   protected
@@ -454,13 +454,14 @@ type
     procedure CalculateViewItemsPlace; virtual;
     procedure DoCalculate(AChanges: TIntegerSet); override;
     function GetColumnBarBounds: TRect; virtual;
+    function GetLevelIndent: Integer;
     function MeasureContentWidth: Integer; virtual;
 
     // SubCells ViewInfos
     function CreateColumnBarViewInfo: TACLTreeListSubClassColumnBarViewInfo; virtual;
     function CreateDropTargetViewInfo: TACLTreeListDropTargetViewInfo; virtual;
-    function CreateGroupCellViewInfo: TACLTreeListSubClassContentGroupCellViewInfo; virtual;
-    function CreateNodeCellViewInfo: TACLTreeListSubClassContentNodeCellViewInfo; virtual;
+    function CreateGroupViewInfo: TACLTreeListSubClassGroupViewInfo; virtual;
+    function CreateNodeViewInfo: TACLTreeListSubClassNodeViewInfo; virtual;
     function CreateViewItems: TACLCompoundControlSubClassContentCellList; virtual;
 
     function GetLineDownOffset: Integer; virtual;
@@ -480,6 +481,7 @@ type
     // Drawing
     procedure DoDrawCells(ACanvas: TCanvas); override;
     procedure DoDrawFreeSpaceBackground(ACanvas: TCanvas); virtual;
+    procedure DoDrawSelectionRect(ACanvas: TCanvas; const R: TRect); virtual;
   public
     constructor Create(AOwner: TACLCompoundControlSubClass); override;
     destructor Destroy; override;
@@ -501,8 +503,8 @@ type
     //
     property ColumnBarViewInfo: TACLTreeListSubClassColumnBarViewInfo read FColumnBarViewInfo;
     property DropTargetViewInfo: TACLTreeListDropTargetViewInfo read FDropTargetViewInfo;
-    property GroupViewInfo: TACLTreeListSubClassContentGroupCellViewInfo read FGroupViewInfo;
-    property NodeViewInfo: TACLTreeListSubClassContentNodeCellViewInfo read FNodeViewInfo;
+    property GroupViewInfo: TACLTreeListSubClassGroupViewInfo read FGroupViewInfo;
+    property NodeViewInfo: TACLTreeListSubClassNodeViewInfo read FNodeViewInfo;
     //
     property AbsoluteVisibleNodes: TACLTreeListNodeList read FAbsoluteVisibleNodes;
     property FirstVisibleNode: TACLTreeListNode read GetFirstVisibleNode;
@@ -515,7 +517,6 @@ type
     //
     property OptionsBehavior: TACLTreeListOptionsBehavior read GetOptionsBehavior;
     property OptionsView: TACLTreeListOptionsView read GetOptionsView;
-    property Painter: TACLTreeListSubClassPainter read GetPainter;
     property SubClass: TACLTreeListSubClass read GetSubClass;
   end;
 
@@ -541,65 +542,6 @@ type
     property Borders: TACLBorders read GetBorders;
     property BorderWidths: TRect read GetBorderWidths;
     property Content: TACLTreeListSubClassContentViewInfo read FContent;
-  end;
-
-  { TACLTreeListSubClassPainter }
-
-  TACLTreeListSubClassPainter = class(TACLCompoundControlSubClassPersistent)
-  strict private
-    function GetStyleInplaceEdit: TACLStyleEdit; inline;
-    function GetStyle: TACLStyleTreeList; inline;
-    function GetSubClass: TACLTreeListSubClass; inline;
-  public
-    procedure DrawImage(ACanvas: TCanvas; const R: TRect;
-      AImageList: TCustomImageList; AImageIndex: TImageIndex; ASelected: Boolean); virtual;
-    procedure DrawHighlightedText(ACanvas: TCanvas; const AText: UnicodeString;
-      ATextAlignment: TAlignment; const R: TRect; AHighlightStart, AHighlightFinish: Integer);
-    procedure DrawText(ACanvas: TCanvas; const AText: UnicodeString; ATextAlignment: TAlignment; const R: TRect);
-    procedure FlushCache; virtual;
-
-    // CheckBox
-    procedure DrawCheckBox(ACanvas: TCanvas; const R: TRect; AState: TCheckBoxState; AEnabled: Boolean); virtual;
-    function GetCheckBoxSize: TSize; virtual;
-
-    // Column
-    procedure DrawColumnBackground(ACanvas: TCanvas; const R: TRect; ABorders: TACLBorders); virtual;
-    procedure DrawColumnSortArrow(ACanvas: TCanvas; const R: TRect; AForwardDirection: Boolean); virtual;
-    function GetColumnContentOffsets: TRect; virtual;
-    function GetColumnSortArrowSize: TSize; virtual;
-    procedure PrepareCanvasFontForSortingMark(ACanvas: TCanvas); virtual;
-    procedure PrepareCanvasForColumn(ACanvas: TCanvas); virtual;
-
-    // DropTarget
-    procedure DrawDropTarget(ACanvas: TCanvas; const R: TRect; AMode: TACLTreeListDropTargetInsertMode); virtual;
-    function GetDropTargetBorderThin: Integer; virtual;
-
-    // Group
-    procedure DrawGroupBackground(ACanvas: TCanvas; const R: TRect); virtual;
-    procedure DrawGroupExpandButton(ACanvas: TCanvas; const R: TRect; AExpanded: Boolean); virtual;
-    function GetGroupContentOffsets: TRect; virtual;
-    function GetGroupExpandButtonSize: TSize; virtual;
-    procedure PrepareCanvasForGroup(ACanvas: TCanvas); virtual;
-
-    // Node
-    procedure DrawNodeBackground(ACanvas: TCanvas; const R: TRect; AOdd: Boolean; ANode: TACLTreeListNode = nil); virtual;
-    procedure DrawNodeExpandButton(ACanvas: TCanvas; const R: TRect; AExpanded, ASelected: Boolean); virtual;
-    procedure DrawNodeSeparatorHorz(ACanvas: TCanvas; const R: TRect); virtual;
-    procedure DrawNodeSeparatorVert(ACanvas: TCanvas; const R: TRect); virtual;
-    function GetLevelOffset: Integer; virtual;
-    function GetNodeContentOffsets: TRect; virtual;
-    function GetNodeExpandButtonSize: TSize; virtual;
-    procedure PrepareCanvasForNode(ACanvas: TCanvas); overload; inline;
-    procedure PrepareCanvasForNode(ACanvas: TCanvas; ANode: TACLTreeListNode); overload; virtual;
-
-    // Selection Rect
-    procedure DrawSelectionRect(ACanvas: TCanvas; const R: TRect); virtual;
-
-    // Styles
-    property Style: TACLStyleTreeList read GetStyle;
-    property StyleInplaceEdit: TACLStyleEdit read GetStyleInplaceEdit;
-    //
-    property SubClass: TACLTreeListSubClass read GetSubClass;
   end;
 
   { TACLTreeListSubClassHitTest }
@@ -809,7 +751,6 @@ type
     FOptionsCustomizing: TACLTreeListOptionsCustomizing;
     FOptionsSelection: TACLTreeListOptionsSelection;
     FOptionsView: TACLTreeListOptionsView;
-    FPainter: TACLTreeListSubClassPainter;
     FRootNode: TACLTreeListNode;
     FSelection: TACLTreeListNodeList;
     FSorter: TACLTreeListSubClassSorter;
@@ -906,7 +847,6 @@ type
     function CreateOptionsCustomizing: TACLTreeListOptionsCustomizing; virtual;
     function CreateOptionsSelection: TACLTreeListOptionsSelection; virtual;
     function CreateOptionsView: TACLTreeListOptionsView; virtual;
-    function CreatePainter: TACLTreeListSubClassPainter; virtual;
     function CreateSorter: TACLTreeListSubClassSorter; virtual;
     function CreateStyle: TACLStyleTreeList; virtual;
     function CreateViewInfo: TACLCompoundControlSubClassCustomViewInfo; override;
@@ -1022,7 +962,6 @@ type
     function QueryChildInterface(AChild: TObject; const IID: TGUID; var Obj): HRESULT;
 
     property Groups: TACLTreeListGroups read FGroups;
-    property Painter: TACLTreeListSubClassPainter read FPainter;
     property Selection: TACLTreeListNodeList read FSelection;
   public
     constructor Create(AOwner: TComponent); override;
@@ -1085,6 +1024,7 @@ type
     // Styles
     function StyleGetNodeBackgroundColor(AOdd: Boolean; ANode: TACLTreeListNode = nil): TAlphaColor; virtual;
     function StyleGetNodeTextColor(ANode: TACLTreeListNode = nil): TColor; virtual;
+    procedure StylePrepareFont(ACanvas: TCanvas; AFontIndex: Integer = -1; ASuperscript: Boolean = False); virtual;
 
     // Data Properties
     property AbsoluteVisibleNodes: TACLTreeListNodeList read GetAbsoluteVisibleNodes;
@@ -1172,7 +1112,7 @@ uses
   ACL.Threading.Sorting,
   ACL.UI.Controls.TreeList.SubClass.DragAndDrop,
   ACL.Utils.FileSystem,
-  ACL.Utils.Messaging, 
+  ACL.Utils.Messaging,
   ACL.Utils.Stream,
   ACL.Utils.Strings;
 
@@ -1209,9 +1149,22 @@ begin
 end;
 
 procedure TACLStyleTreeList.DrawCheckMark(ACanvas: TCanvas;
-  const R: TRect; AState: TACLButtonState; ACheckBoxState: TCheckBoxState);
+  const R: TRect; AEnabled: Boolean; ACheckBoxState: TCheckBoxState);
+const
+  StateMap: array[Boolean] of TACLButtonState = (absDisabled, absNormal);
 begin
-  CheckMark.Draw(ACanvas.Handle, R, Ord(ACheckBoxState) * 5 + Ord(AState));
+  if not R.IsEmpty then
+    CheckMark.Draw(ACanvas.Handle, R, Ord(ACheckBoxState) * 5 + Ord(StateMap[AEnabled]));
+end;
+
+procedure TACLStyleTreeList.DrawGridline(ACanvas: TCanvas; const R: TRect; ASide: TACLBorder);
+begin
+  acDrawFrameEx(ACanvas.Handle, R, GridColor.Value, [ASide]);
+end;
+
+procedure TACLStyleTreeList.DrawGroupExpandButton(ACanvas: TCanvas; const R: TRect; AExpanded: Boolean);
+begin
+  GroupHeaderExpandButton.Draw(ACanvas.Handle, R, Ord(AExpanded));
 end;
 
 procedure TACLStyleTreeList.DrawGroupHeader(ACanvas: TCanvas; const R: TRect; ABorders: TACLBorders);
@@ -1228,6 +1181,16 @@ end;
 procedure TACLStyleTreeList.DrawHeaderSortingArrow(ACanvas: TCanvas; const R: TRect; ADirection, AEnabled: Boolean);
 begin
   ColumnHeaderSortingArrow.Draw(ACanvas.Handle, R, Ord(ADirection) * 2 + Ord(AEnabled));
+end;
+
+procedure TACLStyleTreeList.DrawRowExpandButton(ACanvas: TCanvas; const R: TRect; AExpanded, ASelected: Boolean);
+var
+  AIndex: Integer;
+begin
+  AIndex := Ord(AExpanded);
+  if RowExpandButton.FrameCount >= 4 then
+    Inc(AIndex, 2 * Ord(ASelected));
+  RowExpandButton.Draw(ACanvas.Handle, R, AIndex);
 end;
 
 procedure TACLStyleTreeList.InitializeResources;
@@ -1316,11 +1279,6 @@ begin
   Result := inherited SubClass as TACLTreeListSubClass;
 end;
 
-function TACLTreeListSubClassCustomViewInfo.GetPainter: TACLTreeListSubClassPainter;
-begin
-  Result := SubClass.Painter;
-end;
-
 { TACLTreeListSubClassColumnViewInfo }
 
 constructor TACLTreeListSubClassColumnViewInfo.Create(ASubClass: TACLCompoundControlSubClass; AColumn: TACLTreeListColumn);
@@ -1334,7 +1292,7 @@ begin
   Result := acRectWidth(Bounds) - acRectWidth(TextRect);
   if Column.TextVisible then
   begin
-    Painter.PrepareCanvasForColumn(MeasureCanvas);
+    SubClass.StylePrepareFont(MeasureCanvas, TACLStyleTreeList.IndexColumnHeaderFont);
     Inc(Result, acTextSize(MeasureCanvas, Column.Caption).cx);
   end
 end;
@@ -1396,9 +1354,11 @@ begin
   FSortArrowIndexRect := acRectSetHeight(FSortArrowIndexRect, ASortArrowSize.cy);
   R.Right := SortArrowIndexRect.Left;
 
-  ASortArrowSize := NullSize;
   if SortByIndex >= 0 then
-    ASortArrowSize := Painter.GetColumnSortArrowSize;
+    ASortArrowSize := SubClass.Style.ColumnHeaderSortingArrow.FrameSize
+  else
+    ASortArrowSize := NullSize;
+
   FSortArrowRect := acRectSetLeft(R, ASortArrowSize.cx);
   FSortArrowRect := acRectCenterVertically(SortArrowRect, ASortArrowSize.cy);
   R.Right := SortArrowRect.Left;
@@ -1432,7 +1392,7 @@ begin
   if IsFirst and SubClass.OptionsView.CheckBoxes then
   begin
     NodeViewInfo.Initialize(nil);
-    Dec(R.Left, Painter.GetNodeContentOffsets.Left);
+    Dec(R.Left, NodeViewInfo.FTextExtends[False].Left);
     FCheckBoxRect := acRectCenterVertically(R, acRectHeight(NodeViewInfo.CheckBoxRect));
     FCheckBoxRect.Left := R.Left + NodeViewInfo.CheckBoxRect.Left;
     FCheckBoxRect.Right := R.Left + NodeViewInfo.CheckBoxRect.Right;
@@ -1444,7 +1404,7 @@ end;
 
 procedure TACLTreeListSubClassColumnViewInfo.CalculateContentRects(R: TRect);
 begin
-  R := acRectContent(R, Painter.GetColumnContentOffsets);
+  R := acRectContent(R, SubClass.Style.ColumnHeader.ContentOffsets);
   CalculateCheckBox(R);
   CalculateSortArea(R);
   R.Right := SortArrowRect.Left - IfThen(SortArrowRect.Width > 0, ScaleFactor.Apply(acIndentBetweenElements));
@@ -1479,11 +1439,11 @@ begin
   try
     if acIntersectClipRegion(ACanvas.Handle, Bounds) then
     begin
-      Painter.PrepareCanvasForColumn(ACanvas);
-      Painter.DrawColumnBackground(ACanvas, Bounds, Borders);
-      Painter.DrawCheckBox(ACanvas, CheckBoxRect, CheckBoxState, True);
-      Painter.DrawImage(ACanvas, ImageRect, OptionsColumns.Images, Column.ImageIndex, False);
-      Painter.DrawText(ACanvas, Column.Caption, Column.TextAlign, TextRect);
+      SubClass.StylePrepareFont(ACanvas, TACLStyleTreeList.IndexColumnHeaderFont);
+      SubClass.Style.DrawHeader(ACanvas, Bounds, Borders);
+      SubClass.Style.DrawCheckMark(ACanvas, CheckBoxRect, True, CheckBoxState);
+      acDrawImage(ACanvas, ImageRect, OptionsColumns.Images, Column.ImageIndex);
+      acTextDraw(ACanvas, Column.Caption, TextRect, Column.TextAlign, taVerticalCenter, True);
       DoDrawSortMark(ACanvas);
     end;
   finally
@@ -1495,8 +1455,8 @@ procedure TACLTreeListSubClassColumnViewInfo.DoDrawSortMark(ACanvas: TCanvas);
 begin
   if SortByIndex >= 0 then
   begin
-    Painter.PrepareCanvasFontForSortingMark(ACanvas);
-    Painter.DrawColumnSortArrow(ACanvas, SortArrowRect, Column.SortDirection <> sdDescending);
+    SubClass.StylePrepareFont(ACanvas, TACLStyleTreeList.IndexColumnHeaderFont, True);
+    SubClass.Style.DrawHeaderSortingArrow(ACanvas, SortArrowRect, Column.SortDirection <> sdDescending, True);
     if not acRectIsEmpty(SortArrowIndexRect) then
       acTextOut(ACanvas, SortArrowIndexRect.Left, SortArrowIndexRect.Top, IntToStr(SortByIndex + 1), 0);
   end;
@@ -1537,7 +1497,7 @@ begin
   begin
     if (SortByIndex >= 0) and IsMultiColumnSorting then
     begin
-      Painter.PrepareCanvasFontForSortingMark(MeasureCanvas);
+      SubClass.StylePrepareFont(MeasureCanvas, TACLStyleTreeList.IndexColumnHeaderFont, True);
       FSortArrowIndexSize := acTextSize(MeasureCanvas, IntToStr(SortByIndex + 1));
     end
     else
@@ -1561,7 +1521,7 @@ begin
   Result := SubClass.GetSortByList.Count > 1;
 end;
 
-function TACLTreeListSubClassColumnViewInfo.GetNodeViewInfo: TACLTreeListSubClassContentNodeCellViewInfo;
+function TACLTreeListSubClassColumnViewInfo.GetNodeViewInfo: TACLTreeListSubClassNodeViewInfo;
 begin
   Result := SubClass.ViewInfo.Content.NodeViewInfo;
 end;
@@ -1586,7 +1546,7 @@ function TACLTreeListSubClassColumnBarViewInfo.MeasureHeight: Integer;
 begin
   Result := SubClass.OptionsView.Columns.Height;
   if Result = tlAutoHeight then
-    CalculateAutoHeight(Result)
+    Result := CalculateAutoHeight
   else
     Result := ScaleFactor.Apply(Result);
 end;
@@ -1613,11 +1573,11 @@ begin
   Result := TACLTreeListSubClassColumnViewInfo.Create(SubClass, AColumn);
 end;
 
-procedure TACLTreeListSubClassColumnBarViewInfo.CalculateAutoHeight(var AHeight: Integer);
+function TACLTreeListSubClassColumnBarViewInfo.CalculateAutoHeight: Integer;
 begin
-  Painter.PrepareCanvasForColumn(MeasureCanvas);
-  AHeight := acMarginHeight(Painter.GetColumnContentOffsets) +
-    Max(Painter.GetCheckBoxSize.cy, acFontHeight(MeasureCanvas));
+  SubClass.StylePrepareFont(MeasureCanvas, TACLStyleTreeList.IndexColumnHeaderFont);
+  Result := acMarginHeight(SubClass.Style.ColumnHeader.ContentOffsets) +
+    Max(SubClass.Style.CheckMark.FrameHeight, acFontHeight(MeasureCanvas));
 end;
 
 procedure TACLTreeListSubClassColumnBarViewInfo.CalculateAutoWidth(const R: TRect);
@@ -1692,7 +1652,7 @@ begin
   if not SubClass.DoCustomDrawColumnBar(ACanvas, Bounds) then
   begin
     inherited DoDraw(ACanvas);
-    Painter.DrawColumnBackground(ACanvas, GetFreeSpaceArea, BordersMap[mTop in SubClass.OptionsView.Borders]);
+    SubClass.Style.DrawHeader(ACanvas, GetFreeSpaceArea, BordersMap[mTop in SubClass.OptionsView.Borders]);
   end;
 end;
 
@@ -1719,11 +1679,6 @@ begin
   Result := Bounds;
   if ChildCount > 0 then
     Result.Left := Children[ChildCount - 1].Bounds.Right;
-end;
-
-function TACLTreeListSubClassColumnBarViewInfo.GetPainter: TACLTreeListSubClassPainter;
-begin
-  Result := SubClass.Painter;
 end;
 
 function TACLTreeListSubClassColumnBarViewInfo.GetResizableColumnsList: TList;
@@ -1765,6 +1720,12 @@ constructor TACLTreeListSubClassContentCellViewInfo.Create(AOwner: TACLTreeListS
 begin
   inherited Create(AOwner);
   FOwner := AOwner;
+  FSubClass := AOwner.SubClass;
+end;
+
+function TACLTreeListSubClassContentCellViewInfo.IsFocused: Boolean;
+begin
+  Result := (FData <> nil) and (FData = SubClass.FocusedObject) and SubClass.Focused;
 end;
 
 function TACLTreeListSubClassContentCellViewInfo.GetFocusRectColor: TColor;
@@ -1772,28 +1733,13 @@ begin
   Result := SubClass.Style.FocusRectColor.AsColor;
 end;
 
-function TACLTreeListSubClassContentCellViewInfo.GetIsFocused: Boolean;
-begin
-  Result := (FData <> nil) and (FData = SubClass.FocusedObject);
-end;
+{ TACLTreeListSubClassGroupViewInfo }
 
-function TACLTreeListSubClassContentCellViewInfo.GetPainter: TACLTreeListSubClassPainter;
-begin
-  Result := SubClass.Painter;
-end;
-
-function TACLTreeListSubClassContentCellViewInfo.GetSubClass: TACLTreeListSubClass;
-begin
-  Result := Owner.SubClass;
-end;
-
-{ TACLTreeListSubClassContentGroupCellViewInfo }
-
-procedure TACLTreeListSubClassContentGroupCellViewInfo.Calculate(AWidth, AHeight: Integer);
+procedure TACLTreeListSubClassGroupViewInfo.Calculate(AWidth, AHeight: Integer);
 begin
   inherited Calculate(AWidth, AHeight);
   FExpandButtonVisible := SubClass.OptionsBehavior.GroupsAllowCollapse;
-  FTextRect := acRectContent(Bounds, Painter.GetGroupContentOffsets);
+  FTextRect := acRectContent(Bounds, GetContentOffsets);
   CalculateExpandButton(FTextRect);
   CalculateCheckBox(FTextRect);
   FBackgroundBounds := Bounds;
@@ -1801,13 +1747,13 @@ begin
     Dec(FBackgroundBounds.Top);
 end;
 
-function TACLTreeListSubClassContentGroupCellViewInfo.CalculateAutoHeight: Integer;
+function TACLTreeListSubClassGroupViewInfo.CalculateAutoHeight: Integer;
 begin
-  Painter.PrepareCanvasForGroup(MeasureCanvas);
-  Result := acFontHeight(MeasureCanvas) + acMarginHeight(Painter.GetGroupContentOffsets);
+  SubClass.StylePrepareFont(MeasureCanvas, TACLStyleTreeList.IndexGroupHeaderFont);
+  Result := acFontHeight(MeasureCanvas) + acMarginHeight(GetContentOffsets);
 end;
 
-procedure TACLTreeListSubClassContentGroupCellViewInfo.Initialize(AData: TObject);
+procedure TACLTreeListSubClassGroupViewInfo.Initialize(AData: TObject);
 var
   AWidth: Integer;
 begin
@@ -1821,68 +1767,76 @@ begin
   end;
 end;
 
-procedure TACLTreeListSubClassContentGroupCellViewInfo.CalculateCheckBox(var R: TRect);
+procedure TACLTreeListSubClassGroupViewInfo.CalculateCheckBox(var R: TRect);
 begin
   FCheckBoxRect := Owner.NodeViewInfo.CheckBoxRect;
   FCheckBoxRect := acRectOffset(CheckBoxRect, 0, acRectCenterVertically(R, CheckBoxRect.Height).Top - CheckBoxRect.Top);
-  R.Left := CheckBoxRect.Left + GetElementWidthIncludeOffset(CheckBoxRect, Painter.ScaleFactor);
+  R.Left := CheckBoxRect.Left + GetElementWidthIncludeOffset(CheckBoxRect, SubClass.ScaleFactor);
 end;
 
-procedure TACLTreeListSubClassContentGroupCellViewInfo.CalculateExpandButton(var R: TRect);
+procedure TACLTreeListSubClassGroupViewInfo.CalculateExpandButton(var R: TRect);
 var
   ASize: TSize;
 begin
   if ExpandButtonVisible then
   begin
-    ASize := Painter.GetGroupExpandButtonSize;
+    ASize := SubClass.Style.GroupHeaderExpandButton.FrameSize;
     FExpandButtonRect := acRectSetRight(R, R.Right, ASize.cx);
     FExpandButtonRect := acRectCenterVertically(ExpandButtonRect, ASize.cy);
-    R.Right := ExpandButtonRect.Right - GetElementWidthIncludeOffset(ExpandButtonRect, Painter.ScaleFactor);
+    R.Right := ExpandButtonRect.Right - GetElementWidthIncludeOffset(ExpandButtonRect, SubClass.ScaleFactor);
   end;
 end;
 
-procedure TACLTreeListSubClassContentGroupCellViewInfo.DoDraw(ACanvas: TCanvas);
+procedure TACLTreeListSubClassGroupViewInfo.DoDraw(ACanvas: TCanvas);
 begin
-  Painter.PrepareCanvasForGroup(ACanvas);
-  Painter.DrawGroupBackground(ACanvas, BackgroundBounds);
-  if not acRectIsEmpty(CheckBoxRect) then
-    Painter.DrawCheckBox(ACanvas, CheckBoxRect, Group.CheckBoxState, True);
+  SubClass.StylePrepareFont(ACanvas, TACLStyleTreeList.IndexGroupHeaderFont);
+  SubClass.Style.DrawGroupHeader(ACanvas, BackgroundBounds);
+  SubClass.Style.DrawCheckMark(ACanvas, CheckBoxRect, True, Group.CheckBoxState);
   if ExpandButtonVisible then
-    Painter.DrawGroupExpandButton(ACanvas, ExpandButtonRect, Group.Expanded);
+    SubClass.Style.DrawGroupExpandButton(ACanvas, ExpandButtonRect, Group.Expanded);
   acTextDraw(ACanvas, Group.Caption, TextRect, taLeftJustify, taVerticalCenter, True);
 end;
 
-function TACLTreeListSubClassContentGroupCellViewInfo.GetFocusRect: TRect;
+function TACLTreeListSubClassGroupViewInfo.GetContentOffsets: TRect;
+begin
+  Result := SubClass.ScaleFactor.Apply(SubClass.Style.GroupHeaderContentOffsets.Value);
+end;
+
+function TACLTreeListSubClassGroupViewInfo.GetFocusRect: TRect;
 begin
   Result := inherited GetFocusRect;
   Dec(Result.Bottom);
 end;
 
-function TACLTreeListSubClassContentGroupCellViewInfo.HasFocusRect: Boolean;
+function TACLTreeListSubClassGroupViewInfo.HasFocusRect: Boolean;
 begin
   Result := IsFocused and SubClass.Focused;
 end;
 
-function TACLTreeListSubClassContentGroupCellViewInfo.CreateDragObject(
+function TACLTreeListSubClassGroupViewInfo.CreateDragObject(
   const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlSubClassDragObject;
 begin
   Result := TACLTreeListSubClassGroupDragObject.Create(TACLTreeListSubClassHitTest(AHitTestInfo).Group);
 end;
 
-function TACLTreeListSubClassContentGroupCellViewInfo.GetGroup: TACLTreeListGroup;
+function TACLTreeListSubClassGroupViewInfo.GetGroup: TACLTreeListGroup;
 begin
   Result := TACLTreeListGroup(FData);
 end;
 
-{ TACLTreeListSubClassContentNodeCellViewInfo }
+{ TACLTreeListSubClassNodeViewInfo }
 
-procedure TACLTreeListSubClassContentNodeCellViewInfo.Calculate(AWidth, AHeight: Integer);
+procedure TACLTreeListSubClassNodeViewInfo.Calculate(AWidth, AHeight: Integer);
+var
+  AHasGridlineColor: Boolean;
 begin
-  FHasHorzSeparators := (tlglHorzontal in OptionsNodes.GridLines) and SubClass.Style.GridColor.Value.IsValid;
-  FHasVertSeparators := (tlglVertical in OptionsNodes.GridLines) and SubClass.Style.GridColor.Value.IsValid;
+  AHasGridlineColor := SubClass.Style.GridColor.Value.IsValid;
+  FHasHorzSeparators := (tlglHorzontal in OptionsNodes.GridLines) and AHasGridlineColor;
+  FHasVertSeparators := (tlglVertical in OptionsNodes.GridLines) and AHasGridlineColor;
+
   inherited Calculate(AWidth, AHeight);
 
-  FTextExtends[True] := Painter.GetNodeContentOffsets;
+  FTextExtends[True] := GetContentOffsets;
   FTextExtends[False] := FTextExtends[True];
 
   CalculateExpandButtonRect;
@@ -1890,7 +1844,13 @@ begin
   CalculateImageRect;
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.CalculateCellAutoWidth(ACanvas: TCanvas;
+function TACLTreeListSubClassNodeViewInfo.CalculateAutoHeight: Integer;
+begin
+  SubClass.StylePrepareFont(MeasureCanvas);
+  Result := acFontHeight(MeasureCanvas) + acMarginHeight(GetContentOffsets);
+end;
+
+function TACLTreeListSubClassNodeViewInfo.CalculateCellAutoWidth(ACanvas: TCanvas;
   ANode: TACLTreeListNode; AColumnIndex: Integer; AColumnViewInfo: TACLTreeListSubClassColumnViewInfo = nil): Integer;
 var
   AText: string;
@@ -1898,13 +1858,13 @@ var
 begin
   Initialize(ANode);
   AText := ANode[AColumnIndex];
-  Painter.PrepareCanvasForNode(ACanvas);
+  SubClass.StylePrepareFont(ACanvas);
   SubClass.DoGetNodeCellDisplayText(ANode, AColumnIndex, AText);
   SubClass.DoGetNodeCellStyle(ACanvas.Font, ANode, GetColumnForViewInfo(AColumnViewInfo), ATextAlign);
   Result := acTextSize(ACanvas, AText).cx + acMarginWidth(CellTextExtends[AColumnViewInfo]);
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.CalculateCellAutoWidth(
+function TACLTreeListSubClassNodeViewInfo.CalculateCellAutoWidth(
   ANode: TACLTreeListNode; AColumn: TACLTreeListColumn): Integer;
 var
   AList: TACLTreeListNodeList;
@@ -1919,7 +1879,7 @@ begin
   end;
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.CalculateCellAutoWidth(
+function TACLTreeListSubClassNodeViewInfo.CalculateCellAutoWidth(
   ANodes: TACLTreeListNodeList; AColumn: TACLTreeListColumn): Integer;
 var
   AColumnViewInfo: TACLTreeListSubClassColumnViewInfo;
@@ -1930,7 +1890,7 @@ begin
     Result := 0;
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.CalculateCellAutoWidth(
+function TACLTreeListSubClassNodeViewInfo.CalculateCellAutoWidth(
   ANodes: TACLTreeListNodeList; AColumnIndex: Integer; AColumnViewInfo: TACLTreeListSubClassColumnViewInfo = nil): Integer;
 var
   I: Integer;
@@ -1940,7 +1900,7 @@ begin
     Result := Max(Result, CalculateCellAutoWidth(MeasureCanvas, ANodes[I], AColumnIndex, AColumnViewInfo));
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.GetCellIndexAtPoint(const P: TPoint; out ACellIndex: Integer): Boolean;
+function TACLTreeListSubClassNodeViewInfo.GetCellIndexAtPoint(const P: TPoint; out ACellIndex: Integer): Boolean;
 var
   I: Integer;
 begin
@@ -1953,19 +1913,19 @@ begin
   Result := False;
 end;
 
-procedure TACLTreeListSubClassContentNodeCellViewInfo.CalculateCheckBoxRect;
+procedure TACLTreeListSubClassNodeViewInfo.CalculateCheckBoxRect;
 begin
-  FCheckBoxRect := PlaceLeftAlignedElement(Painter.GetCheckBoxSize, SubClass.OptionsView.CheckBoxes);
+  FCheckBoxRect := PlaceLeftAlignedElement(SubClass.Style.CheckMark.FrameSize, SubClass.OptionsView.CheckBoxes);
 end;
 
-procedure TACLTreeListSubClassContentNodeCellViewInfo.CalculateExpandButtonRect;
+procedure TACLTreeListSubClassNodeViewInfo.CalculateExpandButtonRect;
 begin
   if Owner.HasSubLevels then
-    Inc(FTextExtends[True].Left, Painter.GetLevelOffset * Level);
-  FExpandButtonRect := PlaceLeftAlignedElement(Painter.GetNodeExpandButtonSize, Owner.HasSubLevels);
+    Inc(FTextExtends[True].Left, Owner.GetLevelIndent * Level);
+  FExpandButtonRect := PlaceLeftAlignedElement(SubClass.Style.RowExpandButton.FrameSize, Owner.HasSubLevels);
 end;
 
-procedure TACLTreeListSubClassContentNodeCellViewInfo.CalculateImageRect;
+procedure TACLTreeListSubClassNodeViewInfo.CalculateImageRect;
 var
   ACellRect: TRect;
   ASize: TSize;
@@ -1980,18 +1940,18 @@ begin
     taLeftJustify:
       begin
         FImageRect := acRectSetLeft(ACellRect, FTextExtends[True].Left, ASize.cx);
-        Inc(FTextExtends[True].Left, GetElementWidthIncludeOffset(ImageRect, Painter.ScaleFactor));
+        Inc(FTextExtends[True].Left, GetElementWidthIncludeOffset(ImageRect, SubClass.ScaleFactor));
       end;
 
     taRightJustify:
       begin
         FImageRect := acRectSetRight(ACellRect, ACellRect.Right - FTextExtends[True].Right, ASize.cx);
-        Inc(FTextExtends[True].Right, GetElementWidthIncludeOffset(ImageRect, Painter.ScaleFactor));
+        Inc(FTextExtends[True].Right, GetElementWidthIncludeOffset(ImageRect, SubClass.ScaleFactor));
       end;
   end;
 end;
 
-procedure TACLTreeListSubClassContentNodeCellViewInfo.DoGetHitTest(const P, AOrigin: TPoint; AInfo: TACLHitTestInfo);
+procedure TACLTreeListSubClassNodeViewInfo.DoGetHitTest(const P, AOrigin: TPoint; AInfo: TACLHitTestInfo);
 var
   ACellAutoWidth: Integer;
   ACellIndex: Integer;
@@ -2033,19 +1993,19 @@ begin
   end;
 end;
 
-procedure TACLTreeListSubClassContentNodeCellViewInfo.DoGetHitTestSubPart(
+procedure TACLTreeListSubClassNodeViewInfo.DoGetHitTestSubPart(
   const P, AOrigin: TPoint; AInfo: TACLHitTestInfo; ACellTextWidth: Integer;
   const ACellRect, ACellTextRect: TRect; AColumnViewInfo: TACLTreeListSubClassColumnViewInfo);
 begin
   // do nothing
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.GetCellTextExtends(AColumn: TACLTreeListSubClassColumnViewInfo): TRect;
+function TACLTreeListSubClassNodeViewInfo.GetCellTextExtends(AColumn: TACLTreeListSubClassColumnViewInfo): TRect;
 begin
   Result := FTextExtends[IsFirstColumn(AColumn)];
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.GetColumnAbsoluteIndex(AColumnViewInfo: TACLTreeListSubClassColumnViewInfo): Integer;
+function TACLTreeListSubClassNodeViewInfo.GetColumnAbsoluteIndex(AColumnViewInfo: TACLTreeListSubClassColumnViewInfo): Integer;
 begin
   if AColumnViewInfo <> nil then
     Result := AColumnViewInfo.AbsoluteIndex
@@ -2053,7 +2013,7 @@ begin
     Result := 0;
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.GetFocusRect: TRect;
+function TACLTreeListSubClassNodeViewInfo.GetFocusRect: TRect;
 var
   AViewInfo: TACLTreeListSubClassColumnViewInfo;
 begin
@@ -2063,38 +2023,40 @@ begin
     Result := inherited GetFocusRect;
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.HasFocusRect: Boolean;
+function TACLTreeListSubClassNodeViewInfo.HasFocusRect: Boolean;
 begin
   Result := IsFocused and not Node.Selected;
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.IsCheckBoxEnabled: Boolean;
+function TACLTreeListSubClassNodeViewInfo.IsCheckBoxEnabled: Boolean;
 begin
   Result := Node.CheckMarkEnabled;
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.DoCustomDraw(ACanvas: TCanvas): Boolean;
+function TACLTreeListSubClassNodeViewInfo.DoCustomDraw(ACanvas: TCanvas): Boolean;
 begin
   Result := (Node <> nil) and SubClass.DoCustomDrawNode(ACanvas, Bounds, Node);
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.DoCustomDrawCell(
+function TACLTreeListSubClassNodeViewInfo.DoCustomDrawCell(
   ACanvas: TCanvas; const R: TRect; AColumn: TACLTreeListColumn): Boolean;
 begin
   Result := (Node <> nil) and SubClass.DoCustomDrawNodeCell(ACanvas, R, Node, AColumn);
 end;
 
-procedure TACLTreeListSubClassContentNodeCellViewInfo.DoDraw(ACanvas: TCanvas);
+procedure TACLTreeListSubClassNodeViewInfo.DoDraw(ACanvas: TCanvas);
 var
   I: Integer;
 begin
-  Painter.DrawNodeBackground(ACanvas, Bounds, Odd(AbsoluteNodeIndex), Node);
-  if IsFocused and SubClass.Focused and (SubClass.FocusedColumn <> nil) then
+  acFillRect(ACanvas.Handle, Bounds, SubClass.StyleGetNodeBackgroundColor(Odd(AbsoluteNodeIndex), Node));
+  if IsFocused and (SubClass.FocusedColumn <> nil) and SubClass.Focused then
     acFillRect(ACanvas.Handle, GetFocusRect, SubClass.Style.RowColorFocused.Value);
   if HasHorzSeparators then
-    Painter.DrawNodeSeparatorHorz(ACanvas, acRectSetTop(Bounds, Bounds.Bottom, 1));
+    SubClass.Style.DrawGridline(ACanvas, GetBottomSeparatorRect, mBottom);
 
-  Painter.PrepareCanvasForNode(ACanvas, Node);
+  SubClass.StylePrepareFont(ACanvas);
+  ACanvas.Font.Color := SubClass.StyleGetNodeTextColor(Node);
+
   if not DoCustomDraw(ACanvas) then
   begin
     for I := 0 to CellCount - 1 do
@@ -2102,7 +2064,7 @@ begin
   end;
 end;
 
-procedure TACLTreeListSubClassContentNodeCellViewInfo.DoDrawCell(
+procedure TACLTreeListSubClassNodeViewInfo.DoDrawCell(
   ACanvas: TCanvas; const R: TRect; AColumnViewInfo: TACLTreeListSubClassColumnViewInfo);
 var
   ASaveIndex: HRGN;
@@ -2120,11 +2082,11 @@ begin
       end;
     end;
     if HasVertSeparators and (AColumnViewInfo <> nil) and (mRight in AColumnViewInfo.Borders) then
-      Painter.DrawNodeSeparatorVert(ACanvas, R);
+      SubClass.Style.DrawGridline(ACanvas, R, mRight);
   end;
 end;
 
-procedure TACLTreeListSubClassContentNodeCellViewInfo.DoDrawCellContent(
+procedure TACLTreeListSubClassNodeViewInfo.DoDrawCellContent(
   ACanvas: TCanvas; const R: TRect; AColumnViewInfo: TACLTreeListSubClassColumnViewInfo);
 var
   AAlignment: TAlignment;
@@ -2136,9 +2098,11 @@ begin
     if IsFirstColumn(AColumnViewInfo) then
     begin
       if ExpandButtonVisible then
-        Painter.DrawNodeExpandButton(ACanvas, ExpandButtonRect, Node.Expanded, Node.Selected);
-      Painter.DrawCheckBox(ACanvas, CheckBoxRect, Node.CheckState, Node.CheckMarkEnabled and SubClass.EnabledContent);
-      Painter.DrawImage(ACanvas, ImageRect, OptionsNodes.Images, Node.ImageIndex, Node.Selected);
+        SubClass.Style.DrawRowExpandButton(ACanvas, ExpandButtonRect, Node.Expanded, Node.Selected);
+      if not CheckBoxRect.IsEmpty then
+        SubClass.Style.DrawCheckMark(ACanvas, CheckBoxRect, Node.CheckMarkEnabled and SubClass.EnabledContent, Node.CheckState);
+      if not ImageRect.IsEmpty then
+        DoDrawCellImage(ACanvas, ImageRect);
     end;
     AValueIndex := GetColumnAbsoluteIndex(AColumnViewInfo);
     AValue := Node.Values[AValueIndex];
@@ -2148,33 +2112,45 @@ begin
   end;
 end;
 
-procedure TACLTreeListSubClassContentNodeCellViewInfo.DoDrawCellValue(ACanvas: TCanvas;
-  const R: TRect; const AValue: string; AValueIndex: Integer; AAlignment: TAlignment);
+procedure TACLTreeListSubClassNodeViewInfo.DoDrawCellImage(ACanvas: TCanvas; const ABounds: TRect);
+begin
+  acDrawImage(ACanvas, ABounds, OptionsNodes.Images, Node.ImageIndex);
+end;
+
+procedure TACLTreeListSubClassNodeViewInfo.DoDrawCellValue(ACanvas: TCanvas;
+  const ABounds: TRect; const AValue: string; AValueIndex: Integer; AAlignment: TAlignment);
 var
   AHighlightStart, AHighlightFinish: Integer;
 begin
-  if not SubClass.DoCustomDrawNodeCellValue(ACanvas, R, Node, AValue, AValueIndex, AAlignment) then
+  if not SubClass.DoCustomDrawNodeCellValue(ACanvas, ABounds, Node, AValue, AValueIndex, AAlignment) then
   begin
     if IsFocused and SubClass.GetHighlightBounds(AValue, AValueIndex, AHighlightStart, AHighlightFinish) then
-      Painter.DrawHighlightedText(ACanvas, AValue, AAlignment, R, AHighlightStart, AHighlightFinish)
+      acTextDrawHighlight(ACanvas, AValue, ABounds, AAlignment,
+        taVerticalCenter, True, AHighlightStart, AHighlightFinish,
+        SubClass.Style.IncSearchColor.AsColor, SubClass.Style.IncSearchColorText.AsColor)
     else
-      Painter.DrawText(ACanvas, AValue, AAlignment, R);
+      acTextDraw(ACanvas, AValue, ABounds, AAlignment, taVerticalCenter, True);
   end;
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.CreateDragObject(const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlSubClassDragObject;
+function TACLTreeListSubClassNodeViewInfo.CreateDragObject(const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlSubClassDragObject;
 begin
   Result := TACLTreeListSubClassNodeDragObject.Create(TACLTreeListSubClassHitTest(AHitTestInfo).Node);
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.GetAbsoluteNodeIndex: Integer;
+function TACLTreeListSubClassNodeViewInfo.GetAbsoluteNodeIndex: Integer;
 begin
   if FAbsoluteNodeIndex < 0 then
     FAbsoluteNodeIndex := Node.AbsoluteVisibleIndex;
   Result := FAbsoluteNodeIndex;
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.GetCellColumnViewInfo(Index: Integer): TACLTreeListSubClassColumnViewInfo;
+function TACLTreeListSubClassNodeViewInfo.GetBottomSeparatorRect: TRect;
+begin
+  Result := acRectSetTop(Bounds, Bounds.Bottom, 1);
+end;
+
+function TACLTreeListSubClassNodeViewInfo.GetCellColumnViewInfo(Index: Integer): TACLTreeListSubClassColumnViewInfo;
 begin
   if ColumnBarViewInfo.ChildCount > 0 then
     Result := ColumnBarViewInfo.Children[Index]
@@ -2182,17 +2158,17 @@ begin
     Result := nil;
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.GetCellCount: Integer;
+function TACLTreeListSubClassNodeViewInfo.GetCellCount: Integer;
 begin
   Result := Max(1, ColumnBarViewInfo.ChildCount);
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.GetCellRect(AIndex: Integer): TRect;
+function TACLTreeListSubClassNodeViewInfo.GetCellRect(AIndex: Integer): TRect;
 begin
   Result := GetCellRect(CellColumnViewInfo[AIndex]);
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.GetCellRect(AViewInfo: TACLTreeListSubClassColumnViewInfo): TRect;
+function TACLTreeListSubClassNodeViewInfo.GetCellRect(AViewInfo: TACLTreeListSubClassColumnViewInfo): TRect;
 begin
   if AViewInfo <> nil then
   begin
@@ -2204,12 +2180,12 @@ begin
     Result := Bounds;
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.GetColumnBarViewInfo: TACLTreeListSubClassColumnBarViewInfo;
+function TACLTreeListSubClassNodeViewInfo.GetColumnBarViewInfo: TACLTreeListSubClassColumnBarViewInfo;
 begin
   Result := Owner.ColumnBarViewInfo;
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.GetColumnForViewInfo(AColumnViewInfo: TACLTreeListSubClassColumnViewInfo): TACLTreeListColumn;
+function TACLTreeListSubClassNodeViewInfo.GetColumnForViewInfo(AColumnViewInfo: TACLTreeListSubClassColumnViewInfo): TACLTreeListColumn;
 begin
   if AColumnViewInfo <> nil then
     Result := AColumnViewInfo.Column
@@ -2217,22 +2193,27 @@ begin
     Result := nil;
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.GetNode: TACLTreeListNode;
+function TACLTreeListSubClassNodeViewInfo.GetContentOffsets: TRect;
+begin
+  Result := SubClass.ScaleFactor.Apply(SubClass.Style.RowContentOffsets.Value);
+end;
+
+function TACLTreeListSubClassNodeViewInfo.GetNode: TACLTreeListNode;
 begin
   Result := TACLTreeListNode(FData)
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.GetOptionsNodes: TACLTreeListOptionsViewNodes;
+function TACLTreeListSubClassNodeViewInfo.GetOptionsNodes: TACLTreeListOptionsViewNodes;
 begin
   Result := SubClass.OptionsView.Nodes;
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.IsFirstColumn(AColumnViewInfo: TACLTreeListSubClassColumnViewInfo): Boolean;
+function TACLTreeListSubClassNodeViewInfo.IsFirstColumn(AColumnViewInfo: TACLTreeListSubClassColumnViewInfo): Boolean;
 begin
   Result := (AColumnViewInfo = nil) or AColumnViewInfo.IsFirst;
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.MeasureHeight: Integer;
+function TACLTreeListSubClassNodeViewInfo.MeasureHeight: Integer;
 begin
   Result := FHeight;
   if Node <> nil then
@@ -2241,7 +2222,7 @@ begin
     Inc(Result);
 end;
 
-procedure TACLTreeListSubClassContentNodeCellViewInfo.Initialize(AData: TObject);
+procedure TACLTreeListSubClassNodeViewInfo.Initialize(AData: TObject);
 begin
   inherited Initialize(AData);
 
@@ -2255,21 +2236,21 @@ begin
     Level := 0;
 end;
 
-procedure TACLTreeListSubClassContentNodeCellViewInfo.Initialize(AData: TObject; AHeight: Integer);
+procedure TACLTreeListSubClassNodeViewInfo.Initialize(AData: TObject; AHeight: Integer);
 begin
   inherited Initialize(AData, AHeight - Ord(HasHorzSeparators));
 end;
 
-function TACLTreeListSubClassContentNodeCellViewInfo.PlaceLeftAlignedElement(ASize: TSize; AVisible: Boolean): TRect;
+function TACLTreeListSubClassNodeViewInfo.PlaceLeftAlignedElement(ASize: TSize; AVisible: Boolean): TRect;
 begin
   if not AVisible then
     ASize := NullSize;
   Result := acRectCenterVertically(Bounds, ASize.cy);
   Result := acRectSetLeft(Result, FTextExtends[True].Left, ASize.cx);
-  Inc(FTextExtends[True].Left, GetElementWidthIncludeOffset(Result, Painter.ScaleFactor));
+  Inc(FTextExtends[True].Left, GetElementWidthIncludeOffset(Result, SubClass.ScaleFactor));
 end;
 
-procedure TACLTreeListSubClassContentNodeCellViewInfo.SetLevel(AValue: Integer);
+procedure TACLTreeListSubClassNodeViewInfo.SetLevel(AValue: Integer);
 begin
   AValue := Max(AValue, 0);
   if FLevel <> AValue then
@@ -2313,13 +2294,27 @@ begin
 end;
 
 procedure TACLTreeListDropTargetViewInfo.Draw(ACanvas: TCanvas);
+var
+  AColor: TAlphaColor;
 begin
-  Painter.DrawDropTarget(ACanvas, Bounds, FInsertMode);
+  if not Bounds.IsEmpty then
+  begin
+    AColor := Owner.SubClass.Style.RowColorText.Value;
+    if FInsertMode = dtimOver then
+      acDrawFrame(ACanvas.Handle, Bounds, AColor, MeasureHeight)
+    else
+      acFillRect(ACanvas.Handle, Bounds, AColor);
+  end;
 end;
 
 procedure TACLTreeListDropTargetViewInfo.Invalidate;
 begin
   Owner.SubClass.InvalidateRect(Bounds);
+end;
+
+function TACLTreeListDropTargetViewInfo.MeasureHeight: Integer;
+begin
+  Result := Owner.ScaleFactor.Apply(3);
 end;
 
 function TACLTreeListDropTargetViewInfo.CalculateActualTargetObject: TObject;
@@ -2355,11 +2350,11 @@ begin
     dtimAfter:
       FBounds := acRectSetBottom(FBounds, FBounds.Bottom, 0);
     dtimInto:
-      FBounds := Rect(FBounds.Left + 2 * Painter.GetLevelOffset, FBounds.Bottom, FBounds.Right, FBounds.Bottom);
+      FBounds := Rect(FBounds.Left + 2 * Owner.GetLevelIndent, FBounds.Bottom, FBounds.Right, FBounds.Bottom);
     dtimOver:
       Exit;
   end;
-  FBounds := acRectCenterVertically(FBounds, Painter.GetDropTargetBorderThin);
+  FBounds := acRectCenterVertically(FBounds, MeasureHeight);
 end;
 
 function TACLTreeListDropTargetViewInfo.GetDragAndDropController: TACLTreeListSubClassDragAndDropController;
@@ -2372,11 +2367,6 @@ begin
   Result := DragAndDropController.DropTargetObject;
 end;
 
-function TACLTreeListDropTargetViewInfo.GetPainter: TACLTreeListSubClassPainter;
-begin
-  Result := Owner.Painter;
-end;
-
 { TACLTreeListSubClassContentViewInfo }
 
 constructor TACLTreeListSubClassContentViewInfo.Create(AOwner: TACLCompoundControlSubClass);
@@ -2387,8 +2377,8 @@ begin
   FAbsoluteVisibleNodes := TACLTreeListNodeList.Create;
   FDropTargetViewInfo := CreateDropTargetViewInfo;
   FColumnBarViewInfo := CreateColumnBarViewInfo;
-  FGroupViewInfo := CreateGroupCellViewInfo;
-  FNodeViewInfo := CreateNodeCellViewInfo;
+  FGroupViewInfo := CreateGroupViewInfo;
+  FNodeViewInfo := CreateNodeViewInfo;
   FViewItems := CreateViewItems;
 end;
 
@@ -2525,10 +2515,7 @@ begin
   if Result = tlAutoHeight then
   begin
     if FMeasuredNodeHeight = -1 then
-    begin
-      Painter.PrepareCanvasForNode(MeasureCanvas);
-      FMeasuredNodeHeight := acFontHeight(MeasureCanvas) + acMarginHeight(Painter.GetNodeContentOffsets);
-    end;
+      FMeasuredNodeHeight := NodeViewInfo.CalculateAutoHeight;
     Result := FMeasuredNodeHeight;
   end
   else
@@ -2647,14 +2634,14 @@ begin
   Result := TACLTreeListDropTargetViewInfo.Create(Self);
 end;
 
-function TACLTreeListSubClassContentViewInfo.CreateGroupCellViewInfo: TACLTreeListSubClassContentGroupCellViewInfo;
+function TACLTreeListSubClassContentViewInfo.CreateGroupViewInfo: TACLTreeListSubClassGroupViewInfo;
 begin
-  Result := TACLTreeListSubClassContentGroupCellViewInfo.Create(Self);
+  Result := TACLTreeListSubClassGroupViewInfo.Create(Self);
 end;
 
-function TACLTreeListSubClassContentViewInfo.CreateNodeCellViewInfo: TACLTreeListSubClassContentNodeCellViewInfo;
+function TACLTreeListSubClassContentViewInfo.CreateNodeViewInfo: TACLTreeListSubClassNodeViewInfo;
 begin
-  Result := TACLTreeListSubClassContentNodeCellViewInfo.Create(Self);
+  Result := TACLTreeListSubClassNodeViewInfo.Create(Self);
 end;
 
 function TACLTreeListSubClassContentViewInfo.CreateViewItems: TACLCompoundControlSubClassContentCellList;
@@ -2767,7 +2754,7 @@ begin
   begin
     ViewItems.Draw(ACanvas);
     DoDrawFreeSpaceBackground(ACanvas);
-    Painter.DrawSelectionRect(ACanvas, acRectOffset(SelectionRect, ViewItemsOrigin));
+    DoDrawSelectionRect(ACanvas, acRectOffset(SelectionRect, ViewItemsOrigin));
     DropTargetViewInfo.Draw(ACanvas);
   end;
 end;
@@ -2791,6 +2778,11 @@ begin
   end;
 end;
 
+procedure TACLTreeListSubClassContentViewInfo.DoDrawSelectionRect(ACanvas: TCanvas; const R: TRect);
+begin
+  acDrawSelectionRect(ACanvas.Handle, R, SubClass.Style.SelectionRectColor.Value);
+end;
+
 function TACLTreeListSubClassContentViewInfo.GetFirstVisibleNode: TACLTreeListNode;
 var
   ACell: TACLCompoundControlSubClassBaseContentCell;
@@ -2811,6 +2803,11 @@ begin
     Result := nil;
 end;
 
+function TACLTreeListSubClassContentViewInfo.GetLevelIndent: Integer;
+begin
+  Result := SubClass.Style.RowExpandButton.FrameWidth + ScaleFactor.Apply(acIndentBetweenElements);
+end;
+
 function TACLTreeListSubClassContentViewInfo.GetOptionsBehavior: TACLTreeListOptionsBehavior;
 begin
   Result := SubClass.OptionsBehavior;
@@ -2819,11 +2816,6 @@ end;
 function TACLTreeListSubClassContentViewInfo.GetOptionsView: TACLTreeListOptionsView;
 begin
   Result := SubClass.OptionsView;
-end;
-
-function TACLTreeListSubClassContentViewInfo.GetPainter: TACLTreeListSubClassPainter;
-begin
-  Result := SubClass.Painter;
 end;
 
 function TACLTreeListSubClassContentViewInfo.GetSubClass: TACLTreeListSubClass;
@@ -2876,7 +2868,7 @@ end;
 
 procedure TACLTreeListSubClassViewInfo.DoDraw(ACanvas: TCanvas);
 begin
-  Painter.Style.DrawBackground(ACanvas, Bounds, SubClass.EnabledContent, Borders);
+  SubClass.Style.DrawBackground(ACanvas, Bounds, SubClass.EnabledContent, Borders);
   Content.Draw(ACanvas);
 end;
 
@@ -2888,197 +2880,6 @@ end;
 function TACLTreeListSubClassViewInfo.GetBorderWidths: TRect;
 begin
   Result := acBorderOffsets;
-end;
-
-{ TACLTreeListSubClassPainter }
-
-procedure TACLTreeListSubClassPainter.DrawImage(ACanvas: TCanvas;
-  const R: TRect; AImageList: TCustomImageList; AImageIndex: TImageIndex; ASelected: Boolean);
-begin
-  acDrawImage(ACanvas, R, AImageList, AImageIndex);
-end;
-
-procedure TACLTreeListSubClassPainter.DrawHighlightedText(ACanvas: TCanvas; const AText: UnicodeString;
-  ATextAlignment: TAlignment; const R: TRect; AHighlightStart, AHighlightFinish: Integer);
-begin
-  acTextDrawHighlight(ACanvas, AText, R,
-    ATextAlignment, taVerticalCenter, True, AHighlightStart, AHighlightFinish,
-    Style.IncSearchColor.AsColor, Style.IncSearchColorText.AsColor);
-end;
-
-procedure TACLTreeListSubClassPainter.DrawText(ACanvas: TCanvas;
-  const AText: UnicodeString; ATextAlignment: TAlignment; const R: TRect);
-begin
-  acTextDraw(ACanvas, AText, R, ATextAlignment, taVerticalCenter, True);
-end;
-
-procedure TACLTreeListSubClassPainter.FlushCache;
-begin
-  // do nothing
-end;
-
-procedure TACLTreeListSubClassPainter.DrawCheckBox(ACanvas: TCanvas; const R: TRect; AState: TCheckBoxState; AEnabled: Boolean);
-const
-  StateMap: array[Boolean] of TACLButtonState = (absDisabled, absNormal);
-begin
-  if not acRectIsEmpty(R) then
-    Style.DrawCheckMark(ACanvas, R, StateMap[AEnabled], AState);
-end;
-
-function TACLTreeListSubClassPainter.GetCheckBoxSize: TSize;
-begin
-  Result := Style.CheckMark.FrameSize;
-end;
-
-procedure TACLTreeListSubClassPainter.DrawColumnBackground(ACanvas: TCanvas; const R: TRect; ABorders: TACLBorders);
-begin
-  Style.DrawHeader(ACanvas, R, ABorders);
-end;
-
-procedure TACLTreeListSubClassPainter.DrawColumnSortArrow(ACanvas: TCanvas; const R: TRect; AForwardDirection: Boolean);
-begin
-  Style.DrawHeaderSortingArrow(ACanvas, R, AForwardDirection, True);
-end;
-
-function TACLTreeListSubClassPainter.GetColumnContentOffsets: TRect;
-begin
-  Result := Style.ColumnHeader.ContentOffsets;
-end;
-
-function TACLTreeListSubClassPainter.GetColumnSortArrowSize: TSize;
-begin
-  Result := Style.ColumnHeaderSortingArrow.FrameSize;
-end;
-
-procedure TACLTreeListSubClassPainter.PrepareCanvasFontForSortingMark(ACanvas: TCanvas);
-begin
-  PrepareCanvasForColumn(ACanvas);
-  ACanvas.Font.Height := MulDiv(ACanvas.Font.Height, 2, 3);
-end;
-
-procedure TACLTreeListSubClassPainter.PrepareCanvasForColumn(ACanvas: TCanvas);
-begin
-  ACanvas.Brush.Style := bsSolid;
-  ACanvas.Font.Assign(Style.ColumnHeaderFont);
-  ACanvas.Brush.Style := bsClear;
-end;
-
-procedure TACLTreeListSubClassPainter.DrawDropTarget(ACanvas: TCanvas; const R: TRect; AMode: TACLTreeListDropTargetInsertMode);
-begin
-  if not acRectIsEmpty(R) then
-  begin
-    if AMode = dtimOver then
-      acDrawFrame(ACanvas.Handle, R, Style.RowColorText.Value, GetDropTargetBorderThin)
-    else
-      acFillRect(ACanvas.Handle, R, Style.RowColorText.Value);
-  end;
-end;
-
-function TACLTreeListSubClassPainter.GetDropTargetBorderThin: Integer;
-begin
-  Result := ScaleFactor.Apply(3);
-end;
-
-procedure TACLTreeListSubClassPainter.DrawGroupBackground(ACanvas: TCanvas; const R: TRect);
-begin
-  Style.DrawGroupHeader(ACanvas, R, [mTop, mBottom]);
-end;
-
-procedure TACLTreeListSubClassPainter.DrawGroupExpandButton(ACanvas: TCanvas; const R: TRect; AExpanded: Boolean);
-begin
-  Style.GroupHeaderExpandButton.Draw(ACanvas.Handle, R, Ord(AExpanded));
-end;
-
-function TACLTreeListSubClassPainter.GetGroupContentOffsets: TRect;
-begin
-  Result := ScaleFactor.Apply(Style.GroupHeaderContentOffsets.Value);
-end;
-
-function TACLTreeListSubClassPainter.GetGroupExpandButtonSize: TSize;
-begin
-  Result := Style.GroupHeaderExpandButton.FrameSize;
-end;
-
-procedure TACLTreeListSubClassPainter.PrepareCanvasForGroup(ACanvas: TCanvas);
-begin
-  ACanvas.Brush.Style := bsSolid;
-  ACanvas.Font.Assign(Style.GroupHeaderFont);
-  ACanvas.Brush.Style := bsClear;
-end;
-
-procedure TACLTreeListSubClassPainter.DrawNodeBackground(
-  ACanvas: TCanvas; const R: TRect; AOdd: Boolean; ANode: TACLTreeListNode = nil);
-begin
-  acFillRect(ACanvas.Handle, R, SubClass.StyleGetNodeBackgroundColor(AOdd, ANode));
-end;
-
-procedure TACLTreeListSubClassPainter.DrawNodeExpandButton(ACanvas: TCanvas; const R: TRect; AExpanded, ASelected: Boolean);
-var
-  AIndex: Integer;
-begin
-  AIndex := Ord(AExpanded);
-  if Style.RowExpandButton.FrameCount >= 4 then
-    Inc(AIndex, 2 * Ord(ASelected));
-  Style.RowExpandButton.Draw(ACanvas.Handle, R, AIndex);
-end;
-
-procedure TACLTreeListSubClassPainter.DrawNodeSeparatorHorz(ACanvas: TCanvas; const R: TRect);
-begin
-  acDrawFrameEx(ACanvas.Handle, R, Style.GridColor.Value, [mBottom]);
-end;
-
-procedure TACLTreeListSubClassPainter.DrawNodeSeparatorVert(ACanvas: TCanvas; const R: TRect);
-begin
-  acDrawFrameEx(ACanvas.Handle, R, Style.GridColor.Value, [mRight]);
-end;
-
-function TACLTreeListSubClassPainter.GetLevelOffset: Integer;
-begin
-  Result := GetNodeExpandButtonSize.cx + ScaleFactor.Apply(acIndentBetweenElements);
-end;
-
-function TACLTreeListSubClassPainter.GetNodeContentOffsets: TRect;
-begin
-  Result := ScaleFactor.Apply(Style.RowContentOffsets.Value);
-end;
-
-function TACLTreeListSubClassPainter.GetNodeExpandButtonSize: TSize;
-begin
-  Result := Style.RowExpandButton.FrameSize;
-end;
-
-procedure TACLTreeListSubClassPainter.PrepareCanvasForNode(ACanvas: TCanvas);
-begin
-  PrepareCanvasForNode(ACanvas, nil);
-end;
-
-procedure TACLTreeListSubClassPainter.PrepareCanvasForNode(ACanvas: TCanvas; ANode: TACLTreeListNode);
-begin
-  ACanvas.Refresh;
-  ACanvas.Brush.Style := bsSolid;
-  ACanvas.Font := SubClass.Font;
-  ACanvas.Font.Color := SubClass.StyleGetNodeTextColor(ANode);
-  ACanvas.Brush.Style := bsClear;
-end;
-
-procedure TACLTreeListSubClassPainter.DrawSelectionRect(ACanvas: TCanvas; const R: TRect);
-begin
-  acDrawSelectionRect(ACanvas.Handle, R, Style.SelectionRectColor.Value);
-end;
-
-function TACLTreeListSubClassPainter.GetStyleInplaceEdit: TACLStyleEdit;
-begin
-  Result := SubClass.StyleInplaceEdit;
-end;
-
-function TACLTreeListSubClassPainter.GetStyle: TACLStyleTreeList;
-begin
-  Result := SubClass.Style;
-end;
-
-function TACLTreeListSubClassPainter.GetSubClass: TACLTreeListSubClass;
-begin
-  Result := TACLTreeListSubClass(inherited SubClass);
 end;
 
 { TACLTreeListSubClassHitTest }
@@ -3702,7 +3503,6 @@ begin
   FStyleInplaceEditButton := TACLStyleEditButton.Create(Self);
   FStyleTreeList := CreateStyle;
   FStyleMenu := TACLStyleMenu.Create(Self);
-  FPainter := CreatePainter;
 end;
 
 destructor TACLTreeListSubClass.Destroy;
@@ -3723,7 +3523,6 @@ begin
   FreeAndNil(FColumnsOrderCustomizationMenu);
   FreeAndNil(FIncSearch);
   FreeAndNil(FSelection);
-  FreeAndNil(FPainter);
   inherited Destroy;
 end;
 
@@ -4237,6 +4036,22 @@ begin
   end;
 end;
 
+procedure TACLTreeListSubClass.StylePrepareFont(ACanvas: TCanvas; AFontIndex: Integer; ASuperscript: Boolean);
+begin
+  ACanvas.Refresh;
+  ACanvas.Brush.Style := bsSolid;
+
+  if AFontIndex < 0 then
+    ACanvas.Font := Font
+  else
+    ACanvas.Font.Assign(Style.GetFont(AFontIndex));
+
+  if ASuperscript then
+    ACanvas.Font.Height := MulDiv(ACanvas.Font.Height, 2, 3);
+
+  ACanvas.Brush.Style := bsClear;
+end;
+
 function TACLTreeListSubClass.CreateColumnsOrderCustomizationMenu: TACLPopupMenu;
 begin
   Result := TACLTreeListColumnCustomizationPopup.Create(Self);
@@ -4308,11 +4123,6 @@ end;
 function TACLTreeListSubClass.CreateOptionsView: TACLTreeListOptionsView;
 begin
   Result := TACLTreeListOptionsView.Create(Self);
-end;
-
-function TACLTreeListSubClass.CreatePainter: TACLTreeListSubClassPainter;
-begin
-  Result := TACLTreeListSubClassPainter.Create(Self);
 end;
 
 function TACLTreeListSubClass.CreateSorter: TACLTreeListSubClassSorter;
@@ -4673,10 +4483,7 @@ begin
   end;
 
   if cccnStruct in AChanges then
-  begin
-    Painter.FlushCache;
     Groups.Validate;
-  end;
 
   if [tlcnNodeIndex, tlcnGroupIndex] * AChanges <> [] then
   begin
