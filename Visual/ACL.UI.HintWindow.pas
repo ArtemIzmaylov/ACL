@@ -78,6 +78,8 @@ type
   { TACLHintWindow }
 
   TACLHintWindow = class(THintWindow)
+  strict private const
+    HeightCorrection = 4;
   strict private
     FScaleFactor: TACLScaleFactor;
     FStyle: TACLStyleHint;
@@ -345,7 +347,7 @@ begin
   Result := acRectOffsetNegative(Result, Result.TopLeft);
   Inc(Result.Right, 2 * ScaleFactor.Apply(HintTextIndentH));
   Inc(Result.Bottom, 2 * ScaleFactor.Apply(HintTextIndentV));
-  Dec(Result.Bottom, 4);
+  Dec(Result.Bottom, HeightCorrection);
 end;
 
 procedure TACLHintWindow.Hide;
@@ -370,7 +372,8 @@ var
   AHintSize: TSize;
 begin
   ScaleForPPI(MonitorGet(AScreenRect.TopLeft).PixelsPerInch);
-  AHintPos := acPointOffset(AScreenRect.TopLeft, -HintTextIndentH, -HintTextIndentV);
+  AHintPos.X := AScreenRect.Left - ScaleFactor.Apply(HintTextIndentH);
+  AHintPos.Y := AScreenRect.Top - ScaleFactor.Apply(HintTextIndentV);
   AHintSize := acSize(CalcHintRect(Screen.Width div 3, AHint, nil));
 
   case AHorzAlignment of
@@ -382,11 +385,11 @@ begin
 
   case AVertAligment of
     hwvaAbove:
-      AHintPos.Y := AScreenRect.Top - AHintSize.cy - ScaleFactor.Apply(Indent);
+      AHintPos.Y := AScreenRect.Top - (AHintSize.cy + HeightCorrection) - ScaleFactor.Apply(Indent);
     hwvaBelow:
       AHintPos.Y := AScreenRect.Bottom + ScaleFactor.Apply(Indent);
     hwvaOver:
-      AHintPos.Y := (AScreenRect.Bottom + AScreenRect.Top - AHintSize.cy) div 2;
+      AHintPos.Y := (AScreenRect.Bottom + AScreenRect.Top - (AHintSize.cy + HeightCorrection)) div 2;
   end;
 
   ActivateHint(Bounds(AHintPos.X, AHintPos.Y, AHintSize.cx, AHintSize.cy), AHint);
@@ -420,7 +423,7 @@ begin
   PaintText(Canvas,
     acRectInflate(ClientRect,
       -ScaleFactor.Apply(HintTextIndentH),
-      -ScaleFactor.Apply(HintTextIndentV) + 1));
+      -ScaleFactor.Apply(HintTextIndentV)));
 end;
 
 procedure TACLHintWindow.PaintBackground(ACanvas: TCanvas; const R: TRect);
