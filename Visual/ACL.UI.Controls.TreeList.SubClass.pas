@@ -3612,6 +3612,8 @@ end;
 procedure TACLTreeListSubClass.ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: UnicodeString);
 begin
   Columns.ConfigLoad(AConfig, ASection, AItem + '.ColumnsData');
+  if OptionsBehavior.SortingMode = tlsmDisabled then
+    ResetSortingParams;
 end;
 
 procedure TACLTreeListSubClass.ConfigSave(AConfig: TACLIniFile; const ASection, AItem: UnicodeString);
