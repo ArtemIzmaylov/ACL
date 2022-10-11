@@ -127,7 +127,29 @@ begin
     begin
       APrevPixelsPerInch := MeasureCanvas.Font.PixelsPerInch;
       try
-        //#AI: https://support.microsoft.com/en-us/help/74299/info-calculating-the-logical-height-and-point-size-of-a-font
+        // AI:
+        // https://support.microsoft.com/en-us/help/74299/info-calculating-the-logical-height-and-point-size-of-a-font
+        // https://jeffpar.github.io/kbarchive/kb/074/Q74299/
+        //
+        //                   -(Point Size * LOGPIXELSY)
+        //          height = --------------------------
+        //                                72
+        //
+        //          ----------  <------------------------------
+        //          |        |           |- Internal Leading  |
+        //          | |   |  |  <---------                    |
+        //          | |   |  |        |                       |- Cell Height
+        //          | |---|  |        |- Character Height     |
+        //          | |   |  |        |                       |
+        //          | |   |  |        |                       |
+        //          ----------  <------------------------------
+        //
+        //        The following formula computes the point size of a font:
+        //
+        //                       (Height - Internal Leading) * 72
+        //          Point Size = --------------------------------
+        //                                  LOGPIXELSY
+        //
         MeasureCanvas.Font := AFont;
         MeasureCanvas.Font.PixelsPerInch := acDefaultDPI;
         MeasureCanvas.Font.Height := AHeight;
