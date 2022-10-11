@@ -42,10 +42,10 @@ const
   calcnLast = calcnValue + 1;
 
 type
-  TACLCalendarSubClassScrollButtonCell = class;
-  TACLCalendarSubClassTitleCell = class;
-  TACLCalendarSubClassTodayCell = class;
-  TACLCalendarSubClassViewInfo = class;
+  TACLCalendarScrollButtonCell = class;
+  TACLCalendarTitleCell = class;
+  TACLCalendarTodayCell = class;
+  TACLCalendarViewInfo = class;
 
   { TACLStyleCalendar }
 
@@ -73,11 +73,11 @@ type
 
     FOnSelect: TNotifyEvent;
 
-    function GetViewInfo: TACLCalendarSubClassViewInfo; inline;
+    function GetViewInfo: TACLCalendarViewInfo; inline;
     procedure SetValue(const AValue: TDate);
   protected
     function CreateStyle: TACLStyleCalendar; virtual;
-    function CreateViewInfo: TACLCompoundControlSubClassCustomViewInfo; override;
+    function CreateViewInfo: TACLCompoundControlCustomViewInfo; override;
     function GetFullRefreshChanges: TIntegerSet; override;
     procedure DoSelected; virtual;
     procedure ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState); override;
@@ -89,14 +89,14 @@ type
     property Style: TACLStyleCalendar read FStyle;
     property Transparent: Boolean read FTransparent write FTransparent;
     property Value: TDate read FValue write SetValue;
-    property ViewInfo: TACLCalendarSubClassViewInfo read GetViewInfo;
+    property ViewInfo: TACLCalendarViewInfo read GetViewInfo;
     //
     property OnSelect: TNotifyEvent read FOnSelect write FOnSelect;
   end;
 
-  { TACLCalendarSubClassCustomViewInfo }
+  { TACLCalendarCustomViewInfo }
 
-  TACLCalendarSubClassCustomViewInfo = class(TACLCompoundControlSubClassCustomViewInfo)
+  TACLCalendarCustomViewInfo = class(TACLCompoundControlCustomViewInfo)
   strict private
     function GetStyle: TACLStyleCalendar; inline;
     function GetSubClass: TACLCalendarSubClass; inline;
@@ -107,9 +107,9 @@ type
     property SubClass: TACLCalendarSubClass read GetSubClass;
   end;
 
-  { TACLCalendarSubClassViewCustomCell }
+  { TACLCalendarViewCustomCell }
 
-  TACLCalendarSubClassViewCustomCell = class(TACLCalendarSubClassCustomViewInfo,
+  TACLCalendarViewCustomCell = class(TACLCalendarCustomViewInfo,
     IACLAnimateControl,
     IACLHotTrackObject)
   protected const
@@ -136,17 +136,17 @@ type
     property DisplayValue: string read GetDisplayValue;
   end;
 
-  { TACLCalendarSubClassAbstractViewViewInfo }
+  { TACLCalendarAbstractViewViewInfo }
 
-  TACLCalendarSubClassAbstractViewViewInfo = class(TACLCalendarSubClassCustomViewInfo)
+  TACLCalendarAbstractViewViewInfo = class(TACLCalendarCustomViewInfo)
   public
     procedure NextPage(ADirection: TACLMouseWheelDirection); virtual; abstract;
     procedure NextRow(ADirection: TACLMouseWheelDirection); virtual; abstract;
   end;
 
-  { TACLCalendarSubClassCustomViewViewInfo }
+  { TACLCalendarCustomViewViewInfo }
 
-  TACLCalendarSubClassCustomViewViewInfo = class(TACLCalendarSubClassAbstractViewViewInfo)
+  TACLCalendarCustomViewViewInfo = class(TACLCalendarAbstractViewViewInfo)
   strict private
     FInitialDate: TDate;
 
@@ -154,15 +154,15 @@ type
   protected
     FActualRangeFinish: TDate;
     FActualRangeStart: TDate;
-    FCells: array of TACLCalendarSubClassViewCustomCell;
+    FCells: array of TACLCalendarViewCustomCell;
     FCellsArea: TRect;
     FCellsPerRow: Integer;
     FRangeFinish: TDate;
     FRangeStart: TDate;
-    FScrollDown: TACLCalendarSubClassScrollButtonCell;
-    FScrollUp: TACLCalendarSubClassScrollButtonCell;
-    FTitle: TACLCalendarSubClassTitleCell;
-    FToday: TACLCalendarSubClassTodayCell;
+    FScrollDown: TACLCalendarScrollButtonCell;
+    FScrollUp: TACLCalendarScrollButtonCell;
+    FTitle: TACLCalendarTitleCell;
+    FToday: TACLCalendarTodayCell;
 
     procedure DoCalculate(AChanges: TIntegerSet); override;
     procedure DoCalculateLayout; virtual;
@@ -185,9 +185,9 @@ type
     property InitialDate: TDate read FInitialDate write SetInitialDate;
   end;
 
-  { TACLCalendarSubClassDayViewViewInfo }
+  { TACLCalendarDayViewViewInfo }
 
-  TACLCalendarSubClassDayViewViewInfo = class(TACLCalendarSubClassCustomViewViewInfo)
+  TACLCalendarDayViewViewInfo = class(TACLCalendarCustomViewViewInfo)
   protected
     FSelectedDay: TDate;
 
@@ -201,36 +201,36 @@ type
     procedure NextRow(ADirection: TACLMouseWheelDirection); override;
   end;
 
-  { TACLCalendarSubClassCustomDateCell }
+  { TACLCalendarCustomDateCell }
 
-  TACLCalendarSubClassCustomDateCell = class(TACLCalendarSubClassViewCustomCell)
+  TACLCalendarCustomDateCell = class(TACLCalendarViewCustomCell)
   strict private
     FValue: TDate;
   protected
-    FOwner: TACLCalendarSubClassCustomViewViewInfo;
+    FOwner: TACLCalendarCustomViewViewInfo;
 
     function GetDisplayValue: string; override;
     function GetTextColor: TColor; override;
     function GetTextStyle: TFontStyles; override;
     function IsSelected: Boolean; override;
   public
-    constructor Create(AOwner: TACLCalendarSubClassCustomViewViewInfo); reintroduce;
+    constructor Create(AOwner: TACLCalendarCustomViewViewInfo); reintroduce;
     //
     property Value: TDate read FValue write FValue;
   end;
 
-  { TACLCalendarSubClassDayCell }
+  { TACLCalendarDayCell }
 
-  TACLCalendarSubClassDayCell = class(TACLCalendarSubClassCustomDateCell)
+  TACLCalendarDayCell = class(TACLCalendarCustomDateCell)
   protected
     FIsToday: Boolean;
 
     function GetTextColor: TColor; override;
   end;
 
-  { TACLCalendarSubClassDayOfWeekCell }
+  { TACLCalendarDayOfWeekCell }
 
-  TACLCalendarSubClassDayOfWeekCell = class(TACLCalendarSubClassViewCustomCell)
+  TACLCalendarDayOfWeekCell = class(TACLCalendarViewCustomCell)
   strict private
     FDayOfWeek: Byte;
   protected
@@ -240,16 +240,16 @@ type
     function CalculateHitTest(const AInfo: TACLHitTestInfo): Boolean; override;
   end;
 
-  { TACLCalendarSubClassMonthCell }
+  { TACLCalendarMonthCell }
 
-  TACLCalendarSubClassMonthCell = class(TACLCalendarSubClassCustomDateCell)
+  TACLCalendarMonthCell = class(TACLCalendarCustomDateCell)
   protected
     function GetDisplayValue: string; override;
   end;
 
-  { TACLCalendarSubClassMonthViewViewInfo }
+  { TACLCalendarMonthViewViewInfo }
 
-  TACLCalendarSubClassMonthViewViewInfo = class(TACLCalendarSubClassCustomViewViewInfo)
+  TACLCalendarMonthViewViewInfo = class(TACLCalendarCustomViewViewInfo)
   protected
     FSelectedMonth: TDate;
 
@@ -262,18 +262,18 @@ type
     procedure NextRow(ADirection: TACLMouseWheelDirection); override;
   end;
 
-  { TACLCalendarSubClassTodayCell }
+  { TACLCalendarTodayCell }
 
-  TACLCalendarSubClassTodayCell = class(TACLCalendarSubClassViewCustomCell)
+  TACLCalendarTodayCell = class(TACLCalendarViewCustomCell)
   protected
     function GetDisplayValue: string; override;
     function GetTextColor: TColor; override;
     function GetTextStyle: TFontStyles; override;
   end;
 
-  { TACLCalendarSubClassScrollButtonCell }
+  { TACLCalendarScrollButtonCell }
 
-  TACLCalendarSubClassScrollButtonCell = class(TACLCalendarSubClassViewCustomCell)
+  TACLCalendarScrollButtonCell = class(TACLCalendarViewCustomCell)
   strict private
     FDirection: TACLMouseWheelDirection;
   protected
@@ -284,32 +284,32 @@ type
     property Direction: TACLMouseWheelDirection read FDirection;
   end;
 
-  { TACLCalendarSubClassTitleCell }
+  { TACLCalendarTitleCell }
 
-  TACLCalendarSubClassTitleCell = class(TACLCalendarSubClassViewCustomCell)
+  TACLCalendarTitleCell = class(TACLCalendarViewCustomCell)
   strict private
-    FOwner: TACLCalendarSubClassCustomViewViewInfo;
+    FOwner: TACLCalendarCustomViewViewInfo;
   protected
     function GetDisplayValue: string; override;
     procedure PrepareCanvas(ACanvas: TCanvas); override;
   public
-    constructor Create(AOwner: TACLCalendarSubClassCustomViewViewInfo); reintroduce;
+    constructor Create(AOwner: TACLCalendarCustomViewViewInfo); reintroduce;
     procedure Calculate(const R: TRect; AChanges: TIntegerSet); override;
   end;
 
-  { TACLCalendarSubClassViewInfo }
+  { TACLCalendarViewInfo }
 
-  TACLCalendarSubClassViewInfo = class(TACLCalendarSubClassAbstractViewViewInfo,
+  TACLCalendarViewInfo = class(TACLCalendarAbstractViewViewInfo,
     IACLAnimateControl)
   strict private
-    FActiveView: TACLCalendarSubClassCustomViewViewInfo;
-    FDayView: TACLCalendarSubClassDayViewViewInfo;
-    FMonthView: TACLCalendarSubClassMonthViewViewInfo;
+    FActiveView: TACLCalendarCustomViewViewInfo;
+    FDayView: TACLCalendarDayViewViewInfo;
+    FMonthView: TACLCalendarMonthViewViewInfo;
 
     // IACLAnimateControl
     procedure IACLAnimateControl.Animate = Invalidate;
   protected
-    procedure DoActivateView(AView: TACLCalendarSubClassCustomViewViewInfo; const AInitialDate: TDate);
+    procedure DoActivateView(AView: TACLCalendarCustomViewViewInfo; const AInitialDate: TDate);
     procedure DoCalculate(AChanges: TIntegerSet); override;
     procedure DoDraw(ACanvas: TCanvas); override;
     procedure PrepareAnimationFrame(AFrame: TACLBitmap; const P: TPoint);
@@ -323,7 +323,7 @@ type
     procedure NextRow(ADirection: TACLMouseWheelDirection); override;
     procedure Select(const ADate: TDateTime);
     //
-    property ActiveView: TACLCalendarSubClassCustomViewViewInfo read FActiveView;
+    property ActiveView: TACLCalendarCustomViewViewInfo read FActiveView;
   end;
 
   { TACLCustomCalendar }
@@ -424,14 +424,14 @@ begin
   Result := TACLStyleCalendar.Create(Self);
 end;
 
-function TACLCalendarSubClass.CreateViewInfo: TACLCompoundControlSubClassCustomViewInfo;
+function TACLCalendarSubClass.CreateViewInfo: TACLCompoundControlCustomViewInfo;
 begin
-  Result := TACLCalendarSubClassViewInfo.Create(Self);
+  Result := TACLCalendarViewInfo.Create(Self);
 end;
 
-function TACLCalendarSubClass.GetViewInfo: TACLCalendarSubClassViewInfo;
+function TACLCalendarSubClass.GetViewInfo: TACLCalendarViewInfo;
 begin
-  Result := TACLCalendarSubClassViewInfo(inherited ViewInfo);
+  Result := TACLCalendarViewInfo(inherited ViewInfo);
 end;
 
 procedure TACLCalendarSubClass.ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState);
@@ -441,15 +441,15 @@ begin
   if AButton <> mbLeft then
     Exit;
 
-  if HitTest.HitObject is TACLCalendarSubClassMonthCell then
-    ViewInfo.ActivateDayView(TACLCalendarSubClassMonthCell(HitTest.HitObject).Value)
-  else if HitTest.HitObject is TACLCalendarSubClassDayCell then
-    Value := TACLCalendarSubClassDayCell(HitTest.HitObject).Value + TimeOf(Value)
-  else if HitTest.HitObject is TACLCalendarSubClassScrollButtonCell then
-    ViewInfo.NextPage(TACLCalendarSubClassScrollButtonCell(HitTest.HitObject).Direction)
-  else if HitTest.HitObject is TACLCalendarSubClassTitleCell then
+  if HitTest.HitObject is TACLCalendarMonthCell then
+    ViewInfo.ActivateDayView(TACLCalendarMonthCell(HitTest.HitObject).Value)
+  else if HitTest.HitObject is TACLCalendarDayCell then
+    Value := TACLCalendarDayCell(HitTest.HitObject).Value + TimeOf(Value)
+  else if HitTest.HitObject is TACLCalendarScrollButtonCell then
+    ViewInfo.NextPage(TACLCalendarScrollButtonCell(HitTest.HitObject).Direction)
+  else if HitTest.HitObject is TACLCalendarTitleCell then
     ViewInfo.ActivateMonthView
-  else if HitTest.HitObject is TACLCalendarSubClassTodayCell then
+  else if HitTest.HitObject is TACLCalendarTodayCell then
     ViewInfo.Select(Now);
 end;
 
@@ -458,45 +458,45 @@ begin
   ViewInfo.NextRow(ADirection);
 end;
 
-{ TACLCalendarSubClassCustomViewInfo }
+{ TACLCalendarCustomViewInfo }
 
-procedure TACLCalendarSubClassCustomViewInfo.Invalidate;
+procedure TACLCalendarCustomViewInfo.Invalidate;
 begin
   SubClass.InvalidateRect(Bounds);
 end;
 
-function TACLCalendarSubClassCustomViewInfo.GetStyle: TACLStyleCalendar;
+function TACLCalendarCustomViewInfo.GetStyle: TACLStyleCalendar;
 begin
   Result := SubClass.Style;
 end;
 
-function TACLCalendarSubClassCustomViewInfo.GetSubClass: TACLCalendarSubClass;
+function TACLCalendarCustomViewInfo.GetSubClass: TACLCalendarSubClass;
 begin
   Result := TACLCalendarSubClass(inherited SubClass);
 end;
 
-{ TACLCalendarSubClassViewCustomCell }
+{ TACLCalendarViewCustomCell }
 
-destructor TACLCalendarSubClassViewCustomCell.Destroy;
+destructor TACLCalendarViewCustomCell.Destroy;
 begin
   AnimationManager.RemoveOwner(Self);
   inherited;
 end;
 
-procedure TACLCalendarSubClassViewCustomCell.DoCalculateHitTest(const AInfo: TACLHitTestInfo);
+procedure TACLCalendarViewCustomCell.DoCalculateHitTest(const AInfo: TACLHitTestInfo);
 begin
   inherited;
   AInfo.Cursor := crHandPoint;
 end;
 
-procedure TACLCalendarSubClassViewCustomCell.DoDraw(ACanvas: TCanvas);
+procedure TACLCalendarViewCustomCell.DoDraw(ACanvas: TCanvas);
 begin
   PrepareCanvas(ACanvas);
   acTextDraw(ACanvas, DisplayValue, Bounds, taCenter, taVerticalCenter);
   DoDrawSelection(ACanvas, GetActualFrameColor);
 end;
 
-procedure TACLCalendarSubClassViewCustomCell.DoDrawSelection(ACanvas: TCanvas; AColor: TAlphaColor);
+procedure TACLCalendarViewCustomCell.DoDrawSelection(ACanvas: TCanvas; AColor: TAlphaColor);
 const
   FrameSize = 2;
 begin
@@ -504,22 +504,22 @@ begin
     acDrawFrame(ACanvas.Handle, Bounds, AColor, ScaleFactor.Apply(FrameSize));
 end;
 
-function TACLCalendarSubClassViewCustomCell.GetTextColor: TColor;
+function TACLCalendarViewCustomCell.GetTextColor: TColor;
 begin
   Result := Style.ColorText.AsColor;
 end;
 
-function TACLCalendarSubClassViewCustomCell.GetTextStyle: TFontStyles;
+function TACLCalendarViewCustomCell.GetTextStyle: TFontStyles;
 begin
   Result := [];
 end;
 
-function TACLCalendarSubClassViewCustomCell.IsSelected: Boolean;
+function TACLCalendarViewCustomCell.IsSelected: Boolean;
 begin
   Result := False;
 end;
 
-procedure TACLCalendarSubClassViewCustomCell.PrepareCanvas(ACanvas: TCanvas);
+procedure TACLCalendarViewCustomCell.PrepareCanvas(ACanvas: TCanvas);
 begin
   ACanvas.Brush.Style := bsClear;
   ACanvas.Font := SubClass.Font;
@@ -527,13 +527,13 @@ begin
   ACanvas.Font.Color := GetTextColor;
 end;
 
-procedure TACLCalendarSubClassViewCustomCell.Enter;
+procedure TACLCalendarViewCustomCell.Enter;
 begin
   AnimationManager.RemoveOwner(Self);
   Invalidate;
 end;
 
-procedure TACLCalendarSubClassViewCustomCell.Leave;
+procedure TACLCalendarViewCustomCell.Leave;
 var
   AAnimation: TACLAnimation;
 begin
@@ -549,7 +549,7 @@ begin
     Invalidate
 end;
 
-function TACLCalendarSubClassViewCustomCell.GetActualFrameColor: TAlphaColor;
+function TACLCalendarViewCustomCell.GetActualFrameColor: TAlphaColor;
 var
   AAnimation: TACLAnimation;
 begin
@@ -565,18 +565,18 @@ begin
       Result := TAlphaColor.None;
 end;
 
-{ TACLCalendarSubClassCustomViewViewInfo }
+{ TACLCalendarCustomViewViewInfo }
 
-constructor TACLCalendarSubClassCustomViewViewInfo.Create(ASubClass: TACLCompoundControlSubClass);
+constructor TACLCalendarCustomViewViewInfo.Create(ASubClass: TACLCompoundControlSubClass);
 begin
   inherited;
-  FTitle := TACLCalendarSubClassTitleCell.Create(Self);
-  FScrollDown := TACLCalendarSubClassScrollButtonCell.Create(SubClass, mwdUp);
-  FScrollUp := TACLCalendarSubClassScrollButtonCell.Create(SubClass, mwdDown);
-  FToday := TACLCalendarSubClassTodayCell.Create(SubClass);
+  FTitle := TACLCalendarTitleCell.Create(Self);
+  FScrollDown := TACLCalendarScrollButtonCell.Create(SubClass, mwdUp);
+  FScrollUp := TACLCalendarScrollButtonCell.Create(SubClass, mwdDown);
+  FToday := TACLCalendarTodayCell.Create(SubClass);
 end;
 
-destructor TACLCalendarSubClassCustomViewViewInfo.Destroy;
+destructor TACLCalendarCustomViewViewInfo.Destroy;
 var
   I: Integer;
 begin
@@ -589,19 +589,19 @@ begin
   inherited;
 end;
 
-procedure TACLCalendarSubClassCustomViewViewInfo.AfterConstruction;
+procedure TACLCalendarCustomViewViewInfo.AfterConstruction;
 begin
   inherited;
   IntializeCells;
 end;
 
-procedure TACLCalendarSubClassCustomViewViewInfo.BeforeDestruction;
+procedure TACLCalendarCustomViewViewInfo.BeforeDestruction;
 begin
   inherited;
   AnimationManager.RemoveOwner(Self);
 end;
 
-function TACLCalendarSubClassCustomViewViewInfo.CalculateHitTest(const AInfo: TACLHitTestInfo): Boolean;
+function TACLCalendarCustomViewViewInfo.CalculateHitTest(const AInfo: TACLHitTestInfo): Boolean;
 var
   I: Integer;
 begin
@@ -621,7 +621,7 @@ begin
   Result := False;
 end;
 
-procedure TACLCalendarSubClassCustomViewViewInfo.DoCalculate(AChanges: TIntegerSet);
+procedure TACLCalendarCustomViewViewInfo.DoCalculate(AChanges: TIntegerSet);
 begin
   if calcnValue in AChanges then
   begin
@@ -633,7 +633,7 @@ begin
     DoCalculateLayout;
 end;
 
-procedure TACLCalendarSubClassCustomViewViewInfo.DoCalculateLayout;
+procedure TACLCalendarCustomViewViewInfo.DoCalculateLayout;
 var
   ABounds: TRect;
   ACellHeight: Integer;
@@ -658,7 +658,7 @@ begin
     acRectUnion(FCellsArea, FCells[X].Bounds);
 end;
 
-procedure TACLCalendarSubClassCustomViewViewInfo.DoCalculateTitleArea(var ARect: TRect; AChanges: TIntegerSet);
+procedure TACLCalendarCustomViewViewInfo.DoCalculateTitleArea(var ARect: TRect; AChanges: TIntegerSet);
 var
   R: TRect;
 begin
@@ -674,7 +674,7 @@ begin
   ARect.Bottom := FToday.Bounds.Top;
 end;
 
-procedure TACLCalendarSubClassCustomViewViewInfo.DoDraw(ACanvas: TCanvas);
+procedure TACLCalendarCustomViewViewInfo.DoDraw(ACanvas: TCanvas);
 var
   I: Integer;
 begin
@@ -687,18 +687,18 @@ begin
     FCells[I].Draw(ACanvas);
 end;
 
-procedure TACLCalendarSubClassCustomViewViewInfo.DoDrawBackground(ACanvas: TCanvas);
+procedure TACLCalendarCustomViewViewInfo.DoDrawBackground(ACanvas: TCanvas);
 begin
   if not SubClass.Transparent then
     acFillRect(ACanvas.Handle, Bounds, Style.ColorBackground.Value);
 end;
 
-function TACLCalendarSubClassCustomViewViewInfo.IsOutOfActualRange(const AValue: TDate): Boolean;
+function TACLCalendarCustomViewViewInfo.IsOutOfActualRange(const AValue: TDate): Boolean;
 begin
   Result := (CompareDateTime(AValue, FActualRangeStart) < 0) or (CompareDateTime(AValue, FActualRangeFinish) > 0);
 end;
 
-procedure TACLCalendarSubClassCustomViewViewInfo.SetInitialDate(const AValue: TDate);
+procedure TACLCalendarCustomViewViewInfo.SetInitialDate(const AValue: TDate);
 begin
   if not SameDate(AValue, InitialDate) then
   begin
@@ -708,27 +708,27 @@ begin
   end;
 end;
 
-{ TACLCalendarSubClassDayViewViewInfo }
+{ TACLCalendarDayViewViewInfo }
 
-procedure TACLCalendarSubClassDayViewViewInfo.NextPage(ADirection: TACLMouseWheelDirection);
+procedure TACLCalendarDayViewViewInfo.NextPage(ADirection: TACLMouseWheelDirection);
 begin
   InitialDate := TACLDateUtils.AddMonths(InitialDate, Signs[ADirection = mwdDown]);
 end;
 
-procedure TACLCalendarSubClassDayViewViewInfo.NextRow(ADirection: TACLMouseWheelDirection);
+procedure TACLCalendarDayViewViewInfo.NextRow(ADirection: TACLMouseWheelDirection);
 begin
   InitialDate := TACLDateUtils.AddDays(InitialDate, Signs[ADirection = mwdDown] * FCellsPerRow);
 end;
 
-procedure TACLCalendarSubClassDayViewViewInfo.DoCalculateLayout;
+procedure TACLCalendarDayViewViewInfo.DoCalculateLayout;
 begin
   inherited;
   FCellsArea.Top := FCells[7].Bounds.Top;
 end;
 
-procedure TACLCalendarSubClassDayViewViewInfo.DoUpdateRanges;
+procedure TACLCalendarDayViewViewInfo.DoUpdateRanges;
 var
-  ACell: TACLCalendarSubClassDayCell;
+  ACell: TACLCalendarDayCell;
   ANow: TDateTime;
   I: Integer;
 begin
@@ -739,7 +739,7 @@ begin
   FRangeFinish := FRangeStart;
   for I := 7 to 48 do
   begin
-    ACell := TACLCalendarSubClassDayCell(FCells[I]);
+    ACell := TACLCalendarDayCell(FCells[I]);
     ACell.FIsToday := SameDate(ANow, FRangeFinish);
     ACell.Value := FRangeFinish;
     FRangeFinish := FRangeFinish + 1;
@@ -754,42 +754,42 @@ begin
   DoCalculateLayout;
 end;
 
-function TACLCalendarSubClassDayViewViewInfo.GetTitle: string;
+function TACLCalendarDayViewViewInfo.GetTitle: string;
 begin
   Result := Format('%s %d', [FormatSettings.LongMonthNames[MonthOf(FActualRangeStart)], YearOf(FActualRangeStart)]);
 end;
 
-procedure TACLCalendarSubClassDayViewViewInfo.IntializeCells;
+procedure TACLCalendarDayViewViewInfo.IntializeCells;
 var
   I: Integer;
 begin
   FCellsPerRow := 7;
   SetLength(FCells, 49);
   for I := 0 to 6 do
-    FCells[I] := TACLCalendarSubClassDayOfWeekCell.Create(SubClass, I + 1);
+    FCells[I] := TACLCalendarDayOfWeekCell.Create(SubClass, I + 1);
   for I := 7 to 48 do
-    FCells[I] := TACLCalendarSubClassDayCell.Create(Self);
+    FCells[I] := TACLCalendarDayCell.Create(Self);
 end;
 
-function TACLCalendarSubClassDayViewViewInfo.IsSelected(const AValue: TDate): Boolean;
+function TACLCalendarDayViewViewInfo.IsSelected(const AValue: TDate): Boolean;
 begin
   Result := SameDate(FSelectedDay, AValue)
 end;
 
-{ TACLCalendarSubClassCustomDateCell }
+{ TACLCalendarCustomDateCell }
 
-constructor TACLCalendarSubClassCustomDateCell.Create(AOwner: TACLCalendarSubClassCustomViewViewInfo);
+constructor TACLCalendarCustomDateCell.Create(AOwner: TACLCalendarCustomViewViewInfo);
 begin
   inherited Create(AOwner.SubClass);
   FOwner := AOwner;
 end;
 
-function TACLCalendarSubClassCustomDateCell.GetDisplayValue: string;
+function TACLCalendarCustomDateCell.GetDisplayValue: string;
 begin
   Result := IntToStr(DayOfTheMonth(Value));
 end;
 
-function TACLCalendarSubClassCustomDateCell.GetTextColor: TColor;
+function TACLCalendarCustomDateCell.GetTextColor: TColor;
 var
   AColorResource: TACLResourceColor;
 begin
@@ -803,7 +803,7 @@ begin
   Result := AColorResource.AsColor;
 end;
 
-function TACLCalendarSubClassCustomDateCell.GetTextStyle: TFontStyles;
+function TACLCalendarCustomDateCell.GetTextStyle: TFontStyles;
 begin
   if IsSelected then
     Result := [fsBold]
@@ -811,14 +811,14 @@ begin
     Result := [];
 end;
 
-function TACLCalendarSubClassCustomDateCell.IsSelected: Boolean;
+function TACLCalendarCustomDateCell.IsSelected: Boolean;
 begin
   Result := FOwner.IsSelected(Value);
 end;
 
-{ TACLCalendarSubClassDayCell }
+{ TACLCalendarDayCell }
 
-function TACLCalendarSubClassDayCell.GetTextColor: TColor;
+function TACLCalendarDayCell.GetTextColor: TColor;
 var
   AColorResource: TACLResourceColor;
 begin
@@ -836,44 +836,44 @@ begin
   Result := AColorResource.AsColor;
 end;
 
-{ TACLCalendarSubClassDayOfWeekCell }
+{ TACLCalendarDayOfWeekCell }
 
-constructor TACLCalendarSubClassDayOfWeekCell.Create(ASubClass: TACLCalendarSubClass; ADayOfWeek: Byte);
+constructor TACLCalendarDayOfWeekCell.Create(ASubClass: TACLCalendarSubClass; ADayOfWeek: Byte);
 begin
   inherited Create(ASubClass);
   FDayOfWeek := ADayOfWeek;
 end;
 
-function TACLCalendarSubClassDayOfWeekCell.CalculateHitTest(const AInfo: TACLHitTestInfo): Boolean;
+function TACLCalendarDayOfWeekCell.CalculateHitTest(const AInfo: TACLHitTestInfo): Boolean;
 begin
   Result := False;
 end;
 
-function TACLCalendarSubClassDayOfWeekCell.GetDisplayValue: string;
+function TACLCalendarDayOfWeekCell.GetDisplayValue: string;
 begin
   Result := TACLDateUtils.GetDayOfWeekName(FDayOfWeek, True);
 end;
 
-{ TACLCalendarSubClassMonthCell }
+{ TACLCalendarMonthCell }
 
-function TACLCalendarSubClassMonthCell.GetDisplayValue: string;
+function TACLCalendarMonthCell.GetDisplayValue: string;
 begin
   Result := FormatSettings.LongMonthNames[TACLDateUtils.GetMonthOfYear(Value)];
 end;
 
-{ TACLCalendarSubClassMonthViewViewInfo }
+{ TACLCalendarMonthViewViewInfo }
 
-procedure TACLCalendarSubClassMonthViewViewInfo.NextPage(ADirection: TACLMouseWheelDirection);
+procedure TACLCalendarMonthViewViewInfo.NextPage(ADirection: TACLMouseWheelDirection);
 begin
   InitialDate := TACLDateUtils.AddYears(InitialDate, Signs[ADirection = mwdDown]);
 end;
 
-procedure TACLCalendarSubClassMonthViewViewInfo.NextRow(ADirection: TACLMouseWheelDirection);
+procedure TACLCalendarMonthViewViewInfo.NextRow(ADirection: TACLMouseWheelDirection);
 begin
   InitialDate := TACLDateUtils.AddMonths(InitialDate, Signs[ADirection = mwdDown] * FCellsPerRow);
 end;
 
-procedure TACLCalendarSubClassMonthViewViewInfo.DoUpdateRanges;
+procedure TACLCalendarMonthViewViewInfo.DoUpdateRanges;
 var
   I: Integer;
 begin
@@ -883,7 +883,7 @@ begin
   FRangeFinish := FRangeStart;
   for I := Low(FCells) to High(FCells) do
   begin
-    TACLCalendarSubClassMonthCell(FCells[I]).Value := FRangeFinish;
+    TACLCalendarMonthCell(FCells[I]).Value := FRangeFinish;
     FRangeFinish := TACLDateUtils.AddMonths(FRangeFinish, 1);
   end;
   FRangeFinish := TACLDateUtils.AddMonths(FRangeFinish, -1);
@@ -894,52 +894,52 @@ begin
   FActualRangeFinish := TACLDateUtils.GetEndOfYear(FActualRangeStart);
 end;
 
-function TACLCalendarSubClassMonthViewViewInfo.GetTitle: string;
+function TACLCalendarMonthViewViewInfo.GetTitle: string;
 begin
   Result := IntToStr(YearOf(FActualRangeStart));
 end;
 
-procedure TACLCalendarSubClassMonthViewViewInfo.IntializeCells;
+procedure TACLCalendarMonthViewViewInfo.IntializeCells;
 var
   I: Integer;
 begin
   FCellsPerRow := 3;
   SetLength(FCells, 12);
   for I := Low(FCells) to High(FCells) do
-    FCells[I] := TACLCalendarSubClassMonthCell.Create(Self);
+    FCells[I] := TACLCalendarMonthCell.Create(Self);
 end;
 
-function TACLCalendarSubClassMonthViewViewInfo.IsSelected(const AValue: TDate): Boolean;
+function TACLCalendarMonthViewViewInfo.IsSelected(const AValue: TDate): Boolean;
 begin
   Result := SameDate(AValue, FSelectedMonth);
 end;
 
-{ TACLCalendarSubClassTodayCell }
+{ TACLCalendarTodayCell }
 
-function TACLCalendarSubClassTodayCell.GetDisplayValue: string;
+function TACLCalendarTodayCell.GetDisplayValue: string;
 begin
   Result := FormatDateTime(FormatSettings.LongDateFormat, Now);
 end;
 
-function TACLCalendarSubClassTodayCell.GetTextColor: TColor;
+function TACLCalendarTodayCell.GetTextColor: TColor;
 begin
   Result := Style.ColorTextToday.AsColor;
 end;
 
-function TACLCalendarSubClassTodayCell.GetTextStyle: TFontStyles;
+function TACLCalendarTodayCell.GetTextStyle: TFontStyles;
 begin
   Result := [];
 end;
 
-{ TACLCalendarSubClassScrollButtonCell }
+{ TACLCalendarScrollButtonCell }
 
-constructor TACLCalendarSubClassScrollButtonCell.Create(ASubClass: TACLCalendarSubClass; ADirection: TACLMouseWheelDirection);
+constructor TACLCalendarScrollButtonCell.Create(ASubClass: TACLCalendarSubClass; ADirection: TACLMouseWheelDirection);
 begin
   inherited Create(ASubClass);
   FDirection := ADirection;
 end;
 
-function TACLCalendarSubClassScrollButtonCell.GetDisplayValue: string;
+function TACLCalendarScrollButtonCell.GetDisplayValue: string;
 begin
   if Direction = mwdDown then
     Result := '>'
@@ -947,15 +947,15 @@ begin
     Result := '<';
 end;
 
-{ TACLCalendarSubClassTitleCell }
+{ TACLCalendarTitleCell }
 
-constructor TACLCalendarSubClassTitleCell.Create(AOwner: TACLCalendarSubClassCustomViewViewInfo);
+constructor TACLCalendarTitleCell.Create(AOwner: TACLCalendarCustomViewViewInfo);
 begin
   FOwner := AOwner;
   inherited Create(AOwner.SubClass);
 end;
 
-procedure TACLCalendarSubClassTitleCell.Calculate(const R: TRect; AChanges: TIntegerSet);
+procedure TACLCalendarTitleCell.Calculate(const R: TRect; AChanges: TIntegerSet);
 var
   AIndent: Integer;
   ATextSize: TSize;
@@ -969,28 +969,28 @@ begin
   inherited Calculate(acRectSetSize(R, ATextSize.cx + 2 * AIndent, ATextSize.cy + 2 * Min(AIndent, acIndentBetweenElements)), AChanges);
 end;
 
-function TACLCalendarSubClassTitleCell.GetDisplayValue: string;
+function TACLCalendarTitleCell.GetDisplayValue: string;
 begin
   Result := FOwner.GetTitle;
 end;
 
-procedure TACLCalendarSubClassTitleCell.PrepareCanvas(ACanvas: TCanvas);
+procedure TACLCalendarTitleCell.PrepareCanvas(ACanvas: TCanvas);
 begin
   inherited;
   ACanvas.Font.Size := ACanvas.Font.Size + 2;
 end;
 
-{ TACLCalendarSubClassViewInfo }
+{ TACLCalendarViewInfo }
 
-constructor TACLCalendarSubClassViewInfo.Create(ASubClass: TACLCompoundControlSubClass);
+constructor TACLCalendarViewInfo.Create(ASubClass: TACLCompoundControlSubClass);
 begin
   inherited;
-  FDayView := TACLCalendarSubClassDayViewViewInfo.Create(ASubClass);
-  FMonthView := TACLCalendarSubClassMonthViewViewInfo.Create(ASubClass);
+  FDayView := TACLCalendarDayViewViewInfo.Create(ASubClass);
+  FMonthView := TACLCalendarMonthViewViewInfo.Create(ASubClass);
   FActiveView := FDayView;
 end;
 
-destructor TACLCalendarSubClassViewInfo.Destroy;
+destructor TACLCalendarViewInfo.Destroy;
 begin
   AnimationManager.RemoveOwner(Self);
   FreeAndNil(FMonthView);
@@ -998,22 +998,22 @@ begin
   inherited;
 end;
 
-procedure TACLCalendarSubClassViewInfo.ActivateDayView(const AMonth: TDateTime);
+procedure TACLCalendarViewInfo.ActivateDayView(const AMonth: TDateTime);
 begin
   DoActivateView(FDayView, AMonth);
 end;
 
-procedure TACLCalendarSubClassViewInfo.ActivateMonthView;
+procedure TACLCalendarViewInfo.ActivateMonthView;
 begin
   DoActivateView(FMonthView, TACLDateUtils.GetStartOfYear(FDayView.InitialDate));
 end;
 
-function TACLCalendarSubClassViewInfo.CalculateHitTest(const AInfo: TACLHitTestInfo): Boolean;
+function TACLCalendarViewInfo.CalculateHitTest(const AInfo: TACLHitTestInfo): Boolean;
 begin
   Result := ActiveView.CalculateHitTest(AInfo);
 end;
 
-procedure TACLCalendarSubClassViewInfo.NextPage(ADirection: TACLMouseWheelDirection);
+procedure TACLCalendarViewInfo.NextPage(ADirection: TACLMouseWheelDirection);
 const
   ModeMap: array[TACLMouseWheelDirection] of TACLBitmapSlideAnimationMode = (samBottomToTop, samTopToBottom);
 var
@@ -1031,12 +1031,12 @@ begin
     ActiveView.NextPage(ADirection);
 end;
 
-procedure TACLCalendarSubClassViewInfo.NextRow(ADirection: TACLMouseWheelDirection);
+procedure TACLCalendarViewInfo.NextRow(ADirection: TACLMouseWheelDirection);
 begin
   ActiveView.NextRow(ADirection);
 end;
 
-procedure TACLCalendarSubClassViewInfo.Select(const ADate: TDateTime);
+procedure TACLCalendarViewInfo.Select(const ADate: TDateTime);
 var
   AAnimation: TACLCustomBitmapAnimation;
 begin
@@ -1055,7 +1055,7 @@ begin
   end;
 end;
 
-procedure TACLCalendarSubClassViewInfo.DoActivateView(AView: TACLCalendarSubClassCustomViewViewInfo; const AInitialDate: TDate);
+procedure TACLCalendarViewInfo.DoActivateView(AView: TACLCalendarCustomViewViewInfo; const AInitialDate: TDate);
 
   procedure DoActivateViewCore;
   begin
@@ -1084,12 +1084,12 @@ begin
   end;
 end;
 
-procedure TACLCalendarSubClassViewInfo.DoCalculate(AChanges: TIntegerSet);
+procedure TACLCalendarViewInfo.DoCalculate(AChanges: TIntegerSet);
 begin
   ActiveView.Calculate(Bounds, AChanges);
 end;
 
-procedure TACLCalendarSubClassViewInfo.DoDraw(ACanvas: TCanvas);
+procedure TACLCalendarViewInfo.DoDraw(ACanvas: TCanvas);
 var
   AAnimation: TACLAnimation;
   ASaveIndex: Integer;
@@ -1114,7 +1114,7 @@ begin
     ActiveView.Draw(ACanvas);
 end;
 
-procedure TACLCalendarSubClassViewInfo.PrepareAnimationFrame(AFrame: TACLBitmap; const P: TPoint);
+procedure TACLCalendarViewInfo.PrepareAnimationFrame(AFrame: TACLBitmap; const P: TPoint);
 begin
   DrawTo(AFrame.Canvas, Bounds.Left - P.X, Bounds.Top - P.Y);
   AFrame.MakeOpaque;

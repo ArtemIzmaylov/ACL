@@ -44,19 +44,19 @@ uses
 
 type
 
-  { TACLTreeListSubClassDropTarget }
+  { TACLTreeListDropTarget }
 
-  TACLTreeListSubClassDropTargetClass = class of TACLTreeListSubClassDropTarget;
-  TACLTreeListSubClassDropTarget = class(TACLDropTarget)
+  TACLTreeListDropTargetClass = class of TACLTreeListDropTarget;
+  TACLTreeListDropTarget = class(TACLDropTarget)
   strict private
     FAutoExpandTimer: TACLTimer;
     FSubClass: TACLTreeListSubClass;
 
     procedure AutoExpandTimerHandler(Sender: TObject);
-    function GetContentViewInfo: TACLTreeListSubClassContentViewInfo;
-    function GetDragAndDropController: TACLTreeListSubClassDragAndDropController;
-    function GetHitTest: TACLTreeListSubClassHitTest;
-    function GetNodeViewInfo: TACLTreeListSubClassNodeViewInfo;
+    function GetContentViewInfo: TACLTreeListContentViewInfo;
+    function GetDragAndDropController: TACLTreeListDragAndDropController;
+    function GetHitTest: TACLTreeListHitTest;
+    function GetNodeViewInfo: TACLTreeListNodeViewInfo;
   protected
     function CalculateDropTarget(var AObject: TObject; var AMode: TACLTreeListDropTargetInsertMode): Boolean; virtual;
     function CalculateInsertMode(ANode: TACLTreeListNode): TACLTreeListDropTargetInsertMode;
@@ -76,24 +76,24 @@ type
     destructor Destroy; override;
     //
     property AutoExpandTimer: TACLTimer read FAutoExpandTimer;
-    property ContentViewInfo: TACLTreeListSubClassContentViewInfo read GetContentViewInfo;
-    property DragAndDropController: TACLTreeListSubClassDragAndDropController read GetDragAndDropController;
-    property HitTest: TACLTreeListSubClassHitTest read GetHitTest;
-    property NodeViewInfo: TACLTreeListSubClassNodeViewInfo read GetNodeViewInfo;
+    property ContentViewInfo: TACLTreeListContentViewInfo read GetContentViewInfo;
+    property DragAndDropController: TACLTreeListDragAndDropController read GetDragAndDropController;
+    property HitTest: TACLTreeListHitTest read GetHitTest;
+    property NodeViewInfo: TACLTreeListNodeViewInfo read GetNodeViewInfo;
     property SubClass: TACLTreeListSubClass read FSubClass;
   end;
 
-  { TACLTreeListSubClassCustomDragSortingDropTarget }
+  { TACLTreeListCustomDragSortingDropTarget }
 
-  TACLTreeListSubClassCustomDragSortingDropTarget = class(TACLTreeListSubClassDropTarget)
+  TACLTreeListCustomDragSortingDropTarget = class(TACLTreeListDropTarget)
   protected
     procedure DoDropObjects; overload; virtual; abstract;
     procedure DoDropCore(Action: TACLDropAction); override;
   end;
 
-  { TACLTreeListSubClassGroupDragSortingDropTarget }
+  { TACLTreeListGroupDragSortingDropTarget }
 
-  TACLTreeListSubClassGroupDragSortingDropTarget = class(TACLTreeListSubClassCustomDragSortingDropTarget)
+  TACLTreeListGroupDragSortingDropTarget = class(TACLTreeListCustomDragSortingDropTarget)
   strict private
     FSelection: TACLList<TACLTreeListGroup>;
 
@@ -108,9 +108,9 @@ type
     property Selection: TACLList<TACLTreeListGroup> read FSelection;
   end;
 
-  { TACLTreeListSubClassNodeDragSortingDropTarget }
+  { TACLTreeListNodeDragSortingDropTarget }
 
-  TACLTreeListSubClassNodeDragSortingDropTarget = class(TACLTreeListSubClassCustomDragSortingDropTarget)
+  TACLTreeListNodeDragSortingDropTarget = class(TACLTreeListCustomDragSortingDropTarget)
   strict private
     FSelectedGroup: TACLTreeListGroup;
     FSelectedLevel: TACLTreeListNode;
@@ -131,15 +131,15 @@ type
     property Selection: TACLTreeListNodeList read FSelection;
   end;
 
-  { TACLTreeListSubClassCustomDragSortingObject }
+  { TACLTreeListCustomDragSortingObject }
 
-  TACLTreeListSubClassCustomDragSortingObject = class(TACLCompoundControlSubClassDragObject,
+  TACLTreeListCustomDragSortingObject = class(TACLCompoundControlDragObject,
     IACLDropSourceOperation)
   strict private
-    function GetHitTest: TACLTreeListSubClassHitTest;
+    function GetHitTest: TACLTreeListHitTest;
     function GetSubClass: TACLTreeListSubClass;
   protected
-    function GetDropTargetClass: TACLTreeListSubClassDropTargetClass; virtual;
+    function GetDropTargetClass: TACLTreeListDropTargetClass; virtual;
     // IACLDropSourceOperation
     procedure DropSourceBegin;
     procedure DropSourceDrop(var AllowDrop: Boolean);
@@ -149,49 +149,49 @@ type
     procedure DragMove(const P: TPoint; var ADeltaX: Integer; var ADeltaY: Integer); override;
     function DragStart: Boolean; override;
     //
-    property HitTest: TACLTreeListSubClassHitTest read GetHitTest;
+    property HitTest: TACLTreeListHitTest read GetHitTest;
     property SubClass: TACLTreeListSubClass read GetSubClass;
   end;
 
-  { TACLTreeListSubClassColumnCustomDragObject }
+  { TACLTreeListColumnCustomDragObject }
 
-  TACLTreeListSubClassColumnCustomDragObject = class(TACLCompoundControlSubClassDragObject)
+  TACLTreeListColumnCustomDragObject = class(TACLCompoundControlDragObject)
   strict private
-    FColumnViewInfo: TACLTreeListSubClassColumnViewInfo;
+    FColumnViewInfo: TACLTreeListColumnViewInfo;
 
     function GetColumn: TACLTreeListColumn;
-    function GetColumnBarViewInfo: TACLTreeListSubClassColumnBarViewInfo;
+    function GetColumnBarViewInfo: TACLTreeListColumnBarViewInfo;
     function GetSubClass: TACLTreeListSubClass;
   public
-    constructor Create(AColumnViewInfo: TACLTreeListSubClassColumnViewInfo); virtual;
+    constructor Create(AColumnViewInfo: TACLTreeListColumnViewInfo); virtual;
     //
     property Column: TACLTreeListColumn read GetColumn;
-    property ColumnBarViewInfo: TACLTreeListSubClassColumnBarViewInfo read GetColumnBarViewInfo;
-    property ColumnViewInfo: TACLTreeListSubClassColumnViewInfo read FColumnViewInfo;
+    property ColumnBarViewInfo: TACLTreeListColumnBarViewInfo read GetColumnBarViewInfo;
+    property ColumnViewInfo: TACLTreeListColumnViewInfo read FColumnViewInfo;
     property SubClass: TACLTreeListSubClass read GetSubClass;
   end;
 
-  { TACLTreeListSubClassColumnDragMoveObject }
+  { TACLTreeListColumnDragMoveObject }
 
-  TACLTreeListSubClassColumnDragMoveObject = class(TACLTreeListSubClassColumnCustomDragObject)
+  TACLTreeListColumnDragMoveObject = class(TACLTreeListColumnCustomDragObject)
   strict private
     FAutoScrollTimer: TACLTimer;
 
     procedure AutoScrollTimerHandler(Sender: TObject);
     function CalculateAutoScrollingDelta(const P: TPoint): Integer;
     procedure CheckAutoScrolling(ADelta: Integer);
-    function GetHitTest: TACLTreeListSubClassHitTest;
+    function GetHitTest: TACLTreeListHitTest;
   public
     procedure DragFinished(ACanceled: Boolean); override;
     procedure DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer); override;
     function DragStart: Boolean; override;
     //
-    property HitTest: TACLTreeListSubClassHitTest read GetHitTest;
+    property HitTest: TACLTreeListHitTest read GetHitTest;
   end;
 
-  { TACLTreeListSubClassColumnDragResizeObject }
+  { TACLTreeListColumnDragResizeObject }
 
-  TACLTreeListSubClassColumnDragResizeObject = class(TACLTreeListSubClassColumnCustomDragObject)
+  TACLTreeListColumnDragResizeObject = class(TACLTreeListColumnCustomDragObject)
   strict private
     procedure DragMoveAutoWidthColumns(const P: TPoint; var ADeltaX, ADeltaY: Integer);
   public
@@ -199,14 +199,14 @@ type
     function DragStart: Boolean; override;
   end;
 
-  { TACLTreeListSubClassGroupDragObject }
+  { TACLTreeListGroupDragObject }
 
-  TACLTreeListSubClassGroupDragObject = class(TACLTreeListSubClassCustomDragSortingObject)
+  TACLTreeListGroupDragObject = class(TACLTreeListCustomDragSortingObject)
   strict private
     FGroup: TACLTreeListGroup;
   protected
     procedure CheckSelection; virtual;
-    function GetDropTargetClass: TACLTreeListSubClassDropTargetClass; override;
+    function GetDropTargetClass: TACLTreeListDropTargetClass; override;
     procedure StartDropSource(AActions: TACLDropSourceActions; ASource: IACLDropSourceOperation; ASourceObject: TObject); override;
   public
     constructor Create(AGroup: TACLTreeListGroup); virtual;
@@ -214,9 +214,9 @@ type
     property Group: TACLTreeListGroup read FGroup;
   end;
 
-  { TACLTreeListSubClassSelectionRectDragObject }
+  { TACLTreeListSelectionRectDragObject }
 
-  TACLTreeListSubClassSelectionRectDragObject = class(TACLTreeListSubClassCustomDragSortingObject)
+  TACLTreeListSelectionRectDragObject = class(TACLTreeListCustomDragSortingObject)
   strict private
     FCapturePoint: TPoint;
     FLastHitNode: TACLTreeListNode;
@@ -224,7 +224,7 @@ type
     FStartNode: TACLTreeListNode;
     FStartNodeNearest: TACLTreeListNode;
 
-    function GetContentViewInfo: TACLTreeListSubClassContentViewInfo; inline;
+    function GetContentViewInfo: TACLTreeListContentViewInfo; inline;
     function GetHitNode: TACLTreeListNode;
     function GetSelection: TACLTreeListNodeList;
   protected
@@ -237,15 +237,15 @@ type
     procedure DragMove(const P: TPoint; var ADeltaX: Integer; var ADeltaY: Integer); override;
     function DragStart: Boolean; override;
     //
-    property ContentViewInfo: TACLTreeListSubClassContentViewInfo read GetContentViewInfo;
+    property ContentViewInfo: TACLTreeListContentViewInfo read GetContentViewInfo;
     property Selection: TACLTreeListNodeList read GetSelection;
     property StartNode: TACLTreeListNode read FStartNode;
     property StartNodeNearest: TACLTreeListNode read FStartNodeNearest;
   end;
 
-  { TACLTreeListSubClassNodeDragObject }
+  { TACLTreeListNodeDragObject }
 
-  TACLTreeListSubClassNodeDragObject = class(TACLTreeListSubClassSelectionRectDragObject)
+  TACLTreeListNodeDragObject = class(TACLTreeListSelectionRectDragObject)
   protected
     function CanStartSelectionMode: Boolean; override;
   end;
@@ -258,24 +258,24 @@ uses
 
 type
   TACLTreeListNodeAccess = class(TACLTreeListNode);
-  TACLTreeListSubClassAccess = class(TACLTreeListSubClass);
+  TACLTreeListAccess = class(TACLTreeListSubClass);
 
-{ TACLTreeListSubClassDropTarget }
+{ TACLTreeListDropTarget }
 
-constructor TACLTreeListSubClassDropTarget.Create(ASubClass: TACLTreeListSubClass);
+constructor TACLTreeListDropTarget.Create(ASubClass: TACLTreeListSubClass);
 begin
   inherited Create(nil);
   FSubClass := ASubClass;
   Target := ASubClass.Container.GetControl;
 end;
 
-destructor TACLTreeListSubClassDropTarget.Destroy;
+destructor TACLTreeListDropTarget.Destroy;
 begin
   FreeAndNil(FAutoExpandTimer);
   inherited;
 end;
 
-procedure TACLTreeListSubClassDropTarget.DoDrop(Shift: TShiftState; const ScreenPoint: TPoint; Action: TACLDropAction);
+procedure TACLTreeListDropTarget.DoDrop(Shift: TShiftState; const ScreenPoint: TPoint; Action: TACLDropAction);
 begin
   DragAndDropController.IsDropping := True;
   try
@@ -285,25 +285,25 @@ begin
   end;
 end;
 
-procedure TACLTreeListSubClassDropTarget.DoDropCore(Action: TACLDropAction);
+procedure TACLTreeListDropTarget.DoDropCore(Action: TACLDropAction);
 begin
-  TACLTreeListSubClassAccess(SubClass).DoDrop(Self, Action,
+  TACLTreeListAccess(SubClass).DoDrop(Self, Action,
     DragAndDropController.DropTargetObject as TACLTreeListNode,
     DragAndDropController.DropTargetObjectInsertMode);
 end;
 
-procedure TACLTreeListSubClassDropTarget.DoEnter;
+procedure TACLTreeListDropTarget.DoEnter;
 begin
   FAutoExpandTimer := TACLTimer.CreateEx(AutoExpandTimerHandler);
 end;
 
-procedure TACLTreeListSubClassDropTarget.DoLeave;
+procedure TACLTreeListDropTarget.DoLeave;
 begin
   FreeAndNil(FAutoExpandTimer);
   DragAndDropController.UpdateDropInfo(nil, dtimInto);
 end;
 
-procedure TACLTreeListSubClassDropTarget.DoOver(Shift: TShiftState;
+procedure TACLTreeListDropTarget.DoOver(Shift: TShiftState;
   const ScreenPoint: TPoint; var Hint: UnicodeString; var Allow: Boolean; var Action: TACLDropAction);
 var
   AMode: TACLTreeListDropTargetInsertMode;
@@ -319,18 +319,18 @@ begin
     Allow := CalculateDropTarget(AObject, AMode);
 
     if Allow and not DragAndDropController.IsActive then
-      TACLTreeListSubClassAccess(SubClass).DoDropOver(Self, Action, AObject, AMode, Allow);
+      TACLTreeListAccess(SubClass).DoDropOver(Self, Action, AObject, AMode, Allow);
     if DragAndDropController.UpdateDropInfo(AObject, AMode) then
       AutoExpandTimer.Restart;
   end;
 end;
 
-procedure TACLTreeListSubClassDropTarget.DoScroll(ALines: Integer; ADirection: TACLMouseWheelDirection; const P: TPoint);
+procedure TACLTreeListDropTarget.DoScroll(ALines: Integer; ADirection: TACLMouseWheelDirection; const P: TPoint);
 begin
   ContentViewInfo.ScrollByLines(ALines, ADirection);
 end;
 
-function TACLTreeListSubClassDropTarget.CalculateDropTarget(
+function TACLTreeListDropTarget.CalculateDropTarget(
   var AObject: TObject; var AMode: TACLTreeListDropTargetInsertMode): Boolean;
 begin
   Result := HitTest.HitAtNode;
@@ -349,9 +349,9 @@ begin
   end;
 end;
 
-function TACLTreeListSubClassDropTarget.CalculateInsertMode(ANode: TACLTreeListNode): TACLTreeListDropTargetInsertMode;
+function TACLTreeListDropTarget.CalculateInsertMode(ANode: TACLTreeListNode): TACLTreeListDropTargetInsertMode;
 var
-  ACell: TACLCompoundControlSubClassBaseContentCell;
+  ACell: TACLCompoundControlBaseContentCell;
 begin
   Result := dtimAfter;
   if ContentViewInfo.ViewItems.Find(ANode, ACell) then
@@ -370,22 +370,22 @@ begin
   end;
 end;
 
-function TACLTreeListSubClassDropTarget.CanChangeNodeLevel: Boolean;
+function TACLTreeListDropTarget.CanChangeNodeLevel: Boolean;
 begin
   Result := SubClass.OptionsBehavior.DropTargetAllowCreateLevel;
 end;
 
-function TACLTreeListSubClassDropTarget.GetTargetClientRect: TRect;
+function TACLTreeListDropTarget.GetTargetClientRect: TRect;
 begin
   Result := acRectOffset(ContentViewInfo.ClientBounds, 0, 0);
 end;
 
-function TACLTreeListSubClassDropTarget.ScreenToClient(const P: TPoint): TPoint;
+function TACLTreeListDropTarget.ScreenToClient(const P: TPoint): TPoint;
 begin
   Result := SubClass.ScreenToClient(P);
 end;
 
-procedure TACLTreeListSubClassDropTarget.AutoExpandTimerHandler(Sender: TObject);
+procedure TACLTreeListDropTarget.AutoExpandTimerHandler(Sender: TObject);
 var
   AExpandable: IACLExpandableObject;
 begin
@@ -394,60 +394,60 @@ begin
     AExpandable.Expanded := True;
 end;
 
-function TACLTreeListSubClassDropTarget.GetContentViewInfo: TACLTreeListSubClassContentViewInfo;
+function TACLTreeListDropTarget.GetContentViewInfo: TACLTreeListContentViewInfo;
 begin
   Result := SubClass.ViewInfo.Content;
 end;
 
-function TACLTreeListSubClassDropTarget.GetDragAndDropController: TACLTreeListSubClassDragAndDropController;
+function TACLTreeListDropTarget.GetDragAndDropController: TACLTreeListDragAndDropController;
 begin
   Result := SubClass.DragAndDropController;
 end;
 
-function TACLTreeListSubClassDropTarget.GetHitTest: TACLTreeListSubClassHitTest;
+function TACLTreeListDropTarget.GetHitTest: TACLTreeListHitTest;
 begin
   Result := SubClass.HitTest;
 end;
 
-function TACLTreeListSubClassDropTarget.GetNodeViewInfo: TACLTreeListSubClassNodeViewInfo;
+function TACLTreeListDropTarget.GetNodeViewInfo: TACLTreeListNodeViewInfo;
 begin
   Result := ContentViewInfo.NodeViewInfo;
 end;
 
-{ TACLTreeListSubClassCustomDragSortingDropTarget }
+{ TACLTreeListCustomDragSortingDropTarget }
 
-procedure TACLTreeListSubClassCustomDragSortingDropTarget.DoDropCore(Action: TACLDropAction);
+procedure TACLTreeListCustomDragSortingDropTarget.DoDropCore(Action: TACLDropAction);
 begin
   SubClass.BeginLongOperation;
   SubClass.BeginUpdate;
   try
     DoDropObjects;
-    TACLTreeListSubClassAccess(SubClass).DoDragSorting;
+    TACLTreeListAccess(SubClass).DoDragSorting;
   finally
     SubClass.EndUpdate;
     SubClass.EndLongOperation;
   end;
 end;
 
-{ TACLTreeListSubClassGroupDragSortingDropTarget }
+{ TACLTreeListGroupDragSortingDropTarget }
 
-constructor TACLTreeListSubClassGroupDragSortingDropTarget.Create(ASubClass: TACLTreeListSubClass);
+constructor TACLTreeListGroupDragSortingDropTarget.Create(ASubClass: TACLTreeListSubClass);
 begin
   inherited Create(ASubClass);
   FSelection := TACLList<TACLTreeListGroup>.Create;
   PopulateSelection;
 end;
 
-destructor TACLTreeListSubClassGroupDragSortingDropTarget.Destroy;
+destructor TACLTreeListGroupDragSortingDropTarget.Destroy;
 begin
   FreeAndNil(FSelection);
   inherited Destroy;
 end;
 
-function TACLTreeListSubClassGroupDragSortingDropTarget.CalculateDropTarget(
+function TACLTreeListGroupDragSortingDropTarget.CalculateDropTarget(
   var AObject: TObject; var AMode: TACLTreeListDropTargetInsertMode): Boolean;
 var
-  ACell: TACLCompoundControlSubClassBaseContentCell;
+  ACell: TACLCompoundControlBaseContentCell;
   AGroup: TACLTreeListGroup;
 begin
   Result := False;
@@ -491,7 +491,7 @@ begin
   end;
 end;
 
-procedure TACLTreeListSubClassGroupDragSortingDropTarget.DoDropObjects;
+procedure TACLTreeListGroupDragSortingDropTarget.DoDropObjects;
 var
   AGroup: TACLTreeListGroup;
 begin
@@ -507,12 +507,12 @@ begin
 
   if AGroup <> nil then
   begin
-    TACLTreeListSubClassAccess(SubClass).Groups.Move(AGroup.Index +
+    TACLTreeListAccess(SubClass).Groups.Move(AGroup.Index +
       Ord(DragAndDropController.DropTargetObjectInsertMode = dtimAfter), Selection);
   end;
 end;
 
-procedure TACLTreeListSubClassGroupDragSortingDropTarget.PopulateSelection;
+procedure TACLTreeListGroupDragSortingDropTarget.PopulateSelection;
 var
   I: Integer;
 begin
@@ -529,22 +529,22 @@ begin
   end;
 end;
 
-{ TACLTreeListSubClassNodeDragSortingDropTarget }
+{ TACLTreeListNodeDragSortingDropTarget }
 
-constructor TACLTreeListSubClassNodeDragSortingDropTarget.Create(ASubClass: TACLTreeListSubClass);
+constructor TACLTreeListNodeDragSortingDropTarget.Create(ASubClass: TACLTreeListSubClass);
 begin
   inherited Create(ASubClass);
   FSelection := TACLTreeListNodeList.Create;
   PopulateSelection;
 end;
 
-destructor TACLTreeListSubClassNodeDragSortingDropTarget.Destroy;
+destructor TACLTreeListNodeDragSortingDropTarget.Destroy;
 begin
   FreeAndNil(FSelection);
   inherited Destroy;
 end;
 
-function TACLTreeListSubClassNodeDragSortingDropTarget.CalculateDropTarget(
+function TACLTreeListNodeDragSortingDropTarget.CalculateDropTarget(
   var AObject: TObject; var AMode: TACLTreeListDropTargetInsertMode): Boolean;
 var
   ANode: TACLTreeListNode;
@@ -588,21 +588,21 @@ begin
     end;
   end;
 
-  Result := Result and TACLTreeListSubClassAccess(SubClass).DoDragSortingOver(AObject as TACLTreeListNode, AMode);
+  Result := Result and TACLTreeListAccess(SubClass).DoDragSortingOver(AObject as TACLTreeListNode, AMode);
 end;
 
-function TACLTreeListSubClassNodeDragSortingDropTarget.CanChangeNodeLevel: Boolean;
+function TACLTreeListNodeDragSortingDropTarget.CanChangeNodeLevel: Boolean;
 begin
   Result := SubClass.OptionsBehavior.DragSortingAllowChangeLevel;
 end;
 
-function TACLTreeListSubClassNodeDragSortingDropTarget.DoDragSortingDrop(
+function TACLTreeListNodeDragSortingDropTarget.DoDragSortingDrop(
   ANode: TACLTreeListNode; AMode: TACLTreeListDropTargetInsertMode): Boolean;
 begin
-  Result := TACLTreeListSubClassAccess(SubClass).DoDragSortingDrop(ANode, AMode);
+  Result := TACLTreeListAccess(SubClass).DoDragSortingDrop(ANode, AMode);
 end;
 
-procedure TACLTreeListSubClassNodeDragSortingDropTarget.DoDropObjects;
+procedure TACLTreeListNodeDragSortingDropTarget.DoDropObjects;
 var
   AInsertIndex: Integer;
   AList: TACLTreeListNodeList;
@@ -649,7 +649,7 @@ begin
   end;
 end;
 
-procedure TACLTreeListSubClassNodeDragSortingDropTarget.PopulateSelection;
+procedure TACLTreeListNodeDragSortingDropTarget.PopulateSelection;
 
   function ValidateSelection: Boolean;
   var
@@ -672,7 +672,7 @@ begin
   begin
     SelectedLevel := SubClass.Selected[0].Parent;
     SelectedGroup := SubClass.Selected[0].TopLevel.Group;
-    Selection.Assign(TACLTreeListSubClassAccess(SubClass).Selection);
+    Selection.Assign(TACLTreeListAccess(SubClass).Selection);
     if not ValidateSelection then
     begin
       SelectedGroup := nil;
@@ -682,82 +682,82 @@ begin
   end;
 end;
 
-{ TACLTreeListSubClassCustomDragSortingObject }
+{ TACLTreeListCustomDragSortingObject }
 
-procedure TACLTreeListSubClassCustomDragSortingObject.DragFinished(ACanceled: Boolean);
+procedure TACLTreeListCustomDragSortingObject.DragFinished(ACanceled: Boolean);
 begin
   // do nothing
 end;
 
-procedure TACLTreeListSubClassCustomDragSortingObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
+procedure TACLTreeListCustomDragSortingObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
 begin
   // do nothing
 end;
 
-function TACLTreeListSubClassCustomDragSortingObject.DragStart: Boolean;
+function TACLTreeListCustomDragSortingObject.DragStart: Boolean;
 begin
   Result := SubClass.OptionsBehavior.DropSource or SubClass.OptionsBehavior.DragSorting;
   if Result then
     StartDropSource([dsaCopy], Self, nil);
 end;
 
-function TACLTreeListSubClassCustomDragSortingObject.GetDropTargetClass: TACLTreeListSubClassDropTargetClass;
+function TACLTreeListCustomDragSortingObject.GetDropTargetClass: TACLTreeListDropTargetClass;
 begin
-  Result := TACLTreeListSubClassNodeDragSortingDropTarget;
+  Result := TACLTreeListNodeDragSortingDropTarget;
 end;
 
-procedure TACLTreeListSubClassCustomDragSortingObject.DropSourceBegin;
+procedure TACLTreeListCustomDragSortingObject.DropSourceBegin;
 begin
   if SubClass.OptionsBehavior.DragSorting then
     UpdateDropTarget(GetDropTargetClass.Create(SubClass));
 end;
 
-procedure TACLTreeListSubClassCustomDragSortingObject.DropSourceDrop(var AllowDrop: Boolean);
+procedure TACLTreeListCustomDragSortingObject.DropSourceDrop(var AllowDrop: Boolean);
 begin
   // do nothing
 end;
 
-procedure TACLTreeListSubClassCustomDragSortingObject.DropSourceEnd(AActions: TACLDropSourceActions; AShiftState: TShiftState);
+procedure TACLTreeListCustomDragSortingObject.DropSourceEnd(AActions: TACLDropSourceActions; AShiftState: TShiftState);
 begin
   UpdateDropTarget(nil);
 end;
 
-function TACLTreeListSubClassCustomDragSortingObject.GetSubClass: TACLTreeListSubClass;
+function TACLTreeListCustomDragSortingObject.GetSubClass: TACLTreeListSubClass;
 begin
   Result := inherited SubClass as TACLTreeListSubClass;
 end;
 
-function TACLTreeListSubClassCustomDragSortingObject.GetHitTest: TACLTreeListSubClassHitTest;
+function TACLTreeListCustomDragSortingObject.GetHitTest: TACLTreeListHitTest;
 begin
   Result := SubClass.HitTest;
 end;
 
-{ TACLTreeListSubClassColumnCustomDragObject }
+{ TACLTreeListColumnCustomDragObject }
 
-constructor TACLTreeListSubClassColumnCustomDragObject.Create(AColumnViewInfo: TACLTreeListSubClassColumnViewInfo);
+constructor TACLTreeListColumnCustomDragObject.Create(AColumnViewInfo: TACLTreeListColumnViewInfo);
 begin
   inherited Create;
   FColumnViewInfo := AColumnViewInfo;
 end;
 
-function TACLTreeListSubClassColumnCustomDragObject.GetColumn: TACLTreeListColumn;
+function TACLTreeListColumnCustomDragObject.GetColumn: TACLTreeListColumn;
 begin
   Result := ColumnViewInfo.Column;
 end;
 
-function TACLTreeListSubClassColumnCustomDragObject.GetColumnBarViewInfo: TACLTreeListSubClassColumnBarViewInfo;
+function TACLTreeListColumnCustomDragObject.GetColumnBarViewInfo: TACLTreeListColumnBarViewInfo;
 begin
   Result := SubClass.ViewInfo.Content.ColumnBarViewInfo;
 end;
 
-function TACLTreeListSubClassColumnCustomDragObject.GetSubClass: TACLTreeListSubClass;
+function TACLTreeListColumnCustomDragObject.GetSubClass: TACLTreeListSubClass;
 begin
   Result := ColumnViewInfo.SubClass;
 end;
 
-{ TACLTreeListSubClassColumnDragMoveObject }
+{ TACLTreeListColumnDragMoveObject }
 
-procedure TACLTreeListSubClassColumnDragMoveObject.DragFinished(ACanceled: Boolean);
+procedure TACLTreeListColumnDragMoveObject.DragFinished(ACanceled: Boolean);
 begin
   if not ACanceled then
   begin
@@ -770,9 +770,9 @@ begin
   FreeAndNil(FAutoScrollTimer);
 end;
 
-procedure TACLTreeListSubClassColumnDragMoveObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
+procedure TACLTreeListColumnDragMoveObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
 var
-  AColumnViewInfo: TACLTreeListSubClassColumnViewInfo;
+  AColumnViewInfo: TACLTreeListColumnViewInfo;
   ADropTargetBounds: TRect;
 begin
   DragWindow.SetVisible(True);
@@ -798,19 +798,19 @@ begin
   end;
 end;
 
-function TACLTreeListSubClassColumnDragMoveObject.DragStart: Boolean;
+function TACLTreeListColumnDragMoveObject.DragStart: Boolean;
 begin
   Result := SubClass.OptionsCustomizing.ColumnOrder;
   if Result then
     InitializeDragWindow(ColumnViewInfo);
 end;
 
-procedure TACLTreeListSubClassColumnDragMoveObject.AutoScrollTimerHandler(Sender: TObject);
+procedure TACLTreeListColumnDragMoveObject.AutoScrollTimerHandler(Sender: TObject);
 begin
   SubClass.ScrollBy(10 * FAutoScrollTimer.Tag, 0);
 end;
 
-function TACLTreeListSubClassColumnDragMoveObject.CalculateAutoScrollingDelta(const P: TPoint): Integer;
+function TACLTreeListColumnDragMoveObject.CalculateAutoScrollingDelta(const P: TPoint): Integer;
 var
   R: TRect;
 begin
@@ -824,7 +824,7 @@ begin
   end;
 end;
 
-procedure TACLTreeListSubClassColumnDragMoveObject.CheckAutoScrolling(ADelta: Integer);
+procedure TACLTreeListColumnDragMoveObject.CheckAutoScrolling(ADelta: Integer);
 begin
   if FAutoScrollTimer = nil then
     FAutoScrollTimer := TACLTimer.CreateEx(AutoScrollTimerHandler, 1);
@@ -832,14 +832,14 @@ begin
   FAutoScrollTimer.Enabled := ADelta <> 0;
 end;
 
-function TACLTreeListSubClassColumnDragMoveObject.GetHitTest: TACLTreeListSubClassHitTest;
+function TACLTreeListColumnDragMoveObject.GetHitTest: TACLTreeListHitTest;
 begin
   Result := SubClass.HitTest;
 end;
 
-{ TACLTreeListSubClassColumnDragResizeObject }
+{ TACLTreeListColumnDragResizeObject }
 
-procedure TACLTreeListSubClassColumnDragResizeObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
+procedure TACLTreeListColumnDragResizeObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
 var
   APrevWidth: Integer;
 begin
@@ -858,14 +858,14 @@ begin
   end;
 end;
 
-function TACLTreeListSubClassColumnDragResizeObject.DragStart: Boolean;
+function TACLTreeListColumnDragResizeObject.DragStart: Boolean;
 begin
   Result := Column.CanResize;
 end;
 
-procedure TACLTreeListSubClassColumnDragResizeObject.DragMoveAutoWidthColumns(const P: TPoint; var ADeltaX, ADeltaY: Integer);
+procedure TACLTreeListColumnDragResizeObject.DragMoveAutoWidthColumns(const P: TPoint; var ADeltaX, ADeltaY: Integer);
 var
-  AColumnViewInfo: TACLTreeListSubClassColumnViewInfo;
+  AColumnViewInfo: TACLTreeListColumnViewInfo;
   ANextSibling: TACLTreeListColumn;
   APrevWidth: Integer;
   I: Integer;
@@ -900,15 +900,15 @@ begin
   end;
 end;
 
-{ TACLTreeListSubClassGroupDragObject }
+{ TACLTreeListGroupDragObject }
 
-constructor TACLTreeListSubClassGroupDragObject.Create(AGroup: TACLTreeListGroup);
+constructor TACLTreeListGroupDragObject.Create(AGroup: TACLTreeListGroup);
 begin
   inherited Create;
   FGroup := AGroup;
 end;
 
-procedure TACLTreeListSubClassGroupDragObject.CheckSelection;
+procedure TACLTreeListGroupDragObject.CheckSelection;
 begin
   if not Group.Selected then
   begin
@@ -922,33 +922,33 @@ begin
   end;
 end;
 
-function TACLTreeListSubClassGroupDragObject.GetDropTargetClass: TACLTreeListSubClassDropTargetClass;
+function TACLTreeListGroupDragObject.GetDropTargetClass: TACLTreeListDropTargetClass;
 begin
-  Result := TACLTreeListSubClassGroupDragSortingDropTarget;
+  Result := TACLTreeListGroupDragSortingDropTarget;
 end;
 
-procedure TACLTreeListSubClassGroupDragObject.StartDropSource(
+procedure TACLTreeListGroupDragObject.StartDropSource(
   AActions: TACLDropSourceActions; ASource: IACLDropSourceOperation; ASourceObject: TObject);
 begin
   CheckSelection;
   inherited StartDropSource(AActions, ASource, ASourceObject);
 end;
 
-{ TACLTreeListSubClassSelectionRectDragObject }
+{ TACLTreeListSelectionRectDragObject }
 
-constructor TACLTreeListSubClassSelectionRectDragObject.Create(ANode: TACLTreeListNode);
+constructor TACLTreeListSelectionRectDragObject.Create(ANode: TACLTreeListNode);
 begin
   inherited Create;
   FStartNode := ANode;
 end;
 
-procedure TACLTreeListSubClassSelectionRectDragObject.DragFinished(ACanceled: Boolean);
+procedure TACLTreeListSelectionRectDragObject.DragFinished(ACanceled: Boolean);
 begin
   inherited DragFinished(ACanceled);
   ContentViewInfo.SelectionRect := NullRect;
 end;
 
-procedure TACLTreeListSubClassSelectionRectDragObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
+procedure TACLTreeListSelectionRectDragObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
 
   procedure UpdateSelectionRect(const P1, P2: TPoint);
   begin
@@ -978,7 +978,7 @@ begin
   end;
 end;
 
-function TACLTreeListSubClassSelectionRectDragObject.DragStart: Boolean;
+function TACLTreeListSelectionRectDragObject.DragStart: Boolean;
 begin
   Result := CanStartSelectionMode;
   if Result then
@@ -992,27 +992,27 @@ begin
     Result := SubClass.HasSelection and inherited DragStart;
 end;
 
-function TACLTreeListSubClassSelectionRectDragObject.CanStartSelectionMode: Boolean;
+function TACLTreeListSelectionRectDragObject.CanStartSelectionMode: Boolean;
 begin
   Result := SubClass.OptionsSelection.MultiSelect;
 end;
 
-function TACLTreeListSubClassSelectionRectDragObject.GetAbsoluteHitPoint: TPoint;
+function TACLTreeListSelectionRectDragObject.GetAbsoluteHitPoint: TPoint;
 begin
   Result := acPointOffsetNegative(HitTest.HitPoint, ContentViewInfo.ViewItemsOrigin);
 end;
 
-procedure TACLTreeListSubClassSelectionRectDragObject.UpdateStartNodeNearest;
+procedure TACLTreeListSelectionRectDragObject.UpdateStartNodeNearest;
 begin
   FStartNodeNearest := ContentViewInfo.FindNearestNode(FCapturePoint, GetAbsoluteHitPoint.Y - FCapturePoint.Y);
 end;
 
-function TACLTreeListSubClassSelectionRectDragObject.GetContentViewInfo: TACLTreeListSubClassContentViewInfo;
+function TACLTreeListSelectionRectDragObject.GetContentViewInfo: TACLTreeListContentViewInfo;
 begin
   Result := SubClass.ViewInfo.Content;
 end;
 
-function TACLTreeListSubClassSelectionRectDragObject.GetHitNode: TACLTreeListNode;
+function TACLTreeListSelectionRectDragObject.GetHitNode: TACLTreeListNode;
 var
   ADirection: Integer;
   APrevHitPoint: TPoint;
@@ -1041,16 +1041,16 @@ begin
 //    Result := nil;
 end;
 
-function TACLTreeListSubClassSelectionRectDragObject.GetSelection: TACLTreeListNodeList;
+function TACLTreeListSelectionRectDragObject.GetSelection: TACLTreeListNodeList;
 begin
-  Result := TACLTreeListSubClassAccess(SubClass).Selection;
+  Result := TACLTreeListAccess(SubClass).Selection;
 end;
 
-{ TACLTreeListSubClassNodeDragObject }
+{ TACLTreeListNodeDragObject }
 
-function TACLTreeListSubClassNodeDragObject.CanStartSelectionMode: Boolean;
+function TACLTreeListNodeDragObject.CanStartSelectionMode: Boolean;
 var
-  AViewInfo: TACLTreeListSubClassColumnViewInfo;
+  AViewInfo: TACLTreeListColumnViewInfo;
 begin
   Result := False;
   if inherited CanStartSelectionMode and HitTest.HitAtNode then

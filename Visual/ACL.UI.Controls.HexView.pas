@@ -52,7 +52,7 @@ const
   hvcLast = hvcMakeVisible;
 
 type
-  TACLHexViewSubClassViewInfo = class;
+  TACLHexViewViewInfo = class;
 
   { TACLHexViewStyle }
 
@@ -127,14 +127,14 @@ type
     FOnSelect: TNotifyEvent;
 
     function GetSelFinish: Int64;
-    function GetViewInfo: TACLHexViewSubClassViewInfo; inline;
+    function GetViewInfo: TACLHexViewViewInfo; inline;
     procedure SetCursor(AValue: Int64);
     procedure SetData(AValue: TStream);
   protected
     FSelectionStart: Int64;
 
     function CreateStyle: TACLHexViewStyle; virtual;
-    function CreateViewInfo: TACLCompoundControlSubClassCustomViewInfo; override;
+    function CreateViewInfo: TACLCompoundControlCustomViewInfo; override;
     procedure DoSelectionChanged; virtual;
     function GetPositionFromHitTest(AHitTestInfo: TACLHitTestInfo): Int64;
     procedure ProcessChanges(AChanges: TIntegerSet = []); override;
@@ -167,14 +167,14 @@ type
     property SelLength: Int64 read FSelLength;
     property SelStart: Int64 read FSelStart;
     property Style: TACLHexViewStyle read FStyle;
-    property ViewInfo: TACLHexViewSubClassViewInfo read GetViewInfo;
+    property ViewInfo: TACLHexViewViewInfo read GetViewInfo;
     //
     property OnSelect: TNotifyEvent read FOnSelect write FOnSelect;
   end;
 
-  { TACLHexViewSubClassChararterSetViewViewInfo }
+  { TACLHexViewChararterSetViewViewInfo }
 
-  TACLHexViewSubClassChararterSetViewViewInfo = class(TACLCompoundControlSubClassCustomViewInfo,
+  TACLHexViewChararterSetViewViewInfo = class(TACLCompoundControlCustomViewInfo,
     IACLDraggableObject)
   strict private
     FCharacterSet: TACLHexViewCharacterSet;
@@ -184,7 +184,7 @@ type
   protected
     procedure DoCalculateHitTest(const AInfo: TACLHitTestInfo); override;
     // IACLDraggableObject
-    function CreateDragObject(const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlSubClassDragObject;
+    function CreateDragObject(const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlDragObject;
   public
     constructor Create(ASubClass: TACLHexViewSubClass; ACharacterSet: TACLHexViewCharacterSet); reintroduce;
     procedure Draw(ACanvas: TCanvas; AData: PByte; ADataSize: Integer);
@@ -197,15 +197,15 @@ type
     property IndentBetweenCharacters: Integer read FIndentBetweenCharacters write FIndentBetweenCharacters;
   end;
 
-  { TACLHexViewSubClassRowViewInfo }
+  { TACLHexViewRowViewInfo }
 
-  TACLHexViewSubClassRowViewInfo = class(TACLCompoundControlSubClassCustomViewInfo)
+  TACLHexViewRowViewInfo = class(TACLCompoundControlCustomViewInfo)
   strict private
-    FHexView: TACLHexViewSubClassChararterSetViewViewInfo;
+    FHexView: TACLHexViewChararterSetViewViewInfo;
     FIndentBetweenViews: Integer;
     FLabelRect: TRect;
     FLabelText: string;
-    FTextView: TACLHexViewSubClassChararterSetViewViewInfo;
+    FTextView: TACLHexViewChararterSetViewViewInfo;
 
     function GetSubClass: TACLHexViewSubClass; inline;
   protected
@@ -221,16 +221,16 @@ type
     function MeasureHeight: Integer; virtual;
     function MeasureWidth: Integer; virtual;
 
-    property TextView: TACLHexViewSubClassChararterSetViewViewInfo read FTextView;
-    property HexView: TACLHexViewSubClassChararterSetViewViewInfo read FHexView;
+    property TextView: TACLHexViewChararterSetViewViewInfo read FTextView;
+    property HexView: TACLHexViewChararterSetViewViewInfo read FHexView;
     property IndentBetweenViews: Integer read FIndentBetweenViews write FIndentBetweenViews;
     property LabelText: string read FLabelText write FLabelText;
     property SubClass: TACLHexViewSubClass read GetSubClass;
   end;
 
-  { TACLHexViewSubClassHeaderViewInfo }
+  { TACLHexViewHeaderViewInfo }
 
-  TACLHexViewSubClassHeaderViewInfo = class(TACLHexViewSubClassRowViewInfo)
+  TACLHexViewHeaderViewInfo = class(TACLHexViewRowViewInfo)
   strict private
     FLinespacing: Integer;
   protected
@@ -240,33 +240,33 @@ type
     function MeasureHeight: Integer; override;
   end;
 
-  { TACLHexViewSubClassSelectionViewInfo }
+  { TACLHexViewSelectionViewInfo }
 
-  TACLHexViewSubClassSelectionViewInfo = class
+  TACLHexViewSelectionViewInfo = class
   strict private
-    FCharsetViewInfo: TACLHexViewSubClassChararterSetViewViewInfo;
+    FCharsetViewInfo: TACLHexViewChararterSetViewViewInfo;
     FCursor: TRect;
     FFocused: Boolean;
     FRects: array[0..2] of TRect;
-    FViewInfo: TACLHexViewSubClassViewInfo;
+    FViewInfo: TACLHexViewViewInfo;
 
     function GetStyle: TACLHexViewStyle; inline;
   public
-    constructor Create(AViewInfo: TACLHexViewSubClassViewInfo;
-      ACharsetViewInfo: TACLHexViewSubClassChararterSetViewViewInfo);
+    constructor Create(AViewInfo: TACLHexViewViewInfo;
+      ACharsetViewInfo: TACLHexViewChararterSetViewViewInfo);
     procedure Calculate;
     function CalculateCharBounds(AOffset: Int64; ADiscardNegativeOffset: Boolean = False): TRect;
     procedure Draw(ACanvas: TCanvas; const AOrigin: TPoint);
     //
-    property CharsetViewInfo: TACLHexViewSubClassChararterSetViewViewInfo read FCharsetViewInfo;
+    property CharsetViewInfo: TACLHexViewChararterSetViewViewInfo read FCharsetViewInfo;
     property Focused: Boolean read FFocused write FFocused;
     property Style: TACLHexViewStyle read GetStyle;
-    property ViewInfo: TACLHexViewSubClassViewInfo read FViewInfo;
+    property ViewInfo: TACLHexViewViewInfo read FViewInfo;
   end;
 
-  { TACLHexViewSubClassSelectionDragObject }
+  { TACLHexViewSelectionDragObject }
 
-  TACLHexViewSubClassSelectionDragObject = class(TACLCompoundControlSubClassDragObject)
+  TACLHexViewSelectionDragObject = class(TACLCompoundControlDragObject)
   strict private
     FContentArea: TRect;
     FSavedSelLength: Int64;
@@ -287,9 +287,9 @@ type
     property SubClass: TACLHexViewSubClass read FSubClass;
   end;
 
-  { TACLHexViewSubClassViewInfo }
+  { TACLHexViewViewInfo }
 
-  TACLHexViewSubClassViewInfo = class(TACLCompoundControlSubClassScrollContainerViewInfo)
+  TACLHexViewViewInfo = class(TACLCompoundControlScrollContainerViewInfo)
   protected type
     TPane = (pHex, pText);
   strict private const
@@ -302,11 +302,11 @@ type
     FBufferPosition: Int64;
     FFocusedPane: TPane;
     FHeaderHeight: Integer;
-    FHeaderViewInfo: TACLHexViewSubClassHeaderViewInfo;
-    FHexSelection: TACLHexViewSubClassSelectionViewInfo;
+    FHeaderViewInfo: TACLHexViewHeaderViewInfo;
+    FHexSelection: TACLHexViewSelectionViewInfo;
     FRowHeight: Integer;
-    FRowViewInfo: TACLHexViewSubClassRowViewInfo;
-    FTextSelection: TACLHexViewSubClassSelectionViewInfo;
+    FRowViewInfo: TACLHexViewRowViewInfo;
+    FTextSelection: TACLHexViewSelectionViewInfo;
 
     function GetRowsArea: TRect;
     function GetSubClass: TACLHexViewSubClass; inline;
@@ -335,9 +335,9 @@ type
     destructor Destroy; override;
     //
     property FocusedPane: TPane read FFocusedPane write SetFocusedPane;
-    property HexSelection: TACLHexViewSubClassSelectionViewInfo read FHexSelection;
+    property HexSelection: TACLHexViewSelectionViewInfo read FHexSelection;
     property SubClass: TACLHexViewSubClass read GetSubClass;
-    property TextSelection: TACLHexViewSubClassSelectionViewInfo read FTextSelection;
+    property TextSelection: TACLHexViewSelectionViewInfo read FTextSelection;
   end;
 
   { TACLHexView }
@@ -718,7 +718,7 @@ end;
 procedure TACLHexViewSubClass.MakeVisible(const ACharPosition: Int64);
 var
   ACharBounds: TRect;
-  ASelection: TACLHexViewSubClassSelectionViewInfo;
+  ASelection: TACLHexViewSelectionViewInfo;
   AViewBounds: TRect;
 begin
   if ViewInfo.FocusedPane = pHex then
@@ -768,9 +768,9 @@ begin
   Result := TACLHexViewStyle.Create(Self);
 end;
 
-function TACLHexViewSubClass.CreateViewInfo: TACLCompoundControlSubClassCustomViewInfo;
+function TACLHexViewSubClass.CreateViewInfo: TACLCompoundControlCustomViewInfo;
 begin
-  Result := TACLHexViewSubClassViewInfo.Create(Self);
+  Result := TACLHexViewViewInfo.Create(Self);
 end;
 
 procedure TACLHexViewSubClass.DoSelectionChanged;
@@ -810,9 +810,9 @@ begin
   CharactersHex.Font := AFontInfo;
 end;
 
-function TACLHexViewSubClass.GetViewInfo: TACLHexViewSubClassViewInfo;
+function TACLHexViewSubClass.GetViewInfo: TACLHexViewViewInfo;
 begin
-  Result := TACLHexViewSubClassViewInfo(inherited ViewInfo);
+  Result := TACLHexViewViewInfo(inherited ViewInfo);
 end;
 
 procedure TACLHexViewSubClass.SetCursor(AValue: Int64);
@@ -899,7 +899,7 @@ procedure TACLHexViewSubClass.ProcessMouseClick(AButton: TMouseButton; AShift: T
 var
   ACursor: Integer;
 begin
-  if (AButton = mbLeft) and (HitTest.HitObject is TACLHexViewSubClassChararterSetViewViewInfo) then
+  if (AButton = mbLeft) and (HitTest.HitObject is TACLHexViewChararterSetViewViewInfo) then
   begin
     ACursor := GetPositionFromHitTest(HitTest);
     if ssShift in AShift then
@@ -914,9 +914,9 @@ procedure TACLHexViewSubClass.ProcessMouseDown(AButton: TMouseButton; AShift: TS
 begin
   inherited;
 
-  if HitTest.HitObject is TACLHexViewSubClassChararterSetViewViewInfo then
+  if HitTest.HitObject is TACLHexViewChararterSetViewViewInfo then
   begin
-    if TACLHexViewSubClassChararterSetViewViewInfo(HitTest.HitObject).CharacterSet = CharactersHex then
+    if TACLHexViewChararterSetViewViewInfo(HitTest.HitObject).CharacterSet = CharactersHex then
       ViewInfo.FocusedPane := pHex
     else
       ViewInfo.FocusedPane := pText;
@@ -945,15 +945,15 @@ begin
   end;
 end;
 
-{ TACLHexViewSubClassChararterSetViewViewInfo }
+{ TACLHexViewChararterSetViewViewInfo }
 
-constructor TACLHexViewSubClassChararterSetViewViewInfo.Create(ASubClass: TACLHexViewSubClass; ACharacterSet: TACLHexViewCharacterSet);
+constructor TACLHexViewChararterSetViewViewInfo.Create(ASubClass: TACLHexViewSubClass; ACharacterSet: TACLHexViewCharacterSet);
 begin
   inherited Create(ASubClass);
   FCharacterSet := ACharacterSet;
 end;
 
-procedure TACLHexViewSubClassChararterSetViewViewInfo.Draw(ACanvas: TCanvas; AData: PByte; ADataSize: Integer);
+procedure TACLHexViewChararterSetViewViewInfo.Draw(ACanvas: TCanvas; AData: PByte; ADataSize: Integer);
 var
   APrevTextColor: Cardinal;
   ASize: TSize;
@@ -983,23 +983,23 @@ begin
   SetTextColor(DC, APrevTextColor);
 end;
 
-function TACLHexViewSubClassChararterSetViewViewInfo.MeasureHeight: Integer;
+function TACLHexViewChararterSetViewViewInfo.MeasureHeight: Integer;
 begin
   Result := FCharacterSet.Size.cy;
 end;
 
-function TACLHexViewSubClassChararterSetViewViewInfo.MeasureWidth: Integer;
+function TACLHexViewChararterSetViewViewInfo.MeasureWidth: Integer;
 begin
   Result := FCharacterSet.Size.cx * acHexViewBytesPerRow + FIndentBetweenCharacters * (acHexViewBytesPerRow - 1);
 end;
 
-function TACLHexViewSubClassChararterSetViewViewInfo.CreateDragObject(
-  const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlSubClassDragObject;
+function TACLHexViewChararterSetViewViewInfo.CreateDragObject(
+  const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlDragObject;
 begin
-  Result := TACLHexViewSubClassSelectionDragObject.Create(TACLHexViewSubClass(SubClass));
+  Result := TACLHexViewSelectionDragObject.Create(TACLHexViewSubClass(SubClass));
 end;
 
-procedure TACLHexViewSubClassChararterSetViewViewInfo.DoCalculateHitTest(const AInfo: TACLHitTestInfo);
+procedure TACLHexViewChararterSetViewViewInfo.DoCalculateHitTest(const AInfo: TACLHitTestInfo);
 var
   I: Integer;
   O: Integer;
@@ -1021,23 +1021,23 @@ begin
   end;
 end;
 
-{ TACLHexViewSubClassRowViewInfo }
+{ TACLHexViewRowViewInfo }
 
-constructor TACLHexViewSubClassRowViewInfo.Create;
+constructor TACLHexViewRowViewInfo.Create;
 begin
   inherited;
-  FTextView := TACLHexViewSubClassChararterSetViewViewInfo.Create(SubClass, SubClass.Characters);
-  FHexView := TACLHexViewSubClassChararterSetViewViewInfo.Create(SubClass, SubClass.CharactersHex);
+  FTextView := TACLHexViewChararterSetViewViewInfo.Create(SubClass, SubClass.Characters);
+  FHexView := TACLHexViewChararterSetViewViewInfo.Create(SubClass, SubClass.CharactersHex);
 end;
 
-destructor TACLHexViewSubClassRowViewInfo.Destroy;
+destructor TACLHexViewRowViewInfo.Destroy;
 begin
   FreeAndNil(FTextView);
   FreeAndNil(FHexView);
   inherited;
 end;
 
-procedure TACLHexViewSubClassRowViewInfo.Draw(ACanvas: TCanvas; const AOrigin: TPoint; AData: PByte; ADataSize: Integer);
+procedure TACLHexViewRowViewInfo.Draw(ACanvas: TCanvas; const AOrigin: TPoint; AData: PByte; ADataSize: Integer);
 var
   AWindowOrg: TPoint;
 begin
@@ -1052,17 +1052,17 @@ begin
   end;
 end;
 
-function TACLHexViewSubClassRowViewInfo.MeasureHeight: Integer;
+function TACLHexViewRowViewInfo.MeasureHeight: Integer;
 begin
   Result := Max(TextView.MeasureHeight, HexView.MeasureHeight);
 end;
 
-function TACLHexViewSubClassRowViewInfo.MeasureWidth: Integer;
+function TACLHexViewRowViewInfo.MeasureWidth: Integer;
 begin
   Result := FLabelAreaWidth + IndentBetweenViews + HexView.MeasureWidth + IndentBetweenViews + TextView.MeasureWidth;
 end;
 
-procedure TACLHexViewSubClassRowViewInfo.DoCalculate(AChanges: TIntegerSet);
+procedure TACLHexViewRowViewInfo.DoCalculate(AChanges: TIntegerSet);
 var
   ARect: TRect;
 begin
@@ -1086,26 +1086,26 @@ begin
   FLabelTextColor := SubClass.Style.ColorHeaderText.AsColor;
 end;
 
-procedure TACLHexViewSubClassRowViewInfo.DoCalculateHitTest(const AInfo: TACLHitTestInfo);
+procedure TACLHexViewRowViewInfo.DoCalculateHitTest(const AInfo: TACLHitTestInfo);
 begin
   if not (HexView.CalculateHitTest(AInfo) or TextView.CalculateHitTest(AInfo)) then
     inherited;
 end;
 
-function TACLHexViewSubClassRowViewInfo.GetSubClass: TACLHexViewSubClass;
+function TACLHexViewRowViewInfo.GetSubClass: TACLHexViewSubClass;
 begin
   Result := TACLHexViewSubClass(inherited SubClass);
 end;
 
-{ TACLHexViewSubClassHeaderViewInfo }
+{ TACLHexViewHeaderViewInfo }
 
-constructor TACLHexViewSubClassHeaderViewInfo.Create(ASubClass: TACLCompoundControlSubClass);
+constructor TACLHexViewHeaderViewInfo.Create(ASubClass: TACLCompoundControlSubClass);
 begin
   inherited;
   LabelText := 'Offset (h)';
 end;
 
-procedure TACLHexViewSubClassHeaderViewInfo.DoCalculate(AChanges: TIntegerSet);
+procedure TACLHexViewHeaderViewInfo.DoCalculate(AChanges: TIntegerSet);
 var
   AMetric: TTextMetric;
 begin
@@ -1121,21 +1121,21 @@ begin
   FLinespacing := IndentBetweenViews - AMetric.tmDescent;
 end;
 
-function TACLHexViewSubClassHeaderViewInfo.MeasureHeight: Integer;
+function TACLHexViewHeaderViewInfo.MeasureHeight: Integer;
 begin
   Result := inherited + FLinespacing;
 end;
 
-{ TACLHexViewSubClassSelectionViewInfo }
+{ TACLHexViewSelectionViewInfo }
 
-constructor TACLHexViewSubClassSelectionViewInfo.Create(AViewInfo: TACLHexViewSubClassViewInfo;
-  ACharsetViewInfo: TACLHexViewSubClassChararterSetViewViewInfo);
+constructor TACLHexViewSelectionViewInfo.Create(AViewInfo: TACLHexViewViewInfo;
+  ACharsetViewInfo: TACLHexViewChararterSetViewViewInfo);
 begin
   FViewInfo := AViewInfo;
   FCharsetViewInfo := ACharsetViewInfo;
 end;
 
-procedure TACLHexViewSubClassSelectionViewInfo.Calculate;
+procedure TACLHexViewSelectionViewInfo.Calculate;
 var
   ASelFinish: TRect;
   ASelStart: TRect;
@@ -1163,7 +1163,7 @@ begin
     FCursor := NullRect;
 end;
 
-function TACLHexViewSubClassSelectionViewInfo.CalculateCharBounds(AOffset: Int64; ADiscardNegativeOffset: Boolean = False): TRect;
+function TACLHexViewSelectionViewInfo.CalculateCharBounds(AOffset: Int64; ADiscardNegativeOffset: Boolean = False): TRect;
 var
   AColIndex: Integer;
   AIndent: Integer;
@@ -1194,7 +1194,7 @@ begin
   Result.Bottom := Result.Top + ViewInfo.RowHeight;
 end;
 
-procedure TACLHexViewSubClassSelectionViewInfo.Draw(ACanvas: TCanvas; const AOrigin: TPoint);
+procedure TACLHexViewSelectionViewInfo.Draw(ACanvas: TCanvas; const AOrigin: TPoint);
 var
   AColor: TAlphaColor;
   AWindowOrg: TPoint;
@@ -1220,21 +1220,21 @@ begin
   end;
 end;
 
-function TACLHexViewSubClassSelectionViewInfo.GetStyle: TACLHexViewStyle;
+function TACLHexViewSelectionViewInfo.GetStyle: TACLHexViewStyle;
 begin
   Result := FViewInfo.SubClass.Style;
 end;
 
-{ TACLHexViewSubClassSelectionDragObject }
+{ TACLHexViewSelectionDragObject }
 
-constructor TACLHexViewSubClassSelectionDragObject.Create(ASubClass: TACLHexViewSubClass);
+constructor TACLHexViewSelectionDragObject.Create(ASubClass: TACLHexViewSubClass);
 begin
   inherited Create;
   FSubClass := ASubClass;
   FStartPosition := SubClass.GetPositionFromHitTest(HitTest);
 end;
 
-procedure TACLHexViewSubClassSelectionDragObject.DragFinished(ACanceled: Boolean);
+procedure TACLHexViewSelectionDragObject.DragFinished(ACanceled: Boolean);
 begin
   if ACanceled then
     SubClass.SetSelection(FSavedSelStart, FSavedSelLength)
@@ -1244,7 +1244,7 @@ begin
   inherited;
 end;
 
-procedure TACLHexViewSubClassSelectionDragObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
+procedure TACLHexViewSelectionDragObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
 var
   AHitPoint: TPoint;
 begin
@@ -1260,7 +1260,7 @@ begin
   inherited;
 end;
 
-function TACLHexViewSubClassSelectionDragObject.DragStart: Boolean;
+function TACLHexViewSelectionDragObject.DragStart: Boolean;
 begin
   CreateAutoScrollTimer;
   FSavedSelStart := SubClass.SelStart;
@@ -1270,31 +1270,31 @@ begin
   Result := True;
 end;
 
-function TACLHexViewSubClassSelectionDragObject.GetHitTest: TACLHitTestInfo;
+function TACLHexViewSelectionDragObject.GetHitTest: TACLHitTestInfo;
 begin
   Result := FSubClass.HitTest;
 end;
 
-procedure TACLHexViewSubClassSelectionDragObject.UpdateSelection;
+procedure TACLHexViewSelectionDragObject.UpdateSelection;
 begin
-  if HitTest.HitObject is TACLHexViewSubClassChararterSetViewViewInfo then
+  if HitTest.HitObject is TACLHexViewChararterSetViewViewInfo then
     SubClass.Select(FStartPosition, SubClass.GetPositionFromHitTest(HitTest));
 end;
 
-{ TACLHexViewSubClassViewInfo }
+{ TACLHexViewViewInfo }
 
-constructor TACLHexViewSubClassViewInfo.Create(AOwner: TACLCompoundControlSubClass);
+constructor TACLHexViewViewInfo.Create(AOwner: TACLCompoundControlSubClass);
 begin
   inherited;
   FBuffer := TACLByteBuffer.Create(2);
-  FRowViewInfo := TACLHexViewSubClassRowViewInfo.Create(SubClass);
-  FTextSelection := TACLHexViewSubClassSelectionViewInfo.Create(Self, FRowViewInfo.TextView);
-  FHexSelection := TACLHexViewSubClassSelectionViewInfo.Create(Self, FRowViewInfo.HexView);
+  FRowViewInfo := TACLHexViewRowViewInfo.Create(SubClass);
+  FTextSelection := TACLHexViewSelectionViewInfo.Create(Self, FRowViewInfo.TextView);
+  FHexSelection := TACLHexViewSelectionViewInfo.Create(Self, FRowViewInfo.HexView);
   FHexSelection.Focused := True;
-  FHeaderViewInfo := TACLHexViewSubClassHeaderViewInfo.Create(SubClass);
+  FHeaderViewInfo := TACLHexViewHeaderViewInfo.Create(SubClass);
 end;
 
-destructor TACLHexViewSubClassViewInfo.Destroy;
+destructor TACLHexViewViewInfo.Destroy;
 begin
   FreeAndNil(FHeaderViewInfo);
   FreeAndNil(FRowViewInfo);
@@ -1304,7 +1304,7 @@ begin
   inherited Destroy;
 end;
 
-procedure TACLHexViewSubClassViewInfo.CalculateContentLayout;
+procedure TACLHexViewViewInfo.CalculateContentLayout;
 begin
   FRowViewInfo.IndentBetweenViews := ScaleFactor.Apply(IndentBetweenViews);
   FRowViewInfo.Calculate(Bounds, []);
@@ -1326,19 +1326,19 @@ begin
   CalculateSelection;
 end;
 
-procedure TACLHexViewSubClassViewInfo.CalculateSelection;
+procedure TACLHexViewViewInfo.CalculateSelection;
 begin
   FHexSelection.Calculate;
   FTextSelection.Calculate;
 end;
 
-procedure TACLHexViewSubClassViewInfo.CalculateSubCells(const AChanges: TIntegerSet);
+procedure TACLHexViewViewInfo.CalculateSubCells(const AChanges: TIntegerSet);
 begin
   inherited;
   FClientBounds := acRectInflate(FClientBounds, -ScaleFactor.Apply(Padding));
 end;
 
-procedure TACLHexViewSubClassViewInfo.CheckBufferCapacity(ACapacity: Integer);
+procedure TACLHexViewViewInfo.CheckBufferCapacity(ACapacity: Integer);
 begin
   if (FBuffer = nil) or (FBuffer.Size < ACapacity) then
   begin
@@ -1348,13 +1348,13 @@ begin
   end;
 end;
 
-procedure TACLHexViewSubClassViewInfo.ContentScrolled(ADeltaX, ADeltaY: Integer);
+procedure TACLHexViewViewInfo.ContentScrolled(ADeltaX, ADeltaY: Integer);
 begin
   BufferPosition := (ViewportY div FRowHeight) * acHexViewBytesPerRow;
   inherited;
 end;
 
-procedure TACLHexViewSubClassViewInfo.DoCalculateHitTest(const AInfo: TACLHitTestInfo);
+procedure TACLHexViewViewInfo.DoCalculateHitTest(const AInfo: TACLHitTestInfo);
 var
   ADataOffset: Integer;
   ARowRect: TRect;
@@ -1384,7 +1384,7 @@ begin
   end;
 end;
 
-procedure TACLHexViewSubClassViewInfo.DoDraw(ACanvas: TCanvas);
+procedure TACLHexViewViewInfo.DoDraw(ACanvas: TCanvas);
 var
   AClipRegion: HRGN;
   AData: PByte;
@@ -1429,19 +1429,19 @@ begin
   end;
 end;
 
-function TACLHexViewSubClassViewInfo.GetScrollInfo(AKind: TScrollBarKind; out AInfo: TACLScrollInfo): Boolean;
+function TACLHexViewViewInfo.GetScrollInfo(AKind: TScrollBarKind; out AInfo: TACLScrollInfo): Boolean;
 begin
   Result := inherited;
   if Result and (AKind = sbVertical) then
     AInfo.LineSize := FRowHeight;
 end;
 
-procedure TACLHexViewSubClassViewInfo.RecreateSubCells;
+procedure TACLHexViewViewInfo.RecreateSubCells;
 begin
   FreeAndNil(FBuffer);
 end;
 
-procedure TACLHexViewSubClassViewInfo.PopulateData;
+procedure TACLHexViewViewInfo.PopulateData;
 var
   AData: TStream;
 begin
@@ -1455,30 +1455,30 @@ begin
     FBuffer.Used := 0;
 end;
 
-function TACLHexViewSubClassViewInfo.GetRowsArea: TRect;
+function TACLHexViewViewInfo.GetRowsArea: TRect;
 begin
   Result := RowsAreaClipRect;
   Dec(Result.Left, ViewportX);
   Dec(Result.Top, ViewportY mod FRowHeight);
 end;
 
-function TACLHexViewSubClassViewInfo.GetRowsAreaClipRect: TRect;
+function TACLHexViewViewInfo.GetRowsAreaClipRect: TRect;
 begin
   Result := ClientBounds;
   Inc(Result.Top, FHeaderHeight);
 end;
 
-function TACLHexViewSubClassViewInfo.GetSubClass: TACLHexViewSubClass;
+function TACLHexViewViewInfo.GetSubClass: TACLHexViewSubClass;
 begin
   Result := TACLHexViewSubClass(inherited SubClass);
 end;
 
-function TACLHexViewSubClassViewInfo.GetVisibleRowCount: Integer;
+function TACLHexViewViewInfo.GetVisibleRowCount: Integer;
 begin
   Result := acRectHeight(RowsArea) div RowHeight;
 end;
 
-procedure TACLHexViewSubClassViewInfo.SetBufferPosition(const AValue: Int64);
+procedure TACLHexViewViewInfo.SetBufferPosition(const AValue: Int64);
 begin
   if FBufferPosition <> AValue then
   begin
@@ -1488,7 +1488,7 @@ begin
   end;
 end;
 
-procedure TACLHexViewSubClassViewInfo.SetFocusedPane(const Value: TPane);
+procedure TACLHexViewViewInfo.SetFocusedPane(const Value: TPane);
 begin
   if FFocusedPane <> Value then
   begin

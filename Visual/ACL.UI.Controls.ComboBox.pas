@@ -85,7 +85,7 @@ type
     procedure MouseUpHandler(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
   protected
     procedure AdjustSize; override;
-    procedure ClickAtObject(AHitTest: TACLTreeListSubClassHitTest); virtual;
+    procedure ClickAtObject(AHitTest: TACLTreeListHitTest); virtual;
     procedure Initialize; override;
     procedure PopulateList(AList: TACLTreeList); virtual; abstract;
     procedure ResourceChanged; override;
@@ -163,7 +163,7 @@ type
   strict private
     function GetOwnerEx: TACLBasicComboBox;
   protected
-    procedure ClickAtObject(AHitTest: TACLTreeListSubClassHitTest); override;
+    procedure ClickAtObject(AHitTest: TACLTreeListHitTest); override;
     procedure DoCustomDraw(Sender: TObject; ACanvas: TCanvas; const R: TRect; ANode: TACLTreeListNode; var AHandled: Boolean);
     procedure DoGetGroupName(Sender: TObject; ANode: TACLTreeListNode; var AGroupName: string);
     procedure DoKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
@@ -400,10 +400,10 @@ end;
 function TACLCustomComboBoxDropDownForm.CalculateHeight: Integer;
 var
   AFirstNode: TACLTreeListNode;
-  AFirstNodeCell: TACLCompoundControlSubClassBaseContentCell;
+  AFirstNodeCell: TACLCompoundControlBaseContentCell;
   ALastNode: TACLTreeListNode;
-  ALastNodeCell: TACLCompoundControlSubClassBaseContentCell;
-  AViewItems: TACLCompoundControlSubClassContentCellList;
+  ALastNodeCell: TACLCompoundControlBaseContentCell;
+  AViewItems: TACLCompoundControlContentCellList;
 begin
   Result := 0;
   if Control.RootNode.ChildrenCount > 0 then
@@ -424,7 +424,7 @@ begin
   Height := CalculateHeight;
 end;
 
-procedure TACLCustomComboBoxDropDownForm.ClickAtObject(AHitTest: TACLTreeListSubClassHitTest);
+procedure TACLCustomComboBoxDropDownForm.ClickAtObject(AHitTest: TACLTreeListHitTest);
 begin
   // do nothing
 end;
@@ -855,7 +855,7 @@ begin
   SyncItemIndex;
 end;
 
-procedure TACLBasicComboBoxDropDownForm.ClickAtObject(AHitTest: TACLTreeListSubClassHitTest);
+procedure TACLBasicComboBoxDropDownForm.ClickAtObject(AHitTest: TACLTreeListHitTest);
 begin
   if AHitTest.HitAtNode then
     DoSelectItem;

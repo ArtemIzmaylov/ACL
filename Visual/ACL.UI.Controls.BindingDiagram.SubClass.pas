@@ -159,7 +159,7 @@ type
     procedure HandlerObjectsChanged(Sender: TObject; AChanges: TACLPersistentChanges);
     procedure SetSelectedObject(const Value: TObject);
   protected
-    function CreateViewInfo: TACLCompoundControlSubClassCustomViewInfo; override;
+    function CreateViewInfo: TACLCompoundControlCustomViewInfo; override;
     function DoLinkChanging(ALink: TACLBindingDiagramLink; ASourcePin, ATargetPin: TACLBindingDiagramObjectPin): Boolean; virtual;
     procedure DoLinkChanged(ALink: TACLBindingDiagramLink); virtual;
     function DoLinkCreating(ASourcePin, ATargetPin: TACLBindingDiagramObjectPin): Boolean; virtual;
@@ -199,7 +199,7 @@ type
 
   { TACLBindingDiagramObjectDragObject }
 
-  TACLBindingDiagramObjectDragObject = class(TACLCompoundControlSubClassDragObject)
+  TACLBindingDiagramObjectDragObject = class(TACLCompoundControlDragObject)
   strict private
     FObject: TACLBindingDiagramObject;
   public
@@ -211,7 +211,7 @@ type
 
   { TACLBindingDiagramObjectViewInfo }
 
-  TACLBindingDiagramObjectViewInfo = class(TACLCompoundControlSubClassContainerViewInfo,
+  TACLBindingDiagramObjectViewInfo = class(TACLCompoundControlContainerViewInfo,
     IACLDraggableObject)
   protected const
     BorderWidth = 2;
@@ -238,7 +238,7 @@ type
     procedure FlushCache; inline;
     procedure RecreateSubCells; override;
     // IACLDraggableObject
-    function CreateDragObject(const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlSubClassDragObject;
+    function CreateDragObject(const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlDragObject;
   public
     constructor Create(AOwner: TACLBindingDiagramSubClassViewInfo; AObject: TACLBindingDiagramObject); reintroduce;
     function IsSelected: Boolean;
@@ -257,7 +257,7 @@ type
 
   { TACLBindingDiagramObjectPinViewInfo }
 
-  TACLBindingDiagramObjectPinViewInfo = class(TACLCompoundControlSubClassCustomViewInfo,
+  TACLBindingDiagramObjectPinViewInfo = class(TACLCompoundControlCustomViewInfo,
     IACLDraggableObject)
   strict private
     FInputConnectorRect: TRect;
@@ -282,7 +282,7 @@ type
     procedure DoDrawBackground(ACanvas: TCanvas);
     procedure DoDrawConnector(ACanvas: TCanvas; const R: TRect; AMode: TACLBindingDiagramObjectPinMode);
     // IACLDraggableObject
-    function CreateDragObject(const AInfo: TACLHitTestInfo): TACLCompoundControlSubClassDragObject;
+    function CreateDragObject(const AInfo: TACLHitTestInfo): TACLCompoundControlDragObject;
   public
     constructor Create(AOwner: TACLBindingDiagramObjectViewInfo; APin: TACLBindingDiagramObjectPin); reintroduce;
     destructor Destroy; override;
@@ -344,7 +344,7 @@ type
 
   { TACLBindingDiagramCustomLinkDragObject }
 
-  TACLBindingDiagramCustomLinkDragObject = class(TACLCompoundControlSubClassDragObject)
+  TACLBindingDiagramCustomLinkDragObject = class(TACLCompoundControlDragObject)
   strict private
     FLineFinish: TPoint;
     FLineStart: TPoint;
@@ -377,7 +377,7 @@ type
 
   { TACLBindingDiagramLinkViewInfo }
 
-  TACLBindingDiagramLinkViewInfo = class(TACLCompoundControlSubClassCustomViewInfo,
+  TACLBindingDiagramLinkViewInfo = class(TACLCompoundControlCustomViewInfo,
     IACLDraggableObject)
   public const
     ArrowSize = 3;
@@ -399,7 +399,7 @@ type
     procedure DoCalculateHitTest(const AInfo: TACLHitTestInfo); override;
     procedure DoDraw(ACanvas: TCanvas); override;
     // IACLDraggableObject
-    function CreateDragObject(const AInfo: TACLHitTestInfo): TACLCompoundControlSubClassDragObject;
+    function CreateDragObject(const AInfo: TACLHitTestInfo): TACLCompoundControlDragObject;
   public
     constructor Create(ALink: TACLBindingDiagramLink; AOwner: TACLBindingDiagramSubClassViewInfo;
       ASourcePin, ATargetPin: TACLBindingDiagramObjectPinViewInfo; AColor: TColor); reintroduce;
@@ -440,7 +440,7 @@ type
 
   { TACLBindingDiagramScrollDragObject }
 
-  TACLBindingDiagramScrollDragObject = class(TACLCompoundControlSubClassDragObject)
+  TACLBindingDiagramScrollDragObject = class(TACLCompoundControlDragObject)
   strict private
     FOwner: TACLBindingDiagramSubClassViewInfo;
   public
@@ -452,7 +452,7 @@ type
 
   { TACLBindingDiagramSubClassViewInfo }
 
-  TACLBindingDiagramSubClassViewInfo = class(TACLCompoundControlSubClassScrollContainerViewInfo,
+  TACLBindingDiagramSubClassViewInfo = class(TACLCompoundControlScrollContainerViewInfo,
     IACLDraggableObject)
   strict private const
     CellSize = 10;
@@ -462,7 +462,7 @@ type
  strict private
     function GetSubClass: TACLBindingDiagramSubClass;
     // IACLDraggableObject
-    function CreateDragObject(const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlSubClassDragObject;
+    function CreateDragObject(const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlDragObject;
   protected
     FLineOffset: Integer;
     FLinkColors: TACLColorList;
@@ -713,7 +713,7 @@ begin
   CaptionFont.Style := [fsBold];
 end;
 
-function TACLBindingDiagramSubClass.CreateViewInfo: TACLCompoundControlSubClassCustomViewInfo;
+function TACLBindingDiagramSubClass.CreateViewInfo: TACLCompoundControlCustomViewInfo;
 begin
   Result := TACLBindingDiagramSubClassViewInfo.Create(Self);
 end;
@@ -978,7 +978,7 @@ begin
     FChildren.Add(TACLBindingDiagramObjectPinViewInfo.Create(Self, &Object.Pins[I]));
 end;
 
-function TACLBindingDiagramObjectViewInfo.CreateDragObject(const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlSubClassDragObject;
+function TACLBindingDiagramObjectViewInfo.CreateDragObject(const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlDragObject;
 begin
   if SubClass.OptionsBehavior.AllowMoveObjects then
     Result := TACLBindingDiagramObjectDragObject.Create(&Object)
@@ -1148,7 +1148,7 @@ begin
   end;
 end;
 
-function TACLBindingDiagramObjectPinViewInfo.CreateDragObject(const AInfo: TACLHitTestInfo): TACLCompoundControlSubClassDragObject;
+function TACLBindingDiagramObjectPinViewInfo.CreateDragObject(const AInfo: TACLHitTestInfo): TACLCompoundControlDragObject;
 begin
   if TACLBindingDiagramSubClass(SubClass).OptionsBehavior.AllowCreateLinks and (Pin.Mode <> []) then
     Result := TACLBindingDiagramCreateLinkDragObject.Create(Self)
@@ -1699,7 +1699,7 @@ begin
   Result := TACLBindingDiagramSubClass(inherited SubClass);
 end;
 
-function TACLBindingDiagramSubClassViewInfo.CreateDragObject(const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlSubClassDragObject;
+function TACLBindingDiagramSubClassViewInfo.CreateDragObject(const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlDragObject;
 begin
   Result := TACLBindingDiagramScrollDragObject.Create(Self);
 end;
@@ -1952,7 +1952,7 @@ begin
     ACanvas.Polygon(FArrowInput);
 end;
 
-function TACLBindingDiagramLinkViewInfo.CreateDragObject(const AInfo: TACLHitTestInfo): TACLCompoundControlSubClassDragObject;
+function TACLBindingDiagramLinkViewInfo.CreateDragObject(const AInfo: TACLHitTestInfo): TACLCompoundControlDragObject;
 begin
   if TACLBindingDiagramSubClass(SubClass).OptionsBehavior.AllowEditLinks then
     Result := TACLBindingDiagramEditLinkDragObject.Create(Self)

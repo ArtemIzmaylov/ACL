@@ -99,7 +99,7 @@ type
     procedure ItemCheckHandler(Sender: TObject; AItem: TACLTreeListNode);
     procedure UpdateStateHandler(Sender: TObject);
   protected
-    procedure ClickAtObject(AHitTest: TACLTreeListSubClassHitTest); override;
+    procedure ClickAtObject(AHitTest: TACLTreeListHitTest); override;
     procedure PopulateList(AList: TACLTreeList); override;
   public
     constructor Create(AOwner: TComponent); override;
@@ -328,7 +328,7 @@ begin
   Control.OnUpdateState := UpdateStateHandler;
 end;
 
-procedure TACLCheckComboBoxDropDownForm.ClickAtObject(AHitTest: TACLTreeListSubClassHitTest);
+procedure TACLCheckComboBoxDropDownForm.ClickAtObject(AHitTest: TACLTreeListHitTest);
 begin
   if AHitTest.HitAtNode and not AHitTest.IsCheckable then
     AHitTest.Node.Checked := not AHitTest.Node.Checked;

@@ -45,7 +45,7 @@ uses
   ACL.UI.Resources;
 
 type
-  TACLCompoundControlSubClassScrollBarThumbnailViewInfo = class;
+  TACLCompoundControlScrollBarThumbnailViewInfo = class;
 
   TACLScrollEvent = procedure (Sender: TObject; Position: Integer) of object;
   TACLVisibleScrollBars = set of TScrollBarKind;
@@ -64,9 +64,9 @@ type
     procedure Reset;
   end;
 
-  { TACLCompoundControlSubClassScrollBarViewInfo }
+  { TACLCompoundControlScrollBarViewInfo }
 
-  TACLCompoundControlSubClassScrollBarViewInfo = class(TACLCompoundControlSubClassContainerViewInfo, IACLPressableObject)
+  TACLCompoundControlScrollBarViewInfo = class(TACLCompoundControlContainerViewInfo, IACLPressableObject)
   strict private
     FKind: TScrollBarKind;
     FPageSizeInPixels: Integer;
@@ -80,7 +80,7 @@ type
 
     function GetHitTest: TACLHitTestInfo; inline;
     function GetStyle: TACLStyleScrollBox; inline;
-    function GetThumbnailViewInfo: TACLCompoundControlSubClassScrollBarThumbnailViewInfo;
+    function GetThumbnailViewInfo: TACLCompoundControlScrollBarThumbnailViewInfo;
     procedure ScrollTimerHandler(Sender: TObject);
   protected
     function CalculateScrollDelta(const P: TPoint): Integer;
@@ -97,7 +97,7 @@ type
     procedure MouseUp(AButton: TMouseButton; AShift: TShiftState; AHitTestInfo: TACLHitTestInfo);
     //
     property HitTest: TACLHitTestInfo read GetHitTest;
-    property ThumbnailViewInfo: TACLCompoundControlSubClassScrollBarThumbnailViewInfo read GetThumbnailViewInfo;
+    property ThumbnailViewInfo: TACLCompoundControlScrollBarThumbnailViewInfo read GetThumbnailViewInfo;
   public
     constructor Create(ASubClass: TACLCompoundControlSubClass; AKind: TScrollBarKind); reintroduce; virtual;
     destructor Destroy; override;
@@ -115,14 +115,14 @@ type
     property OnScroll: TACLScrollEvent read FOnScroll write FOnScroll;
   end;
 
-  { TACLCompoundControlSubClassScrollBarPartViewInfo }
+  { TACLCompoundControlScrollBarPartViewInfo }
 
-  TACLCompoundControlSubClassScrollBarPartViewInfo = class(TACLCompoundControlSubClassCustomViewInfo,
+  TACLCompoundControlScrollBarPartViewInfo = class(TACLCompoundControlCustomViewInfo,
     IACLAnimateControl,
     IACLPressableObject,
     IACLHotTrackObject)
   strict private
-    FOwner: TACLCompoundControlSubClassScrollBarViewInfo;
+    FOwner: TACLCompoundControlScrollBarViewInfo;
     FPart: TACLScrollBarPart;
     FState: TACLButtonState;
 
@@ -145,20 +145,20 @@ type
     //
     property ActualState: TACLButtonState read GetActualState;
   public
-    constructor Create(AOwner: TACLCompoundControlSubClassScrollBarViewInfo; APart: TACLScrollBarPart); reintroduce; virtual;
+    constructor Create(AOwner: TACLCompoundControlScrollBarViewInfo; APart: TACLScrollBarPart); reintroduce; virtual;
     destructor Destroy; override;
     procedure Scroll(APosition: Integer);
     //
     property Kind: TScrollBarKind read GetKind;
-    property Owner: TACLCompoundControlSubClassScrollBarViewInfo read FOwner;
+    property Owner: TACLCompoundControlScrollBarViewInfo read FOwner;
     property Part: TACLScrollBarPart read FPart;
     property State: TACLButtonState read FState write SetState;
     property Style: TACLStyleScrollBox read GetStyle;
   end;
 
-  { TACLCompoundControlSubClassScrollBarButtonViewInfo }
+  { TACLCompoundControlScrollBarButtonViewInfo }
 
-  TACLCompoundControlSubClassScrollBarButtonViewInfo = class(TACLCompoundControlSubClassScrollBarPartViewInfo)
+  TACLCompoundControlScrollBarButtonViewInfo = class(TACLCompoundControlScrollBarPartViewInfo)
   strict private
     FTimer: TACLTimer;
 
@@ -170,40 +170,40 @@ type
     procedure MouseUp(AButton: TMouseButton; AShift: TShiftState; AHitTestInfo: TACLHitTestInfo); override;
   end;
 
-  { TACLCompoundControlSubClassScrollBarThumbnailDragObject }
+  { TACLCompoundControlScrollBarThumbnailDragObject }
 
-  TACLCompoundControlSubClassScrollBarThumbnailDragObject = class(TACLCompoundControlSubClassDragObject)
+  TACLCompoundControlScrollBarThumbnailDragObject = class(TACLCompoundControlDragObject)
   strict private
-    FOwner: TACLCompoundControlSubClassScrollBarPartViewInfo;
+    FOwner: TACLCompoundControlScrollBarPartViewInfo;
     FSavedBounds: TRect;
     FSavedPosition: Integer;
 
     function GetTrackArea: TRect;
   public
-    constructor Create(AOwner: TACLCompoundControlSubClassScrollBarPartViewInfo);
+    constructor Create(AOwner: TACLCompoundControlScrollBarPartViewInfo);
     function DragStart: Boolean; override;
     procedure DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer); override;
     procedure DragFinished(ACanceled: Boolean); override;
     //
-    property Owner: TACLCompoundControlSubClassScrollBarPartViewInfo read FOwner;
+    property Owner: TACLCompoundControlScrollBarPartViewInfo read FOwner;
     property TrackArea: TRect read GetTrackArea;
   end;
 
-  { TACLCompoundControlSubClassScrollBarThumbnailViewInfo }
+  { TACLCompoundControlScrollBarThumbnailViewInfo }
 
-  TACLCompoundControlSubClassScrollBarThumbnailViewInfo = class(TACLCompoundControlSubClassScrollBarPartViewInfo,
+  TACLCompoundControlScrollBarThumbnailViewInfo = class(TACLCompoundControlScrollBarPartViewInfo,
     IACLDraggableObject)
   protected
     // IACLDraggableObject
-    function CreateDragObject(const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlSubClassDragObject;
+    function CreateDragObject(const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlDragObject;
   end;
 
-  { TACLCompoundControlSubClassScrollContainerViewInfo }
+  { TACLCompoundControlScrollContainerViewInfo }
 
-  TACLCompoundControlSubClassScrollContainerViewInfo = class(TACLCompoundControlSubClassContainerViewInfo)
+  TACLCompoundControlScrollContainerViewInfo = class(TACLCompoundControlContainerViewInfo)
   strict private
-    FScrollBarHorz: TACLCompoundControlSubClassScrollBarViewInfo;
-    FScrollBarVert: TACLCompoundControlSubClassScrollBarViewInfo;
+    FScrollBarHorz: TACLCompoundControlScrollBarViewInfo;
+    FScrollBarVert: TACLCompoundControlScrollBarViewInfo;
     FSizeGripArea: TRect;
     FViewportX: Integer;
     FViewportY: Integer;
@@ -220,12 +220,12 @@ type
     FClientBounds: TRect;
     FContentSize: TSize;
 
-    function CreateScrollBar(AKind: TScrollBarKind): TACLCompoundControlSubClassScrollBarViewInfo; virtual;
+    function CreateScrollBar(AKind: TScrollBarKind): TACLCompoundControlScrollBarViewInfo; virtual;
     function GetScrollInfo(AKind: TScrollBarKind; out AInfo: TACLScrollInfo): Boolean; virtual;
     function ScrollViewport(AKind: TScrollBarKind; AScrollCode: TScrollCode): Integer;
     //
     procedure CalculateContentLayout; virtual; abstract;
-    procedure CalculateScrollBar(AScrollBar: TACLCompoundControlSubClassScrollBarViewInfo); virtual;
+    procedure CalculateScrollBar(AScrollBar: TACLCompoundControlScrollBarViewInfo); virtual;
     procedure CalculateScrollBarsPosition(var R: TRect);
     procedure CalculateSubCells(const AChanges: TIntegerSet); override;
     procedure ContentScrolled(ADeltaX, ADeltaY: Integer); virtual;
@@ -242,8 +242,8 @@ type
     //
     property ClientBounds: TRect read FClientBounds;
     property ContentSize: TSize read FContentSize;
-    property ScrollBarHorz: TACLCompoundControlSubClassScrollBarViewInfo read FScrollBarHorz;
-    property ScrollBarVert: TACLCompoundControlSubClassScrollBarViewInfo read FScrollBarVert;
+    property ScrollBarHorz: TACLCompoundControlScrollBarViewInfo read FScrollBarHorz;
+    property ScrollBarVert: TACLCompoundControlScrollBarViewInfo read FScrollBarVert;
     property SizeGripArea: TRect read FSizeGripArea;
     property Viewport: TPoint read GetViewport write SetViewport;
     property ViewportX: Integer read FViewportX write SetViewportX;
@@ -273,26 +273,26 @@ begin
   ZeroMemory(@Self, SizeOf(Self));
 end;
 
-{ TACLCompoundControlSubClassScrollBarViewInfo }
+{ TACLCompoundControlScrollBarViewInfo }
 
-constructor TACLCompoundControlSubClassScrollBarViewInfo.Create(ASubClass: TACLCompoundControlSubClass; AKind: TScrollBarKind);
+constructor TACLCompoundControlScrollBarViewInfo.Create(ASubClass: TACLCompoundControlSubClass; AKind: TScrollBarKind);
 begin
   inherited Create(ASubClass);
   FKind := AKind;
 end;
 
-destructor TACLCompoundControlSubClassScrollBarViewInfo.Destroy;
+destructor TACLCompoundControlScrollBarViewInfo.Destroy;
 begin
   FreeAndNil(FScrollTimer);
   inherited Destroy;
 end;
 
-function TACLCompoundControlSubClassScrollBarViewInfo.IsThumbResizable: Boolean;
+function TACLCompoundControlScrollBarViewInfo.IsThumbResizable: Boolean;
 begin
   Result := Style.IsThumbResizable(Kind);
 end;
 
-function TACLCompoundControlSubClassScrollBarViewInfo.MeasureSize: Integer;
+function TACLCompoundControlScrollBarViewInfo.MeasureSize: Integer;
 begin
   if not Visible then
     Result := 0
@@ -303,7 +303,7 @@ begin
       Result := Style.TextureBackgroundHorz.FrameHeight;
 end;
 
-procedure TACLCompoundControlSubClassScrollBarViewInfo.SetParams(const AScrollInfo: TACLScrollInfo);
+procedure TACLCompoundControlScrollBarViewInfo.SetParams(const AScrollInfo: TACLScrollInfo);
 begin
   FScrollInfo := AScrollInfo;
   if not IsThumbResizable then
@@ -315,7 +315,7 @@ begin
   Calculate(Bounds, [cccnLayout]);
 end;
 
-function TACLCompoundControlSubClassScrollBarViewInfo.CalculateScrollDelta(const P: TPoint): Integer;
+function TACLCompoundControlScrollBarViewInfo.CalculateScrollDelta(const P: TPoint): Integer;
 var
   ADelta: TPoint;
 begin
@@ -326,7 +326,7 @@ begin
     Result := Sign(ADelta.Y) * Min(Abs(ADelta.Y), FPageSizeInPixels);
 end;
 
-procedure TACLCompoundControlSubClassScrollBarViewInfo.DoCalculate(AChanges: TIntegerSet);
+procedure TACLCompoundControlScrollBarViewInfo.DoCalculate(AChanges: TIntegerSet);
 var
   ASize: Integer;
   R1: TRect;
@@ -387,35 +387,35 @@ begin
   end;
 end;
 
-procedure TACLCompoundControlSubClassScrollBarViewInfo.DoCalculateHitTest(const AInfo: TACLHitTestInfo);
+procedure TACLCompoundControlScrollBarViewInfo.DoCalculateHitTest(const AInfo: TACLHitTestInfo);
 begin
   inherited;
   AInfo.IsScrollBarArea := True;
 end;
 
-procedure TACLCompoundControlSubClassScrollBarViewInfo.DoDraw(ACanvas: TCanvas);
+procedure TACLCompoundControlScrollBarViewInfo.DoDraw(ACanvas: TCanvas);
 begin
   Style.DrawBackground(ACanvas.Handle, Bounds, Kind);
   inherited DoDraw(ACanvas);
 end;
 
-procedure TACLCompoundControlSubClassScrollBarViewInfo.RecreateSubCells;
+procedure TACLCompoundControlScrollBarViewInfo.RecreateSubCells;
 begin
-  FChildren.Add(TACLCompoundControlSubClassScrollBarButtonViewInfo.Create(Self, sbpLineDown));
-  FChildren.Add(TACLCompoundControlSubClassScrollBarButtonViewInfo.Create(Self, sbpLineUp));
-  FChildren.Add(TACLCompoundControlSubClassScrollBarThumbnailViewInfo.Create(Self, sbpThumbnail));
+  FChildren.Add(TACLCompoundControlScrollBarButtonViewInfo.Create(Self, sbpLineDown));
+  FChildren.Add(TACLCompoundControlScrollBarButtonViewInfo.Create(Self, sbpLineUp));
+  FChildren.Add(TACLCompoundControlScrollBarThumbnailViewInfo.Create(Self, sbpThumbnail));
 end;
 
-procedure TACLCompoundControlSubClassScrollBarViewInfo.Scroll(APosition: Integer);
+procedure TACLCompoundControlScrollBarViewInfo.Scroll(APosition: Integer);
 begin
   if Assigned(OnScroll) then
     OnScroll(Self, APosition);
 end;
 
-procedure TACLCompoundControlSubClassScrollBarViewInfo.ScrollTo(const P: TPoint);
+procedure TACLCompoundControlScrollBarViewInfo.ScrollTo(const P: TPoint);
 var
   ADelta: TPoint;
-  ADragObject: TACLCompoundControlSubClassDragObject;
+  ADragObject: TACLCompoundControlDragObject;
 begin
   ADelta := acPointOffsetNegative(P, acRectCenter(ThumbnailViewInfo.Bounds));
   if acPointIsEqual(ADelta, NullPoint) then
@@ -433,7 +433,7 @@ begin
   end;
 end;
 
-procedure TACLCompoundControlSubClassScrollBarViewInfo.ScrollToMouseCursor(const AInitialDelta: Integer);
+procedure TACLCompoundControlScrollBarViewInfo.ScrollToMouseCursor(const AInitialDelta: Integer);
 var
   ACenter: TPoint;
   ADelta: Integer;
@@ -454,7 +454,7 @@ begin
   ScrollTo(ACenter);
 end;
 
-procedure TACLCompoundControlSubClassScrollBarViewInfo.MouseDown(
+procedure TACLCompoundControlScrollBarViewInfo.MouseDown(
   AButton: TMouseButton; AShift: TShiftState; AHitTestInfo: TACLHitTestInfo);
 var
   ADelta: Integer;
@@ -475,13 +475,13 @@ begin
     end;
 end;
 
-procedure TACLCompoundControlSubClassScrollBarViewInfo.MouseUp(
+procedure TACLCompoundControlScrollBarViewInfo.MouseUp(
   AButton: TMouseButton; AShift: TShiftState; AHitTestInfo: TACLHitTestInfo);
 begin
   FreeAndNil(FScrollTimer);
 end;
 
-procedure TACLCompoundControlSubClassScrollBarViewInfo.ScrollTimerHandler(Sender: TObject);
+procedure TACLCompoundControlScrollBarViewInfo.ScrollTimerHandler(Sender: TObject);
 begin
   if ssLeft in KeyboardStateToShiftState then
   begin
@@ -492,55 +492,55 @@ begin
     FreeAndNil(FScrollTimer);
 end;
 
-function TACLCompoundControlSubClassScrollBarViewInfo.GetHitTest: TACLHitTestInfo;
+function TACLCompoundControlScrollBarViewInfo.GetHitTest: TACLHitTestInfo;
 begin
   Result := SubClass.HitTest;
 end;
 
-function TACLCompoundControlSubClassScrollBarViewInfo.GetStyle: TACLStyleScrollBox;
+function TACLCompoundControlScrollBarViewInfo.GetStyle: TACLStyleScrollBox;
 begin
   Result := SubClass.StyleScrollBox;
 end;
 
-function TACLCompoundControlSubClassScrollBarViewInfo.GetThumbnailViewInfo: TACLCompoundControlSubClassScrollBarThumbnailViewInfo;
+function TACLCompoundControlScrollBarViewInfo.GetThumbnailViewInfo: TACLCompoundControlScrollBarThumbnailViewInfo;
 begin
-  Result := Children[2] as TACLCompoundControlSubClassScrollBarThumbnailViewInfo;
+  Result := Children[2] as TACLCompoundControlScrollBarThumbnailViewInfo;
 end;
 
-{ TACLCompoundControlSubClassScrollBarPartViewInfo }
+{ TACLCompoundControlScrollBarPartViewInfo }
 
-constructor TACLCompoundControlSubClassScrollBarPartViewInfo.Create(
-  AOwner: TACLCompoundControlSubClassScrollBarViewInfo; APart: TACLScrollBarPart);
+constructor TACLCompoundControlScrollBarPartViewInfo.Create(
+  AOwner: TACLCompoundControlScrollBarViewInfo; APart: TACLScrollBarPart);
 begin
   inherited Create(AOwner.SubClass);
   FOwner := AOwner;
   FPart := APart;
 end;
 
-destructor TACLCompoundControlSubClassScrollBarPartViewInfo.Destroy;
+destructor TACLCompoundControlScrollBarPartViewInfo.Destroy;
 begin
   AnimationManager.RemoveOwner(Self);
   inherited Destroy;
 end;
 
-procedure TACLCompoundControlSubClassScrollBarPartViewInfo.Scroll(APosition: Integer);
+procedure TACLCompoundControlScrollBarPartViewInfo.Scroll(APosition: Integer);
 begin
   Owner.Scroll(APosition);
 end;
 
-procedure TACLCompoundControlSubClassScrollBarPartViewInfo.DoCalculateHitTest(const AInfo: TACLHitTestInfo);
+procedure TACLCompoundControlScrollBarPartViewInfo.DoCalculateHitTest(const AInfo: TACLHitTestInfo);
 begin
   inherited;
   AInfo.IsScrollBarArea := True;
 end;
 
-procedure TACLCompoundControlSubClassScrollBarPartViewInfo.DoDraw(ACanvas: TCanvas);
+procedure TACLCompoundControlScrollBarPartViewInfo.DoDraw(ACanvas: TCanvas);
 begin
   if not AnimationManager.Draw(Self, ACanvas.Handle, Bounds) then
     Style.DrawPart(ACanvas.Handle, Bounds, Part, ActualState, Kind);
 end;
 
-procedure TACLCompoundControlSubClassScrollBarPartViewInfo.UpdateState;
+procedure TACLCompoundControlScrollBarPartViewInfo.UpdateState;
 begin
   if SubClass.PressedObject = Self then
     State := absPressed
@@ -550,19 +550,19 @@ begin
     State := absNormal;
 end;
 
-procedure TACLCompoundControlSubClassScrollBarPartViewInfo.MouseDown(
+procedure TACLCompoundControlScrollBarPartViewInfo.MouseDown(
   AButton: TMouseButton; AShift: TShiftState; AHitTestInfo: TACLHitTestInfo);
 begin
   UpdateState;
 end;
 
-procedure TACLCompoundControlSubClassScrollBarPartViewInfo.MouseUp(
+procedure TACLCompoundControlScrollBarPartViewInfo.MouseUp(
   AButton: TMouseButton; AShift: TShiftState; AHitTestInfo: TACLHitTestInfo);
 begin
   UpdateState;
 end;
 
-function TACLCompoundControlSubClassScrollBarPartViewInfo.GetActualState: TACLButtonState;
+function TACLCompoundControlScrollBarPartViewInfo.GetActualState: TACLButtonState;
 begin
   if SubClass.EnabledContent then
     Result := State
@@ -570,17 +570,17 @@ begin
     Result := absDisabled;
 end;
 
-function TACLCompoundControlSubClassScrollBarPartViewInfo.GetKind: TScrollBarKind;
+function TACLCompoundControlScrollBarPartViewInfo.GetKind: TScrollBarKind;
 begin
   Result := Owner.Kind;
 end;
 
-function TACLCompoundControlSubClassScrollBarPartViewInfo.GetStyle: TACLStyleScrollBox;
+function TACLCompoundControlScrollBarPartViewInfo.GetStyle: TACLStyleScrollBox;
 begin
   Result := Owner.Style;
 end;
 
-procedure TACLCompoundControlSubClassScrollBarPartViewInfo.SetState(AValue: TACLButtonState);
+procedure TACLCompoundControlScrollBarPartViewInfo.SetState(AValue: TACLButtonState);
 var
   AAnimator: TACLBitmapFadingAnimation;
 begin
@@ -603,9 +603,9 @@ begin
   end;
 end;
 
-{ TACLCompoundControlSubClassScrollBarButtonViewInfo }
+{ TACLCompoundControlScrollBarButtonViewInfo }
 
-procedure TACLCompoundControlSubClassScrollBarButtonViewInfo.Click;
+procedure TACLCompoundControlScrollBarButtonViewInfo.Click;
 begin
   case Part of
     sbpLineDown:
@@ -615,7 +615,7 @@ begin
   end;
 end;
 
-procedure TACLCompoundControlSubClassScrollBarButtonViewInfo.MouseDown(
+procedure TACLCompoundControlScrollBarButtonViewInfo.MouseDown(
   AButton: TMouseButton; AShift: TShiftState; AHitTestInfo: TACLHitTestInfo);
 begin
   if AButton = mbLeft then
@@ -626,36 +626,36 @@ begin
   inherited MouseDown(AButton, AShift, AHitTestInfo);
 end;
 
-procedure TACLCompoundControlSubClassScrollBarButtonViewInfo.MouseUp(
+procedure TACLCompoundControlScrollBarButtonViewInfo.MouseUp(
   AButton: TMouseButton; AShift: TShiftState; AHitTestInfo: TACLHitTestInfo);
 begin
   FreeAndNil(FTimer);
   inherited MouseUp(AButton, AShift, AHitTestInfo);
 end;
 
-procedure TACLCompoundControlSubClassScrollBarButtonViewInfo.TimerHandler(Sender: TObject);
+procedure TACLCompoundControlScrollBarButtonViewInfo.TimerHandler(Sender: TObject);
 begin
   FTimer.Interval := acScrollBarTimerScrollInterval;
   Click;
 end;
 
-{ TACLCompoundControlSubClassScrollBarThumbnailDragObject }
+{ TACLCompoundControlScrollBarThumbnailDragObject }
 
-constructor TACLCompoundControlSubClassScrollBarThumbnailDragObject.Create(
-  AOwner: TACLCompoundControlSubClassScrollBarPartViewInfo);
+constructor TACLCompoundControlScrollBarThumbnailDragObject.Create(
+  AOwner: TACLCompoundControlScrollBarPartViewInfo);
 begin
   inherited Create;
   FOwner := AOwner;
 end;
 
-function TACLCompoundControlSubClassScrollBarThumbnailDragObject.DragStart: Boolean;
+function TACLCompoundControlScrollBarThumbnailDragObject.DragStart: Boolean;
 begin
   FSavedBounds := Owner.Bounds;
   FSavedPosition := Owner.Owner.ScrollInfo.Position;
   Result := True;
 end;
 
-procedure TACLCompoundControlSubClassScrollBarThumbnailDragObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
+procedure TACLCompoundControlScrollBarThumbnailDragObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
 
   procedure CheckDeltas(var ADeltaX, ADeltaY: Integer; APosition, ALeftBound, ARightBound: Integer);
   begin
@@ -703,29 +703,29 @@ begin
   Owner.Owner.Invalidate;
 end;
 
-procedure TACLCompoundControlSubClassScrollBarThumbnailDragObject.DragFinished(ACanceled: Boolean);
+procedure TACLCompoundControlScrollBarThumbnailDragObject.DragFinished(ACanceled: Boolean);
 begin
   if ACanceled then
     Owner.Scroll(FSavedPosition);
   Owner.UpdateState;
 end;
 
-function TACLCompoundControlSubClassScrollBarThumbnailDragObject.GetTrackArea: TRect;
+function TACLCompoundControlScrollBarThumbnailDragObject.GetTrackArea: TRect;
 begin
   Result := Owner.Owner.TrackArea;
 end;
 
-{ TACLCompoundControlSubClassScrollBarThumbnailViewInfo }
+{ TACLCompoundControlScrollBarThumbnailViewInfo }
 
-function TACLCompoundControlSubClassScrollBarThumbnailViewInfo.CreateDragObject(
-  const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlSubClassDragObject;
+function TACLCompoundControlScrollBarThumbnailViewInfo.CreateDragObject(
+  const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlDragObject;
 begin
-  Result := TACLCompoundControlSubClassScrollBarThumbnailDragObject.Create(Self);
+  Result := TACLCompoundControlScrollBarThumbnailDragObject.Create(Self);
 end;
 
 { TACLCompoundControlViewInfo }
 
-constructor TACLCompoundControlSubClassScrollContainerViewInfo.Create(AOwner: TACLCompoundControlSubClass);
+constructor TACLCompoundControlScrollContainerViewInfo.Create(AOwner: TACLCompoundControlSubClass);
 begin
   inherited Create(AOwner);
   FScrollBarHorz := CreateScrollBar(sbHorizontal);
@@ -734,14 +734,14 @@ begin
   FScrollBarVert.OnScroll := ScrollVertHandler;
 end;
 
-destructor TACLCompoundControlSubClassScrollContainerViewInfo.Destroy;
+destructor TACLCompoundControlScrollContainerViewInfo.Destroy;
 begin
   FreeAndNil(FScrollBarHorz);
   FreeAndNil(FScrollBarVert);
   inherited Destroy;
 end;
 
-procedure TACLCompoundControlSubClassScrollContainerViewInfo.Calculate(const R: TRect; AChanges: TIntegerSet);
+procedure TACLCompoundControlScrollContainerViewInfo.Calculate(const R: TRect; AChanges: TIntegerSet);
 begin
   inherited Calculate(R, AChanges);
   if [cccnLayout, cccnStruct] * AChanges <> [] then
@@ -750,12 +750,12 @@ begin
     UpdateScrollBars;
 end;
 
-function TACLCompoundControlSubClassScrollContainerViewInfo.CalculateHitTest(const AInfo: TACLHitTestInfo): Boolean;
+function TACLCompoundControlScrollContainerViewInfo.CalculateHitTest(const AInfo: TACLHitTestInfo): Boolean;
 begin
   Result := ScrollBarHorz.CalculateHitTest(AInfo) or ScrollBarVert.CalculateHitTest(AInfo) or inherited CalculateHitTest(AInfo);
 end;
 
-procedure TACLCompoundControlSubClassScrollContainerViewInfo.ScrollByMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState);
+procedure TACLCompoundControlScrollContainerViewInfo.ScrollByMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState);
 var
   ACount: Integer;
 begin
@@ -771,23 +771,23 @@ begin
   end
 end;
 
-procedure TACLCompoundControlSubClassScrollContainerViewInfo.ScrollHorizontally(const AScrollCode: TScrollCode);
+procedure TACLCompoundControlScrollContainerViewInfo.ScrollHorizontally(const AScrollCode: TScrollCode);
 begin
   ViewportX := ScrollViewport(sbHorizontal, AScrollCode);
 end;
 
-procedure TACLCompoundControlSubClassScrollContainerViewInfo.ScrollVertically(const AScrollCode: TScrollCode);
+procedure TACLCompoundControlScrollContainerViewInfo.ScrollVertically(const AScrollCode: TScrollCode);
 begin
   ViewportY := ScrollViewport(sbVertical, AScrollCode);
 end;
 
-function TACLCompoundControlSubClassScrollContainerViewInfo.CreateScrollBar(
-  AKind: TScrollBarKind): TACLCompoundControlSubClassScrollBarViewInfo;
+function TACLCompoundControlScrollContainerViewInfo.CreateScrollBar(
+  AKind: TScrollBarKind): TACLCompoundControlScrollBarViewInfo;
 begin
-  Result := TACLCompoundControlSubClassScrollBarViewInfo.Create(SubClass, AKind);
+  Result := TACLCompoundControlScrollBarViewInfo.Create(SubClass, AKind);
 end;
 
-function TACLCompoundControlSubClassScrollContainerViewInfo.GetScrollInfo(
+function TACLCompoundControlScrollContainerViewInfo.GetScrollInfo(
   AKind: TScrollBarKind; out AInfo: TACLScrollInfo): Boolean;
 begin
   AInfo.Reset;
@@ -810,7 +810,7 @@ begin
   Result := (AInfo.Max >= AInfo.Page) and (AInfo.Max > AInfo.Min);
 end;
 
-function TACLCompoundControlSubClassScrollContainerViewInfo.ScrollViewport(
+function TACLCompoundControlScrollContainerViewInfo.ScrollViewport(
   AKind: TScrollBarKind; AScrollCode: TScrollCode): Integer;
 var
   AInfo: TACLScrollInfo;
@@ -833,8 +833,8 @@ begin
     end;
 end;
 
-procedure TACLCompoundControlSubClassScrollContainerViewInfo.CalculateScrollBar(
-  AScrollBar: TACLCompoundControlSubClassScrollBarViewInfo);
+procedure TACLCompoundControlScrollContainerViewInfo.CalculateScrollBar(
+  AScrollBar: TACLCompoundControlScrollBarViewInfo);
 var
   AScrollInfo: TACLScrollInfo;
 begin
@@ -843,7 +843,7 @@ begin
   AScrollBar.SetParams(AScrollInfo);
 end;
 
-procedure TACLCompoundControlSubClassScrollContainerViewInfo.CalculateScrollBarsPosition(var R: TRect);
+procedure TACLCompoundControlScrollContainerViewInfo.CalculateScrollBarsPosition(var R: TRect);
 var
   R1: TRect;
 begin
@@ -863,19 +863,19 @@ begin
   Dec(R.Right, ScrollBarVert.Bounds.Width);
 end;
 
-procedure TACLCompoundControlSubClassScrollContainerViewInfo.CalculateSubCells(const AChanges: TIntegerSet);
+procedure TACLCompoundControlScrollContainerViewInfo.CalculateSubCells(const AChanges: TIntegerSet);
 begin
   FClientBounds := Bounds;
   CalculateScrollBarsPosition(FClientBounds);
 end;
 
-procedure TACLCompoundControlSubClassScrollContainerViewInfo.ContentScrolled(ADeltaX, ADeltaY: Integer);
+procedure TACLCompoundControlScrollContainerViewInfo.ContentScrolled(ADeltaX, ADeltaY: Integer);
 begin
   SubClass.Changed([cccnViewport]);
   SubClass.Update;
 end;
 
-procedure TACLCompoundControlSubClassScrollContainerViewInfo.DoDraw(ACanvas: TCanvas);
+procedure TACLCompoundControlScrollContainerViewInfo.DoDraw(ACanvas: TCanvas);
 begin
   inherited DoDraw(ACanvas);
   SubClass.StyleScrollBox.DrawSizeGripArea(ACanvas.Handle, SizeGripArea);
@@ -883,7 +883,7 @@ begin
   ScrollBarVert.Draw(ACanvas);
 end;
 
-procedure TACLCompoundControlSubClassScrollContainerViewInfo.UpdateScrollBars;
+procedure TACLCompoundControlScrollContainerViewInfo.UpdateScrollBars;
 var
   AVisibleScrollBars: TACLVisibleScrollBars;
 begin
@@ -899,12 +899,12 @@ begin
   end;
 end;
 
-function TACLCompoundControlSubClassScrollContainerViewInfo.GetViewport: TPoint;
+function TACLCompoundControlScrollContainerViewInfo.GetViewport: TPoint;
 begin
   Result := Point(ViewportX, ViewportY);
 end;
 
-function TACLCompoundControlSubClassScrollContainerViewInfo.GetVisibleScrollBars: TACLVisibleScrollBars;
+function TACLCompoundControlScrollContainerViewInfo.GetVisibleScrollBars: TACLVisibleScrollBars;
 begin
   Result := [];
   if ScrollBarHorz.Visible then
@@ -913,13 +913,13 @@ begin
     Include(Result, sbVertical);
 end;
 
-procedure TACLCompoundControlSubClassScrollContainerViewInfo.SetViewport(const AValue: TPoint);
+procedure TACLCompoundControlScrollContainerViewInfo.SetViewport(const AValue: TPoint);
 begin
   ViewportX := AValue.X;
   ViewportY := AValue.Y;
 end;
 
-procedure TACLCompoundControlSubClassScrollContainerViewInfo.SetViewportX(AValue: Integer);
+procedure TACLCompoundControlScrollContainerViewInfo.SetViewportX(AValue: Integer);
 var
   ADelta: Integer;
 begin
@@ -932,7 +932,7 @@ begin
   end;
 end;
 
-procedure TACLCompoundControlSubClassScrollContainerViewInfo.SetViewportY(AValue: Integer);
+procedure TACLCompoundControlScrollContainerViewInfo.SetViewportY(AValue: Integer);
 var
   ADelta: Integer;
 begin
@@ -945,12 +945,12 @@ begin
   end;
 end;
 
-procedure TACLCompoundControlSubClassScrollContainerViewInfo.ScrollHorzHandler(Sender: TObject; ScrollPos: Integer);
+procedure TACLCompoundControlScrollContainerViewInfo.ScrollHorzHandler(Sender: TObject; ScrollPos: Integer);
 begin
   ViewportX := ScrollPos;
 end;
 
-procedure TACLCompoundControlSubClassScrollContainerViewInfo.ScrollVertHandler(Sender: TObject; ScrollPos: Integer);
+procedure TACLCompoundControlScrollContainerViewInfo.ScrollVertHandler(Sender: TObject; ScrollPos: Integer);
 begin
   ViewportY := ScrollPos;
 end;

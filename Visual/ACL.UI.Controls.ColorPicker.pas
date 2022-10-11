@@ -50,8 +50,8 @@ const
 
 type
   TACLColorPickerOptions = class;
-  TACLColorPickerSubClassColorModifierCell = class;
-  TACLColorPickerSubClassPainter = class;
+  TACLColorPickerColorModifierCell = class;
+  TACLColorPickerPainter = class;
 
   TACLColorPickerColorComponent = (cpccA, cpccR, cpccG, cpccB, cpccH, cpccS, cpccL);
   TACLColorPickerColorComponents = set of TACLColorPickerColorComponent;
@@ -108,7 +108,7 @@ type
   strict private
     FColor: TACLColorPickerColorInfo;
     FOptions: TACLColorPickerOptions;
-    FPainter: TACLColorPickerSubClassPainter;
+    FPainter: TACLColorPickerPainter;
     FStyle: TACLStyleContent;
     FStyleEdit: TACLStyleEdit;
     FStyleEditButton: TACLStyleButton;
@@ -120,7 +120,7 @@ type
     procedure ColorChangeHandler(Sender: TObject);
     procedure OptionsChangeHandler(Sender: TObject);
   protected
-    function CreateViewInfo: TACLCompoundControlSubClassCustomViewInfo; override;
+    function CreateViewInfo: TACLCompoundControlCustomViewInfo; override;
     procedure ProcessMouseDown(AButton: TMouseButton; AShift: TShiftState); override;
   public
     constructor Create(AOwner: TComponent); override;
@@ -130,7 +130,7 @@ type
     //
     property Color: TACLColorPickerColorInfo read FColor;
     property Options: TACLColorPickerOptions read FOptions;
-    property Painter: TACLColorPickerSubClassPainter read FPainter;
+    property Painter: TACLColorPickerPainter read FPainter;
     property Style: TACLStyleContent read FStyle;
     property StyleEdit: TACLStyleEdit read FStyleEdit;
     property StyleEditButton: TACLStyleButton read FStyleEditButton;
@@ -140,9 +140,9 @@ type
     property OnColorChanged: TNotifyEvent read FOnColorChanged write FOnColorChanged;
   end;
 
-  { TACLColorPickerSubClassPainter }
+  { TACLColorPickerPainter }
 
-  TACLColorPickerSubClassPainter = class(TACLCompoundControlSubClassPersistent)
+  TACLColorPickerPainter = class(TACLCompoundControlPersistent)
   strict private
     function GetStyle: TACLStyleContent;
     function GetStyleHatch: TACLStyleHatch;
@@ -154,18 +154,18 @@ type
     property StyleHatch: TACLStyleHatch read GetStyleHatch;
   end;
 
-  { TACLColorPickerSubClassViewInfo }
+  { TACLColorPickerViewInfo }
 
-  TACLColorPickerSubClassViewInfo = class(TACLCompoundControlSubClassContainerViewInfo)
+  TACLColorPickerViewInfo = class(TACLCompoundControlContainerViewInfo)
   strict private
     function GetSubClass: TACLColorPickerSubClass;
   protected
-    FEdits: array[TACLColorPickerColorComponent] of TACLColorPickerSubClassColorModifierCell;
-    FGamut: TACLColorPickerSubClassColorModifierCell;
-    FHexCode: TACLColorPickerSubClassColorModifierCell;
-    FPreview: TACLColorPickerSubClassColorModifierCell;
-    FSlider1: TACLColorPickerSubClassColorModifierCell;
-    FSlider2: TACLColorPickerSubClassColorModifierCell;
+    FEdits: array[TACLColorPickerColorComponent] of TACLColorPickerColorModifierCell;
+    FGamut: TACLColorPickerColorModifierCell;
+    FHexCode: TACLColorPickerColorModifierCell;
+    FPreview: TACLColorPickerColorModifierCell;
+    FSlider1: TACLColorPickerColorModifierCell;
+    FSlider2: TACLColorPickerColorModifierCell;
 
     FIndentBetweenElements: Integer;
 
@@ -181,13 +181,13 @@ type
     property SubClass: TACLColorPickerSubClass read GetSubClass;
   end;
 
-  { TACLColorPickerSubClassColorModifierCell }
+  { TACLColorPickerColorModifierCell }
 
-  TACLColorPickerSubClassColorModifierCell = class abstract(TACLCompoundControlSubClassCustomViewInfo,
+  TACLColorPickerColorModifierCell = class abstract(TACLCompoundControlCustomViewInfo,
     IACLDraggableObject)
   strict private
     function GetColorInfo: TACLColorPickerColorInfo; inline;
-    function GetPainter: TACLColorPickerSubClassPainter; inline;
+    function GetPainter: TACLColorPickerPainter; inline;
     function GetSubClass: TACLColorPickerSubClass; inline;
   protected
     FUpdateLocked: Boolean;
@@ -196,13 +196,13 @@ type
     function IsCaptured: Boolean; virtual;
     procedure UpdateEditValue; virtual; abstract;
     // IACLDraggableObject
-    function CreateDragObject(const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlSubClassDragObject;
+    function CreateDragObject(const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlDragObject;
   public
     procedure DragMove(X, Y: Integer); virtual;
     function MeasureSize: TSize; virtual; abstract;
     //
     property ColorInfo: TACLColorPickerColorInfo read GetColorInfo;
-    property Painter: TACLColorPickerSubClassPainter read GetPainter;
+    property Painter: TACLColorPickerPainter read GetPainter;
     property SubClass: TACLColorPickerSubClass read GetSubClass;
   end;
 
@@ -318,20 +318,20 @@ const
   accpIndentBetweenElements = 6;
 
 type
-  { TACLColorPickerSubClassColorModifierCellDragObject }
+  { TACLColorPickerColorModifierCellDragObject }
 
-  TACLColorPickerSubClassColorModifierCellDragObject = class(TACLCompoundControlSubClassDragObject)
+  TACLColorPickerColorModifierCellDragObject = class(TACLCompoundControlDragObject)
   strict private
-    FCell: TACLColorPickerSubClassColorModifierCell;
+    FCell: TACLColorPickerColorModifierCell;
   public
-    constructor Create(ACell: TACLColorPickerSubClassColorModifierCell);
+    constructor Create(ACell: TACLColorPickerColorModifierCell);
     procedure DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer); override;
     function DragStart: Boolean; override;
   end;
 
-  { TACLColorPickerSubClassVisualColorModifierCell }
+  { TACLColorPickerVisualColorModifierCell }
 
-  TACLColorPickerSubClassVisualColorModifierCell = class(TACLColorPickerSubClassColorModifierCell)
+  TACLColorPickerVisualColorModifierCell = class(TACLColorPickerColorModifierCell)
   strict private
     FContentCache: TACLBitmap;
     FCursorPosition: TPoint;
@@ -357,9 +357,9 @@ type
     property CursorPosition: TPoint read FCursorPosition write SetCursorPosition;
   end;
 
-  { TACLColorPickerSubClassGamutCell }
+  { TACLColorPickerGamutCell }
 
-  TACLColorPickerSubClassGamutCell = class(TACLColorPickerSubClassVisualColorModifierCell)
+  TACLColorPickerGamutCell = class(TACLColorPickerVisualColorModifierCell)
   protected
     function CalculateCursorPosition: TPoint; override;
     procedure DrawContent(ACanvas: TCanvas); override;
@@ -370,9 +370,9 @@ type
     function MeasureSize: TSize; override;
   end;
 
-  { TACLColorPickerSubClassSliderCell }
+  { TACLColorPickerSliderCell }
 
-  TACLColorPickerSubClassSliderCell = class(TACLColorPickerSubClassVisualColorModifierCell)
+  TACLColorPickerSliderCell = class(TACLColorPickerVisualColorModifierCell)
   protected
     procedure DrawArrow(ACanvas: TCanvas); virtual;
     procedure DrawContent(ACanvas: TCanvas); override;
@@ -384,9 +384,9 @@ type
     property ArrowBounds: TRect read GetArrowBounds;
   end;
 
-  { TACLColorPickerSubClassAlphaSliderCell }
+  { TACLColorPickerAlphaSliderCell }
 
-  TACLColorPickerSubClassAlphaSliderCell = class(TACLColorPickerSubClassSliderCell)
+  TACLColorPickerAlphaSliderCell = class(TACLColorPickerSliderCell)
   protected
     function CalculateCursorPosition: TPoint; override;
     procedure UpdateContentCache(ACanvas: TCanvas; AWidth, AHeight: Integer); override;
@@ -394,9 +394,9 @@ type
     procedure DragMove(X, Y: Integer); override;
   end;
 
-  { TACLColorPickerSubClassLightnessSliderCell }
+  { TACLColorPickerLightnessSliderCell }
 
-  TACLColorPickerSubClassLightnessSliderCell = class(TACLColorPickerSubClassSliderCell)
+  TACLColorPickerLightnessSliderCell = class(TACLColorPickerSliderCell)
   protected
     function CalculateCursorPosition: TPoint; override;
     procedure UpdateContentCache(ACanvas: TCanvas; AWidth, AHeight: Integer); override;
@@ -404,9 +404,9 @@ type
     procedure DragMove(X, Y: Integer); override;
   end;
 
-  { TACLColorPickerSubClassPreviewCell }
+  { TACLColorPickerPreviewCell }
 
-  TACLColorPickerSubClassPreviewCell = class(TACLColorPickerSubClassColorModifierCell)
+  TACLColorPickerPreviewCell = class(TACLColorPickerColorModifierCell)
   protected
     procedure DoDraw(ACanvas: TCanvas); override;
     procedure UpdateEditValue; override;
@@ -414,9 +414,9 @@ type
     function MeasureSize: TSize; override;
   end;
 
-  { TACLColorPickerSubClassCustomEditCell }
+  { TACLColorPickerCustomEditCell }
 
-  TACLColorPickerSubClassCustomEditCell = class abstract(TACLColorPickerSubClassColorModifierCell)
+  TACLColorPickerCustomEditCell = class abstract(TACLColorPickerColorModifierCell)
   protected
     FEdit: TACLCustomEdit;
 
@@ -432,9 +432,9 @@ type
     function MeasureSize: TSize; override;
   end;
 
-  { TACLColorPickerSubClassCustomSpinEditCell }
+  { TACLColorPickerCustomSpinEditCell }
 
-  TACLColorPickerSubClassCustomSpinEditCell = class abstract(TACLColorPickerSubClassCustomEditCell)
+  TACLColorPickerCustomSpinEditCell = class abstract(TACLColorPickerCustomEditCell)
   strict private
     procedure EditChangeHandler(Sender: TObject);
   protected
@@ -445,9 +445,9 @@ type
     procedure UpdateEditValue; override;
   end;
 
-  { TACLColorPickerSubClassSpinEditCell }
+  { TACLColorPickerSpinEditCell }
 
-  TACLColorPickerSubClassSpinEditCell = class(TACLColorPickerSubClassCustomSpinEditCell)
+  TACLColorPickerSpinEditCell = class(TACLColorPickerCustomSpinEditCell)
   protected
     FType: TACLColorPickerColorComponent;
 
@@ -458,9 +458,9 @@ type
     constructor Create(ASubClass: TACLCompoundControlSubClass; AType: TACLColorPickerColorComponent); reintroduce;
   end;
 
-  { TACLColorPickerSubClassHexCodeEditCell }
+  { TACLColorPickerHexCodeEditCell }
 
-  TACLColorPickerSubClassHexCodeEditCell = class(TACLColorPickerSubClassCustomEditCell)
+  TACLColorPickerHexCodeEditCell = class(TACLColorPickerCustomEditCell)
   strict private
     procedure EditChangeHandler(Sender: TObject);
     procedure EditKeyPressHandler(Sender: TObject; var AKey: Char);
@@ -596,9 +596,9 @@ begin
   end;
 end;
 
-{ TACLColorPickerSubClassColorModifierCell }
+{ TACLColorPickerColorModifierCell }
 
-procedure TACLColorPickerSubClassColorModifierCell.DoCalculate(AChanges: TIntegerSet);
+procedure TACLColorPickerColorModifierCell.DoCalculate(AChanges: TIntegerSet);
 begin
   inherited DoCalculate(AChanges);
 
@@ -610,64 +610,64 @@ begin
   end;
 end;
 
-function TACLColorPickerSubClassColorModifierCell.IsCaptured: Boolean;
+function TACLColorPickerColorModifierCell.IsCaptured: Boolean;
 begin
   Result := Self = SubClass.PressedObject;
 end;
 
-procedure TACLColorPickerSubClassColorModifierCell.DragMove(X, Y: Integer);
+procedure TACLColorPickerColorModifierCell.DragMove(X, Y: Integer);
 begin
   // do nothing
 end;
 
-function TACLColorPickerSubClassColorModifierCell.CreateDragObject(
-  const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlSubClassDragObject;
+function TACLColorPickerColorModifierCell.CreateDragObject(
+  const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlDragObject;
 begin
-  Result := TACLColorPickerSubClassColorModifierCellDragObject.Create(Self);
+  Result := TACLColorPickerColorModifierCellDragObject.Create(Self);
 end;
 
-function TACLColorPickerSubClassColorModifierCell.GetColorInfo: TACLColorPickerColorInfo;
+function TACLColorPickerColorModifierCell.GetColorInfo: TACLColorPickerColorInfo;
 begin
   Result := SubClass.Color;
 end;
 
-function TACLColorPickerSubClassColorModifierCell.GetPainter: TACLColorPickerSubClassPainter;
+function TACLColorPickerColorModifierCell.GetPainter: TACLColorPickerPainter;
 begin
   Result := SubClass.Painter;
 end;
 
-function TACLColorPickerSubClassColorModifierCell.GetSubClass: TACLColorPickerSubClass;
+function TACLColorPickerColorModifierCell.GetSubClass: TACLColorPickerSubClass;
 begin
   Result := TACLColorPickerSubClass(inherited SubClass);
 end;
 
-{ TACLColorPickerSubClassColorModifierCellDragObject }
+{ TACLColorPickerColorModifierCellDragObject }
 
-constructor TACLColorPickerSubClassColorModifierCellDragObject.Create(ACell: TACLColorPickerSubClassColorModifierCell);
+constructor TACLColorPickerColorModifierCellDragObject.Create(ACell: TACLColorPickerColorModifierCell);
 begin
   FCell := ACell;
   inherited Create;
 end;
 
-procedure TACLColorPickerSubClassColorModifierCellDragObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
+procedure TACLColorPickerColorModifierCellDragObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
 begin
   FCell.DragMove(P.X, P.Y);
 end;
 
-function TACLColorPickerSubClassColorModifierCellDragObject.DragStart: Boolean;
+function TACLColorPickerColorModifierCellDragObject.DragStart: Boolean;
 begin
   Result := True;
 end;
 
-{ TACLColorPickerSubClassVisualColorModifierCell }
+{ TACLColorPickerVisualColorModifierCell }
 
-destructor TACLColorPickerSubClassVisualColorModifierCell.Destroy;
+destructor TACLColorPickerVisualColorModifierCell.Destroy;
 begin
   FlushContentCache;
   inherited Destroy;
 end;
 
-procedure TACLColorPickerSubClassVisualColorModifierCell.DoCalculate(AChanges: TIntegerSet);
+procedure TACLColorPickerVisualColorModifierCell.DoCalculate(AChanges: TIntegerSet);
 begin
   inherited DoCalculate(AChanges);
 
@@ -680,7 +680,7 @@ begin
   end;
 end;
 
-procedure TACLColorPickerSubClassVisualColorModifierCell.DoDraw(ACanvas: TCanvas);
+procedure TACLColorPickerVisualColorModifierCell.DoDraw(ACanvas: TCanvas);
 var
   ASaveIndex: Integer;
 begin
@@ -702,46 +702,46 @@ begin
   end;
 end;
 
-procedure TACLColorPickerSubClassVisualColorModifierCell.DrawContent(ACanvas: TCanvas);
+procedure TACLColorPickerVisualColorModifierCell.DrawContent(ACanvas: TCanvas);
 begin
   ACanvas.Draw(ContentBounds.Left, ContentBounds.Top, FContentCache);
 end;
 
-procedure TACLColorPickerSubClassVisualColorModifierCell.FlushContentCache;
+procedure TACLColorPickerVisualColorModifierCell.FlushContentCache;
 begin
   FreeAndNil(FContentCache);
 end;
 
-function TACLColorPickerSubClassVisualColorModifierCell.GetContentBounds: TRect;
+function TACLColorPickerVisualColorModifierCell.GetContentBounds: TRect;
 begin
   Result := acRectInflate(Bounds, -Painter.BorderSize);
 end;
 
-function TACLColorPickerSubClassVisualColorModifierCell.GetContentFrameRect: TRect;
+function TACLColorPickerVisualColorModifierCell.GetContentFrameRect: TRect;
 begin
   Result := acRectInflate(ContentBounds, Painter.BorderSize);
 end;
 
-function TACLColorPickerSubClassVisualColorModifierCell.GetCursorColor: TColor;
+function TACLColorPickerVisualColorModifierCell.GetCursorColor: TColor;
 begin
   Result := clBlack;
 end;
 
-procedure TACLColorPickerSubClassVisualColorModifierCell.UpdateContentCache;
+procedure TACLColorPickerVisualColorModifierCell.UpdateContentCache;
 begin
   FlushContentCache;
   FContentCache := TACLBitmap.CreateEx(ContentBounds, pf32bit, True);
   UpdateContentCache(FContentCache.Canvas, FContentCache.Width, FContentCache.Height);
 end;
 
-procedure TACLColorPickerSubClassVisualColorModifierCell.UpdateEditValue;
+procedure TACLColorPickerVisualColorModifierCell.UpdateEditValue;
 begin
   CursorPosition := CalculateCursorPosition;
   FlushContentCache;
   Invalidate;
 end;
 
-procedure TACLColorPickerSubClassVisualColorModifierCell.SetCursorPosition(const AValue: TPoint);
+procedure TACLColorPickerVisualColorModifierCell.SetCursorPosition(const AValue: TPoint);
 begin
   if FCursorPosition <> AValue then
   begin
@@ -763,7 +763,7 @@ begin
   FStyleHatch := TACLStyleHatch.Create(Self);
   FOptions := TACLColorPickerOptions.Create;
   FOptions.FOnChange := OptionsChangeHandler;
-  FPainter := TACLColorPickerSubClassPainter.Create(Self);
+  FPainter := TACLColorPickerPainter.Create(Self);
   FTargetDPI := acDefaultDPI;
 end;
 
@@ -781,7 +781,7 @@ end;
 
 function TACLColorPickerSubClass.CalculateAutoSize(var AWidth, AHeight: Integer): Boolean;
 begin
-  TACLColorPickerSubClassViewInfo(ViewInfo).CalculateAutoSize(AWidth, AHeight);
+  TACLColorPickerViewInfo(ViewInfo).CalculateAutoSize(AWidth, AHeight);
   Result := True;
 end;
 
@@ -792,9 +792,9 @@ begin
   inherited SetTargetDPI(AValue);
 end;
 
-function TACLColorPickerSubClass.CreateViewInfo: TACLCompoundControlSubClassCustomViewInfo;
+function TACLColorPickerSubClass.CreateViewInfo: TACLCompoundControlCustomViewInfo;
 begin
-  Result := TACLColorPickerSubClassViewInfo.Create(Self);
+  Result := TACLColorPickerViewInfo.Create(Self);
 end;
 
 procedure TACLColorPickerSubClass.ColorChangeHandler(Sender: TObject);
@@ -813,41 +813,41 @@ end;
 procedure TACLColorPickerSubClass.ProcessMouseDown(AButton: TMouseButton; AShift: TShiftState);
 begin
   inherited;
-  if HitTest.HitObject is TACLColorPickerSubClassColorModifierCell then
-    TACLColorPickerSubClassColorModifierCell(HitTest.HitObject).DragMove(HitTest.HitPoint.X, HitTest.HitPoint.Y);
+  if HitTest.HitObject is TACLColorPickerColorModifierCell then
+    TACLColorPickerColorModifierCell(HitTest.HitObject).DragMove(HitTest.HitPoint.X, HitTest.HitPoint.Y);
 end;
 
-{ TACLColorPickerSubClassPainter }
+{ TACLColorPickerPainter }
 
-function TACLColorPickerSubClassPainter.BorderSize: Integer;
+function TACLColorPickerPainter.BorderSize: Integer;
 begin
   Result := 2;
 end;
 
-procedure TACLColorPickerSubClassPainter.DrawBorder(ACanvas: TCanvas; const R: TRect);
+procedure TACLColorPickerPainter.DrawBorder(ACanvas: TCanvas; const R: TRect);
 begin
   Style.DrawBorder(ACanvas, R, acAllBorders);
 end;
 
-function TACLColorPickerSubClassPainter.GetStyle: TACLStyleContent;
+function TACLColorPickerPainter.GetStyle: TACLStyleContent;
 begin
   Result := TACLColorPickerSubClass(SubClass).Style;
 end;
 
-function TACLColorPickerSubClassPainter.GetStyleHatch: TACLStyleHatch;
+function TACLColorPickerPainter.GetStyleHatch: TACLStyleHatch;
 begin
   Result := TACLColorPickerSubClass(SubClass).StyleHatch;
 end;
 
-{ TACLColorPickerSubClassViewInfo }
+{ TACLColorPickerViewInfo }
 
-procedure TACLColorPickerSubClassViewInfo.Calculate(const R: TRect; AChanges: TIntegerSet);
+procedure TACLColorPickerViewInfo.Calculate(const R: TRect; AChanges: TIntegerSet);
 begin
   inherited;
   FIndentBetweenElements := ScaleFactor.Apply(accpIndentBetweenElements);
 end;
 
-procedure TACLColorPickerSubClassViewInfo.CalculateAutoSize(var AWidth, AHeight: Integer);
+procedure TACLColorPickerViewInfo.CalculateAutoSize(var AWidth, AHeight: Integer);
 
   procedure Include(const ASize: TSize);
   begin
@@ -877,7 +877,7 @@ begin
   Inc(AWidth, 2 * FIndentBetweenElements);
 end;
 
-procedure TACLColorPickerSubClassViewInfo.CalculateSubCells(const AChanges: TIntegerSet);
+procedure TACLColorPickerViewInfo.CalculateSubCells(const AChanges: TIntegerSet);
 var
   ARect: TRect;
 begin
@@ -890,9 +890,9 @@ begin
     FGamut.Calculate(ARect, AChanges);
 end;
 
-procedure TACLColorPickerSubClassViewInfo.CalculateSubCellsEditors(var R: TRect; const AChanges: TIntegerSet);
+procedure TACLColorPickerViewInfo.CalculateSubCellsEditors(var R: TRect; const AChanges: TIntegerSet);
 
-  function PlaceCell(ACell: TACLColorPickerSubClassColorModifierCell; var R: TRect): Boolean;
+  function PlaceCell(ACell: TACLColorPickerColorModifierCell; var R: TRect): Boolean;
   begin
     Result := ACell <> nil;
     if Result then
@@ -921,9 +921,9 @@ begin
   R.Right := ARect.Left - FIndentBetweenElements;
 end;
 
-procedure TACLColorPickerSubClassViewInfo.CalculateSubCellsSliders(var R: TRect; const AChanges: TIntegerSet);
+procedure TACLColorPickerViewInfo.CalculateSubCellsSliders(var R: TRect; const AChanges: TIntegerSet);
 
-  procedure Place(var R: TRect; ACell: TACLColorPickerSubClassColorModifierCell);
+  procedure Place(var R: TRect; ACell: TACLColorPickerColorModifierCell);
   begin
     if ACell <> nil then
     begin
@@ -939,7 +939,7 @@ begin
   InflateRect(R, 0, -accpSliderArrowWidthHalf);
 end;
 
-function TACLColorPickerSubClassViewInfo.MeasureEditsAreaSize: TSize;
+function TACLColorPickerViewInfo.MeasureEditsAreaSize: TSize;
 
   procedure Include(const ACellSize: TSize; var ASize: TSize);
   begin
@@ -948,7 +948,7 @@ function TACLColorPickerSubClassViewInfo.MeasureEditsAreaSize: TSize;
   end;
 
 var
-  ACell: TACLColorPickerSubClassColorModifierCell;
+  ACell: TACLColorPickerColorModifierCell;
   AComponent: TACLColorPickerColorComponent;
 begin
   Result := acSize(0, 0);
@@ -970,16 +970,16 @@ begin
     Inc(Result.cy, FIndentBetweenElements);
 end;
 
-procedure TACLColorPickerSubClassViewInfo.RecreateSubCells;
+procedure TACLColorPickerViewInfo.RecreateSubCells;
 var
   AComponent: TACLColorPickerColorComponent;
   AComponents: TACLColorPickerColorComponents;
 begin
-  AddCell(TACLColorPickerSubClassPreviewCell.Create(SubClass), FPreview);
-  AddCell(TACLColorPickerSubClassGamutCell.Create(SubClass), FGamut);
-  AddCell(TACLColorPickerSubClassLightnessSliderCell.Create(SubClass), FSlider1);
+  AddCell(TACLColorPickerPreviewCell.Create(SubClass), FPreview);
+  AddCell(TACLColorPickerGamutCell.Create(SubClass), FGamut);
+  AddCell(TACLColorPickerLightnessSliderCell.Create(SubClass), FSlider1);
   if SubClass.Options.AllowEditAlpha then
-    AddCell(TACLColorPickerSubClassAlphaSliderCell.Create(SubClass), FSlider2)
+    AddCell(TACLColorPickerAlphaSliderCell.Create(SubClass), FSlider2)
   else
     FSlider2 := nil;
 
@@ -989,22 +989,22 @@ begin
   for AComponent := Low(AComponent) to High(AComponent) do
   begin
     if AComponent in AComponents then
-      AddCell(TACLColorPickerSubClassSpinEditCell.Create(SubClass, AComponent), FEdits[AComponent])
+      AddCell(TACLColorPickerSpinEditCell.Create(SubClass, AComponent), FEdits[AComponent])
     else
       FEdits[AComponent] := nil;
   end;
 
-  AddCell(TACLColorPickerSubClassHexCodeEditCell.Create(SubClass), FHexCode);
+  AddCell(TACLColorPickerHexCodeEditCell.Create(SubClass), FHexCode);
 end;
 
-function TACLColorPickerSubClassViewInfo.GetSubClass: TACLColorPickerSubClass;
+function TACLColorPickerViewInfo.GetSubClass: TACLColorPickerSubClass;
 begin
   Result := TACLColorPickerSubClass(inherited SubClass);
 end;
 
-{ TACLColorPickerSubClassGamutCell }
+{ TACLColorPickerGamutCell }
 
-procedure TACLColorPickerSubClassGamutCell.DragMove(X, Y: Integer);
+procedure TACLColorPickerGamutCell.DragMove(X, Y: Integer);
 begin
   X := Min(acRectWidth(ContentBounds), Max(0, X - ContentBounds.Left));
   Y := Min(acRectHeight(ContentBounds), Max(0, Y - ContentBounds.Top));
@@ -1013,17 +1013,17 @@ begin
   CursorPosition := Point(X, Y);
 end;
 
-function TACLColorPickerSubClassGamutCell.MeasureSize: TSize;
+function TACLColorPickerGamutCell.MeasureSize: TSize;
 begin
   Result := acSize(ScaleFactor.Apply(200));
 end;
 
-function TACLColorPickerSubClassGamutCell.CalculateCursorPosition: TPoint;
+function TACLColorPickerGamutCell.CalculateCursorPosition: TPoint;
 begin
   Result := Point(Round(acRectWidth(ContentBounds) * ColorInfo.H), Round(acRectHeight(ContentBounds) * (1 - ColorInfo.S)));
 end;
 
-procedure TACLColorPickerSubClassGamutCell.UpdateContentCache(ACanvas: TCanvas; AWidth, AHeight: Integer);
+procedure TACLColorPickerGamutCell.UpdateContentCache(ACanvas: TCanvas; AWidth, AHeight: Integer);
 var
   I: Integer;
 begin
@@ -1041,13 +1041,13 @@ begin
   end;
 end;
 
-procedure TACLColorPickerSubClassGamutCell.DrawContent(ACanvas: TCanvas);
+procedure TACLColorPickerGamutCell.DrawContent(ACanvas: TCanvas);
 begin
   inherited DrawContent(ACanvas);
   DrawCursor(ACanvas);
 end;
 
-procedure TACLColorPickerSubClassGamutCell.DrawCursor(ACanvas: TCanvas);
+procedure TACLColorPickerGamutCell.DrawCursor(ACanvas: TCanvas);
 const
   LineThin = 3;
   LineWidth = 5;
@@ -1065,14 +1065,14 @@ begin
   ACanvas.FillRect(acRectSetBottom(acRectCenterHorizontally(R, LineThin), R.Bottom, LineWidth));
 end;
 
-{ TACLColorPickerSubClassSliderCell }
+{ TACLColorPickerSliderCell }
 
-function TACLColorPickerSubClassSliderCell.MeasureSize: TSize;
+function TACLColorPickerSliderCell.MeasureSize: TSize;
 begin
   Result := acSize(ScaleFactor.Apply(20));
 end;
 
-procedure TACLColorPickerSubClassSliderCell.DrawArrow(ACanvas: TCanvas);
+procedure TACLColorPickerSliderCell.DrawArrow(ACanvas: TCanvas);
 var
   R1, R2: TRect;
   I: Integer;
@@ -1088,41 +1088,41 @@ begin
   end;
 end;
 
-procedure TACLColorPickerSubClassSliderCell.DrawContent(ACanvas: TCanvas);
+procedure TACLColorPickerSliderCell.DrawContent(ACanvas: TCanvas);
 begin
   inherited DrawContent(ACanvas);
   DrawArrow(ACanvas);
 end;
 
-function TACLColorPickerSubClassSliderCell.GetArrowBounds: TRect;
+function TACLColorPickerSliderCell.GetArrowBounds: TRect;
 begin
   Result := acRectSetRight(Bounds, Bounds.Right, accpSliderArrowWidth);
   Result := acRectSetHeight(Result, accpSliderArrowWidth * 2 - 1);
   Result := acRectOffset(Result, 0, CursorPosition.Y);
 end;
 
-function TACLColorPickerSubClassSliderCell.GetContentBounds: TRect;
+function TACLColorPickerSliderCell.GetContentBounds: TRect;
 begin
   Result := inherited GetContentBounds;
   Result := acRectInflate(Result, 0, -accpSliderArrowWidth + Painter.BorderSize);
   Result.Right := ArrowBounds.Left - acTextIndent - Painter.BorderSize;
 end;
 
-{ TACLColorPickerSubClassAlphaSliderCell }
+{ TACLColorPickerAlphaSliderCell }
 
-function TACLColorPickerSubClassAlphaSliderCell.CalculateCursorPosition: TPoint;
+function TACLColorPickerAlphaSliderCell.CalculateCursorPosition: TPoint;
 begin
   Result := Point(0, MulDiv(acRectHeight(ContentBounds), ColorInfo.Alpha, MaxByte));
 end;
 
-procedure TACLColorPickerSubClassAlphaSliderCell.DragMove(X, Y: Integer);
+procedure TACLColorPickerAlphaSliderCell.DragMove(X, Y: Integer);
 begin
   Y := Min(acRectHeight(ContentBounds), Max(0, Y - ContentBounds.Top));
   ColorInfo.Alpha := Round(MaxByte * Y / acRectHeight(ContentBounds));
   CursorPosition := Point(0, Y);
 end;
 
-procedure TACLColorPickerSubClassAlphaSliderCell.UpdateContentCache(ACanvas: TCanvas; AWidth, AHeight: Integer);
+procedure TACLColorPickerAlphaSliderCell.UpdateContentCache(ACanvas: TCanvas; AWidth, AHeight: Integer);
 begin
   Painter.StyleHatch.Draw(ACanvas, Rect(0, 0, AWidth, AHeight), 2);
   GpPaintCanvas.BeginPaint(ACanvas.Handle);
@@ -1133,21 +1133,21 @@ begin
   end;
 end;
 
-{ TACLColorPickerSubClassLightnessSliderCell }
+{ TACLColorPickerLightnessSliderCell }
 
-procedure TACLColorPickerSubClassLightnessSliderCell.DragMove(X, Y: Integer);
+procedure TACLColorPickerLightnessSliderCell.DragMove(X, Y: Integer);
 begin
   Y := Min(acRectHeight(ContentBounds), Max(0, Y - ContentBounds.Top));
   ColorInfo.L := 1 - Y / acRectHeight(ContentBounds);
   CursorPosition := Point(0, Y);
 end;
 
-function TACLColorPickerSubClassLightnessSliderCell.CalculateCursorPosition: TPoint;
+function TACLColorPickerLightnessSliderCell.CalculateCursorPosition: TPoint;
 begin
   Result := Point(0, Round((1 - ColorInfo.L) * acRectHeight(ContentBounds)));
 end;
 
-procedure TACLColorPickerSubClassLightnessSliderCell.UpdateContentCache(ACanvas: TCanvas; AWidth, AHeight: Integer);
+procedure TACLColorPickerLightnessSliderCell.UpdateContentCache(ACanvas: TCanvas; AWidth, AHeight: Integer);
 var
   AColor: TAlphaColor;
 begin
@@ -1161,9 +1161,9 @@ begin
   end;
 end;
 
-{ TACLColorPickerSubClassPreviewCell }
+{ TACLColorPickerPreviewCell }
 
-procedure TACLColorPickerSubClassPreviewCell.DoDraw(ACanvas: TCanvas);
+procedure TACLColorPickerPreviewCell.DoDraw(ACanvas: TCanvas);
 var
   R: TRect;
 begin
@@ -1174,19 +1174,19 @@ begin
   acFillRect(ACanvas.Handle, R, ColorInfo.AlphaColor);
 end;
 
-function TACLColorPickerSubClassPreviewCell.MeasureSize: TSize;
+function TACLColorPickerPreviewCell.MeasureSize: TSize;
 begin
   Result := acSize(ScaleFactor.Apply(48));
 end;
 
-procedure TACLColorPickerSubClassPreviewCell.UpdateEditValue;
+procedure TACLColorPickerPreviewCell.UpdateEditValue;
 begin
   Invalidate;
 end;
 
-{ TACLColorPickerSubClassCustomEditCell }
+{ TACLColorPickerCustomEditCell }
 
-constructor TACLColorPickerSubClassCustomEditCell.Create(ASubClass: TACLCompoundControlSubClass);
+constructor TACLColorPickerCustomEditCell.Create(ASubClass: TACLCompoundControlSubClass);
 begin
   inherited Create(ASubClass);
   FEdit := CreateEdit;
@@ -1196,20 +1196,20 @@ begin
     TComponentAccess(FEdit).SetDesigning(True);
 end;
 
-destructor TACLColorPickerSubClassCustomEditCell.Destroy;
+destructor TACLColorPickerCustomEditCell.Destroy;
 begin
   FreeAndNil(FEdit);
   inherited Destroy;
 end;
 
-procedure TACLColorPickerSubClassCustomEditCell.DoCalculate(AChanges: TIntegerSet);
+procedure TACLColorPickerCustomEditCell.DoCalculate(AChanges: TIntegerSet);
 begin
   if [cccnStruct, cccnLayout] * AChanges <> [] then
     FEdit.BoundsRect := acRectSetRight(Bounds, Bounds.Right, MeasureEditWidth);
   inherited DoCalculate(AChanges);
 end;
 
-procedure TACLColorPickerSubClassCustomEditCell.DoDraw(ACanvas: TCanvas);
+procedure TACLColorPickerCustomEditCell.DoDraw(ACanvas: TCanvas);
 begin
   ACanvas.Font := SubClass.Font;
   ACanvas.Font.Color := SubClass.Style.TextColors[SubClass.EnabledContent];
@@ -1217,20 +1217,20 @@ begin
   acTextDraw(ACanvas, GetCaption, Bounds, taLeftJustify, taVerticalCenter);
 end;
 
-function TACLColorPickerSubClassCustomEditCell.IsCaptured: Boolean;
+function TACLColorPickerCustomEditCell.IsCaptured: Boolean;
 begin
   Result := inherited IsCaptured or FEdit.Focused;
 end;
 
-function TACLColorPickerSubClassCustomEditCell.MeasureSize: TSize;
+function TACLColorPickerCustomEditCell.MeasureSize: TSize;
 begin
   Result.cx := acTextSize(SubClass.Font, GetCaption).cx + ScaleFactor.Apply(accpIndentBetweenElements) + MeasureEditWidth;
   Result.cy := FEdit.Height;
 end;
 
-{ TACLColorPickerSubClassCustomSpinEditCell }
+{ TACLColorPickerCustomSpinEditCell }
 
-function TACLColorPickerSubClassCustomSpinEditCell.CreateEdit: TACLCustomEdit;
+function TACLColorPickerCustomSpinEditCell.CreateEdit: TACLCustomEdit;
 var
   AEdit: TACLSpinEdit;
 begin
@@ -1244,41 +1244,41 @@ begin
   Result := AEdit;
 end;
 
-procedure TACLColorPickerSubClassCustomSpinEditCell.EditChangeHandler(Sender: TObject);
+procedure TACLColorPickerCustomSpinEditCell.EditChangeHandler(Sender: TObject);
 begin
   if not FUpdateLocked then
     SetValue(TACLSpinEdit(FEdit).Value);
 end;
 
-function TACLColorPickerSubClassCustomSpinEditCell.MeasureEditWidth: Integer;
+function TACLColorPickerCustomSpinEditCell.MeasureEditWidth: Integer;
 begin
   Result := CalculateTextFieldSize(SubClass.Font, 3) +
     TACLSpinEdit(FEdit).StyleButton.Texture.FrameWidth * 2 + 4 * acTextIndent;
 end;
 
-procedure TACLColorPickerSubClassCustomSpinEditCell.UpdateEditValue;
+procedure TACLColorPickerCustomSpinEditCell.UpdateEditValue;
 begin
   TACLSpinEdit(FEdit).Value := GetValue;
   TACLSpinEdit(FEdit).Update;
 end;
 
-{ TACLColorPickerSubClassSpinEditCell }
+{ TACLColorPickerSpinEditCell }
 
-constructor TACLColorPickerSubClassSpinEditCell.Create(
+constructor TACLColorPickerSpinEditCell.Create(
   ASubClass: TACLCompoundControlSubClass; AType: TACLColorPickerColorComponent);
 begin
   FType := AType;
   inherited Create(ASubClass);
 end;
 
-function TACLColorPickerSubClassSpinEditCell.GetCaption: string;
+function TACLColorPickerSpinEditCell.GetCaption: string;
 const
   Map: array[TACLColorPickerColorComponent] of string = ('A:', 'R:', 'G:', 'B:', 'H:', 'S:', 'L:');
 begin
   Result := Map[FType];
 end;
 
-function TACLColorPickerSubClassSpinEditCell.GetValue: Integer;
+function TACLColorPickerSpinEditCell.GetValue: Integer;
 begin
   Result := 0;
   case FType of
@@ -1292,7 +1292,7 @@ begin
   end;
 end;
 
-procedure TACLColorPickerSubClassSpinEditCell.SetValue(AValue: Integer);
+procedure TACLColorPickerSpinEditCell.SetValue(AValue: Integer);
 begin
   case FType of
     cpccA: ColorInfo.Alpha := AValue;
@@ -1305,9 +1305,9 @@ begin
   end;
 end;
 
-{ TACLColorPickerSubClassHexCodeEditCell }
+{ TACLColorPickerHexCodeEditCell }
 
-function TACLColorPickerSubClassHexCodeEditCell.CreateEdit: TACLCustomEdit;
+function TACLColorPickerHexCodeEditCell.CreateEdit: TACLCustomEdit;
 begin
   Result := TACLEdit.Create(SubClass);
   TACLEdit(Result).ResourceCollection := SubClass.ResourceCollection;
@@ -1317,17 +1317,17 @@ begin
   TACLEdit(Result).OnKeyPress := EditKeyPressHandler;
 end;
 
-function TACLColorPickerSubClassHexCodeEditCell.GetCaption: string;
+function TACLColorPickerHexCodeEditCell.GetCaption: string;
 begin
   Result := '#';
 end;
 
-function TACLColorPickerSubClassHexCodeEditCell.MeasureEditWidth: Integer;
+function TACLColorPickerHexCodeEditCell.MeasureEditWidth: Integer;
 begin
   Result := CalculateTextFieldSize(SubClass.Font, 8) + 6 * acTextIndent;
 end;
 
-procedure TACLColorPickerSubClassHexCodeEditCell.UpdateEditValue;
+procedure TACLColorPickerHexCodeEditCell.UpdateEditValue;
 begin
   if SubClass.Options.AllowEditAlpha then
     TACLEdit(FEdit).Value := ColorInfo.AlphaColor.ToString
@@ -1337,13 +1337,13 @@ begin
   FEdit.Update;
 end;
 
-procedure TACLColorPickerSubClassHexCodeEditCell.EditChangeHandler(Sender: TObject);
+procedure TACLColorPickerHexCodeEditCell.EditChangeHandler(Sender: TObject);
 begin
   if not FUpdateLocked then
     ColorInfo.AlphaColor := TAlphaColor.FromString(TACLEdit(FEdit).Value);
 end;
 
-procedure TACLColorPickerSubClassHexCodeEditCell.EditKeyPressHandler(Sender: TObject; var AKey: Char);
+procedure TACLColorPickerHexCodeEditCell.EditKeyPressHandler(Sender: TObject; var AKey: Char);
 begin
 {$WARNINGS OFF}
   if TCharacter.IsControl(AKey) or TCharacter.IsDigit(AKey) then

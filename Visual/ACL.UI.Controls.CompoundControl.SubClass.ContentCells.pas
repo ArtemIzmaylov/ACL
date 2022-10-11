@@ -34,7 +34,7 @@ uses
   ACL.UI.Controls.CompoundControl.SubClass;
 
 type
-  TACLCompoundControlSubClassBaseContentCellViewInfo = class;
+  TACLCompoundControlBaseContentCellViewInfo = class;
 
   { IACLCompoundControlSubClassContent }
 
@@ -45,10 +45,10 @@ type
     function GetViewItemsOrigin: TPoint;
   end;
 
-  { TACLCompoundControlSubClassBaseContentCell }
+  { TACLCompoundControlBaseContentCell }
 
-  TACLCompoundControlSubClassBaseContentCellClass = class of TACLCompoundControlSubClassBaseContentCell;
-  TACLCompoundControlSubClassBaseContentCell = class(TACLUnknownObject)
+  TACLCompoundControlBaseContentCellClass = class of TACLCompoundControlBaseContentCell;
+  TACLCompoundControlBaseContentCell = class(TACLUnknownObject)
   strict private
     FData: TObject;
 
@@ -56,11 +56,11 @@ type
   protected
     FHeight: Integer;
     FTop: Integer;
-    FViewInfo: TACLCompoundControlSubClassBaseContentCellViewInfo;
+    FViewInfo: TACLCompoundControlBaseContentCellViewInfo;
 
     function GetClientBounds: TRect; virtual;
   public
-    constructor Create(AData: TObject; AViewInfo: TACLCompoundControlSubClassBaseContentCellViewInfo);
+    constructor Create(AData: TObject; AViewInfo: TACLCompoundControlBaseContentCellViewInfo);
     procedure CalculateHitTest(AInfo: TACLHitTestInfo);
     procedure Draw(ACanvas: TCanvas);
     function MeasureHeight: Integer;
@@ -69,12 +69,12 @@ type
     property Data: TObject read FData;
     property Height: Integer read FHeight;
     property Top: Integer read FTop;
-    property ViewInfo: TACLCompoundControlSubClassBaseContentCellViewInfo read FViewInfo;
+    property ViewInfo: TACLCompoundControlBaseContentCellViewInfo read FViewInfo;
   end;
 
-  { TACLCompoundControlSubClassBaseContentCellViewInfo }
+  { TACLCompoundControlBaseContentCellViewInfo }
 
-  TACLCompoundControlSubClassBaseContentCellViewInfo = class(TACLUnknownObject)
+  TACLCompoundControlBaseContentCellViewInfo = class(TACLUnknownObject)
   strict private
     FOwner: IACLCompoundControlSubClassContent;
 
@@ -103,9 +103,9 @@ type
     property Owner: IACLCompoundControlSubClassContent read FOwner;
   end;
 
-  { TACLCompoundControlSubClassBaseCheckableContentCellViewInfo }
+  { TACLCompoundControlBaseCheckableContentCellViewInfo }
 
-  TACLCompoundControlSubClassBaseCheckableContentCellViewInfo = class(TACLCompoundControlSubClassBaseContentCellViewInfo)
+  TACLCompoundControlBaseCheckableContentCellViewInfo = class(TACLCompoundControlBaseContentCellViewInfo)
   protected
     FCheckBoxRect: TRect;
     FExpandButtonRect: TRect;
@@ -119,26 +119,26 @@ type
     property ExpandButtonVisible: Boolean read FExpandButtonVisible;
   end;
 
-  { TACLCompoundControlSubClassContentCellList }
+  { TACLCompoundControlContentCellList }
 
-  TACLCompoundControlSubClassContentCellList<T: TACLCompoundControlSubClassBaseContentCell> = class(TACLObjectList<T>)
+  TACLCompoundControlContentCellList<T: TACLCompoundControlBaseContentCell> = class(TACLObjectList<T>)
   strict private
     FFirstVisible: Integer;
     FLastVisible: Integer;
     FOwner: IACLCompoundControlSubClassContent;
   protected
-    FCellClass: TACLCompoundControlSubClassBaseContentCellClass;
+    FCellClass: TACLCompoundControlBaseContentCellClass;
 
     function GetClipRect: TRect; virtual;
   public
     constructor Create(AOwner: IACLCompoundControlSubClassContent);
-    function Add(AData: TObject; AViewInfo: TACLCompoundControlSubClassBaseContentCellViewInfo): T;
+    function Add(AData: TObject; AViewInfo: TACLCompoundControlBaseContentCellViewInfo): T;
     function CalculateHitTest(const AInfo: TACLHitTestInfo): Boolean;
     procedure Clear;
     procedure Draw(ACanvas: TCanvas);
     function Find(AData: TObject; out ACell: T): Boolean;
     function FindFirstVisible(AStartFromIndex: Integer; ADirection: Integer; ADataClass: TClass; out ACell: T): Boolean;
-    function GetCell(Index: Integer; out ACell: TACLCompoundControlSubClassBaseContentCell): Boolean;
+    function GetCell(Index: Integer; out ACell: TACLCompoundControlBaseContentCell): Boolean;
     function GetContentSize: Integer;
     procedure UpdateVisibleBounds;
     //
@@ -146,11 +146,11 @@ type
     property LastVisible: Integer read FLastVisible;
   end;
 
-  { TACLCompoundControlSubClassContentCellList }
+  { TACLCompoundControlContentCellList }
 
-  TACLCompoundControlSubClassContentCellList = class(TACLCompoundControlSubClassContentCellList<TACLCompoundControlSubClassBaseContentCell>)
+  TACLCompoundControlContentCellList = class(TACLCompoundControlContentCellList<TACLCompoundControlBaseContentCell>)
   public
-    constructor Create(AOwner: IACLCompoundControlSubClassContent; ACellClass: TACLCompoundControlSubClassBaseContentCellClass);
+    constructor Create(AOwner: IACLCompoundControlSubClassContent; ACellClass: TACLCompoundControlBaseContentCellClass);
   end;
 
 implementation
@@ -158,60 +158,60 @@ implementation
 uses
   System.Math;
 
-{ TACLCompoundControlSubClassBaseContentCell }
+{ TACLCompoundControlBaseContentCell }
 
-constructor TACLCompoundControlSubClassBaseContentCell.Create(AData: TObject; AViewInfo: TACLCompoundControlSubClassBaseContentCellViewInfo);
+constructor TACLCompoundControlBaseContentCell.Create(AData: TObject; AViewInfo: TACLCompoundControlBaseContentCellViewInfo);
 begin
   inherited Create;
   FData := AData;
   FViewInfo := AViewInfo;
 end;
 
-procedure TACLCompoundControlSubClassBaseContentCell.CalculateHitTest(AInfo: TACLHitTestInfo);
+procedure TACLCompoundControlBaseContentCell.CalculateHitTest(AInfo: TACLHitTestInfo);
 begin
   ViewInfo.CalculateHitTest(Data, Bounds, AInfo);
 end;
 
-procedure TACLCompoundControlSubClassBaseContentCell.Draw(ACanvas: TCanvas);
+procedure TACLCompoundControlBaseContentCell.Draw(ACanvas: TCanvas);
 begin
   ViewInfo.Draw(ACanvas, Data, Bounds);
 end;
 
-function TACLCompoundControlSubClassBaseContentCell.MeasureHeight: Integer;
+function TACLCompoundControlBaseContentCell.MeasureHeight: Integer;
 begin
   ViewInfo.Initialize(Data);
   Result := ViewInfo.MeasureHeight;
 end;
 
-function TACLCompoundControlSubClassBaseContentCell.GetClientBounds: TRect;
+function TACLCompoundControlBaseContentCell.GetClientBounds: TRect;
 begin
   Result := System.Types.Bounds(0, Top, ViewInfo.Owner.GetContentWidth, Height);
 end;
 
-function TACLCompoundControlSubClassBaseContentCell.GetBounds: TRect;
+function TACLCompoundControlBaseContentCell.GetBounds: TRect;
 begin
   Result := acRectOffset(GetClientBounds, ViewInfo.Owner.GetViewItemsOrigin);
 end;
 
-{ TACLCompoundControlSubClassBaseContentCellViewInfo }
+{ TACLCompoundControlBaseContentCellViewInfo }
 
-constructor TACLCompoundControlSubClassBaseContentCellViewInfo.Create(AOwner: IACLCompoundControlSubClassContent);
+constructor TACLCompoundControlBaseContentCellViewInfo.Create(AOwner: IACLCompoundControlSubClassContent);
 begin
   FOwner := AOwner;
 end;
 
-procedure TACLCompoundControlSubClassBaseContentCellViewInfo.Calculate;
+procedure TACLCompoundControlBaseContentCellViewInfo.Calculate;
 begin
   Calculate(FWidth, FHeight);
 end;
 
-procedure TACLCompoundControlSubClassBaseContentCellViewInfo.Calculate(AWidth, AHeight: Integer);
+procedure TACLCompoundControlBaseContentCellViewInfo.Calculate(AWidth, AHeight: Integer);
 begin
   FWidth := AWidth;
   FHeight := AHeight;
 end;
 
-procedure TACLCompoundControlSubClassBaseContentCellViewInfo.CalculateHitTest(
+procedure TACLCompoundControlBaseContentCellViewInfo.CalculateHitTest(
   AData: TObject; const ABounds: TRect; AInfo: TACLHitTestInfo);
 begin
   Initialize(AData, ABounds.Height);
@@ -220,7 +220,7 @@ begin
   DoGetHitTest(acPointOffsetNegative(AInfo.HitPoint, ABounds.TopLeft), ABounds.TopLeft, AInfo);
 end;
 
-procedure TACLCompoundControlSubClassBaseContentCellViewInfo.Draw(ACanvas: TCanvas; AData: TObject; const ABounds: TRect);
+procedure TACLCompoundControlBaseContentCellViewInfo.Draw(ACanvas: TCanvas; AData: TObject; const ABounds: TRect);
 begin
   MoveWindowOrg(ACanvas.Handle, ABounds.Left, ABounds.Top);
   try
@@ -233,50 +233,50 @@ begin
   end;
 end;
 
-procedure TACLCompoundControlSubClassBaseContentCellViewInfo.Initialize(AData: TObject);
+procedure TACLCompoundControlBaseContentCellViewInfo.Initialize(AData: TObject);
 begin
   FData := AData;
 end;
 
-procedure TACLCompoundControlSubClassBaseContentCellViewInfo.Initialize(AData: TObject; AHeight: Integer);
+procedure TACLCompoundControlBaseContentCellViewInfo.Initialize(AData: TObject; AHeight: Integer);
 begin
   FHeight := AHeight;
   Initialize(AData);
 end;
 
-function TACLCompoundControlSubClassBaseContentCellViewInfo.MeasureHeight: Integer;
+function TACLCompoundControlBaseContentCellViewInfo.MeasureHeight: Integer;
 begin
   Result := Bounds.Height;
 end;
 
-procedure TACLCompoundControlSubClassBaseContentCellViewInfo.DoGetHitTest(const P, AOrigin: TPoint; AInfo: TACLHitTestInfo);
+procedure TACLCompoundControlBaseContentCellViewInfo.DoGetHitTest(const P, AOrigin: TPoint; AInfo: TACLHitTestInfo);
 begin
   // do nothing
 end;
 
-function TACLCompoundControlSubClassBaseContentCellViewInfo.GetFocusRect: TRect;
+function TACLCompoundControlBaseContentCellViewInfo.GetFocusRect: TRect;
 begin
   Result := Bounds;
 end;
 
-function TACLCompoundControlSubClassBaseContentCellViewInfo.GetFocusRectColor: TColor;
+function TACLCompoundControlBaseContentCellViewInfo.GetFocusRectColor: TColor;
 begin
   Result := clDefault;
 end;
 
-function TACLCompoundControlSubClassBaseContentCellViewInfo.HasFocusRect: Boolean;
+function TACLCompoundControlBaseContentCellViewInfo.HasFocusRect: Boolean;
 begin
   Result := False;
 end;
 
-function TACLCompoundControlSubClassBaseContentCellViewInfo.GetBounds: TRect;
+function TACLCompoundControlBaseContentCellViewInfo.GetBounds: TRect;
 begin
   Result := Rect(0, 0, FWidth, FHeight);
 end;
 
-{ TACLCompoundControlSubClassBaseCheckableContentCellViewInfo }
+{ TACLCompoundControlBaseCheckableContentCellViewInfo }
 
-procedure TACLCompoundControlSubClassBaseCheckableContentCellViewInfo.DoGetHitTest(const P, AOrigin: TPoint; AInfo: TACLHitTestInfo);
+procedure TACLCompoundControlBaseCheckableContentCellViewInfo.DoGetHitTest(const P, AOrigin: TPoint; AInfo: TACLHitTestInfo);
 begin
   if acPointInRect(CheckBoxRect, P) and IsCheckBoxEnabled then
   begin
@@ -291,29 +291,29 @@ begin
     end;
 end;
 
-function TACLCompoundControlSubClassBaseCheckableContentCellViewInfo.IsCheckBoxEnabled: Boolean;
+function TACLCompoundControlBaseCheckableContentCellViewInfo.IsCheckBoxEnabled: Boolean;
 begin
   Result := True;
 end;
 
-{ TACLCompoundControlSubClassContentCellList }
+{ TACLCompoundControlContentCellList }
 
-constructor TACLCompoundControlSubClassContentCellList<T>.Create(AOwner: IACLCompoundControlSubClassContent);
+constructor TACLCompoundControlContentCellList<T>.Create(AOwner: IACLCompoundControlSubClassContent);
 begin
   inherited Create;
   FLastVisible := -1;
   FOwner := AOwner;
-  FCellClass := TACLCompoundControlSubClassBaseContentCellClass(T);
+  FCellClass := TACLCompoundControlBaseContentCellClass(T);
 end;
 
-function TACLCompoundControlSubClassContentCellList<T>.Add(
-  AData: TObject; AViewInfo: TACLCompoundControlSubClassBaseContentCellViewInfo): T;
+function TACLCompoundControlContentCellList<T>.Add(
+  AData: TObject; AViewInfo: TACLCompoundControlBaseContentCellViewInfo): T;
 begin
   Result := T(FCellClass.Create(AData, AViewInfo));
   inherited Add(Result);
 end;
 
-function TACLCompoundControlSubClassContentCellList<T>.CalculateHitTest(const AInfo: TACLHitTestInfo): Boolean;
+function TACLCompoundControlContentCellList<T>.CalculateHitTest(const AInfo: TACLHitTestInfo): Boolean;
 var
   I: Integer;
 begin
@@ -326,13 +326,13 @@ begin
   Result := False;
 end;
 
-procedure TACLCompoundControlSubClassContentCellList<T>.Clear;
+procedure TACLCompoundControlContentCellList<T>.Clear;
 begin
   inherited Clear;
   UpdateVisibleBounds;
 end;
 
-procedure TACLCompoundControlSubClassContentCellList<T>.Draw(ACanvas: TCanvas);
+procedure TACLCompoundControlContentCellList<T>.Draw(ACanvas: TCanvas);
 var
   ASaveIndex: HRGN;
   I: Integer;
@@ -349,7 +349,7 @@ begin
   end;
 end;
 
-function TACLCompoundControlSubClassContentCellList<T>.Find(AData: TObject; out ACell: T): Boolean;
+function TACLCompoundControlContentCellList<T>.Find(AData: TObject; out ACell: T): Boolean;
 var
   I: Integer;
 begin
@@ -363,7 +363,7 @@ begin
   Result := False;
 end;
 
-function TACLCompoundControlSubClassContentCellList<T>.FindFirstVisible(
+function TACLCompoundControlContentCellList<T>.FindFirstVisible(
   AStartFromIndex: Integer; ADirection: Integer; ADataClass: TClass; out ACell: T): Boolean;
 var
   AIndex: Integer;
@@ -382,20 +382,20 @@ begin
   Result := ACell <> nil;
 end;
 
-function TACLCompoundControlSubClassContentCellList<T>.GetCell(
-  Index: Integer; out ACell: TACLCompoundControlSubClassBaseContentCell): Boolean;
+function TACLCompoundControlContentCellList<T>.GetCell(
+  Index: Integer; out ACell: TACLCompoundControlBaseContentCell): Boolean;
 begin
   Result := (Index >= 0) and (Index < Count);
   if Result then
     ACell := Items[Index];
 end;
 
-function TACLCompoundControlSubClassContentCellList<T>.GetClipRect: TRect;
+function TACLCompoundControlContentCellList<T>.GetClipRect: TRect;
 begin
   Result := FOwner.GetViewItemsArea;
 end;
 
-function TACLCompoundControlSubClassContentCellList<T>.GetContentSize: Integer;
+function TACLCompoundControlContentCellList<T>.GetContentSize: Integer;
 begin
   if Count > 0 then
     Result := Last.Bounds.Bottom - First.Bounds.Top
@@ -403,9 +403,9 @@ begin
     Result := 0;
 end;
 
-procedure TACLCompoundControlSubClassContentCellList<T>.UpdateVisibleBounds;
+procedure TACLCompoundControlContentCellList<T>.UpdateVisibleBounds;
 var
-  ACell: TACLCompoundControlSubClassBaseContentCell;
+  ACell: TACLCompoundControlBaseContentCell;
   I: Integer;
   R: TRect;
 begin
@@ -431,10 +431,10 @@ begin
     end;
 end;
 
-{ TACLCompoundControlSubClassContentCellList }
+{ TACLCompoundControlContentCellList }
 
-constructor TACLCompoundControlSubClassContentCellList.Create(
-  AOwner: IACLCompoundControlSubClassContent; ACellClass: TACLCompoundControlSubClassBaseContentCellClass);
+constructor TACLCompoundControlContentCellList.Create(
+  AOwner: IACLCompoundControlSubClassContent; ACellClass: TACLCompoundControlBaseContentCellClass);
 begin
   inherited Create(AOwner);
   FCellClass := ACellClass;

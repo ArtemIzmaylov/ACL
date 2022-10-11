@@ -158,9 +158,9 @@ type
     procedure SetSearchString(const Value: string);
   protected
     function CanAddProperty(AObject: TObject; APropInfo: PPropInfo): Boolean;
-    function CreateEditingController: TACLTreeListSubClassEditingController; override;
+    function CreateEditingController: TACLTreeListEditingController; override;
     function CreateNode: TACLTreeListNode; override;
-    function CreateViewInfo: TACLCompoundControlSubClassCustomViewInfo; override;
+    function CreateViewInfo: TACLCompoundControlCustomViewInfo; override;
 
     function CanStartEditingByMouse(AButton: TMouseButton): Boolean;
     procedure ProcessKeyDown(AKey: Word; AShift: TShiftState); override;
@@ -206,9 +206,9 @@ type
     property OnPropertyGetGroupName: TACLObjectInspectorPropertyGetGroupNameEvent read FOnPropertyGetGroupName write FOnPropertyGetGroupName;
   end;
 
-  { TACLObjectInspectorSubClassEditingController }
+  { TACLObjectInspectorEditingController }
 
-  TACLObjectInspectorSubClassEditingController = class(TACLTreeListSubClassEditingController)
+  TACLObjectInspectorEditingController = class(TACLTreeListEditingController)
   strict private
     FIsKeyboardAction: Boolean;
   protected
@@ -216,16 +216,16 @@ type
     procedure EditKeyDownHandler(Sender: TObject; var Key: Word; Shift: TShiftState); override;
   end;
 
-  { TACLObjectInspectorSubClassContentViewInfo }
+  { TACLObjectInspectorContentViewInfo }
 
-  TACLObjectInspectorSubClassContentViewInfo = class(TACLTreeListSubClassContentViewInfo)
+  TACLObjectInspectorContentViewInfo = class(TACLTreeListContentViewInfo)
   protected
-    function CreateNodeViewInfo: TACLTreeListSubClassNodeViewInfo; override;
+    function CreateNodeViewInfo: TACLTreeListNodeViewInfo; override;
   end;
 
-  { TACLObjectInspectorSubClassNodeViewInfo }
+  { TACLObjectInspectorNodeViewInfo }
 
-  TACLObjectInspectorSubClassNodeViewInfo = class(TACLTreeListSubClassNodeViewInfo)
+  TACLObjectInspectorNodeViewInfo = class(TACLTreeListNodeViewInfo)
   strict private
     FButtonRect: TRect;
     FLastCellTextExtends: TRect;
@@ -234,9 +234,9 @@ type
     function GetOptionsView: TACLObjectInspectorOptionsView;
   protected
     procedure DoDraw(ACanvas: TCanvas); override;
-    procedure DoDrawCellContent(ACanvas: TCanvas; const R: TRect; AColumnViewInfo: TACLTreeListSubClassColumnViewInfo); override;
+    procedure DoDrawCellContent(ACanvas: TCanvas; const R: TRect; AColumnViewInfo: TACLTreeListColumnViewInfo); override;
     procedure DoGetHitTest(const P: TPoint; const AOrigin: TPoint; AInfo: TACLHitTestInfo); override;
-    function GetCellTextExtends(AColumn: TACLTreeListSubClassColumnViewInfo): TRect; override;
+    function GetCellTextExtends(AColumn: TACLTreeListColumnViewInfo): TRect; override;
     function HasButton: Boolean; virtual;
   public
     procedure Calculate(AWidth: Integer; AHeight: Integer); override;
@@ -246,11 +246,11 @@ type
     property OptionsView: TACLObjectInspectorOptionsView read GetOptionsView;
   end;
 
-  { TACLObjectInspectorSubClassViewInfo }
+  { TACLObjectInspectorViewInfo }
 
-  TACLObjectInspectorSubClassViewInfo = class(TACLTreeListSubClassViewInfo)
+  TACLObjectInspectorViewInfo = class(TACLTreeListViewInfo)
   protected
-    function CreateContent: TACLTreeListSubClassContentViewInfo; override;
+    function CreateContent: TACLTreeListContentViewInfo; override;
   end;
 
   { TACLObjectInspectorControl }
@@ -625,9 +625,9 @@ begin
     OnPropertyAdd(Self, AObject, APropInfo, Result);
 end;
 
-function TACLObjectInspectorSubClass.CreateEditingController: TACLTreeListSubClassEditingController;
+function TACLObjectInspectorSubClass.CreateEditingController: TACLTreeListEditingController;
 begin
-  Result := TACLObjectInspectorSubClassEditingController.Create(Self);
+  Result := TACLObjectInspectorEditingController.Create(Self);
 end;
 
 function TACLObjectInspectorSubClass.CreateNode: TACLTreeListNode;
@@ -635,9 +635,9 @@ begin
   Result := TACLObjectInspectorNode.Create(Self);
 end;
 
-function TACLObjectInspectorSubClass.CreateViewInfo: TACLCompoundControlSubClassCustomViewInfo;
+function TACLObjectInspectorSubClass.CreateViewInfo: TACLCompoundControlCustomViewInfo;
 begin
-  Result := TACLObjectInspectorSubClassViewInfo.Create(Self);
+  Result := TACLObjectInspectorViewInfo.Create(Self);
 end;
 
 function TACLObjectInspectorSubClass.GetStyle: TACLStyleTreeList;
@@ -959,9 +959,9 @@ begin
     ProcessMouseClickAtNodeButton(HitTest.Node)
 end;
 
-{ TACLObjectInspectorSubClassEditingController }
+{ TACLObjectInspectorEditingController }
 
-procedure TACLObjectInspectorSubClassEditingController.EditApplyHandler(Sender: TObject);
+procedure TACLObjectInspectorEditingController.EditApplyHandler(Sender: TObject);
 begin
   if (FApplyLockCount = 0) and (Sender = Edit) then
   begin
@@ -975,7 +975,7 @@ begin
   end;
 end;
 
-procedure TACLObjectInspectorSubClassEditingController.EditKeyDownHandler(
+procedure TACLObjectInspectorEditingController.EditKeyDownHandler(
   Sender: TObject; var Key: Word; Shift: TShiftState);
 begin
   FIsKeyboardAction := True;
@@ -983,16 +983,16 @@ begin
   FIsKeyboardAction := False;
 end;
 
-{ TACLObjectInspectorSubClassContentViewInfo }
+{ TACLObjectInspectorContentViewInfo }
 
-function TACLObjectInspectorSubClassContentViewInfo.CreateNodeViewInfo: TACLTreeListSubClassNodeViewInfo;
+function TACLObjectInspectorContentViewInfo.CreateNodeViewInfo: TACLTreeListNodeViewInfo;
 begin
-  Result := TACLObjectInspectorSubClassNodeViewInfo.Create(Self);
+  Result := TACLObjectInspectorNodeViewInfo.Create(Self);
 end;
 
-{ TACLObjectInspectorSubClassNodeViewInfo }
+{ TACLObjectInspectorNodeViewInfo }
 
-procedure TACLObjectInspectorSubClassNodeViewInfo.Calculate(AWidth, AHeight: Integer);
+procedure TACLObjectInspectorNodeViewInfo.Calculate(AWidth, AHeight: Integer);
 begin
   inherited Calculate(AWidth, AHeight);
 
@@ -1003,7 +1003,7 @@ begin
   Inc(FLastCellTextExtends.Right, FButtonRect.Width);
 end;
 
-procedure TACLObjectInspectorSubClassNodeViewInfo.DoDraw(ACanvas: TCanvas);
+procedure TACLObjectInspectorNodeViewInfo.DoDraw(ACanvas: TCanvas);
 begin
   inherited DoDraw(ACanvas);
 
@@ -1016,8 +1016,8 @@ begin
   end;
 end;
 
-procedure TACLObjectInspectorSubClassNodeViewInfo.DoDrawCellContent(
-  ACanvas: TCanvas; const R: TRect; AColumnViewInfo: TACLTreeListSubClassColumnViewInfo);
+procedure TACLObjectInspectorNodeViewInfo.DoDrawCellContent(
+  ACanvas: TCanvas; const R: TRect; AColumnViewInfo: TACLTreeListColumnViewInfo);
 var
   AIntf: IACLPropertyEditorCustomDraw;
 begin
@@ -1040,7 +1040,7 @@ begin
   inherited DoDrawCellContent(ACanvas, R, AColumnViewInfo);
 end;
 
-procedure TACLObjectInspectorSubClassNodeViewInfo.DoGetHitTest(const P, AOrigin: TPoint; AInfo: TACLHitTestInfo);
+procedure TACLObjectInspectorNodeViewInfo.DoGetHitTest(const P, AOrigin: TPoint; AInfo: TACLHitTestInfo);
 begin
   inherited DoGetHitTest(P, AOrigin, AInfo);
   if HasButton and PtInRect(ButtonRect, P) then
@@ -1050,7 +1050,7 @@ begin
   end;
 end;
 
-function TACLObjectInspectorSubClassNodeViewInfo.GetCellTextExtends(AColumn: TACLTreeListSubClassColumnViewInfo): TRect;
+function TACLObjectInspectorNodeViewInfo.GetCellTextExtends(AColumn: TACLTreeListColumnViewInfo): TRect;
 begin
   if ((AColumn = nil) or AColumn.IsLast) and HasButton then
     Result := FLastCellTextExtends
@@ -1058,26 +1058,26 @@ begin
     Result := inherited GetCellTextExtends(AColumn);
 end;
 
-function TACLObjectInspectorSubClassNodeViewInfo.HasButton: Boolean;
+function TACLObjectInspectorNodeViewInfo.HasButton: Boolean;
 begin
   Result := (Node <> nil) and Node.Selected and Supports(Node.PropertyEditor, IACLPropertyEditorDialog);
 end;
 
-function TACLObjectInspectorSubClassNodeViewInfo.GetNode: TACLObjectInspectorNode;
+function TACLObjectInspectorNodeViewInfo.GetNode: TACLObjectInspectorNode;
 begin
   Result := TACLObjectInspectorNode(inherited Node);
 end;
 
-function TACLObjectInspectorSubClassNodeViewInfo.GetOptionsView: TACLObjectInspectorOptionsView;
+function TACLObjectInspectorNodeViewInfo.GetOptionsView: TACLObjectInspectorOptionsView;
 begin
   Result := TACLObjectInspectorSubClass(SubClass).OptionsView;
 end;
 
-{ TACLObjectInspectorSubClassViewInfo }
+{ TACLObjectInspectorViewInfo }
 
-function TACLObjectInspectorSubClassViewInfo.CreateContent: TACLTreeListSubClassContentViewInfo;
+function TACLObjectInspectorViewInfo.CreateContent: TACLTreeListContentViewInfo;
 begin
-  Result := TACLObjectInspectorSubClassContentViewInfo.Create(SubClass);
+  Result := TACLObjectInspectorContentViewInfo.Create(SubClass);
 end;
 
 { TACLObjectInspectorControl }
