@@ -1750,8 +1750,12 @@ begin
     end
     else
     begin
-      if FEndEllipsis and not (FWordWrap or FAutoWidth) and (FCurrentRow.FBounds.Right > FMaxWidth) then
-        SetEndEllipsis(FCurrentRow);
+      if not (FWordWrap or FAutoWidth) and (FCurrentRow.FBounds.Right > FMaxWidth) then
+      begin
+        Owner.FTruncated := True;
+        if FEndEllipsis then
+          SetEndEllipsis(FCurrentRow);
+      end;
       FLayout.Add(FCurrentRow);
     end;
   {$IFDEF ACL_TEXTLAYOUT_RTL_SUPPORT}
