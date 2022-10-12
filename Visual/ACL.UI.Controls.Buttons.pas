@@ -892,7 +892,8 @@ begin
   begin
     AssignCanvasParameters(ACanvas);
     ATextRect := TextRect;
-    acSysDrawText(ACanvas, ATextRect, Caption, acTextAlignHorz[Alignment] or DT_VCENTER or DT_END_ELLIPSIS); // Keep the "&" Prefix in mind
+    acSysDrawText(ACanvas, ATextRect, Caption, acTextAlignHorz[Alignment] or
+      DT_VCENTER or DT_SINGLELINE or DT_END_ELLIPSIS); // Keep the "&" Prefix in mind
   end;
 end;
 
