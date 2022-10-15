@@ -151,19 +151,20 @@ type
   TACLGroupBox = class(TACLCustomGroupBox)
   strict private
     FCheckBox: TACLGroupBoxCheckBox;
-    FDisabledControls: TACLList<TControl>;
+    FDisabledChildren: TACLList;
     FMinimized: Boolean;
     FRestoredHeight: Integer;
 
     FOnCheckBoxStateChanged: TNotifyEvent;
 
-    procedure DisableChildren;
-    procedure EnableChildren;
     procedure SetCheckBox(AValue: TACLGroupBoxCheckBox);
     procedure SetMinimized(AValue: Boolean);
     // backward compatibility
     procedure ReadCheckBoxMode(Reader: TReader);
     procedure ReadCheckBoxState(Reader: TReader);
+  private
+    procedure DisableChildren;
+    procedure EnableChildren;
   protected
     procedure AdjustClientRect(var Rect: TRect); override;
     procedure ApplyCheckBoxState;
@@ -518,6 +519,7 @@ begin
   if Value <> FAction then
   begin
     FAction := Value;
+    FOwner.EnableChildren;
     FOwner.Minimized := False;
     FOwner.ApplyCheckBoxState;
   end;
@@ -538,8 +540,11 @@ end;
 
 procedure TACLGroupBoxCheckBox.SetVisible(const Value: Boolean);
 begin
-  FOwner.CaptionViewInfo.ShowCheckMark := Value;
-  FOwner.ApplyCheckBoxState;
+  if Visible <> Value then
+  begin
+    FOwner.CaptionViewInfo.ShowCheckMark := Value;
+    FOwner.ApplyCheckBoxState;
+  end;
 end;
 
 { TACLGroupBox }
@@ -552,7 +557,7 @@ end;
 
 destructor TACLGroupBox.Destroy;
 begin
-  FreeAndNil(FDisabledControls);
+  FreeAndNil(FDisabledChildren);
   FreeAndNil(FCheckBox);
   inherited Destroy;
 end;
@@ -628,18 +633,19 @@ end;
 procedure TACLGroupBox.DisableChildren;
 var
   AControl: TControl;
-  I: Integer;
 begin
-  for I := 0 to ControlCount - 1 do
+  if FDisabledChildren = nil then
   begin
-    AControl := Controls[I];
-    if not AControl.Enabled then
+    FDisabledChildren := TACLList.Create;
+    for var I := 0 to ControlCount - 1 do
     begin
-      if FDisabledControls = nil then
-        FDisabledControls := TACLList<TControl>.Create;
-      FDisabledControls.Add(AControl);
+      AControl := Controls[I];
+      if AControl.Enabled then
+      begin
+        FDisabledChildren.Add(AControl);
+        AControl.Enabled := False;
+      end;
     end;
-    AControl.Enabled := False;
   end;
 end;
 
@@ -648,14 +654,17 @@ var
   AControl: TControl;
   I: Integer;
 begin
-  for I := 0 to ControlCount - 1 do
-  begin
-    AControl := Controls[I];
-    if (FDisabledControls = nil) or (FDisabledControls.IndexOf(AControl) < 0) then
-      AControl.Enabled := True;
+  if FDisabledChildren <> nil then
+  try
+    for I := 0 to ControlCount - 1 do
+    begin
+      AControl := Controls[I];
+      if FDisabledChildren.Remove(AControl) >= 0 then
+        AControl.Enabled := True;
+    end;
+  finally
+    FreeAndNil(FDisabledChildren);
   end;
-  if FDisabledControls <> nil then
-    FDisabledControls.Clear;
 end;
 
 procedure TACLGroupBox.SetCheckBox(AValue: TACLGroupBoxCheckBox);
