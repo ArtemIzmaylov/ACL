@@ -835,9 +835,10 @@ begin
   case AScrollToMode of
     TACLScrollToMode.MakeTop:
       Result := AObjectTopValue - AAreaTopValue;
+
     TACLScrollToMode.MakeCenter:
       if AAreaBottomValue - AAreaTopValue > AObjectBottomValue - AObjectTopValue then
-        Result := (AAreaTopValue + AAreaBottomValue - AObjectBottomValue + AObjectTopValue) div 2
+        Result := (AObjectBottomValue + AObjectTopValue) div 2 - (AAreaTopValue + AAreaBottomValue) div 2
       else
         Result := AObjectTopValue - AAreaTopValue;
 
