@@ -53,7 +53,7 @@ uses
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.TextLayout,
-  ACL.Graphics.Layers,
+  ACL.Graphics.Ex,
   ACL.Graphics.SkinImage,
   ACL.Graphics.SkinImageSet,
   ACL.Math,

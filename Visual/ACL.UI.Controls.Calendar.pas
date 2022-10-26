@@ -28,7 +28,7 @@ uses
   // ACL
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.GdiPlus,
+  ACL.Graphics.Ex.Gdip,
   ACL.UI.Animation,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.CompoundControl,

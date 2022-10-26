@@ -19,11 +19,11 @@ interface
 uses
   Winapi.Windows,
   // System
-  System.UITypes,
-  System.SysUtils,
   System.Classes,
-  System.Math,
   System.Generics.Collections,
+  System.Math,
+  System.SysUtils,
+  System.UITypes,
   System.ZLib,
   // VCL
   Vcl.Graphics,
@@ -306,8 +306,8 @@ uses
   System.Types,
   // ACL
   ACL.FastCode,
-  ACL.Graphics.Gdiplus,
-  ACL.Graphics.Layers,
+  ACL.Graphics.Ex,
+  ACL.Graphics.Ex.Gdip,
   ACL.Math,
   ACL.Threading,
   ACL.Utils.Stream;

@@ -33,7 +33,7 @@ uses
   ACL.Classes.Timer,
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.Layers,
+  ACL.Graphics.Ex,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.Labels,
   ACL.UI.Resources;

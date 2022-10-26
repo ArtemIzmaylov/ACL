@@ -1,7 +1,8 @@
 ﻿{*********************************************}
 {*                                           *}
 {*        Artem's Components Library         *}
-{*             Gdiplus Wrappers              *}
+{*         Extended Graphic Library          *}
+{*            GDI+ Integration               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
 {*                 2006-2022                 *}
@@ -9,7 +10,7 @@
 {*                                           *}
 {*********************************************}
 
-unit ACL.Graphics.Gdiplus;
+unit ACL.Graphics.Ex.Gdip;
 
 {$I ACL.Config.inc}
 
@@ -270,6 +271,15 @@ type
     class function GetOrCreate(AColor: TAlphaColor): GpBrush;
   end;
 
+var
+  GpDefaultColorMatrix: TColorMatrix = (
+    (1.0, 0.0, 0.0, 0.0, 0.0),
+    (0.0, 1.0, 0.0, 0.0, 0.0),
+    (0.0, 0.0, 1.0, 0.0, 0.0),
+    (0.0, 0.0, 0.0, 1.0, 0.0),
+    (0.0, 0.0, 0.0, 0.0, 1.0)
+  );
+
 procedure GdipCheck(AStatus: GpStatus);
 function GpPaintCanvas: TACLGdiplusPaintCanvas;
 
@@ -300,14 +310,6 @@ uses
 const
   sErrorInvalidGdipOperation = 'Invalid operation in GDI+ (Code: %d)';
   sErrorPaintCanvasAlreadyBusy = 'PaintCanvas is already busy!';
-
-  GpDefaultColorMatrix: TColorMatrix = (
-    (1.0, 0.0, 0.0, 0.0, 0.0),
-    (0.0, 1.0, 0.0, 0.0, 0.0),
-    (0.0, 0.0, 1.0, 0.0, 0.0),
-    (0.0, 0.0, 0.0, 1.0, 0.0),
-    (0.0, 0.0, 0.0, 0.0, 1.0)
-  );
 
 var
   FPaintCanvas: TACLGdiplusPaintCanvas;

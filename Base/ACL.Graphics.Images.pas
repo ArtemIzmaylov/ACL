@@ -31,7 +31,6 @@ uses
   ACL.Classes.ByteBuffer,
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.Gdiplus,
   ACL.Threading,
   ACL.Utils.Clipboard,
   ACL.Utils.Common,
@@ -305,6 +304,7 @@ uses
   System.Math,
   // ACL
   ACL.FastCode,
+  ACL.Graphics.Ex.Gdip,
   ACL.Math,
   ACL.Utils.FileSystem,
   ACL.Utils.Stream;

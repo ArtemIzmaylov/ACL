@@ -38,7 +38,7 @@ uses
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Images,
-  ACL.Graphics.Layers,
+  ACL.Graphics.Ex,
   ACL.Graphics.SkinImage,
   ACL.MUI,
   ACL.ObjectLinks,

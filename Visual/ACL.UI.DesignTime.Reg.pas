@@ -46,7 +46,7 @@ uses
   ACL.Classes.StringList,
   ACL.Classes.Timer,
   ACL.Geometry,
-  ACL.Graphics.Gdiplus,
+  ACL.Graphics.Ex.Gdip,
   ACL.UI.Application,
   ACL.UI.Controls.ActivityIndicator,
   ACL.UI.Controls.BaseControls,

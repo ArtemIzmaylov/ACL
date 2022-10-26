@@ -30,7 +30,7 @@ uses
   ACL.Classes.Collections,
   ACL.Classes.StringList,
   ACL.Graphics,
-  ACL.Graphics.Gdiplus,
+  ACL.Graphics.Ex.Gdip,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.Buttons,

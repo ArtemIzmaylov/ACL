@@ -28,7 +28,7 @@ uses
   ACL.Classes.Timer,
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.Gdiplus,
+  ACL.Graphics.Ex.Gdip,
   ACL.Utils.Common,
   ACL.Utils.FileSystem;
 

@@ -31,7 +31,7 @@ uses
   ACL.Classes.StringList,
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.Gdiplus,
+  ACL.Graphics.Ex.Gdip,
   ACL.Graphics.SkinImage,
   ACL.Utils.DPIAware,
   ACL.Utils.Common,

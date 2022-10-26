@@ -29,7 +29,7 @@ uses
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.FontCache,
-  ACL.Graphics.Gdiplus,
+  ACL.Graphics.Ex.Gdip,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.Category,

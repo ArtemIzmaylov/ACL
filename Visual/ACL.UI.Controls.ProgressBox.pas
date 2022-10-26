@@ -155,7 +155,7 @@ uses
   Vcl.Forms,
   // ACL
   ACL.Geometry,
-  ACL.Graphics.Gdiplus,
+  ACL.Graphics.Ex.Gdip,
   ACL.UI.Forms,
   ACL.Utils.Common,
   ACL.Utils.FileSystem;

@@ -28,7 +28,7 @@ uses
   ACL.Classes,
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.Gdiplus,
+  ACL.Graphics.Ex.Gdip,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Resources;
 

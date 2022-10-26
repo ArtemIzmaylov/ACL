@@ -31,7 +31,7 @@ uses
   ACL.Classes.Timer,
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.Gdiplus,
+  ACL.Graphics.Ex.Gdip,
   ACL.Math,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.CompoundControl,

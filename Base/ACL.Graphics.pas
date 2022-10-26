@@ -20,20 +20,19 @@ uses
   Winapi.Windows,
   Winapi.Messages,
   // Vcl
-  Vcl.Graphics,
 {$IFNDEF ACL_BASE_NOVCL}
   Vcl.Controls,
 {$ENDIF}
+  Vcl.Graphics,
   // System
-  System.UITypes,
-  System.Types,
-  System.SysUtils,
   System.Classes,
   System.Math,
+  System.SysUtils,
+  System.Types,
+  System.UITypes,
   // ACL
   ACL.Classes.Collections,
   ACL.Geometry,
-  ACL.Graphics.Gdiplus,
   ACL.Utils.Common,
   ACL.Utils.FileSystem;
 
@@ -309,6 +308,7 @@ type
     class procedure ApplyColorSchema(var AColor: TColor; const AValue: TACLColorSchema); overload;
     class procedure ApplyColorSchema(var AColor: TRGBQuad; const AValue: TACLColorSchema); overload;
     class function ArePremultiplied(AColors: PRGBQuad; ACount: Integer): Boolean;
+    class procedure Flip(AColors: PRGBQuadArray; AWidth, AHeight: Integer; AHorizontally, AVertically: Boolean);
     class procedure Flush(var Q: TRGBQuad); inline; static;
     class procedure Grayscale(Q: PRGBQuad; ACount: Integer); overload; static;
     class procedure Grayscale(var Q: TRGBQuad); overload; inline; static;
@@ -396,8 +396,8 @@ procedure acDrawFrame(DC: HDC; ARect: TRect; AColor: TColor; AThickness: Integer
 procedure acDrawFrame(DC: HDC; ARect: TRect; AColor: TAlphaColor; AThickness: Integer = 1); overload;
 procedure acDrawFrameEx(DC: HDC; const ARect: TRect; AColor: TColor; ABorders: TACLBorders; AThickness: Integer = 1); overload;
 procedure acDrawFrameEx(DC: HDC; ARect: TRect; AColor: TAlphaColor; ABorders: TACLBorders; AThickness: Integer = 1); overload;
-procedure acDrawGradient(DC: HDC; const ARect: TRect; AFrom, ATo: TColor; AMode: TGpLinearGradientMode = gmVertical); overload;
-procedure acDrawGradient(DC: HDC; const ARect: TRect; AFrom, ATo: TAlphaColor; AMode: TGpLinearGradientMode = gmVertical); overload;
+procedure acDrawGradient(DC: HDC; const ARect: TRect; AFrom, ATo: TColor; AVertical: Boolean = True); overload;
+procedure acDrawGradient(DC: HDC; const ARect: TRect; AFrom, ATo: TAlphaColor; AVertical: Boolean = True); overload;
 procedure acDrawHatch(DC: HDC; const R: TRect); overload;
 procedure acDrawHatch(DC: HDC; const R: TRect; AColor1, AColor2: TColor; ASize: Integer); overload;
 procedure acDrawHueColorBar(ACanvas: TCanvas; const R: TRect);
@@ -497,11 +497,12 @@ function ScreenCanvas: TACLScreenCanvas;
 implementation
 
 uses
-  StrUtils,
+  System.StrUtils,
   // ACL
   ACL.FastCode,
   ACL.Math,
-  ACL.Graphics.Layers,
+  ACL.Graphics.Ex,
+  ACL.Graphics.Ex.Gdip,
   ACL.Utils.Strings,
   ACL.Utils.Strings.Transcode,
   ACL.Utils.DPIAware;
@@ -1900,7 +1901,7 @@ begin
   acDrawFrameEx(DC, acRectContent(R, 1, ABorders), AColor2, ABorders);
 end;
 
-procedure acDrawGradient(DC: HDC; const ARect: TRect; AFrom, ATo: TColor; AMode: TGpLinearGradientMode = gmVertical);
+procedure acDrawGradient(DC: HDC; const ARect: TRect; AFrom, ATo: TColor; AVertical: Boolean = True);
 begin
   if AFrom = clNone then
     acFillRect(DC, ARect, ATo)
@@ -1908,10 +1909,12 @@ begin
     if (ATo = clNone) or (AFrom = ATo) then
       acFillRect(DC, ARect, AFrom)
     else
-      acDrawGradient(DC, ARect, TAlphaColor.FromColor(AFrom), TAlphaColor.FromColor(ATo), AMode);
+      acDrawGradient(DC, ARect, TAlphaColor.FromColor(AFrom), TAlphaColor.FromColor(ATo), AVertical);
 end;
 
-procedure acDrawGradient(DC: HDC; const ARect: TRect; AFrom, ATo: TAlphaColor; AMode: TGpLinearGradientMode = gmVertical);
+procedure acDrawGradient(DC: HDC; const ARect: TRect; AFrom, ATo: TAlphaColor; AVertical: Boolean = True);
+const
+  ModeMap: array[Boolean] of TGpLinearGradientMode = (gmHorizontal, gmVertical);
 begin
   if (AFrom = ATo) or not AFrom.IsValid then
     acFillRect(DC, ARect, ATo)
@@ -1919,7 +1922,7 @@ begin
     if ATo.IsValid then
     begin
       GpPaintCanvas.BeginPaint(DC);
-      GpPaintCanvas.FillRectangleByGradient(AFrom, ATo, ARect, AMode);
+      GpPaintCanvas.FillRectangleByGradient(AFrom, ATo, ARect, ModeMap[AVertical]);
       GpPaintCanvas.EndPaint;
     end
     else
@@ -2870,6 +2873,49 @@ begin
   end;
 end;
 
+class procedure TACLColors.Flip(AColors: PRGBQuadArray; AWidth, AHeight: Integer; AHorizontally, AVertically: Boolean);
+var
+  I: Integer;
+  Q1, Q2, Q3: PRGBQuad;
+  Q4: TRGBQuad;
+  RS: Integer;
+begin
+  if AVertically then
+  begin
+    Q1 := @AColors^[0];
+    Q2 := @AColors^[(AHeight - 1) * AWidth];
+    RS := AWidth * SizeOf(TRGBQuad);
+    Q3 := AllocMem(RS);
+    try
+      while NativeUInt(Q1) < NativeUInt(Q2) do
+      begin
+        FastMove(Q2^, Q3^, RS);
+        FastMove(Q1^, Q2^, RS);
+        FastMove(Q3^, Q1^, RS);
+        Inc(Q1, AWidth);
+        Dec(Q2, AWidth);
+      end;
+    finally
+      FreeMem(Q3, RS);
+    end;
+  end;
+
+  if AHorizontally then
+    for I := 0 to AHeight - 1 do
+    begin
+      Q1 := @AColors^[I * AWidth];
+      Q2 := @AColors^[I * AWidth + AWidth - 1];
+      while NativeUInt(Q1) < NativeUInt(Q2) do
+      begin
+        Q4  := Q2^;
+        Q2^ := Q1^;
+        Q1^ := Q4;
+        Inc(Q1);
+        Dec(Q2);
+      end;
+    end;
+end;
+
 class procedure TACLColors.Flush(var Q: TRGBQuad);
 begin
   PCardinal(@Q)^ := 0;
@@ -3313,7 +3359,6 @@ begin
     Result := AtomicExchange(Cache[AIndex], 0);
     Inc(AIndex);
   end;
-
   if Result = 0 then
     Result := CreateRectRgn(0, 0, 0, 0);
 end;

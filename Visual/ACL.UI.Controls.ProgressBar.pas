@@ -110,7 +110,7 @@ uses
   // ACL
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.Gdiplus,
+  ACL.Graphics.Ex.Gdip,
   ACL.UI.Forms,
   ACL.Utils.Common,
   ACL.Utils.FileSystem;

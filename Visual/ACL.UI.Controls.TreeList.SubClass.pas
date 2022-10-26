@@ -1107,7 +1107,7 @@ uses
   System.Character,
   System.Math,
   // ACL
-  ACL.Graphics.Gdiplus,
+  ACL.Graphics.Ex.Gdip,
   ACL.Math,
   ACL.Threading.Sorting,
   ACL.UI.Controls.TreeList.SubClass.DragAndDrop,

@@ -33,7 +33,7 @@ uses
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.FontCache,
-  ACL.Graphics.Layers,
+  ACL.Graphics.Ex,
   ACL.Math,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.CompoundControl,

@@ -33,7 +33,7 @@ uses
   ACL.FastCode,
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.Layers,
+  ACL.Graphics.Ex,
   ACL.Graphics.SkinImage,
   ACL.Math,
   ACL.UI.Controls.BaseControls,
