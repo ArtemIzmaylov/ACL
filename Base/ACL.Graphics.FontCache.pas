@@ -50,6 +50,7 @@ type
     Style: TFontStyles;
     TargetDPI: Integer;
 
+    class function Create(AFont: TFont): TACLFontData; static;
     function ToString: string;
   end;
 
@@ -127,7 +128,6 @@ type
     class function CreateFontHandle(const AFontData: TACLFontData): HFONT;
     class function CreateFontInfo(const AFontData: TACLFontData): TACLFontInfo;
     class function CreateFontInfoCore(const AFontData: TACLFontData; const AFontHandle: HFONT): TACLFontInfo;
-    class function GetFontData(AFont: TFont): TACLFontData; inline;
     class procedure StartLoader;
     class procedure WaitForLoader(ACancel: Boolean = False);
   public
@@ -246,6 +246,19 @@ begin
 end;
 
 { TACLFontData }
+
+class function TACLFontData.Create(AFont: TFont): TACLFontData;
+begin
+  Result.Charset := AFont.Charset;
+  Result.Height := AFont.Height;
+  Result.Name := AFont.Name;
+  Result.TargetDPI := acDefaultDPI;
+  Result.Orientation := AFont.Orientation;
+  Result.Pitch := AFont.Pitch;
+  Result.Quality := AFont.Quality;
+  Result.Style := AFont.Style;
+  TACLFontCache.RemapFont(Result.Name, Result.Height);
+end;
 
 function TACLFontData.ToString: string;
 begin
@@ -417,7 +430,7 @@ var
 begin
   FLock.Enter;
   try
-    AFontData := GetFontData(AFont);
+    AFontData := TACLFontData.Create(AFont);
     if not FFontDataToFontInfo.TryGetValue(AFontData, Result) then
     begin
     {$IFDEF ACL_LOG_FONTCACHE}
@@ -497,7 +510,7 @@ begin
   {$IFDEF ACL_LOG_FONTCACHE}
     AddToDebugLog('FontCache', 'GetSubstituteFont(%s -> %s)', [AFontInfo.Font.Name, ASuggestedFontName]);
   {$ENDIF}
-    AFontData := GetFontData(AFontInfo.Font);
+    AFontData := TACLFontData.Create(AFontInfo.Font);
     AFontData.Name := ASuggestedFontName;
     Result := GetInfo(AFontData);
   end
@@ -654,19 +667,6 @@ begin
   end;
   Result := TACLFontInfo.Create(AFontHandle, AGlyphSet);
   FFontDataToFontInfo.Add(AFontData, Result);
-end;
-
-class function TACLFontCache.GetFontData(AFont: TFont): TACLFontData;
-begin
-  Result.Charset := AFont.Charset;
-  Result.Height := AFont.Height;
-  Result.Name := AFont.Name;
-  Result.TargetDPI := acDefaultDPI;
-  Result.Orientation := AFont.Orientation;
-  Result.Pitch := AFont.Pitch;
-  Result.Quality := AFont.Quality;
-  Result.Style := AFont.Style;
-  RemapFont(Result.Name, Result.Height);
 end;
 
 class procedure TACLFontCache.StartLoader;

@@ -1883,7 +1883,7 @@ begin
   begin
     GdipCreateFromHDC(DC, AHandle);
     GdipFillRectangleI(AHandle,
-      TACLGdiplusSolidBrushCache.GetOrCreate(AColor),
+      TACLGdiplusResourcesCache.BrushGet(AColor),
       ARect.Left, ARect.Top, acRectWidth(ARect), acRectHeight(ARect));
     GdipDeleteGraphics(AHandle);
   end;
@@ -1914,7 +1914,7 @@ end;
 
 procedure acDrawGradient(DC: HDC; const ARect: TRect; AFrom, ATo: TAlphaColor; AVertical: Boolean = True);
 const
-  ModeMap: array[Boolean] of TGpLinearGradientMode = (gmHorizontal, gmVertical);
+  ModeMap: array[Boolean] of TLinearGradientMode = (gmHorizontal, gmVertical);
 begin
   if (AFrom = ATo) or not AFrom.IsValid then
     acFillRect(DC, ARect, ATo)

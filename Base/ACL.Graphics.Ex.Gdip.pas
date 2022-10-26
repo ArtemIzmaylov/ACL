@@ -30,61 +30,41 @@ uses
   // Vcl
   Vcl.Graphics,
   // ACL
+  ACL.Classes,
   ACL.Classes.Collections,
-  ACL.Math;
+  ACL.Classes.StringList,
+  ACL.FastCode,
+  ACL.Geometry,
+  ACL.Graphics,
+  ACL.Graphics.Ex,
+  ACL.Graphics.FontCache,
+  ACL.Graphics.Images,
+  ACL.Math,
+  ACL.Utils.Common,
+  ACL.Utils.FileSystem,
+  ACL.Utils.Stream;
 
-type
-  GpHandle = type Pointer;
+{$REGION 'Aliases'}
+const
+  pomInvalid     = PixelOffsetModeInvalid;
+  pomDefault     = PixelOffsetModeDefault;
+  pomHighSpeed   = PixelOffsetModeHighSpeed;
+  pomHighQuality = PixelOffsetModeHighQuality;
+  pomNone        = PixelOffsetModeNone;
+  pomHalf        = PixelOffsetModeHalf;
 
-  TGpSmoothingMode = (
-    smInvalid      = -1,
-    smDefault      = 0,
-    smHighSpeed    = 1,
-    smHighQuality  = 2,
-    smNone         = 3,
-    smAntiAlias    = 4
-  );
+  smInvalid      = SmoothingModeInvalid;
+  smDefault      = SmoothingModeDefault;
+  smHighSpeed    = SmoothingModeHighSpeed;
+  smHighQuality  = SmoothingModeHighQuality;
+  smNone         = SmoothingModeNone;
+  smAntiAlias    = SmoothingModeAntiAlias;
 
-  TGpInterpolationMode = (
-    imDefault             = 0,
-    imLowQuality          = 1,
-    imHighQuality         = 2,
-    imBilinear            = 3,
-    imBicubic             = 4,
-    imNearestNeighbor     = 5,
-    imHighQualityBilinear = 6,
-    imHighQualityBicubic  = 7
-  );
-
-  TGpPixelOffsetMode = (
-    pomInvalid     = Ord(QualityModeInvalid),
-    pomDefault     = Ord(QualityModeDefault),
-    pomHighSpeed   = Ord(QualityModeLow),
-    pomHighQuality = Ord(QualityModeHigh),
-    pomNone        = Ord(QualityModeHigh) + 1, // No pixel offset
-    pomHalf        = Ord(QualityModeHigh) + 2  // Offset by -0.5, -0.5 for fast anti-alias perf
-  );
-
-  TGpCompositingMode = (
-    cmSourceOver = 0,
-    cmSourceCopy = 1
-  );
-
-  TGpLinearGradientMode = (
-    gmHorizontal = 0,
-    gmVertical = 1,
-    gmForwardDiagonal = 2,
-    gmBackwardDiagonal = 3
-  );
-
-  TGpTextRenderingHint = (
-    trhSystemDefault,                // Glyph with system default rendering hint
-    trhSingleBitPerPixelGridFit,     // Glyph bitmap with hinting
-    trhSingleBitPerPixel,            // Glyph bitmap without hinting
-    trhAntiAliasGridFit,             // Glyph anti-alias bitmap with hinting
-    trhAntiAlias,                    // Glyph anti-alias bitmap without hinting
-    trhClearTypeGridFit              // Glyph CT bitmap with hinting
-  );
+  gmBackwardDiagonal = LinearGradientModeBackwardDiagonal;
+  gmForwardDiagonal  = LinearGradientModeForwardDiagonal;
+  gmHorizontal       = LinearGradientModeHorizontal;
+  gmVertical         = LinearGradientModeVertical;
+{$ENDREGION}
 
 type
 
@@ -99,145 +79,133 @@ type
     property Status: GpStatus read FStatus;
   end;
 
-  { TACLGdiplusObject }
+{$REGION 'GDI+ Cache'}
 
-  TACLGdiplusObject = class
+  { TACLGdiplusResourcesCache }
+
+  TACLGdiplusResourcesCache = class
+  strict private type
+  {$REGION 'Internal Types'}
+    TPenKey = record
+      Color: TAlphaColor;
+      Style: TACL2DRenderStrokeStyle;
+      Width: Single;
+    end;
+  {$ENDREGION}
+  strict private
+    class var FBrushes: TACLValueCacheManager<TAlphaColor, GpBrush>;
+    class var FFonts: TACLValueCacheManager<TACLFontData, GpFont>;
+    class var FPens: TACLValueCacheManager<TPenKey, GpPen>;
+
+    class procedure HandlerOnRemoveBrush(Sender: TObject; const ABrush: GpBrush);
+    class procedure HandlerOnRemoveFont(Sender: TObject; const AFont: GpFont);
+    class procedure HandlerOnRemovePen(Sender: TObject; const APen: GpPen);
   public
-    class function NewInstance: TObject; override;
-    procedure FreeInstance; override;
+    class procedure Flush;
+    class function BrushGet(AColor: TAlphaColor): GpBrush;
+    class function FontGet(const AFont: TACLFontData): GpFont; overload;
+    class function FontGet(const AFont: TFont): GpFont; overload;
+    class function PenGet(Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle): GpPen;
   end;
 
-  { TACLGdiplusCustomGraphicObject }
+{$ENDREGION}
 
-  TACLGdiplusCustomGraphicObject = class(TACLGdiplusObject)
+{$REGION '2D Render'}
+
+  { TACLGdiplusRender }
+
+  TACLGdiplusRender = class(TACL2DRender)
   strict private
-    FChangeLockCount: Integer;
-    FHandle: GpHandle;
+    FSavedClipRegion: TStack;
+    FSavedWorldTransforms: TStack;
 
-    FOnChange: TNotifyEvent;
-
-    function GetHandle: GpHandle;
-    function GetHandleAllocated: Boolean;
+    function GetInterpolationMode: TInterpolationMode;
+    function GetPixelOffsetMode: TPixelOffsetMode;
+    function GetSmoothingMode: TSmoothingMode;
+    procedure SetInterpolationMode(AValue: TInterpolationMode);
+    procedure SetPixelOffsetMode(AValue: TPixelOffsetMode);
+    procedure SetSmoothingMode(AValue: TSmoothingMode);
   protected
-    procedure Changed; virtual;
-    procedure DoCreateHandle(out AHandle: GpHandle); virtual; abstract;
-    procedure DoFreeHandle(AHandle: GpHandle); virtual; abstract;
-  public
-    procedure BeforeDestruction; override;
-    procedure FreeHandle;
-    procedure HandleNeeded; virtual;
-    //
-    property Handle: GpHandle read GetHandle;
-    property HandleAllocated: Boolean read GetHandleAllocated;
-    property OnChange: TNotifyEvent read FOnChange write FOnChange;
-  end;
-
-  { TACLGdiplusBrush }
-
-  TACLGdiplusBrush = class(TACLGdiplusCustomGraphicObject)
-  strict private
-    FColor: TAlphaColor;
-
-    procedure SetColor(AValue: TAlphaColor);
-  protected
-    procedure DoCreateHandle(out AHandle: GpHandle); override;
-    procedure DoFreeHandle(AHandle: GpHandle); override;
-  public
-    procedure AfterConstruction; override;
-    //
-    property Color: TAlphaColor read FColor write SetColor;
-  end;
-
-  { TACLGdiplusPen }
-
-  TACLGdiplusPenStyle = (gpsSolid, gpsDash, gpsDot, gpsDashDot, gpsDashDotDot);
-
-  TACLGdiplusPen = class(TACLGdiplusCustomGraphicObject)
-  strict private
-    FColor: TAlphaColor;
-    FStyle: TACLGdiplusPenStyle;
-    FWidth: Single;
-
-    procedure SetColor(AValue: TAlphaColor);
-    procedure SetStyle(AValue: TACLGdiplusPenStyle);
-    procedure SetWidth(AValue: Single);
-  protected
-    procedure DoCreateHandle(out AHandle: GpHandle); override;
-    procedure DoFreeHandle(AHandle: GpHandle); override;
-    procedure DoSetDashStyle(AHandle: GpHandle);
-  public
-    procedure AfterConstruction; override;
-    //
-    property Color: TAlphaColor read FColor write SetColor;
-    property Style: TACLGdiplusPenStyle read FStyle write SetStyle;
-    property Width: Single read FWidth write SetWidth;
-  end;
-
-  { TACLGdiplusCanvas }
-
-  TACLGdiplusCanvas = class(TACLGdiplusObject)
-  strict private
-    FBrush: TACLGdiplusBrush;
-    FPen: TACLGdiplusPen;
-
-    function GetInterpolationMode: TGpInterpolationMode;
-    function GetPixelOffsetMode: TGpPixelOffsetMode;
-    function GetSmoothingMode: TGpSmoothingMode;
-    procedure SetInterpolationMode(const Value: TGpInterpolationMode);
-    procedure SetSmoothingMode(const Value: TGpSmoothingMode);
-    procedure SetPixelOffsetMode(const Value: TGpPixelOffsetMode);
-  protected
-    FHandle: GpGraphics;
+    FGraphics: GpGraphics;
   public
     constructor Create; overload; virtual;
     constructor Create(DC: HDC); overload;
-    constructor Create(AHandle: GpGraphics); overload;
+    constructor Create(Graphics: GpGraphics); overload;
     destructor Destroy; override;
 
-    // Closed Curve
-    procedure FillClosedCurve2(ABrush: TACLGdiplusBrush; const APoints: array of TPoint; ATension: Single); overload;
-    procedure FillClosedCurve2(AColor: TAlphaColor; const APoints: array of TPoint; ATension: Single); overload;
-    procedure DrawClosedCurve2(APen: TACLGdiplusPen; const APoints: array of TPoint; ATension: Single); overload;
-    procedure DrawClosedCurve2(APenColor: TAlphaColor; const APoints: array of TPoint; ATension: Single;
-      APenStyle: TACLGdiplusPenStyle = gpsSolid; APenWidth: Single = 1.0); overload;
+    // Clipping
+    function IsVisible(const R: TRect): Boolean; override;
+    function IntersectClipRect(const R: TRect): Boolean; override;
+    procedure RestoreClipRegion; override;
+    procedure SaveClipRegion; override;
 
-    // Curve
-    procedure DrawCurve2(APen: TACLGdiplusPen; APoints: array of TPoint; ATension: Single); overload;
-    procedure DrawCurve2(APenColor: TAlphaColor; APoints: array of TPoint; ATension: Single;
-      APenStyle: TACLGdiplusPenStyle = gpsSolid; APenWidth: Single = 1.0); overload;
+    // Images
+    function CreateImage(Colors: PRGBQuad; Width, Height: Integer;
+      AlphaFormat: TAlphaFormat = afDefined): TACL2DRenderImage; override;
+    function CreateImage(Image: TACLImage): TACL2DRenderImage; override;
+    function CreateImageAttributes: TACL2DRenderImageAttributes; override;
+    procedure DrawImage(Image: TACL2DRenderImage; const TargetRect, SourceRect: TRect;
+      Attributes: TACL2DRenderImageAttributes = nil); override;
 
-    // Lines
-    procedure DrawLine(APen: TACLGdiplusPen; X1, Y1, X2, Y2: Integer); overload;
-    procedure DrawLine(APenColor: TAlphaColor; X1, Y1, X2, Y2: Integer;
-      APenStyle: TACLGdiplusPenStyle = gpsSolid; APenWidth: Single = 1.0); overload;
-    procedure DrawLine(APenColor: TAlphaColor; const APoints: array of TPoint;
-      APenStyle: TACLGdiplusPenStyle = gpsSolid; APenWidth: Single = 1.0); overload;
+    // Curves
+    procedure DrawCurve2(APenColor: TAlphaColor; APoints: array of TPoint;
+      ATension: Single; APenStyle: TACL2DRenderStrokeStyle = ssSolid; APenWidth: Single = 1.0);
+    procedure DrawClosedCurve2(APenColor: TAlphaColor; const APoints: array of TPoint;
+      ATension: Single; APenStyle: TACL2DRenderStrokeStyle = ssSolid; APenWidth: Single = 1.0);
+    procedure FillClosedCurve2(AColor: TAlphaColor; const APoints: array of TPoint; ATension: Single);
 
     // Ellipse
-    procedure DrawEllipse(APen: TACLGdiplusPen; const R: TRect); overload;
-    procedure DrawEllipse(APenColor: TAlphaColor; const R: TRect;
-      APenStyle: TACLGdiplusPenStyle = gpsSolid; APenWidth: Single = 1.0); overload;
-    procedure FillEllipse(ABrush: TACLGdiplusBrush; const R: TRect); overload;
-    procedure FillEllipse(AColor: TAlphaColor; const R: TRect); overload;
+    procedure DrawEllipse(X1, Y1, X2, Y2: Single; Color: TAlphaColor;
+      StrokeWidth: Single = 1; StrokeStyle: TACL2DRenderStrokeStyle = ssSolid); override;
+    procedure FillEllipse(X1, Y1, X2, Y2: Single; Color: TAlphaColor); override;
+
+    // Line
+    procedure Line(X1, Y1, X2, Y2: Single; Color: TAlphaColor;
+      Width: Single = 1; Style: TACL2DRenderStrokeStyle = ssSolid); override;
+    procedure Line(const Points: PPoint; Count: Integer; Color: TAlphaColor;
+      Width: Single = 1; Style: TACL2DRenderStrokeStyle = ssSolid); override;
 
     // Rectangle
-    procedure FillRectangle(ABrush: TACLGdiplusBrush; const R: TRect; AMode: TGpCompositingMode = cmSourceOver); overload;
-    procedure FillRectangle(AColor: TAlphaColor; const R: TRect; AMode: TGpCompositingMode = cmSourceOver); overload;
-    procedure FillRectangleByGradient(AColor1, AColor2: TAlphaColor; const R: TRect; AMode: TGpLinearGradientMode);
-    procedure DrawRectangle(APen: TACLGdiplusPen; const R: TRect); overload;
-    procedure DrawRectangle(APenColor: TAlphaColor; const R: TRect;
-      APenStyle: TACLGdiplusPenStyle = gpsSolid; APenWidth: Single = 1.0); overload;
+    procedure DrawRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor;
+      StrokeWidth: Single = 1; StrokeStyle: TACL2DRenderStrokeStyle = ssSolid); override;
+    procedure FillRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor); override;
+    procedure FillRectangleByGradient(AColor1, AColor2: TAlphaColor; const R: TRect; AMode: TLinearGradientMode);
 
     // Text
-    procedure TextOut(const AText: UnicodeString; const R: TRect; AFont: TFont; AHorzAlign: TAlignment;
-      AVertAlign: TVerticalAlignment; AWordWrap: Boolean; ATextColor: TAlphaColor;
-      ARendering: TGpTextRenderingHint = trhSystemDefault);
+    procedure DrawText(const Text: string; const R: TRect; Color: TAlphaColor; Font: TFont;
+      HorzAlign: TAlignment = taLeftJustify; VertAlgin: TVerticalAlignment = taVerticalCenter;
+      WordWrap: Boolean = False); override;
 
-    property Handle: GpGraphics read FHandle;
-    property InterpolationMode: TGpInterpolationMode read GetInterpolationMode write SetInterpolationMode;
-    property PixelOffsetMode: TGpPixelOffsetMode read GetPixelOffsetMode write SetPixelOffsetMode;
-    property SmoothingMode: TGpSmoothingMode read GetSmoothingMode write SetSmoothingMode;
+    // Path
+    function CreatePath: TACL2DRenderPath; override;
+    procedure DrawPath(Path: TACL2DRenderPath; Color: TAlphaColor;
+      Width: Single = 1; Style: TACL2DRenderStrokeStyle = ssSolid); override;
+    procedure FillPath(Path: TACL2DRenderPath; Color: TAlphaColor); override;
+
+    // Polygon
+    procedure DrawPolygon(const Points: array of TPoint; Color: TAlphaColor;
+      Width: Single = 1; Style: TACL2DRenderStrokeStyle = ssSolid); override;
+    procedure FillPolygon(const Points: array of TPoint; Color: TAlphaColor); override;
+
+    // World Transform
+    procedure ModifyWorldTransform(const XForm: TXForm); override;
+    procedure RestoreWorldTransform; override;
+    procedure SaveWorldTransform; override;
+    procedure ScaleWorldTransform(ScaleX, ScaleY: Single); override;
+    procedure TransformPoints(Points: PPointF; Count: Integer); override;
+    procedure TranslateWorldTransform(OffsetX, OffsetY: Single); override;
+
+    property NativeHandle: GpGraphics read FGraphics;
+    property InterpolationMode: TInterpolationMode read GetInterpolationMode write SetInterpolationMode;
+    property PixelOffsetMode: TPixelOffsetMode read GetPixelOffsetMode write SetPixelOffsetMode;
+    property SmoothingMode: TSmoothingMode read GetSmoothingMode write SetSmoothingMode;
   end;
+
+{$ENDREGION}
+
+  { TACLGdiplusCanvas }
+
+  TACLGdiplusCanvas = TACLGdiplusRender;
 
   { TACLGdiplusPaintCanvas }
 
@@ -258,19 +226,6 @@ type
     function Stat(out AStatStg: TStatStg; AStatFlag: DWORD): HResult; override; stdcall;
   end;
 
-  { TACLGdiplusSolidBrushCache }
-
-  TACLGdiplusSolidBrushCache = class
-  strict private
-    class var FInstance: TACLValueCacheManager<TAlphaColor, GpBrush>;
-
-    class procedure RemoveValueHandler(Sender: TObject; const ABrush: GpBrush);
-  public
-    class destructor Destroy;
-    class procedure Flush;
-    class function GetOrCreate(AColor: TAlphaColor): GpBrush;
-  end;
-
 var
   GpDefaultColorMatrix: TColorMatrix = (
     (1.0, 0.0, 0.0, 0.0, 0.0),
@@ -279,13 +234,12 @@ var
     (0.0, 0.0, 0.0, 1.0, 0.0),
     (0.0, 0.0, 0.0, 0.0, 1.0)
   );
+  GpPaintCanvas: TACLGdiplusPaintCanvas;
 
 procedure GdipCheck(AStatus: GpStatus);
-function GpPaintCanvas: TACLGdiplusPaintCanvas;
-
 function GpCreateBitmap(AWidth, AHeight: Integer; ABits: PByte = nil; APixelFormat: Integer = PixelFormat32bppPARGB): GpImage;
 function GpGetCodecByMimeType(const AMimeType: UnicodeString; out ACodecID: TGUID): Boolean;
-procedure GpFillRect(DC: HDC; const R: TRect; AColor: TAlphaColor; AMode: TGpCompositingMode = cmSourceOver);
+procedure GpFillRect(DC: HDC; const R: TRect; AColor: TAlphaColor);
 procedure GpFocusRect(DC: HDC; const R: TRect; AColor: TAlphaColor);
 procedure GpFrameRect(DC: HDC; const R: TRect; AColor: TAlphaColor; AFrameSize: Integer);
 procedure GpDrawImage(AGraphics: GpGraphics; AImage: GpImage; AImageAttributes: GpImageAttributes;
@@ -295,36 +249,59 @@ procedure GpDrawImage(AGraphics: GpGraphics; AImage: GpImage;
 implementation
 
 uses
-  System.Math,
-  // ACL
-  ACL.Classes,
-  ACL.Classes.StringList,
-  ACL.FastCode,
-  ACL.Geometry,
-  ACL.Graphics,
-  ACL.Utils.Common,
-  ACL.Utils.FileSystem,
-  ACL.Utils.Strings,
-  ACL.Utils.Stream;
+  System.Math;
 
 const
   sErrorInvalidGdipOperation = 'Invalid operation in GDI+ (Code: %d)';
   sErrorPaintCanvasAlreadyBusy = 'PaintCanvas is already busy!';
 
-var
-  FPaintCanvas: TACLGdiplusPaintCanvas;
+type
+  TACLImageAccess = class(TACLImage);
+
+{$REGION '2D Render'}
+
+  { TACLGdiplusRenderImage }
+
+  TACLGdiplusRenderImage = class(TACL2DRenderImage)
+  protected
+    FHandle: GpImage;
+  public
+    constructor Create(AOwner: TACL2DRender; AHandle: GpImage);
+    destructor Destroy; override;
+  end;
+
+  { TACLGdiplusRenderImageAttributes }
+
+  TACLGdiplusRenderImageAttributes = class(TACL2DRenderImageAttributes)
+  protected
+    FHandle: GpImageAttributes;
+  public
+    constructor Create(AOwner: TACL2DRender);
+    destructor Destroy; override;
+    procedure SetColorMatrix(const AColorMatrix: ColorMatrix); override;
+  end;
+
+  { TACLGdiplusRenderPath }
+
+  TACLGdiplusRenderPath = class(TACL2DRenderPath)
+  protected
+    Handle: GpPath;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure AddArc(const X, Y, Width, Height, StartAngle, SweepAngle: Single); override;
+    procedure AddLine(const X1, Y1, X2, Y2: Single); override;
+    procedure AddRect(const R: TRectF); override;
+    procedure FigureClose; override;
+    procedure FigureStart; override;
+  end;
+
+{$ENDREGION}
 
 procedure GdipCheck(AStatus: GpStatus);
 begin
   if AStatus <> Ok then
     raise EGdipException.Create(AStatus);
-end;
-
-function GpPaintCanvas: TACLGdiplusPaintCanvas;
-begin
-  if FPaintCanvas = nil then
-    FPaintCanvas := TACLGdiplusPaintCanvas.Create;
-  Result := FPaintCanvas;
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -341,13 +318,13 @@ end;
 // Fill Rect
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure GpFillRect(DC: HDC; const R: TRect; AColor: TAlphaColor; AMode: TGpCompositingMode = cmSourceOver);
+procedure GpFillRect(DC: HDC; const R: TRect; AColor: TAlphaColor);
 begin
-  if (AColor <> TAlphaColor.None) or (AMode = cmSourceCopy) then
+  if AColor.IsValid then
   begin
     GpPaintCanvas.BeginPaint(DC);
     try
-      GpPaintCanvas.FillRectangle(AColor, R, AMode);
+      GpPaintCanvas.FillRectangle(R, AColor);
     finally
       GpPaintCanvas.EndPaint;
     end;
@@ -360,7 +337,7 @@ begin
   begin
     GpPaintCanvas.BeginPaint(DC);
     try
-      GpPaintCanvas.DrawRectangle(AColor, R, gpsSolid, AFrameSize);
+      GpPaintCanvas.DrawRectangle(R, AColor, AFrameSize);
     finally
       GpPaintCanvas.EndPaint;
     end;
@@ -378,7 +355,7 @@ begin
     try
       GpPaintCanvas.BeginPaint(DC);
       try
-        GpPaintCanvas.DrawRectangle(AColor, R, gpsDot);
+        GpPaintCanvas.DrawRectangle(R, AColor, 1, ssDot);
       finally
         GpPaintCanvas.EndPaint;
       end;
@@ -544,7 +521,7 @@ begin
       begin
         for I := 1 to ACount do
         begin
-          if acSameText(PWideChar(ACodecInfo^.MimeType), AMimeType) then
+          if SameText(PWideChar(ACodecInfo^.MimeType), AMimeType) then
           begin
             ACodecID := ACodecInfo^.Clsid;
             Exit(True);
@@ -555,7 +532,7 @@ begin
     finally
       FreeMem(AStartInfo, ASize);
     end;
-    if acSameText(AMimeType, 'image/jpg') then
+    if SameText(AMimeType, 'image/jpg') then
       Result := GpGetCodecByMimeType('image/jpeg', ACodecID)
   end;
 end;
@@ -568,301 +545,485 @@ begin
   FStatus := AStatus;
 end;
 
-{ TACLGdiplusObject }
+//----------------------------------------------------------------------------------------------------------------------
+// GDI + Cache
+//----------------------------------------------------------------------------------------------------------------------
 
-class function TACLGdiplusObject.NewInstance: TObject;
-begin
-  Result := InitInstance(GdipAlloc(InstanceSize));
-end;
+{$REGION 'GDI+ Cache'}
 
-procedure TACLGdiplusObject.FreeInstance;
-begin
-  CleanupInstance;
-  GdipFree(Self);
-end;
-
-{ TACLGdiplusCustomGraphicObject }
-
-procedure TACLGdiplusCustomGraphicObject.BeforeDestruction;
-begin
-  inherited BeforeDestruction;
-  FreeHandle;
-end;
-
-procedure TACLGdiplusCustomGraphicObject.FreeHandle;
-begin
-  if HandleAllocated then
-  begin
-    DoFreeHandle(FHandle);
-    FHandle := nil;
-  end;
-end;
-
-procedure TACLGdiplusCustomGraphicObject.HandleNeeded;
-begin
-  if FHandle = nil then
-  begin
-    Inc(FChangeLockCount);
-    try
-      DoCreateHandle(FHandle);
-    finally
-      Dec(FChangeLockCount);
-    end;
-  end;
-end;
-
-procedure TACLGdiplusCustomGraphicObject.Changed;
-begin
-  if FChangeLockCount = 0 then
-    CallNotifyEvent(Self, OnChange);
-end;
-
-function TACLGdiplusCustomGraphicObject.GetHandle: GpHandle;
-begin
-  HandleNeeded;
-  Result := FHandle;
-end;
-
-function TACLGdiplusCustomGraphicObject.GetHandleAllocated: Boolean;
-begin
-  Result := FHandle <> nil;
-end;
-
-{ TACLGdiplusBrush }
-
-procedure TACLGdiplusBrush.AfterConstruction;
-begin
-  inherited AfterConstruction;
-  FColor := TAlphaColor.Black;
-end;
-
-procedure TACLGdiplusBrush.DoCreateHandle(out AHandle: GpHandle);
-begin
-  GdipCheck(GdipCreateSolidFill(Color, GpBrush(AHandle)));
-end;
-
-procedure TACLGdiplusBrush.DoFreeHandle(AHandle: GpHandle);
-begin
-  GdipCheck(GdipDeleteBrush(AHandle));
-end;
-
-procedure TACLGdiplusBrush.SetColor(AValue: TAlphaColor);
-begin
-  if FColor <> AValue then
-  begin
-    FColor := AValue;
-    if HandleAllocated then
-      GdipCheck(GdipSetSolidFillColor(Handle, Color));
-    Changed;
-  end;
-end;
-
-{ TACLGdiplusPen }
-
-procedure TACLGdiplusPen.AfterConstruction;
-begin
-  inherited AfterConstruction;
-  FColor := TAlphaColor.Black;
-  FWidth := 1.0;
-end;
-
-procedure TACLGdiplusPen.DoCreateHandle(out AHandle: GpHandle);
-begin
-  GdipCheck(GdipCreatePen1(Color, Width, UnitPixel, GpPen(AHandle)));
-  DoSetDashStyle(AHandle);
-end;
-
-procedure TACLGdiplusPen.DoFreeHandle(AHandle: GpHandle);
-begin
-  GdipCheck(GdipDeletePen(AHandle));
-end;
-
-procedure TACLGdiplusPen.DoSetDashStyle(AHandle: GpHandle);
+function acCreateFont(const AData: TACLFontData): GpFont;
 const
-  Map: array[TACLGdiplusPenStyle] of TDashStyle = (
+  DefaultTrueTypeFont: PChar = 'Tahoma';
+var
+  AError: GpStatus;
+  ALogFont: TLogFontW;
+begin
+  ZeroMemory(@ALogFont, SizeOf(ALogFont));
+
+  ALogFont.lfHeight := AData.Height;
+  ALogFont.lfEscapement := AData.Orientation;
+  ALogFont.lfOrientation := AData.Orientation;
+  ALogFont.lfWeight := IfThen(fsBold in AData.Style, FW_BOLD, FW_NORMAL);
+  ALogFont.lfItalic := Ord(fsItalic in AData.Style);
+  ALogFont.lfUnderline := Byte(fsUnderline in AData.Style);
+  ALogFont.lfStrikeOut := Byte(fsStrikeOut in AData.Style);
+  ALogFont.lfQuality := Ord(AData.Quality);
+
+  if (AData.Charset = DEFAULT_CHARSET) and (DefFontData.Charset <> DEFAULT_CHARSET) then
+    ALogFont.lfCharSet := DefFontData.Charset
+  else
+    ALogFont.lfCharSet := Byte(AData.Charset);
+
+  ALogFont.lfClipPrecision := CLIP_DEFAULT_PRECIS;
+  if ALogFont.lfOrientation <> 0 then
+    ALogFont.lfOutPrecision := OUT_TT_ONLY_PRECIS
+  else
+    ALogFont.lfOutPrecision := OUT_DEFAULT_PRECIS;
+
+  case AData.Pitch of
+    fpVariable:
+      ALogFont.lfPitchAndFamily := VARIABLE_PITCH;
+    fpFixed:
+      ALogFont.lfPitchAndFamily := FIXED_PITCH;
+  else
+    ALogFont.lfPitchAndFamily := DEFAULT_PITCH;
+  end;
+
+  StrLCopy(@ALogFont.lfFaceName[0], PChar(AData.Name), Length(ALogFont.lfFaceName));
+
+  AError := GdipCreateFontFromLogfontW(MeasureCanvas.Handle, @ALogFont, Result);
+  if AError = NotTrueTypeFont then
+  begin
+    StrLCopy(@ALogFont.lfFaceName[0], DefaultTrueTypeFont, Length(ALogFont.lfFaceName));
+    AError := GdipCreateFontFromLogfontW(MeasureCanvas.Handle, @ALogFont, Result);
+  end;
+  GdipCheck(AError);
+end;
+
+{ TACLGdiplusResourcesCache }
+
+class procedure TACLGdiplusResourcesCache.Flush;
+begin
+  FreeAndNil(FBrushes);
+  FreeAndNil(FFonts);
+  FreeAndNil(FPens);
+end;
+
+class function TACLGdiplusResourcesCache.BrushGet(AColor: TAlphaColor): GpBrush;
+begin
+  if FBrushes = nil then
+  begin
+    FBrushes := TACLValueCacheManager<TAlphaColor, GpBrush>.Create;
+    FBrushes.OnRemove := HandlerOnRemoveBrush;
+  end;
+  if not FBrushes.Get(AColor, Result) then
+  begin
+    GdipCheck(GdipCreateSolidFill(AColor, Result));
+    FBrushes.Add(AColor, Result);
+  end;
+end;
+
+class function TACLGdiplusResourcesCache.FontGet(const AFont: TFont): GpFont;
+begin
+  Result := FontGet(TACLFontData.Create(AFont));
+end;
+
+class function TACLGdiplusResourcesCache.FontGet(const AFont: TACLFontData): GpFont;
+begin
+  if FFonts = nil then
+  begin
+    FFonts := TACLValueCacheManager<TACLFontData, GpFont>.Create(16);
+    FFonts.OnRemove := HandlerOnRemoveFont;
+  end;
+  if not FFonts.Get(AFont, Result) then
+  begin
+    Result := acCreateFont(AFont);
+    FFonts.Add(AFont, Result);
+  end;
+end;
+
+class function TACLGdiplusResourcesCache.PenGet(Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle): GpPen;
+const
+  Map: array[TACL2DRenderStrokeStyle] of TDashStyle = (
     DashStyleSolid, DashStyleDash, DashStyleDot, DashStyleDashDot, DashStyleDashDotDot
   );
-begin
-  GdipCheck(GdipSetPenDashStyle(AHandle, Map[Style]));
-end;
-
-procedure TACLGdiplusPen.SetColor(AValue: TAlphaColor);
-begin
-  if FColor <> AValue then
-  begin
-    FColor := AValue;
-    if HandleAllocated then
-      GdipCheck(GdipSetPenColor(Handle, Color));
-    Changed;
-  end;
-end;
-
-procedure TACLGdiplusPen.SetStyle(AValue: TACLGdiplusPenStyle);
-begin
-  if FStyle <> AValue then
-  begin
-    FStyle := AValue;
-    if HandleAllocated then
-      DoSetDashStyle(Handle);
-    Changed;
-  end;
-end;
-
-procedure TACLGdiplusPen.SetWidth(AValue: Single);
-begin
-  AValue := Max(0, AValue);
-  if AValue <> FWidth then
-  begin
-    FWidth := AValue;
-    if HandleAllocated then
-      GdipCheck(GdipSetPenWidth(Handle, Width));
-    Changed;
-  end;
-end;
-
-{ TACLGdiplusCanvas }
-
-constructor TACLGdiplusCanvas.Create;
-begin
-  inherited Create;
-  FPen := TACLGdiplusPen.Create;
-  FBrush := TACLGdiplusBrush.Create;
-end;
-
-constructor TACLGdiplusCanvas.Create(DC: HDC);
-begin
-  Create;
-  GdipCheck(GdipCreateFromHDC(DC, FHandle));
-end;
-
-constructor TACLGdiplusCanvas.Create(AHandle: GpGraphics);
-begin
-  Create;
-  FHandle := AHandle;
-end;
-
-destructor TACLGdiplusCanvas.Destroy;
-begin
-  FreeAndNil(FPen);
-  FreeAndNil(FBrush);
-  if Handle <> nil then
-    GdipCheck(GdipDeleteGraphics(Handle));
-  inherited Destroy;
-end;
-
-procedure TACLGdiplusCanvas.DrawLine(APen: TACLGdiplusPen; X1, Y1, X2, Y2: Integer);
-begin
-  GdipCheck(GdipDrawLineI(Handle, APen.Handle, X1, Y1, X2, Y2));
-end;
-
-procedure TACLGdiplusCanvas.FillClosedCurve2(ABrush: TACLGdiplusBrush; const APoints: array of TPoint; ATension: Single);
-begin
-  GdipCheck(GdipFillClosedCurve2I(Handle, ABrush.Handle, @APoints[0], Length(APoints), ATension, FillModeWinding));
-end;
-
-procedure TACLGdiplusCanvas.FillClosedCurve2(AColor: TAlphaColor; const APoints: array of TPoint; ATension: Single);
-begin
-  FBrush.Color := AColor;
-  FillClosedCurve2(FBrush, APoints, ATension);
-end;
-
-procedure TACLGdiplusCanvas.DrawClosedCurve2(APen: TACLGdiplusPen; const APoints: array of TPoint; ATension: Single);
-begin
-  GdipCheck(GdipDrawClosedCurve2I(Handle, APen.Handle, @APoints[0], Length(APoints), ATension));
-end;
-
-procedure TACLGdiplusCanvas.DrawClosedCurve2(APenColor: TAlphaColor; const APoints: array of TPoint;
-  ATension: Single; APenStyle: TACLGdiplusPenStyle = gpsSolid; APenWidth: Single = 1.0);
-begin
-  FPen.Color := APenColor;
-  FPen.Style := APenStyle;
-  FPen.Width := APenWidth;
-  DrawClosedCurve2(FPen, APoints, ATension);
-end;
-
-procedure TACLGdiplusCanvas.DrawCurve2(APen: TACLGdiplusPen; APoints: array of TPoint; ATension: Single);
-begin
-  GdipCheck(GdipDrawCurve2I(Handle, APen.Handle, @APoints[0], Length(APoints), ATension));
-end;
-
-procedure TACLGdiplusCanvas.DrawCurve2(APenColor: TAlphaColor; APoints: array of TPoint; ATension: Single;
-  APenStyle: TACLGdiplusPenStyle = gpsSolid; APenWidth: Single = 1.0);
-begin
-  FPen.Color := APenColor;
-  FPen.Style := APenStyle;
-  FPen.Width := APenWidth;
-  DrawCurve2(FPen, APoints, ATension);
-end;
-
-procedure TACLGdiplusCanvas.DrawLine(APenColor: TAlphaColor; X1, Y1, X2, Y2: Integer;
-  APenStyle: TACLGdiplusPenStyle = gpsSolid; APenWidth: Single = 1.0);
-begin
-  FPen.Color := APenColor;
-  FPen.Style := APenStyle;
-  FPen.Width := APenWidth;
-  DrawLine(FPen, X1, Y1, X2, Y2);
-end;
-
-procedure TACLGdiplusCanvas.DrawLine(APenColor: TAlphaColor; const APoints: array of TPoint;
-  APenStyle: TACLGdiplusPenStyle = gpsSolid; APenWidth: Single = 1.0);
-begin
-  FPen.Color := APenColor;
-  FPen.Style := APenStyle;
-  FPen.Width := APenWidth;
-  GdipDrawLinesI(Handle, FPen.Handle, @APoints[0], Length(APoints));
-end;
-
-procedure TACLGdiplusCanvas.DrawEllipse(APen: TACLGdiplusPen; const R: TRect);
-begin
-  GdipDrawEllipseI(Handle, APen.Handle, R.Left, R.Top, R.Width, R.Height);
-end;
-
-procedure TACLGdiplusCanvas.DrawEllipse(APenColor: TAlphaColor; const R: TRect;
-  APenStyle: TACLGdiplusPenStyle = gpsSolid; APenWidth: Single = 1.0);
-begin
-  FPen.Color := APenColor;
-  FPen.Style := APenStyle;
-  FPen.Width := APenWidth;
-  DrawEllipse(FPen, R);
-end;
-
-procedure TACLGdiplusCanvas.FillEllipse(ABrush: TACLGdiplusBrush; const R: TRect);
-begin
-  GdipFillEllipseI(Handle, ABrush.Handle, R.Left, R.Top, R.Width, R.Height);
-end;
-
-procedure TACLGdiplusCanvas.FillEllipse(AColor: TAlphaColor; const R: TRect);
-begin
-  FBrush.Color := AColor;
-  FillEllipse(FBrush, R);
-end;
-
-procedure TACLGdiplusCanvas.FillRectangle(ABrush: TACLGdiplusBrush; const R: TRect; AMode: TGpCompositingMode = cmSourceOver);
 var
-  APrevMode: TCompositingMode;
+  AKey: TPenKey;
 begin
-  if not acRectIsEmpty(R) then
+  if FPens = nil then
   begin
-    GdipGetCompositingMode(Handle, APrevMode);
+    FPens := TACLValueCacheManager<TPenKey, GpPen>.Create(64);
+    FPens.OnRemove := HandlerOnRemovePen;
+  end;
+  AKey.Color := Color;
+  AKey.Style := Style;
+  AKey.Width := Width;
+  if not FPens.Get(AKey, Result) then
+  begin
+    GdipCheck(GdipCreatePen1(AKey.Color, AKey.Width, UnitPixel, Result));
+    GdipCheck(GdipSetPenDashStyle(Result, Map[AKey.Style]));
+    FPens.Add(AKey, Result);
+  end;
+end;
+
+class procedure TACLGdiplusResourcesCache.HandlerOnRemoveBrush(Sender: TObject; const ABrush: GpBrush);
+begin
+  GdipDeleteBrush(ABrush);
+end;
+
+class procedure TACLGdiplusResourcesCache.HandlerOnRemoveFont(Sender: TObject; const AFont: GpFont);
+begin
+  GdipDeleteFont(AFont)
+end;
+
+class procedure TACLGdiplusResourcesCache.HandlerOnRemovePen(Sender: TObject; const APen: GpPen);
+begin
+  GdipDeletePen(APen);
+end;
+
+{$ENDREGION}
+
+//----------------------------------------------------------------------------------------------------------------------
+// 2D Render
+//----------------------------------------------------------------------------------------------------------------------
+
+{$REGION '2D Render'}
+
+{ TACLGdiplusRenderImage }
+
+constructor TACLGdiplusRenderImage.Create(AOwner: TACL2DRender; AHandle: GpImage);
+begin
+  inherited Create(AOwner);
+  FHandle := AHandle;
+  if GdipGetImageHeight(FHandle, Cardinal(FHeight)) <> Ok then
+    FHeight := 0;
+  if GdipGetImageWidth(FHandle, Cardinal(FWidth)) <> Ok then
+    FWidth := 0;
+end;
+
+destructor TACLGdiplusRenderImage.Destroy;
+begin
+  GdipDisposeImage(FHandle);
+  inherited;
+end;
+
+{ TACLGdiplusRenderImageAttributes }
+
+constructor TACLGdiplusRenderImageAttributes.Create(AOwner: TACL2DRender);
+begin
+  inherited Create(AOwner);
+  GdipCheck(GdipCreateImageAttributes(FHandle));
+end;
+
+destructor TACLGdiplusRenderImageAttributes.Destroy;
+begin
+  GdipCheck(GdipDisposeImageAttributes(FHandle));
+  inherited;
+end;
+
+procedure TACLGdiplusRenderImageAttributes.SetColorMatrix(const AColorMatrix: ColorMatrix);
+begin
+  GdipCheck(GdipSetImageAttributesColorMatrix(FHandle, ColorAdjustTypeBitmap, True, @AColorMatrix, nil, ColorMatrixFlagsDefault));
+end;
+
+{ TACLGdiplusRenderPath }
+
+constructor TACLGdiplusRenderPath.Create;
+begin
+  GdipCheck(GdipCreatePath(FillModeAlternate, Handle));
+end;
+
+destructor TACLGdiplusRenderPath.Destroy;
+begin
+  GdipCheck(GdipDeletePath(Handle));
+  inherited;
+end;
+
+procedure TACLGdiplusRenderPath.AddArc(const X, Y, Width, Height, StartAngle, SweepAngle: Single);
+begin
+  GdipCheck(GdipAddPathArc(Handle, X, Y, Width, Height, StartAngle, SweepAngle));
+end;
+
+procedure TACLGdiplusRenderPath.AddLine(const X1, Y1, X2, Y2: Single);
+begin
+  GdipCheck(GdipAddPathLine(Handle, X1, Y1, X2, Y2));
+end;
+
+procedure TACLGdiplusRenderPath.AddRect(const R: TRectF);
+begin
+  GdipCheck(GdipAddPathRectangle(Handle, R.Left, R.Top, R.Width, R.Height));
+end;
+
+procedure TACLGdiplusRenderPath.FigureClose;
+begin
+  GdipCheck(GdipClosePathFigure(Handle));
+end;
+
+procedure TACLGdiplusRenderPath.FigureStart;
+begin
+  GdipCheck(GdipStartPathFigure(Handle));
+end;
+
+{ TACLGdiplusRender }
+
+constructor TACLGdiplusRender.Create;
+begin
+  FSavedClipRegion := TStack.Create;
+  FSavedWorldTransforms := TStack.Create;
+end;
+
+constructor TACLGdiplusRender.Create(Graphics: GpGraphics);
+begin
+  Create;
+  FGraphics := Graphics;
+end;
+
+constructor TACLGdiplusRender.Create(DC: HDC);
+begin
+  Create;
+  GdipCheck(GdipCreateFromHDC(DC, FGraphics));
+end;
+
+destructor TACLGdiplusRender.Destroy;
+begin
+  if FGraphics <> nil then
+    GdipCheck(GdipDeleteGraphics(FGraphics));
+  while FSavedClipRegion.Count > 0 do
+    GdipDeleteRegion(FSavedClipRegion.Pop);
+  while FSavedWorldTransforms.Count > 0 do
+    GdipDeleteMatrix(FSavedWorldTransforms.Pop);
+  FreeAndNil(FSavedWorldTransforms);
+  FreeAndNil(FSavedClipRegion);
+  inherited;
+end;
+
+function TACLGdiplusRender.CreatePath: TACL2DRenderPath;
+begin
+  Result := TACLGdiplusRenderPath.Create;
+end;
+
+{$REGION 'Clipping'}
+function TACLGdiplusRender.IntersectClipRect(const R: TRect): Boolean;
+begin
+  GdipSetClipRectI(FGraphics, R.Left, R.Top, R.Width, R.Height, CombineModeIntersect);
+  Result := IsVisible(R);
+end;
+
+function TACLGdiplusRender.IsVisible(const R: TRect): Boolean;
+var
+  LResult: LongBool;
+begin
+  Result := (GdipIsVisibleRectI(FGraphics, R.Left, R.Top, R.Width, R.Height, LResult) = Ok) and LResult;
+end;
+
+procedure TACLGdiplusRender.RestoreClipRegion;
+var
+  AHandle: GpRegion;
+begin
+  AHandle := FSavedClipRegion.Pop;
+  GdipSetClipRegion(FGraphics, AHandle, CombineModeReplace);
+  GdipDeleteRegion(AHandle);
+end;
+
+procedure TACLGdiplusRender.SaveClipRegion;
+var
+  AHandle: Pointer;
+begin
+  GdipCheck(GdipCreateRegion(AHandle));
+  GdipCheck(GdipGetClip(FGraphics, AHandle));
+  FSavedClipRegion.Push(AHandle);
+end;
+{$ENDREGION}
+
+{$REGION 'World Transform'}
+
+procedure TACLGdiplusRender.ModifyWorldTransform(const XForm: TXForm);
+var
+  AMatrix: GpMatrix;
+begin
+  GdipCheck(GdipCreateMatrix2(XForm.eM11, XForm.eM12, XForm.eM21, XForm.eM22, XForm.eDx, XForm.eDy, AMatrix));
+  GdipCheck(GdipMultiplyWorldTransform(FGraphics, AMatrix, MatrixOrderPrepend));
+  GdipCheck(GdipDeleteMatrix(AMatrix));
+end;
+
+procedure TACLGdiplusRender.RestoreWorldTransform;
+var
+  AHandle: GpMatrix;
+begin
+  AHandle := FSavedWorldTransforms.Pop;
+  GdipSetWorldTransform(FGraphics, AHandle);
+  GdipDeleteMatrix(AHandle);
+end;
+
+procedure TACLGdiplusRender.SaveWorldTransform;
+var
+  AHandle: GpMatrix;
+begin
+  GdipCheck(GdipCreateMatrix(AHandle));
+  GdipCheck(GdipGetWorldTransform(FGraphics, AHandle));
+  FSavedWorldTransforms.Push(AHandle);
+end;
+
+procedure TACLGdiplusRender.ScaleWorldTransform(ScaleX, ScaleY: Single);
+begin
+  GdipCheck(GdipScaleWorldTransform(FGraphics, ScaleX, ScaleY, MatrixOrderPrepend));
+end;
+
+procedure TACLGdiplusRender.TransformPoints(Points: PPointF; Count: Integer);
+var
+  AHandle: GpMatrix;
+begin
+  GdipCheck(GdipCreateMatrix(AHandle));
+  GdipCheck(GdipGetWorldTransform(FGraphics, AHandle));
+  GdipCheck(GdipTransformMatrixPoints(AHandle, PGpPointF(Points), Count));
+  GdipCheck(GdipDeleteMatrix(AHandle));
+end;
+
+procedure TACLGdiplusRender.TranslateWorldTransform(OffsetX, OffsetY: Single);
+begin
+  GdipCheck(GdipTranslateWorldTransform(FGraphics, OffsetX, OffsetY, MatrixOrderPrepend));
+end;
+{$ENDREGION}
+
+function TACLGdiplusRender.CreateImage(Colors: PRGBQuad; Width, Height: Integer; AlphaFormat: TAlphaFormat): TACL2DRenderImage;
+const
+  FormatMap: array[TAlphaFormat] of Integer = (PixelFormat32bppRGB, PixelFormat32bppARGB, PixelFormat32bppPARGB);
+var
+  AHandle: GpBitmap;
+begin
+  GdipCheck(GdipCreateBitmapFromScan0(Width, Height, Width * 4, FormatMap[AlphaFormat], PByte(Colors), AHandle));
+  Result := TACLGdiplusRenderImage.Create(Self, AHandle);
+end;
+
+function TACLGdiplusRender.CreateImage(Image: TACLImage): TACL2DRenderImage;
+begin
+  Result := TACLGdiplusRenderImage.Create(Self, TACLImageAccess(Image).CloneHandle);
+end;
+
+function TACLGdiplusRender.CreateImageAttributes: TACL2DRenderImageAttributes;
+begin
+  Result := TACLGdiplusRenderImageAttributes.Create(Self);
+end;
+
+procedure TACLGdiplusRender.DrawImage(Image: TACL2DRenderImage;
+  const TargetRect, SourceRect: TRect; Attributes: TACL2DRenderImageAttributes = nil);
+var
+  AImageAttributes: GpImageAttributes;
+begin
+  if IsValid(Image) then
+  begin
+    if IsValid(Attributes) then
+      AImageAttributes := TACLGdiplusRenderImageAttributes(Attributes).FHandle
+    else
+      AImageAttributes := nil;
+
+    GpDrawImage(FGraphics, TACLGdiplusRenderImage(Image).FHandle, AImageAttributes, TargetRect, SourceRect, False);
+  end;
+end;
+
+procedure TACLGdiplusRender.FillClosedCurve2(
+  AColor: TAlphaColor; const APoints: array of TPoint; ATension: Single);
+begin
+  GdipCheck(GdipFillClosedCurve2I(FGraphics, TACLGdiplusResourcesCache.BrushGet(AColor),
+    @APoints[0], Length(APoints), ATension, FillModeWinding));
+end;
+
+procedure TACLGdiplusRender.DrawClosedCurve2(APenColor: TAlphaColor;
+  const APoints: array of TPoint; ATension: Single; APenStyle: TACL2DRenderStrokeStyle; APenWidth: Single);
+begin
+  GdipCheck(GdipDrawClosedCurve2I(FGraphics,
+    TACLGdiplusResourcesCache.PenGet(APenColor, APenWidth, APenStyle),
+    @APoints[0], Length(APoints), ATension));
+end;
+
+procedure TACLGdiplusRender.DrawCurve2(APenColor: TAlphaColor;
+  APoints: array of TPoint; ATension: Single; APenStyle: TACL2DRenderStrokeStyle; APenWidth: Single);
+begin
+  GdipCheck(GdipDrawCurve2I(FGraphics,
+    TACLGdiplusResourcesCache.PenGet(APenColor, APenWidth, APenStyle),
+    @APoints[0], Length(APoints), ATension));
+end;
+
+procedure TACLGdiplusRender.DrawEllipse(X1, Y1, X2, Y2: Single; Color: TAlphaColor; StrokeWidth: Single; StrokeStyle: TACL2DRenderStrokeStyle);
+begin
+  if (X2 > X1) and (Y2 > Y1) and Color.IsValid and (StrokeWidth > 0) then
+    GdipDrawEllipse(FGraphics, TACLGdiplusResourcesCache.PenGet(Color, StrokeWidth, StrokeStyle), X1, Y1, X2 - X1, Y2 - Y1);
+end;
+
+procedure TACLGdiplusRender.DrawPath(Path: TACL2DRenderPath; Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
+begin
+  if Color.IsValid and (Width > 0) then
+    GdipDrawPath(FGraphics, TACLGdiplusResourcesCache.PenGet(Color, Width, Style), TACLGdiplusRenderPath(Path).Handle);
+end;
+
+procedure TACLGdiplusRender.DrawPolygon(const Points: array of TPoint; Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
+begin
+  if (Length(Points) > 1) and Color.IsValid and (Width > 0) then
+    GdipDrawPolygonI(FGraphics, TACLGdiplusResourcesCache.PenGet(Color, Width, Style), @Points[0], Length(Points));
+end;
+
+procedure TACLGdiplusRender.DrawRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor; StrokeWidth: Single; StrokeStyle: TACL2DRenderStrokeStyle);
+begin
+  if (X2 > X1) and (Y2 > Y1) and Color.IsValid and (StrokeWidth > 0) then
+    GdipDrawRectangle(FGraphics, TACLGdiplusResourcesCache.PenGet(Color, StrokeWidth, StrokeStyle), X1, Y1, X2 - X1, Y2 - Y1);
+end;
+
+procedure TACLGdiplusRender.DrawText(const Text: string; const R: TRect; Color: TAlphaColor;
+  Font: TFont; HorzAlign: TAlignment; VertAlgin: TVerticalAlignment; WordWrap: Boolean);
+const
+  AlignmentToStringAlignment: array[TAlignment] of TStringAlignment = (
+    StringAlignmentNear, StringAlignmentFar, StringAlignmentCenter
+  );
+  VerticalAlignmentToLineAlignment: array[TVerticalAlignment] of TStringAlignment = (
+    StringAlignmentNear, StringAlignmentFar, StringAlignmentCenter
+  );
+var
+  ARectF: TGPRectF;
+  AStringFormat: GpStringFormat;
+begin
+  if Color.IsValid and not R.IsEmpty and (Text <> '') then
+  begin
+    GdipCheck(GdipCreateStringFormat(StringFormatFlagsMeasureTrailingSpaces or
+      IfThen(WordWrap, 0, StringFormatFlagsNoWrap), 0, AStringFormat));
     try
-      GdipSetCompositingMode(Handle, TCompositingMode(AMode));
-      GdipFillRectangleI(Handle, ABrush.Handle, R.Left, R.Top, R.Width, R.Height);
+      GdipCheck(GdipSetStringFormatAlign(AStringFormat, AlignmentToStringAlignment[HorzAlign]));
+      GdipCheck(GdipSetStringFormatLineAlign(AStringFormat, VerticalAlignmentToLineAlignment[VertAlgin]));
+      ARectF := MakeRect(Single(R.Left), R.Top, R.Width, R.Height);
+      GdipDrawString(FGraphics, PChar(Text), Length(Text),
+        TACLGdiplusResourcesCache.FontGet(Font), @ARectF, AStringFormat,
+        TACLGdiplusResourcesCache.BrushGet(Color));
     finally
-      GdipSetCompositingMode(Handle, APrevMode);
+      GdipCheck(GdipDeleteStringFormat(AStringFormat));
     end;
   end;
 end;
 
-procedure TACLGdiplusCanvas.FillRectangle(AColor: TAlphaColor; const R: TRect; AMode: TGpCompositingMode = cmSourceOver);
+procedure TACLGdiplusRender.FillEllipse(X1, Y1, X2, Y2: Single; Color: TAlphaColor);
 begin
-  if (AColor <> TAlphaColor.None) or (AMode = cmSourceCopy) then
-  begin
-    FBrush.Color := AColor;
-    FillRectangle(FBrush, R, AMode);
-  end;
+  if (X2 > X1) and (Y2 > Y1) and Color.IsValid then
+    GdipFillEllipse(FGraphics, TACLGdiplusResourcesCache.BrushGet(Color), X1, Y1, X2 - X1, Y2 - Y1);
 end;
 
-procedure TACLGdiplusCanvas.FillRectangleByGradient(AColor1, AColor2: TAlphaColor; const R: TRect; AMode: TGpLinearGradientMode);
+procedure TACLGdiplusRender.FillPath(Path: TACL2DRenderPath; Color: TAlphaColor);
+begin
+  if Color.IsValid then
+    GdipFillPath(FGraphics, TACLGdiplusResourcesCache.BrushGet(Color), TACLGdiplusRenderPath(Path).Handle);
+end;
+
+procedure TACLGdiplusRender.FillPolygon(const Points: array of TPoint; Color: TAlphaColor);
+begin
+  if (Length(Points) > 1) and Color.IsValid then
+    GdipFillPolygonI(FGraphics, TACLGdiplusResourcesCache.BrushGet(Color), @Points[0], Length(Points), FillModeAlternate);
+end;
+
+procedure TACLGdiplusRender.FillRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor);
+begin
+  if (X2 > X1) and (Y2 > Y1) and Color.IsValid then
+    GdipFillRectangle(FGraphics, TACLGdiplusResourcesCache.BrushGet(Color), X1, Y1, X2 - X1, Y2 - Y1);
+end;
+
+procedure TACLGdiplusRender.FillRectangleByGradient(
+  AColor1, AColor2: TAlphaColor; const R: TRect; AMode: TLinearGradientMode);
 var
   ABrush: GpBrush;
   ABrushRect: TGpRect;
@@ -872,108 +1033,65 @@ begin
   ABrushRect.Width := acRectWidth(R) + 2;
   ABrushRect.Height := acRectHeight(R) + 2;
   GdipCheck(GdipCreateLineBrushFromRectI(@ABrushRect, AColor1, AColor2, TLinearGradientMode(AMode), WrapModeTile, ABrush));
-  GdipCheck(GdipFillRectangleI(Handle, ABrush, R.Left, R.Top, R.Right - R.Left, R.Bottom - R.Top));
+  GdipCheck(GdipFillRectangleI(FGraphics, ABrush, R.Left, R.Top, R.Right - R.Left, R.Bottom - R.Top));
   GdipCheck(GdipDeleteBrush(ABrush));
 end;
 
-procedure TACLGdiplusCanvas.DrawRectangle(APen: TACLGdiplusPen; const R: TRect);
+procedure TACLGdiplusRender.Line(X1, Y1, X2, Y2: Single; Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
 begin
-  if not acRectIsEmpty(R) then
-    GdipDrawRectangleI(Handle, APen.Handle, R.Left, R.Top, R.Width - 1, R.Height - 1);
+  if Color.IsValid and (Width > 0) then
+    GdipDrawLine(FGraphics, TACLGdiplusResourcesCache.PenGet(Color, Width, Style), X1, Y1, X2, Y2);
 end;
 
-procedure TACLGdiplusCanvas.DrawRectangle(APenColor: TAlphaColor;
-  const R: TRect; APenStyle: TACLGdiplusPenStyle = gpsSolid; APenWidth: Single = 1.0);
+procedure TACLGdiplusRender.Line(const Points: PPoint; Count: Integer;
+  Color: TAlphaColor; Width: Single = 1; Style: TACL2DRenderStrokeStyle = ssSolid);
 begin
-  FPen.Color := APenColor;
-  FPen.Style := APenStyle;
-  FPen.Width := APenWidth;
-  DrawRectangle(FPen, R);
+  if (Count > 0) and Color.IsValid and (Width > 0) then
+    GdipDrawLinesI(FGraphics, TACLGdiplusResourcesCache.PenGet(Color, Width, Style), PGPPoint(Points), Count);
 end;
 
-procedure TACLGdiplusCanvas.TextOut(const AText: UnicodeString; const R: TRect; AFont: TFont;
-  AHorzAlign: TAlignment; AVertAlign: TVerticalAlignment; AWordWrap: Boolean; ATextColor: TAlphaColor;
-  ARendering: TGpTextRenderingHint = trhSystemDefault);
-const
-  HorzAlignMap: array[TAlignment] of TStringAlignment = (StringAlignmentNear, StringAlignmentFar, StringAlignmentCenter);
-  VertAlignMap: array[TVerticalAlignment] of TStringAlignment = (StringAlignmentNear, StringAlignmentFar, StringAlignmentCenter);
-  WordWrapMap: array[Boolean] of Integer = (StringFormatFlagsNoWrap, 0);
-var
-  ABrush: GpBrush;
-  AFontHandle: GpFont;
-  AFontInfo: TLogFontW;
-  ARect: TGPRectF;
-  AStringFormat: GpStringFormat;
+function TACLGdiplusRender.GetInterpolationMode: TInterpolationMode;
 begin
-  if acRectIsEmpty(R) or (AText = '') then Exit;
-
-  if ATextColor = TAlphaColor.Default then
-    ATextColor := TAlphaColor.FromColor(AFont.Color);
-
-  ZeroMemory(@AFontInfo, SizeOf(AFontInfo));
-  GetObjectW(AFont.Handle, SizeOf(AFontInfo), @AFontInfo);
-  GdipCheck(GdipCreateFontFromLogfontW(MeasureCanvas.Handle, @AFontInfo, AFontHandle));
-  try
-    GdipCheck(GdipSetTextRenderingHint(Handle, TTextRenderingHint(ARendering)));
-    GdipCheck(GdipCreateStringFormat(WordWrapMap[AWordWrap], LANG_NEUTRAL, AStringFormat));
-    try
-      GdipCheck(GdipSetStringFormatAlign(AStringFormat, HorzAlignMap[AHorzAlign]));
-      GdipCheck(GdipSetStringFormatLineAlign(AStringFormat, VertAlignMap[AVertAlign]));
-      GdipCheck(GdipCreateSolidFill(ATextColor, ABrush));
-      try
-        ARect.X := R.Left;
-        ARect.Y := R.Top;
-        ARect.Width := R.Width;
-        ARect.Height := R.Height;
-        GdipCheck(GdipDrawString(Handle, PWideChar(AText), Length(AText), AFontHandle, @ARect, AStringFormat, ABrush));
-      finally
-        GdipCheck(GdipDeleteBrush(ABrush));
-      end;
-    finally
-      GdipCheck(GdipDeleteStringFormat(AStringFormat));
-    end;
-  finally
-    GdipCheck(GdipDeleteFont(AFontHandle));
-  end;
+  GdipCheck(GdipGetInterpolationMode(FGraphics, Result));
 end;
 
-function TACLGdiplusCanvas.GetInterpolationMode: TGpInterpolationMode;
-var
-  M: TInterpolationMode;
+function TACLGdiplusRender.GetPixelOffsetMode: TPixelOffsetMode;
 begin
-  GdipCheck(GdipGetInterpolationMode(Handle, M));
-  Result := TGpInterpolationMode(M);
+  GdipCheck(GdipGetPixelOffsetMode(FGraphics, Result));
 end;
 
-function TACLGdiplusCanvas.GetPixelOffsetMode: TGpPixelOffsetMode;
-var
-  AMode: TPixelOffsetMode;
+function TACLGdiplusRender.GetSmoothingMode: TSmoothingMode;
 begin
-  GdipCheck(GdipGetPixelOffsetMode(Handle, AMode));
-  Result := TGpPixelOffsetMode(AMode);
+  GdipCheck(GdipGetSmoothingMode(FGraphics, Result));
 end;
 
-function TACLGdiplusCanvas.GetSmoothingMode: TGpSmoothingMode;
-var
-  M: TSmoothingMode;
+procedure TACLGdiplusRender.SetInterpolationMode(AValue: TInterpolationMode);
 begin
-  GdipCheck(GdipGetSmoothingMode(Handle, M));
-  Result := TGpSmoothingMode(M);
+  GdipSetInterpolationMode(FGraphics, AValue)
 end;
 
-procedure TACLGdiplusCanvas.SetInterpolationMode(const Value: TGpInterpolationMode);
+procedure TACLGdiplusRender.SetPixelOffsetMode(AValue: TPixelOffsetMode);
 begin
-  GdipCheck(GdipSetInterpolationMode(Handle, TInterpolationMode(Value)));
+  GdipSetPixelOffsetMode(FGraphics, AValue);
 end;
 
-procedure TACLGdiplusCanvas.SetPixelOffsetMode(const Value: TGpPixelOffsetMode);
+procedure TACLGdiplusRender.SetSmoothingMode(AValue: TSmoothingMode);
 begin
-  GdipCheck(GdipSetPixelOffsetMode(Handle, TPixelOffsetMode(Value)));
+  GdipSetSmoothingMode(FGraphics, AValue);
 end;
 
-procedure TACLGdiplusCanvas.SetSmoothingMode(const Value: TGpSmoothingMode);
+{$ENDREGION}
+
+//----------------------------------------------------------------------------------------------------------------------
+// Other
+//----------------------------------------------------------------------------------------------------------------------
+
+{ TACLGdiplusStream }
+
+function TACLGdiplusStream.Stat(out AStatStg: TStatStg; AStatFlag: DWORD): HResult; stdcall;
 begin
-  GdipCheck(GdipSetSmoothingMode(Handle, TSmoothingMode(Value)));
+  ZeroMemory(@AStatStg, SizeOf(AStatStg));
+  Result := inherited Stat(AStatStg, AStatFlag);
 end;
 
 { TACLGdiplusPaintCanvas }
@@ -992,65 +1110,27 @@ end;
 
 procedure TACLGdiplusPaintCanvas.BeginPaint(DC: HDC);
 begin
-  if FHandle <> nil then
-    FSavedHandles.Push(FHandle);
-  GdipCheck(GdipCreateFromHDC(DC, FHandle));
+  if FGraphics <> nil then
+    FSavedHandles.Push(FGraphics);
+  GdipCheck(GdipCreateFromHDC(DC, FGraphics));
 end;
 
 procedure TACLGdiplusPaintCanvas.EndPaint;
 begin
   try
-    GdipDeleteGraphics(FHandle);
+    GdipDeleteGraphics(FGraphics);
   finally
     if FSavedHandles.Count > 0 then
-      FHandle := FSavedHandles.Pop
+      FGraphics := FSavedHandles.Pop
     else
-      FHandle := nil;
+      FGraphics := nil;
   end;
-end;
-
-{ TACLGdiplusStream }
-
-function TACLGdiplusStream.Stat(out AStatStg: TStatStg; AStatFlag: DWORD): HResult; stdcall;
-begin
-  ZeroMemory(@AStatStg, SizeOf(AStatStg));
-  Result := inherited Stat(AStatStg, AStatFlag);
-end;
-
-{ TACLGdiplusSolidBrushCache }
-
-class destructor TACLGdiplusSolidBrushCache.Destroy;
-begin
-  FreeAndNil(FInstance);
-end;
-
-class procedure TACLGdiplusSolidBrushCache.Flush;
-begin
-  if FInstance <> nil then
-    FInstance.Clear;
-end;
-
-class function TACLGdiplusSolidBrushCache.GetOrCreate(AColor: TAlphaColor): GpBrush;
-begin
-  if FInstance = nil then
-  begin
-    FInstance := TACLValueCacheManager<TAlphaColor, GpBrush>.Create(512);
-    FInstance.OnRemove := RemoveValueHandler;
-  end;
-  if not FInstance.Get(AColor, Result) then
-  begin
-    GdipCheck(GdipCreateSolidFill(AColor, Result));
-    FInstance.Add(AColor, Result);
-  end;
-end;
-
-class procedure TACLGdiplusSolidBrushCache.RemoveValueHandler(Sender: TObject; const ABrush: GpBrush);
-begin
-  GdipDeleteBrush(ABrush);
 end;
 
 initialization
+  GpPaintCanvas := TACLGdiplusPaintCanvas.Create;
 
 finalization
-  FreeAndNil(FPaintCanvas);
+  TACLGdiplusResourcesCache.Flush;
+  FreeAndNil(GpPaintCanvas);
 end.

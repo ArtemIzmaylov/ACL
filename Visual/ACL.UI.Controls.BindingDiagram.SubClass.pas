@@ -31,6 +31,7 @@ uses
   ACL.Classes.Timer,
   ACL.Geometry,
   ACL.Graphics,
+  ACL.Graphics.Ex,
   ACL.Graphics.Ex.Gdip,
   ACL.Math,
   ACL.UI.Controls.BaseControls,
@@ -955,10 +956,12 @@ begin
   begin
     GpPaintCanvas.BeginPaint(ACanvas.Handle);
     try
-      GPPaintCanvas.DrawLine(Style.ColorObjectCaptionText.Value,
-        RemoveButtonRect.Left, RemoveButtonRect.Top, RemoveButtonRect.Right, RemoveButtonRect.Bottom, gpsSolid, 2);
-      GPPaintCanvas.DrawLine(Style.ColorObjectCaptionText.Value,
-        RemoveButtonRect.Right, RemoveButtonRect.Top, RemoveButtonRect.Left, RemoveButtonRect.Bottom, gpsSolid, 2);
+      GPPaintCanvas.Line(
+        RemoveButtonRect.Left, RemoveButtonRect.Top, RemoveButtonRect.Right, RemoveButtonRect.Bottom,
+        Style.ColorObjectCaptionText.Value, 2, ssSolid);
+      GPPaintCanvas.Line(
+        RemoveButtonRect.Right, RemoveButtonRect.Top, RemoveButtonRect.Left, RemoveButtonRect.Bottom,
+        Style.ColorObjectCaptionText.Value, 2, ssSolid);
     finally
       GPPaintCanvas.EndPaint;
     end;

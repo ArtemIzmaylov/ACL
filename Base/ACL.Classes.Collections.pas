@@ -746,7 +746,7 @@ type
   protected
     procedure DoRemove(const Item: TValue); virtual;
   public
-    constructor Create(ACapacity: Integer); overload;
+    constructor Create(ACapacity: Integer = 256); overload;
     constructor Create(ACapacity: Integer; AEqualityComparer: IEqualityComparer<TKey>); overload;
     destructor Destroy; override;
     procedure Add(const Key: TKey; const Value: TValue);
