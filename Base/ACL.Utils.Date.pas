@@ -282,7 +282,7 @@ begin
       Result := Result - ADelta;
   end
   else
-    while Result < ANow do
+    while (Result < ANow) or SameValue(Result, ANow) do
       Result := Result + ADelta;
 end;
 
