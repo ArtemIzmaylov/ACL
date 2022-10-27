@@ -66,9 +66,9 @@ type
 
   { TACLImage }
 
-  TACLImage = class
+  TACLImage = class(TPersistent)
   strict private
-    FBits: array of TRGBQuad;
+    FBits: TRGBColors;
     FComposingMode: TACLImageCompositingMode;
     FHandle: GpImage;
     FPixelOffsetMode: TACLImagePixelOffsetMode;
@@ -82,12 +82,16 @@ type
   protected
     FFormat: TACLImageFormatClass;
 
-    function CloneHandle: GpImage;
+    procedure Changed; virtual;
     procedure DestroyHandle;
     procedure LoadFromHandle(AHandle: GpImage; AFormat: TACLImageFormatClass = nil);
+    procedure LoadFromImage(AImage: TACLImage);
 
-    function BeginLock(var AData: TBitmapData): Boolean;
+    function BeginLock(var AData: TBitmapData;
+      APixelFormat: Integer = PixelFormatUndefined;
+      ALockMode: TImageLockMode = ImageLockModeRead): Boolean;
     function EndLock(var AData: TBitmapData): Boolean;
+    function GetPixelFormat: Integer;
 
     property Handle: GpImage read FHandle;
   public
@@ -100,7 +104,10 @@ type
     constructor Create(const ABits: PRGBQuad; AWidth, AHeight: Integer); overload;
     constructor Create(const AFileName: UnicodeString); overload;
     destructor Destroy; override;
-    procedure Assign(ASource: TObject);
+    procedure Assign(ASource: TPersistent); override;
+    procedure AssignTo(ATarget: TPersistent); override;
+    procedure Clear;
+    function Equals(Obj: TObject): Boolean; override;
 
     procedure ApplyColorSchema(const AColorSchema: TACLColorSchema);
     procedure ConvertToBitmap;
@@ -133,7 +140,7 @@ type
     procedure LoadFromStream(AStream: TStream);
     procedure SaveToFile(const AFileName: UnicodeString); overload;
     procedure SaveToFile(const AFileName: UnicodeString; AFormat: TACLImageFormatClass); overload;
-    procedure SaveToStream(AStream: TStream); overload;
+    procedure SaveToStream(AStream: TStream); overload; virtual;
     procedure SaveToStream(AStream: TStream; AFormat: TACLImageFormatClass); overload;
 
     property ClientRect: TRect read GetClientRect;
@@ -155,7 +162,7 @@ type
     class function CheckPreamble(AData: PByte; AMaxSize: Integer): Boolean; virtual; abstract;
     class function GetMaxPreamble: Integer; virtual; abstract;
 
-    class function Load(AStream: TStream): GpBitmap; virtual;
+    class procedure Load(AStream: TStream; AImage: TACLImage); virtual;
     class procedure Save(AStream: TStream; ABitmap: GpBitmap); virtual;
   public
     class function ClipboardFormat: Word; virtual;
@@ -273,7 +280,7 @@ type
   // https://developers.google.com/speed/webp
   TACLImageFormatWebP = class(TACLImageFormat)
   strict private type
-    TDecodeFunc = function (const data: PByte; size: Cardinal; width, height: PInteger): PByte; cdecl;
+    TDecodeFunc = function (const data: PByte; size: Cardinal; width, height: PInteger): PRGBQuad; cdecl;
     TEncodeFunc = function (const rgba: PByte; width, height, stride: Integer; quality: Single; var output: PByte): Cardinal; cdecl;
     TFreeFunc = procedure (P: Pointer); cdecl;
     TGetInfoFunc = function (const data: PByte; size: Cardinal; width, height: PInteger): Integer; cdecl;
@@ -287,7 +294,7 @@ type
     class function CheckIsAvailable: Boolean; override;
     class function CheckPreamble(AData: PByte; AMaxSize: Integer): Boolean; override;
     class function GetMaxPreamble: Integer; override;
-    class function Load(AStream: TStream): GpBitmap; override;
+    class procedure Load(AStream: TStream; AImage: TACLImage); override;
     class procedure Save(AStream: TStream; ABitmap: GpBitmap); override;
   public
     class destructor Destroy;
@@ -396,14 +403,72 @@ begin
   inherited Destroy;
 end;
 
-procedure TACLImage.Assign(ASource: TObject);
+procedure TACLImage.Assign(ASource: TPersistent);
 begin
-  if ASource is TBitmap then
+  if ASource = nil then
+    Clear
+  else if ASource is TBitmap then
     LoadFromBitmap(TBitmap(ASource))
   else if ASource is TGraphic then
     LoadFromGraphic(TGraphic(ASource))
   else if ASource is TACLImage then
-    SetHandle(TACLImage(ASource).CloneHandle);
+    LoadFromImage(TACLImage(ASource))
+  else if ASource is TPicture then
+    Assign(TPicture(ASource).Graphic)
+  else
+    inherited;
+end;
+
+procedure TACLImage.AssignTo(ATarget: TPersistent);
+var
+  AStream: TStream;
+begin
+  if ATarget is TPicture then
+  begin
+    AStream := TMemoryStream.Create;
+    try
+      SaveToStream(AStream);
+      AStream.Position := 0;
+      TPicture(ATarget).LoadFromStream(AStream);
+    finally
+      AStream.Free;
+    end;
+  end
+  else
+    inherited;
+end;
+
+function TACLImage.Equals(Obj: TObject): Boolean;
+var
+  AData1: TBitmapData;
+  AData2: TBitmapData;
+  AImage: TACLImage;
+begin
+  Result := False;
+  if Self = Obj then
+    Exit(True);
+  if Obj is TACLImage then
+  begin
+    AImage := TACLImage(Obj);
+    if (AImage.Width = Width) and (AImage.Height = Height) then
+    begin
+      if BeginLock(AData1) then
+      try
+        if AImage.BeginLock(AData2) then
+        try
+          Result :=
+            (AData1.Width = AData2.Width) and
+            (AData1.Height = AData2.Height) and
+            (AData1.Stride = AData2.Stride) and
+            CompareMem(AData1.Scan0, AData2.Scan0, Cardinal(AData1.Stride) * AData1.Width * AData1.Height);
+        finally
+          AImage.EndLock(AData2)
+        end;
+      finally
+        EndLock(AData1);
+      end;
+    end;
+  end;
 end;
 
 procedure TACLImage.ApplyColorSchema(const AColorSchema: TACLColorSchema);
@@ -412,7 +477,7 @@ var
 begin
   if AColorSchema.IsAssigned then
   begin
-    if BeginLock(AData) then
+    if BeginLock(AData, ImageLockModeWrite, PixelFormat32bppARGB) then
     try
       TACLColors.ApplyColorSchema(AData.Scan0, AData.Width * AData.Height, AColorSchema);
     finally
@@ -441,18 +506,15 @@ begin
   end;
 end;
 
+procedure TACLImage.Clear;
+begin
+  SetHandle(nil);
+end;
+
 function TACLImage.Clone: TACLImage;
-var
-  ANewHandle: GpImage;
 begin
   Result := TACLImage.Create;
-  if GdipCloneImage(Handle, ANewHandle) = Ok then
-  begin
-    Result.FFormat := Format;
-    Result.FStretchQuality := FStretchQuality;
-    Result.FPixelOffsetMode := FPixelOffsetMode;
-    Result.SetHandle(ANewHandle);
-  end;
+  Result.Assign(Self);
 end;
 
 function TACLImage.ToBitmap(AAlphaFormat: TAlphaFormat = afIgnored): TACLBitmap;
@@ -591,18 +653,22 @@ begin
   Draw(Graphics, R, ClientRect, AAlpha, ATile);
 end;
 
-function TACLImage.BeginLock(var AData: TBitmapData): Boolean;
-var
-  AFormat: Integer;
+function TACLImage.BeginLock(var AData: TBitmapData; APixelFormat: Integer; ALockMode: TImageLockMode): Boolean;
 begin
-  Result :=
-    (GdipGetImagePixelFormat(Handle, AFormat) = Ok) and
-    (GdipBitmapLockBits(Handle, nil, ImageLockModeRead, AFormat, @AData) = Ok);
+  if APixelFormat = PixelFormatUndefined then
+    APixelFormat := GetPixelFormat;
+  Result := GdipBitmapLockBits(Handle, nil, ALockMode, APixelFormat, @AData) = Ok;
 end;
 
 function TACLImage.EndLock(var AData: TBitmapData): Boolean;
 begin
   Result := GdipBitmapUnlockBits(Handle, @AData) = Ok;
+end;
+
+function TACLImage.GetPixelFormat: Integer;
+begin
+  if GdipGetImagePixelFormat(FHandle, Result) <> Ok then
+    Result := PixelFormatUndefined;
 end;
 
 procedure TACLImage.Crop(const ACropMargins: TRect);
@@ -654,7 +720,7 @@ var
   AHandle: GpImage;
 begin
   GdipCheck(GdipCreateBitmapFromHBITMAP(ABitmap, APalette, AHandle));
-  LoadFromHandle(AHandle);
+  LoadFromHandle(AHandle, nil);
 end;
 
 procedure TACLImage.LoadFromBitmap(ABitmap: TBitmap; AAlphaFormat: TAlphaFormat = afPremultiplied);
@@ -665,21 +731,29 @@ begin
     LoadFromBits(@acGetBitmapBits(ABitmap)[0], ABitmap.Width, ABitmap.Height, AAlphaFormat);
 end;
 
-procedure TACLImage.LoadFromBits(ABits: PRGBQuad; AWidth, AHeight: Integer; AAlphaFormat: TAlphaFormat = afPremultiplied);
+procedure TACLImage.LoadFromBits(ABits: PRGBQuad; AWidth, AHeight: Integer; AAlphaFormat: TAlphaFormat);
+const
+  PixelFormatMap: array[TAlphaFormat] of Integer = (
+    PixelFormat32bppARGB, // PixelFormat32bppRGB - однако мы сбросили альфу в 255
+    PixelFormat32bppARGB,
+    PixelFormat32bppPARGB
+  );
 var
-  ACount: Integer;
-  I: Integer;
+  AColorCount: Integer;
+  AColors: TRGBColors;
 begin
-  ACount := AWidth * AHeight;
-  SetLength(FBits, ACount);
-  FastMove(ABits^, FBits[0], ACount * SizeOf(TRGBQuad));
+  AColorCount := AWidth * AHeight;
+  SetLength(AColors, AColorCount);
+  FastMove(ABits^, AColors[0], AColorCount * SizeOf(TRGBQuad));
+
   if AAlphaFormat = afIgnored then
   begin
-    for I := 0 to ACount - 1 do
-      FBits[I].rgbReserved := MaxByte;
+    for var I := 0 to AColorCount - 1 do
+      AColors[I].rgbReserved := MaxByte;
   end;
-  LoadFromHandle(GpCreateBitmap(AWidth, AHeight, @FBits[0],
-    IfThen(AAlphaFormat = afPremultiplied, PixelFormat32bppPARGB, PixelFormat32bppARGB)));
+
+  LoadFromHandle(GpCreateBitmap(AWidth, AHeight, @AColors[0], PixelFormatMap[AAlphaFormat]));
+  FBits := AColors;
 end;
 
 procedure TACLImage.LoadFromFile(const AFileName: UnicodeString);
@@ -730,7 +804,7 @@ begin
     // raise EACLImageUnsupportedFormat.Create;
     AFormat := TACLImageFormatBMP;
   end;
-  LoadFromHandle(AFormat.Load(AStream), AFormat);
+  AFormat.Load(AStream, Self);
 end;
 
 procedure TACLImage.SaveToFile(const AFileName: UnicodeString);
@@ -762,21 +836,19 @@ begin
   AFormat.Save(AStream, Handle);
 end;
 
-function TACLImage.CloneHandle: GpImage;
+procedure TACLImage.Changed;
 begin
-  if Handle <> nil then
-    GdipCheck(GdipCloneImage(Handle, Result))
-  else
-    Result := nil;
+  // do nothing
 end;
 
 procedure TACLImage.DestroyHandle;
 begin
   if Assigned(Handle) then
   begin
+    // keep the order
     GdipDisposeImage(Handle);
     FHandle := nil;
-    SetLength(FBits, 0);
+    FBits := nil;
   end;
 end;
 
@@ -807,6 +879,27 @@ begin
   //     2. Gdi+ works with memory-bitmaps faster than with other formats
   if FFormat <> TACLImageFormatPNG then // to keep alpha channel unpremultiplied
     ConvertToBitmap;
+end;
+
+procedure TACLImage.LoadFromImage(AImage: TACLImage);
+var
+  AHandle: GpImage;
+begin
+  if Self = AImage then Exit;
+
+  FComposingMode := AImage.FComposingMode;
+  FPixelOffsetMode := AImage.FPixelOffsetMode;
+  FStretchQuality := AImage.FStretchQuality;
+
+  if GdipCloneImage(AImage.Handle, AHandle) = Ok then
+  begin
+    SetLength(FBits, Length(AImage.FBits));
+    if Length(FBits) > 0 then
+      FastMove(AImage.FBits[0], FBits[0], SizeOf(AImage.FBits));
+    SetHandle(AHandle);
+  end
+  else
+    Clear;
 end;
 
 function TACLImage.GetClientRect: TRect;
@@ -842,6 +935,7 @@ begin
   begin
     DestroyHandle;
     FHandle := AValue;
+    Changed;
   end;
 end;
 
@@ -857,17 +951,24 @@ begin
   Result := 0;
 end;
 
-class function TACLImageFormat.Load(AStream: TStream): GpBitmap;
+class procedure TACLImageFormat.Load(AStream: TStream; AImage: TACLImage);
 var
+  AAvailableSize: Int64;
   AGdiPlusStream: IStream;
+  AHandle: GpImage;
   ANewPosition: UInt64;
 begin
-  AGdiPlusStream := TACLGdiplusStream.Create(AStream, soReference);
-  if GdipLoadImageFromStreamICM(AGdiPlusStream, Result) <> Ok then
+  AAvailableSize := AStream.Size - AStream.Position;
+  // TMemoryStream.CopyOf:
+  // Для некоторых форматов GDI+ хранит референс на TStream и подгружает оттуда данные по мере необходимости.
+  // Поэтому нам важно сохранить оригинальный стрим живым.
+  AGdiPlusStream := TACLGdiplusStream.Create(TMemoryStream.CopyOf(AStream, AAvailableSize), soOwned);
+  if GdipLoadImageFromStreamICM(AGdiPlusStream, AHandle) <> Ok then
   begin
     AGdiPlusStream.Seek(0, STREAM_SEEK_SET, ANewPosition);
-    GdipCheck(GdipCreateBitmapFromStream(AGdiPlusStream, Result));
+    GdipCheck(GdipCreateBitmapFromStream(AGdiPlusStream, AHandle));
   end;
+  AImage.LoadFromHandle(AHandle, Self);
 end;
 
 class procedure TACLImageFormat.Save(AStream: TStream; ABitmap: GpBitmap);
@@ -1375,11 +1476,7 @@ var
 begin
   AAvailableSize := AStream.Size - AStream.Position;
   if AStream is TCustomMemoryStream then
-  begin
-    Result := FGetInfoFunc(
-      PByte(TCustomMemoryStream(AStream).Memory) + AStream.Position,
-      AAvailableSize, @ASize.cx, @ASize.cy) <> 0
-  end
+    Result := FGetInfoFunc(PByte(TCustomMemoryStream(AStream).Memory) + AStream.Position, AAvailableSize, @ASize.cx, @ASize.cy) <> 0
   else
   begin
     AStream := TMemoryStream.CopyOf(AStream, AAvailableSize);
@@ -1408,28 +1505,29 @@ begin
   Result := 16;
 end;
 
-class function TACLImageFormatWebP.Load(AStream: TStream): GpBitmap;
+class procedure TACLImageFormatWebP.Load(AStream: TStream; AImage: TACLImage);
 var
   AAvailableSize: Int64;
-  APixels: PByte;
+  APixels: PRGBQuad;
   AHeight: Integer;
   AWidth: Integer;
 begin
   AAvailableSize := AStream.Size - AStream.Position;
   if AStream is TCustomMemoryStream then
   begin
-    APixels := FDecodeFunc(
-      PByte(TCustomMemoryStream(AStream).Memory) + AStream.Position,
-      AAvailableSize, @AWidth, @AHeight);
-    if APixels = nil then
-      raise EACLImageFormatError.Create('WebP returns no data');
-    GdipCheck(GdipCreateBitmapFromScan0(AWidth, AHeight, AWidth * 4, PixelFormat32bppARGB, APixels, Result));
+    APixels := FDecodeFunc(PByte(TCustomMemoryStream(AStream).Memory) + AStream.Position, AAvailableSize, @AWidth, @AHeight);
+    if APixels <> nil then
+    try
+      AImage.LoadFromBits(APixels, AWidth, AHeight, afDefined);
+    finally
+      FFreeFunc(APixels);
+    end;
   end
   else
   begin
     AStream := TMemoryStream.CopyOf(AStream, AAvailableSize);
     try
-      Result := Load(AStream);
+      Load(AStream, AImage);
     finally
       AStream.Free;
     end;

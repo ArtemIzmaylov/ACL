@@ -214,16 +214,24 @@ type
   { TACL2DRenderImageAttributes }
 
   TACL2DRenderImageAttributes = class(TACL2DRenderResource)
+  strict private
+    FTintColor: TAlphaColor;
+    FAlpha: Byte;
+  protected
+    procedure SetAlpha(AValue: Byte); virtual;
+    procedure SetTintColor(AValue: TAlphaColor); virtual;
   public
-    procedure SetColorMatrix(const AColorMatrix: TColorMatrix); virtual; abstract;
+    procedure AfterConstruction; override;
+    property Alpha: Byte read FAlpha write SetAlpha;
+    property TintColor: TAlphaColor read FTintColor write SetTintColor;
   end;
 
   { TACL2DRenderPath }
 
   TACL2DRenderPath = class(TACL2DRenderResource)
   public
-    procedure AddArc(const X, Y, Width, Height, StartAngle, SweepAngle: Single); virtual; abstract;
-    procedure AddLine(const X1, Y1, X2, Y2: Single); virtual; abstract;
+    procedure AddArc(CX, CY, RadiusX, RadiusY, StartAngle, SweepAngle: Single); virtual; abstract;
+    procedure AddLine(X1, Y1, X2, Y2: Single); virtual; abstract;
     procedure AddRect(const R: TRectF); virtual;
     procedure AddRoundRect(const R: TRectF; RadiusX, RadiusY: Single);
     procedure FigureClose; virtual; abstract;
@@ -266,9 +274,12 @@ type
     function CreateImage(Image: TACLBitmapLayer): TACL2DRenderImage; overload; virtual;
     function CreateImage(Image: TACLImage): TACL2DRenderImage; overload; virtual;
     function CreateImageAttributes: TACL2DRenderImageAttributes; virtual; abstract;
-    procedure DrawImage(Image: TACLBitmapLayer; const R: TRect; Cache: PACL2DRenderImage = nil); overload;
-    procedure DrawImage(Image: TACL2DRenderImage; const TargetRect, SourceRect: TRect;
-      Attributes: TACL2DRenderImageAttributes = nil); overload; virtual; abstract;
+    procedure DrawImage(Image: TACLBitmapLayer; const TargetRect: TRect; Cache: PACL2DRenderImage = nil); overload;
+    procedure DrawImage(Image: TACL2DRenderImage; const TargetRect: TRect; Alpha: Byte = MaxByte); overload;
+    procedure DrawImage(Image: TACL2DRenderImage;
+      const TargetRect, SourceRect: TRect; Alpha: Byte = MaxByte); overload; virtual; abstract;
+    procedure DrawImage(Image: TACL2DRenderImage;
+      const TargetRect, SourceRect: TRect; Attributes: TACL2DRenderImageAttributes); overload; virtual; abstract;
 
     procedure Rectangle(const R: TRect; Color, StrokeColor: TAlphaColor;
       StrokeWidth: Single = 1; StrokeStyle: TACL2DRenderStrokeStyle = ssSolid);
@@ -281,7 +292,7 @@ type
 
     // Text
     procedure DrawText(const Text: string; const R: TRect; Color: TAlphaColor; Font: TFont;
-      HorzAlign: TAlignment = taLeftJustify; VertAlgin: TVerticalAlignment = taVerticalCenter;
+      HorzAlign: TAlignment = taLeftJustify; VertAlign: TVerticalAlignment = taVerticalCenter;
       WordWrap: Boolean = False); virtual; abstract;
 
     // Paths
@@ -1876,6 +1887,25 @@ begin
   Result := (Width = 0) or (Height = 0);
 end;
 
+{ TACL2DRenderImageAttributes }
+
+procedure TACL2DRenderImageAttributes.AfterConstruction;
+begin
+  inherited;
+  FAlpha := MaxByte;
+  FTintColor := TAlphaColor.None;
+end;
+
+procedure TACL2DRenderImageAttributes.SetAlpha(AValue: Byte);
+begin
+  FAlpha := AValue;
+end;
+
+procedure TACL2DRenderImageAttributes.SetTintColor(AValue: TAlphaColor);
+begin
+  FTintColor := AValue;
+end;
+
 { TACL2DRender }
 
 function TACL2DRender.IsValid(const AResource: TACL2DRenderResource): Boolean;
@@ -1887,16 +1917,22 @@ function TACL2DRender.CreateImage(Image: TACLImage): TACL2DRenderImage;
 var
   AData: TBitmapData;
   AFormat: TAlphaFormat;
+  APixelFormat: Integer;
 begin
-  if TACLImageAccess(Image).BeginLock(AData) then
+  APixelFormat := TACLImageAccess(Image).GetPixelFormat;
+  if GetPixelFormatSize(APixelFormat) <> 32 then
+    APixelFormat := PixelFormat32bppARGB;
+  if TACLImageAccess(Image).BeginLock(AData, APixelFormat) then
   try
     case AData.PixelFormat of
       PixelFormat32bppARGB:
         AFormat := afDefined;
       PixelFormat32bppPARGB:
         AFormat := afPremultiplied;
+      PixelFormat32bppRGB:
+        AFormat := afIgnored;
     else
-      AFormat := afIgnored;
+      raise EInvalidArgument.Create('Unexpected pixel format');
     end;
     Result := CreateImage(AData.Scan0, AData.Width, AData.Height, AFormat);
   finally
@@ -1914,7 +1950,7 @@ begin
     Result := CreateImage(PRGBQuad(Image.Colors), Image.Width, Image.Height, afPremultiplied);
 end;
 
-procedure TACL2DRender.DrawImage(Image: TACLBitmapLayer; const R: TRect; Cache: PACL2DRenderImage);
+procedure TACL2DRender.DrawImage(Image: TACLBitmapLayer; const TargetRect: TRect; Cache: PACL2DRenderImage);
 var
   AImage: TACL2DRenderImage;
 begin
@@ -1925,17 +1961,22 @@ begin
       FreeAndNil(Cache^);
       Cache^ := CreateImage(Image);
     end;
-    DrawImage(Cache^, R, Cache^.ClientRect);
+    DrawImage(Cache^, TargetRect);
   end
   else
   begin
     AImage := CreateImage(Image);
     try
-      DrawImage(AImage, R, AImage.ClientRect);
+      DrawImage(AImage, TargetRect);
     finally
       AImage.Free;
     end;
   end;
+end;
+
+procedure TACL2DRender.DrawImage(Image: TACL2DRenderImage; const TargetRect: TRect; Alpha: Byte);
+begin
+  DrawImage(Image, TargetRect, Image.ClientRect, Alpha);
 end;
 
 procedure TACL2DRender.DrawEllipse(const R: TRect; Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
@@ -2001,10 +2042,14 @@ end;
 
 procedure TACL2DRenderPath.AddRect(const R: TRectF);
 begin
-  AddLine(R.Left, R.Top, R.Right, R.Top);
-  AddLine(R.Right, R.Top, R.Right, R.Bottom);
-  AddLine(R.Right, R.Bottom, R.Left, R.Bottom);
-  AddLine(R.Left, R.Bottom, R.Left, R.Top);
+  FigureStart;
+  try
+    AddLine(R.Left, R.Top, R.Right, R.Top);
+    AddLine(R.Right, R.Top, R.Right, R.Bottom);
+    AddLine(R.Right, R.Bottom, R.Left, R.Bottom);
+  finally
+    FigureClose;
+  end;
 end;
 
 procedure TACL2DRenderPath.AddRoundRect(const R: TRectF; RadiusX, RadiusY: Single);
@@ -2012,24 +2057,24 @@ begin
   RadiusX := Min(RadiusX, R.Width / 3);
   RadiusY := Min(RadiusY, R.Height / 3);
 
-  FigureStart;
-  try
-    if (RadiusX > 0) and (RadiusY > 0) and not IsZero(RadiusX) and not IsZero(RadiusY) then
-    begin
-      AddLine(R.Left + RadiusX, R.Top, R.Right - 2 * RadiusX, R.Top);
-      AddArc(R.Right - 2 * RadiusX, R.Top, 2 * RadiusX, 2 * RadiusY, 270, 90);
-      AddLine(R.Right, R.Top + RadiusY, R.Right, R.Bottom - 2 * RadiusY);
-      AddArc(R.Right - 2 * RadiusX, R.Bottom - 2 * RadiusY, 2 * RadiusX, 2 * RadiusY, 0, 90);
-      AddLine(R.Right - 2 * RadiusX, R.Bottom, R.Left + RadiusX, R.Bottom);
-      AddArc(R.Left, R.Bottom - 2 * RadiusY, 2 * RadiusX, 2 * RadiusY, 90, 90);
-      AddLine(R.Left, R.Bottom - 2 * RadiusY, R.Left, R.Top + RadiusY);
-      AddArc(R.Left, R.Top, 2 * RadiusX, 2 * RadiusY, 180, 90);
-    end
-    else
-      AddRect(R);
-  finally
-    FigureClose;
-  end;
+  if (RadiusX > 0) and (RadiusY > 0) and not IsZero(RadiusX) and not IsZero(RadiusY) then
+  begin
+    FigureStart;
+    try
+      AddLine(R.Left + RadiusX, R.Top, R.Right - RadiusX, R.Top);
+      AddArc(R.Right - RadiusX, R.Top + RadiusY, RadiusX, RadiusY, 270, 90);
+      AddLine(R.Right, R.Top + RadiusY, R.Right, R.Bottom - RadiusY);
+      AddArc(R.Right - RadiusX, R.Bottom - RadiusY, RadiusX, RadiusY, 0, 90);
+      AddLine(R.Right - RadiusX, R.Bottom, R.Left + RadiusX, R.Bottom);
+      AddArc(R.Left + RadiusX, R.Bottom - RadiusY, RadiusX, RadiusY, 90, 90);
+      AddLine(R.Left, R.Bottom - RadiusY, R.Left, R.Top + RadiusY);
+      AddArc(R.Left + RadiusX, R.Top + RadiusY, RadiusX, RadiusY, 180, 90);
+    finally
+      FigureClose;
+    end;
+  end
+  else
+    AddRect(R);
 end;
 
 {$ENDREGION}

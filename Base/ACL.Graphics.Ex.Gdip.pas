@@ -144,8 +144,8 @@ type
       AlphaFormat: TAlphaFormat = afDefined): TACL2DRenderImage; override;
     function CreateImage(Image: TACLImage): TACL2DRenderImage; override;
     function CreateImageAttributes: TACL2DRenderImageAttributes; override;
-    procedure DrawImage(Image: TACL2DRenderImage; const TargetRect, SourceRect: TRect;
-      Attributes: TACL2DRenderImageAttributes = nil); override;
+    procedure DrawImage(Image: TACL2DRenderImage; const TargetRect, SourceRect: TRect; Attributes: TACL2DRenderImageAttributes); override;
+    procedure DrawImage(Image: TACL2DRenderImage; const TargetRect, SourceRect: TRect; Alpha: Byte = MaxByte); override;
 
     // Curves
     procedure DrawCurve2(APenColor: TAlphaColor; APoints: array of TPoint;
@@ -173,7 +173,7 @@ type
 
     // Text
     procedure DrawText(const Text: string; const R: TRect; Color: TAlphaColor; Font: TFont;
-      HorzAlign: TAlignment = taLeftJustify; VertAlgin: TVerticalAlignment = taVerticalCenter;
+      HorzAlign: TAlignment = taLeftJustify; VertAlign: TVerticalAlignment = taVerticalCenter;
       WordWrap: Boolean = False); override;
 
     // Path
@@ -258,7 +258,18 @@ const
 type
   TACLImageAccess = class(TACLImage);
 
-{$REGION '2D Render'}
+  { TACLGdiplusAlphaBlendAttributes }
+
+  TACLGdiplusAlphaBlendAttributes = class
+  strict private
+    class var FAlpha: Byte;
+    class var FColorMatrix: TColorMatrix;
+    class var FHandle: GpImageAttributes;
+  public
+    class constructor Create;
+    class procedure Finalize;
+    class function Get(Alpha: Byte): GpImageAttributes;
+  end;
 
   { TACLGdiplusRenderImage }
 
@@ -273,12 +284,17 @@ type
   { TACLGdiplusRenderImageAttributes }
 
   TACLGdiplusRenderImageAttributes = class(TACL2DRenderImageAttributes)
-  protected
+  strict private
     FHandle: GpImageAttributes;
+    FMatrix: TColorMatrix;
+
+    procedure ApplyColorMatrix;
+    procedure SetAlpha(AValue: Byte); override;
+    procedure SetTintColor(AValue: TAlphaColor); override;
   public
     constructor Create(AOwner: TACL2DRender);
     destructor Destroy; override;
-    procedure SetColorMatrix(const AColorMatrix: ColorMatrix); override;
+    property Handle: GpImageAttributes read FHandle;
   end;
 
   { TACLGdiplusRenderPath }
@@ -289,14 +305,12 @@ type
   public
     constructor Create;
     destructor Destroy; override;
-    procedure AddArc(const X, Y, Width, Height, StartAngle, SweepAngle: Single); override;
-    procedure AddLine(const X1, Y1, X2, Y2: Single); override;
+    procedure AddArc(CX, CY, RadiusX, RadiusY, StartAngle, SweepAngle: Single); override;
+    procedure AddLine(X1, Y1, X2, Y2: Single); override;
     procedure AddRect(const R: TRectF); override;
     procedure FigureClose; override;
     procedure FigureStart; override;
   end;
-
-{$ENDREGION}
 
 procedure GdipCheck(AStatus: GpStatus);
 begin
@@ -537,6 +551,38 @@ begin
   end;
 end;
 
+{ TACLGdiplusAlphaBlendAttributes }
+
+class constructor TACLGdiplusAlphaBlendAttributes.Create;
+begin
+  FAlpha := MaxByte;
+end;
+
+class procedure TACLGdiplusAlphaBlendAttributes.Finalize;
+begin
+  if FHandle <> nil then
+  begin
+    GdipDisposeImageAttributes(FHandle);
+    FHandle := nil;
+  end;
+end;
+
+class function TACLGdiplusAlphaBlendAttributes.Get(Alpha: Byte): GpImageAttributes;
+begin
+  if Alpha = MaxByte then
+    Exit(nil);
+  if Alpha <> FAlpha then
+  begin
+    FAlpha := Alpha;
+    FColorMatrix[3, 3] := FAlpha / MaxByte;
+    if FHandle = nil then
+      GdipCheck(GdipCreateImageAttributes(FHandle));
+    if FHandle <> nil then
+      GdipCheck(GdipSetImageAttributesColorMatrix(FHandle, ColorAdjustTypeBitmap, True, @FColorMatrix, nil, ColorMatrixFlagsDefault));
+  end;
+  Result := FHandle;
+end;
+
 { EGdipException }
 
 constructor EGdipException.Create(AStatus: GpStatus);
@@ -721,9 +767,39 @@ begin
   inherited;
 end;
 
-procedure TACLGdiplusRenderImageAttributes.SetColorMatrix(const AColorMatrix: ColorMatrix);
+procedure TACLGdiplusRenderImageAttributes.SetAlpha(AValue: Byte);
 begin
-  GdipCheck(GdipSetImageAttributesColorMatrix(FHandle, ColorAdjustTypeBitmap, True, @AColorMatrix, nil, ColorMatrixFlagsDefault));
+  if Alpha <> AValue then
+  begin
+    inherited;
+    ApplyColorMatrix;
+  end;
+end;
+
+procedure TACLGdiplusRenderImageAttributes.SetTintColor(AValue: TAlphaColor);
+begin
+  if TintColor <> AValue then
+  begin
+    inherited;
+    ApplyColorMatrix;
+  end;
+end;
+
+procedure TACLGdiplusRenderImageAttributes.ApplyColorMatrix;
+begin
+  if TintColor.IsValid then
+  begin
+    ZeroMemory(@FMatrix, SizeOf(FMatrix));
+    FMatrix[4, 0] := TintColor.R / MaxByte;
+    FMatrix[4, 1] := TintColor.G / MaxByte;
+    FMatrix[4, 2] := TintColor.B / MaxByte;
+    FMatrix[4, 4] := TintColor.A / MaxByte;
+  end
+  else
+    FMatrix := GpDefaultColorMatrix;
+
+  FMatrix[3, 3] := Alpha / MaxByte;
+  GdipCheck(GdipSetImageAttributesColorMatrix(FHandle, ColorAdjustTypeBitmap, True, @FMatrix, nil, ColorMatrixFlagsDefault));
 end;
 
 { TACLGdiplusRenderPath }
@@ -739,12 +815,12 @@ begin
   inherited;
 end;
 
-procedure TACLGdiplusRenderPath.AddArc(const X, Y, Width, Height, StartAngle, SweepAngle: Single);
+procedure TACLGdiplusRenderPath.AddArc(CX, CY, RadiusX, RadiusY, StartAngle, SweepAngle: Single);
 begin
-  GdipCheck(GdipAddPathArc(Handle, X, Y, Width, Height, StartAngle, SweepAngle));
+  GdipCheck(GdipAddPathArc(Handle, CX - RadiusX, CY - RadiusY, 2 * RadiusX, 2 * RadiusY, StartAngle, SweepAngle));
 end;
 
-procedure TACLGdiplusRenderPath.AddLine(const X1, Y1, X2, Y2: Single);
+procedure TACLGdiplusRenderPath.AddLine(X1, Y1, X2, Y2: Single);
 begin
   GdipCheck(GdipAddPathLine(Handle, X1, Y1, X2, Y2));
 end;
@@ -896,8 +972,11 @@ begin
 end;
 
 function TACLGdiplusRender.CreateImage(Image: TACLImage): TACL2DRenderImage;
+var
+  AHandle: GpImage;
 begin
-  Result := TACLGdiplusRenderImage.Create(Self, TACLImageAccess(Image).CloneHandle);
+  GdipCheck(GdipCloneImage(TACLImageAccess(Image).Handle, AHandle));
+  Result := TACLGdiplusRenderImage.Create(Self, AHandle);
 end;
 
 function TACLGdiplusRender.CreateImageAttributes: TACL2DRenderImageAttributes;
@@ -906,19 +985,25 @@ begin
 end;
 
 procedure TACLGdiplusRender.DrawImage(Image: TACL2DRenderImage;
-  const TargetRect, SourceRect: TRect; Attributes: TACL2DRenderImageAttributes = nil);
+  const TargetRect, SourceRect: TRect; Attributes: TACL2DRenderImageAttributes);
 var
   AImageAttributes: GpImageAttributes;
 begin
   if IsValid(Image) then
   begin
+    AImageAttributes := nil;
     if IsValid(Attributes) then
-      AImageAttributes := TACLGdiplusRenderImageAttributes(Attributes).FHandle
-    else
-      AImageAttributes := nil;
-
+      AImageAttributes := TACLGdiplusRenderImageAttributes(Attributes).Handle;
     GpDrawImage(FGraphics, TACLGdiplusRenderImage(Image).FHandle, AImageAttributes, TargetRect, SourceRect, False);
   end;
+end;
+
+procedure TACLGdiplusRender.DrawImage(Image: TACL2DRenderImage; const TargetRect, SourceRect: TRect; Alpha: Byte);
+begin
+  if IsValid(Image) then
+    GpDrawImage(FGraphics,
+      TACLGdiplusRenderImage(Image).FHandle,
+      TACLGdiplusAlphaBlendAttributes.Get(Alpha), TargetRect, SourceRect, False);
 end;
 
 procedure TACLGdiplusRender.FillClosedCurve2(
@@ -969,7 +1054,7 @@ begin
 end;
 
 procedure TACLGdiplusRender.DrawText(const Text: string; const R: TRect; Color: TAlphaColor;
-  Font: TFont; HorzAlign: TAlignment; VertAlgin: TVerticalAlignment; WordWrap: Boolean);
+  Font: TFont; HorzAlign: TAlignment; VertAlign: TVerticalAlignment; WordWrap: Boolean);
 const
   AlignmentToStringAlignment: array[TAlignment] of TStringAlignment = (
     StringAlignmentNear, StringAlignmentFar, StringAlignmentCenter
@@ -987,7 +1072,7 @@ begin
       IfThen(WordWrap, 0, StringFormatFlagsNoWrap), 0, AStringFormat));
     try
       GdipCheck(GdipSetStringFormatAlign(AStringFormat, AlignmentToStringAlignment[HorzAlign]));
-      GdipCheck(GdipSetStringFormatLineAlign(AStringFormat, VerticalAlignmentToLineAlignment[VertAlgin]));
+      GdipCheck(GdipSetStringFormatLineAlign(AStringFormat, VerticalAlignmentToLineAlignment[VertAlign]));
       ARectF := MakeRect(Single(R.Left), R.Top, R.Width, R.Height);
       GdipDrawString(FGraphics, PChar(Text), Length(Text),
         TACLGdiplusResourcesCache.FontGet(Font), @ARectF, AStringFormat,
@@ -1131,6 +1216,7 @@ initialization
   GpPaintCanvas := TACLGdiplusPaintCanvas.Create;
 
 finalization
+  TACLGdiplusAlphaBlendAttributes.Finalize;
   TACLGdiplusResourcesCache.Flush;
   FreeAndNil(GpPaintCanvas);
 end.
