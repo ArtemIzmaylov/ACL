@@ -18,6 +18,13 @@ interface
 uses
   System.Math;
 
+type
+  TACLMath = class
+  public
+    class function IfThen<T>(Condition: Boolean; const True: T): T; overload; inline;
+    class function IfThen<T>(Condition: Boolean; const True: T; const False: T): T; overload; inline;
+  end;
+
 // MinMax, MaxMin
 function MaxMin(const AValue, AMinValue, AMaxValue: Double): Double; overload; inline;
 function MaxMin(const AValue, AMinValue, AMaxValue: Int64): Int64; overload; inline;
@@ -149,6 +156,22 @@ begin
     ARatio := 0;
 
   Result := Round(ARatio * AValue); //#AI: must be round!!
+end;
+
+{ TACLMath }
+
+class function TACLMath.IfThen<T>(Condition: Boolean; const True: T): T;
+begin
+  if Condition then
+    Exit(True);
+  Result := Default(T);
+end;
+
+class function TACLMath.IfThen<T>(Condition: Boolean; const True, False: T): T;
+begin
+  if Condition then
+    Exit(True);
+  Result := False;
 end;
 
 end.
