@@ -57,6 +57,8 @@ contains
   ACL.Graphics.Images in 'Base\ACL.Graphics.Images.pas',
   ACL.Graphics.FontCache in 'Base\ACL.Graphics.FontCache.pas',
   ACL.Graphics.Ex in 'ACL\Base\ACL.Graphics.Ex.pas',
+  ACL.Graphics.Ex.D2D in 'ACL\Base\ACL.Graphics.Ex.D2D.pas',
+  ACL.Graphics.Ex.D2D.Types in 'ACL\Base\ACL.Graphics.Ex.D2D.Types.pas',
   ACL.Graphics.Ex.Gdip in 'ACL\Base\ACL.Graphics.Ex.Gdip.pas',
   ACL.Graphics.SkinImage in 'Base\ACL.Graphics.SkinImage.pas',
   ACL.Graphics.SkinImageSet in 'Base\ACL.Graphics.SkinImageSet.pas',
