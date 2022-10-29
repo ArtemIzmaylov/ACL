@@ -28,6 +28,7 @@ uses
   // VCL
   Vcl.Graphics,
   // ACL
+  ACL.Classes,
   ACL.Classes.Collections,
   ACL.Graphics,
   ACL.Graphics.Images,
@@ -187,6 +188,14 @@ type
   TACL2DRender = class;
   TACL2DRenderStrokeStyle = (ssSolid, ssDash, ssDot, ssDashDot, ssDashDotDot);
 
+  { IACL2DRenderGdiCompatible }
+
+  TACL2DRenderGdiDrawProc = reference to procedure (DC: HDC; out UpdateRect: TRect);
+  IACL2DRenderGdiCompatible = interface
+  ['{D4065B50-E628-4E99-AD58-DF771293C551}']
+    procedure GdiDraw(Proc: TACL2DRenderGdiDrawProc);
+  end;
+
   { TACL2DRenderResource }
 
   TACL2DRenderResource = class
@@ -240,8 +249,12 @@ type
 
   { TACL2DRender }
 
-  TACL2DRender = class
+  TACL2DRender = class(TACLUnknownObject)
   public
+    procedure BeginPaint(DC: HDC; const BoxRect: TRect); overload;
+    procedure BeginPaint(DC: HDC; const BoxRect, UpdateRect: TRect); overload; virtual; abstract;
+    procedure EndPaint; virtual; abstract;
+
     function IsValid(const AResource: TACL2DRenderResource): Boolean; inline;
 
     // Clipping
@@ -269,6 +282,7 @@ type
       Width: Single = 1; Style: TACL2DRenderStrokeStyle = ssSolid); overload; virtual; abstract;
 
     // Images
+    function CreateImage(Bitmap: TBitmap): TACL2DRenderImage; overload; virtual;
     function CreateImage(Colors: PRGBQuad; Width, Height: Integer;
       AlphaFormat: TAlphaFormat = afDefined): TACL2DRenderImage; overload; virtual; abstract;
     function CreateImage(Image: TACLBitmapLayer): TACL2DRenderImage; overload; virtual;
@@ -281,12 +295,14 @@ type
     procedure DrawImage(Image: TACL2DRenderImage;
       const TargetRect, SourceRect: TRect; Attributes: TACL2DRenderImageAttributes); overload; virtual; abstract;
 
+    // Rectangles
     procedure Rectangle(const R: TRect; Color, StrokeColor: TAlphaColor;
       StrokeWidth: Single = 1; StrokeStyle: TACL2DRenderStrokeStyle = ssSolid);
     procedure DrawRectangle(const R: TRect; Color: TAlphaColor;
       Width: Single = 1; Style: TACL2DRenderStrokeStyle = ssSolid); overload;
     procedure DrawRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor;
       Width: Single = 1; Style: TACL2DRenderStrokeStyle = ssSolid); overload; virtual; abstract;
+    procedure FillHatchRectangle(const R: TRect; Color1, Color2: TAlphaColor; Size: Integer); virtual; abstract;
     procedure FillRectangle(const R: TRect; Color: TAlphaColor); overload;
     procedure FillRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor); overload; virtual; abstract;
 
@@ -312,7 +328,9 @@ type
     procedure ModifyWorldTransform(const XForm: TXForm); virtual; abstract;
     procedure RestoreWorldTransform; virtual; abstract;
     procedure SaveWorldTransform; virtual; abstract;
-    procedure ScaleWorldTransform(ScaleX, ScaleY: Single); virtual;
+    procedure ScaleWorldTransform(Scale: Single); overload;
+    procedure ScaleWorldTransform(ScaleX, ScaleY: Single); overload; virtual;
+    procedure SetWorldTransform(const XForm: TXForm); virtual; abstract;
     procedure TransformPoints(Points: PPointF; Count: Integer); virtual; abstract;
     procedure TranslateWorldTransform(OffsetX, OffsetY: Single); virtual;
   end;
@@ -1913,6 +1931,11 @@ begin
   Result := (AResource <> nil) and (AResource.FOwner = Self);
 end;
 
+procedure TACL2DRender.BeginPaint(DC: HDC; const BoxRect: TRect);
+begin
+  BeginPaint(DC, BoxRect, BoxRect)
+end;
+
 function TACL2DRender.CreateImage(Image: TACLImage): TACL2DRenderImage;
 var
   AData: TBitmapData;
@@ -1940,6 +1963,21 @@ begin
   end
   else
     Result := nil;
+end;
+
+function TACL2DRender.CreateImage(Bitmap: TBitmap): TACL2DRenderImage;
+var
+  AColors: TRGBColors;
+begin
+  Result := nil;
+  if not Bitmap.Empty then
+    with TACLBitmapBits.Create(Bitmap.Handle) do
+    try
+      if ReadColors(AColors) then
+        Result := CreateImage(@AColors[0], Bitmap.Width, Bitmap.Height, Bitmap.AlphaFormat);
+    finally
+      Free;
+    end;
 end;
 
 function TACL2DRender.CreateImage(Image: TACLBitmapLayer): TACL2DRenderImage;
@@ -2026,6 +2064,11 @@ procedure TACL2DRender.Rectangle(const R: TRect;
 begin
   FillRectangle(R, Color);
   DrawRectangle(R, StrokeColor, StrokeWidth, StrokeStyle);
+end;
+
+procedure TACL2DRender.ScaleWorldTransform(Scale: Single);
+begin
+  ScaleWorldTransform(Scale, Scale);
 end;
 
 procedure TACL2DRender.ScaleWorldTransform(ScaleX, ScaleY: Single);

@@ -114,7 +114,8 @@ type
 
   { TACLGdiplusRender }
 
-  TACLGdiplusRender = class(TACL2DRender)
+  TACLGdiplusRender = class(TACL2DRender,
+    IACL2DRenderGdiCompatible)
   strict private
     FSavedClipRegion: TStack;
     FSavedWorldTransforms: TStack;
@@ -127,11 +128,16 @@ type
     procedure SetSmoothingMode(AValue: TSmoothingMode);
   protected
     FGraphics: GpGraphics;
+
+    // IACL2DRenderGdiCompatible
+    procedure GdiDraw(Proc: TACL2DRenderGdiDrawProc);
   public
     constructor Create; overload; virtual;
     constructor Create(DC: HDC); overload;
     constructor Create(Graphics: GpGraphics); overload;
     destructor Destroy; override;
+    procedure BeginPaint(DC: HDC; const Unused1, Unused2: TRect); override;
+    procedure EndPaint; override;
 
     // Clipping
     function IsVisible(const R: TRect): Boolean; override;
@@ -168,6 +174,7 @@ type
     // Rectangle
     procedure DrawRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor;
       StrokeWidth: Single = 1; StrokeStyle: TACL2DRenderStrokeStyle = ssSolid); override;
+    procedure FillHatchRectangle(const R: TRect; Color1, Color2: TAlphaColor; Size: Integer); override;
     procedure FillRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor); override;
     procedure FillRectangleByGradient(AColor1, AColor2: TAlphaColor; const R: TRect; AMode: TLinearGradientMode);
 
@@ -192,6 +199,7 @@ type
     procedure RestoreWorldTransform; override;
     procedure SaveWorldTransform; override;
     procedure ScaleWorldTransform(ScaleX, ScaleY: Single); override;
+    procedure SetWorldTransform(const XForm: TXForm); override;
     procedure TransformPoints(Points: PPointF; Count: Integer); override;
     procedure TranslateWorldTransform(OffsetX, OffsetY: Single); override;
 
@@ -215,8 +223,9 @@ type
   public
     constructor Create; override;
     destructor Destroy; override;
-    procedure BeginPaint(DC: HDC);
-    procedure EndPaint;
+    procedure BeginPaint(DC: HDC); reintroduce; overload;
+    procedure BeginPaint(DC: HDC; const Unused1, Unused2: TRect); override;
+    procedure EndPaint; override;
   end;
 
   { TACLGdiplusStream }
@@ -863,7 +872,7 @@ end;
 destructor TACLGdiplusRender.Destroy;
 begin
   if FGraphics <> nil then
-    GdipCheck(GdipDeleteGraphics(FGraphics));
+    GdipDeleteGraphics(FGraphics);
   while FSavedClipRegion.Count > 0 do
     GdipDeleteRegion(FSavedClipRegion.Pop);
   while FSavedWorldTransforms.Count > 0 do
@@ -871,6 +880,23 @@ begin
   FreeAndNil(FSavedWorldTransforms);
   FreeAndNil(FSavedClipRegion);
   inherited;
+end;
+
+procedure TACLGdiplusRender.BeginPaint(DC: HDC; const Unused1, Unused2: TRect);
+begin
+  if FGraphics <> nil then
+    raise EInvalidGraphicOperation.Create('Render is already in paint stage');
+  GdipCheck(GdipCreateFromHDC(DC, FGraphics));
+end;
+
+procedure TACLGdiplusRender.EndPaint;
+begin
+  if FGraphics <> nil then
+  try
+    GdipDeleteGraphics(FGraphics);
+  finally
+    FGraphics := nil;
+  end;
 end;
 
 function TACLGdiplusRender.CreatePath: TACL2DRenderPath;
@@ -943,6 +969,15 @@ end;
 procedure TACLGdiplusRender.ScaleWorldTransform(ScaleX, ScaleY: Single);
 begin
   GdipCheck(GdipScaleWorldTransform(FGraphics, ScaleX, ScaleY, MatrixOrderPrepend));
+end;
+
+procedure TACLGdiplusRender.SetWorldTransform(const XForm: TXForm);
+var
+  AMatrix: GpMatrix;
+begin
+  GdipCheck(GdipCreateMatrix2(XForm.eM11, XForm.eM12, XForm.eM21, XForm.eM22, XForm.eDx, XForm.eDy, AMatrix));
+  GdipCheck(GdipSetWorldTransform(FGraphics, AMatrix));
+  GdipCheck(GdipDeleteMatrix(AMatrix));
 end;
 
 procedure TACLGdiplusRender.TransformPoints(Points: PPointF; Count: Integer);
@@ -1089,6 +1124,41 @@ begin
     GdipFillEllipse(FGraphics, TACLGdiplusResourcesCache.BrushGet(Color), X1, Y1, X2 - X1, Y2 - Y1);
 end;
 
+procedure TACLGdiplusRender.FillHatchRectangle(const R: TRect; Color1, Color2: TAlphaColor; Size: Integer);
+var
+  ABitmap: GpBitmap;
+  ABitmapGraphics: GpGraphics;
+  ABitmapBrush: GpTexture;
+  ABrush: GpBrush;
+begin
+  ABitmap := GpCreateBitmap(2 * Size, 2 * Size);
+  if ABitmap <> nil then
+  try
+    // Generate Pattern
+    if GdipGetImageGraphicsContext(ABitmap, ABitmapGraphics) = Ok then
+    try
+      ABrush := TACLGdiplusResourcesCache.BrushGet(Color2);
+      GdipFillRectangleI(ABitmapGraphics, ABrush, 0, 0, Size, Size);
+      GdipFillRectangleI(ABitmapGraphics, ABrush, Size, Size, Size, Size);
+      ABrush := TACLGdiplusResourcesCache.BrushGet(Color1);
+      GdipFillRectangleI(ABitmapGraphics, ABrush, 0, Size, Size, Size);
+      GdipFillRectangleI(ABitmapGraphics, ABrush, Size, 0, Size, Size);
+    finally
+      GdipCheck(GdipDeleteGraphics(ABitmapGraphics));
+    end;
+
+    // Draw
+    if GdipCreateTexture(ABitmap, WrapModeTile, ABitmapBrush) = Ok then
+    try
+      GdipFillRectangle(FGraphics, ABitmapBrush, R.Left, R.Top, R.Width, R.Height);
+    finally
+      GdipDeleteBrush(ABitmapBrush);
+    end;
+  finally
+    GdipDisposeImage(ABitmap);
+  end;
+end;
+
 procedure TACLGdiplusRender.FillPath(Path: TACL2DRenderPath; Color: TAlphaColor);
 begin
   if Color.IsValid then
@@ -1133,6 +1203,19 @@ procedure TACLGdiplusRender.Line(const Points: PPoint; Count: Integer;
 begin
   if (Count > 0) and Color.IsValid and (Width > 0) then
     GdipDrawLinesI(FGraphics, TACLGdiplusResourcesCache.PenGet(Color, Width, Style), PGPPoint(Points), Count);
+end;
+
+procedure TACLGdiplusRender.GdiDraw(Proc: TACL2DRenderGdiDrawProc);
+var
+  DC: HDC;
+  R: TRect;
+begin
+  GdipCheck(GdipGetDC(FGraphics, DC));
+  try
+    Proc(DC, R);
+  finally
+    GdipCheck(GdipReleaseDC(FGraphics, DC));
+  end;
 end;
 
 function TACLGdiplusRender.GetInterpolationMode: TInterpolationMode;
@@ -1198,6 +1281,11 @@ begin
   if FGraphics <> nil then
     FSavedHandles.Push(FGraphics);
   GdipCheck(GdipCreateFromHDC(DC, FGraphics));
+end;
+
+procedure TACLGdiplusPaintCanvas.BeginPaint(DC: HDC; const Unused1, Unused2: TRect);
+begin
+  BeginPaint(DC)
 end;
 
 procedure TACLGdiplusPaintCanvas.EndPaint;
