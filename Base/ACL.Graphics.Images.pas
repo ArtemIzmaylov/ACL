@@ -460,7 +460,7 @@ begin
             (AData1.Width = AData2.Width) and
             (AData1.Height = AData2.Height) and
             (AData1.Stride = AData2.Stride) and
-            CompareMem(AData1.Scan0, AData2.Scan0, Cardinal(AData1.Stride) * AData1.Width * AData1.Height);
+            CompareMem(AData1.Scan0, AData2.Scan0, Cardinal(AData1.Stride) * AData1.Height);
         finally
           AImage.EndLock(AData2)
         end;
