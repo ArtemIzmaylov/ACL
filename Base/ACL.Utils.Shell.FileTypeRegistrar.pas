@@ -432,7 +432,7 @@ begin
       AIconIndex := 0;
 
     ATypeRoot := AInfo.GetProgID(AppName);
-    acRegWriteDefaultStr(AKey, ATypeRoot, AppDisplayName + ': ' + AInfo.Title);
+    acRegWriteDefaultStr(AKey, ATypeRoot, {AppDisplayName + ': ' +}AInfo.Title);
     acRegWriteDefaultStr(AKey, ATypeRoot + '\DefaultIcon', ALibrary.FileName + ',' + IntToStr(AIconIndex));
     if AppDropTargetClass <> '' then
       acRegWriteDefaultStr(AKey, ATypeRoot + '\CLSID', AppDropTargetClass);
