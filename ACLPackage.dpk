@@ -25,7 +25,7 @@
 {$IMAGEBASE $400000}
 {$DEFINE DEBUG}
 {$ENDIF IMPLICITBUILDING}
-{$DESCRIPTION 'Artem''s Components Library v2022.10'}
+{$DESCRIPTION 'Artem''s Components Library v2022.11'}
 {$IMPLICITBUILD ON}
 
 requires
@@ -108,6 +108,7 @@ contains
   ACL.UI.Controls.Panel in 'Visual\ACL.UI.Controls.Panel.pas',
   ACL.UI.Controls.ProgressBar in 'Visual\ACL.UI.Controls.ProgressBar.pas',
   ACL.UI.Controls.ProgressBox in 'Visual\ACL.UI.Controls.ProgressBox.pas',
+  ACL.UI.Controls.Scene2D in 'Visual\ACL.UI.Controls.Scene2D.pas',
   ACL.UI.Controls.ScrollBar in 'Visual\ACL.UI.Controls.ScrollBar.pas',
   ACL.UI.Controls.ScrollBox in 'Visual\ACL.UI.Controls.ScrollBox.pas',
   ACL.UI.Controls.SearchBox in 'Visual\ACL.UI.Controls.SearchBox.pas',

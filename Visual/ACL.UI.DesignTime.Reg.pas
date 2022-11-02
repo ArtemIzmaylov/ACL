@@ -74,6 +74,7 @@ uses
   ACL.UI.Controls.Panel,
   ACL.UI.Controls.ProgressBar,
   ACL.UI.Controls.ProgressBox,
+  ACL.UI.Controls.Scene2D,
   ACL.UI.Controls.ScrollBar,
   ACL.UI.Controls.ScrollBox,
   ACL.UI.Controls.SearchBox,
@@ -217,6 +218,9 @@ begin
   RegisterSelectionEditor(TACLTreeList, TACLTreeListSelectionEditor);
   RegisterPropertyEditor(TypeInfo(TImageIndex), TACLTreeListColumn, 'ImageIndex', TACLTreeListColumnImageIndexProperty);
   HideProperties(TACLTreeList, ['OnEditApply']);
+
+  // Scene2D
+  RegisterComponents(sACLComponentsPage, [TACLPaintBox2D]);
 end;
 
 end.
