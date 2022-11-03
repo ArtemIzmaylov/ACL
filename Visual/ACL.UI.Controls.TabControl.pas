@@ -42,7 +42,8 @@ uses
   ACL.UI.Resources,
   ACL.Utils.Common,
   ACL.Utils.Desktop,
-  ACL.Utils.FileSystem;
+  ACL.Utils.FileSystem,
+  ACL.Utils.Strings;
 
 type
   TACLCustomTabControl = class;
@@ -100,6 +101,7 @@ type
     constructor Create(AControl: TACLCustomTabControl); virtual;
     function Add: TACLTab; overload;
     function Add(const ACaption: UnicodeString; AData: Pointer = nil): TACLTab; overload;
+    function FindByCaption(const ACaption: UnicodeString; out ATab: TACLTab): Boolean;
     //
     property Items[Index: Integer]: TACLTab read GetItem; default;
   end;
@@ -162,6 +164,7 @@ type
   TACLCustomTabControl = class(TACLCustomControl)
   strict private
     FActiveIndex: Integer;
+    FBorders: TACLBorders;
     FFrameRect: TRect;
     FHoverTab: TACLTab;
     FIsUserAction: Boolean;
@@ -177,6 +180,7 @@ type
 
     function GetTabHeight: Integer;
     procedure SetActiveIndex(AValue: Integer);
+    procedure SetBorders(AValue: TACLBorders);
     procedure SetHoverTab(AValue: TACLTab);
     procedure SetOptionsView(AValue: TACLTabsOptionsView);
     procedure SetStyle(AValue: TACLStyleTabControl);
@@ -248,6 +252,7 @@ type
     property ActiveIndex: Integer read FActiveIndex write SetActiveIndex default 0;
     property Align;
     property Anchors;
+    property Borders: TACLBorders read FBorders write SetBorders default acAllBorders;
     property Font;
     property Padding;
     property OptionsView: TACLTabsOptionsView read FOptionsView write SetOptionsView;
@@ -334,6 +339,7 @@ type
     function AddPage(const ACaption: UnicodeString): TACLPageControlPage;
     procedure GetChildren(Proc: TGetChildProc; Root: TComponent); override;
     procedure GetTabOrderList(List: TList); override;
+    procedure ShowControl(AControl: TControl); override;
     //
     property ActivePage: TACLPageControlPage read GetActivePage write SetActivePage;
     property PageCount: Integer read GetPageCount;
@@ -446,6 +452,17 @@ begin
   end;
 end;
 
+function TACLTabsList.FindByCaption(const ACaption: UnicodeString; out ATab: TACLTab): Boolean;
+begin
+  for var I := 0 to Count - 1 do
+    if acSameText(Items[I].Caption, ACaption) then
+    begin
+      ATab := Items[I];
+      Exit(True);
+    end;
+  Result := False;
+end;
+
 function TACLTabsList.GetItem(Index: Integer): TACLTab;
 begin
   Result := TACLTab(inherited Items[Index]);
@@ -467,6 +484,7 @@ constructor TACLCustomTabControl.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   FActiveIndex := -1;
+  FBorders := acAllBorders;
   TabStop := True;
   ControlStyle := ControlStyle + [csAcceptsControls];
   FStyle := TACLStyleTabControl.Create(Self);
@@ -486,7 +504,7 @@ end;
 
 procedure TACLCustomTabControl.AdjustClientRect(var Rect: TRect);
 begin
-  Rect := acRectInflate(FFrameRect, -1);
+  Rect := acRectContent(FFrameRect, 1, Borders);
   Rect := acRectContent(Rect, Padding.GetScaledMargins(ScaleFactor));
 end;
 
@@ -674,7 +692,7 @@ end;
 procedure TACLCustomTabControl.DrawContentAreaBackground(ACanvas: TCanvas);
 begin
   acFillRect(ACanvas.Handle, FrameRect, Style.ColorContent.AsColor);
-  acDrawComplexFrame(ACanvas.Handle, FrameRect, Style.ColorBorder1.AsColor, Style.ColorBorder2.AsColor);
+  acDrawComplexFrame(ACanvas.Handle, FrameRect, Style.ColorBorder1.AsColor, Style.ColorBorder2.AsColor, Borders);
 end;
 
 procedure TACLCustomTabControl.DrawItem(ACanvas: TCanvas; AViewItem: TACLTabViewItem);
@@ -986,6 +1004,15 @@ begin
   end;
 end;
 
+procedure TACLCustomTabControl.SetBorders(AValue: TACLBorders);
+begin
+  if FBorders <> AValue then
+  begin
+    FBorders := AValue;
+    FullRefresh;
+  end;
+end;
+
 procedure TACLCustomTabControl.SetDefaultSize;
 begin
   SetBounds(Left, Top, 400, 300);
@@ -1097,6 +1124,7 @@ end;
 
 procedure TACLTabsOptionsView.SetTabIndent(AValue: Integer);
 begin
+  FTabIndent := Max(FTabIndent, 0);
   if AValue <> FTabIndent then
   begin
     FTabIndent := AValue;
@@ -1315,6 +1343,13 @@ begin
     ActivePage.GetTabOrderList(List);
 end;
 
+procedure TACLPageControl.ShowControl(AControl: TControl);
+begin
+  if AControl is TACLPageControlPage then
+    ActivePage := TACLPageControlPage(AControl);
+  inherited;
+end;
+
 function TACLPageControl.GetPageCount: Integer;
 begin
   Result := Tabs.Count;
@@ -1327,10 +1362,13 @@ end;
 
 procedure TACLPageControl.SetActivePage(AValue: TACLPageControlPage);
 begin
-  if AValue <> nil then
-    ActiveIndex := AValue.PageIndex
-  else
-    ActiveIndex := -1;
+  if (AValue = nil) or (AValue.PageControl = Self) then
+  begin
+    if AValue <> nil then
+      ActiveIndex := AValue.PageIndex
+    else
+      ActiveIndex := -1;
+  end;
 end;
 
 { TACLPageControlUIInsightAdapter }
