@@ -34,7 +34,6 @@ uses
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Ex,
-  ACL.Graphics.Ex.Gdip,
   ACL.Graphics.SkinImage,
   ACL.Graphics.SkinImageSet,
   ACL.UI.Controls.BaseControls,
@@ -179,16 +178,18 @@ type
   strict private
     FAllowedElements: TACLSelectionFrameElements;
     FBounds: TRect;
-    FElements: array [TACLSelectionFrameElement] of TACLRegion;
-    FFrameSize: Integer;
     FHandleAlignment: TACLSelectionFrameHandleAlignment;
+  protected
+    FElements: array [TACLSelectionFrameElement] of TRect;
+    FFrameSize: Integer;
+    FLineSize: Integer;
   public
     constructor Create;
-    destructor Destroy; override;
     procedure Calculate(const ABounds: TRect; AScaleFactor: TACLScaleFactor);
     function CalculateBounds(const AControlBounds: TRect; AScaleFactor: TACLScaleFactor): TRect;
     function CalculateHitTest(const P: TPoint): TACLSelectionFrameHitTestCode;
-    procedure Draw(DC: HDC; ASelectedElement: TACLSelectionFrameHitTestCode = sfeNone);
+    procedure Draw(ARender: TACL2DRender; ASelectedElement: TACLSelectionFrameHitTestCode = sfeNone); overload;
+    procedure Draw(DC: HDC; ASelectedElement: TACLSelectionFrameHitTestCode = sfeNone); overload;
     //
     property AllowedElements: TACLSelectionFrameElements read FAllowedElements write FAllowedElements;
     property Bounds: TRect read FBounds;
@@ -259,7 +260,7 @@ type
 implementation
 
 uses
-  Math,
+  System.Math,
   // ACL
   ACL.Utils.Common,
   ACL.Utils.DPIAware;
@@ -607,74 +608,49 @@ var
 begin
   AllowedElements := [Low(TACLSelectionFrameElement)..High(TACLSelectionFrameElement)];
   for AElement := Low(AElement) to High(AElement) do
-    FElements[AElement] := TACLRegion.Create;
-end;
-
-destructor TACLSelectionFrame.Destroy;
-var
-  AElement: TACLSelectionFrameElement;
-begin
-  for AElement := Low(AElement) to High(AElement) do
-    FreeAndNil(FElements[AElement]);
-  inherited;
+    FElements[AElement] := NullRect;
 end;
 
 procedure TACLSelectionFrame.Calculate(const ABounds: TRect; AScaleFactor: TACLScaleFactor);
-
-  procedure AddSideElement(AElement: TACLSelectionFrameElement; const R: TRect; ALineSize: Integer);
-  begin
-    if AElement in AllowedElements then
-    begin
-      if not acRectIsEmpty(R) then
-        FElements[sfeFrame].Combine(acRectInflate(R, 2 * ALineSize), rcmDiff);
-      FElements[AElement].Combine(R, rcmCopy);
-    end
-    else
-      FElements[AElement].Reset;
-  end;
-
 var
   ACornerSize: Integer;
-  ALineSize: Integer;
   ARect: TRect;
   ASideSize: Integer;
 begin
   FBounds := ABounds;
   FFrameSize := AScaleFactor.Apply(DefaultFrameSize);
 
-  ALineSize := AScaleFactor.Apply(DefaultLineSize);
+  FLineSize := AScaleFactor.Apply(DefaultLineSize);
   ASideSize := AScaleFactor.Apply(DefaultSideSize);
   ACornerSize := AScaleFactor.Apply(DefaultCornerSize);
   ACornerSize := Min(ACornerSize, Min(FBounds.Width, FBounds.Height) div 3);
 
-  if sfeFrame in AllowedElements then
-  begin
-    if HandleAlignment = sfhaOutside then
-    begin
-      FElements[sfeFrame].Combine(acRectInflate(Bounds, -FFrameSize + ALineSize), rcmCopy);
-      FElements[sfeFrame].Combine(acRectInflate(Bounds, -FFrameSize), rcmDiff);
-    end
-    else
-    begin  
-      FElements[sfeFrame].Combine(Bounds, rcmCopy);
-      FElements[sfeFrame].Combine(acRectInflate(Bounds, -ALineSize), rcmDiff);
-    end;
-  end
+  if HandleAlignment = sfhaOutside then
+    FElements[sfeFrame] := acRectInflate(Bounds, -FFrameSize + FLineSize)
   else
-    FElements[sfeFrame].Reset;
+    FElements[sfeFrame] := Bounds;
 
-  AddSideElement(sfeCornerLeftTop, acRectSetSize(FBounds, ACornerSize, ACornerSize), ALineSize);
-  AddSideElement(sfeCornerRightTop, acRectSetHeight(acRectSetRight(FBounds, FBounds.Right, ACornerSize), ACornerSize), ALineSize);
-  AddSideElement(sfeCornerLeftBottom, acRectSetWidth(acRectSetBottom(FBounds, FBounds.Bottom, ACornerSize), ACornerSize), ALineSize);
-  AddSideElement(sfeCornerRightBottom, acRectSetRight(acRectSetBottom(FBounds, FBounds.Bottom, ACornerSize), FBounds.Right, ACornerSize), ALineSize);
+  ARect := acRectSetHeight(ABounds, ACornerSize);
+  FElements[sfeCornerLeftTop] := acRectSetWidth(ARect, ACornerSize);
+  FElements[sfeCornerRightTop] := acRectSetRight(ARect, ARect.Right, ACornerSize);
+
+  ARect := acRectSetBottom(FBounds, FBounds.Bottom, ACornerSize);
+  FElements[sfeCornerLeftBottom] := acRectSetWidth(ARect, ACornerSize);
+  FElements[sfeCornerRightBottom] := acRectSetRight(ARect, FBounds.Right, ACornerSize);
 
   ARect := acRectCenterVertically(ABounds, MaxMin(ASideSize, 0, FBounds.Height - 3 * (ACornerSize + 1)));
-  AddSideElement(sfeLeft, acRectSetWidth(ARect, ACornerSize), ALineSize);
-  AddSideElement(sfeRight, acRectSetRight(ARect, ARect.Right, ACornerSize), ALineSize);
+  FElements[sfeLeft] := acRectSetWidth(ARect, ACornerSize);
+  FElements[sfeRight] := acRectSetRight(ARect, ARect.Right, ACornerSize);
 
   ARect := acRectCenterHorizontally(ABounds, MaxMin(ASideSize, 0, FBounds.Width - 3 * (ACornerSize + 1)));
-  AddSideElement(sfeBottom, acRectSetBottom(ARect, ARect.Bottom, ACornerSize), ALineSize);
-  AddSideElement(sfeTop, acRectSetHeight(ARect, ACornerSize), ALineSize);
+  FElements[sfeBottom] := acRectSetBottom(ARect, ARect.Bottom, ACornerSize);
+  FElements[sfeTop] := acRectSetHeight(ARect, ACornerSize);
+
+  for var AElement := Low(TACLSelectionFrameElement) to High(TACLSelectionFrameElement) do
+  begin
+    if not (AElement in AllowedElements) then
+      FElements[AElement] := NullRect;
+  end;
 end;
 
 function TACLSelectionFrame.CalculateBounds(const AControlBounds: TRect; AScaleFactor: TACLScaleFactor): TRect;
@@ -691,42 +667,96 @@ begin
   Result := sfeNone;
   if PtInRect(acRectInflate(Bounds, FFrameSize), P) then
   begin
-    Result := sfeFrame;
-    for AIndex := High(AIndex) downto Low(AIndex) do
+    for AIndex := High(AIndex) downto sfeLeft do
     begin
-      if PtInRegion(FElements[AIndex].Handle, P.X, P.Y) then
+      if PtInRect(FElements[AIndex], P) then
         Exit(AIndex);
     end;
     if PtInRect(acRectInflate(Bounds, -FFrameSize), P) then
-      Exit(sfeClient);    
+      Result := sfeClient
+    else
+      Result := sfeFrame;
+  end;
+end;
+
+procedure TACLSelectionFrame.Draw(ARender: TACL2DRender; ASelectedElement: TACLSelectionFrameHitTestCode);
+
+  procedure DrawElements(const AClipRect: TRect);
+  begin
+    ARender.SaveClipRegion;
+    try
+      ARender.IntersectClipRect(AClipRect);
+      for var I := Low(FElements) to High(FElements) do
+      begin
+        if I = ASelectedElement then
+          ARender.FillHatchRectangle(FElements[I], TAlphaColors.Black, TAlphaColors.White, 1)
+        else
+          ARender.FillRectangle(FElements[I], TAlphaColors.Black);
+      end;
+    finally
+      ARender.RestoreClipRegion;
+    end;
+  end;
+
+var
+  AGdi: IACL2DRenderGdiCompatible;
+begin
+  if Supports(ARender, IACL2DRenderGdiCompatible, AGdi) then
+  begin
+    AGdi.GdiDraw(
+      procedure (DC: HDC; out UpdatedRect: TRect)
+      begin
+        Draw(DC, ASelectedElement);
+        UpdatedRect := Bounds;
+      end)
+  end
+  else
+  begin
+    DrawElements(acRectSetBottom(Bounds, Bounds.Bottom, FFrameSize));
+    DrawElements(acRectSetRight(Bounds, Bounds.Right, FFrameSize));
+    DrawElements(acRectSetHeight(Bounds, FFrameSize));
+    DrawElements(acRectSetWidth(Bounds, FFrameSize));
   end;
 end;
 
 procedure TACLSelectionFrame.Draw(DC: HDC; ASelectedElement: TACLSelectionFrameHitTestCode = sfeNone);
-var
-  AElement: TACLSelectionFrameElement;
-  ARegion: HRGN;
-  ASaveIndex: Integer;
-  AWindowOrg: TPoint;
-begin
-  ASaveIndex := SaveDC(DC);
-  try
-    GetWindowOrgEx(DC, AWindowOrg);
-    for AElement := Low(AElement) to High(AElement) do
+
+  procedure DrawElement(AElement: TACLSelectionFrameElement);
+  var
+    R: TRect;
+  begin
+    R := FElements[AElement];
+    if not R.IsEmpty then
     begin
-      ARegion := FElements[AElement].Handle;
-      OffsetRgn(ARegion, -AWindowOrg.X, -AWindowOrg.Y);
-      SelectClipRgn(DC, ARegion);
-      acIntersectClipRegion(DC, Bounds);
-      acExcludeFromClipRegion(DC, acRectInflate(Bounds, -FFrameSize));
       if ASelectedElement = AElement then
-        acDrawHatch(DC, Bounds, clWhite, clBlack, 1)
+        acDrawHatch(DC, R, clWhite, clBlack, 1)
       else
-        PatBlt(DC, Bounds.Left, Bounds.Top, Bounds.Width, Bounds.Height, PATINVERT);
-      OffsetRgn(ARegion, AWindowOrg.X, AWindowOrg.Y);
+        PatBlt(DC, R.Left, R.Top, R.Width, R.Height, PATINVERT);
+
+      acExcludeFromClipRegion(DC, acRectInflate(R, 2 * FLineSize));
+    end;
+  end;
+
+var
+  AClipRgn: HRGN;
+  AElement: TACLSelectionFrameElement;
+begin
+  AClipRgn := acSaveClipRegion(DC);
+  try
+    acIntersectClipRegion(DC, Bounds);
+    acExcludeFromClipRegion(DC, acRectInflate(Bounds, -FFrameSize));
+    for AElement := High(AElement) downto Low(AElement) do
+    begin
+      if AElement <> sfeFrame then
+        DrawElement(AElement);
+    end;
+    if not FElements[sfeFrame].IsEmpty then
+    begin
+      acExcludeFromClipRegion(DC, acRectInflate(FElements[sfeFrame], -FLineSize));
+      DrawElement(sfeFrame);
     end;
   finally
-    RestoreDC(DC, ASaveIndex);
+    acRestoreClipRegion(DC, AClipRgn);
   end;
 end;
 
