@@ -560,6 +560,10 @@ end;
 
 class constructor TACLDirect2D.Create;
 begin
+  // Direct2D support has been added in Windows 7 Platform update,
+  // but it works not so perfect. Disabling it for Windows 7 at all.
+  if IsWine or not IsWin8OrLater then
+    FAvailable := TACLBoolean.False;
   SwapChainSize := 2;
   VSync := True;
 end;

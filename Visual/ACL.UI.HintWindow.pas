@@ -16,8 +16,9 @@ unit ACL.UI.HintWindow;
 interface
 
 uses
-  Winapi.Windows,
+  Winapi.DwmApi,
   Winapi.Messages,
+  Winapi.Windows,
   // System
   System.Types,
   System.Classes,
@@ -132,6 +133,7 @@ type
     FPauseMode: TACLHintPauseMode;
     FPauseTimer: TACLTimer;
 
+    function CanShowHintOverOwner: Boolean;
     function IsFormActive(AForm: TCustomForm): Boolean;
     procedure DeactivateTimerHandler(Sender: TObject);
     procedure PauseTimerHandler(Sender: TObject);
@@ -515,8 +517,8 @@ begin
     Cancel;
     if CanShowHint(AHintOwner, AHintData) then
     begin
-      FHintData := AHintData;
       FHintOwner := AHintOwner;
+      FHintData := AHintData;
       FPauseMode := hpmBeforeShow;
       FPauseTimer.Interval := Max(1, HintData.DelayBeforeShow);
       FPauseTimer.Enabled := True;
@@ -536,6 +538,13 @@ begin
     AForm := GetOwnerForm;
     Result := (AForm <> nil) and IsFormActive(AForm) and not acMenusHasActivePopup;
   end;
+end;
+
+function TACLHintController.CanShowHintOverOwner: Boolean;
+begin
+  // Otherwise cases, the hint does not want to be transparent for mouse (for some reason)
+  // and prevents the user from clicking on the item
+  Result := IsWinVistaOrLater and not IsWine and (not IsWinSeven or DwmCompositionEnabled);
 end;
 
 function TACLHintController.CreateHintWindow: TACLHintWindow;
@@ -574,7 +583,7 @@ begin
         if HintWindow = nil then
           FHintWindow := CreateHintWindow;
 
-        if acRectIsEmpty(HintData.ScreenBounds) then
+        if HintData.ScreenBounds.IsEmpty or (FHintData.AlignVert = hwvaOver) and not CanShowHintOverOwner then
           HintWindow.ShowFloatHint(HintData.Text, acPointOffset(HintPoint, 0, GetCursorHeightMargin))
         else
           HintWindow.ShowFloatHint(HintData.Text, HintData.ScreenBounds, HintData.AlignHorz, HintData.AlignVert);

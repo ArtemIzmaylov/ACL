@@ -533,6 +533,10 @@ end;
 
 procedure TACLBasicScalableForm.InitializeNewForm;
 begin
+  //#AI:
+  // В TCustomForm.InitializeNewForm сначала выставляются дефолтные размеры формы, а уже потом Visible в False.
+  // На Wine зз-за этого форма на секунду становится видимой в нулевых координатах.
+  Visible := False;
   inherited;
   FCurrentPPI := PixelsPerInch;
   FScaleFactor := TACLScaleFactor.Create;

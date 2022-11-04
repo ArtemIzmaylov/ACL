@@ -1860,6 +1860,7 @@ begin
   end;
 
   FTextRect := acRectCenterVertically(FTextRect, FTextSize.cy);
+  FTextRect.Offset(0, -1);
 
   if TextRect.IsEmpty or (Caption = '') then
   begin
@@ -1869,11 +1870,12 @@ begin
   end
   else
     if ShowCheckMark then
-      FFocusRect := acRectInflate(TextRect, acTextIndent, acFocusRectIndent)
+    begin
+      FFocusRect := acRectInflate(TextRect, acTextIndent, acFocusRectIndent);
+      FFocusRect := TRect.Intersect(FFocusRect, Bounds);
+    end
     else
       FFocusRect := NullRect;
-
-  OffsetRect(FTextRect, 0, -1);
 end;
 
 procedure TACLCheckBoxViewInfo.CalculateTextSize(var R: TRect; var ATextSize: TSize);
