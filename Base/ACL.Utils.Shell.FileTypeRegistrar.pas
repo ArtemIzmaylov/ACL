@@ -375,7 +375,12 @@ begin
   end;
 
   if not AResult then
-    ShellExecute('control.exe', '/NAME Microsoft.DefaultPrograms /PAGE pageDefaultProgram');
+  begin
+    if IsWinVistaOrLater then
+      ShellExecute('control.exe', '/NAME Microsoft.DefaultPrograms /PAGE pageDefaultProgram')
+    else
+      ShellExecute('control.exe', 'appwiz.cpl,,3');
+  end;
 end;
 
 class function TACLFileTypeRegistrar.AppDisplayName: string;
