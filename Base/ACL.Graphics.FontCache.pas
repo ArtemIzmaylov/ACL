@@ -90,7 +90,7 @@ type
     FFont: TFont;
     FGlyphSet: TACLFontGlyphSet;
   public
-    constructor Create(AFontHandle: HFONT; AGlyphSet: TACLFontGlyphSet);
+    constructor Create(AOwnedFont: TFont; AGlyphSet: TACLFontGlyphSet);
     destructor Destroy; override;
     procedure AssignTo(AFont: TFont);
     //
@@ -125,9 +125,9 @@ type
     class procedure AsyncFontLoaderFinished;
     class function AsyncPutGlyphSet(const AName: TFontName; AGlyphSet: TACLFontGlyphSet): TACLFontGlyphSet;
 
-    class function CreateFontHandle(const AFontData: TACLFontData): HFONT;
+    class function CreateFont(const AFontData: TACLFontData): TFont;
     class function CreateFontInfo(const AFontData: TACLFontData): TACLFontInfo;
-    class function CreateFontInfoCore(const AFontData: TACLFontData; const AFontHandle: HFONT): TACLFontInfo;
+    class function CreateFontInfoCore(const AFontData: TACLFontData; AOwnedFont: TFont): TACLFontInfo;
     class procedure StartLoader;
     class procedure WaitForLoader(ACancel: Boolean = False);
   public
@@ -371,11 +371,10 @@ end;
 
 { TACLFontInfo }
 
-constructor TACLFontInfo.Create(AFontHandle: HFONT; AGlyphSet: TACLFontGlyphSet);
+constructor TACLFontInfo.Create(AOwnedFont: TFont; AGlyphSet: TACLFontGlyphSet);
 begin
+  FFont := AOwnedFont;
   FGlyphSet := AGlyphSet;
-  FFont := TFont.Create;
-  FFont.Handle := AFontHandle;
 end;
 
 destructor TACLFontInfo.Destroy;
@@ -385,12 +384,9 @@ begin
 end;
 
 procedure TACLFontInfo.AssignTo(AFont: TFont);
-var
-  AFontHandle: HFONT;
 begin
-  AFontHandle := Font.Handle;
-  if AFontHandle <> AFont.Handle then // Why VCL does not check it?
-    AFont.Handle := AFontHandle;
+  if Font.Handle <> AFont.Handle then // Why VCL does not check it?
+    AFont.Assign(Font);
 end;
 
 { TACLFontCache }
@@ -436,7 +432,7 @@ begin
     {$IFDEF ACL_LOG_FONTCACHE}
       AddToDebugLog('FontCache', 'GetInfo(%s)', [AFontData.ToString]);
     {$ENDIF}
-      Result := CreateFontInfoCore(AFontData, AFont.Handle);
+      Result := CreateFontInfoCore(AFontData, AFont.Clone);
     end;
   finally
     FLock.Leave;
@@ -594,62 +590,29 @@ begin
   end;
 end;
 
-class function TACLFontCache.CreateFontHandle(const AFontData: TACLFontData): HFONT;
-const
-  PitchMap: array[TFontPitch] of Integer = (DEFAULT_PITCH, VARIABLE_PITCH, FIXED_PITCH);
-var
-  ALogFont: TLogFont;
-  APrevFont: HFONT;
-  ATextMetric: TTextMetricW;
+class function TACLFontCache.CreateFont(const AFontData: TACLFontData): TFont;
 begin
-  ZeroMemory(@ALogFont, SizeOf(ALogFont));
-  ALogFont.lfHeight := AFontData.Height;
-  ALogFont.lfEscapement := AFontData.Orientation;
-  ALogFont.lfOrientation := AFontData.Orientation;
-  ALogFont.lfWeight := IfThen(fsBold in AFontData.Style, FW_BOLD, FW_NORMAL);
-  ALogFont.lfItalic := Byte(fsItalic in AFontData.Style);
-  ALogFont.lfUnderline := Byte(fsUnderline in AFontData.Style);
-  ALogFont.lfStrikeOut := Byte(fsStrikeOut in AFontData.Style);
-  StrPLCopy(ALogFont.lfFaceName, AFontData.Name, Length(ALogFont.lfFaceName) - 1);
+  Result := TFont.Create;
+  Result.Name := AFontData.Name;
+  Result.Orientation := AFontData.Orientation;
+  Result.Pitch := AFontData.Pitch;
+  Result.Quality := AFontData.Quality;
+  Result.Style := AFontData.Style;
 
   if AFontData.CharSet <> DEFAULT_CHARSET then
-    ALogFont.lfCharSet := Byte(AFontData.Charset)
+    Result.Charset := AFontData.Charset
   else
-    ALogFont.lfCharSet := DefFontData.Charset;
+    Result.Charset := DefFontData.Charset;
 
-  ALogFont.lfQuality := Ord(AFontData.Quality);
-  ALogFont.lfOutPrecision := IfThen(AFontData.Orientation <> 0, OUT_TT_ONLY_PRECIS, OUT_DEFAULT_PRECIS);
-  ALogFont.lfClipPrecision := CLIP_DEFAULT_PRECIS;
-  ALogFont.lfPitchAndFamily := PitchMap[AFontData.Pitch];
-
-  if (AFontData.TargetDPI > 0) and (AFontData.TargetDPI <> acDefaultDPI) then
-  begin
-    // Convert font's height to -height
-    //
-    // This code was copied from the acSetFontHeight method
-    // Refer to the
-    //   https://support.microsoft.com/en-us/help/74299/info-calculating-the-logical-height-and-point-size-of-a-font
-    if ALogFont.lfHeight > 0 then
-    begin
-      Result := CreateFontIndirect(ALogFont);
-      APrevFont := SelectObject(MeasureCanvas.Handle, Result);
-      GetTextMetrics(MeasureCanvas.Handle, ATextMetric);
-      ALogFont.lfHeight := -(ATextMetric.tmHeight - ATextMetric.tmInternalLeading);
-      SelectObject(MeasureCanvas.Handle, APrevFont);
-      DeleteObject(Result);
-    end;
-    ALogFont.lfHeight := MulDiv(ALogFont.lfHeight, AFontData.TargetDPI, acDefaultDPI);
-  end;
-
-  Result := CreateFontIndirect(ALogFont);
+  acSetFontHeight(Result, AFontData.Height, AFontData.TargetDPI);
 end;
 
 class function TACLFontCache.CreateFontInfo(const AFontData: TACLFontData): TACLFontInfo;
 begin
-  Result := CreateFontInfoCore(AFontData, CreateFontHandle(AFontData));
+  Result := CreateFontInfoCore(AFontData, CreateFont(AFontData));
 end;
 
-class function TACLFontCache.CreateFontInfoCore(const AFontData: TACLFontData; const AFontHandle: HFONT): TACLFontInfo;
+class function TACLFontCache.CreateFontInfoCore(const AFontData: TACLFontData; AOwnedFont: TFont): TACLFontInfo;
 var
   AGlyphSet: TACLFontGlyphSet;
   AMeasureDC: HDC;
@@ -658,14 +621,14 @@ begin
   if not FNameToGlyphSet.TryGetValue(AFontData.Name, AGlyphSet) then
   begin
     AMeasureDC := MeasureCanvas.Handle;
-    APrevFontHandle := SelectObject(AMeasureDC, AFontHandle);
+    APrevFontHandle := SelectObject(AMeasureDC, AOwnedFont.Handle);
   {$IFDEF ACL_LOG_FONTCACHE}
     AddToDebugLog('FontCache', 'ForceCreateGlyphSet(%s)', [AFontData.ToString]);
   {$ENDIF}
     AGlyphSet := AsyncPutGlyphSet(AFontData.Name, TACLFontGlyphSet.Create(AMeasureDC));
     SelectObject(AMeasureDC, APrevFontHandle);
   end;
-  Result := TACLFontInfo.Create(AFontHandle, AGlyphSet);
+  Result := TACLFontInfo.Create(AOwnedFont, AGlyphSet);
   FFontDataToFontInfo.Add(AFontData, Result);
 end;
 

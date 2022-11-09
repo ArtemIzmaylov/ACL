@@ -128,6 +128,7 @@ type
 
   TFontHelper = class helper for TFont
   public
+    function Clone: TFont;
     procedure SetSize(ASize: Integer; AScaleFactor: TACLScaleFactor);
   end;
 
@@ -2442,6 +2443,12 @@ begin
 end;
 
 { TFontHelper }
+
+function TFontHelper.Clone: TFont;
+begin
+  Result := TFont.Create;
+  Result.Assign(Self);
+end;
 
 procedure TFontHelper.SetSize(ASize: Integer; AScaleFactor: TACLScaleFactor);
 var

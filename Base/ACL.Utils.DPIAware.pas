@@ -121,7 +121,7 @@ var
   APrevPixelsPerInch: Integer;
   ATextMetric: TTextMetricW;
 begin
-  if ATargetDPI <> acDefaultDPI then
+  if (ATargetDPI > 0) and (ATargetDPI <> acDefaultDPI) then
   begin
     if AHeight > 0 then
     begin

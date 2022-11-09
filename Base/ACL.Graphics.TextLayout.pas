@@ -888,9 +888,8 @@ var
 begin
   if not R.IsEmpty and (S <> '') and RectVisible(ACanvas.Handle, R) then
   begin
-    AFont := TFont.Create;
+    AFont := ACanvas.Font.Clone;
     try
-      AFont.Assign(ACanvas.Font);
       AText := TACLTextLayout.Create(AFont);
       try
         AText.SetOption(tloWordWrap, AWordWrap);
