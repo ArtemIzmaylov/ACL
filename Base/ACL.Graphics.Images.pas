@@ -238,11 +238,17 @@ type
     class function GetSize(AStream: TStream; out ASize: TSize): Boolean; override;
   end;
 
+  { TACLImageFormatJPEG2 }
+
+  TACLImageFormatJPEG2 = class(TACLImageFormatJPEG)
+  public
+    class function Ext: string; override;
+  end;
+
   { TACLImageFormatJPG }
 
   TACLImageFormatJPG = class(TACLImageFormatJPEG)
   public
-    class function Ext: string; override;
     class function MimeType: string; override;
   end;
 
@@ -990,12 +996,15 @@ end;
 
 class constructor TACLImageFormatRepository.Create;
 begin
-  // do not change the order
-  Register(TACLImageFormatPNG); // must be before BMP
+  // keep the order
+  Register(TACLImageFormatPNG); // must be before BMP (BMP codec is GDI+ based and will load PNG too)
   Register(TACLImageFormatBMP);
   Register(TACLImageFormatGIF);
-  Register(TACLImageFormatJPG);
-  Register(TACLImageFormatJPEG); // must be after JPG
+
+  Register(TACLImageFormatJPEG);  // canonical
+  Register(TACLImageFormatJPEG2); // alternate extension
+  Register(TACLImageFormatJPG);   // alternate mimetype
+
   Register(TACLImageFormatWebP);
 end;
 
@@ -1290,7 +1299,7 @@ end;
 
 class function TACLImageFormatJPEG.Ext: string;
 begin
-  Result := '.jpeg';
+  Result := '.jpg';
 end;
 
 class function TACLImageFormatJPEG.MimeType: string;
@@ -1336,12 +1345,14 @@ begin
   end;
 end;
 
-{ TACLImageFormatJPG }
+{ TACLImageFormatJPEG2 }
 
-class function TACLImageFormatJPG.Ext: string;
+class function TACLImageFormatJPEG2.Ext: string;
 begin
-  Result := '.jpg';
+  Result := '.jpeg';
 end;
+
+{ TACLImageFormatJPG }
 
 class function TACLImageFormatJPG.MimeType: string;
 begin
