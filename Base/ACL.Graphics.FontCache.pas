@@ -571,7 +571,7 @@ begin
 {$IFDEF ACL_LOG_FONTCACHE}
   AddToDebugLog('FontCache', 'Loader Finished');
 {$ENDIF}
-  FLoaderHandle := 0;
+  FLoaderHandle := INVALID_HANDLE_VALUE;
 end;
 
 class function TACLFontCache.AsyncPutGlyphSet(const AName: TFontName; AGlyphSet: TACLFontGlyphSet): TACLFontGlyphSet;
@@ -640,7 +640,9 @@ end;
 
 class procedure TACLFontCache.WaitForLoader(ACancel: Boolean);
 begin
-  if FLoaderHandle <> 0 then
+  if FLoaderHandle = 0 then
+    StartLoader;
+  if FLoaderHandle <> INVALID_HANDLE_VALUE then
   begin
     if ACancel then
       TaskDispatcher.Cancel(FLoaderHandle, True)
