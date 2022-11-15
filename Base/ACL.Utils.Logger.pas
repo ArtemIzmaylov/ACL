@@ -12,6 +12,7 @@
 unit ACL.Utils.Logger;
 
 {$I ACL.Config.inc}
+{$SCOPEDENUMS ON}
 
 interface
 
@@ -28,17 +29,14 @@ uses
   ACL.Utils.Stream;
 
 type
-  TACLLogOption = (loWriteTimestamp, loWriteThreadId);
-  TACLLogOptions = set of TACLLogOption;
 
   { TACLLog }
 
   TACLLog = class
-  public const
-    DefaultOptions = [loWriteTimestamp, loWriteThreadId];
+  public type
+    TEntryType = (Debug, Error);
   strict private
     FLock: TACLCriticalSection;
-    FOptions: TACLLogOptions;
   protected
     FEncoding: TEncoding;
 
@@ -50,8 +48,8 @@ type
     destructor Destroy; override;
     // high-level
     procedure Add(const ATag: string; const E: Exception); overload;
-    procedure Add(const ATag, AFormatLine: string; const AArgs: array of const); overload;
-    procedure Add(const ATag, AText: string); overload;
+    procedure Add(const ATag, AFormatLine: string; const AArgs: array of const; AType: TEntryType = TEntryType.Debug); overload;
+    procedure Add(const ATag, AText: string; AType: TEntryType = TEntryType.Debug); overload;
     // low-level
     procedure Write(const ABuffer: TBytes); overload;
     procedure Write(const ABuffer; ACount: Integer); overload;
@@ -62,7 +60,6 @@ type
     // Lock
     property Encoding: TEncoding read FEncoding;
     property Lock: TACLCriticalSection read FLock;
-    property Options: TACLLogOptions read FOptions write FOptions;
   end;
 
   { TACLLogStream }
@@ -200,7 +197,6 @@ end;
 constructor TACLLog.Create;
 begin
   FLock := TACLCriticalSection.Create;
-  FOptions := DefaultOptions;
   FEncoding := TEncoding.UTF8;
 end;
 
@@ -216,7 +212,7 @@ var
 begin
   Lock.Enter;
   try
-    Add(ATag, Format('Error: %s - %s', [E.ClassName, E.ToString]));
+    Add(ATag, Format('Error: %s - %s', [E.ClassName, E.ToString]), TEntryType.Error);
 
     AStackTrace := E.StackTrace;
     if AStackTrace <> '' then
@@ -231,20 +227,18 @@ begin
   end;
 end;
 
-procedure TACLLog.Add(const ATag, AText: string);
+procedure TACLLog.Add(const ATag, AText: string; AType: TEntryType = TEntryType.Debug);
+const
+  TypeMap: array[TEntryType] of string = ('D/', 'E/');
 begin
   Lock.Enter;
   try
-    if loWriteTimestamp in Options then
-      WriteTimestamp;
-    if loWriteThreadId in Options then
-      WriteThreadId;
-    if ATag <> '' then
-    begin
-      Write(ATag);
-      Write(':');
-      Write(#9);
-    end;
+    WriteThreadId;
+    WriteTimestamp;
+    Write(TypeMap[AType]);
+    Write(ATag);
+    Write(':');
+    Write(#9);
     Write(AText);
     WriteLine;
   finally
@@ -252,9 +246,9 @@ begin
   end;
 end;
 
-procedure TACLLog.Add(const ATag, AFormatLine: string; const AArgs: array of const);
+procedure TACLLog.Add(const ATag, AFormatLine: string; const AArgs: array of const; AType: TEntryType);
 begin
-  Add(ATag, Format(AFormatLine, AArgs));
+  Add(ATag, Format(AFormatLine, AArgs), AType);
 end;
 
 procedure TACLLog.Write(const ABuffer; ACount: Integer);
@@ -303,8 +297,7 @@ procedure TACLLog.WriteSeparator;
 begin
   Lock.Enter;
   try
-    Write(DupeString('-', 120));
-    WriteLine;
+    Write('--------------------------------------------------------------------------'#13#10);
   finally
     Lock.Leave;
   end;
@@ -314,13 +307,11 @@ procedure TACLLog.WriteThreadId;
 begin
   Lock.Enter;
   try
-    Write('[Thread: ');
     if GetCurrentThreadId = MainThreadID then
       Write('Main')
     else
-      Write(Format('%4d', [GetCurrentThreadId]));
+      Write('thread-' + Format('%4d', [GetCurrentThreadId]));
 
-    Write(']');
     Write(#9);
   finally
     Lock.Leave;
@@ -331,7 +322,7 @@ procedure TACLLog.WriteTimestamp;
 begin
   Lock.Enter;
   try
-    Write(FormatDateTime('[yyyy.MM.dd hh:mm:ss:zzz]', Now));
+    Write(FormatDateTime('yyyy.MM.dd hh:mm:ss.zzz', Now));
     Write(#9);
   finally
     Lock.Leave;
