@@ -120,6 +120,7 @@ type
     FSavedClipRegion: TStack;
     FSavedWorldTransforms: TStack;
 
+    procedure AdjustRectToGdiLikeAppearance(var X2, Y2: Single); inline;
     function GetInterpolationMode: TInterpolationMode;
     function GetPixelOffsetMode: TPixelOffsetMode;
     function GetSmoothingMode: TSmoothingMode;
@@ -882,6 +883,12 @@ begin
   inherited;
 end;
 
+procedure TACLGdiplusRender.AdjustRectToGdiLikeAppearance(var X2, Y2: Single);
+begin
+  X2 := X2 - 1;
+  Y2 := Y2 - 1;
+end;
+
 procedure TACLGdiplusRender.BeginPaint(DC: HDC; const Unused1, Unused2: TRect);
 begin
   if FGraphics <> nil then
@@ -1064,8 +1071,10 @@ begin
     @APoints[0], Length(APoints), ATension));
 end;
 
-procedure TACLGdiplusRender.DrawEllipse(X1, Y1, X2, Y2: Single; Color: TAlphaColor; StrokeWidth: Single; StrokeStyle: TACL2DRenderStrokeStyle);
+procedure TACLGdiplusRender.DrawEllipse(X1, Y1, X2, Y2: Single;
+  Color: TAlphaColor; StrokeWidth: Single; StrokeStyle: TACL2DRenderStrokeStyle);
 begin
+  AdjustRectToGdiLikeAppearance(X2, Y2);
   if (X2 > X1) and (Y2 > Y1) and Color.IsValid and (StrokeWidth > 0) then
     GdipDrawEllipse(FGraphics, TACLGdiplusResourcesCache.PenGet(Color, StrokeWidth, StrokeStyle), X1, Y1, X2 - X1, Y2 - Y1);
 end;
@@ -1084,6 +1093,7 @@ end;
 
 procedure TACLGdiplusRender.DrawRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor; StrokeWidth: Single; StrokeStyle: TACL2DRenderStrokeStyle);
 begin
+  AdjustRectToGdiLikeAppearance(X2, Y2);
   if (X2 > X1) and (Y2 > Y1) and Color.IsValid and (StrokeWidth > 0) then
     GdipDrawRectangle(FGraphics, TACLGdiplusResourcesCache.PenGet(Color, StrokeWidth, StrokeStyle), X1, Y1, X2 - X1, Y2 - Y1);
 end;
@@ -1120,6 +1130,7 @@ end;
 
 procedure TACLGdiplusRender.FillEllipse(X1, Y1, X2, Y2: Single; Color: TAlphaColor);
 begin
+  AdjustRectToGdiLikeAppearance(X2, Y2);
   if (X2 > X1) and (Y2 > Y1) and Color.IsValid then
     GdipFillEllipse(FGraphics, TACLGdiplusResourcesCache.BrushGet(Color), X1, Y1, X2 - X1, Y2 - Y1);
 end;
@@ -1173,6 +1184,7 @@ end;
 
 procedure TACLGdiplusRender.FillRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor);
 begin
+  AdjustRectToGdiLikeAppearance(X2, Y2);
   if (X2 > X1) and (Y2 > Y1) and Color.IsValid then
     GdipFillRectangle(FGraphics, TACLGdiplusResourcesCache.BrushGet(Color), X1, Y1, X2 - X1, Y2 - Y1);
 end;
@@ -1188,7 +1200,7 @@ begin
   ABrushRect.Width := acRectWidth(R) + 2;
   ABrushRect.Height := acRectHeight(R) + 2;
   GdipCheck(GdipCreateLineBrushFromRectI(@ABrushRect, AColor1, AColor2, TLinearGradientMode(AMode), WrapModeTile, ABrush));
-  GdipCheck(GdipFillRectangleI(FGraphics, ABrush, R.Left, R.Top, R.Right - R.Left, R.Bottom - R.Top));
+  GdipCheck(GdipFillRectangleI(FGraphics, ABrush, R.Left, R.Top, R.Right - R.Left - 1, R.Bottom - R.Top - 1));
   GdipCheck(GdipDeleteBrush(ABrush));
 end;
 
