@@ -3235,7 +3235,10 @@ end;
 constructor TACLValueCacheManager<TKey, TValue>.Create(
   ACapacity: Integer; AEqualityComparer: IEqualityComparer<TKey>);
 begin
-  FCapacity := ACapacity;
+  FCapacity := Max(ACapacity, 4);
+  FComparer := AEqualityComparer;
+  if FComparer = nil then
+    FComparer := TEqualityComparer<TKey>.Default;
   FData := TACLDictionary<TKey, TValue>.Create(ACapacity, AEqualityComparer);
   FData.OnValueNotify := ValueHandler;
   SetLength(FQueue, FCapacity);

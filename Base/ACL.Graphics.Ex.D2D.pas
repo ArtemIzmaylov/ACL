@@ -1060,14 +1060,16 @@ begin
   ATextLength := Length(Text);
   if (ATextLength > 0) and Color.IsValid then
   begin
-    TACLDirect2D.DWriteFactory.CreateTextFormat(PChar(Font.Name), nil,
+    if Succeeded(TACLDirect2D.DWriteFactory.CreateTextFormat(PChar(Font.Name), nil,
       TACLMath.IfThen(fsBold in Font.Style, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_WEIGHT_NORMAL),
       TACLMath.IfThen(fsItalic in Font.Style, DWRITE_FONT_STYLE_ITALIC, DWRITE_FONT_STYLE_NORMAL),
-      DWRITE_FONT_STRETCH_NORMAL, -Font.Height, 'en-us', ATextFormat);
-    ATextFormat.SetTextAlignment(HorzAlignMap[HorzAlign]);
-    ATextFormat.SetParagraphAlignment(VertAlignMap[VertAlign]);
-    ATextFormat.SetWordWrapping(WordWrapMap[WordWrap]);
-    FDeviceContext.DrawText(PChar(Text), ATextLength, ATextFormat, R, CacheGetSolidBrush(Color), D2D1_DRAW_TEXT_OPTIONS_CLIP);
+      DWRITE_FONT_STRETCH_NORMAL, -Font.Height, 'en-us', ATextFormat)) then
+    begin
+      ATextFormat.SetTextAlignment(HorzAlignMap[HorzAlign]);
+      ATextFormat.SetParagraphAlignment(VertAlignMap[VertAlign]);
+      ATextFormat.SetWordWrapping(WordWrapMap[WordWrap]);
+      FDeviceContext.DrawText(PChar(Text), ATextLength, ATextFormat, R, CacheGetSolidBrush(Color), D2D1_DRAW_TEXT_OPTIONS_CLIP);
+    end;
   end;
 end;
 

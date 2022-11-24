@@ -195,7 +195,6 @@ type
 implementation
 
 uses
-  Winapi.ActiveX,
   // System
   System.SysUtils,
   System.Math,
@@ -204,46 +203,6 @@ uses
   ACL.Parsers,
   ACL.Hashes,
   ACL.Utils.Strings;
-
-const
-  CLASS_CMultiLanguage: TGUID = '{275C23E2-3747-11D0-9FEA-00AA003F8646}';
-
-type
-
-  { IMLangCodePages }
-
-  IMLangCodePages = interface(IUnknown)
-  ['{359F3443-BD4A-11D0-B188-00AA0038C969}']
-    function GetCharCodePages(const chSrc: Char; out pdwCodePages: DWORD): HResult; stdcall;
-    function GetStrCodePages(const pszSrc: PChar; const cchSrc: ULONG; dwPriorityCodePages: DWORD; out pdwCodePages: DWORD; out pcchCodePages: ULONG): HResult; stdcall;
-    function CodePageToCodePages(const uCodePage: SYSUINT; out pdwCodePages: LongWord): HResult; stdcall;
-    function CodePagesToCodePage(const dwCodePages: LongWord; const uDefaultCodePage: SYSUINT; out puCodePage: SYSUINT): HResult; stdcall;
-  end;
-
-  { IMLangFontLink }
-
-  IMLangFontLink = interface(IMLangCodePages)
-  ['{359F3441-BD4A-11D0-B188-00AA0038C969}']
-    function GetFontCodePages(const hDC: THandle; const hFont: THandle; out pdwCodePages: LongWord): HResult; stdcall;
-    function MapFont(const hDC: THandle; const dwCodePages: LongWord; hSrcFont: THandle; out phDestFont: THandle): HResult; stdcall;
-    function ReleaseFont(const hFont: THandle): HResult; stdcall;
-    function ResetFontMapping: HResult; stdcall;
-  end;
-
-function CreateFontLink: IMLangFontLink;
-begin
-{$IFDEF CPUX86}
-  try
-    Set8087CW(Default8087CW or $08);
-{$ENDIF CPUX86}
-    if not Succeeded(CoCreateInstance(CLASS_CMultiLanguage, nil, CLSCTX_INPROC_SERVER or CLSCTX_LOCAL_SERVER, IMLangFontLink, Result)) then
-      Result := nil;
-{$IFDEF CPUX86}
-  finally
-    Reset8087CW;
-  end;
-{$ENDIF CPUX86}
-end;
 
 { TACLFontData }
 
@@ -640,7 +599,7 @@ end;
 
 class procedure TACLFontCache.WaitForLoader(ACancel: Boolean);
 begin
-  if FLoaderHandle = 0 then
+  if (FLoaderHandle = 0) and not ACancel then
     StartLoader;
   if FLoaderHandle <> INVALID_HANDLE_VALUE then
   begin

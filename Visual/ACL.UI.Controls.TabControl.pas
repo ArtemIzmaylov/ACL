@@ -238,7 +238,6 @@ type
     procedure WMGetDlgCode(var Message: TWMGetDlgCode); message WM_GETDLGCODE;
     //
     property FrameRect: TRect read FFrameRect;
-    property HoverTab: TACLTab read FHoverTab write SetHoverTab;
     property TabAreaRect: TRect read FTabAreaRect;
     property Tabs: TACLTabsList read FTabs write SetTabs;
     property ViewItems: TACLTabViewItemList read FViewItems;
@@ -247,6 +246,7 @@ type
     destructor Destroy; override;
     procedure JumpToNextPage(AForward: Boolean);
     //
+    property HoverTab: TACLTab read FHoverTab;
     property IsUserAction: Boolean read FIsUserAction;
   published
     property ActiveIndex: Integer read FActiveIndex write SetActiveIndex default 0;
@@ -843,7 +843,7 @@ end;
 
 procedure TACLCustomTabControl.MouseLeave;
 begin
-  HoverTab := nil;
+  SetHoverTab(nil);
   inherited MouseLeave;
 end;
 
@@ -856,9 +856,9 @@ begin
   inherited MouseMove(Shift, X, Y);
 
   if HitTest(X, Y, AViewItem) then
-    HoverTab := AViewItem.Tab
+    SetHoverTab(AViewItem.Tab)
   else
-    HoverTab := nil;
+    SetHoverTab(nil);
 
   Cursor := CursorsMap[(HoverTab <> nil) and (HoverTab.Index <> ActiveIndex)];
 end;

@@ -279,6 +279,7 @@ function acDetectEncoding(ABuffer: TBytes; out AEncoding: TEncoding; ADefaultEnc
 function acDetectEncoding(AStream: TStream; ADefaultEncoding: TEncoding = nil): TEncoding; overload;
 
 // Replacing
+function acRemoveChar(const S: UnicodeString; const ACharToRemove: WideChar): UnicodeString;
 function acReplaceChar(const S: UnicodeString; const ACharToReplace, AReplaceBy: WideChar): UnicodeString;
 function acReplaceChars(const S: UnicodeString; const ACharsToReplace: UnicodeString; const AReplaceBy: WideChar = '_'): UnicodeString;
 function acStringReplace(const S, OldPattern, NewPattern: string; AIgnoreCase: Boolean = False; AWholeWords: Boolean = False): string;
@@ -1284,6 +1285,14 @@ begin
     Result := Result + Copy(S, AOffset, AOffsetNew - AOffset) + NewPattern;
     AOffset := AOffsetNew + Length(APattern);
   end;
+end;
+
+function acRemoveChar(const S: UnicodeString; const ACharToRemove: WideChar): UnicodeString;
+begin
+  if acPos(ACharToRemove, S) > 0 then
+    Result := acStringReplace(S, ACharToRemove, '')
+  else
+    Result := S;
 end;
 
 function acReplaceChar(const S: UnicodeString; const ACharToReplace, AReplaceBy: WideChar): UnicodeString;
