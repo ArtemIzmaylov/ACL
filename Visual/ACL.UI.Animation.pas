@@ -348,12 +348,12 @@ end;
 
 class function TACLAnimation.TanhTransition(AProgress: Single): Single;
 const
-  AExactitude = 3;
+  Exactitude = 3;
 var
   ATanh: Double;
 begin
-  ATanh := Tanh(AProgress * (2 * AExactitude) - AExactitude);
-  Result := 1 / (2 * Tanh(AExactitude)) * (ATanh - Tanh(-AExactitude));
+  ATanh := Tanh(AProgress * (2 * Exactitude) - Exactitude);
+  Result := 1 / (2 * Tanh(Exactitude)) * (ATanh - Tanh(-Exactitude));
 end;
 
 procedure TACLAnimation.SetFinished(AValue: Boolean);

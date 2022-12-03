@@ -751,6 +751,7 @@ type
     destructor Destroy; override;
     procedure Add(const Key: TKey; const Value: TValue);
     procedure Clear;
+    function Contains(const Key: TKey): Boolean;
     function Get(const Key: TKey; out Value: TValue): Boolean;
     procedure Remove(const Key: TKey);
     //
@@ -3279,6 +3280,11 @@ begin
   for I := 0 to Length(FQueue) - 1 do
     FQueue[I].Value := False;
   FQueueCursor := 0;
+end;
+
+function TACLValueCacheManager<TKey, TValue>.Contains(const Key: TKey): Boolean;
+begin
+  Result := FData.ContainsKey(Key);
 end;
 
 function TACLValueCacheManager<TKey, TValue>.Get(const Key: TKey; out Value: TValue): Boolean;
