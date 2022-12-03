@@ -1130,7 +1130,6 @@ end;
 
 procedure TACLGdiplusRender.FillEllipse(X1, Y1, X2, Y2: Single; Color: TAlphaColor);
 begin
-  AdjustRectToGdiLikeAppearance(X2, Y2);
   if (X2 > X1) and (Y2 > Y1) and Color.IsValid then
     GdipFillEllipse(FGraphics, TACLGdiplusResourcesCache.BrushGet(Color), X1, Y1, X2 - X1, Y2 - Y1);
 end;
@@ -1184,7 +1183,6 @@ end;
 
 procedure TACLGdiplusRender.FillRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor);
 begin
-  AdjustRectToGdiLikeAppearance(X2, Y2);
   if (X2 > X1) and (Y2 > Y1) and Color.IsValid then
     GdipFillRectangle(FGraphics, TACLGdiplusResourcesCache.BrushGet(Color), X1, Y1, X2 - X1, Y2 - Y1);
 end;
