@@ -561,6 +561,7 @@ type
     procedure Click; override;
     procedure ChangeState(AChecked: Boolean); overload;
     procedure ChangeState(AState: TCheckBoxState); overload;
+    procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
     procedure ToggleState;
   published
     property Alignment default taLeftJustify;
@@ -2062,6 +2063,13 @@ begin
   Result := inherited GetCursor(P);
   if (Result = crDefault) and ShowCheckMark then
     Result := crHandPoint;
+end;
+
+procedure TACLCustomCheckBox.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
+begin
+  inherited;
+  if (csAligning in ControlState) and (SubControl.Control <> nil) then
+    BoundsChanged;
 end;
 
 procedure TACLCustomCheckBox.SetChecked(AValue: Boolean);

@@ -141,6 +141,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
   published
     property Alignment: TAlignment read FAlignment write SetAlignment default taLeftJustify;
     property AlignmentVert: TVerticalAlignment read FAlignmentVert write SetAlignmentVert default taVerticalCenter;
@@ -623,6 +624,13 @@ begin
     Calculate;
     Invalidate;
   end;
+end;
+
+procedure TACLLabel.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
+begin
+  inherited;
+  if (csAligning in ControlState) and (SubControl.Control <> nil) then
+    Calculate;
 end;
 
 procedure TACLLabel.SetStyle(AValue: TACLStyleLabel);
