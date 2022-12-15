@@ -141,11 +141,11 @@ begin
   RegisterOperator('=', OperatorEqual, 2, 9);
 
   RegisterOperator('not', OperatorNot, 1, 8);
-  RegisterOperator('!', OperatorNot, 1, 8);
+  RegisterOperator('!',   OperatorNot, 1, 8);
 
   RegisterOperator('and', OperatorAnd, 2, 7);
-  RegisterOperator('or', OperatorOr, 2, 7);
-  RegisterOperator('xor', OperatorXor, 2, 7);
+  RegisterOperator('or',  OperatorOr,  2, 6);
+  RegisterOperator('xor', OperatorXor, 2, 6);
 end;
 
 function TACLMathExpressionFactory.CreateCompiler: TACLExpressionCompiler;
