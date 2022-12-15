@@ -367,7 +367,7 @@ type
     FOnLookup: TLookupEvent;
     FOnChange: TNotifyEvent;
 
-    function GetIsActive: Boolean;
+    function GetActive: Boolean;
     procedure SetText(const AValue: string);
     procedure SetMode(const AValue: TACLIncrementalSearchMode);
   protected
@@ -380,9 +380,9 @@ type
     function ProcessKey(Key: Char): Boolean; overload;
     function ProcessKey(Key: Word; Shift: TShiftState): Boolean; overload;
     //
-    property Active: Boolean read GetIsActive;
+    property Active: Boolean read GetActive;
     property Mode: TACLIncrementalSearchMode read FMode write SetMode;
-    property Text: string read FText;
+    property Text: string read FText write SetText;
     //
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
     property OnLookup: TLookupEvent read FOnLookup write FOnLookup;
@@ -1515,7 +1515,7 @@ begin
   end;
 end;
 
-function TACLIncrementalSearch.GetIsActive: Boolean;
+function TACLIncrementalSearch.GetActive: Boolean;
 begin
   Result := FTextLength > 0;
 end;

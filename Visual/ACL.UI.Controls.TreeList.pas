@@ -497,8 +497,8 @@ end;
 
 procedure TACLCustomTreeList.SetFocusOnSearchResult;
 begin
-  if RootNode.ChildrenCount > 0 then
-    FocusedNode := RootNode.Children[0];
+  if AbsoluteVisibleNodes.Count > 0 then
+    FocusedNode := AbsoluteVisibleNodes[0];
   SetFocus;
 end;
 

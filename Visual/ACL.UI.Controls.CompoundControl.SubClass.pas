@@ -539,7 +539,7 @@ type
     procedure KeyDown(var Key: Word; Shift: TShiftState);
     procedure KeyPress(var Key: Char);
     procedure KeyUp(var Key: Word; Shift: TShiftState);
-    function WantSpecialKey(Key: Word; Shift: TShiftState): Boolean;
+    function WantSpecialKey(Key: Word; Shift: TShiftState): Boolean; virtual;
 
     // Mouse
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);

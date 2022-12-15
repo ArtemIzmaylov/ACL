@@ -971,7 +971,7 @@ type
     procedure DeleteSelected; virtual;
     procedure ReloadData; virtual;
     procedure SetTargetDPI(AValue: Integer); override;
-    function WantSpecialKey(Key: Word; Shift: TShiftState): Boolean;
+    function WantSpecialKey(Key: Word; Shift: TShiftState): Boolean; override;
 
     // MUI
     procedure Localize(const ASection: string); override;
@@ -3758,7 +3758,9 @@ procedure TACLTreeListSubClass.SortBy(AColumn: TACLTreeListColumn; ADirection: T
 var
   ASortByList: TACLTreeListColumnList;
 begin
-  if (AColumn <> nil) then
+  if (AColumn <> nil) and (AColumn.Columns <> Columns) then
+    raise EInvalidArgument.Create('Column that you specified not owned by this TreeList.');
+  if AColumn <> nil then
   begin
     BeginUpdate;
     try
