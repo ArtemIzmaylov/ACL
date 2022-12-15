@@ -1198,7 +1198,7 @@ begin
   ABrushRect.Width := acRectWidth(R) + 2;
   ABrushRect.Height := acRectHeight(R) + 2;
   GdipCheck(GdipCreateLineBrushFromRectI(@ABrushRect, AColor1, AColor2, TLinearGradientMode(AMode), WrapModeTile, ABrush));
-  GdipCheck(GdipFillRectangleI(FGraphics, ABrush, R.Left, R.Top, R.Right - R.Left - 1, R.Bottom - R.Top - 1));
+  GdipCheck(GdipFillRectangleI(FGraphics, ABrush, R.Left, R.Top, R.Width, R.Height));
   GdipCheck(GdipDeleteBrush(ABrush));
 end;
 
