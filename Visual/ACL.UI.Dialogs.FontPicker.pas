@@ -417,6 +417,7 @@ procedure TACLFontPickerDialog.HandlerFontPreview(Sender: TObject; ACanvas: TCan
   const R: TRect; ANode: TACLTreeListNode; AColumn: TACLTreeListColumn; var AHandled: Boolean);
 begin
   TACLFontCache.GetInfo(ANode.Caption, [], ACanvas.Font.Height, acDefaultDPI, fqDefault).AssignTo(ACanvas.Font);
+  ACanvas.Font.Color := FFontName.Style.RowColorsText[True];
 end;
 
 procedure TACLFontPickerDialog.HandlerFontSizeListChanged(Sender: TObject);
