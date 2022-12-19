@@ -1622,6 +1622,9 @@ function TACLTextLayoutCalculator.AddSpace(ABlock: TACLTextLayoutBlockSpace): Bo
 var
   ABlockWidth: Integer;
 begin
+  if FCurrentRow = nil then
+    Exit(False);
+
   ABlockWidth := SpaceSize.cx;
   if not FWordWrap or FAutoWidth or (FOrigin.X + ABlockWidth <= FMaxWidth) then
   begin
@@ -1634,6 +1637,8 @@ end;
 
 function TACLTextLayoutCalculator.AddStyle(ABlock: TACLTextLayoutBlockStyle): Boolean;
 begin
+  if FCurrentRow = nil then
+    Exit(False);
   inherited;
   ABlock.FBounds := Bounds(FOrigin.X, FOrigin.Y, 0, 0);
   FCurrentRow.Blocks.Add(ABlock);
@@ -1647,6 +1652,9 @@ var
   ARange: TACLRange;
 {$ENDIF}
 begin
+  if FCurrentRow = nil then
+    Exit(False);
+
   ABlock.FVisibleLength := ABlock.TextLength;
   if not FWordWrap and (FOrigin.X >= FMaxWidth) then
   begin
