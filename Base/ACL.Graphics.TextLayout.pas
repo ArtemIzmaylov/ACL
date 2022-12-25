@@ -146,7 +146,7 @@ type
   strict private
     function GetBoundingRect: TRect;
   public
-    procedure Export(AExporter: TACLTextLayoutExporter; AFreeExporter: Boolean);
+    function Export(AExporter: TACLTextLayoutExporter; AFreeExporter: Boolean): Boolean;
     procedure Offset(ADeltaX, ADeltaY: Integer);
     //
     property BoundingRect: TRect read GetBoundingRect;
@@ -1213,15 +1213,19 @@ end;
 
 { TACLTextLayoutBlockList }
 
-procedure TACLTextLayoutBlockList.Export(AExporter: TACLTextLayoutExporter; AFreeExporter: Boolean);
+function TACLTextLayoutBlockList.Export(AExporter: TACLTextLayoutExporter; AFreeExporter: Boolean): Boolean;
 begin
-  for var I := 0 to Count - 1 do
-  begin
-    if not List[I].Export(AExporter) then
-      Break;
+  Result := True;
+  try
+    for var I := 0 to Count - 1 do
+    begin
+      if not List[I].Export(AExporter) then
+        Exit(False);
+    end;
+  finally
+    if AFreeExporter then
+      FreeAndNil(AExporter);
   end;
-  if AFreeExporter then
-    FreeAndNil(AExporter);
 end;
 
 procedure TACLTextLayoutBlockList.Offset(ADeltaX, ADeltaY: Integer);
@@ -1486,8 +1490,7 @@ end;
 
 function TACLTextLayoutRow.Export(AExporter: TACLTextLayoutExporter): Boolean;
 begin
-  FBlocks.Export(AExporter, False);
-  Result := True;
+  Result := FBlocks.Export(AExporter, False);
 end;
 
 procedure TACLTextLayoutRow.Offset(ADeltaX, ADeltaY: Integer);
