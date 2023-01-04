@@ -1033,7 +1033,7 @@ end;
 function TACLTextLayout.MeasureSize: TSize;
 begin
   Calculate;
-  Result := acSize(FBlocks.BoundingRect);
+  Result := acSize(FLayout.BoundingRect);
 end;
 
 procedure TACLTextLayout.Refresh;
