@@ -146,6 +146,7 @@ type
 
   { TACLTextViewInfo }
 
+  // FIXME: hieroglyphs displays blurry with this approach
   TACLTextViewInfo = class
   strict private type
   {$REGION 'TSpan'}

@@ -748,11 +748,7 @@ function TACLTextLayoutRender32.AddText(ABlock: TACLTextLayoutBlockText): Boolea
 begin
   FillBackground(ABlock);
   if FDrawContent then
-  {$IFDEF ACL_TEXTLAYOUT_USE_FONTCACHE}
-    DrawText32Prepared(Canvas.Handle, ABlock.Bounds, ABlock.TextViewInfo, FFont);
-  {$ELSE}
     DrawText32Prepared(Canvas.Handle, ABlock.Bounds, ABlock.Text, ABlock.TextLength, FFont);
-  {$ENDIF}
   Result := True;
 end;
 
@@ -809,7 +805,7 @@ var
   AWindowOrg: TPoint;
   I, J: Integer;
 begin
-  if ABlock.VisibleLength > 0 then
+  if ABlock.TextSize.Width > 0 then
   begin
     GetWindowOrgEx(Canvas.Handle, AWindowOrg);
     try
