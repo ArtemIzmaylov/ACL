@@ -317,9 +317,8 @@ end;
 
 function PrepareData(const AData: UnicodeString): UnicodeString; inline; overload;
 begin
-  //# This symbols cannot be recognized by SQLite
-  //# http://www.fileformat.info/info/unicode/char/106bd/index.htm
-  Result := acReplaceChars(AData, #$DEBD#$D801, ' ');
+  //# Surrogates does not supported by SQLite
+  Result := acRemoveSurrogates(AData, ' ');
   Result := #39 + acStringReplace(Result, #39, #39#39) + #39;
 end;
 

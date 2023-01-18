@@ -221,12 +221,12 @@ function acStringFromBytes(B: PByte; Count: Integer): UnicodeString; overload;
 function acStringIsRealUnicode(const S: UnicodeString): Boolean;
 
 // UTF8
-// Unlike built-in to RTL and Windows OS versions of these functions
-// Our functions returns an empty string if UTF8 sequence is invalid
+// Unlike built-in to RTL and Windows OS versions of UTF8 Decoder
+// The acDecodeUTF8 returns an empty string if UTF8 sequence is malformed
 function acDecodeUTF8(const Source: AnsiString): UnicodeString;
 function acEncodeUTF8(const Source: UnicodeString): AnsiString;
-function acUnicodeToUtf8(Dest: PAnsiChar; MaxDestBytes: Cardinal; Source: PWideChar; SourceChars: Cardinal): Cardinal;
-function acUtf8ToUnicode(Dest: PWideChar; MaxDestChars: Cardinal; Source: PAnsiChar; SourceBytes: Integer): Integer;
+function acUtf8IsWellformed(Source: PAnsiChar; SourceBytes: Integer): Boolean;
+function acUtf8ToUnicode(Dest: PWideChar; MaxDestChars: Integer; Source: PAnsiChar; SourceBytes: Integer): Integer;
 
 // Search
 function acFindString(const ACharToSearch: WideChar; const AString: UnicodeString; out AIndex: Integer): Boolean; overload;
@@ -246,10 +246,10 @@ function acPos(const ASubStr, AString: UnicodeString; AIgnoreCase, AWholeWords: 
 function acPos(const ASubStr, AString: UnicodeString; AIgnoreCase: Boolean = False; AOffset: Integer = 1): Integer; overload;
 
 // Explode
-function acExplodeString(const S: UnicodeString; const ADelimiters: UnicodeString; AReceiveProc: TWideExplodeStringReceiveResultProc): Integer; overload;
-function acExplodeString(const S: UnicodeString; const ADelimiters: UnicodeString; out AParts: TStringDynArray): Integer; overload;
 function acExplodeString(AScan: PAnsiChar; AScanCount: Integer; ADelimiter: AnsiChar; AReceiveProc: TAnsiExplodeStringReceiveResultProc): Integer; overload;
 function acExplodeString(AScan: PWideChar; AScanCount: Integer; const ADelimiters: UnicodeString; AReceiveProc: TWideExplodeStringReceiveResultProc): Integer; overload;
+function acExplodeString(const S: UnicodeString; const ADelimiters: UnicodeString; AReceiveProc: TWideExplodeStringReceiveResultProc): Integer; overload;
+function acExplodeString(const S: UnicodeString; const ADelimiters: UnicodeString; out AParts: TStringDynArray): Integer; overload;
 function acExplodeStringAsIntegerArray(const S: UnicodeString; ADelimiter: WideChar; AArray: PInteger; AArrayLength: Integer): Integer;
 function acGetCharacterCount(const S, ACharacters: UnicodeString): Integer; overload;
 function acGetCharacterCount(P: PWideChar; ALength: Integer; const ACharacters: UnicodeString): Integer; overload;
@@ -280,6 +280,7 @@ function acDetectEncoding(AStream: TStream; ADefaultEncoding: TEncoding = nil): 
 
 // Replacing
 function acRemoveChar(const S: UnicodeString; const ACharToRemove: WideChar): UnicodeString;
+function acRemoveSurrogates(const S: UnicodeString; const AReplaceBy: WideChar = #0): UnicodeString;
 function acReplaceChar(const S: UnicodeString; const ACharToReplace, AReplaceBy: WideChar): UnicodeString;
 function acReplaceChars(const S: UnicodeString; const ACharsToReplace: UnicodeString; const AReplaceBy: WideChar = '_'): UnicodeString;
 function acStringReplace(const S, OldPattern, NewPattern: string; AIgnoreCase: Boolean = False; AWholeWords: Boolean = False): string;
@@ -739,98 +740,85 @@ begin
     Result := acPos(ASubStr, AString, AIgnoreCase, AOffset);
 end;
 
-//==============================================================================
-// UTF8: Default Delphi's algorithm was changed in D2009 and it have another behavior.
-//       Old Behavior: for non-UTF8 strings function return an empty string.
-//==============================================================================
-
-function acUnicodeToUtf8(Dest: PAnsiChar; MaxDestBytes: Cardinal; Source: PWideChar; SourceChars: Cardinal): Cardinal;
-var
-  I, C, Count: Cardinal;
+function acUtf8IsWellformed(Source: PAnsiChar; SourceBytes: Integer): Boolean;
 begin
-  Result := 0;
-  if (Source = nil) or (Dest = nil) then Exit;
-
-  I := 0;
-  Count := 0;
-  while (I < SourceChars) and (Count < MaxDestBytes) do
-  begin
-    C := Cardinal(Source[I]);
-    Inc(I);
-    if C <= $7F then
-    begin
-      Dest[Count] := AnsiChar(C);
-      Inc(Count);
-    end
-    else
-
-    if C > $7FF then
-    begin
-      if Count + 3 > MaxDestBytes then Break;
-      Dest[Count]     := AnsiChar($E0 or (C shr 12));
-      Dest[Count + 1] := AnsiChar($80 or ((C shr 6) and $3F));
-      Dest[Count + 2] := AnsiChar($80 or (C and $3F));
-      Inc(Count, 3);
-    end
-    else //  $7F < Source[i] <= $7FF
-    begin
-      if Count + 2 > MaxDestBytes then Break;
-      Dest[Count]     := AnsiChar($C0 or (C shr 6));
-      Dest[Count + 1] := AnsiChar($80 or (C and $3F));
-      Inc(Count, 2);
-    end;
-  end;
-  if Count >= MaxDestBytes then
-    Count := MaxDestBytes - 1;
-  Dest[Count] := #0;
-  Result := Count + 1;  // convert zero based index to byte count
+  Result := acUtf8ToUnicode(nil, MaxInt, Source, SourceBytes) > 0;
 end;
 
-function acUtf8ToUnicode(Dest: PWideChar; MaxDestChars: Cardinal; Source: PAnsiChar; SourceBytes: Integer): Integer;
+function acUtf8ToUnicode(Dest: PWideChar; MaxDestChars: Integer; Source: PAnsiChar; SourceBytes: Integer): Integer;
+const
+  Masks: array[1..3] of Byte = ($3F, $1F, $F);
 var
-  AChar: WideChar;
-  C: Byte;
-  Count, WC: Cardinal;
+  AByte: Byte;
+  AByteRemaining: Integer;
+  ACharAccumulator: Cardinal;
 begin
   if Source = nil then
     Exit(0);
 
-  Count := 0;
-  Result := -1;
-  FastZeroMem(Dest, MaxDestChars * SizeOf(WideChar));
-  while (SourceBytes > 0) and (Count < MaxDestChars) do
+  Result := 0;
+  if Dest <> nil then
+    FastZeroMem(Dest, MaxDestChars * SizeOf(WideChar));
+
+  while (SourceBytes > 0) and (Result < MaxDestChars) do
   begin
-    WC := Cardinal(Source^);
+    AByte := Cardinal(Source^);
     Dec(SourceBytes);
     Inc(Source);
-    if WC and $80 = 0 then
-      AChar := WideChar(WC)
-    else
-    begin
-      if SourceBytes = 0 then
-        Exit; // incomplete multibyte char
 
-      WC := WC and $3F;
-      if WC and $20 <> 0 then
+    // Aggregate the char
+    ACharAccumulator := AByte;
+    if AByte and $80 <> 0 then // non-single byte
+    begin
+      if AByte and $F0 = $F0 then
+        AByteRemaining := 3 // 4 byte-wide
+      else if AByte and $E0 = $E0 then
+        AByteRemaining := 2 // 3 byte-wide
+      else if AByte and $C0 = $C0 then
+        AByteRemaining := 1 // 2 byte-wide
+      else
+        Exit(-1); // malformed bit-stream
+
+      if AByteRemaining > SourceBytes then
+        Exit(-1); // incomplete multibyte char
+
+      ACharAccumulator := AByte and Masks[AByteRemaining];
+      while AByteRemaining > 0 do
       begin
-        C := Byte(Source^);
+        AByte := Byte(Source^);
+        if AByte and $C0 <> $80 then
+          Exit(-1); // malformed trail byte or out of range char
+        ACharAccumulator := (ACharAccumulator shl 6) or (AByte and $3F);
+        Dec(AByteRemaining);
         Dec(SourceBytes);
         Inc(Source);
-        if C and $C0 <> $80 then Exit;      // malformed trail byte or out of range char
-        if SourceBytes <= 0 then Exit;      // incomplete multibyte char
-        WC := (WC shl 6) or (C and $3F);
       end;
-      C := Byte(Source^);
-      Dec(SourceBytes);
-      Inc(Source);
-      if C and $C0 <> $80 then Exit;      // malformed trail byte
-      AChar := WideChar((WC shl 6) or (C and $3F));
     end;
-    Dest^ := AChar;
-    Inc(Count);
-    Inc(Dest);
+
+    // Post the char
+    if ACharAccumulator > MaxWord then // Surrogate
+    begin
+      if Result + 2 > MaxDestChars then
+        Break;
+      if Dest <> nil then
+      begin
+        Dest^ := WideChar((((ACharAccumulator - $10000) shr 10) and $3FF) or $D800);
+        Inc(Dest);
+        Dest^ := WideChar((((ACharAccumulator - $10000) and $3FF) or $DC00));
+        Inc(Dest);
+      end;
+      Inc(Result, 2);
+    end
+    else
+    begin
+      if Dest <> nil then
+      begin
+        Dest^ := WideChar(ACharAccumulator);
+        Inc(Dest);
+      end;
+      Inc(Result);
+    end;
   end;
-  Result := Count;
 end;
 
 function acDecodeUTF8(const Source: AnsiString): UnicodeString;
@@ -1291,6 +1279,52 @@ function acRemoveChar(const S: UnicodeString; const ACharToRemove: WideChar): Un
 begin
   if acPos(ACharToRemove, S) > 0 then
     Result := acStringReplace(S, ACharToRemove, '')
+  else
+    Result := S;
+end;
+
+function acRemoveSurrogates(const S: UnicodeString; const AReplaceBy: WideChar = #0): UnicodeString;
+var
+  ABuffer: TStringBuilder;
+  AHasSurrogates: Boolean;
+  AScan: PWideChar;
+begin
+  AHasSurrogates := False;
+  AScan := PWideChar(S);
+  while Ord(AScan^) <> 0 do
+  begin
+    if Ord(AScan^) >= $D800 then
+    begin
+      AHasSurrogates := True;
+      Break;
+    end;
+    Inc(AScan);
+  end;
+
+  if AHasSurrogates then
+  begin
+    ABuffer := TACLStringBuilderManager.Get(Length(S));
+    try
+      AScan := PWideChar(S);
+      while Ord(AScan^) <> 0 do
+      begin
+        if (Ord(AScan^) >= $D800) and (Ord(PWideChar(AScan + 1)^) and $DC00 = $DC00) then
+        begin
+          if Ord(AReplaceBy) <> 0 then
+            ABuffer.Append(AReplaceBy);
+          Inc(AScan, 2);
+        end
+        else
+        begin
+          ABuffer.Append(AScan^);
+          Inc(AScan);
+        end;
+      end;
+      Result := ABuffer.ToString;
+    finally
+      TACLStringBuilderManager.Release(ABuffer);
+    end;
+  end
   else
     Result := S;
 end;
