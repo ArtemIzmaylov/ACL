@@ -792,7 +792,10 @@ end;
 
 procedure TACLDropSource.ExecuteInThread;
 begin
-  TACLDropSourceThread.Create(Self);
+  if IsWine then
+    Execute
+  else
+    TACLDropSourceThread.Create(Self);
 end;
 
 procedure TACLDropSource.DoDrop(var AAllowDrop: Boolean);
