@@ -401,7 +401,7 @@ begin
     ANumber := AValue;
     Exit(True);
   end;
-  Result := TryStrToInt(AValue, ANumber);
+  Result := TryStrToInt(acTrim(AValue), ANumber);
 end;
 
 class function TACLFormatStringFactory.FunctionCaps(AContext: TObject; AParams: TACLExpressionElements): Variant;
