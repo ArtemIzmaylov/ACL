@@ -4,7 +4,7 @@
 {*             Strings Utilities             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -29,14 +29,22 @@ type
   { TACLHexcode }
 
   TACLHexcode = class
+  strict private const
+    Map: array[0..15] of Char = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f');
+  strict private
+    class var FByteToHexMap: array[Byte] of UnicodeString;
   public
+    class constructor Create;
+
     class function Decode(const AChar1, AChar2: Char): Byte; overload;
     class function Decode(const AChar1, AChar2: Char; out AValue: Byte): Boolean; overload;
     class function Decode(const ACode: UnicodeString; AStream: TStream): Boolean; overload;
     class function DecodeString(const ACode: UnicodeString): UnicodeString; overload;
+
+    class function Encode(ABuffer: PByte; ACount: Integer): UnicodeString; overload;
+    class function Encode(AChar: WideChar): UnicodeString; overload; static;
+    class function Encode(AChar: WideChar; ABuffer: PWideChar): PWideChar; overload; static;
     class function Encode(AStream: TStream): UnicodeString; overload;
-    class function Encode(B: PByte; Len: Integer): UnicodeString; overload;
-    class function Encode(const AValue: Byte; out AChar1, AChar2: AnsiChar): Boolean; overload;
     class function EncodeFile(const AFileName: UnicodeString): UnicodeString; overload;
     class function EncodeString(const AValue: UnicodeString): UnicodeString; overload;
   end;
@@ -123,6 +131,14 @@ type
   { TACLTranslit }
 
   TACLTranslit = class
+  strict private const
+    ColChar = 33;
+    RArrayL = 'абвгдеёжзийклмнопрстуфхцчшщьыъэюя';
+    Translit: array[1..ColChar] of UnicodeString = (
+      'a', 'b', 'v', 'g', 'd', 'e', 'yo', 'zh', 'z', 'i', 'i''', 'k', 'l', 'm', 'n',
+      'o', 'p', 'r', 's', 't', 'u', 'f', 'h', 'ts', 'ch', 'sh', 'sch', #39, 'y',
+      #39, 'e', 'yu', 'ya'
+    );
   public
     class function Decode(const S: UnicodeString): UnicodeString;
     class function Encode(const S: UnicodeString): UnicodeString;
@@ -142,16 +158,13 @@ uses
   ACL.Utils.Stream,
   ACL.Utils.Strings;
 
-const
-  ColChar = 33;
-  RArrayL = 'абвгдеёжзийклмнопрстуфхцчшщьыъэюя';
-  Translit: array[1..ColChar] of UnicodeString = (
-    'a', 'b', 'v', 'g', 'd', 'e', 'yo', 'zh', 'z', 'i', 'i''', 'k', 'l', 'm', 'n',
-    'o', 'p', 'r', 's', 't', 'u', 'f', 'h', 'ts', 'ch', 'sh', 'sch', #39, 'y',
-    #39, 'e', 'yu', 'ya'
-  );
-
 { TACLHexcode }
+
+class constructor TACLHexcode.Create;
+begin
+  for var B := Low(Byte) to High(Byte) do
+    FByteToHexMap[B] := Map[B shr 4] + Map[B and $F];
+end;
 
 class function TACLHexcode.Decode(const AChar1, AChar2: Char): Byte;
 begin
@@ -234,22 +247,20 @@ begin
   end;
 end;
 
-class function TACLHexcode.Encode(B: PByte; Len: Integer): UnicodeString;
+class function TACLHexcode.Encode(ABuffer: PByte; ACount: Integer): UnicodeString;
 var
   AScan: PWideChar;
-  C1, C2: AnsiChar;
 begin
-  System.SetString(Result, nil, 2 * Len);
+  System.SetString(Result, nil, 2 * ACount);
   AScan := @Result[1];
-  while Len > 0 do
+  while ACount > 0 do
   begin
-    Encode(B^, C1, C2);
-    AScan^ := WideChar(C1);
+    AScan^ := Map[ABuffer^ shr 4];
     Inc(AScan);
-    AScan^ := WideChar(C2);
+    AScan^ := Map[ABuffer^ and $F];
+    Inc(ABuffer);
     Inc(AScan);
-    Dec(Len);
-    Inc(B);
+    Dec(ACount);
   end;
 end;
 
@@ -274,13 +285,20 @@ begin
   end;
 end;
 
-class function TACLHexcode.Encode(const AValue: Byte; out AChar1, AChar2: AnsiChar): Boolean;
-const
-  Map: array[0..15] of AnsiChar = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F');
+class function TACLHexcode.Encode(AChar: WideChar): UnicodeString;
 begin
-  AChar1 := Map[AValue shr 4];
-  AChar2 := Map[AValue and $F];
-  Result := True;
+  Result := FByteToHexMap[Ord(AChar) shr 8] + FByteToHexMap[Ord(AChar) and $FF];
+end;
+
+class function TACLHexcode.Encode(AChar: WideChar; ABuffer: PWideChar): PWideChar;
+var
+  AScan: PCardinal absolute ABuffer;
+begin
+  AScan^ := PCardinal(FByteToHexMap[Ord(AChar) shr 8])^;
+  Inc(AScan);
+  AScan^ := PCardinal(FByteToHexMap[Ord(AChar) and $FF])^;
+  Inc(AScan);
+  Result := ABuffer;
 end;
 
 class function TACLHexcode.EncodeString(const AValue: UnicodeString): UnicodeString;

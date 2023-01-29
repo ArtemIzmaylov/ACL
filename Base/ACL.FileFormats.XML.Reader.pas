@@ -1947,7 +1947,9 @@ begin
   for I := FIndex + 1 to FIndex + FAttributeCount + 1 - 1 do
   begin
     ANode := FNodes[I];
-    if (ANode.LocalName = ALocalName) and (ANode.Namespace = ANamespace) then
+    if (Pointer(ANode.LocalName) = Pointer(ALocalName)) and
+       (Pointer(ANode.Namespace) = Pointer(ANamespace))
+    then
       Exit(ANode.StringValue);
   end;
   Result := '';
@@ -2068,7 +2070,9 @@ begin
   for I := FIndex + 1 to FIndex + FAttributeCount do
   begin
     ANode := FNodes[I];
-    if (ANode.LocalName = ALocalName) and (ANode.Namespace = ANamespace) then
+    if (Pointer(ANode.LocalName) = Pointer(ALocalName)) and
+       (Pointer(ANode.Namespace) = Pointer(ANamespace))
+    then
       Exit(ANode);
   end;
   Result := nil;
@@ -2088,7 +2092,9 @@ begin
   for I := FIndex + 1 to FIndex + FAttributeCount do
   begin
     ANode := FNodes[I];
-    if (ANode.LocalName = ANameValue) and (ANode.Prefix = APrefixValue) then
+    if (Pointer(ANode.LocalName) = Pointer(ANameValue)) and
+       (Pointer(ANode.Prefix) = Pointer(APrefixValue))
+    then
       Exit(ANode);
   end;
   Result := nil;
