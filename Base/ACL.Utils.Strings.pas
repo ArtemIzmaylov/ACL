@@ -26,12 +26,12 @@ uses
 {$IFNDEF ACL_BASE_NOVCL}
   System.UITypes,
 {$ENDIF}
-  System.Types,
-  System.Math,
-  System.SysUtils,
   System.Character,
   System.Classes,
-  System.Generics.Collections;
+  System.Math,
+  System.SysUtils,
+  System.Generics.Collections,
+  System.Types;
 
 const
   acCRLF = UnicodeString(#13#10);
@@ -325,14 +325,14 @@ var
 function StrToIntDef(const S: AnsiString; ADefault: Integer): Integer; overload;
 
 // Text Conversions
-function acAnsiFromUnicode(const S: UnicodeString): AnsiString; overload;
-function acAnsiFromUnicode(const S: UnicodeString; CodePage: Integer): AnsiString; overload;
-function acBytesFromUnicode(W: PWideChar; ACount: Integer): RawByteString;
-function acStringFromAnsi(const S: AnsiChar): WideChar; overload;
-function acStringFromAnsi(const S: AnsiString): UnicodeString; overload;
-function acStringFromAnsi(const S: AnsiString; CodePage: Integer): UnicodeString; overload;
-function acStringFromAnsi(const S: PAnsiChar; ALength, ACodePage: Integer): UnicodeString; overload;
-function acStringFromBytes(const ABytes: TBytes): UnicodeString; overload;
+function acStringToAnsiString(const S: UnicodeString): AnsiString; overload;
+function acStringToAnsiString(const S: UnicodeString; CodePage: Integer): AnsiString; overload;
+function acStringToBytes(W: PWideChar; ACount: Integer): RawByteString;
+function acStringFromAnsiString(const S: AnsiChar): WideChar; overload;
+function acStringFromAnsiString(const S: AnsiString): UnicodeString; overload;
+function acStringFromAnsiString(const S: AnsiString; CodePage: Integer): UnicodeString; overload;
+function acStringFromAnsiString(const S: PAnsiChar; Length, CodePage: Integer): UnicodeString; overload;
+function acStringFromBytes(const Bytes: TBytes): UnicodeString; overload;
 function acStringFromBytes(B: PByte; Count: Integer): UnicodeString; overload;
 function acStringIsRealUnicode(const S: UnicodeString): Boolean;
 
@@ -625,12 +625,12 @@ end;
 // Text Conversions
 // ---------------------------------------------------------------------------------------------------------------------
 
-function acAnsiFromUnicode(const S: UnicodeString): AnsiString; overload;
+function acStringToAnsiString(const S: UnicodeString): AnsiString; overload;
 begin
-  Result := acAnsiFromUnicode(S, DefaultCodePage);
+  Result := acStringToAnsiString(S, DefaultCodePage);
 end;
 
-function acAnsiFromUnicode(const S: UnicodeString; CodePage: Integer): AnsiString; overload;
+function acStringToAnsiString(const S: UnicodeString; CodePage: Integer): AnsiString; overload;
 var
   ALen: Integer;
   ATemp: PWideChar;
@@ -641,7 +641,7 @@ begin
   LocaleCharsFromUnicode(CodePage, 0, ATemp, Length(S), PAnsiChar(Result), ALen, nil, nil);
 end;
 
-function acBytesFromUnicode(W: PWideChar; ACount: Integer): RawByteString;
+function acStringToBytes(W: PWideChar; ACount: Integer): RawByteString;
 var
   B: PByte;
 begin
@@ -659,33 +659,33 @@ begin
   end;
 end;
 
-function acStringFromAnsi(const S: AnsiString): UnicodeString;
+function acStringFromAnsiString(const S: AnsiString): UnicodeString;
 begin
-  Result := acStringFromAnsi(S, DefaultCodePage);
+  Result := acStringFromAnsiString(S, DefaultCodePage);
 end;
 
-function acStringFromAnsi(const S: AnsiChar): WideChar;
+function acStringFromAnsiString(const S: AnsiChar): WideChar;
 begin
   UnicodeFromLocaleChars(DefaultCodePage, 0, @S, 1, @Result, 1);
 end;
 
-function acStringFromAnsi(const S: PAnsiChar; ALength, ACodePage: Integer): UnicodeString;
+function acStringFromAnsiString(const S: PAnsiChar; Length, CodePage: Integer): UnicodeString;
 var
   ATargetLength: Integer;
 begin
-  ATargetLength := UnicodeFromLocaleChars(ACodePage, 0, S, ALength, nil, 0);
+  ATargetLength := UnicodeFromLocaleChars(CodePage, 0, S, Length, nil, 0);
   SetLength(Result, ATargetLength);
-  UnicodeFromLocaleChars(ACodePage, 0, S, ALength, PWideChar(Result), ATargetLength);
+  UnicodeFromLocaleChars(CodePage, 0, S, Length, PWideChar(Result), ATargetLength);
 end;
 
-function acStringFromAnsi(const S: AnsiString; CodePage: Integer): UnicodeString;
+function acStringFromAnsiString(const S: AnsiString; CodePage: Integer): UnicodeString;
 begin
-  Result := acStringFromAnsi(PAnsiChar(S), Length(S), CodePage);
+  Result := acStringFromAnsiString(PAnsiChar(S), Length(S), CodePage);
 end;
 
-function acStringFromBytes(const ABytes: TBytes): UnicodeString;
+function acStringFromBytes(const Bytes: TBytes): UnicodeString;
 begin
-  Result := acStringFromBytes(@ABytes[0], Length(ABytes));
+  Result := acStringFromBytes(@Bytes[0], Length(Bytes));
 end;
 
 function acStringFromBytes(B: PByte; Count: Integer): UnicodeString;
@@ -2560,7 +2560,7 @@ end;
 
 class function TACLMimecode.DecodeBytes(const ACode: UnicodeString): TBytes;
 begin
-  Result := DecodeBytes(acAnsiFromUnicode(ACode));
+  Result := DecodeBytes(acStringToAnsiString(ACode));
 end;
 
 class function TACLMimecode.DecodeBytes(const ACode: AnsiString): TBytes;

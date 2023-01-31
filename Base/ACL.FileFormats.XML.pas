@@ -1659,9 +1659,9 @@ begin
     mxeUTF8:
       Result := acDecodeUTF8(S);
     mxeWindows:
-      Result := acStringFromAnsi(S, Encoding.CodePage);
+      Result := acStringFromAnsiString(S, Encoding.CodePage);
   else
-    Result := acStringFromAnsi(S);
+    Result := acStringFromAnsiString(S);
   end;
   Result := TACLXMLHelper.DecodeString(Result);
 end;

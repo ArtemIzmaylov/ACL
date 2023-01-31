@@ -324,7 +324,7 @@ function acURLDecode(const S: UnicodeString): UnicodeString;
   begin
     Result := TryDecodeChar(C1, B1) and TryDecodeChar(C2, B2);
     if Result then
-      AChar := acStringFromAnsi(AnsiChar(B1 shl 4 or B2));
+      AChar := acStringFromAnsiString(AnsiChar(B1 shl 4 or B2));
   end;
 
   function IsHexEncodedChar(AIndex, ALength: Integer; out AChar: WideChar): Boolean;

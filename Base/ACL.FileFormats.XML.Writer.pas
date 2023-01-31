@@ -29,7 +29,7 @@ uses
   // ACL
   ACL.Classes,
   ACL.FileFormats.XML.Types,
-  ACL.Utils.Strings.Transcode;
+  ACL.Utils.Strings;
 
 type
   //# NewLineHandling specifies what will XmlWriter do with new line characters. The options are:

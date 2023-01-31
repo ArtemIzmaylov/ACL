@@ -267,7 +267,7 @@ begin
         end
         else
         begin
-          AString := acStringFromAnsi(AFileName);
+          AString := acStringFromAnsiString(AFileName);
           Inc(AFileName, Length(AString) + 1);
         end;
         AFiles.Add(AString);
@@ -335,7 +335,7 @@ begin
     if AUnicode then
       Result := PWideChar(APtr)
     else
-      Result := acStringFromAnsi(PAnsiChar(APtr));
+      Result := acStringFromAnsiString(PAnsiChar(APtr));
   finally
     GlobalUnlock(AGlobal);
   end;

@@ -715,7 +715,7 @@ function TACLDragDropDataProviderTextAnsi.Store(var AMedium: TStgMedium;
   const AFormat: TFormatEtc; ATargetConfig: TACLIniFile): Boolean;
 begin
   AMedium.tymed := TYMED_HGLOBAL;
-  AMedium.hGlobal := acTextToHGLOBAL(acAnsiFromUnicode(Text));
+  AMedium.hGlobal := acTextToHGLOBAL(acStringToAnsiString(Text));
   Result := True;
 end;
 
