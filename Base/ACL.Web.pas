@@ -161,6 +161,7 @@ implementation
 uses
   Winapi.WinInet,
   // ACL
+  ACL.Crypto,
   ACL.Math,
   ACL.Parsers,
   ACL.Utils.Common,

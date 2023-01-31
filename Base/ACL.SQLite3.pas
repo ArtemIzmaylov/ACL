@@ -31,7 +31,6 @@ uses
   ACL.Utils.Common,
   ACL.Utils.FileSystem,
   ACL.Utils.Strings,
-  ACL.Utils.Strings.Transcode,
   ACL.Threading;
 
 const

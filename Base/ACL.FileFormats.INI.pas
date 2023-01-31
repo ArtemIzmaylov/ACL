@@ -35,7 +35,6 @@ uses
   ACL.Utils.Common,
   ACL.Utils.FileSystem,
   ACL.Utils.Stream,
-  ACL.Utils.Strings.Transcode,
   ACL.Utils.Strings;
 
 type

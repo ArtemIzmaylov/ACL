@@ -60,13 +60,15 @@ type
 
 function acDecryptString(const S, Key: string): string;
 function acEncryptString(const S, Key: string): string;
+
+procedure acCryptStringXOR(var S: UnicodeString; const AKey: UnicodeString);
 implementation
 
 uses
   System.Math,
   // ACL
   ACL.FastCode,
-  ACL.Utils.Strings.Transcode;
+  ACL.Utils.Strings;
 
 function acDecryptString(const S, Key: string): string;
 begin
@@ -76,6 +78,15 @@ end;
 function acEncryptString(const S, Key: string): string;
 begin
   Result := TACLMimecode.EncodeBytes(TEncoding.Unicode.GetBytes(TRC4.CryptString(S, Key)));
+end;
+
+procedure acCryptStringXOR(var S: UnicodeString; const AKey: UnicodeString);
+var
+  I, L: Integer;
+begin
+  L := Length(AKey);
+  for I := 1 to Length(S) do
+    S[I] := WideChar(Word(S[I]) xor Word(AKey[I mod L + 1]));
 end;
 
 { TRC4 }

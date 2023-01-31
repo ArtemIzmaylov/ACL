@@ -27,8 +27,7 @@ uses
   ACL.Expressions,
   ACL.Parsers,
   ACL.Utils.Common,
-  ACL.Utils.Strings,
-  ACL.Utils.Strings.Transcode;
+  ACL.Utils.Strings;
 
 type
   TACLFormatStringMacroProc = function (AContext: TObject): string of object;

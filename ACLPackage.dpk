@@ -162,7 +162,6 @@ contains
   ACL.Utils.Shell.UserAccounts in 'Base\ACL.Utils.Shell.UserAccounts.pas',
   ACL.Utils.Stream in 'Base\ACL.Utils.Stream.pas',
   ACL.Utils.Strings in 'Base\ACL.Utils.Strings.pas',
-  ACL.Utils.Strings.Transcode in 'Base\ACL.Utils.Strings.Transcode.pas',
   ACL.Web in 'Base\ACL.Web.pas',
   ACL.Web.Http in 'Base\ACL.Web.Http.pas';
 

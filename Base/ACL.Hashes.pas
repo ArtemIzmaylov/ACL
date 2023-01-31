@@ -234,8 +234,7 @@ uses
   ACL.FastCode,
   ACL.Utils.Common,
   ACL.Utils.FileSystem,
-  ACL.Utils.Strings,
-  ACL.Utils.Strings.Transcode;
+  ACL.Utils.Strings;
 
 {$IFDEF MSWINDOWS}
 

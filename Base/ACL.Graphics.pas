@@ -505,7 +505,6 @@ uses
   ACL.Graphics.Ex,
   ACL.Graphics.Ex.Gdip,
   ACL.Utils.Strings,
-  ACL.Utils.Strings.Transcode,
   ACL.Utils.DPIAware;
 
 type
