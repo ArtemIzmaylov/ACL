@@ -325,9 +325,9 @@ end;
 
 procedure TACLFormattedLabelSubClass.ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState);
 var
-  AHyperlink: TACLTextLayoutBlockStyleHyperlink;
+  AHyperlink: TACLTextLayoutBlockHyperlink;
 begin
-  AHyperlink := TACLTextLayoutBlockStyleHyperlink(HitTest.HitObjectData[flhtHyperlink]);
+  AHyperlink := TACLTextLayoutBlockHyperlink(HitTest.HitObjectData[flhtHyperlink]);
   if AHyperlink <> nil then
     ExecuteLink(AHyperlink.Hyperlink)
   else

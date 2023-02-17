@@ -118,7 +118,8 @@ procedure acUnquot(var AToken: TACLParserToken); overload;
 procedure acUnquot(var S: UnicodeString); overload;
 
 function acCompareTokens(B1, B2: PWideChar; L1, L2: Integer): Boolean; overload;
-function acCompareTokens(const S1, S2: UnicodeString): Boolean; overload;
+function acCompareTokens(const S: UnicodeString; P: PWideChar; L: Integer): Boolean; overload; inline;
+function acCompareTokens(const S1, S2: UnicodeString): Boolean; overload; inline;
 implementation
 
 uses
@@ -250,6 +251,11 @@ begin
     if (I <> 1) or (J <> Length(S)) then
       S := Copy(S, I, J - I + 1);
   end;
+end;
+
+function acCompareTokens(const S: UnicodeString; P: PWideChar; L: Integer): Boolean; overload;
+begin
+  Result := acCompareTokens(PWideChar(S), P, L, Length(S));
 end;
 
 function acCompareTokens(const S1, S2: UnicodeString): Boolean;

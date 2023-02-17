@@ -128,11 +128,11 @@ type
   { TACLTextLayoutBaseRender32 }
 
   TACLTextLayoutBaseRender32 = class(TACLTextLayoutRender)
+  strict private
+    procedure FontChanged(Sender: TObject);
   protected
     FFont: TACLFont;
     FOrigin: TPoint;
-
-    procedure PrepareCanvas(ACanvas: TCanvas); override;
   public
     constructor Create(AOwner: TACLTextLayout; ACanvas: TCanvas);
     destructor Destroy; override;
@@ -145,8 +145,8 @@ type
     FDrawBackground: Boolean;
     FDrawContent: Boolean;
   protected
-    function AddSpace(ABlock: TACLTextLayoutBlockSpace): Boolean; override;
-    function AddText(ABlock: TACLTextLayoutBlockText): Boolean; override;
+    function OnSpace(ABlock: TACLTextLayoutBlockSpace): Boolean; override;
+    function OnText(ABlock: TACLTextLayoutBlockText): Boolean; override;
     procedure FillBackground(ABlock: TACLTextLayoutBlock); inline;
   public
     constructor Create(AOwner: TACLTextLayout; ACanvas: TCanvas; ADrawBackground, ADrawContent: Boolean);
@@ -162,9 +162,8 @@ type
     FShadow: TACLFontShadow;
     FTargetCanvas: TCanvas;
   protected
-    function AddSpace(ABlock: TACLTextLayoutBlockSpace): Boolean; override;
-    function AddText(ABlock: TACLTextLayoutBlockText): Boolean; override;
-    procedure PrepareCanvas(ACanvas: TCanvas); override;
+    function OnSpace(ABlock: TACLTextLayoutBlockSpace): Boolean; override;
+    function OnText(ABlock: TACLTextLayoutBlockText): Boolean; override;
   public
     constructor Create(AOwner: TACLTextLayout32; ACanvas: TCanvas);
     destructor Destroy; override;
@@ -703,8 +702,10 @@ constructor TACLTextLayoutBaseRender32.Create(AOwner: TACLTextLayout; ACanvas: T
 begin
   inherited Create(AOwner, ACanvas);
   FFont := TACLFont.Create;
+  FFont.OnChange := FontChanged;
   FFont.Assign(AOwner.Font);
   FOrigin := FFont.TextExtends.TopLeft;
+  Font := FFont;
 end;
 
 destructor TACLTextLayoutBaseRender32.Destroy;
@@ -713,10 +714,9 @@ begin
   inherited;
 end;
 
-procedure TACLTextLayoutBaseRender32.PrepareCanvas(ACanvas: TCanvas);
+procedure TACLTextLayoutBaseRender32.FontChanged(Sender: TObject);
 begin
-  inherited;
-  FFont.Assign(ACanvas.Font);
+  Canvas.Font.Assign(FFont);
 end;
 
 { TACLTextLayoutRender32 }
@@ -736,7 +736,7 @@ begin
   inherited;
 end;
 
-function TACLTextLayoutRender32.AddSpace(ABlock: TACLTextLayoutBlockSpace): Boolean;
+function TACLTextLayoutRender32.OnSpace(ABlock: TACLTextLayoutBlockSpace): Boolean;
 begin
   FillBackground(ABlock);
   if FDrawContent and (fsUnderline in Canvas.Font.Style) then
@@ -744,7 +744,7 @@ begin
   Result := True;
 end;
 
-function TACLTextLayoutRender32.AddText(ABlock: TACLTextLayoutBlockText): Boolean;
+function TACLTextLayoutRender32.OnText(ABlock: TACLTextLayoutBlockText): Boolean;
 begin
   FillBackground(ABlock);
   if FDrawContent then
@@ -794,12 +794,12 @@ begin
   FBuffer.DrawBlend(FTargetCanvas.Handle, FBufferOrigin);
 end;
 
-function TACLTextLayoutShadowRender32.AddSpace(ABlock: TACLTextLayoutBlockSpace): Boolean;
+function TACLTextLayoutShadowRender32.OnSpace(ABlock: TACLTextLayoutBlockSpace): Boolean;
 begin
   Result := True;
 end;
 
-function TACLTextLayoutShadowRender32.AddText(ABlock: TACLTextLayoutBlockText): Boolean;
+function TACLTextLayoutShadowRender32.OnText(ABlock: TACLTextLayoutBlockText): Boolean;
 var
   APoint: TPoint;
   AWindowOrg: TPoint;
@@ -807,6 +807,10 @@ var
 begin
   if ABlock.TextSize.Width > 0 then
   begin
+    SetBkColor(Canvas.Handle, clBlack);
+    SetBkMode(Canvas.Handle, TRANSPARENT);
+    SetTextColor(Canvas.Handle, clWhite);
+
     GetWindowOrgEx(Canvas.Handle, AWindowOrg);
     try
       APoint := acPointOffsetNegative(AWindowOrg, FOrigin);
@@ -832,14 +836,6 @@ begin
     end;
   end;
   Result := True;
-end;
-
-procedure TACLTextLayoutShadowRender32.PrepareCanvas(ACanvas: TCanvas);
-begin
-  inherited;
-  SetBkColor(ACanvas.Handle, clBlack);
-  SetBkMode(ACanvas.Handle, TRANSPARENT);
-  SetTextColor(ACanvas.Handle, clWhite);
 end;
 
 { TACLSimpleTextLayout32 }
