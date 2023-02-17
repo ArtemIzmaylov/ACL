@@ -4,7 +4,7 @@
 {*              Label Controls               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -35,6 +35,7 @@ uses
   ACL.Graphics,
   ACL.Graphics.Ex,
   ACL.Graphics.SkinImage,
+  ACL.Graphics.SkinImageSet,
   ACL.Math,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Forms,
@@ -198,6 +199,7 @@ type
     function MeasureSize(AWidth: Integer = 0): TSize; override;
   public
     constructor Create(AOwner: TComponent); override;
+    procedure SetCaption(const AValue: UnicodeString; AIcon: TACLValidationLabelIcon);
   published
     property AutoSize default True;
     property Icon: TACLValidationLabelIcon read FIcon write SetIcon default vliWarning;
@@ -749,6 +751,12 @@ begin
   Result := inherited MeasureSize(AWidth);
   Result.cy := Max(Result.cy, Style.Icons.FrameHeight);
   Result.cx := Result.cx + GetTextOffset;
+end;
+
+procedure TACLValidationLabel.SetCaption(const AValue: UnicodeString; AIcon: TACLValidationLabelIcon);
+begin
+  Caption := AValue;
+  Icon := AIcon;
 end;
 
 procedure TACLValidationLabel.SetIcon(AValue: TACLValidationLabelIcon);

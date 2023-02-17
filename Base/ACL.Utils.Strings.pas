@@ -1387,6 +1387,8 @@ begin
     AOffsetNew := acPos(APattern, ASearchStr, False, AWholeWords, AOffset);
     if AOffsetNew = 0 then
     begin
+      if AOffset = 1 then
+        Exit(S);
       Result := Result + Copy(S, AOffset, ALength - AOffset + 1);
       Break;
     end;
