@@ -630,9 +630,8 @@ end;
 constructor TACLFileSystemWatcherThread.Create(
   AWatcher: TACLFileSystemWatcher; AActiveTasks: TACLList<IACLFileSystemWatcherTask>;
   ATasks: TACLList<TPair<Integer, IACLFileSystemWatcherTask>>; var AIndex: Integer);
-const
-  Map: array [Boolean] of TACLFileSystemChanges = ([fscFolders], []);
 var
+  AChanges: TACLFileSystemChanges;
   AHandle: THandle;
   AMode: DWORD;
   APathIndex: Integer;
@@ -650,7 +649,14 @@ begin
       APathIndex := ATasks.List[AIndex].Key;
       ARecursive := ATask.GetPaths.Recursive[APathIndex];
 
-      AHandle := FindFirstChangeNotification(PChar(ATask.GetPaths[APathIndex]), ARecursive, BuildNotifyFilter(ATask.GetChanges - Map[ARecursive]));
+      AChanges := ATask.GetChanges;
+      if not ARecursive then
+      begin
+        Exclude(AChanges, fscFolders);
+        Exclude(AChanges, fscLastWriteTime);
+      end;
+
+      AHandle := FindFirstChangeNotification(PChar(ATask.GetPaths[APathIndex]), ARecursive, BuildNotifyFilter(AChanges));
       if AHandle <> INVALID_HANDLE_VALUE then
       begin
         AActiveTasks.Add(ATask);
