@@ -1921,6 +1921,8 @@ begin
   FDefaultTextColor := Owner.GetDefaultTextColor;
   FFontColors := TACLTextLayoutValueStack<TColor>.Create;
   FFillColors := TACLTextLayoutValueStack<TColor>.Create;
+  UpdateFillColor;
+  UpdateFontColor;
 end;
 
 destructor TACLTextLayoutRender.Destroy;
