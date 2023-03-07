@@ -500,7 +500,8 @@ begin
             ABuffer.Append(ReplacementForInvalidChars);
         end
         else
-          ABuffer.Append(AChar);
+          if Ord(AChar) >= Ord(' ') then
+            ABuffer.Append(AChar);
     end;
 
     AIndex := 0;
