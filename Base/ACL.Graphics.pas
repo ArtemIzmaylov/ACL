@@ -4,7 +4,7 @@
 {*            Graphics Utilities             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -46,11 +46,8 @@ type
   TACLBitmapRotation = (br0, br90, br180, br270);
 
 const
-  NullRGBQuad: TRGBQuad = (rgbBlue: 0; rgbGreen: 0; rgbRed: 0; rgbReserved: 0);
-  TransparentRGBQuad: TRGBQuad = (rgbBlue: 255; rgbGreen: 0; rgbRed: 255; rgbReserved: 0); // clFuchsia
-  MeasureTextPattern = 'Qq';
-
   acDropArrowSize: TSize = (cx: 7; cy: 3);
+  acMeasureTextPattern = 'Qq';
   acEndEllipsis: string = '…';
   acFocusRectIndent = 1;
   acTextIndent = 2;
@@ -287,6 +284,7 @@ type
 
   TACLColors = class
   public const
+    MaskPixel: TRGBQuad = (rgbBlue: 255; rgbGreen: 0; rgbRed: 255; rgbReserved: 0); // clFuchsia
     NullPixel: TRGBQuad = (rgbBlue: 0; rgbGreen: 0; rgbRed: 0; rgbReserved: 0);
   public class var
     PremultiplyTable: TACLPixelMap;
@@ -295,7 +293,7 @@ type
     class constructor Create;
     class function CompareRGB(const Q1, Q2: TRGBQuad): Boolean; inline; static;
     class function IsDark(Color: TColor): Boolean;
-    class function IsTransparent(const Q: TRGBQuad): Boolean; inline; static;
+    class function IsMask(const Q: TRGBQuad): Boolean; inline; static;
     class function ToColor(const Q: TRGBQuad): TColor; static;
     class function ToQuad(A, R, G, B: Byte): TRGBQuad; overload; static; inline;
     class function ToQuad(AColor: TAlphaColor): TRGBQuad; overload; static;
@@ -311,13 +309,13 @@ type
     class function ArePremultiplied(AColors: PRGBQuad; ACount: Integer): Boolean;
     class procedure Flip(AColors: PRGBQuadArray; AWidth, AHeight: Integer; AHorizontally, AVertically: Boolean);
     class procedure Flush(var Q: TRGBQuad); inline; static;
-    class procedure Grayscale(Q: PRGBQuad; ACount: Integer); overload; static;
-    class procedure Grayscale(var Q: TRGBQuad); overload; inline; static;
+    class procedure Grayscale(Q: PRGBQuad; Count: Integer; IgnoreMask: Boolean = False); overload; static;
+    class procedure Grayscale(var Q: TRGBQuad; IgnoreMask: Boolean = False); overload; inline; static;
     class function Hue(Color: TColor): Single; overload; static;
     class function Invert(Color: TColor): TColor; static;
     class function Lightness(Color: TColor): Single; overload; static;
-    class procedure MakeDisabled(Q: PRGBQuad; ACount: Integer); overload; static;
-    class procedure MakeDisabled(var Q: TRGBQuad); overload; inline; static;
+    class procedure MakeDisabled(Q: PRGBQuad; Count: Integer; IgnoreMask: Boolean = False); overload; static;
+    class procedure MakeDisabled(var Q: TRGBQuad; IgnoreMask: Boolean = False); overload; inline; static;
     class procedure MakeTransparent(Q: PRGBQuad; ACount: Integer; const AColor: TRGBQuad); overload;
     class procedure Premultiply(Q: PRGBQuad; ACount: Integer); overload; static;
     class procedure Premultiply(var Q: TRGBQuad); overload; inline; static;
@@ -950,12 +948,12 @@ end;
 
 function acFontHeight(Canvas: TCanvas): Integer;
 begin
-  Result := acTextSize(Canvas, MeasureTextPattern).cy;
+  Result := acTextSize(Canvas, acMeasureTextPattern).cy;
 end;
 
 function acFontHeight(Font: TFont): Integer;
 begin
-  Result := acTextSize(Font, MeasureTextPattern).cy;
+  Result := acTextSize(Font, acMeasureTextPattern).cy;
 end;
 
 function acTextSize(Font: TFont; const AText: UnicodeString; AStartIndex, ALength: Integer): TSize;
@@ -2706,12 +2704,9 @@ begin
   Result := Lightness(Color) < 0.45;
 end;
 
-class function TACLColors.IsTransparent(const Q: TRGBQuad): Boolean;
+class function TACLColors.IsMask(const Q: TRGBQuad): Boolean;
 begin
-  Result :=
-    (Q.rgbGreen = 0) and
-    (Q.rgbBlue = TransparentRGBQuad.rgbBlue) and
-    (Q.rgbRed = TransparentRGBQuad.rgbRed);
+  Result := (Q.rgbGreen = MaskPixel.rgbGreen) and (Q.rgbBlue = MaskPixel.rgbBlue) and (Q.rgbRed = MaskPixel.rgbRed);
 end;
 
 class function TACLColors.ToQuad(A, R, G, B: Byte): TRGBQuad;
@@ -2847,7 +2842,7 @@ begin
   RGBtoHSLi(AColor.rgbRed, AColor.rgbGreen, AColor.rgbBlue, H, S, L);
   while ACount > 0 do
   begin
-    if not IsTransparent(Q^) then
+    if not IsMask(Q^) then
     begin
       Cmax := Max(Q^.rgbRed, Max(Q^.rgbGreen, Q^.rgbBlue));
       Cmin := Min(Q^.rgbRed, Min(Q^.rgbGreen, Q^.rgbBlue));
@@ -2862,7 +2857,7 @@ class procedure TACLColors.ChangeHue(var Q: TRGBQuad; AHue: Byte; AIntensity: By
 var
   H, S, L: Byte;
 begin
-  if not IsTransparent(Q) then
+  if not IsMask(Q) then
   begin
     TACLColors.RGBtoHSLi(Q.rgbRed, Q.rgbGreen, Q.rgbBlue, H, S, L);
     TACLColors.HSLtoRGBi(AHue, MulDiv(S, AIntensity, 100), L, Q.rgbRed, Q.rgbGreen, Q.rgbBlue);
@@ -2927,19 +2922,19 @@ begin
   PCardinal(@Q)^ := 0;
 end;
 
-class procedure TACLColors.Grayscale(Q: PRGBQuad; ACount: Integer);
+class procedure TACLColors.Grayscale(Q: PRGBQuad; Count: Integer; IgnoreMask: Boolean = False);
 begin
-  while ACount > 0 do
+  while Count > 0 do
   begin
-    Grayscale(Q^);
-    Dec(ACount);
+    Grayscale(Q^, IgnoreMask);
+    Dec(Count);
     Inc(Q);
   end;
 end;
 
-class procedure TACLColors.Grayscale(var Q: TRGBQuad);
+class procedure TACLColors.Grayscale(var Q: TRGBQuad; IgnoreMask: Boolean = False);
 begin
-  if not IsTransparent(Q) then
+  if IgnoreMask or not IsMask(Q) then
   begin
     Q.rgbBlue := PremultiplyTable[Q.rgbBlue, 77] + PremultiplyTable[Q.rgbGreen, 150] + PremultiplyTable[Q.rgbRed, 28];
     Q.rgbGreen := Q.rgbBlue;
@@ -2959,21 +2954,21 @@ begin
   TACLColors.RGBtoHSL(Color, H, S, Result);
 end;
 
-class procedure TACLColors.MakeDisabled(Q: PRGBQuad; ACount: Integer);
+class procedure TACLColors.MakeDisabled(Q: PRGBQuad; Count: Integer; IgnoreMask: Boolean = False);
 begin
-  while ACount > 0 do
+  while Count > 0 do
   begin
-    MakeDisabled(Q^);
-    Dec(ACount);
+    MakeDisabled(Q^, IgnoreMask);
+    Dec(Count);
     Inc(Q);
   end;
 end;
 
-class procedure TACLColors.MakeDisabled(var Q: TRGBQuad);
+class procedure TACLColors.MakeDisabled(var Q: TRGBQuad; IgnoreMask: Boolean = False);
 var
   APixel: Byte;
 begin
-  if not IsTransparent(Q) and (Q.rgbReserved > 0) then
+  if (Q.rgbReserved > 0) and (IgnoreMask or not IsMask(Q)) then
   begin
     Unpremultiply(Q);
     Q.rgbReserved := PremultiplyTable[Q.rgbReserved, 128];

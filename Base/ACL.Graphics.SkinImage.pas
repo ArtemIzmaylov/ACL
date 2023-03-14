@@ -4,7 +4,7 @@
 {*              SkinImage Class              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -1059,7 +1059,7 @@ begin
   GetDIBits(MeasureCanvas.Handle, ABitmap.Handle, 0, Height, Bits, AInfo, DIB_RGB_COLORS);
 
   if (ABitmap.PixelFormat > pfDevice) and (ABitmap.PixelFormat < pf32bit) then
-    TACLColors.MakeTransparent(PRGBQuad(Bits), BitCount, TransparentRGBQuad);
+    TACLColors.MakeTransparent(PRGBQuad(Bits), BitCount, TACLColors.MaskPixel);
   if ABitmap.AlphaFormat = afPremultiplied then
     FBitsState := ibsPremultiplied;
 
@@ -2071,7 +2071,7 @@ class procedure TACLSkinImageAnalyzer.RecoveryAlpha(Q: PRGBQuad; ACount: Integer
 begin
   while ACount > 0 do
   begin
-    if TACLColors.IsTransparent(Q^) then
+    if TACLColors.IsMask(Q^) then
     begin
       AHasSemiTransparentPixels := True;
       TACLColors.Flush(Q^);

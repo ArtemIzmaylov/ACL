@@ -4,7 +4,7 @@
 {*         Extended Graphic Library          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -77,7 +77,7 @@ type
     procedure ApplyTint(const AColor: TColor); overload;
     procedure ApplyTint(const AColor: TRGBQuad); overload;
     procedure Flip(AHorizontally, AVertically: Boolean);
-    procedure MakeDisabled;
+    procedure MakeDisabled(AIgnoreMask: Boolean = False);
     procedure MakeMirror(ASize: Integer);
     procedure MakeOpaque;
     procedure MakeTransparent(AColor: TColor);
@@ -1466,9 +1466,9 @@ begin
   TACLColors.Flip(Colors, Width, Height, AHorizontally, AVertically);
 end;
 
-procedure TACLBitmapLayer.MakeDisabled;
+procedure TACLBitmapLayer.MakeDisabled(AIgnoreMask: Boolean = False);
 begin
-  TACLColors.MakeDisabled(@FColors^[0], ColorCount);
+  TACLColors.MakeDisabled(@FColors^[0], ColorCount, AIgnoreMask);
 end;
 
 procedure TACLBitmapLayer.MakeMirror(ASize: Integer);
