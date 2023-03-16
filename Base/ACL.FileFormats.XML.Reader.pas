@@ -4,7 +4,7 @@
 {*          Stream based XML Parser          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -319,6 +319,7 @@ const
   SXmlCharEntityOverflow = 'Invalid value of a character entity reference.';
   SXmlEncodingSwitchAfterResetState = '''%s'' is an invalid value for the ''encoding'' attribute. ' +
     'The encoding cannot be switched after a call to ResetState';
+  SXmlEntityReferencesNotImplemented = 'Entity references are not implemented';
   SXmlExpectExternalOrClose = 'Expecting external ID, ''['' or ''&gt;''.';
   SXmlExpectSubOrClose = 'Expecting an internal subset or the end of the DOCTYPE declaration.';
   SXmlExpectingWhiteSpace = '''%s'' is an unexpected token. Expecting white space.';
@@ -353,7 +354,6 @@ const
   SXmlXmlnsPrefix = 'Prefix ''xmlns'' is reserved for use by XML.';
   SXmlXmlPrefix = 'Prefix ''xml'' is reserved for use by XML and can be mapped only to namespace name ' +
     '''http://www.w3.org/XML/1998/namespace''.';
-  SDTDNotImplemented = 'DTD not implemented';
 
 type
 
@@ -693,6 +693,7 @@ type
     function ParseCDataOrComment(AType: TACLXMLNodeType; out AOutStartPosition, AOutEndPosition: Integer): Boolean; overload;
     function ParseCharRefInline(AStartPosition: Integer; out ACharCount: Integer; out AEntityType: TEntityType): Integer;
     function ParseComment: Boolean;
+    function ParseDocTypeDeclaraion: Boolean;
     function ParseDocumentContent: Boolean;
     function ParseElementContent: Boolean;
     function ParseName: Integer;
@@ -718,7 +719,10 @@ type
     procedure ParseElement;
     procedure ParseEndElement;
     procedure ParseXmlDeclarationFragment;
+    procedure SkipDtd;
     procedure SkipPartialTextValue;
+    procedure SkipPublicOrSystemIdLiteral;
+    procedure SkipUntil(AStopChar: Char; ARecognizeLiterals: Boolean);
 
     function HandleEntityReference(AIsInAttributeValue: Boolean;
       AExpandType: TEntityExpandType; out ACharRefEndPos: Integer): TEntityType;
@@ -2467,13 +2471,38 @@ begin
   end;
 end;
 
+function TACLXMLTextReader.ParseDoctypeDeclaraion: Boolean;
+begin
+  while FParsingState.CharsUsed - FParsingState.CharPos < 8 do
+  begin
+    if ReadData = 0 then
+      Throw(SXmlUnexpectedEOF, 'DOCTYPE');
+  end;
+
+  if not StrEqual(FParsingState.Chars, FParsingState.CharPos, 7, 'DOCTYPE') then
+    ThrowUnexpectedToken(IfThen(FRootElementParsed, '<!--', 'DOCTYPE'));
+
+  if not TACLXMLCharType.IsWhiteSpace(FParsingState.Chars[FParsingState.CharPos + 7]) then
+    ThrowExpectingWhitespace(FParsingState.CharPos + 7);
+
+  if FRootElementParsed then
+    Throw(FParsingState.CharPos - 2, SXmlBadDTDLocation);
+
+  Inc(FParsingState.CharPos, 8);
+  EatWhitespaces(nil);
+  //if (dtdProcessing == DtdProcessing.Parse) {
+  //} else
+  SkipDtd;
+  Result := False;
+end;
+
 function TACLXMLTextReader.ParseDocumentContent: Boolean;
 label
   LblReadData;
 var
+  AChars: TCharArray;
   AMangoQuirks, ANeedMoreChars: Boolean;
   APosition: Integer;
-  AChars: TCharArray;
 begin
   AMangoQuirks := False;
   while True do
@@ -2537,9 +2566,15 @@ begin
                   Throw(FParsingState.CharPos, 'InvalidRootData');
               end
               else
-                Throw(SDTDNotImplemented);
+              begin
+                FParsingState.CharPos := APosition;
+                if ParseDocTypeDeclaraion then
+                  Exit(True);
+                Continue;
+              end;
           end;
-        '/':
+
+        Ord('/'):
           Throw(APosition + 1, SXmlUnexpectedEndTag);
         else
           begin
@@ -2558,10 +2593,30 @@ begin
           end;
       end;
     end
-    else
-      if AChars[APosition] = '&' then
-        Throw(SDTDNotImplemented)
+    else // if Ord(AChars[APosition]) = Ord('<') then
+
+      if Ord(AChars[APosition]) = Ord('&') then
+      begin
+//        if FFragmentType = TACLXMLNodeType.Document then
+          Throw(SXmlInvalidRootData)
+//        else
+//        begin
+//          if FFragmentType = TACLXMLNodeType.None then
+//            FFragmentType := TACLXMLNodeType.Element;
+//          case HandleEntityReference(False, TEntityExpandType.OnlyGeneral, ACharRefPos) of
+//            TEntityType.Unexpanded:
+//              Throw(SXmlEntityReferencesNotImplemented);
+//            TEntityType.CharacterDec, TEntityType.CharacterHex, TEntityType.CharacterNamed:
+//              if ParseText then
+//                Exit(True);
+//          else
+//            Inc(FParsingState.CharPos); // +1 ò.ê. EntityReferencesNotImplemented
+//          end;
+//          Continue;
+//        end;
+      end
       else
+
         if (APosition = FParsingState.CharsUsed) or (AMangoQuirks and (AChars[APosition] = #0)) then
           goto LblReadData
         else
@@ -2588,10 +2643,6 @@ begin
 
 LblReadData:
     //# read new characters into the buffer
-//# fix hint
-//#    if ReadData <> 0 then
-//#      APos := FPs.CharPos
-//#    else
     if ReadData = 0 then
     begin
       if ANeedMoreChars then
@@ -2607,12 +2658,10 @@ LblReadData:
           FFragmentType := TACLXMLNodeType.Document
         else
           FFragmentType := TACLXMLNodeType.Element;
+
       OnEof;
       Exit(False);
     end;
-
-//# at the beginning of cycle:   APos := FPs.CharPos;
-    AChars := FParsingState.Chars;
   end;
 end;
 
@@ -2857,10 +2906,12 @@ begin
             FParsingState.CharPos := APosition;
 
             AEntityLineInfo := TACLXMLLineInfo.Create(FParsingState.LineNo, FParsingState.LinePos + 1);
-
-            if not (HandleEntityReference(True, TEntityExpandType.All, APosition) in
-              [TEntityType.CharacterDec, TEntityType.CharacterHex, TEntityType.CharacterNamed]) then
-              APosition := FParsingState.CharPos;
+            case HandleEntityReference(True, TEntityExpandType.All, APosition) of
+              TEntityType.CharacterDec, TEntityType.CharacterHex, TEntityType.CharacterNamed:
+                { do nothing};
+            else
+              APosition := FParsingState.CharPos + 1; // +1 ò.ê. EntityReferencesNotImplemented
+            end;
             AChars := FParsingState.Chars;
             Continue;
           end;
@@ -2902,9 +2953,7 @@ begin
         Assert(FParsingState.IsEof);
       end
       else
-      begin
-        Throw(SDTDNotImplemented);
-      end;
+        Throw(SXmlEntityReferencesNotImplemented);
     end;
 
     APosition := FParsingState.CharPos;
@@ -4537,8 +4586,11 @@ begin
     ACharRefEndPos := ParseNamedCharRef(AExpandType <> TEntityExpandType.OnlyGeneral, nil);
     if ACharRefEndPos >= 0 then
       Exit(TEntityType.CharacterNamed);
-    if AIsInAttributeValue then
-      Throw(SDTDNotImplemented);
+
+    //# we does not supports for EntityReferences now
+    //# so, just skip the character
+    // Throw(SXmlEntityReferencesNotImplemented);
+
     Result := TEntityType.Skipped;
   end;
 end;
@@ -4648,9 +4700,10 @@ begin
           begin
             if APosition > FParsingState.CharPos then
               goto ReturnPartialValue;
+
             case HandleEntityReference(False, TEntityExpandType.All, APosition) of
               //# Needed only for XmlTextReader (reporting of entities)
-              TEntityType.CharacterDec, //# VCL removed V1Compat mode
+              TEntityType.CharacterDec,
               TEntityType.CharacterHex,
               TEntityType.CharacterNamed:
                 if not TACLXMLCharType.IsWhiteSpace(FParsingState.Chars[APosition - 1]) then
@@ -4664,7 +4717,7 @@ begin
                   goto NoValue;
                 end;
             else
-              APosition := FParsingState.CharPos + 1; // +1, because of Continue;
+              APosition := FParsingState.CharPos + 1; // +1 ò.ê. EntityReferencesNotImplemented
             end;
             AChars := FParsingState.Chars;
           end;
@@ -5045,6 +5098,95 @@ begin
   end;
 end;
 
+procedure TACLXMLTextReader.SkipDtd;
+var
+  AColonPos: Integer;
+begin
+  // parse dtd name
+  FParsingState.CharPos := ParseQName(AColonPos);
+  // check whitespace
+  EatWhitespaces(nil);
+
+  // PUBLIC Id
+  if Ord(FParsingState.Chars[FParsingState.CharPos]) = Ord('P') then
+  begin
+    // make sure we have enough characters
+    while FParsingState.charsUsed - FParsingState.charPos < 6 do
+    begin
+      if ReadData = 0 then
+        Throw(SXmlUnexpectedEOF1)
+    end;
+    // check 'PUBLIC'
+    if not StrEqual(FParsingState.Chars, FParsingState.CharPos, 6, 'PUBLIC') then
+      ThrowUnexpectedToken('PUBLIC');
+    Inc(FParsingState.CharPos, 6);
+
+    // check whitespace
+    if EatWhitespaces(nil) = 0 then
+      ThrowExpectingWhitespace(FParsingState.CharPos);
+
+    // parse PUBLIC value
+    SkipPublicOrSystemIdLiteral;
+
+    // check whitespace
+    if EatWhitespaces(nil) = 0 then
+      ThrowExpectingWhitespace(FParsingState.CharPos);
+
+    // parse SYSTEM value
+    SkipPublicOrSystemIdLiteral;
+
+    EatWhitespaces(nil);
+  end
+  else
+    // SYSTEM Value
+    if Ord(FParsingState.Chars[FParsingState.CharPos]) = Ord('S') then
+    begin
+      // make sure we have enough characters
+      while FParsingState.charsUsed - FParsingState.charPos < 6 do
+      begin
+        if ReadData = 0 then
+          Throw(SXmlUnexpectedEOF1);
+      end;
+
+      // check 'SYSTEM'
+      if not StrEqual(FParsingState.Chars, FParsingState.CharPos, 6, 'SYSTEM') then
+        ThrowUnexpectedToken('SYSTEM');
+      Inc(FParsingState.CharPos, 6);
+
+      // check whitespace
+      if EatWhitespaces(nil) = 0 then
+        ThrowExpectingWhitespace(FParsingState.CharPos);
+
+      // parse SYSTEM value
+      SkipPublicOrSystemIdLiteral;
+
+      EatWhitespaces(nil);
+    end
+    else
+      if (Ord(FParsingState.Chars[FParsingState.CharPos]) <> Ord('[')) and
+         (Ord(FParsingState.Chars[FParsingState.CharPos]) <> Ord('>'))
+      then
+        Throw(SXmlExpectExternalOrClose);
+
+  // internal DTD
+  if Ord(FParsingState.Chars[FParsingState.CharPos]) = Ord('[') then
+  begin
+    Inc(FParsingState.CharPos);
+    SkipUntil(']', True);
+    EatWhitespaces(nil);
+    if Ord(FParsingState.Chars[FParsingState.CharPos]) <> Ord('>') then
+      ThrowUnexpectedToken('>');
+  end
+  else
+    // just close the entry
+    if Ord(FParsingState.Chars[FParsingState.CharPos]) = Ord('>') then
+      FCurrentNode.SetValue(EmptyStr)
+    else
+      Throw(SXmlExpectSubOrClose);
+
+  Inc(FParsingState.CharPos);
+end;
+
 procedure TACLXMLTextReader.SkipPartialTextValue;
 var
   AStartPos, AEndPos, AOrChars: Integer;
@@ -5058,6 +5200,220 @@ begin
   AOrChars := 0;
   FParsingFunction := FNextParsingFunction;
   while not ParseText(AStartPos, AEndPos, AOrChars) do ;
+end;
+
+procedure TACLXMLTextReader.SkipPublicOrSystemIdLiteral;
+var
+  AQuoteChar: Char;
+begin
+  // check quote char
+  AQuoteChar := FParsingState.Chars[FParsingState.CharPos];
+  if (Ord(AQuoteChar) <> Ord('"')) and (Ord(AQuoteChar) <> Ord(#39)) then
+    ThrowUnexpectedToken('", '#39);
+  Inc(FParsingState.CharPos);
+  SkipUntil(AQuoteChar, False);
+end;
+
+procedure TACLXMLTextReader.SkipUntil(AStopChar: Char; ARecognizeLiterals: Boolean);
+label
+  LblReadData;
+var
+  AChar: Char;
+  AChars: TCharArray;
+  AInComment: Boolean;
+  AInPI: Boolean;
+  AInLiteral: Boolean;
+  ALiteralQuote: Char;
+  APosition: Integer;
+begin
+  AInPI := False;
+  AInLiteral := False;
+  AInComment := False;
+  ALiteralQuote := '"';
+
+  AChars := FParsingState.Chars;
+  APosition := FParsingState.CharPos;
+
+  repeat
+
+    // fast forward on non-special characters
+    repeat
+      AChar := AChars[APosition];
+      if not TACLXMLCharType.IsAttributeValueChar(AChar) then
+        Break;
+      if Ord(AChar) = Ord(AStopChar) then
+        Break;
+      if Ord(AChar) = Ord('-') then
+        Break;
+      if Ord(AChar) = Ord('?') then
+        Break;
+      Inc(APosition);
+    until False;
+
+    // Closing stopChar outside of literal and ignore/include sections -> save value & return
+    if (Ord(AChar) = Ord(AStopChar)) and not AInLiteral then
+    begin
+      FParsingState.CharPos := APosition + 1;
+      Exit;
+    end;
+
+    // handle the special character
+    FParsingState.CharPos := APosition;
+    case Ord(AChar) of
+      $A:
+        begin
+          Inc(APosition);
+          OnNewLine(APosition);
+          Continue;
+        end;
+
+      $D:
+        begin
+          if Ord(AChars[APosition + 1]) = $A then
+            Inc(APosition, 2)
+          else
+            if (APosition + 1 < FParsingState.CharsUsed) or FParsingState.IsEof then
+              Inc(APosition)
+            else
+              goto LblReadData;
+
+          OnNewLine(APosition);
+          Continue;
+        end;
+
+      // comment, instruction
+      Ord('<'):
+        begin
+          // processing instruction
+          if Ord(AChars[APosition + 1]) = Ord('?') then
+          begin
+            if ARecognizeLiterals and not AInLiteral and not AInComment then
+            begin
+              AInPI := True;
+              Inc(APosition, 2);
+              Continue;
+            end;
+          end
+          else
+            // comment
+            if Ord(AChars[APosition + 1]) = Ord('!') then
+            begin
+              if (APosition + 3 >= FParsingState.CharsUsed) and not FParsingState.IsEof then
+                goto LblReadData;
+              if (Ord(AChars[APosition + 2]) = Ord('-')) and (Ord(AChars[APosition + 3]) = Ord('-')) then
+              begin
+                if ARecognizeLiterals and not AInLiteral and AInPI then
+                begin
+                  AInComment := True;
+                  Inc(APosition, 4);
+                  Continue;
+                end;
+              end;
+            end
+            else // need more data
+              if (APosition + 1 >= FParsingState.CharsUsed) and not FParsingState.IsEof then
+                goto LblReadData;
+
+          Inc(APosition);
+          Continue;
+        end;
+
+      Ord('-'):
+        begin
+          // end of comment
+          if AInComment then
+          begin
+            if (APosition + 2 >= FParsingState.CharsUsed) and not FParsingState.IsEof then
+              goto LblReadData;
+            if (Ord(AChars[APosition + 1]) = Ord('-')) and (Ord(AChars[APosition + 2]) = Ord('>')) then
+            begin
+              AInComment := False;
+              Inc(APosition, 2);
+              Continue;
+            end;
+          end;
+          Inc(APosition);
+          Continue;
+        end;
+
+      Ord('?'):
+        begin
+          // end of processing instruction
+          if AInPI then
+          begin
+            if (APosition + 1 >= FParsingState.CharsUsed) and not FParsingState.IsEof then
+              goto LblReadData;
+            if (Ord(AChars[APosition + 1]) = Ord('>')) then
+            begin
+              AInPI := False;
+              Inc(APosition);
+              Continue;
+            end;
+          end;
+          Inc(APosition);
+          Continue;
+        end;
+
+      9, Ord('>'), Ord(']'), Ord('&'):
+        begin
+          Inc(APosition);
+          Continue;
+        end;
+
+      Ord('"'), Ord(''''):
+        begin
+          if AInLiteral then
+          begin
+            if Ord(ALiteralQuote) = Ord(AChar) then
+              AInLiteral := False;
+          end
+          else
+            if ARecognizeLiterals and not (AInComment or AInPI) then
+            begin
+              AInLiteral := True;
+              ALiteralQuote := AChar;
+            end;
+
+          Inc(APosition);
+          Continue;
+        end;
+
+    else // default handler
+      if APosition = FParsingState.CharsUsed then
+        goto LblReadData
+      else // surrogate chars
+      begin
+        if TACLXMLCharType.IsHighSurrogate(AChars[APosition]) then
+        begin
+          if APosition + 1 = FParsingState.CharsUsed then
+            goto LblReadData;
+          Inc(APosition);
+          if TACLXMLCharType.IsLowSurrogate(AChars[APosition]) then
+          begin
+            Inc(APosition);
+            Continue;
+          end;
+        end;
+        ThrowInvalidChar(AChars, FParsingState.CharsUsed, APosition);
+        Break;
+      end;
+    end;
+
+LblReadData:
+    // read new characters into the buffer
+    if ReadData = 0 then
+    begin
+      if FParsingState.CharsUsed > FParsingState.CharPos then
+      begin
+        if Ord(FParsingState.Chars[FParsingState.CharPos]) <> $D then
+          Throw(SXmlUnexpectedEOF1);
+      end
+      else
+        Throw(SXmlUnexpectedEOF1);
+    end;
+    APosition := FParsingState.CharPos;
+    AChars := FParsingState.Chars;
+  until False;
 end;
 
 procedure TACLXMLTextReader.ReThrow(E: Exception; ALineNo, ALinePos: Integer);
