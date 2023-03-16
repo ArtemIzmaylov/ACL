@@ -250,6 +250,7 @@ type
   public
     constructor Create;
     destructor Destroy; override;
+    procedure Offset(ADeltaX, ADeltaY: Integer); override;
     property Baseline: Integer read FBaseline write SetBaseline;
     property Bounds: TRect read FBounds write FBounds;
     property EndEllipsis: TACLTextLayoutBlockText read FEndEllipsis;
@@ -1375,6 +1376,12 @@ end;
 destructor TACLTextLayoutRow.Destroy;
 begin
   FreeAndNil(FEndEllipsis);
+  inherited;
+end;
+
+procedure TACLTextLayoutRow.Offset(ADeltaX, ADeltaY: Integer);
+begin
+  FBounds.Offset(ADeltaX, ADeltaY);
   inherited;
 end;
 
