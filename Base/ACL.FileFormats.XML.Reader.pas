@@ -2574,7 +2574,7 @@ begin
               end;
           end;
 
-        Ord('/'):
+        '/':
           Throw(APosition + 1, SXmlUnexpectedEndTag);
         else
           begin
