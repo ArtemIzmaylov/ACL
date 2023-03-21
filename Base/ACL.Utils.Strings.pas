@@ -1472,15 +1472,10 @@ begin
 end;
 
 function acReplaceChars(const S: UnicodeString; const ACharsToReplace: UnicodeString; const AReplaceBy: WideChar = '_'): UnicodeString;
-var
-  I: Integer;
 begin
   Result := S;
-  for I := 1 to Length(S) do
-  begin
-    if acPos(Result[I], ACharsToReplace) > 0 then
-      Result[I] := AReplaceBy;
-  end;
+  for var AChar in ACharsToReplace do
+    Result := acReplaceChar(Result, AChar, AReplaceBy);
 end;
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -1594,13 +1589,19 @@ end;
 
 function acTrim(const S: UnicodeString): UnicodeString;
 var
-  I, L: Integer;
+  I, E, L: Integer;
 begin
   I := 1;
   L := Length(S);
-  while (I <= L) and (S[I] <= ' ') do Inc(I);
-  while (L >= I) and (S[L] <= ' ') do Dec(L);
-  Result := Copy(S, I, L - I + 1);
+  E := L;
+  while (I <= E) and (Ord(S[I]) <= Ord(' ')) do
+    Inc(I);
+  while (E >= I) and (Ord(S[E]) <= Ord(' ')) do
+    Dec(E);
+  if (I > 1) or (E < L) then
+    Result := Copy(S, I, E - I + 1)
+  else
+    Result := S;
 end;
 
 procedure acStrLCopy(ADest: PWideChar; const ASource: UnicodeString; AMax: Integer);
