@@ -286,11 +286,10 @@ end;
 function acURLEncode(const B: TArray<Byte>): UnicodeString;
 var
   S: TStringBuilder;
-  I: Integer;
 begin
   S := TACLStringBuilderManager.Get(Length(B) * 3);
   try
-    for I := Low(B) to High(B) do
+    for var I := Low(B) to High(B) do
     begin
       S.Append('%');
       S.Append(IntToHex(B[I], 2));
@@ -302,58 +301,41 @@ begin
 end;
 
 function acURLDecode(const S: UnicodeString): UnicodeString;
-
-  function TryDecodeChar(C: WideChar; out AByte: Byte): Boolean;
-  begin
-    Result := True;
-    case C of
-      '0'..'9':
-        AByte := Ord(C) - Ord('0');
-      'A'..'F':
-        AByte := Ord(C) - Ord('A') + 10;
-      'a'..'f':
-        AByte := Ord(C) - Ord('a') + 10;
-      else
-        Result := False;
-    end;
-  end;
-
-  function TryDecode(C1, C2: WideChar; out AChar: WideChar): Boolean;
-  var
-    B1, B2: Byte;
-  begin
-    Result := TryDecodeChar(C1, B1) and TryDecodeChar(C2, B2);
-    if Result then
-      AChar := acStringFromAnsiString(AnsiChar(B1 shl 4 or B2));
-  end;
-
-  function IsHexEncodedChar(AIndex, ALength: Integer; out AChar: WideChar): Boolean;
-  begin
-    Result := (AIndex + 2 <= ALength) and (S[AIndex] = '%') and TryDecode(S[AIndex + 1], S[AIndex + 2], AChar);
-  end;
-
 var
-  AChar: WideChar;
-  ADestIndex: Integer;
-  AIndex: Integer;
+  ACharCode: Byte;
+  ADest: PWideChar;
+  ADestCount: Integer;
   ALength: Integer;
+  ASrc: PWideChar;
 begin
-  AIndex := 1;
-  ADestIndex := 1;
   ALength := Length(S);
-  SetLength(Result, ALength);
-  while AIndex <= ALength do
-  begin
-    if IsHexEncodedChar(AIndex, ALength, AChar) then
-      Inc(AIndex, 2)
-    else
-      AChar := S[AIndex];
 
-    Result[ADestIndex] := AChar;
-    Inc(ADestIndex);
-    Inc(AIndex);
+  SetLength(Result, ALength);
+  ASrc := PWideChar(S);
+  ADest := PWideChar(Result);
+  ADestCount := 0;
+
+  while ALength > 0 do
+  begin
+    if (Ord(ASrc^) = Ord('%')) and (ALength > 2) and TACLHexcode.Decode((ASrc + 1)^, (ASrc + 2)^, ACharCode) then
+    begin
+      Inc(ASrc, 2);
+      Dec(ALength, 2);
+      if ACharCode >= $7F then
+        Word(ADest^) := Word(acStringFromAnsiString(AnsiChar(ACharCode)))
+      else
+        Word(ADest^) := Word(ACharCode);
+    end
+    else
+      Word(ADest^) := Word(ASrc^);
+
+    Dec(ALength);
+    Inc(ADestCount);
+    Inc(ADest);
+    Inc(ASrc);
   end;
-  SetLength(Result, ADestIndex - 1);
+  if ADestCount <> ALength then
+    SetLength(Result, ADestCount);
 end;
 
 { TACLWebURL }
