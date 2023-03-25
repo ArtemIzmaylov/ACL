@@ -2126,7 +2126,7 @@ var
   ATextBlock: TACLTextLayoutBlockText;
 begin
   Result := False;
-  if Ord(AScan^) = Ord('@') then
+  if AScan^ = '@' then
   begin
     AFirstTextBlock := nil;
     for var I := ATarget.FBlocks.Count - 1 downto 0 do
@@ -2161,7 +2161,7 @@ end;
 class function TACLTextImporter.IsCppLikeLineBreakToken(
   ATarget: TACLTextLayout; var AScan: PWideChar; var ALength: Integer): Boolean;
 begin
-  Result := (Ord(AScan^) = Ord('\')) and (ALength > 1) and (Ord((AScan + 1)^) = Ord('n'));
+  Result := (AScan^ = '\') and (ALength > 1) and ((AScan + 1)^ = 'n');
   if Result then
     ATarget.FBlocks.AddInit(TACLTextLayoutBlockLineBreak.Create, AScan, ALength, 2);
 end;
@@ -2203,14 +2203,14 @@ var
   ATagLength: Integer;
 begin
   Result := False;
-  if Ord(AScan^) = Ord('[') then
+  if AScan^ = '[' then
   begin
     AScanEnd := WStrScan(AScan, ALength, ']');
     if AScanEnd = nil then
       Exit;
 
     AScanTag := AScan + 1;
-    AIsClosing := Ord(AScanTag^) = Ord('/');
+    AIsClosing := AScanTag^ = '/';
     if AIsClosing then
     begin
       AScanParam := AScanEnd;

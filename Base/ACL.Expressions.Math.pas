@@ -340,13 +340,13 @@ const
   begin
     if CharInSet(C, ['0'..'9']) then
       Result := Ord(C) - Ord('0')
-    else if Ord(C) = Ord('+') then
+    else if C = '+' then
       Result := 10
-    else if Ord(C) = Ord('-') then
+    else if С = '-' then
       Result := 11
-    else if Ord(C) = Ord('.') then
+    else if С = '.' then
       Result := 12
-    else if Ord(C) = Ord('E') then
+    else if С = 'E' then
       Result := 13
     else if Contains(C, FDelimiters, FDelimitersLength) then
       Result := 14

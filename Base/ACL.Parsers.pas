@@ -271,8 +271,8 @@ begin
   if Result then
     while L1 > 0 do
     begin
-      C1 := Ord(B1^);
-      C2 := Ord(B2^);
+      C1 := Word(B1^);
+      C2 := Word(B2^);
       if C1 <> C2 then
       begin
         if (C1 >= Ord('a')) and (C1 <= Ord('z')) then

@@ -4,7 +4,7 @@
 {*               Web Services                *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -317,7 +317,7 @@ begin
 
   while ALength > 0 do
   begin
-    if (Ord(ASrc^) = Ord('%')) and (ALength > 2) and TACLHexcode.Decode((ASrc + 1)^, (ASrc + 2)^, ACharCode) then
+    if (ASrc^ = '%') and (ALength > 2) and TACLHexcode.Decode((ASrc + 1)^, (ASrc + 2)^, ACharCode) then
     begin
       Inc(ASrc, 2);
       Dec(ALength, 2);

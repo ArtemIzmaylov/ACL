@@ -989,7 +989,7 @@ begin
         Result := AStrRet.pOleStr;
   end;
   { This is a hack bug fix to get around Windows Shell Controls returning spurious "?"s in date/time detail fields }
-  if (Length(Result) > 1) and (Ord(Result[1]) = Ord('?')) and (Ord(Result[2]) in [Ord('0')..Ord('9')]) then
+  if (Length(Result) > 1) and (Result[1] = '?') and CharInSet(Result[2], ['0'..'9']) then
     Result := acStringReplace(Result, '?', '');
 end;
 

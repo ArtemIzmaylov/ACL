@@ -491,16 +491,16 @@ begin
     for AIndex := 1 to ALength do
     begin
       AChar := Name[AIndex];
-      if Ord(AChar) = Ord('"') then
+      if AChar = '"' then
         ABuffer.Append(#39)
       else
         if acPos(AChar, InvalidChars) > 0 then
         begin
-          if Ord(ReplacementForInvalidChars) <> 0 then
+          if ReplacementForInvalidChars <> #0 then
             ABuffer.Append(ReplacementForInvalidChars);
         end
         else
-          if Ord(AChar) >= Ord(' ') then
+          if AChar >= ' ' then
             ABuffer.Append(AChar);
     end;
 
@@ -571,14 +571,14 @@ begin
   end;
 
   AExtDelimPos := acLastDelimiter(PChar(sFileExtDelims), PChar(FileName), Length(sFileExtDelims), ALength);
-  if (AExtDelimPos > 0) and (Ord(FileName[AExtDelimPos]) = Ord('.')) then
+  if (AExtDelimPos > 0) and (FileName[AExtDelimPos] = '.') then
   begin
     AStart := AExtDelimPos;
     AFinish := ALength;
     if ADoubleExt then
     begin
       AExtDelimPos := acLastDelimiter(PChar(sFileExtDelims), PChar(FileName), Length(sFileExtDelims), AStart - 1);
-      if (AExtDelimPos > 0) and (Ord(FileName[AExtDelimPos]) = Ord('.')) then
+      if (AExtDelimPos > 0) and (FileName[AExtDelimPos] = '.') then
         AStart := AExtDelimPos;
     end;
     Result := True;
