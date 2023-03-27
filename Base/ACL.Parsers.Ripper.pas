@@ -4,7 +4,7 @@
 {*       High-level Parsers Routines         *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2021-2022                 *}
+{*                 2021-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -23,7 +23,7 @@ uses
   ACL.Classes.Collections,
   ACL.Expressions,
   ACL.Expressions.FormatString,
-  ACL.FileFormats.XML;
+  ACL.FileFormats.XML.Types;
 
 type
 
@@ -357,23 +357,23 @@ begin
 //        Delete(Result, P1, P2 - P1 + 1);
 //    until P1 = 0;
 
-  AData := TACLXMLHelper.DecodeString(ASource);
+  AData := TACLXMLConvert.DecodeName(ASource);
   ABuffer := TStringBuilder.Create(Length(AData));
   try
     AScan := PWideChar(AData);
     ACount := Length(AData);
     repeat
-      case Ord(AScan^) of
-        0:
+      case AScan^ of
+        #0:
           Break;
 
-        13, 10:
+        #13, #10:
           begin
             Dec(ACount);
             Inc(AScan);
           end;
 
-        92: // '\'
+        '\':
           if (ACount > 1) and ((AScan + 1)^ = 'n') then // \n
           begin
             ABuffer.AppendLine;
@@ -387,13 +387,13 @@ begin
             Inc(AScan);
           end;
 
-        60: //'<'
+        '<':
           begin
             Inc(AScan);
             Dec(ACount);
             if acCompareStrings(AScan, 'br', Min(ACount, 2), 2, True) = 0 then
               ABuffer.AppendLine;
-            while (ACount > 0) and (Ord(AScan^) <> 62{'>'}) do
+            while (ACount > 0) and (AScan^ <> '>') do
             begin
               Inc(AScan);
               Dec(ACount);

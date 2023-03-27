@@ -1,11 +1,10 @@
 {*********************************************}
 {*                                           *}
 {*        Artem's Components Library         *}
-{*          Stream based XML Types           *}
-{*        ported from .NET platform          *}
+{*    General Types for XML Reader/Writer    *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -15,20 +14,34 @@ unit ACL.FileFormats.XML.Types;
 {$I ACL.Config.inc}
 {$SCOPEDENUMS ON}
 
+// Ported from .NET platform:
+// https://github.com/microsoft/referencesource/tree/master/System.Xml/System/Xml/Core
+
 interface
 
 uses
+  // System
   System.Character,
   System.Math,
   System.Generics.Defaults,
   System.Generics.Collections,
   System.SysUtils,
-  System.Types;
+  System.Types,
+  // ACL
+  ACL.Classes.Collections,
+  ACL.Parsers,
+  ACL.Utils.Common,
+  ACL.Utils.Strings;
 
 const
-  sGSXMLBoolValues: array[Boolean] of string = ('false', 'true');
+  sXMLBoolValues: array[Boolean] of string = ('false', 'true');
 
 type
+  TACLXMLSpace = (
+    None,      //# xml:space scope has not been specified.
+    Default,   //# The xml:space scope is "default".
+    Preserve   //# The xml:space scope is "preserve".
+  );
 
   { EACLXMLException }
 
@@ -113,12 +126,6 @@ type
     XsltInternal = 'http://schemas.microsoft.com/framework/2003/xml/xslt/internal';
   end;
 
-  TACLXMLSpace = (
-    None,      //# xml:space scope has not been specified.
-    Default,   //# The xml:space scope is "default".
-    Preserve   //# The xml:space scope is "preserve".
-  );
-
   { TACLXMLCharType }
 
   TACLXMLCharType = class
@@ -177,74 +184,31 @@ type
     Document  //# Conformance level for XML document as specified in XML 1.0 Specification
   );
 
-  TACLXMLNamespaceScope = (All, ExcludeXML, Local);
-
-  //# Provides read-only access to a set of (prefix, namespace) mappings.  Each distinct prefix is mapped to exactly
-  //# one namespace, but multiple prefixes may be mapped to the same namespace (e.g. xmlns:foo="ns" xmlns:bar="ns").
-  IGSXMLNamespaceResolver = interface
-  ['{15968D58-D401-445D-B173-955FF84DFB38}']
-    //# Return the namespace to which the specified prefix is mapped.  Returns null if the prefix isn't mapped to
-    //# a namespace.
-    //# The "xml" prefix is always mapped to the "http://www.w3.org/XML/1998/namespace" namespace.
-    //# The "xmlns" prefix is always mapped to the "http://www.w3.org/2000/xmlns/" namespace.
-    //# If the default namespace has not been defined, then the "" prefix is mapped to "" (the empty namespace).
-    function LookupNamespace(const prefix: string): string;
-    //# Return a prefix which is mapped to the specified namespace.  Multiple prefixes can be mapped to the
-    //# same namespace, and it is undefined which prefix will be returned.  Returns null if no prefixes are
-    //# mapped to the namespace.
-    //# The "xml" prefix is always mapped to the "http://www.w3.org/XML/1998/namespace" namespace.
-    //# The "xmlns" prefix is always mapped to the "http://www.w3.org/2000/xmlns/" namespace.
-    //# If the default namespace has not been defined, then the "" prefix is mapped to "" (the empty namespace).
-    function LookupPrefix(const namespaceName: string): string;
-  end;
-
   { TACLXMLConvert }
 
   //# https://msdn.microsoft.com/en-us/library/system.xml.xmlconvert.decodename(v=vs.110).aspx
   TACLXMLConvert = class
   strict private
-    class function EncodeString(const S: string; ARemoveBreakLines, ASkipServiceCharacters: Boolean): string; static;
-    class function GetServiceCharacter(ACharCount: Integer; P: PWord; out L: Integer; out C: Char): Boolean;
+    class var FMap: TACLStringsMap;
+
     class function IsEncodedCharacter(const S: string; APosition, ALength: Integer; out ACode: Integer): Boolean; static;
-    class function IsInvalidXmlChar(const C: Word): Boolean; inline;
   public
-    class function DecodeBoolean(const S: string): Boolean;
-    class function DecodeName(const S: string): string;
-    class function EncodeName(const S: string): string;
+    class constructor Create;
+    class destructor Destroy;
+    class function DecodeBoolean(const S: string): Boolean; static;
+    class function DecodeName(const S: string): string; static;
+    class function EncodeName(const S: string): string; static;
+    class function EncodeString(const S: string; ARemoveBreakLines, ASkipServiceCharacters: Boolean): string; static;
+    class function IsHTMLCode(var P: PWideChar; var L: Integer): Boolean; static;
+    class function IsInvalidXmlChar(const C: Word): Boolean; inline;
   end;
 
 implementation
-
-uses
-  ACL.Utils.Common;
 
 const
   SXMLMessageWithErrorPosition = '%s Line %d, position %d';
   SXMLDefaultException = 'An XML error has occurred.';
   SXMLUserException = '%s';
-
-type
-
-  { TACLXMLServiceCharMap }
-
-  TACLXMLServiceCharMap = record
-    Char: Char;
-    Replacement: string;
-  end;
-
-const
-  XMLServiceCharMapCount = 8;
-  XMLServiceCharMap: array [0..XMLServiceCharMapCount - 1] of TACLXMLServiceCharMap =
-  (
-    (Char:  #9; Replacement: '&#9;'),
-    (Char: #10; Replacement: '&#10;'),
-    (Char: #13; Replacement: '&#13;'),
-    (Char: '"'; Replacement: '&quot;'),
-    (Char: #39; Replacement: '&apos;'),
-    (Char: '<'; Replacement: '&lt;'),
-    (Char: '>'; Replacement: '&gt;'),
-    (Char: '&'; Replacement: '&amp;') //#AI: should be last
-  );
 
 function IfThen(AValue: Boolean; const ATrue: Char; const AFalse: Char): Char; overload; inline;
 begin
@@ -656,6 +620,24 @@ end;
 
 { TACLXMLConvert }
 
+class constructor TACLXMLConvert.Create;
+begin
+  FMap := TACLStringsMap.Create;
+  FMap.Add(#9, #9);
+  FMap.Add(#10, #10);
+  FMap.Add(#13, #13);
+  FMap.Add(#39, 'apos');
+  FMap.Add('"', 'quot');
+  FMap.Add('&', 'amp');
+  FMap.Add('<', 'lt');
+  FMap.Add('>', 'gt');
+end;
+
+class destructor TACLXMLConvert.Destroy;
+begin
+  FreeAndNil(FMap);
+end;
+
 class function TACLXMLConvert.IsEncodedCharacter(const S: string; APosition, ALength: Integer; out ACode: Integer): Boolean;
 begin
   Result := (APosition <= ALength - 6) and (S[APosition] = '_') and (S[APosition + 1] = 'x') and
@@ -674,46 +656,62 @@ begin
   if TryStrToInt(S, AValue) then
     Result := AValue <> 0
   else
-    Result := SameText(S, sGSXMLBoolValues[True]);
+    Result := acCompareTokens(S, sXMLBoolValues[True]);
 end;
 
 class function TACLXMLConvert.DecodeName(const S: string): string;
-var
-  ACode: Integer;
-  ALength: Integer;
-  AReplacement: Char;
-  ASecondPassNeeded: Boolean;
-  I, J, L: Integer;
-begin
-  Result := S;
-  repeat
-    I := 1;
-    J := 1;
-    ASecondPassNeeded := False;
-    ALength := Length(Result);
-    while I <= ALength do
+
+  function GetReplacement(const S: UnicodeString): UnicodeString;
+  begin
+    if not FMap.TryGetKey(S, Result) then
     begin
-      if IsEncodedCharacter(Result, I, ALength, ACode) then
+      if (S <> '') and (S[1] = '#') then
+        Result := Char(StrToIntDef(Copy(S, 2, MaxInt), 0))
+      else
+        Result := S;
+    end;
+  end;
+
+var
+  B: TStringBuilder;
+  L, LS: Integer;
+  P, PS: PWideChar;
+  V: UnicodeString;
+begin
+  P := PWideChar(S);
+  L := Length(S);
+  B := TACLStringBuilderManager.Get(L);
+  try
+    while L > 0 do
+    begin
+      if (P^ = '\') and (L > 0) and FMap.TryGetValue((P + 1)^, V) then
       begin
-        Result[J] := Char(ACode);
-        Inc(I, 6);
+        // Skip backslash and add next symbol to the queue
+        Inc(P);
+        Dec(L);
       end
       else
-        if (Result[I] = '&') and GetServiceCharacter(ALength - I + 1, @Result[I], L, AReplacement) then
+        if P^ = '&' then
         begin
-          ASecondPassNeeded := ASecondPassNeeded or (AReplacement = '&');
-          Result[J] := AReplacement;
-          Inc(I, L - 1);
-        end
-        else
-          Result[J] := Result[I];
+          PS := P + 1;
+          LS := L - 1;
+          if IsHTMLCode(PS, LS) then
+          begin
+            B.Append(GetReplacement(acExtractString(P + 1, PS)));
+            P := PS + 1;
+            L := LS - 1;
+            Continue;
+          end;
+        end;
 
-      Inc(I);
-      Inc(J);
+      B.Append(P^);
+      Dec(L);
+      Inc(P);
     end;
-    if I <> J then
-      SetLength(Result, J - 1);
-  until not ASecondPassNeeded;
+    Result := B.ToString;
+  finally
+    TACLStringBuilderManager.Release(B);
+  end;
 end;
 
 class function TACLXMLConvert.EncodeName(const S: string): string;
@@ -721,22 +719,19 @@ begin
   Result := EncodeString(S, False, True);
 end;
 
+class function TACLXMLConvert.IsHTMLCode(var P: PWideChar; var L: Integer): Boolean;
+begin
+  while (L > 0) and CharInSet(P^, ['0'..'9', '#', 'A'..'Z', 'a'..'z']) do
+  begin
+    Inc(P);
+    Dec(L);
+  end;
+  Result := P^ = ';';
+end;
+
 class function TACLXMLConvert.EncodeString(const S: string; ARemoveBreakLines, ASkipServiceCharacters: Boolean): string;
 
-  function CheckServiceChar(const C: Char; out AReplacement: string): Boolean;
-  var
-    I: Integer;
-  begin
-    Result := False;
-    for I := 0 to XMLServiceCharMapCount - 1 do
-      if XMLServiceCharMap[I].Char = C then
-      begin
-        AReplacement := XMLServiceCharMap[I].Replacement;
-        Exit(True);
-      end;
-  end;
-
-  function EncodeChar(const AChar: Char): string;
+  function EncodeChar(const AChar: Char): string; inline;
   begin
     Result := '_x' + IntToHex(Word(AChar), 4) + '_';
   end;
@@ -754,10 +749,10 @@ begin
     for I := 1 to ALength do
     begin
       AChar := S[I];
-      if ARemoveBreakLines and ((AChar = #13) or (AChar = #10)) then
+      if ARemoveBreakLines and ((Ord(AChar) = 13) or (Ord(AChar) = 10)) then
         ABuilder.Append(' ')
-      else if not ASkipServiceCharacters and CheckServiceChar(AChar, AReplacement) then
-        ABuilder.Append(AReplacement)
+      else if not ASkipServiceCharacters and FMap.TryGetValue(AChar, AReplacement) then
+        ABuilder.Append('&').Append(AReplacement).Append(';')
       else if IsInvalidXmlChar(Word(AChar)) then
         ABuilder.Append(EncodeChar(AChar))
       else if IsEncodedCharacter(S, I, ALength, X) then
@@ -768,53 +763,6 @@ begin
     Result := ABuilder.ToString;
   finally
     ABuilder.Free;
-  end;
-end;
-
-class function TACLXMLConvert.GetServiceCharacter(ACharCount: Integer; P: PWord; out L: Integer; out C: Char): Boolean;
-var
-  I: Integer;
-  S: string;
-begin
-  Result := False;
-
-  for I := 0 to XMLServiceCharMapCount - 1 do
-  begin
-    S := XMLServiceCharMap[I].Replacement;
-    L := Length(S);
-    if (L <= ACharCount) and CompareMem(P, @S[1], L * SizeOf(Char)) then
-    begin
-      C := XMLServiceCharMap[I].Char;
-      Exit(True);
-    end;
-  end;
-
-  //# expand the &#CharCode;
-  if (ACharCount > 1) and (PWord(NativeUInt(P) + SizeOf(Word))^ = $23) then
-  begin
-    I := 0;
-    L := 2;
-    Inc(P, 2);
-    Dec(ACharCount, 2);
-    while ACharCount > 0 do
-    begin
-      if P^ = $3B then
-      begin
-        Result := InRange(I, 0, MaxWord);
-        if Result then
-        begin
-          C := Char(I);
-          Inc(L);
-        end;
-        Break;
-      end;
-      if not InRange(P^, $30, $39) then
-        Exit(False);
-      I := I * 10 + (P^ - $30);
-      Dec(ACharCount);
-      Inc(L);
-      Inc(P);
-    end;
   end;
 end;
 

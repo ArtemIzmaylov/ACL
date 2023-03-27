@@ -64,30 +64,20 @@ type
 
   { TACLXMLWriterSettings }
 
-  TACLXMLWriterSettings = class
-  strict private
-    FCheckCharacters: Boolean;
-    FDisableValidation: boolean;
-    FEncodeInvalidXmlCharAsUCS2: Boolean;
-    FIndentChars: string;
-    FNewLineChars: string;
-    FNewLineHandling: TACLXMLNewLineHandling;
-    FNewLineOnAttributes: Boolean;
-    FNewLineOnNode: Boolean;
-    FOmitXmlDeclaration: Boolean;
+  TACLXMLWriterSettings = record
   public
-    constructor Create;
-    procedure Reset;
+    CheckCharacters: Boolean;
+    CheckWellformed: boolean;
+    EncodeInvalidXmlCharAsUCS2: Boolean;
+    IndentChars: string;
+    NewLineChars: string;
+    NewLineHandling: TACLXMLNewLineHandling;
+    NewLineOnAttributes: Boolean;
+    NewLineOnNode: Boolean;
+    OmitXmlDeclaration: Boolean;
 
-    property CheckCharacters: Boolean read FCheckCharacters write FCheckCharacters;
-    property DisableValidation: boolean read FDisableValidation write FDisableValidation;
-    property EncodeInvalidXmlCharAsUCS2: Boolean read FEncodeInvalidXmlCharAsUCS2 write FEncodeInvalidXmlCharAsUCS2;
-    property IndentChars: string read FIndentChars write FIndentChars;
-    property NewLineChars: string read FNewLineChars write FNewLineChars;
-    property NewLineHandling: TACLXMLNewLineHandling read FNewLineHandling write FNewLineHandling;
-    property NewLineOnAttributes: Boolean read FNewLineOnAttributes write FNewLineOnAttributes;
-    property NewLineOnNode: Boolean read FNewLineOnNode write FNewLineOnNode;
-    property OmitXmlDeclaration: Boolean read FOmitXmlDeclaration write FOmitXmlDeclaration;
+    class function Default: TACLXMLWriterSettings; static;
+    procedure Reset;
   end;
 
   { TACLXMLWriter }
@@ -96,10 +86,9 @@ type
   protected
     function GetWriteState: TACLXMLWriteState; virtual; abstract;
   public
-    class function Create(AStream: TStream; ASettings: TACLXMLWriterSettings): TACLXMLWriter; static;
+    class function Create(AStream: TStream; const ASettings: TACLXMLWriterSettings): TACLXMLWriter; static;
 
     procedure WriteStartDocument; overload;
-    procedure WriteStartDocument(AStandalone: Boolean); overload;
     procedure WriteStartDocument(AStandalone: TACLXMLStandalone); overload; virtual; abstract;
     procedure WriteEndDocument; virtual; abstract;
 
@@ -153,6 +142,7 @@ implementation
 uses
   System.Character;
 
+{$REGION 'ErrorMessages'}
 const
   SXmlInvalidSurrogatePair =
     'The surrogate pair (%s, %s) is invalid. A high surrogate character (0xD800 - 0xDBFF) must ' +
@@ -163,12 +153,15 @@ const
   SXmlEmptyName = 'The empty string is not a valid name.';
   SXmlIndentCharsNotWhitespace = 'XmlWriterSettings.%s can contain only valid XML white space characters when ' +
     'XmlWriterSettings.CheckCharacters and XmlWriterSettings.NewLineOnAttributes are true.';
-  SXmlInvalidCharacter = '%s, hexadecimal value %s, is an invalid character.';
-  SXmlInvalidNameCharsDetail = 'Invalid name character in "%s". The %d character, hexadecimal value %s, cannot be included in a name.';
   SXmlInvalidCharsInIndent = 'WriterSettings.%s can contain only valid XML text content characters when XmlWriterSettings.CheckCharacters is true. %s';
+  SXmlInvalidCharacter = '%s, hexadecimal value %s, is an invalid character.';
   SXmlInvalidHighSurrogateChar = 'Invalid high surrogate character (%s). A high surrogate character must have a value from range (0xD800 - 0xDBFF).';
+  SXmlInvalidNameCharsDetail = 'Invalid name character in "%s". The %d character, hexadecimal value %s, cannot be included in a name.';
   SXmlInvalidSurrogateMissingLowChar = 'The surrogate pair is invalid. Missing a low surrogate character.';
+  SXmlInvalidLocalName = 'The %s is invalid for local name';
   SXmlNoStartTag = 'There was no XML start tag open.';
+  SXmlUnexpectedToken = 'The %s expected, but %s specified.';
+{$ENDREGION}
 
 type
   TACLXMLRawWriter = class;
@@ -247,7 +240,7 @@ type
     property Stream: TStream read FStream;
     property Encoding: TEncoding read FEncoding;
   public
-    constructor CreateEx(AStream: TStream; ASettings: TACLXMLWriterSettings);
+    constructor CreateEx(AStream: TStream; const ASettings: TACLXMLWriterSettings);
     destructor Destroy; override;
 
     procedure WriteStartDocument(AStandalone: TACLXMLStandalone); override; final;
@@ -310,13 +303,12 @@ type
     end;
 
   {$ENDREGION}
-
   strict private
     FWriter: TACLXMLWriter;
     FIsError: boolean;
 
-    FAttrStack: TArray<TAttrName>;
     FAttrCount: Integer;
+    FAttrStack: TArray<TAttrName>;
 
     FCheckCharacters: Boolean;
 
@@ -339,13 +331,12 @@ type
     class function InvalidCharsException(const AName: string; ABadCharIndex: Integer): EACLXMLException; static;
   protected
     function GetWriteState: TACLXMLWriteState; override;
+    property InnerWriter: TACLXMLWriter read FWriter;
   public
-    constructor Create(AWriter: TACLXMLWriter; ASettings: TACLXMLWriterSettings);
+    constructor Create(AWriter: TACLXMLWriter; const ASettings: TACLXMLWriterSettings);
     destructor Destroy; override;
-
     procedure Close; override;
     procedure Flush; override;
-
     procedure WriteCData(const AText: string); override;
     procedure WriteCharEntity(ACh: Char); override;
     procedure WriteComment(const AText: string); override;
@@ -361,8 +352,6 @@ type
     procedure WriteStartElement(const APrefix, ALocalName: string); override;
     procedure WriteString(AStr: PChar; ALength: Integer); override;
     procedure WriteSurrogateCharEntity(ALowChar: Char; AHighChar: Char); override;
-
-    property  InnerWriter: TACLXMLWriter read FWriter;
   end;
 
 { EACLXMLInvalidSurrogatePairException }
@@ -374,30 +363,30 @@ end;
 
 { TACLXMLWriterSettings }
 
-constructor TACLXMLWriterSettings.Create;
+class function TACLXMLWriterSettings.Default: TACLXMLWriterSettings;
 begin
-  inherited Create;
-  Reset;
+  Result.Reset;
 end;
 
 procedure TACLXMLWriterSettings.Reset;
 begin
-  FCheckCharacters := True;
-  FDisableValidation := False;
-  FIndentChars := '  ';
-  FNewLineChars := sLineBreak;
-  FNewLineHandling := TACLXMLNewLineHandling.Replace;
-  FNewLineOnAttributes := False;
-  FNewLineOnNode := False;
-  FOmitXmlDeclaration := False;
+  CheckCharacters := True;
+  CheckWellformed := True;
+  IndentChars := #9;
+  NewLineChars := sLineBreak;
+  NewLineHandling := TACLXMLNewLineHandling.Replace;
+  NewLineOnAttributes := False;
+  NewLineOnNode := False;
+  OmitXmlDeclaration := False;
+  EncodeInvalidXmlCharAsUCS2 := True;
 end;
 
 { TACLXMLWriter }
 
-class function TACLXMLWriter.Create(AStream: TStream; ASettings: TACLXMLWriterSettings): TACLXMLWriter;
+class function TACLXMLWriter.Create(AStream: TStream; const ASettings: TACLXMLWriterSettings): TACLXMLWriter;
 begin
   Result := TACLXMLRawWriter.CreateEx(AStream, ASettings);
-  if not ASettings.DisableValidation then
+  if ASettings.CheckWellformed then
     Result := TACLXMLWellFormedWriter.Create(Result, ASettings);
 end;
 
@@ -418,7 +407,7 @@ end;
 
 procedure TACLXMLWriter.WriteString(const AText: AnsiString);
 begin
-  WriteString(string(AText));
+  WriteString(acStringFromAnsiString(AText));
 end;
 
 procedure TACLXMLWriter.WriteChars(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer);
@@ -432,12 +421,12 @@ end;
 
 procedure TACLXMLWriter.WriteAttributeBoolean(const ALocalName: string; AValue: Boolean);
 begin
-  WriteAttributeString(ALocalName, sGSXMLBoolValues[AValue]);
+  WriteAttributeString(ALocalName, sXMLBoolValues[AValue]);
 end;
 
 procedure TACLXMLWriter.WriteAttributeBoolean(const APrefix, ALocalName: string; AValue: Boolean);
 begin
-  WriteAttributeString(APrefix, ALocalName, sGSXMLBoolValues[AValue]);
+  WriteAttributeString(APrefix, ALocalName, sXMLBoolValues[AValue]);
 end;
 
 procedure TACLXMLWriter.WriteAttributeFloat(const APrefix, ALocalName: string; AValue: Single);
@@ -508,13 +497,6 @@ begin
   WriteStartAttribute('', ALocalName);
 end;
 
-procedure TACLXMLWriter.WriteStartDocument(AStandalone: Boolean);
-begin
-  if AStandalone
-    then WriteStartDocument(TACLXMLStandalone.Yes)
-    else WriteStartDocument(TACLXMLStandalone.No);
-end;
-
 procedure TACLXMLWriter.WriteStartDocument;
 begin
   WriteStartDocument(TACLXMLStandalone.Omit);
@@ -568,7 +550,6 @@ end;
 
 procedure TACLXMLRawWriter.WriteEndDocument;
 begin
-
 end;
 
 procedure TACLXMLRawWriter.WriteEndElement;
@@ -647,7 +628,7 @@ begin
 end;
 
 //# Construct an instance of this class that outputs text to the TextWriter interface.
-constructor TACLXMLRawWriter.CreateEx(AStream: TStream; ASettings: TACLXMLWriterSettings);
+constructor TACLXMLRawWriter.CreateEx(AStream: TStream; const ASettings: TACLXMLWriterSettings);
 begin
   FStream := AStream;
   FEncoding := TEncoding.UTF8;
@@ -697,17 +678,13 @@ begin
     Ord(TState.Start)       shl 16 + Ord(TToken.StartElement) : FState := TState.Element;
     Ord(TState.StartDoc)    shl 16 + Ord(TToken.StartElement) : FState := TState.Element;
     Ord(TState.Element)     shl 16 + Ord(TToken.EndElement)   :
-      if FElementStackTop = 0
-        then FState := TState.&End
-        else FState := TState.ElementText;
+      if FElementStackTop = 0 then FState := TState.&End else FState := TState.ElementText;
     Ord(TState.Element)     shl 16 + Ord(TToken.StartElement) : FState := TState.Element;
     Ord(TState.Element)     shl 16 + Ord(TToken.StartAttr)    : FState := TState.Attr;
     Ord(TState.Element)     shl 16 + Ord(TToken.Text)         : FState := TState.ElementText;
     Ord(TState.ElementText) shl 16 + Ord(TToken.Text)         : FState := TState.ElementText;
     Ord(TState.ElementText) shl 16 + Ord(TToken.EndElement)   :
-      if FElementStackTop = 0
-        then FState := TState.&End
-        else FState := TState.ElementText;
+      if FElementStackTop = 0 then FState := TState.&End else FState := TState.ElementText;
     Ord(TState.ElementText) shl 16 + Ord(TToken.StartElement) : FState := TState.Element;
     Ord(TState.Attr)        shl 16 + Ord(TToken.Text)         : FState := TState.AttrText;
     Ord(TState.Attr)        shl 16 + Ord(TToken.EndAttr)      : FState := TState.Element;
@@ -729,7 +706,10 @@ begin
     RawText('<?xml version="');
     RawText('1.0');
     if Encoding <> nil then
-      RawText('" encoding="utf-8');
+    begin
+      RawText('" encoding="');
+      RawText(TACLEncodings.WebName(Encoding));
+    end;
     if AStandalone <> TACLXMLStandalone.Omit then
     begin
       RawText('" standalone="');
@@ -753,8 +733,7 @@ begin
     WriteStartDocument;
 
   AdvanceState(TToken.StartElement);
-  if ((FElementStackTop >= 0) and FNewLineOnNode) or
-     ((FElementStackTop < 0) and not FOmitXmlDeclaration) then
+  if (FElementStackTop >= 0) and FNewLineOnNode or (FElementStackTop < 0) and not FOmitXmlDeclaration then
     WriteNewLineAndAlignment;
 
   Inc(FNestingLevel);
@@ -1359,11 +1338,9 @@ begin
 end;
 
 procedure TACLXMLRawWriter.WriteNewLineAndAlignment(ANestingLevelCorrection: Integer = 0);
-var
-  I: Integer;
 begin
   RawText(FNewLineChars);
-  for I := 1 to FNestingLevel + ANestingLevelCorrection do
+  for var I := 1 to FNestingLevel + ANestingLevelCorrection do
     RawText(FIndentChars);
 end;
 
@@ -1858,7 +1835,6 @@ begin
   end
   else
   begin
-    //# VCL refactored
     I := 1;
     while I <= Length(AChars) do
     begin
@@ -1895,23 +1871,6 @@ begin
   end;
 end;
 
-(*
-{ TACLXMLWellFormedWriter.TNamespace }
-
-procedure TACLXMLWellFormedWriter.TNamespace.&Set(const APrefix, ANamespaceUri: string; AKind: TNamespaceKind);
-begin
-  FPrefix := APrefix;
-  FNamespaceUri := ANamespaceUri;
-  FKind := AKind;
-  FPrevNsIndex := -1;
-end;
-
-procedure TACLXMLWellFormedWriter.TNamespace.WriteDecl(AWriter: TACLXMLRawWriter);
-begin
-  Assert(FKind = TNamespaceKind.NeedToWrite);
-  AWriter.WriteNamespaceDeclaration(FPrefix, FNamespaceUri);
-end;
-*)
 { TACLXMLWellFormedWriter.TAttrName }
 
 constructor TACLXMLWellFormedWriter.TAttrName.Create(const APrefix, ALocalName: string);
@@ -1920,304 +1879,11 @@ begin
   FLocalName := ALocalName;
 end;
 
-(*
-function TACLXMLWellFormedWriter.TAttrName.IsDuplicate(const APrefix, ALocalName, ANamespaceUri: string): Boolean;
-begin
-  Result := (FLocalName = ALocalName) and ((FPrefix = APrefix) or (FNamespaceUri = ANamespaceUri));
-end;
-
-{ TACLXMLWellFormedWriter.TAttributeValueCache.TItem }
-
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.TItem.&Set(AType: TItemType; const AData: TValue);
-begin
-  FType := AType;
-  FData := AData;
-end;
-
-{ TACLXMLWellFormedWriter.TAttributeValueCache.TdxBufferChunk }
-
-constructor TACLXMLWellFormedWriter.TAttributeValueCache.TBufferChunk.Create(const ABuffer: TCharArray;
-  AIndex: Integer; ACount: Integer);
-begin
-  Buffer := ABuffer;
-  Index := AIndex;
-  Count := ACount;
-end;
-
-{ TAttributeValueCache }
-
-constructor TACLXMLWellFormedWriter.TAttributeValueCache.Create;
-begin
-  FStringValue := TStringBuilder.Create;
-  FLastItem := -1;
-end;
-
-destructor TACLXMLWellFormedWriter.TAttributeValueCache.Destroy;
-begin
-  FStringValue.Free;
-  inherited Destroy;
-end;
-
-function TACLXMLWellFormedWriter.TAttributeValueCache.GetStringValue: string;
-begin
-  if FSingleStringValue <> '' then
-    Result := FSingleStringValue
-  else
-    Result := FStringValue.ToString;
-end;
-
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteEntityRef(const AName: string);
-begin
-  if FSingleStringValue <> '' then
-    StartComplexValue;
-
-  if AName = 'lt' then
-    FStringValue.Append('<')
-  else if AName = 'gt' then
-    FStringValue.Append('>')
-  else if AName = 'quot' then
-    FStringValue.Append('"')
-  else if AName = 'apos' then
-    FStringValue.Append(#$27)
-  else if AName = 'amp' then
-    FStringValue.Append('&')
-  else
-  begin
-    FStringValue.Append('&');
-    FStringValue.Append(AName);
-    FStringValue.Append(';');
-  end;
-
-  AddItem(TItemType.EntityRef, AName);
-end;
-
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteCharEntity(ACh: Char);
-begin
-  if FSingleStringValue <> '' then
-    StartComplexValue;
-  FStringValue.Append(ACh);
-  AddItem(TItemType.CharEntity, TValue.From<Char>(ACh));
-end;
-
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteSurrogateCharEntity(ALowChar: Char; AHighChar: Char);
-begin
-  if FSingleStringValue <> '' then
-    StartComplexValue;
-  FStringValue.Append(AHighChar);
-  FStringValue.Append(ALowChar);
-  AddItem(TItemType.SurrogateCharEntity, ALowChar + AHighChar);
-end;
-
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteString(const AText: string);
-begin
-  if FSingleStringValue <> '' then
-    StartComplexValue
-  else
-  begin
-    if FLastItem = -1 then
-    begin
-      FSingleStringValue := AText;
-      Exit;
-    end;
-  end;
-
-  FStringValue.Append(AText);
-  AddItem(TItemType.String, AText);
-end;
-
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteChars(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer);
-begin
-  if FSingleStringValue <> '' then
-    StartComplexValue;
-  FStringValue.Append(ABuffer, AIndex, ACount);
-  AddItem(TItemType.StringChars, TValue.From<TBufferChunk>(TBufferChunk.Create(ABuffer, AIndex, ACount)));
-end;
-
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteRaw(const ABuffer: TCharArray; AIndex: Integer; ACount: Integer);
-begin
-  if FSingleStringValue <> '' then
-    StartComplexValue;
-  FStringValue.Append(ABuffer, AIndex, ACount);
-  AddItem(TItemType.RawChars, TValue.From<TBufferChunk>(TBufferChunk.Create(ABuffer, AIndex, ACount)));
-end;
-
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.WriteRaw(const AData: string);
-begin
-  if FSingleStringValue <> '' then
-    StartComplexValue;
-  FStringValue.Append(AData);
-  AddItem(TItemType.Raw, AData);
-end;
-
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.Replay(AWriter: TACLXMLWriter);
-var
-  ABufChunk: TBufferChunk;
-  I: Integer;
-  AItem: TItem;
-  AChars: TCharArray;
-begin
-  if FSingleStringValue <> '' then
-  begin
-    AWriter.WriteString(FSingleStringValue);
-    Exit;
-  end;
-
-  for I := FFirstItem to FLastItem do
-  begin
-    AItem := FItems[I];
-    case AItem.&Type of
-      TItemType.EntityRef:
-        AWriter.WriteEntityRef(AItem.Data.AsString);
-      TItemType.CharEntity:
-        AWriter.WriteCharEntity(AItem.Data.AsType<Char>);
-      TItemType.SurrogateCharEntity:
-        begin
-          AChars := AItem.Data.AsType<TCharArray>;
-          AWriter.WriteSurrogateCharEntity(AChars[0], AChars[1]);
-        end;
-      TItemType.String:
-        AWriter.WriteString(AItem.Data.AsString);
-      TItemType.StringChars:
-        begin
-          ABufChunk := AItem.Data.AsType<TBufferChunk>;
-          AWriter.WriteChars(ABufChunk.Buffer, ABufChunk.Index, ABufChunk.Count);
-        end;
-      TItemType.Raw:
-        AWriter.WriteRaw(AItem.Data.AsString);
-      TItemType.RawChars:
-        begin
-          ABufChunk := AItem.Data.AsType<TBufferChunk>;
-          AWriter.WriteChars(ABufChunk.Buffer, ABufChunk.Index, ABufChunk.Count);
-        end;
-      else
-        Assert(False, 'Unexpected ItemType value.');
-    end;
-  end;
-end;
-
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.Trim;
-var
-  AValBefore, AValAfter: string;
-  I, AEndIndex: Integer;
-  AItem: TItem;
-  ABufChunk: TBufferChunk;
-begin
-  if FSingleStringValue <> '' then
-  begin
-    FSingleStringValue := SysUtils.Trim(FSingleStringValue); //#TODO:  TdxXmlConvert.TrimString(FSingleStringValue);
-    Exit;
-  end;
-
-  AValBefore := FStringValue.ToString;
-  AValAfter := SysUtils.Trim(FSingleStringValue); //#TODO:  XmlConvert.TrimString(AValBefore);
-  if AValBefore <> AValAfter then
-  begin
-    FStringValue.Free;
-    FStringValue := TStringBuilder.Create(AValAfter);
-  end;
-
-  I := FFirstItem;
-  while (I = FFirstItem) and (I <= FLastItem) do
-  begin
-    AItem := FItems[I];
-    case AItem.&Type of
-      TItemType.String,
-      TItemType.Raw:
-        begin
-          AItem.Data := SysUtils.TrimLeft(AItem.Data.AsString); //# XmlConvert.TrimStringStart(string(AItem.data));
-          if AItem.Data.AsString = '' then
-            Inc(FFirstItem);
-        end;
-      TItemType.StringChars,
-      TItemType.RawChars:
-        begin
-          ABufChunk := AItem.Data.AsType<TBufferChunk>;      //# 1. make local copy of struct AItem.Data (in .net class)
-          AEndIndex := ABufChunk.Index + ABufChunk.Count;
-          while (ABufChunk.Index < AEndIndex) and TACLXMLCharType.IsWhiteSpace(ABufChunk.Buffer[ABufChunk.Index]) do
-          begin
-            Inc(ABufChunk.Index);
-            Dec(ABufChunk.Count);
-          end;
-          AItem.Data := TValue.From<TBufferChunk>(ABufChunk); //# 2. update AItem.Data with modified data
-          if ABufChunk.Index = AEndIndex then
-            Inc(FFirstItem); //# no characters left -> move the firstItem index to exclude it from the Replay
-        end;
-    end;
-    Inc(I);
-  end;
-
-  I := FLastItem;
-  while (I = FLastItem) and (I >= FFirstItem) do
-  begin
-    AItem := FItems[I];
-    case AItem.&Type of
-      TItemType.String,
-      TItemType.Raw:
-        begin
-          AItem.Data := SysUtils.TrimRight(AItem.Data.AsString); //# XmlConvert.TrimStringEnd(string(AItem.data));
-          if AItem.Data.AsString = '' then
-            Dec(FLastItem);
-        end;
-      TItemType.StringChars,
-      TItemType.RawChars:
-        begin
-          ABufChunk := AItem.Data.AsType<TBufferChunk>;       //# 1. make local copy of struct AItem.Data (in .net class)
-          while (ABufChunk.Count > 0) and TACLXMLCharType.IsWhiteSpace(ABufChunk.Buffer[ABufChunk.Index + ABufChunk.Count - 1]) do
-            Dec(ABufChunk.Count);
-          AItem.Data := TValue.From<TBufferChunk>(ABufChunk); //# 2. update AItem.Data with modified data
-          if ABufChunk.Count = 0 then
-            Dec(FLastItem); //# no characters left -> move the lastItem index to exclude it from the Replay
-        end;
-    end;
-    Dec(I);
-  end;
-end;
-
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.Clear;
-begin
-  FSingleStringValue := '';
-  FLastItem := -1;
-  FFirstItem := 0;
-  FStringValue.Length := 0;
-end;
-
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.StartComplexValue;
-begin
-  Assert(FSingleStringValue <> '');
-  Assert(FLastItem = -1);
-
-  FStringValue.Append(FSingleStringValue);
-  AddItem(TItemType.String, FSingleStringValue);
-
-  FSingleStringValue := '';
-end;
-
-procedure TACLXMLWellFormedWriter.TAttributeValueCache.AddItem(AType: TItemType; const AData: TValue);
-var
-  ANewItemIndex: Integer;
-begin
-  ANewItemIndex := FLastItem + 1;
-  if FItems = nil then
-    SetLength(FItems, 4)
-  else
-    if Length(FItems) = ANewItemIndex then
-      SetLength(FItems, ANewItemIndex * 2);
-
-  if FItems[ANewItemIndex] = nil then
-    FItems[ANewItemIndex] := TItem.Create;
-
-  FItems[ANewItemIndex].&Set(AType, AData);
-  FLastItem := ANewItemIndex;
-end;
-
-*)
-
 { TACLXMLWellFormedWriter }
 
-constructor TACLXMLWellFormedWriter.Create(AWriter: TACLXMLWriter; ASettings: TACLXMLWriterSettings);
+constructor TACLXMLWellFormedWriter.Create(AWriter: TACLXMLWriter; const ASettings: TACLXMLWriterSettings);
 begin
   Assert(AWriter <> nil);
-  Assert(ASettings <> nil);
   FWriter := AWriter;
 
   FCheckCharacters := ASettings.CheckCharacters;
@@ -2239,13 +1905,16 @@ destructor TACLXMLWellFormedWriter.Destroy;
 begin
   if WriteState <> TACLXMLWriteState.Closed then
     Close;
-  FWriter.Free;
+  FreeAndNil(FWriter);
   inherited Destroy;
 end;
+
 function TACLXMLWellFormedWriter.GetWriteState: TACLXMLWriteState;
 begin
-  if FIsError then Result := TACLXMLWriteState.Error
-  else Result := FWriter.WriteState;
+  if FIsError then
+    Result := TACLXMLWriteState.Error
+  else
+    Result := FWriter.WriteState;
 end;
 
 procedure TACLXMLWellFormedWriter.WriteEndDocument;
@@ -2341,7 +2010,7 @@ begin
       if APrefix = 'xmlns' then
       begin
         if (ALocalName = 'xml') or (ALocalName = 'xmlns') then
-          raise Exception.Create('»м€ ' + ALocalName + ' зарезервировано дл€ использовани€ в xml');
+          raise EACLXMLArgumentException.CreateFmt(SXmlInvalidLocalName, [ALocalName]);
         FIsNamespaceDeclaration := True;
         FCurrentDeclarationNamespacePrefix := ALocalName;
         FCurrentDeclarationNamespace := '';
@@ -2352,7 +2021,7 @@ begin
       if ALocalName = 'xml' then
       begin
         FIsNamespaceDeclaration := True;
-        FCurrentDeclarationNamespacePrefix := ''; // namespace по умолчанию
+        FCurrentDeclarationNamespacePrefix := ''; // default namespace
         FCurrentDeclarationNamespace := '';
       end;
     end;
@@ -2413,7 +2082,7 @@ begin
     CheckNCName(AName);
 
     if (FWriter.WriteState = TACLXMLWriteState.Attribute) and FIsNamespaceDeclaration then
-      raise Exception.Create('ƒл€ декларации namespace''ов допускаетс€ только метод WriteString');
+      raise EACLXMLArgumentException.CreateFmt(SXmlUnexpectedToken, ['Namespace', 'EntityRef']);
     if WriteState = TACLXMLWriteState.Element then
       StartElementContent;
     FWriter.WriteEntityRef(AName);
@@ -2429,7 +2098,7 @@ begin
     if ACh.IsSurrogate then
       raise EACLXMLArgumentException.Create(SXmlInvalidSurrogateMissingLowChar);
     if (FWriter.WriteState = TACLXMLWriteState.Attribute) and FIsNamespaceDeclaration then
-      raise Exception.Create('ƒл€ декларации namespace''ов допускаетс€ только метод WriteString');
+      raise EACLXMLArgumentException.CreateFmt(SXmlUnexpectedToken, ['Namespace', 'CharEntity']);
     if WriteState = TACLXMLWriteState.Element then
       StartElementContent;
     FWriter.WriteCharEntity(ACh);
@@ -2444,9 +2113,8 @@ begin
   try
     if not Char.IsSurrogatePair(AHighChar, ALowChar) then
       raise EACLXMLInvalidSurrogatePairException.Create(ALowChar, AHighChar);
-
     if (FWriter.WriteState = TACLXMLWriteState.Attribute) and FIsNamespaceDeclaration then
-      raise Exception.Create('ƒл€ декларации namespace''ов допускаетс€ только метод WriteString');
+      raise EACLXMLArgumentException.CreateFmt(SXmlUnexpectedToken, ['Namespace', 'CharEntity']);
     FWriter.WriteSurrogateCharEntity(ALowChar, AHighChar);
   except
     FIsError := True;
@@ -2476,22 +2144,16 @@ begin
   try
     if ABuffer = nil then
       raise EACLXMLArgumentNullException.Create('buffer');
-
     if AIndex < 0 then
       raise EACLXMLArgumentOutOfRangeException.Create('index');
-
     if ACount < 0 then
       raise EACLXMLArgumentOutOfRangeException.Create('count');
-
     if ACount > Length(ABuffer) - AIndex then
       raise EACLXMLArgumentOutOfRangeException.Create('count');
-
     if FIsNamespaceDeclaration then
-      raise Exception.Create('ƒл€ декларации namespace''ов допускаетс€ только метод WriteString');
-
+      raise EACLXMLArgumentException.CreateFmt(SXmlUnexpectedToken, ['Namespace', 'Raw']);
     if WriteState = TACLXMLWriteState.Element then
       StartElementContent;
-
     FWriter.WriteRaw(ABuffer, AIndex, ACount);
   except
     FIsError := True;
@@ -2503,8 +2165,7 @@ procedure TACLXMLWellFormedWriter.WriteRaw(const AData: string);
 begin
   try
     if FIsNamespaceDeclaration then
-      raise Exception.Create('ƒл€ декларации namespace''ов допускаетс€ только метод WriteString');
-
+      raise EACLXMLArgumentException.CreateFmt(SXmlUnexpectedToken, ['Namespace', 'Raw']);
     if WriteState = TACLXMLWriteState.Element then
       StartElementContent;
     FWriter.WriteRaw(AData);
@@ -2514,36 +2175,14 @@ begin
   end;
 end;
 
-//procedure TACLXMLWellFormedWriter.WriteBase64(const ABuffer: TBytes; AIndex: Integer; ACount: Integer);
-//begin
-//  try
-//    if ABuffer = nil then
-//      raise EACLXMLArgumentNullException.Create('buffer');
-//    if AIndex < 0 then
-//      raise EACLXMLArgumentOutOfRangeException.Create('index');
-//    if ACount < 0 then
-//      raise EACLXMLArgumentOutOfRangeException.Create('count');
-//    if ACount > Length(ABuffer) - AIndex then
-//      raise EACLXMLArgumentOutOfRangeException.Create('count');
-//
-//    AdvanceState(TToken.Base64);
-//    FWriter.WriteBase64(ABuffer, AIndex, ACount);
-//  except
-//    FCurrentState := TStates.Error;
-//    raise;
-//  end;
-//end;
-
 procedure TACLXMLWellFormedWriter.Close;
 begin
   if not (WriteState in [TACLXMLWriteState.Closed, TACLXMLWriteState.Error]) then
-  begin
-    try
-      FWriter.Close;
-    except
-      FIsError := True;
-      raise;
-    end;
+  try
+    FWriter.Close;
+  except
+    FIsError := True;
+    raise;
   end;
 end;
 
@@ -2667,31 +2306,28 @@ begin
   ALen := Length(ANcname) - 1;
   while ALen > 0 do
   begin
-    if (TACLXMLCharType.CharProperties[P^] and TACLXMLCharType.NCNameSC) <> 0 then
-      Inc(P)
-    else
+    if (TACLXMLCharType.CharProperties[P^] and TACLXMLCharType.NCNameSC) = 0 then
       raise InvalidCharsException(ANcname, P - AStart);
     Dec(ALen);
+    Inc(P);
   end;
 end;
 
 class function TACLXMLWellFormedWriter.InvalidCharsException(const AName: string; ABadCharIndex: Integer): EACLXMLException;
 begin
-  Result := EACLXMLException.CreateFmt(SXmlInvalidNameCharsDetail, [AName, ABadCharIndex, TACLHexCode.Encode(AName[ABadCharIndex + 1])]);
+  Result := EACLXMLException.CreateFmt(SXmlInvalidNameCharsDetail,
+    [AName, ABadCharIndex, TACLHexCode.Encode(AName[ABadCharIndex + 1])]);
 end;
-
-//function TACLXMLWellFormedWriter.GetIsClosedOrErrorState: Boolean;
-//begin
-//  Result := FIsError or (FWriter.WriteState in [TACLXMLWriteState.Closed, TACLXMLWriteState.Error]);
-//end;
 
 procedure TACLXMLWellFormedWriter.AddAttribute(const APrefix, ALocalName: string);
 var
   ATop: Integer;
 begin
   for var I := 0 to FAttrCount - 1 do
+  begin
     if (FAttrStack[I].LocalName = ALocalName) and (FAttrStack[I].Prefix = APrefix) then
       raise DupAttrException(APrefix, ALocalName);
+  end;
 
   ATop := FAttrCount;
   Inc(FAttrCount);

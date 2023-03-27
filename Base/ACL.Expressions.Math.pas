@@ -342,11 +342,11 @@ const
       Result := Ord(C) - Ord('0')
     else if C = '+' then
       Result := 10
-    else if С = '-' then
+    else if C = '-' then
       Result := 11
-    else if С = '.' then
+    else if C = '.' then
       Result := 12
-    else if С = 'E' then
+    else if C = 'E' then
       Result := 13
     else if Contains(C, FDelimiters, FDelimitersLength) then
       Result := 14

@@ -262,11 +262,11 @@ begin
         AXmlDoc[0].Enum(
           procedure (ANode: TACLXMLNode)
           begin
-            if System.AnsiStrings.SameText(ANode.NodeName, 'author') then
+            if acCompareTokens(ANode.NodeName, 'author') then
               FAuthor := ANode.NodeValue
-            else if System.AnsiStrings.SameText(ANode.NodeName, 'name') then
+            else if acCompareTokens(ANode.NodeName, 'name') then
               FName := ANode.NodeValue
-            else if System.AnsiStrings.SameText(ANode.NodeName, 'icon') then
+            else if acCompareTokens(ANode.NodeName, 'icon') then
               FItems.Add(TACLFileTypeIconLibraryItem.Create(ANode));
           end);
       end;

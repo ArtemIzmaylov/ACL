@@ -25,7 +25,7 @@
 {$IMAGEBASE $400000}
 {$DEFINE DEBUG}
 {$ENDIF IMPLICITBUILDING}
-{$DESCRIPTION 'Artem''s Components Library v2022.11'}
+{$DESCRIPTION 'Artem''s Components Library v2023.3'}
 {$IMPLICITBUILD ON}
 
 requires

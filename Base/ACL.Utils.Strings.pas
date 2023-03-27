@@ -35,6 +35,7 @@ uses
 
 const
   acCRLF = UnicodeString(#13#10);
+  acEmptyStr = '';
   acLineBreakMacro = '\n';
   acLineSeparator = WideChar($2028);
   acZero = #0#0;
@@ -190,7 +191,8 @@ type
     class constructor Create;
 
     class function Decode(const AChar1, AChar2: Char): Byte; overload;
-    class function Decode(const AChar1, AChar2: Char; out AValue: Byte): Boolean; overload;
+    class function Decode(const AChar1, AChar2: Char; out AValue: Byte): Boolean; overload; inline;
+    class function Decode(const AChar1: Char; out AValue: Byte): Boolean; overload; inline;
     class function Decode(const ACode: UnicodeString; AStream: TStream): Boolean; overload;
     class function DecodeString(const ACode: UnicodeString): UnicodeString; overload;
 
@@ -310,6 +312,7 @@ type
     class procedure EnumAnsiCodePages(const AProc: TProc<Integer, string>);
     class function Get(const CodePage: Integer): TEncoding; overload;
     class function Get(const Name: string): TEncoding; overload;
+    class function WebName(const Encoding: TEncoding): string;
   end;
 
   TACLFontData = array[0..3] of UnicodeString;
@@ -438,9 +441,9 @@ function IfThenW(AValue: Boolean; const ATrue: UnicodeString; const AFalse: Unic
 function IfThenW(const A, B: UnicodeString): UnicodeString; overload; inline;
 function acDupeString(const AText: UnicodeString; ACount: Integer): UnicodeString;
 function acTrim(const S: UnicodeString): UnicodeString;
-function WStrLength(S: PWideChar; AMaxScanCount: Integer): Integer;
-function WStrScan(Str: PWideChar; ACount: Integer; C: WideChar): PWideChar; overload;
-function WStrScan(Str: PWideChar; C: WideChar): PWideChar; overload;
+function WStrLength(S: PWideChar; AMaxScanCount: Integer): Integer; inline;
+function WStrScan(Str: PWideChar; ACount: Integer; C: WideChar): PWideChar; overload; inline;
+function WStrScan(Str: PWideChar; C: WideChar): PWideChar; overload; inline;
 procedure acStrLCopy(ADest: PWideChar; const ASource: UnicodeString; AMax: Integer);
 implementation
 
@@ -1594,9 +1597,9 @@ begin
   I := 1;
   L := Length(S);
   E := L;
-  while (I <= E) and (Ord(S[I]) <= Ord(' ')) do
+  while (I <= E) and (S[I] <= ' ') do
     Inc(I);
-  while (E >= I) and (Ord(S[E]) <= Ord(' ')) do
+  while (E >= I) and (S[E] <= ' ') do
     Dec(E);
   if (I > 1) or (E < L) then
     Result := Copy(S, I, E - I + 1)
@@ -1718,6 +1721,17 @@ begin
   finally
     AEncoding.Free;
   end;
+end;
+
+class function TACLEncodings.WebName(const Encoding: TEncoding): string;
+var
+  AStartPos: Integer;
+  AEncodingName: string;
+begin
+  AEncodingName := Encoding.EncodingName;
+  AStartPos := acPos('(', AEncodingName) + 1;
+  Result := Copy(AEncodingName, AStartPos, acPos(')', AEncodingName) - AStartPos);
+  Result := acLowerCase(Result);
 end;
 
 class function TACLEncodings.CodePageEnumProc(lpCodePageString: PWideChar): Cardinal; stdcall;
@@ -2334,26 +2348,10 @@ begin
 end;
 
 class function TACLHexcode.Decode(const AChar1, AChar2: Char; out AValue: Byte): Boolean;
-
-  function TryDecode(const C: Char; out X: Byte): Boolean; inline;
-  begin
-    Result := True;
-    case C of
-      '0'..'9':
-        X := Ord(C) - Ord('0');
-      'A'..'F':
-        X := Ord(C) - Ord('A') + 10;
-      'a'..'f':
-        X := Ord(C) - Ord('a') + 10;
-    else
-      Result := False;
-    end;
-  end;
-
 var
   X1, X2: Byte;
 begin
-  Result := TryDecode(AChar1, X1) and TryDecode(AChar2, X2);
+  Result := Decode(AChar1, X1) and Decode(AChar2, X2);
   if Result then
     AValue := X1 shl 4 or X2;
 end;
@@ -2391,6 +2389,21 @@ begin
       end;
       Result := True;
     end;
+  end;
+end;
+
+class function TACLHexcode.Decode(const AChar1: Char; out AValue: Byte): Boolean;
+begin
+  Result := True;
+  case AChar1 of
+    '0'..'9':
+      AValue := Ord(AChar1) - Ord('0');
+    'A'..'F':
+      AValue := Ord(AChar1) - Ord('A') + 10;
+    'a'..'f':
+      AValue := Ord(AChar1) - Ord('a') + 10;
+  else
+    Result := False;
   end;
 end;
 
