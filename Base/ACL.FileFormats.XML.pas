@@ -226,9 +226,10 @@ type
     destructor Destroy; override;
     function Add(const AName: UnicodeString): TACLXMLNode; override;
     // Load
-    procedure LoadFromFile(const AFileName: UnicodeString);
+    procedure LoadFromFile(const AFileName: UnicodeString; AEncoding: TEncoding = nil);
     procedure LoadFromResource(AInst: HINST; const AName, AType: UnicodeString);
-    procedure LoadFromStream(AStream: TStream); virtual;
+    procedure LoadFromStream(AStream: TStream); overload; // TACLStreamProc, b.c.
+    procedure LoadFromStream(const AStream: TStream; AEncoding: TEncoding); overload; virtual;
     procedure LoadFromString(const AString: AnsiString);
     // Save
     procedure SaveToFile(const AFileName: UnicodeString); overload;
@@ -1115,13 +1116,13 @@ begin
   Result := inherited Add(AName);
 end;
 
-procedure TACLXMLDocument.LoadFromFile(const AFileName: UnicodeString);
+procedure TACLXMLDocument.LoadFromFile(const AFileName: UnicodeString; AEncoding: TEncoding = nil);
 var
   AStream: TStream;
 begin
   if StreamCreateReader(AFileName, AStream) then
   try
-    LoadFromStream(AStream);
+    LoadFromStream(AStream, AEncoding);
   finally
     AStream.Free;
   end
@@ -1142,6 +1143,11 @@ begin
 end;
 
 procedure TACLXMLDocument.LoadFromStream(AStream: TStream);
+begin
+  LoadFromStream(AStream, nil);
+end;
+
+procedure TACLXMLDocument.LoadFromStream(const AStream: TStream; AEncoding: TEncoding);
 var
   ACurrentNode: TACLXMLNode;
   AHeader: Cardinal;
@@ -1160,6 +1166,7 @@ begin
     AStream.Seek(-SizeOf(Integer), soCurrent);
 
     AReaderSettings := TACLXMLReaderSettings.Default;
+    AReaderSettings.DefaultEncoding := AEncoding;
     AReaderSettings.IgnoreComments := True;
     AReaderSettings.IgnoreWhitespace := True;
     AReaderSettings.SupportNamespaces := False;

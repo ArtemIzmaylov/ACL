@@ -224,6 +224,7 @@ type
   public
     CheckCharacters: Boolean;
     ConformanceLevel: TACLXMLConformanceLevel;
+    DefaultEncoding: TEncoding;
     IgnoreComments: Boolean;
     IgnoreProcessingInstructions: Boolean;
     IgnoreWhitespace: Boolean;
@@ -1090,6 +1091,7 @@ class function TACLXMLReaderSettings.Default: TACLXMLReaderSettings;
 begin
   Result.CheckCharacters := True;
   Result.ConformanceLevel := TACLXMLConformanceLevel.Document;
+  Result.DefaultEncoding := nil;
   Result.IgnoreComments := False;
   Result.IgnoreProcessingInstructions := False;
   Result.IgnoreWhitespace := False;
@@ -1348,7 +1350,7 @@ constructor TACLXMLTextReader.Create(AStream: TStream;
   const ASettings: TACLXMLReaderSettings);
 begin
   Create(ASettings);
-  InitStreamInput(AStream, ABytes, AByteCount, nil);
+  InitStreamInput(AStream, ABytes, AByteCount, ASettings.DefaultEncoding);
 end;
 
 constructor TACLXMLTextReader.Create(const ASettings: TACLXMLReaderSettings);
