@@ -299,7 +299,8 @@ function acCopyFile(const ASourceFileName, ATargetFileName: UnicodeString; AFail
 function acDeleteDirectory(const APath: UnicodeString): Boolean;
 function acDeleteDirectoryFull(APath: UnicodeString; ARecursive: Boolean = True): Boolean;
 function acDeleteFile(const AFileName: UnicodeString): Boolean;
-function acMakePath(const S: UnicodeString): Boolean;
+function acMakePath(const APath: UnicodeString): Boolean;
+function acMakePathForFileName(const AFileName: UnicodeString): Boolean;
 function acMoveFile(const ASourceFileName, ATargetFileName: UnicodeString): Boolean;
 function acReplaceFile(const ASourceFileName, ATargetFileName: UnicodeString): Boolean; overload;
 function acReplaceFile(const ASourceFileName, ATargetFileName, ABackupFileName: UnicodeString): Boolean; overload;
@@ -1173,13 +1174,18 @@ begin
   end;
 end;
 
-function acMakePath(const S: UnicodeString): Boolean;
+function acMakePath(const APath: UnicodeString): Boolean;
 begin
   try
-    Result := (S <> '') and ForceDirectories(S);
+    Result := (APath <> '') and ForceDirectories(APath);
   except
     Result := False;
   end;
+end;
+
+function acMakePathForFileName(const AFileName: UnicodeString): Boolean;
+begin
+  Result := acMakePath(acExtractFilePath(AFileName));
 end;
 
 function acMoveFile(const ASourceFileName, ATargetFileName: UnicodeString): Boolean;
