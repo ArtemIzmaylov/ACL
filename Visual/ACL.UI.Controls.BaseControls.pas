@@ -2776,7 +2776,10 @@ end;
 
 function TACLSubControlOptions.GetActualIndentBetweenElements: Integer;
 begin
-  Result := acGetScaleFactor(FOwner).Apply(acIndentBetweenElements);
+  if Position in [mRight, mLeft] then
+    Result := acGetScaleFactor(FOwner).Apply(acIndentBetweenElements)
+  else
+    Result := acGetScaleFactor(FOwner).Apply(2);
 end;
 
 function TACLSubControlOptions.Validate: Boolean;
