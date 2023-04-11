@@ -549,6 +549,7 @@ type
     // Messages
     procedure CMEnabledChanged(var Message: TMessage); override;
     procedure CMHitTest(var Message: TCMHitTest); message CM_HITTEST;
+    procedure WMMove(var Message: TWMMove); message WM_MOVE;
     procedure WMNCHitTest(var Message: TWMNCHitTest); message WM_NCHITTEST;
     //
     property Checked: Boolean read GetChecked write SetChecked;
@@ -561,7 +562,6 @@ type
     procedure Click; override;
     procedure ChangeState(AChecked: Boolean); overload;
     procedure ChangeState(AState: TCheckBoxState); overload;
-    procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
     procedure ToggleState;
   published
     property Alignment default taLeftJustify;
@@ -2065,13 +2065,6 @@ begin
     Result := crHandPoint;
 end;
 
-procedure TACLCustomCheckBox.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
-begin
-  inherited;
-  if (csAligning in ControlState) and (SubControl.Control <> nil) then
-    BoundsChanged;
-end;
-
 procedure TACLCustomCheckBox.SetChecked(AValue: Boolean);
 begin
   if AValue then
@@ -2095,6 +2088,13 @@ begin
     PtInRect(ViewInfo.ButtonRect, P) or
     PtInRect(ViewInfo.FocusRect, P) or
     PtInRect(ViewInfo.LineRect, P));
+end;
+
+procedure TACLCustomCheckBox.WMMove(var Message: TWMMove);
+begin
+  inherited;
+  if (SubControl <> nil) and (SubControl.Control <> nil) then
+    BoundsChanged;
 end;
 
 procedure TACLCustomCheckBox.WMNCHitTest(var Message: TCMHitTest);
@@ -2171,7 +2171,7 @@ end;
 
 procedure TACLCustomCheckBox.UpdateSubControlEnabled;
 begin
-  SubControl.Enabled := Enabled and Checked;
+  SubControl.Enabled := Enabled and (not ShowCheckMark or Checked);
 end;
 
 procedure TACLCustomCheckBox.SetWordWrap(AValue: Boolean);

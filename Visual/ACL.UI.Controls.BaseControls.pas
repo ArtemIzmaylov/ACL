@@ -2104,7 +2104,7 @@ end;
 procedure TACLCustomControl.Resize;
 begin
   inherited Resize;
-  if not IsDestroying and not HandleAllocated then
+  if not IsDestroying then
     BoundsChanged;
 end;
 
@@ -2259,14 +2259,7 @@ end;
 
 procedure TACLCustomControl.WMSize(var Message: TWMSize);
 begin
-  if not IsDestroying then
-  begin
-    UpdateBounds;
-    BoundsChanged;
-  end;
-
   inherited;
-
   if Parent <> nil then
   begin
     if TWinControlAccess(Parent).AutoSize then
@@ -2820,6 +2813,7 @@ begin
     if AValue <> nil then
     begin
       FControl := AValue;
+      FPrevBounds := TRect.Empty;
       FPrevWndProc := FControl.WindowProc;
       FControl.Parent := FOwner.Parent;
       if Validate then

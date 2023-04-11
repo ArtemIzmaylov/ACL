@@ -631,7 +631,7 @@ end;
 procedure TACLLabel.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
 begin
   inherited;
-  if (csAligning in ControlState) and (SubControl.Control <> nil) then
+  if SubControl.Control <> nil then
     Calculate;
 end;
 
