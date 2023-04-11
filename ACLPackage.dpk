@@ -25,7 +25,7 @@
 {$IMAGEBASE $400000}
 {$DEFINE DEBUG}
 {$ENDIF IMPLICITBUILDING}
-{$DESCRIPTION 'Artem''s Components Library v2023.3'}
+{$DESCRIPTION 'Artem''s Components Library v2023.4'}
 {$IMPLICITBUILD ON}
 
 requires
@@ -51,6 +51,9 @@ contains
   ACL.FileFormats.INI in 'Base\ACL.FileFormats.INI.pas',
   ACL.FileFormats.CSV in 'Base\ACL.FileFormats.CSV.pas',
   ACL.FileFormats.XML in 'Base\ACL.FileFormats.XML.pas',
+  ACL.FileFormats.XML.Reader in 'Base\ACL.FileFormats.XML.Reader.pas',
+  ACL.FileFormats.XML.Writer in 'Base\ACL.FileFormats.XML.Writer.pas',
+  ACL.FileFormats.XML.Types in 'Base\ACL.FileFormats.XML.Types.pas',
   ACL.Geometry in 'Base\ACL.Geometry.pas',
   ACL.Graphics in 'Base\ACL.Graphics.pas',
   ACL.Graphics.Palette in 'Base\ACL.Graphics.Palette.pas',

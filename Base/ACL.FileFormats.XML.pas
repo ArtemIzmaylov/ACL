@@ -1497,16 +1497,18 @@ end;
 procedure TACLBinaryXMLBuilder.WriteStringTable;
 var
   L: Integer;
-  S: AnsiString;
+  S: array of AnsiString;
 begin
   WriteValue(FStringTable.Count);
+  SetLength(S, FStringTable.Count);
   for var P in FStringTable do
+    S[P.Value] := AnsiString(P.Key);
+  for var I := Low(S) to High(S) do
   begin
-    S := AnsiString(P.Key);
-    L := Length(S);
+    L := Length(S[I]);
     WriteValue(L);
     if L > 0 then
-      Stream.WriteStringA(S);
+      Stream.WriteStringA(S[I]);
   end;
 end;
 

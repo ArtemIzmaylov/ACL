@@ -61,7 +61,6 @@ const
   acTrue = TACLBoolean.True;
 
 type
-  TObjectMethod = procedure of object;
   TProcedureRef = reference to procedure;
 
   { IObject }
@@ -178,6 +177,7 @@ function acGetInterfaceEx(const Instance: TObject; const IID: TGUID; out Intf): 
 procedure acExchangeInt64(var AValue1, AValue2: Int64); inline;
 procedure acExchangeIntegers(var AValue1, AValue2); inline;
 procedure acExchangePointers(var AValue1, AValue2); inline;
+procedure acExchangeStrings(var AValue1, AValue2: UnicodeString); inline;
 function acBoolToHRESULT(AValue: Boolean): HRESULT; inline;
 function acGenerateGUID: UnicodeString;
 function acObjectUID(AObject: TObject): string;
@@ -429,6 +429,15 @@ begin
   ATempValue := Pointer(AValue1);
   Pointer(AValue1) := Pointer(AValue2);
   Pointer(AValue2) := ATempValue;
+end;
+
+procedure acExchangeStrings(var AValue1, AValue2: UnicodeString);
+var
+  ATempValue: UnicodeString;
+begin
+  ATempValue := AValue1;
+  AValue1 := AValue2;
+  AValue2 := ATempValue;
 end;
 
 function acBoolToHRESULT(AValue: Boolean): HRESULT;

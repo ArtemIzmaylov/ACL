@@ -1950,7 +1950,13 @@ begin
               Continue;
             end;
           end;
-          ThrowInvalidChar(AChars, FParsingState.CharsUsed, APosition);
+          if FCheckCharacters then
+            ThrowInvalidChar(AChars, FParsingState.CharsUsed, APosition)
+          else
+          begin
+            Inc(APosition);
+            Continue;
+          end;
         end;
       end;
     end;
@@ -1963,8 +1969,8 @@ ReturnPartial:
     end
     else
       AOutEndPosition := APosition;
-    AOutStartPosition := FParsingState.CharPos;
 
+    AOutStartPosition := FParsingState.CharPos;
     FParsingState.CharPos := APosition;
     Exit(False); //# false == parsing of comment or CData section is not finished yet, must be called again
   end;
