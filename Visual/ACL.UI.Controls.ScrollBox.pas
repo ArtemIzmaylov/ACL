@@ -307,8 +307,11 @@ end;
 
 procedure TACLCustomScrollBox.AlignControls(AControl: TControl; var Rect: TRect);
 begin
-  CalculateAutoRange;
-  inherited AlignControls(AControl, Rect);
+  for var Step := False to True do
+  begin
+    CalculateAutoRange;
+    inherited AlignControls(AControl, Rect);
+  end;
 end;
 
 procedure TACLCustomScrollBox.BoundsChanged;

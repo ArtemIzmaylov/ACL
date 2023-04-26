@@ -539,7 +539,6 @@ type
     FControl: TControl;
     FOwner: TControl;
     FPosition: TACLBorder;
-    FPrevBounds: TRect;
     FPrevWndProc: TWndMethod;
 
     function GetActualIndentBetweenElements: Integer;
@@ -2259,7 +2258,15 @@ end;
 
 procedure TACLCustomControl.WMSize(var Message: TWMSize);
 begin
+  // для корректной работы anchor-ов при смене dpi
+  if not IsDestroying then
+  begin
+    UpdateBounds;
+    BoundsChanged;
+  end;
+
   inherited;
+
   if Parent <> nil then
   begin
     if TWinControlAccess(Parent).AutoSize then
@@ -2631,19 +2638,12 @@ begin
 end;
 
 procedure TACLSubControlOptions.Changed;
-var
-  ABounds: TRect;
 begin
   if not (csDestroying in FOwner.ComponentState) then
   begin
-    ABounds := TControlAccess(FOwner).BoundsRect;
-    if FPrevBounds <> ABounds then
-    begin
-      FPrevBounds := ABounds;
-      TControlAccess(FOwner).AdjustSize;
-      TControlAccess(FOwner).Resize;
-      TControlAccess(FOwner).Invalidate;
-    end;
+    TControlAccess(FOwner).AdjustSize;
+    TControlAccess(FOwner).Resize;
+    TControlAccess(FOwner).Invalidate;
   end;
 end;
 
@@ -2668,9 +2668,8 @@ var
   ABounds: TRect;
 begin
   if Validate then
-  begin  
+  begin
     ABounds := acRectOffset(AClientRect, FOwner.Left, FOwner.Top);
-
     case Position of
       mLeft:
         begin
@@ -2779,8 +2778,8 @@ function TACLSubControlOptions.Validate: Boolean;
 begin
   if (Control <> nil) and (Control.Parent <> FOwner.Parent) then
     Control := nil;
-  if (Control <> nil) and (Control.Align <> alCustom) then
-    Control.Align := alCustom;
+  if (Control <> nil) and (Control.Align <> alNone) then
+    Control.Align := alNone; // alCustom disables auto-size feature
   if (Control <> nil) and (Control.AlignWithMargins) then
     Control.AlignWithMargins := False;
   Result := Control <> nil;
@@ -2813,7 +2812,6 @@ begin
     if AValue <> nil then
     begin
       FControl := AValue;
-      FPrevBounds := TRect.Empty;
       FPrevWndProc := FControl.WindowProc;
       FControl.Parent := FOwner.Parent;
       if Validate then

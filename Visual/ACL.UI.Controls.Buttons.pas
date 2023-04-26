@@ -1739,8 +1739,7 @@ end;
 
 procedure TACLCheckBoxSubControlOptions.Changed;
 begin
-  if Control <> nil then
-    Control.Enabled := Enabled;
+  SyncEnabled;
   inherited;
 end;
 
