@@ -74,7 +74,9 @@ type
     class function FunctionIncCore(AContext: TObject; AParams: TACLExpressionElements; ASign: Integer): Variant;
     class function FunctionLength(AContext: TObject; AParams: TACLExpressionElements): Variant;
     class function FunctionLowerCase(AContext: TObject; AParams: TACLExpressionElements): Variant;
+    class function FunctionRemove(AContext: TObject; AParams: TACLExpressionElements): Variant;
     class function FunctionReplace(AContext: TObject; AParams: TACLExpressionElements): Variant;
+    class function FunctionReplaceEx(AContext: TObject; AParams: TACLExpressionElements): Variant;
     class function FunctionStrCopy(AContext: TObject; AParams: TACLExpressionElements): Variant;
     class function FunctionStrDetransliterate(AContext: TObject; AParams: TACLExpressionElements): Variant;
     class function FunctionStrLeft(AContext: TObject; AParams: TACLExpressionElements): Variant;
@@ -380,7 +382,9 @@ begin
   RegisterFunction('Char', FunctionChar, 1, True, CategoryStrings);
   RegisterFunction('Format', FunctionFormat, 2, True, CategoryStrings);
   RegisterFunction('Length', FunctionLength, 1, True, CategoryStrings);
+  RegisterFunction('Remove', FunctionRemove, -1, True, CategoryStrings);
   RegisterFunction('Replace', FunctionReplace, 3, True, CategoryStrings);
+  RegisterFunction('ReplaceEx', FunctionReplaceEx, -1, True, CategoryStrings);
   RegisterFunction('StrCopy', FunctionStrCopy, 3, True, CategoryStrings);
   RegisterFunction('StrLeft', FunctionStrLeft, 2, True, CategoryStrings);
   RegisterFunction('StrPos', FunctionStrPos, 2, True, CategoryStrings);
@@ -522,9 +526,51 @@ begin
   Result := acLowerCase(AParams[0].Evaluate(AContext));
 end;
 
+class function TACLFormatStringFactory.FunctionRemove(AContext: TObject; AParams: TACLExpressionElements): Variant;
+var
+  ASource: UnicodeString;
+begin
+  if AParams.Count = 0 then
+    Exit(acEmptyStr);
+  if AParams.Count = 1 then
+    Exit(AParams[0].Evaluate(AContext));
+
+  ASource := AParams[0].Evaluate(AContext);
+  for var I := 1 to AParams.Count - 1 do
+    ASource := acStringReplace(ASource, AParams[I].Evaluate(AContext), '');
+  Result := ASource;
+end;
+
 class function TACLFormatStringFactory.FunctionReplace(AContext: TObject; AParams: TACLExpressionElements): Variant;
 begin
   Result := acStringReplace(AParams[0].Evaluate(AContext), AParams[1].Evaluate(AContext), AParams[2].Evaluate(AContext));
+end;
+
+class function TACLFormatStringFactory.FunctionReplaceEx(AContext: TObject; AParams: TACLExpressionElements): Variant;
+var
+  AIndex: Integer;
+  ACount: Integer;
+  ASource: UnicodeString;
+begin
+  ACount := AParams.Count;
+  if ACount = 0 then
+    Exit(acEmptyStr);
+  if ACount = 1 then
+    Exit(AParams[0].Evaluate(AContext));
+  if ACount = 2 then
+    Exit(acStringReplace(AParams[0].Evaluate(AContext), AParams[1].Evaluate(AContext), acEmptyStr));
+  if ACount = 3 then
+    Exit(FunctionReplace(AContext, AParams));
+
+  AIndex  := 1;
+  ASource := AParams[0].Evaluate(AContext);
+  while AIndex + 1 < ACount do
+  begin
+    ASource := acStringReplace(ASource, AParams[AIndex].Evaluate(AContext), AParams[AIndex + 1].Evaluate(AContext));
+    Inc(AIndex, 2);
+  end;
+
+  Result := ASource;
 end;
 
 class function TACLFormatStringFactory.FunctionStrCopy(AContext: TObject; AParams: TACLExpressionElements): Variant;
