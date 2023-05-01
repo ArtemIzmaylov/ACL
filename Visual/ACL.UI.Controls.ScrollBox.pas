@@ -4,7 +4,7 @@
 {*             ScrollBox Control             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -32,7 +32,6 @@ uses
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.CompoundControl,
   ACL.UI.Controls.CompoundControl.SubClass,
-  ACL.UI.Controls.CompoundControl.SubClass.Scrollbox,
   ACL.UI.Controls.ScrollBar,
   ACL.UI.Resources,
   ACL.Utils.Common;

@@ -35,7 +35,6 @@ uses
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.CompoundControl,
   ACL.UI.Controls.CompoundControl.SubClass,
-  ACL.UI.Controls.CompoundControl.SubClass.Scrollbox,
   ACL.UI.Controls.TreeList.Options,
   ACL.UI.Controls.TreeList.SubClass,
   ACL.UI.Controls.TreeList.Types,
@@ -296,8 +295,10 @@ type
     //
     property OnCalculated;
     property OnCanDeleteSelected;
+    property OnClick;
     property OnColumnClick;
     property OnCompare;
+    property OnDblClick;
     property OnDragSorting;
     property OnDragSortingNodeDrop;
     property OnDragSortingNodeOver;
@@ -321,6 +322,12 @@ type
     property OnGetNodeChildren;
     property OnGetNodeGroup;
     property OnGetNodeHeight;
+    property OnKeyDown;
+    property OnKeyPress;
+    property OnKeyUp;
+    property OnMouseDown;
+    property OnMouseMove;
+    property OnMouseUp;
     property OnNodeChecked;
     property OnNodeDblClicked;
     property OnNodeDeleted;
@@ -329,15 +336,6 @@ type
     property OnSorting;
     property OnSortReset;
     property OnUpdateState;
-    //
-    property OnClick;
-    property OnDblClick;
-    property OnKeyDown;
-    property OnKeyPress;
-    property OnKeyUp;
-    property OnMouseDown;
-    property OnMouseMove;
-    property OnMouseUp;
   end;
 
 implementation

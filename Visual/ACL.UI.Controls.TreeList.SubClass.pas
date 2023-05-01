@@ -4,7 +4,7 @@
 {*             TreeList Control              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -48,8 +48,6 @@ uses
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.Category,
   ACL.UI.Controls.CompoundControl.SubClass,
-  ACL.UI.Controls.CompoundControl.SubClass.ContentCells,
-  ACL.UI.Controls.CompoundControl.SubClass.Scrollbox,
   ACL.UI.Controls.GroupBox,
   ACL.UI.Controls.Labels,
   ACL.UI.Controls.Panel,
@@ -100,7 +98,7 @@ type
     procedure InitializeResources; override;
   public
     procedure DrawBackground(ACanvas: TCanvas; const R: TRect; AEnabled: Boolean; ABorders: TACLBorders);
-    procedure DrawCheckMark(ACanvas: TCanvas; const R: TRect; AEnabled: Boolean; ACheckBoxState: TCheckBoxState);
+    procedure DrawCheckMark(ACanvas: TCanvas; const R: TRect; AState: TACLButtonState; ACheckBoxState: TCheckBoxState);
     procedure DrawGridline(ACanvas: TCanvas; const R: TRect; ASide: TACLBorder);
     procedure DrawGroupExpandButton(ACanvas: TCanvas; const R: TRect; AExpanded: Boolean);
     procedure DrawGroupHeader(ACanvas: TCanvas; const R: TRect; ABorders: TACLBorders = [mTop, mBottom]);
@@ -160,13 +158,16 @@ type
 
   { TACLTreeListColumnViewInfo }
 
-  TACLTreeListColumnViewInfo = class(TACLTreeListCustomViewInfo, IACLDraggableObject)
+  TACLTreeListColumnViewInfo = class(TACLTreeListCustomViewInfo,
+    IACLHotTrackObject,
+    IACLDraggableObject)
   strict private
     FActualWidth: Integer;
-    FCheckBoxState: TCheckBoxState;
+    FCheckState: TCheckBoxState;
     FSortArrowIndexSize: TSize;
 
     function CanResize: Boolean;
+    function GetCheckBoxState: TACLButtonState;
     function GetColumnBarViewInfo: TACLTreeListColumnBarViewInfo; inline;
     function GetIsFirst: Boolean;
     function GetIsLast: Boolean;
@@ -196,6 +197,8 @@ type
     procedure DoDraw(ACanvas: TCanvas); override;
     procedure DoDrawSortMark(ACanvas: TCanvas); virtual;
     procedure InitializeActualWidth; virtual;
+    // IACLHotTrackObject
+    procedure OnHotTrack(Action: TACLHotTrackAction);
     //
     property ColumnBarViewInfo: TACLTreeListColumnBarViewInfo read GetColumnBarViewInfo;
     property NodeViewInfo: TACLTreeListNodeViewInfo read GetNodeViewInfo;
@@ -212,7 +215,8 @@ type
     property ActualWidth: Integer read FActualWidth write FActualWidth;
     property Borders: TACLBorders read FBorders;
     property CheckBoxRect: TRect read FCheckBoxRect;
-    property CheckBoxState: TCheckBoxState read FCheckBoxState;
+    property CheckBoxState: TACLButtonState read GetCheckBoxState;
+    property CheckState: TCheckBoxState read FCheckState;
     property Column: TACLTreeListColumn read FColumn;
     property ImageRect: TRect read FImageRect;
     property SortArrowIndexRect: TRect read FSortArrowIndexRect;
@@ -259,15 +263,9 @@ type
   { TACLTreeListContentCell }
 
   TACLTreeListContentCell = class(TACLCompoundControlBaseContentCell, IACLHotTrackObject)
-  strict private
-    function GetSubClass: TACLTreeListSubClass;
   protected
     // IACLHotTrackObject
-    procedure IACLHotTrackObject.Enter = UpdateHotTrack;
-    procedure IACLHotTrackObject.Leave = UpdateHotTrack;
-    procedure UpdateHotTrack;
-    //
-    property SubClass: TACLTreeListSubClass read GetSubClass;
+    procedure OnHotTrack(Action: TACLHotTrackAction);
   end;
 
   { TACLTreeListContentCellViewInfo }
@@ -290,6 +288,7 @@ type
 
   TACLTreeListGroupViewInfo = class(TACLTreeListContentCellViewInfo, IACLDraggableObject)
   strict private
+    function GetCheckBoxState: TACLButtonState;
     function GetGroup: TACLTreeListGroup; inline;
   protected
     FBackgroundBounds: TRect;
@@ -310,6 +309,7 @@ type
     procedure Initialize(AData: TObject); override;
     //
     property BackgroundBounds: TRect read FBackgroundBounds;
+    property CheckBoxState: TACLButtonState read GetCheckBoxState;
     property Group: TACLTreeListGroup read GetGroup;
     property TextRect: TRect read FTextRect;
   end;
@@ -323,6 +323,7 @@ type
     function GetCellCount: Integer;
     function GetCellRect(AIndex: Integer): TRect; overload;
     function GetCellRect(AViewInfo: TACLTreeListColumnViewInfo): TRect; overload;
+    function GetCheckBoxState: TACLButtonState;
     function GetColumnBarViewInfo: TACLTreeListColumnBarViewInfo; inline;
     function GetColumnForViewInfo(AColumnViewInfo: TACLTreeListColumnViewInfo): TACLTreeListColumn; inline;
     function GetNode: TACLTreeListNode; inline;
@@ -366,6 +367,7 @@ type
     function CreateDragObject(const AHitTestInfo: TACLHitTestInfo): TACLCompoundControlDragObject;
 
     property AbsoluteNodeIndex: Integer read GetAbsoluteNodeIndex;
+    property CheckBoxState: TACLButtonState read GetCheckBoxState;
     property ColumnBarViewInfo: TACLTreeListColumnBarViewInfo read GetColumnBarViewInfo;
     property Level: Integer read FLevel write SetLevel;
     property Node: TACLTreeListNode read GetNode;
@@ -1149,12 +1151,10 @@ begin
 end;
 
 procedure TACLStyleTreeList.DrawCheckMark(ACanvas: TCanvas;
-  const R: TRect; AEnabled: Boolean; ACheckBoxState: TCheckBoxState);
-const
-  StateMap: array[Boolean] of TACLButtonState = (absDisabled, absNormal);
+  const R: TRect; AState: TACLButtonState; ACheckBoxState: TCheckBoxState);
 begin
   if not R.IsEmpty then
-    CheckMark.Draw(ACanvas.Handle, R, Ord(ACheckBoxState) * 5 + Ord(StateMap[AEnabled]));
+    CheckMark.Draw(ACanvas.Handle, R, Ord(ACheckBoxState) * 5 + Ord(AState));
 end;
 
 procedure TACLStyleTreeList.DrawGridline(ACanvas: TCanvas; const R: TRect; ASide: TACLBorder);
@@ -1323,6 +1323,7 @@ begin
     begin
       AInfo.Cursor := crHandPoint;
       AInfo.IsCheckable := True;
+      AInfo.HitObjectData[cchdSubPart] := TObject(cchtCheckable);
     end
     else
 
@@ -1428,7 +1429,7 @@ begin
   if [cccnViewport, cccnLayout, cccnStruct] * AChanges <> [] then
     CalculateContentRects(Bounds);
   if ([tlcnCheckState, cccnStruct] * AChanges <> []) and IsFirst then
-    FCheckBoxState := SubClass.RootNode.ChildrenCheckState;
+    FCheckState := SubClass.RootNode.ChildrenCheckState;
 end;
 
 procedure TACLTreeListColumnViewInfo.DoDraw(ACanvas: TCanvas);
@@ -1441,7 +1442,7 @@ begin
     begin
       SubClass.StylePrepareFont(ACanvas, TACLStyleTreeList.IndexColumnHeaderFont);
       SubClass.Style.DrawHeader(ACanvas, Bounds, Borders);
-      SubClass.Style.DrawCheckMark(ACanvas, CheckBoxRect, True, CheckBoxState);
+      SubClass.Style.DrawCheckMark(ACanvas, CheckBoxRect, CheckBoxState, CheckState);
       acDrawImage(ACanvas, ImageRect, OptionsColumns.Images, Column.ImageIndex);
       acTextDraw(ACanvas, Column.Caption, TextRect, Column.TextAlign, taVerticalCenter, True);
       DoDrawSortMark(ACanvas);
@@ -1467,6 +1468,11 @@ begin
   ActualWidth := ScaleFactor.Apply(Column.Width);
 end;
 
+procedure TACLTreeListColumnViewInfo.OnHotTrack(Action: TACLHotTrackAction);
+begin
+  Invalidate;
+end;
+
 procedure TACLTreeListColumnViewInfo.SetSortByIndex(AValue: Integer);
 begin
   if FSortByIndex <> AValue then
@@ -1479,6 +1485,11 @@ end;
 function TACLTreeListColumnViewInfo.CanResize: Boolean;
 begin
   Result := Column.CanResize and (not OptionsColumns.AutoWidth or (SubClass.Columns.Count > 1));
+end;
+
+function TACLTreeListColumnViewInfo.GetCheckBoxState: TACLButtonState;
+begin
+  Result := SubClass.CalculateState(Self, cchtCheckable)
 end;
 
 function TACLTreeListColumnViewInfo.GetColumnBarViewInfo: TACLTreeListColumnBarViewInfo;
@@ -1703,15 +1714,13 @@ end;
 
 { TACLTreeListContentCell }
 
-procedure TACLTreeListContentCell.UpdateHotTrack;
+procedure TACLTreeListContentCell.OnHotTrack(Action: TACLHotTrackAction);
+var
+  ASubClass: TACLTreeListSubClass;
 begin
-  if SubClass.OptionsBehavior.HotTrack or SubClass.OptionsView.CheckBoxes then
-    SubClass.InvalidateRect(Bounds);
-end;
-
-function TACLTreeListContentCell.GetSubClass: TACLTreeListSubClass;
-begin
-  Result := TACLTreeListContentCellViewInfo(ViewInfo).SubClass;
+  ASubClass := TACLTreeListContentCellViewInfo(ViewInfo).SubClass;
+  if ASubClass.OptionsBehavior.HotTrack or (Action = htaSwitchPart) then
+    ASubClass.InvalidateRect(Bounds);
 end;
 
 { TACLTreeListContentCellViewInfo }
@@ -1791,10 +1800,15 @@ procedure TACLTreeListGroupViewInfo.DoDraw(ACanvas: TCanvas);
 begin
   SubClass.StylePrepareFont(ACanvas, TACLStyleTreeList.IndexGroupHeaderFont);
   SubClass.Style.DrawGroupHeader(ACanvas, BackgroundBounds);
-  SubClass.Style.DrawCheckMark(ACanvas, CheckBoxRect, True, Group.CheckBoxState);
+  SubClass.Style.DrawCheckMark(ACanvas, CheckBoxRect, CheckBoxState, Group.CheckBoxState);
   if ExpandButtonVisible then
     SubClass.Style.DrawGroupExpandButton(ACanvas, ExpandButtonRect, Group.Expanded);
   acTextDraw(ACanvas, Group.Caption, TextRect, taLeftJustify, taVerticalCenter, True);
+end;
+
+function TACLTreeListGroupViewInfo.GetCheckBoxState: TACLButtonState;
+begin
+  Result := SubClass.CalculateState(Group, cchtCheckable)
 end;
 
 function TACLTreeListGroupViewInfo.GetContentOffsets: TRect;
@@ -2005,6 +2019,14 @@ begin
   Result := FTextExtends[IsFirstColumn(AColumn)];
 end;
 
+function TACLTreeListNodeViewInfo.GetCheckBoxState: TACLButtonState;
+begin
+  if Node.CheckMarkEnabled then
+    Result := SubClass.CalculateState(Node, cchtCheckable)
+  else
+    Result := absDisabled;
+end;
+
 function TACLTreeListNodeViewInfo.GetColumnAbsoluteIndex(AColumnViewInfo: TACLTreeListColumnViewInfo): Integer;
 begin
   if AColumnViewInfo <> nil then
@@ -2100,7 +2122,7 @@ begin
       if ExpandButtonVisible then
         SubClass.Style.DrawRowExpandButton(ACanvas, ExpandButtonRect, Node.Expanded, Node.Selected);
       if not CheckBoxRect.IsEmpty then
-        SubClass.Style.DrawCheckMark(ACanvas, CheckBoxRect, Node.CheckMarkEnabled and SubClass.EnabledContent, Node.CheckState);
+        SubClass.Style.DrawCheckMark(ACanvas, CheckBoxRect, CheckBoxState, Node.CheckState);
       if not ImageRect.IsEmpty then
         DoDrawCellImage(ACanvas, ImageRect);
     end;
@@ -5131,7 +5153,7 @@ end;
 procedure TACLTreeListSubClass.GroupRemoving(AGroup: TACLTreeListGroup);
 begin
   if AGroup = HoveredObject then
-    HoveredObject := nil;
+    SetHoveredObject(nil);
   if AGroup = FocusedObject then
     FocusedObject := nil;
 end;
@@ -5145,7 +5167,7 @@ begin
   if Selection.RemoveItem(ANode, FromEnd) >= 0 then
     Changed([tlcnSelection]);
   if ANode = HoveredObject then
-    HoveredObject := nil;
+    SetHoveredObject(nil);
 
   if not IsDestroying then
   begin

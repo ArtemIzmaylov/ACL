@@ -33,7 +33,6 @@ uses
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.CompoundControl.SubClass,
-  ACL.UI.Controls.CompoundControl.SubClass.ContentCells,
   ACL.UI.Controls.DropDown,
   ACL.UI.Controls.ScrollBar,
   ACL.UI.Controls.TreeList,

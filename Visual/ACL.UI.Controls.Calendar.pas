@@ -119,8 +119,7 @@ type
     // IACLAnimateControl
     procedure IACLAnimateControl.Animate = Invalidate;
     // IACLHotTrackObject
-    procedure Enter;
-    procedure Leave;
+    procedure OnHotTrack(Action: TACLHotTrackAction);
   protected
     procedure DoCalculateHitTest(const AInfo: TACLHitTestInfo); override;
     procedure DoDraw(ACanvas: TCanvas); override;
@@ -527,26 +526,30 @@ begin
   ACanvas.Font.Color := GetTextColor;
 end;
 
-procedure TACLCalendarViewCustomCell.Enter;
-begin
-  AnimationManager.RemoveOwner(Self);
-  Invalidate;
-end;
-
-procedure TACLCalendarViewCustomCell.Leave;
+procedure TACLCalendarViewCustomCell.OnHotTrack(Action: TACLHotTrackAction);
 var
   AAnimation: TACLAnimation;
 begin
-  if IsSelected then
-    Exit;
-  if acUIFadingEnabled then
-  begin
-    AAnimation := TACLAnimation.Create(Self, acUIFadingTime);
-    AAnimation.Tag := TagAnimationFrame;
-    AAnimation.Run;
+  case Action of
+    htaEnter:
+      begin
+        AnimationManager.RemoveOwner(Self);
+        Invalidate;
+      end;
+
+    htaLeave:
+      if not IsSelected then
+      begin
+        if acUIFadingEnabled then
+        begin
+          AAnimation := TACLAnimation.Create(Self, acUIFadingTime);
+          AAnimation.Tag := TagAnimationFrame;
+          AAnimation.Run;
+        end
+        else
+          Invalidate;
+      end;
   end
-  else
-    Invalidate
 end;
 
 function TACLCalendarViewCustomCell.GetActualFrameColor: TAlphaColor;

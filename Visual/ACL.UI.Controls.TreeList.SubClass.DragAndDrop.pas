@@ -34,7 +34,6 @@ uses
   ACL.Geometry,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.CompoundControl.SubClass,
-  ACL.UI.Controls.CompoundControl.SubClass.ContentCells,
   ACL.UI.Controls.TreeList.SubClass,
   ACL.UI.Controls.TreeList.Types,
   ACL.UI.DropSource,
