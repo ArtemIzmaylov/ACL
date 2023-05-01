@@ -431,13 +431,18 @@ var
 begin
   if ATarget is TPicture then
   begin
-    AStream := TMemoryStream.Create;
-    try
-      SaveToStream(AStream);
-      AStream.Position := 0;
-      TPicture(ATarget).LoadFromStream(AStream);
-    finally
-      AStream.Free;
+    if Empty then
+      TPicture(ATarget).Graphic := nil
+    else
+    begin
+      AStream := TMemoryStream.Create;
+      try
+        SaveToStream(AStream);
+        AStream.Position := 0;
+        TPicture(ATarget).LoadFromStream(AStream);
+      finally
+        AStream.Free;
+      end;
     end;
   end
   else
