@@ -4,7 +4,7 @@
 {*            Shell API Wrappers             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -22,6 +22,7 @@ uses
   Winapi.Windows,
   // System
   System.Classes,
+  System.Contnrs,
   System.Generics.Collections,
   // ACL
   ACL.Classes,
@@ -70,6 +71,8 @@ type
   TACLShellFolderStorageCapabilities = set of TACLShellFolderStorageCapability;
 
   TACLShellFolder = class
+  strict private class var
+    FDesktopFolder: TACLShellFolder;
   strict private
     FFullPIDL: PItemIDList;
     FLibrarySources: TACLStringList;
@@ -87,6 +90,7 @@ type
     function GetPathForParsing: UnicodeString;
     function GetStorageCapabilities: TACLShellFolderStorageCapabilities;
   protected
+    class destructor Destroy;
     function GetChild(ID: PItemIDList): IShellFolder;
     function ParentShellFolder: IShellFolder;
   public
@@ -163,6 +167,7 @@ function ShellRenameDirectory(const AOldPath, ANewPath: UnicodeString): Boolean;
 function ShellDeleteDirectory(const APath: UnicodeString; AOptions: TShellOperationFlags = [sofCanUndo]): Boolean;
 function ShellDeleteFile(const AFile: UnicodeString): Boolean;
 function ShellDeleteFiles(AFiles: TACLStringList; AOptions: TShellOperationFlags = [sofCanUndo]): Boolean;
+function ShellUndelete(const AFileOrFolder: UnicodeString): HRESULT; // restores file or folder from Recycle Bin by it original path
 
 // Shell - Executing
 function ShellExecute(const AFileName, AParameters: UnicodeString): Boolean; overload;
@@ -223,7 +228,6 @@ uses
   ACL.Utils.Registry;
 
 var
-  FDesktopFolder: TACLShellFolder = nil;
   FShellLastErrorCode: Integer;
 
 function ShellOperation(const ASourceList, ADestList: UnicodeString;
@@ -301,6 +305,71 @@ end;
 function ShellDeleteFiles(AFiles: TACLStringList; AOptions: TShellOperationFlags = [sofCanUndo]): Boolean;
 begin
   Result := ShellOperation(AFiles.Text, '', soDelete, AOptions);
+end;
+
+function ShellUndelete(const AFileOrFolder: UnicodeString): HRESULT;
+var
+  ARecycleBin: IShellFolder2;
+  ARecycleBinPIDL: PItemIDList;
+
+  function GetOriginalFileName(AItem: PItemIDList): string;
+  var
+    ADetails: TShellDetails;
+    AFileName: string;
+  begin
+    Result := acEmptyStr;
+    ZeroMemory(@ADetails, SizeOf(ADetails));
+    if Succeeded(ARecycleBin.GetDetailsOf(AItem, 0, ADetails)) then
+    begin
+      AFileName := TPIDLHelper.StrRetToString(AItem, ADetails.str);
+      if acExtractFileExt(AFileName) = '' then // когда отображение расширений отключено в Проводнике
+        AFileName := AFileName + acExtractFileExt(TPIDLHelper.GetDisplayName(ARecycleBin, AItem, SIGDN_FILESYSPATH));
+      if Succeeded(ARecycleBin.GetDetailsOf(AItem, 1, ADetails)) then
+        Result := IncludeTrailingPathDelimiter(TPIDLHelper.StrRetToString(AItem, ADetails.str)) + AFileName;
+    end;
+  end;
+
+  function Undelete(AItem: PItemIDList): HRESULT;
+  var
+    ACommandInfo: TCMInvokeCommandInfo;
+    AContextMenu: IContextMenu;
+  begin
+    Result := ARecycleBin.GetUIObjectOf(0, 1, AItem, IContextMenu, nil, AContextMenu);
+    if Succeeded(Result) then
+    begin
+      ZeroMemory(@ACommandInfo, SizeOf(ACommandInfo));
+      ACommandInfo.cbSize := SizeOf(ACommandInfo);
+      ACommandInfo.lpVerb := 'undelete';
+      ACommandInfo.nShow := SW_SHOWNORMAL;
+      Result := AContextMenu.InvokeCommand(ACommandInfo);
+    end;
+  end;
+
+var
+  ADesktop: IShellFolder;
+  AFetched: Cardinal;
+  AItem: PItemIDList;
+  AItems: IEnumIDList;
+begin
+  if Succeeded(SHGetSpecialFolderLocation(0, CSIDL_BITBUCKET, ARecycleBinPIDL)) then
+  try
+    if Failed(SHGetDesktopFolder(ADesktop)) then
+      Exit(E_NOINTERFACE);
+    if Failed(ADesktop.BindToObject(ARecycleBinPIDL, nil, IShellFolder2, ARecycleBin)) then
+      Exit(E_NOINTERFACE);
+    if Succeeded(ARecycleBin.EnumObjects(0, SHCONTF_FOLDERS or SHCONTF_NONFOLDERS or SHCONTF_INCLUDEHIDDEN, AItems)) then
+    begin
+      AFetched := 0;
+      while Succeeded(AItems.Next(1, AItem, AFetched)) and (AFetched = 1) do
+      begin
+        if acSameText(AFileOrFolder, GetOriginalFileName(AItem)) then
+          Exit(Undelete(AItem));
+      end;
+    end;
+  finally
+    TPIDLHelper.DisposePIDL(ARecycleBinPIDL);
+  end;
+  Result := E_INVALIDARG;
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -751,6 +820,11 @@ begin
   FPIDL := TPIDLHelper.CopyPIDL(ID);
   FFullPIDL := TPIDLHelper.CopyPIDL(ID);
   OleCheck(Root.ShellFolder.BindToObject(FPIDL, nil, IID_IShellFolder, FShellFolder));
+end;
+
+class destructor TACLShellFolder.Destroy;
+begin
+  FreeAndNil(FDesktopFolder);
 end;
 
 destructor TACLShellFolder.Destroy;
@@ -1223,8 +1297,4 @@ begin
   end;
 end;
 
-initialization
-
-finalization
-  FreeAndNil(FDesktopFolder);
 end.
