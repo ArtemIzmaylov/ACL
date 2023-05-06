@@ -4,7 +4,7 @@
 {*             Buttons Controls              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -54,7 +54,7 @@ const
 
 const
   BooleanToCheckBoxState: array[TACLBoolean] of TCheckBoxState = (cbGrayed, cbUnchecked, cbChecked);
-  CheckBoxStateToBoolean: array[TCheckBoxState] of TACLBoolean = (TACLBoolean.False, TACLBoolean.True, TACLBoolean.Default);
+  CheckBoxStateToBoolean: array[TCheckBoxState] of TACLBoolean = (acFalse, acTrue, acDefault);
 
 type
   TACLCustomButtonViewInfo = class;
@@ -359,11 +359,12 @@ type
     procedure SetGlyph(const Value: TACLGlyph);
     procedure SetImageIndex(AIndex: TImageIndex);
     procedure SetImages(const AList: TCustomImageList);
+    // Messages
+    procedure CMFocusChanged(var Message: TCMFocusChanged); message CM_FOCUSCHANGED;
   protected
     function CreateStyle: TACLStyleButton; override;
     function CreateViewInfo: TACLCustomButtonViewInfo; override;
     function GetCursor(const P: TPoint): TCursor; override;
-    procedure FocusChanged; override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     procedure PerformClick; virtual;
     procedure SetTargetDPI(AValue: Integer); override;
@@ -623,28 +624,6 @@ uses
   ACL.UI.PopupMenu,
   ACL.Utils.DPIAware,
   ACL.Utils.Strings;
-
-type
-
-  { TACLDefaultButtonsController }
-
-  TACLDefaultButtonsController = class(TACLList<TACLSimpleButton>)
-  strict private
-    FFocusedButton: TACLSimpleButton;
-
-    procedure SetFocusedButton(AValue: TACLSimpleButton);
-  protected
-    procedure Notify(const Item: TACLSimpleButton; Action: TCollectionNotification); override;
-    procedure UpdateState;
-  public
-    procedure Register(AButton: TACLSimpleButton);
-    procedure Unregister(AButton: TACLSimpleButton);
-
-    property FocusedButton: TACLSimpleButton read FFocusedButton write SetFocusedButton;
-  end;
-
-var
-  FDefaultButtonsController: TACLDefaultButtonsController;
 
 { TACLStyleButton }
 
@@ -1351,7 +1330,6 @@ end;
 procedure TACLSimpleButton.BeforeDestruction;
 begin
   inherited BeforeDestruction;
-  FDefaultButtonsController.Unregister(Self);
   Images := nil;
 end;
 
@@ -1375,6 +1353,15 @@ begin
   end;
 end;
 
+procedure TACLSimpleButton.CMFocusChanged(var Message: TCMFocusChanged);
+begin
+  if Message.Sender is TACLCustomButton then
+    ViewInfo.IsDefault := Default and (Message.Sender = Self)
+  else
+    ViewInfo.IsDefault := Default;
+  inherited;
+end;
+
 function TACLSimpleButton.CreateStyle: TACLStyleButton;
 begin
   Result := TACLStyleButton.Create(Self);
@@ -1390,16 +1377,6 @@ begin
   Result := inherited GetCursor(P);
   if Result = crDefault then
     Result := crHandPoint;
-end;
-
-procedure TACLSimpleButton.FocusChanged;
-begin
-  inherited FocusChanged;
-
-  if Focused then
-    FDefaultButtonsController.FocusedButton := Self
-  else
-    FDefaultButtonsController.FocusedButton := nil;
 end;
 
 procedure TACLSimpleButton.Notification(AComponent: TComponent; Operation: TOperation);
@@ -1449,14 +1426,18 @@ begin
 end;
 
 procedure TACLSimpleButton.SetDefault(AValue: Boolean);
+var
+  AForm: TCustomForm;
 begin
   if FDefault <> AValue then
   begin
     FDefault := AValue;
-    if FDefault then
-      FDefaultButtonsController.Register(Self)
-    else
-      FDefaultButtonsController.Unregister(Self);
+    if HandleAllocated then
+    begin
+      AForm := GetParentForm(Self);
+      if AForm <> nil then
+        AForm.Perform(CM_FOCUSCHANGED, 0, LPARAM(AForm.ActiveControl));
+    end;
   end;
 end;
 
@@ -1633,56 +1614,6 @@ procedure TACLButton.CMEnabledChanged(var Message: TMessage);
 begin
   inherited;
   DropDownViewInfo.IsEnabled := Enabled;
-end;
-
-{ TACLDefaultButtonsController }
-
-procedure TACLDefaultButtonsController.Register(AButton: TACLSimpleButton);
-begin
-  if Self <> nil then
-  begin
-    FNotifications := True;
-    Add(AButton);
-  end;
-end;
-
-procedure TACLDefaultButtonsController.Unregister(AButton: TACLSimpleButton);
-begin
-  if Self <> nil then
-    Remove(AButton);
-end;
-
-procedure TACLDefaultButtonsController.UpdateState;
-var
-  I: Integer;
-begin
-  if FocusedButton = nil then
-  begin
-    for I := 0 to Count - 1 do
-      List[I].ViewInfo.IsDefault := True;
-  end
-  else
-    for I := 0 to Count - 1 do
-    begin
-      if List[I].Owner = FocusedButton.Owner then
-        List[I].ViewInfo.IsDefault := False;
-    end;
-end;
-
-procedure TACLDefaultButtonsController.Notify(const Item: TACLSimpleButton; Action: TCollectionNotification);
-begin
-  inherited Notify(Item, Action);
-  UpdateState;
-end;
-
-procedure TACLDefaultButtonsController.SetFocusedButton(AValue: TACLSimpleButton);
-begin
-  if Self <> nil then
-    if FFocusedButton <> AValue then
-    begin
-      FFocusedButton := AValue;
-      UpdateState;
-    end;
 end;
 
 { TACLStyleCheckBox }
@@ -2233,12 +2164,11 @@ end;
 procedure TACLRadioBox.SetState(AValue: TCheckBoxState);
 var
   AControl: TControl;
-  I: Integer;
 begin
   if (State <> AValue) and (AValue = cbChecked) then
   begin
     if Parent <> nil then
-      for I := 0 to Parent.ControlCount - 1 do
+      for var I := 0 to Parent.ControlCount - 1 do
       begin
         AControl := Parent.Controls[I];
         if (AControl is TACLRadioBox) and (AControl <> Self) then
@@ -2252,9 +2182,4 @@ begin
   end;
 end;
 
-initialization
-  FDefaultButtonsController := TACLDefaultButtonsController.Create;
-
-finalization
-  FreeAndNil(FDefaultButtonsController);
 end.
