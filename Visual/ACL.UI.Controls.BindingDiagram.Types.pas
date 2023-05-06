@@ -4,7 +4,7 @@
 {*          Binding Diagram Control          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -163,10 +163,11 @@ type
     constructor Create(AChangeEvent: TACLPersistentChangeEvent);
     destructor Destroy; override;
     function AddObject(const ACaption: string): TACLBindingDiagramObject;
-    function AddLink(const ASource, ATarget: TACLBindingDiagramObjectPin; AArrows: TACLBindingDiagramLinkArrows = []): TACLBindingDiagramLink;
+    function AddLink(ASource, ATarget: TACLBindingDiagramObjectPin;
+      AArrows: TACLBindingDiagramLinkArrows = []): TACLBindingDiagramLink;
     procedure Clear;
     procedure ClearLinks;
-    function ContainsLink(const ASource, ATarget: TACLBindingDiagramObjectPin): Boolean;
+    function ContainsLink(ASource, ATarget: TACLBindingDiagramObjectPin): Boolean;
     //
     property ObjectCount: Integer read GetObjectCount;
     property Objects[Index: Integer]: TACLBindingDiagramObject read GetObject;
@@ -425,7 +426,9 @@ begin
   end;
 end;
 
-function TACLBindingDiagramData.AddLink(const ASource, ATarget: TACLBindingDiagramObjectPin; AArrows: TACLBindingDiagramLinkArrows = []): TACLBindingDiagramLink;
+function TACLBindingDiagramData.AddLink(
+  ASource, ATarget: TACLBindingDiagramObjectPin;
+  AArrows: TACLBindingDiagramLinkArrows = []): TACLBindingDiagramLink;
 begin
   if not (opmOutput in ASource.Mode) then
     raise EInvalidInsert.Create('Source pin must support for "output" mode');
@@ -467,11 +470,9 @@ begin
   end;
 end;
 
-function TACLBindingDiagramData.ContainsLink(const ASource, ATarget: TACLBindingDiagramObjectPin): Boolean;
-var
-  I: Integer;
+function TACLBindingDiagramData.ContainsLink(ASource, ATarget: TACLBindingDiagramObjectPin): Boolean;
 begin
-  for I := 0 to LinkCount - 1 do
+  for var I := 0 to LinkCount - 1 do
   begin
     if (Links[I].Source = ASource) and (Links[I].Target = ATarget) then
       Exit(True);
