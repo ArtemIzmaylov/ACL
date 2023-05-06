@@ -742,6 +742,7 @@ type
     IACLTreeListOptionsListener)
   strict private
     FColumns: TACLTreeListColumns;
+    FColumnsCustomizationMenu: TACLPopupMenu;
     FEditingController: TACLTreeListEditingController;
     FFocusedColumn: TACLTreeListColumn;
     FFocusedObject: TObject;
@@ -830,13 +831,11 @@ type
     procedure SetViewportX(const Value: Integer);
     procedure SetViewportY(const Value: Integer);
   protected
-    FColumnsOrderCustomizationMenu: TACLPopupMenu;
     FNodeClass: TACLTreeListNodeClass;
     FStartObject: TObject;
     FTapLocation: TPoint;
     FWasSelected: Boolean;
 
-    function CreateColumnsOrderCustomizationMenu: TACLPopupMenu; virtual;
     function CreateDragAndDropController: TACLCompoundControlDragAndDropController; override;
     function CreateHintController: TACLCompoundControlHintController; override;
     function CreateHitTest: TACLHitTestInfo; override;
@@ -892,10 +891,10 @@ type
     procedure DoEditInitialize(const AParams: TACLInplaceInfo; AEdit: TComponent); virtual;
     procedure DoEditKeyDown(var AKey: Word; AShiftState: TShiftState); virtual;
 
-    // ColumnOrderCustomizationMenu
-    procedure ColumnOrderCustomizationMenuClickHandler(Sender: TObject); virtual;
-    procedure ColumnOrderCustomizationMenuRebuild; virtual;
-    procedure ColumnOrderCustomizationMenuShow(const P: TPoint); virtual;
+    // ColumnCustomizationMenu
+    procedure ColumnCustomizationMenuShow(const P: TPoint); virtual;
+    procedure ColumnSetVisibilityHandler(Sender: TObject);
+    function GetColumnCustomizationMenu: TACLPopupMenu; virtual;
 
     // Changes
     procedure ProcessChanges(AChanges: TIntegerSet = []); override;
@@ -3542,7 +3541,7 @@ begin
   FreeAndNil(FOptionsCustomizing);
   FreeAndNil(FOptionsSelection);
   FreeAndNil(FEditingController);
-  FreeAndNil(FColumnsOrderCustomizationMenu);
+  FreeAndNil(FColumnsCustomizationMenu);
   FreeAndNil(FIncSearch);
   FreeAndNil(FSelection);
   inherited Destroy;
@@ -4078,11 +4077,6 @@ begin
   ACanvas.Brush.Style := bsClear;
 end;
 
-function TACLTreeListSubClass.CreateColumnsOrderCustomizationMenu: TACLPopupMenu;
-begin
-  Result := TACLTreeListColumnCustomizationPopup.Create(Self);
-end;
-
 function TACLTreeListSubClass.CreateDragAndDropController: TACLCompoundControlDragAndDropController;
 begin
   Result := TACLTreeListDragAndDropController.Create(Self);
@@ -4462,7 +4456,7 @@ begin
     FocusedColumn := nil;
 end;
 
-procedure TACLTreeListSubClass.ColumnOrderCustomizationMenuClickHandler(Sender: TObject);
+procedure TACLTreeListSubClass.ColumnSetVisibilityHandler(Sender: TObject);
 var
   AIndex: Integer;
 begin
@@ -4471,30 +4465,29 @@ begin
     Columns[AIndex].Visible := (Sender as TMenuItem).Checked;
 end;
 
-procedure TACLTreeListSubClass.ColumnOrderCustomizationMenuRebuild;
-var
-  AColumn: TACLTreeListColumn;
-  I: Integer;
-  M: TMenuItem;
+procedure TACLTreeListSubClass.ColumnCustomizationMenuShow(const P: TPoint);
 begin
-  if FColumnsOrderCustomizationMenu = nil then
-    FColumnsOrderCustomizationMenu := CreateColumnsOrderCustomizationMenu;
-  FColumnsOrderCustomizationMenu.Items.Clear;
-  FColumnsOrderCustomizationMenu.Style.Assign(StyleMenu);
-  FColumnsOrderCustomizationMenu.Style.Collection := StyleMenu.Collection;
-  for I := 0 to Columns.Count - 1 do
-  begin
-    AColumn := Columns.ItemsByDrawingIndex[I];
-    M := FColumnsOrderCustomizationMenu.Items.AddItem(AColumn.Caption, AColumn.Index, ColumnOrderCustomizationMenuClickHandler);
-    M.Checked := AColumn.Visible;
-    M.AutoCheck := True;
-  end;
+  GetColumnCustomizationMenu.Popup(ClientToScreen(P));
 end;
 
-procedure TACLTreeListSubClass.ColumnOrderCustomizationMenuShow(const P: TPoint);
+function TACLTreeListSubClass.GetColumnCustomizationMenu: TACLPopupMenu;
+var
+  AColumn: TACLTreeListColumn;
+  AMenuItem: TMenuItem;
 begin
-  ColumnOrderCustomizationMenuRebuild;
-  FColumnsOrderCustomizationMenu.Popup(ClientToScreen(P));
+  if FColumnsCustomizationMenu = nil then
+    FColumnsCustomizationMenu := TACLTreeListColumnCustomizationPopup.Create(Self);
+  Result := FColumnsCustomizationMenu;
+  Result.Style.Assign(StyleMenu);
+  Result.Style.Collection := StyleMenu.Collection;
+  Result.Items.Clear;
+  for var I := 0 to Columns.Count - 1 do
+  begin
+    AColumn := Columns.ItemsByDrawingIndex[I];
+    AMenuItem := Result.Items.AddItem(AColumn.Caption, AColumn.Index, ColumnSetVisibilityHandler);
+    AMenuItem.Checked := AColumn.Visible;
+    AMenuItem.AutoCheck := True;
+  end;
 end;
 
 procedure TACLTreeListSubClass.ProcessChanges(AChanges: TIntegerSet);
@@ -4928,7 +4921,7 @@ begin
   inherited ProcessContextPopup(AHandled);
   if not AHandled and (OptionsCustomizing.ColumnVisibility and (HitTest.HitAtColumn or HitTest.HitAtColumnBar)) then
   begin
-    ColumnOrderCustomizationMenuShow(HitTest.HitPoint);
+    ColumnCustomizationMenuShow(HitTest.HitPoint);
     AHandled := True;
   end;
 end;
