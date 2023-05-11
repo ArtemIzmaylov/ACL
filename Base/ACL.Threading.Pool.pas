@@ -63,14 +63,14 @@ type
   protected
     procedure Complete; virtual;
     procedure Execute; virtual; abstract;
-    function GetCanceled: Boolean;
     function GetCaption: string; virtual;
     function GetPriority: TACLTaskPriority; virtual;
   public
     procedure Cancel;
+    function IsCanceled: Boolean;
     //
-    property Canceled: Boolean read GetCanceled;
     property Caption: string read GetCaption;
+    property Canceled: Boolean read IsCanceled; // deprecated 'Use IsCanceled';
     property Handle: THandle read GetHandle;
   end;
 
@@ -145,7 +145,7 @@ type
 
     function Cancel(ATaskHandle: THandle; AWaitFor: Boolean = False): Boolean; overload;
     function Cancel(ATaskHandle: THandle; AWaitTimeOut: Cardinal): TWaitResult; overload;
-    function IsCurrentTaskCanceled: Boolean;
+    function CurrentTask: TACLTask;
     function ToString: string; override;
 
     function WaitFor(ATaskHandle: THandle): Boolean; overload;
@@ -222,11 +222,6 @@ begin
   Result := atpNormal;
 end;
 
-function TACLTask.GetCanceled: Boolean;
-begin
-  Result := FCanceled <> 0;
-end;
-
 function TACLTask.GetCaption: string;
 begin
   Result := '';
@@ -235,6 +230,11 @@ end;
 function TACLTask.GetHandle: THandle;
 begin
   Result := THandle(Self);
+end;
+
+function TACLTask.IsCanceled: Boolean;
+begin
+  Result := FCanceled <> 0;
 end;
 
 { TACLTaskQueue }
@@ -344,7 +344,7 @@ end;
 procedure TACLSimpleTask.Execute;
 begin
   if Assigned(FProc) then
-    FProc(GetCanceled);
+    FProc(IsCanceled);
   if Assigned(FProc2) then
     FProc2();
 end;
@@ -489,20 +489,21 @@ begin
     CheckSynchronize;
 end;
 
-function TACLTaskDispatcher.IsCurrentTaskCanceled: Boolean;
+function TACLTaskDispatcher.CurrentTask: TACLTask;
 var
   AThreadId: Cardinal;
   AIndex: Integer;
 begin
   FLock.Enter;
   try
-    Result := False;
     AThreadId := GetCurrentThreadId;
     for AIndex := 0 to FActiveTasks.Count - 1 do
     begin
-      if FActiveTasks.List[AIndex].FThreadID = AThreadId then
-        Exit(FActiveTasks.List[AIndex].Canceled);
+      Result := FActiveTasks.List[AIndex];
+      if Result.FThreadID = AThreadId then
+        Exit;
     end;
+    Result := nil;
   finally
     FLock.Leave;
   end;

@@ -516,13 +516,15 @@ type
     function GetItem(Index: Integer): TACLTreeListNode;
     procedure SetCheckState(AValue: TCheckBoxState);
   public
-    procedure GetCheckUncheckInfo(out ACheckedCount, AUncheckedCount: Integer); overload;
-    procedure GetCheckUncheckInfo(out AHasChecked, AHasUnchecked: Boolean); overload;
     function First: TACLTreeListNode;
     function Last: TACLTreeListNode;
+
+    procedure GetCheckUncheckInfo(out ACheckedCount, AUncheckedCount: Integer); overload;
+    procedure GetCheckUncheckInfo(out AHasChecked, AHasUnchecked: Boolean); overload;
+    procedure InitSortData; inline;
     function IsChild(ANode: TACLTreeListNode): Boolean;
     function IsValid(AIndex: Integer): Boolean; inline;
-    //
+
     property CheckState: TCheckBoxState read GetCheckState write SetCheckState;
     property Items[Index: Integer]: TACLTreeListNode read GetItem; default;
   end;
@@ -1288,10 +1290,8 @@ begin
 end;
 
 procedure TACLTreeListGroups.ClearLinks;
-var
-  I: Integer;
 begin
-  for I := Count - 1 downto 0 do
+  for var I := Count - 1 downto 0 do
     List[I].Links.Count := 0;
 end;
 
@@ -1329,12 +1329,10 @@ begin
 end;
 
 procedure TACLTreeListGroups.SetExpanded(AValue: Boolean);
-var
-  I: Integer;
 begin
   TreeList.BeginUpdate;
   try
-    for I := Count - 1 downto 0 do
+    for var I := Count - 1 downto 0 do
       List[I].Expanded := AValue;
   finally
     TreeList.EndUpdate;
@@ -1349,24 +1347,33 @@ end;
 procedure TACLTreeListGroups.SortByNodeIndex;
 var
   AGroup: TACLTreeListGroup;
-  I: Integer;
+  ASubNodes: TACLTreeListNodeList;
 begin
-  for I := 0 to Count - 1 do
+  ASubNodes := TreeList.RootNode.FSubNodes;
+  if ASubNodes = nil then Exit;
+  ASubNodes.InitSortData;
+  for var I := 0 to Count - 1 do
   begin
     AGroup := List[I];
     if AGroup.Links.Count > 0 then
-      AGroup.FSortData := AGroup.Links.First.Index
+      AGroup.FSortData := TACLTreeListNode(AGroup.Links.List[0]).FSortData
     else
       AGroup.FSortData := MaxInt;
   end;
+//  for var I := 0 to Count - 1 do
+//  begin
+//    AGroup := List[I];
+//    if AGroup.Links.Count > 0 then
+//      AGroup.FSortData := AGroup.Links.First.Index
+//    else
+//      AGroup.FSortData := MaxInt;
+//  end;
   Sort(TACLTreeListGroupSortDataComparer.Create);
 end;
 
 procedure TACLTreeListGroups.Validate;
-var
-  I: Integer;
 begin
-  for I := Count - 1 downto 0 do
+  for var I := Count - 1 downto 0 do
   begin
     if List[I].Links.Count = 0 then
       Delete(I)
@@ -1382,8 +1389,7 @@ procedure TACLTreeListGroups.Notify;
 begin
   if (FIndex <> nil) and (FIndexLockCount = 0) then
     case Action of
-      cnRemoved,
-      cnExtracted:
+      cnRemoved, cnExtracted:
         FIndex.Remove(Item.Caption);
       cnAdded:
         FIndex.Add(Item.Caption, Item);
@@ -2098,11 +2104,15 @@ begin
   Result := TACLTreeListNode(inherited Last);
 end;
 
-function TACLTreeListNodeList.IsChild(ANode: TACLTreeListNode): Boolean;
-var
-  I: Integer;
+procedure TACLTreeListNodeList.InitSortData;
 begin
-  for I := 0 to Count - 1 do
+  for var I := 0 to Count - 1 do
+    TACLTreeListNode(List[I]).FSortData := I;
+end;
+
+function TACLTreeListNodeList.IsChild(ANode: TACLTreeListNode): Boolean;
+begin
+  for var I := 0 to Count - 1 do
   begin
     if TACLTreeListNode(List[I]).IsChild(ANode) then
       Exit(True);

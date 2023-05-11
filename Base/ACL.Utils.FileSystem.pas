@@ -421,10 +421,24 @@ begin
 end;
 
 function acCompareFileNames(const AFileName1, AFileName2: UnicodeString): Integer;
+var
+  ADelim1: Integer;
+  ADelim2: Integer;
 begin
-  Result := acLogicalCompare(acExtractFilePath(AFileName1), acExtractFilePath(AFileName2));
+  ADelim1 := acLastDelimiter(sFilePathDelims, AFileName1);
+  ADelim2 := acLastDelimiter(sFilePathDelims, AFileName2);
+  Result := acLogicalCompare(PWideChar(AFileName1), PWideChar(AFileName2), ADelim1, ADelim2);
   if Result = 0 then
-    Result := acLogicalCompare(acExtractFileName(AFileName1), acExtractFileName(AFileName2));
+  begin
+    Result := acLogicalCompare(
+      PWideChar(AFileName1) + ADelim1,
+      PWideChar(AFileName2) + ADelim2,
+      Length(AFileName1) - ADelim1,
+      Length(AFileName2) - ADelim2);
+  end;
+//  Result := acLogicalCompare(acExtractFilePath(AFileName1), acExtractFilePath(AFileName2));
+//  if Result = 0 then
+//    Result := acLogicalCompare(acExtractFileName(AFileName1), acExtractFileName(AFileName2));
 end;
 
 {$IFDEF MSWINDOWS}
@@ -433,7 +447,7 @@ var
   L: Integer;
   W: TFileLongPath;
 begin
-  if AFileName <> EmptyStr then
+  if AFileName <> '' then
     L := ExpandEnvironmentStringsW(PWideChar(AFileName), @W[0], Length(W))
   else
     L := 0;

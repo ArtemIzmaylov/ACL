@@ -4,7 +4,7 @@
 {*               Object Links                *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,6 +16,10 @@ unit ACL.ObjectLinks;
 interface
 
 uses
+{$IFDEF MSWINDOWS}
+  Winapi.Windows, // inlining
+{$ENDIF}
+  // System
   System.Classes,
   System.Generics.Collections,
   System.SysUtils,

@@ -4,7 +4,7 @@
 {*                Collections                *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -24,6 +24,7 @@ uses
   System.Contnrs,
   System.Generics.Collections,
   System.Generics.Defaults,
+  System.Math,
   System.SysUtils,
   System.Types,
   // ACL
@@ -138,10 +139,7 @@ type
     procedure Notify(Ptr: Pointer; Action: TListNotification); override;
   public
     function ChangePlace(AOldIndex, ANewIndex: Integer): Boolean;
-    function Contains(AItem: Pointer): Boolean; inline;
-    procedure EnsureCapacity(ACount: Integer);
     procedure Exchange(Index1, Index2: Integer);
-    function IsValid(Index: Integer): Boolean;
     //
     property OnChanged: TNotifyEvent read FOnChanged write FOnChanged;
   end;
@@ -150,7 +148,10 @@ type
 
   TACLListHelper = class helper for TList
   public
+    function Contains(AItem: Pointer): Boolean; inline;
+    procedure EnsureCapacity(ACount: Integer); inline;
     procedure Invert;
+    function IsValid(Index: Integer): Boolean; inline;
     procedure Randomize;
   end;
 
@@ -194,7 +195,7 @@ type
     procedure DeleteRangeCore(AIndex, ACount: Integer; AAction: TCollectionNotification);
 
     procedure Notify(const Item: T; Action: TCollectionNotification); virtual;
-    procedure UpdateNotificationFlag; virtual;
+    procedure UpdateNotifications; virtual;
   public
     constructor Create; overload;
     constructor Create(const AComparer: IComparer<T>); overload;
@@ -332,7 +333,7 @@ type
     procedure SetOwnObjects(const Value: Boolean);
   protected
     procedure Notify(const Item: T; Action: TCollectionNotification); override;
-    procedure UpdateNotificationFlag; override;
+    procedure UpdateNotifications; override;
   public
     constructor Create(AOwnsObjects: Boolean = True); overload;
     constructor Create(const AComparer: IComparer<T>; AOwnsObjects: Boolean = True); overload;
@@ -775,7 +776,6 @@ type
 implementation
 
 uses
-  System.Math,
   System.RTLConsts,
   System.SysConst,
   System.TypInfo,
@@ -1011,25 +1011,10 @@ begin
   end;
 end;
 
-function TACLList.Contains(AItem: Pointer): Boolean;
-begin
-  Result := IndexOf(AItem) >= 0;
-end;
-
-procedure TACLList.EnsureCapacity(ACount: Integer);
-begin
-  Capacity := Max(Capacity, Count + ACount);
-end;
-
 procedure TACLList.Exchange(Index1, Index2: Integer);
 begin
   inherited Exchange(Index1, Index2);
   if Assigned(OnChanged) then OnChanged(Self);
-end;
-
-function TACLList.IsValid(Index: Integer): Boolean;
-begin
-  Result := (Index >= 0) and (Index < Count);
 end;
 
 procedure TACLList.Notify(Ptr: Pointer; Action: TListNotification);
@@ -1352,7 +1337,7 @@ begin
   end;
 end;
 
-procedure TACLList<T>.UpdateNotificationFlag;
+procedure TACLList<T>.UpdateNotifications;
 begin
   FNotifications := Assigned(OnNotify);
 end;
@@ -1424,7 +1409,7 @@ end;
 procedure TACLList<T>.SetOnNotify(const Value: TCollectionNotifyEvent<T>);
 begin
   FOnNotify := Value;
-  UpdateNotificationFlag;
+  UpdateNotifications;
 end;
 
 procedure TACLList<T>.Grow(ACount: Integer);
@@ -1484,6 +1469,21 @@ begin
 end;
 
 { TACLListHelper }
+
+function TACLListHelper.Contains(AItem: Pointer): Boolean;
+begin
+  Result := IndexOf(AItem) >= 0;
+end;
+
+procedure TACLListHelper.EnsureCapacity(ACount: Integer);
+begin
+  Capacity := Max(Capacity, Count + ACount);
+end;
+
+function TACLListHelper.IsValid(Index: Integer): Boolean;
+begin
+  Result := (Index >= 0) and (Index < Count);
+end;
 
 procedure TACLListHelper.Invert;
 var
@@ -2389,7 +2389,7 @@ begin
     Item.Free;
 end;
 
-procedure TACLObjectList<T>.UpdateNotificationFlag;
+procedure TACLObjectList<T>.UpdateNotifications;
 begin
   FNotifications := Assigned(OnNotify) or OwnsObjects;
 end;
@@ -2397,7 +2397,7 @@ end;
 procedure TACLObjectList<T>.SetOwnObjects(const Value: Boolean);
 begin
   FOwnsObjects := Value;
-  UpdateNotificationFlag;
+  UpdateNotifications;
 end;
 
 { TACLClassMap<T> }

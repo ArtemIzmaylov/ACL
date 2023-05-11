@@ -3445,14 +3445,12 @@ begin
 end;
 
 function TACLTreeListSorter.Compare(const ALeft, ARight: TACLTreeListNode): Integer;
-var
-  I: Integer;
 begin
   Result := 0;
   if IsCustomSorting then
     SubClass.OnCompare(SubClass, ALeft, ARight, Result)
   else
-    for I := 0 to SortBy.Count - 1 do
+    for var I := 0 to SortBy.Count - 1 do
     begin
       Result := CompareByColumn(ALeft, ARight, SortBy[I]);
       if Result <> 0 then
@@ -3474,13 +3472,10 @@ begin
 end;
 
 procedure TACLTreeListSorter.SortNodes(ANodeList: TACLTreeListNodeList);
-var
-  I: Integer;
 begin
   if (ANodeList <> nil) and AreSortingParametersDefined then
   begin
-    for I := 0 to ANodeList.Count - 1 do
-      TACLTreeListNodeAccess(ANodeList.List[I]).FSortData := I;
+    ANodeList.InitSortData;
 
     TACLMultithreadedListSorter.Sort(ANodeList,
       function (const Item1, Item2: Pointer): Integer
@@ -3489,7 +3484,7 @@ begin
       end,
       SubClass.OptionsBehavior.SortingUseMultithreading);
 
-    for I := 0 to ANodeList.Count - 1 do
+    for var I := 0 to ANodeList.Count - 1 do
       SortNodes(TACLTreeListNodeAccess(ANodeList.List[I]).FSubNodes);
   end;
 end;

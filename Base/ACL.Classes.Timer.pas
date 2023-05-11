@@ -350,8 +350,7 @@ end;
 
 procedure TACLTimerManager.HandleMessage(var AMessage: TMessage);
 var
-  AList: TACLList;
-  I: Integer;
+  AList: TList;
 begin
   case AMessage.Msg of
     WM_TIMER:
@@ -362,8 +361,8 @@ begin
 
     WM_USER:
       begin
-        AList := TACLList(AMessage.LParam);
-        for I := 0 to AList.Count - 1 do
+        AList := TList(AMessage.LParam);
+        for var I := 0 to AList.Count - 1 do
           SafeCallTimerProc(AList.List[I]);
         Exit;
       end;
@@ -442,14 +441,14 @@ var
   AList: TACLList<TACLTimer>;
   ANextTick: Int64;
   ASleepTime: Integer;
-  ATicked: TACLList;
+  ATicked: TList;
   ATicks: Int64;
   ATimer: TACLTimer;
   I: Integer;
 begin
   NameThreadForDebugging('HighResolutionTimer');
 
-  ATicked := TACLList.Create;
+  ATicked := TList.Create;
   try
     while not Terminated do
     begin

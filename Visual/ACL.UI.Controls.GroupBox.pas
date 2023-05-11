@@ -151,7 +151,7 @@ type
   TACLGroupBox = class(TACLCustomGroupBox)
   strict private
     FCheckBox: TACLGroupBoxCheckBox;
-    FDisabledChildren: TACLList;
+    FDisabledChildren: TList;
     FMinimized: Boolean;
     FRestoredHeight: Integer;
 
@@ -636,7 +636,7 @@ var
 begin
   if FDisabledChildren = nil then
   begin
-    FDisabledChildren := TACLList.Create;
+    FDisabledChildren := TList.Create;
     for var I := 0 to ControlCount - 1 do
     begin
       AControl := Controls[I];
