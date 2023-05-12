@@ -553,6 +553,7 @@ type
     procedure WMMove(var Message: TWMMove); message WM_MOVE;
     procedure WMNCHitTest(var Message: TWMNCHitTest); message WM_NCHITTEST;
     //
+    property AllowGrayed: Boolean read FAllowGrayed write FAllowGrayed default False;
     property Checked: Boolean read GetChecked write SetChecked;
     property State: TCheckBoxState read GetState write SetState default cbUnchecked;
     property SubControl: TACLCheckBoxSubControlOptions read FSubControl write SetSubControl;
@@ -563,10 +564,9 @@ type
     procedure Click; override;
     procedure ChangeState(AChecked: Boolean); overload;
     procedure ChangeState(AState: TCheckBoxState); overload;
-    procedure ToggleState;
+    procedure ToggleState; virtual;
   published
     property Alignment default taLeftJustify;
-    property AllowGrayed: Boolean read FAllowGrayed write FAllowGrayed default False;
     property AutoSize default True;
     property ShowCheckMark: Boolean read GetShowCheckMark write SetShowCheckMark default True;
     property ShowLine: Boolean read GetShowLine write SetShowLine default False;
@@ -578,6 +578,7 @@ type
 
   TACLCheckBox = class(TACLCustomCheckBox)
   published
+    property AllowGrayed;
     property Checked stored False;
     property SubControl;
     property State;
@@ -598,6 +599,7 @@ type
     procedure CMHitTest(var Message: TWMNCHitTest); override;
   public
     constructor CreateInplace(const AParams: TACLInplaceInfo);
+    property AllowGrayed;
   end;
 
   { TACLRadioBox }
@@ -605,11 +607,12 @@ type
   TACLRadioBox = class(TACLCustomCheckBox)
   strict private
     FGroupIndex: Integer;
-
     procedure SetGroupIndex(const Value: Integer);
   protected
     function CreateStyle: TACLStyleButton; override;
     procedure SetState(AValue: TCheckBoxState); override;
+  public
+    procedure ToggleState; override;
   published
     property Checked;
     property GroupIndex: Integer read FGroupIndex write SetGroupIndex default 0;
@@ -2152,6 +2155,11 @@ begin
   Result := TACLStyleRadioBox.Create(Self);
 end;
 
+procedure TACLRadioBox.ToggleState;
+begin
+  Checked := True;
+end;
+
 procedure TACLRadioBox.SetGroupIndex(const Value: Integer);
 begin
   if FGroupIndex <> Value then
@@ -2165,19 +2173,21 @@ procedure TACLRadioBox.SetState(AValue: TCheckBoxState);
 var
   AControl: TControl;
 begin
-  if (State <> AValue) and (AValue = cbChecked) then
+  if State <> AValue then
   begin
-    if Parent <> nil then
-      for var I := 0 to Parent.ControlCount - 1 do
-      begin
-        AControl := Parent.Controls[I];
-        if (AControl is TACLRadioBox) and (AControl <> Self) then
+    if AValue = cbChecked then
+    begin
+      if Parent <> nil then
+        for var I := 0 to Parent.ControlCount - 1 do
         begin
-          if TACLRadioBox(AControl).GroupIndex = GroupIndex then
-            TACLRadioBox(AControl).ViewInfo.CheckState := cbUnchecked;
+          AControl := Parent.Controls[I];
+          if (AControl is TACLRadioBox) and (AControl <> Self) then
+          begin
+            if TACLRadioBox(AControl).GroupIndex = GroupIndex then
+              TACLRadioBox(AControl).ViewInfo.CheckState := cbUnchecked;
+          end;
         end;
-      end;
-
+    end;
     inherited;
   end;
 end;
