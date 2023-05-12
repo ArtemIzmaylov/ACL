@@ -216,7 +216,7 @@ type
     FButtonOK: TACLButton;
     FHasChanges: Boolean;
     FPrevClientRect: TRect;
-  protected
+  strict protected
     procedure AfterFormCreate; override;
     procedure CreateControls; virtual;
     procedure SetHasChanges(AValue: Boolean);
@@ -243,39 +243,40 @@ type
   strict private
     FEditors: TACLObjectList<TWinControl>;
     FLabels: TACLObjectList<TACLLabel>;
-  protected
+  strict protected
     procedure CreateEditors(AValueCount: Integer); virtual;
     function GetEditClass: TControlClass; virtual; abstract;
-    procedure Initialize(AValueCount: Integer);
     procedure InitializeEdit(AEdit: TWinControl); virtual; abstract;
-    //
     procedure PlaceControl(var R: TRect; AControl: TControl; AIndent: Integer);
     procedure PlaceControls(var R: TRect); override;
     procedure PlaceEditors(var R: TRect); virtual;
     //
     property Editors: TACLObjectList<TWinControl> read FEditors;
     property Labels: TACLObjectList<TACLLabel> read FLabels;
+  protected
+    procedure Initialize(AValueCount: Integer);
   public
     destructor Destroy; override;
   end;
 
   { TACLInputQueryDialog }
 
-  TACLInputQueryValidateEvent = reference to procedure (Sender: TObject; const AValueIndex: Integer; const AValue: UnicodeString; var AIsValid: Boolean);
+  TACLInputQueryValidateEvent = reference to procedure (Sender: TObject;
+    const AValueIndex: Integer; const AValue: UnicodeString; var AIsValid: Boolean);
 
   TACLInputQueryDialog = class(TACLCustomInputQueryDialog)
   strict private
     FOnValidate: TACLInputQueryValidateEvent;
-
-    procedure EditChangeHandler(Sender: TObject);
-  protected
+  strict protected
     function CanApply: Boolean; override;
+    procedure DoModified(Sender: TObject = nil); override;
     function GetEditClass: TControlClass; override;
     function GetFieldValue(AIndex: Integer): Variant;
     procedure InitializeEdit(AEdit: TWinControl); override;
-    procedure SetupField(AIndex: Integer; const AFieldName: UnicodeString; const AValue: Variant); overload;
-    procedure SetupField(AIndex: Integer; const AFieldName: UnicodeString; const AValue: Variant; ASelStart, ASelLength: Integer); overload;
-    //
+  protected
+    procedure InitializeField(AIndex: Integer; const AFieldName: UnicodeString;
+      const AValue: Variant; ASelStart: Integer = 0; ASelLength: Integer = MaxInt);
+
     property OnValidate: TACLInputQueryValidateEvent read FOnValidate write FOnValidate;
   public
     class function Execute(const ACaption, APrompt: UnicodeString; var AStr: UnicodeString;
@@ -299,7 +300,7 @@ type
 
     procedure MemoKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure PrepareDialogSize;
-  protected
+  strict protected
     procedure CreateControls; override;
     procedure PlaceControls(var R: TRect); override;
 
@@ -318,7 +319,7 @@ type
   strict private
     function GetEditor: TACLComboBox;
     procedure SelectHandler(Sender: TObject);
-  protected
+  strict protected
     function CanApply: Boolean; override;
     function GetEditClass: TControlClass; override;
     procedure InitializeEdit(AEdit: TWinControl); override;
@@ -1277,7 +1278,7 @@ begin
     ADialog.Caption := ACaption;
     ADialog.OnValidate := AValidateEvent;
     ADialog.Initialize(1);
-    ADialog.SetupField(0, APrompt, AStr, ASelStart, ASelLength);
+    ADialog.InitializeField(0, APrompt, AStr, ASelStart, ASelLength);
     Result := ADialog.ShowModal = mrOk;
     if Result then
       AStr := ADialog.GetFieldValue(0);
@@ -1296,7 +1297,6 @@ class function TACLInputQueryDialog.Execute(const ACaption: UnicodeString; const
   var AValues: array of Variant; AOwner: TComponent; AValidateEvent: TACLInputQueryValidateEvent): Boolean;
 var
   ADialog: TACLInputQueryDialog;
-  I: Integer;
 begin
   if Length(AValues) <> Length(APrompts) then
     raise EInvalidArgument.Create(ClassName);
@@ -1306,13 +1306,13 @@ begin
     ADialog.Caption := ACaption;
     ADialog.OnValidate := AValidateEvent;
     ADialog.Initialize(Length(AValues));
-    for I := 0 to Length(AValues) - 1 do
-      ADialog.SetupField(I, APrompts[I], AValues[I]);
+    for var I := 0 to Length(AValues) - 1 do
+      ADialog.InitializeField(I, APrompts[I], AValues[I]);
 
     Result := ADialog.ShowModal = mrOk;
     if Result then
     begin
-      for I := 0 to Length(AValues) - 1 do
+      for var I := 0 to Length(AValues) - 1 do
         AValues[I] := ADialog.GetFieldValue(I);
     end;
   finally
@@ -1340,13 +1340,14 @@ begin
   Result := TACLEdit(Editors.List[AIndex]).Value;
 end;
 
-procedure TACLInputQueryDialog.SetupField(AIndex: Integer; const AFieldName: UnicodeString; const AValue: Variant);
+procedure TACLInputQueryDialog.InitializeEdit(AEdit: TWinControl);
 begin
-  SetupField(AIndex, AFieldName, AValue, 0, MaxInt);
+  TACLEdit(AEdit).OnChange := DoModified;
 end;
 
-procedure TACLInputQueryDialog.SetupField(AIndex: Integer;
-  const AFieldName: UnicodeString; const AValue: Variant; ASelStart, ASelLength: Integer);
+procedure TACLInputQueryDialog.InitializeField(
+  AIndex: Integer; const AFieldName: UnicodeString; const AValue: Variant;
+  ASelStart, ASelLength: Integer);
 var
   AEdit: TACLEdit;
 begin
@@ -1363,7 +1364,6 @@ begin
   AEdit.SelStart := ASelStart;
   AEdit.SelLength := ASelLength;
   Labels.List[AIndex].Caption := AFieldName;
-  EditChangeHandler(AEdit);
 end;
 
 function TACLInputQueryDialog.GetEditClass: TControlClass;
@@ -1371,18 +1371,12 @@ begin
   Result := TACLEdit;
 end;
 
-procedure TACLInputQueryDialog.InitializeEdit(AEdit: TWinControl);
-begin
-  TACLEdit(AEdit).OnChange := EditChangeHandler;
-end;
-
 function TACLInputQueryDialog.CanApply: Boolean;
 var
   AIsValid: Boolean;
-  I: Integer;
 begin
   AIsValid := True;
-  for I := 0 to Editors.Count - 1 do
+  for var I := 0 to Editors.Count - 1 do
   begin
     if Assigned(OnValidate) then
       OnValidate(Self, Editors[I].Tag, TACLEdit(Editors[I]).Text, AIsValid);
@@ -1392,8 +1386,9 @@ begin
   Result := AIsValid;
 end;
 
-procedure TACLInputQueryDialog.EditChangeHandler(Sender: TObject);
+procedure TACLInputQueryDialog.DoModified(Sender: TObject);
 begin
+  inherited;
   DoUpdateState;
 end;
 
