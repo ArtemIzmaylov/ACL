@@ -34,7 +34,8 @@ requires
   designide,
   vclx,
   vclsmp,
-  vclie;
+  vclie,
+  dclstd;
 
 contains
   ACL.Classes in 'Base\ACL.Classes.pas',

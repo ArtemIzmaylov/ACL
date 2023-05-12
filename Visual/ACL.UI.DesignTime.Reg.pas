@@ -28,6 +28,7 @@ uses
   DesignIntf,
   DesignEditors,
   VCLEditors,
+  FiltEdit,
   // ACL
   ACL.UI.DesignTime.PropEditors;
 
@@ -146,6 +147,7 @@ begin
 
   // Dialogs
   RegisterComponents(sACLComponentsPage, [TACLFileDialog]);
+  RegisterPropertyEditor(TypeInfo(String), TACLFileDialog, 'Filter', TFilterProperty);
 
   // ActivityIndicator
   RegisterComponents(sACLComponentsPage, [TACLActivityIndicator]);
