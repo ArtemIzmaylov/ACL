@@ -4775,7 +4775,7 @@ begin
     try
       if ACheckable.CanCheck then
         ACheckable.Checked := not ACheckable.Checked;
-      Selection.CheckState := TCheckBoxState(Ord(ACheckable.Checked));
+      Selection.CheckState := TCheckBoxState.Create(ACheckable.Checked);
     finally
       ACheckable := nil;
     end;
@@ -4939,7 +4939,7 @@ begin
     Exit;
 
   if HitTest.IsCheckable then
-    RootNode.ChildrenCheckState := TCheckBoxState(RootNode.ChildrenCheckState <> cbChecked)
+    RootNode.ChildrenCheckState := TCheckBoxState.Create(RootNode.ChildrenCheckState <> cbChecked)
   else
     if not HitTest.IsResizable and not DoColumnClick(AColumn) then
     begin

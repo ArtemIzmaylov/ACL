@@ -52,10 +52,6 @@ const
   DefaultButtonHeight = 25;
   DefaultButtonWidth = 120;
 
-const
-  BooleanToCheckBoxState: array[TACLBoolean] of TCheckBoxState = (cbGrayed, cbUnchecked, cbChecked);
-  CheckBoxStateToBoolean: array[TCheckBoxState] of TACLBoolean = (acFalse, acTrue, acDefault);
-
 type
   TACLCustomButtonViewInfo = class;
 

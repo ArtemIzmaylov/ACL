@@ -276,25 +276,18 @@ end;
 function TACLCheckComboBoxItems.GetState: TCheckBoxState;
 var
   AHasChecked, AHasUnchecked: Boolean;
-  I: Integer;
 begin
   AHasChecked := False;
   AHasUnchecked := False;
-
-  for I := 0 to Count - 1 do
+  for var I := 0 to Count - 1 do
   begin
-    AHasChecked := AHasChecked or Items[I].Checked;
-    AHasUnchecked := AHasUnchecked or not Items[I].Checked;
+    if Items[I].Checked then
+      AHasChecked := True
+    else
+      AHasUnchecked := True;
     if AHasUnchecked and AHasChecked then Break;
   end;
-
-  if AHasChecked and AHasUnchecked then
-    Result := cbGrayed
-  else
-    if AHasChecked then
-      Result := cbChecked
-    else
-      Result := cbUnchecked;
+  Result := TCheckBoxState.Create(AHasChecked, AHasUnchecked);
 end;
 
 procedure TACLCheckComboBoxItems.SetState(const Value: TCheckBoxState);

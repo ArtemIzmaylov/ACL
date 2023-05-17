@@ -4,7 +4,7 @@
 {*           Base Control Classes            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -28,6 +28,7 @@ uses
   // Vcl
   Vcl.ActnList,
   Vcl.Controls,
+  Vcl.ExtCtrls,
   Vcl.Graphics,
   Vcl.ImgList,
   Vcl.StdCtrls,
@@ -201,6 +202,16 @@ type
   TACLMargins = class(TACLPadding)
   public const
     DefaultValue = 3;
+  end;
+
+  { TACLCheckBoxStateHelper }
+
+  TACLCheckBoxStateHelper = record helper for TCheckBoxState
+  public
+    class function Create(AChecked: Boolean): TCheckBoxState; overload; static;
+    class function Create(AHasChecked, AHasUnchecked: Boolean): TCheckBoxState; overload; static;
+    class function Create(AValue: TACLBoolean): TCheckBoxState; overload; static;
+    function ToBool: TACLBoolean;
   end;
 
   { TACLCustomOptionsPersistent }
@@ -1532,6 +1543,40 @@ begin
   end;
 end;
 
+{ TACLCheckBoxStateHelper }
+
+class function TACLCheckBoxStateHelper.Create(AChecked: Boolean): TCheckBoxState;
+begin
+  if AChecked then
+    Result := cbChecked
+  else
+    Result := cbUnchecked;
+end;
+
+class function TACLCheckBoxStateHelper.Create(AValue: TACLBoolean): TCheckBoxState;
+const
+  Map: array[TACLBoolean] of TCheckBoxState = (cbGrayed, cbUnchecked, cbChecked);
+begin
+  Result := Map[AValue];
+end;
+
+class function TACLCheckBoxStateHelper.Create(AHasChecked, AHasUnchecked: Boolean): TCheckBoxState;
+begin
+  if AHasChecked and AHasUnchecked then
+    Result := cbGrayed
+  else if AHasChecked then
+    Result := cbChecked
+  else
+    Result := cbUnchecked;
+end;
+
+function TACLCheckBoxStateHelper.ToBool: TACLBoolean;
+const
+  Map: array[TCheckBoxState] of TACLBoolean = (acFalse, acTrue, acDefault);
+begin
+  Result := Map[Self];
+end;
+
 { TACLCustomOptionsPersistent }
 
 procedure TACLCustomOptionsPersistent.SetBooleanFieldValue(
@@ -2500,11 +2545,10 @@ function TACLContainer.GetBackgroundStyle: TACLControlBackgroundStyle;
 begin
   if Transparent then
     Result := cbsTransparent
+  else if Style.IsTransparentBackground then
+    Result := cbsSemitransparent
   else
-    if Style.IsTransparentBackground then
-      Result := cbsSemitransparent
-    else
-      Result := cbsOpaque;
+    Result := cbsOpaque;
 end;
 
 procedure TACLContainer.DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect);

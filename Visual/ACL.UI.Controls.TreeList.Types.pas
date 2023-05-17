@@ -2130,13 +2130,7 @@ var
   AHasChecked, AHasUnchecked: Boolean;
 begin
   GetCheckUncheckInfo(AHasChecked, AHasUnchecked);
-  if AHasChecked and AHasUnchecked then
-    Result := cbGrayed
-  else
-    if AHasChecked then
-      Result := cbChecked
-    else
-      Result := cbUnchecked;
+  Result := TCheckBoxState.Create(AHasChecked, AHasUnchecked);
 end;
 
 function TACLTreeListNodeList.GetItem(Index: Integer): TACLTreeListNode;
