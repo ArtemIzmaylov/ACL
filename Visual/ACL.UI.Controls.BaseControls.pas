@@ -585,6 +585,7 @@ type
     FBorders: TACLBorders;
     FStyle: TACLStyleBackground;
 
+    procedure CMShowingChanged(var Message: TMessage); message CM_SHOWINGCHANGED;
     procedure SetBorders(AValue: TACLBorders);
     procedure SetStyle(const Value: TACLStyleBackground);
   protected
@@ -2559,6 +2560,14 @@ end;
 procedure TACLContainer.Paint;
 begin
   Style.DrawBorder(Canvas, ClientRect, Borders);
+end;
+
+procedure TACLContainer.CMShowingChanged(var Message: TMessage);
+begin
+  inherited;
+  // Для корректной отработки AutoSize при первом показе контейнера с контролами
+  if Showing then
+    FullRefresh;
 end;
 
 procedure TACLContainer.SetBorders(AValue: TACLBorders);

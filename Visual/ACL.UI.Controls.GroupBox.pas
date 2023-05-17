@@ -51,14 +51,12 @@ type
     FCaptionViewInfo: TACLCheckBoxViewInfo;
     FStyleCaption: TACLStyleCheckBox;
 
+    procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
+    procedure CheckBoxClickHandler(Sender: TObject);
     function GetCaption: UnicodeString;
     function GetContentRect: TRect;
     procedure SetCaption(const S: UnicodeString);
     procedure SetStyleCaption(const Value: TACLStyleCheckBox);
-    //
-    procedure CheckBoxClickHandler(Sender: TObject);
-    //
-    procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
   protected
     FCaptionArea: TRect;
     FCaptionContentRect: TRect;
@@ -68,8 +66,6 @@ type
     procedure CalculateCaptionRect(const R: TRect); virtual;
     procedure CalculateFrameRect(const R: TRect); virtual;
     function CanAutoSize(var NewWidth, NewHeight: Integer): Boolean; override;
-
-    procedure CreateHandle; override;
     function CreatePadding: TACLPadding; override;
     function CreateStyleCaption: TACLStyleCheckBox; virtual; abstract;
 
@@ -284,12 +280,6 @@ begin
     NewHeight := Max(NewHeight, FCaptionArea.Height);
     NewWidth := Max(NewWidth, FCaptionArea.Width);
   end;
-end;
-
-procedure TACLCustomGroupBox.CreateHandle;
-begin
-  inherited CreateHandle;
-  FullRefresh;
 end;
 
 function TACLCustomGroupBox.CreatePadding: TACLPadding;
