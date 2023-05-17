@@ -4400,12 +4400,10 @@ var
   APrevFocusedColumn: TObject;
   APrevFocusedObject: TObject;
 begin
-  if not EnabledContent then
-    AObject := nil;
-
   if AObject = RootNode then
     Exit;
-
+  if not EnabledContent then
+    AObject := nil;
   if not FFocusing then
   begin
     FFocusing := True;
@@ -4417,11 +4415,14 @@ begin
       if IncSearch.Mode <> ismFilter then
         IncSearch.Cancel;
       if ADropSelection then
-        SelectNone;
+      begin
+        if (Selection.Count > 1) or (AObject <> FFocusedObject) then // Гасим лишние нотификации
+          SelectNone;
+      end;
       ExpandTo(AObject);
       SelectObject(AObject, smSelect, False);
       FFocusedColumn := nil;
-      FFocusedObject := AObject; // after SelectObject
+      FFocusedObject := AObject; // после SelectObject
 
       Changed([cccnContent]);
       if APrevFocusedObject <> FFocusedObject then
