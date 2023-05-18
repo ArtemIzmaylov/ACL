@@ -97,6 +97,7 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure MakeVisible(ARow: Integer);
+    procedure SetTargetDPI(AValue: Integer); override;
     //
     property Alignment: TAlignment read GetAlignment write SetAlignment;
     property AutoScroll: Boolean read FAutoScroll write SetAutoScroll;
@@ -296,6 +297,12 @@ begin
     FAutoScroll := Value;
     FullRefresh;
   end;
+end;
+
+procedure TACLFormattedLabelSubClass.SetTargetDPI(AValue: Integer);
+begin
+  inherited;
+  FormattedText.TargetDpi := AValue;
 end;
 
 procedure TACLFormattedLabelSubClass.SetText(const AValue: UnicodeString);

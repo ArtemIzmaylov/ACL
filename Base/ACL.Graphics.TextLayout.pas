@@ -18,15 +18,16 @@ interface
 uses
   Winapi.Windows,
   // System
-  System.UITypes,
   System.Classes,
   System.Contnrs,
   System.Generics.Collections,
   System.Generics.Defaults,
   System.Math,
+  System.RegularExpressions,
   System.SysUtils,
   System.Types,
-  System.RegularExpressions,
+  System.UITypes,
+  System.Variants,
   // VCL
   Vcl.Graphics,
   // ACL
@@ -38,6 +39,7 @@ uses
   ACL.Graphics,
   ACL.Math,
   ACL.Utils.Common,
+  ACL.Utils.DPIAware,
   ACL.Utils.FileSystem,
   ACL.Utils.Shell,
   ACL.Utils.Strings;
@@ -62,6 +64,7 @@ type
     AllowFormatting: Boolean;
 
     class function Default: TACLTextFormatSettings; static;
+    class function Formatted: TACLTextFormatSettings; static;
     class function PlainText: TACLTextFormatSettings; static;
   end;
 
@@ -76,6 +79,7 @@ type
     FFont: TFont;
     FHorzAlignment: TAlignment;
     FOptions: TACLTextLayoutOptions;
+    FTargetDPI: Integer;
     FText: string;
     FVertAlignment: TVerticalAlignment;
 
@@ -118,6 +122,7 @@ type
     property Font: TFont read FFont;
     property HorzAlignment: TAlignment read FHorzAlignment write SetHorzAlignment;
     property Options: TACLTextLayoutOptions read FOptions write SetOptions;
+    property TargetDPI: Integer read FTargetDPI write FTargetDPI;
     property Text: string read FText;
     property VertAlignment: TVerticalAlignment read FVertAlignment write SetVertAlignment;
   end;
@@ -207,6 +212,31 @@ type
     property Color: TColor read FColor;
   end;
 
+  { TACLTextLayoutBlockFontSize }
+
+  TACLTextLayoutBlockFontSize = class(TACLTextLayoutBlockStyle)
+  strict private
+    FValue: Variant;
+  public
+    constructor Create(const AValue: Variant; AInclude: Boolean);
+    function Export(AExporter: TACLTextLayoutExporter): Boolean; override;
+    property Value: Variant read FValue;
+  end;
+
+  { TACLTextLayoutBlockFontBig }
+
+  TACLTextLayoutBlockFontBig = class(TACLTextLayoutBlockFontSize)
+  public
+    constructor Create(AInclude: Boolean);
+  end;
+
+  { TACLTextLayoutBlockFontSmall }
+
+  TACLTextLayoutBlockFontSmall = class(TACLTextLayoutBlockFontSize)
+  public
+    constructor Create(AInclude: Boolean);
+  end;
+
   { TACLTextLayoutBlockFontStyle }
 
   TACLTextLayoutBlockFontStyle = class(TACLTextLayoutBlockStyle)
@@ -270,13 +300,14 @@ type
   strict private
     FOwner: TACLTextLayout;
   protected
-    function OnFillColor(ABlock: TACLTextLayoutBlockFillColor): Boolean; dynamic;
-    function OnFontColor(ABlock: TACLTextLayoutBlockFontColor): Boolean; dynamic;
-    function OnFontStyle(ABlock: TACLTextLayoutBlockFontStyle): Boolean; dynamic;
-    function OnHyperlink(ABlock: TACLTextLayoutBlockHyperlink): Boolean; dynamic;
-    function OnLineBreak: Boolean; dynamic;
-    function OnSpace(ABlock: TACLTextLayoutBlockSpace): Boolean; dynamic;
-    function OnText(ABlock: TACLTextLayoutBlockText): Boolean; dynamic;
+    function OnFillColor(ABlock: TACLTextLayoutBlockFillColor): Boolean; virtual;
+    function OnFontColor(ABlock: TACLTextLayoutBlockFontColor): Boolean; virtual;
+    function OnFontSize(ABlock: TACLTextLayoutBlockFontSize): Boolean; virtual;
+    function OnFontStyle(ABlock: TACLTextLayoutBlockFontStyle): Boolean; virtual;
+    function OnHyperlink(ABlock: TACLTextLayoutBlockHyperlink): Boolean; virtual;
+    function OnLineBreak: Boolean; virtual;
+    function OnSpace(ABlock: TACLTextLayoutBlockSpace): Boolean; virtual;
+    function OnText(ABlock: TACLTextLayoutBlockText): Boolean; virtual;
     //
     property Owner: TACLTextLayout read FOwner;
   public
@@ -303,13 +334,16 @@ type
   strict private
     FCanvas: TCanvas;
     FFont: TFont;
+    FFontSizes: TACLTextLayoutValueStack<Integer>;
     FFontStyles: array[TFontStyle] of Word;
   protected
+    function OnFontSize(ABlock: TACLTextLayoutBlockFontSize): Boolean; override;
     function OnFontStyle(ABlock: TACLTextLayoutBlockFontStyle): Boolean; override;
     property Canvas: TCanvas read FCanvas;
     property Font: TFont read FFont write FFont;
   public
     constructor Create(ACanvas: TCanvas; AOwner: TACLTextLayout);
+    destructor Destroy; override;
   end;
 
   { TACLTextLayoutCalculator }
@@ -347,6 +381,7 @@ type
     function OnFillColor(ABlock: TACLTextLayoutBlockFillColor): Boolean; override;
     function OnFontColor(ABlock: TACLTextLayoutBlockFontColor): Boolean; override;
     function OnFontStyle(ABlock: TACLTextLayoutBlockFontStyle): Boolean; override;
+    function OnFontSize(ABlock: TACLTextLayoutBlockFontSize): Boolean; override;
     function OnHyperlink(ABlock: TACLTextLayoutBlockHyperlink): Boolean; override;
     function OnLineBreak: Boolean; override;
     function OnSpace(ABlock: TACLTextLayoutBlockSpace): Boolean; override;
@@ -446,7 +481,8 @@ type
     class procedure AddTextBlock(ATarget: TACLTextLayout; AText: PWideChar; ALength: Integer); static; inline;
     class procedure ReplaceWithHyperlink(ATarget: TACLTextLayout;
       AFirstBlockToReplace: TACLTextLayoutBlockText; AScan: PWideChar; const AHyperlinkPrefix: string); static;
-    class procedure ScanUntilDelimiter(var AScan: PWideChar; var ALength: Integer; const ADelimiters: UnicodeString); static; inline;
+    class procedure ScanUntilDelimiter(var AScan: PWideChar;
+      var ALength: Integer; const ADelimiters: UnicodeString); static; inline;
   public
     class constructor Create;
     constructor Create(const ASettings: TACLTextFormatSettings);
@@ -883,6 +919,12 @@ begin
   Result.AllowFormatting := True;
 end;
 
+class function TACLTextFormatSettings.Formatted: TACLTextFormatSettings;
+begin
+  ZeroMemory(@Result, SizeOf(Result));
+  Result.AllowFormatting := True;
+end;
+
 class function TACLTextFormatSettings.PlainText: TACLTextFormatSettings;
 begin
   ZeroMemory(@Result, SizeOf(Result));
@@ -893,6 +935,7 @@ end;
 constructor TACLTextLayout.Create(AFont: TFont);
 begin
   FFont := AFont;
+  FTargetDPI := FFont.PixelsPerInch;
   FBlocks := TACLTextLayoutBlockList.Create;
   FLayout := TACLTextLayoutRows.Create;
 end;
@@ -1333,6 +1376,44 @@ begin
   Result := AExporter.OnFontColor(Self);
 end;
 
+{ TACLTextLayoutBlockFontSize }
+
+constructor TACLTextLayoutBlockFontSize.Create(const AValue: Variant; AInclude: Boolean);
+var
+  AValueFloat: Single;
+  AValueInt32: Integer;
+begin
+  inherited Create(AInclude);
+
+  if VarIsNumeric(AValue) then
+    FValue := AValue
+  else if TryStrToInt(AValue, AValueInt32) then
+    FValue := AValueInt32
+  else if TryStrToFloat(AValue, AValueFloat) then
+    FValue := AValueFloat
+  else
+    FValue := 1.0;
+end;
+
+function TACLTextLayoutBlockFontSize.Export(AExporter: TACLTextLayoutExporter): Boolean;
+begin
+  Result := AExporter.OnFontSize(Self);
+end;
+
+{ TACLTextLayoutBlockFontBig }
+
+constructor TACLTextLayoutBlockFontBig.Create(AInclude: Boolean);
+begin
+  inherited Create(1.10, AInclude);
+end;
+
+{ TACLTextLayoutBlockFontSmall }
+
+constructor TACLTextLayoutBlockFontSmall.Create(AInclude: Boolean);
+begin
+  inherited Create(0.9, AInclude);
+end;
+
 { TACLTextLayoutBlockFontStyle }
 
 constructor TACLTextLayoutBlockFontStyle.Create(AStyle: TFontStyle; AInclude: Boolean);
@@ -1390,7 +1471,7 @@ begin
   if AValue <> FBaseline then
   begin
     for var I := 0 to Count - 1 do
-      List[I].Bounds.Offset(0, AValue - FBaseline);
+      Inc(List[I].FPosition.Y, AValue - FBaseline);
     FBaseline := AValue;
   end;
 end;
@@ -1480,6 +1561,11 @@ begin
   Result := True;
 end;
 
+function TACLTextLayoutExporter.OnFontSize(ABlock: TACLTextLayoutBlockFontSize): Boolean;
+begin
+  Result := True;
+end;
+
 function TACLTextLayoutExporter.OnFontStyle(ABlock: TACLTextLayoutBlockFontStyle): Boolean;
 begin
   Result := True;
@@ -1548,6 +1634,34 @@ begin
   FCanvas := ACanvas;
   FCanvas.Font.Assign(Owner.Font);
   FFont := FCanvas.Font;
+  FFontSizes := TACLTextLayoutValueStack<Integer>.Create;
+  FFontSizes.Push(FFont.Height, nil);
+end;
+
+destructor TACLTextLayoutVisualExporter.Destroy;
+begin
+  FreeAndNil(FFontSizes);
+  inherited;
+end;
+
+function TACLTextLayoutVisualExporter.OnFontSize(ABlock: TACLTextLayoutBlockFontSize): Boolean;
+var
+  AHeight: Integer;
+begin
+  if ABlock.Include then
+  begin
+    if VarIsFloat(ABlock.Value) then
+      AHeight := Round(Font.Height * ABlock.Value)
+    else
+      AHeight := acGetFontHeight(ABlock.Value, Owner.TargetDPI);
+
+    FFontSizes.Push(AHeight, ABlock.ClassType);
+  end
+  else
+    FFontSizes.Pop(ABlock.ClassType);
+
+  Font.Height := FFontSizes.Peek;
+  Result := True;
 end;
 
 function TACLTextLayoutVisualExporter.OnFontStyle(ABlock: TACLTextLayoutBlockFontStyle): Boolean;
@@ -1609,6 +1723,13 @@ end;
 
 function TACLTextLayoutCalculator.OnFontColor(ABlock: TACLTextLayoutBlockFontColor): Boolean;
 begin
+  Result := AddStyle(ABlock);
+end;
+
+function TACLTextLayoutCalculator.OnFontSize(ABlock: TACLTextLayoutBlockFontSize): Boolean;
+begin
+  inherited;
+  UpdateMetrics;
   Result := AddStyle(ABlock);
 end;
 
@@ -2236,6 +2357,12 @@ begin
       ABlock := TACLTextLayoutBlockFontColor.Create(acExtractString(AScanParam + 1, AScanEnd), not AIsClosing)
     else if acCompareTokens('BACKCOLOR', AScanTag, ATagLength) then
       ABlock := TACLTextLayoutBlockFillColor.Create(acExtractString(AScanParam + 1, AScanEnd), not AIsClosing)
+    else if acCompareTokens('BIG', AScanTag, ATagLength) then
+      ABlock := TACLTextLayoutBlockFontBig.Create(not AIsClosing)
+    else if acCompareTokens('SMALL', AScanTag, ATagLength) then
+      ABlock := TACLTextLayoutBlockFontSmall.Create(not AIsClosing)
+    else if acCompareTokens('SIZE', AScanTag, ATagLength) then
+      ABlock := TACLTextLayoutBlockFontSize.Create(acExtractString(AScanParam + 1, AScanEnd), not AIsClosing)
     else if acCompareTokens('URL', AScanTag, ATagLength) then
       ABlock := TACLTextLayoutBlockHyperlink.Create(acExtractString(AScanParam + 1, AScanEnd), not AIsClosing)
     else
@@ -2342,7 +2469,8 @@ begin
   ATarget.FBlocks.Add(TACLTextLayoutBlockHyperlink.Create(EmptyStr, False));
 end;
 
-class procedure TACLTextImporter.ScanUntilDelimiter(var AScan: PWideChar; var ALength: Integer; const ADelimiters: UnicodeString);
+class procedure TACLTextImporter.ScanUntilDelimiter(
+  var AScan: PWideChar; var ALength: Integer; const ADelimiters: UnicodeString);
 begin
   while (ALength > 0) and (acPos(AScan^, ADelimiters) = 0) do
   begin
