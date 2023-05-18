@@ -1,10 +1,10 @@
 ﻿{*********************************************}
 {*                                           *}
 {*     Artem's Visual Components Library     *}
-{*         HintWindow Implementation         *}
+{*         HintWindow & Controllers          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -29,12 +29,13 @@ uses
   // ACL
   ACL.Classes.Timer,
   ACL.Geometry,
-  ACL.Utils.DPIAware,
+  ACL.Graphics.TextLayout,
   ACL.UI.PopupMenu,
-  ACL.UI.Resources;
+  ACL.UI.Resources,
+  ACL.Utils.DPIAware,
+  ACL.Utils.Strings;
 
 const
-  HintTextDrawFlags = DT_NOPREFIX or DT_WORDBREAK;
   HintTextIndentH = 8;
   HintTextIndentV = 5;
 
@@ -82,13 +83,13 @@ type
   strict private const
     HeightCorrection = 4;
   strict private
+    FLayout: TACLTextLayout;
     FScaleFactor: TACLScaleFactor;
     FStyle: TACLStyleHint;
-    FTextChanging: Boolean;
 
     function GetPixelsPerInch: Integer; reintroduce;
     procedure SetStyle(AValue: TACLStyleHint);
-    //
+    // Messages
     procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
     procedure WMMouseWheel(var Message: TWMMouseWheel); message WM_MOUSEWHEEL;
     procedure WMSize(var Message: TWMSize); message WM_SIZE;
@@ -96,10 +97,9 @@ type
     procedure CreateParams(var Params: TCreateParams); override;
     procedure NCPaint(DC: HDC); override;
     procedure Paint; override;
-    procedure PaintBackground(ACanvas: TCanvas; const R: TRect); virtual;
-    procedure PaintText(ACanvas: TCanvas; R: TRect); virtual;
     procedure ScaleForPPI(const ATargetPPI: Integer); reintroduce;
     //
+    property Layout: TACLTextLayout read FLayout;
     property PixelsPerInch: Integer read GetPixelsPerInch;
     property ScaleFactor: TACLScaleFactor read FScaleFactor;
   public
@@ -108,7 +108,6 @@ type
     procedure ActivateHint(Rect: TRect; const AHint: string); override;
     function CalcHintRect(MaxWidth: Integer; const AHint: string; AData: TCustomData): TRect; overload; override;
     procedure Hide;
-    procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
     //
     procedure ShowFloatHint(const AHint: UnicodeString; const AScreenRect: TRect;
       AHorzAlignment: TACLHintWindowHorzAlignment; AVertAligment: TACLHintWindowVertAlignment); overload;
@@ -300,6 +299,8 @@ begin
   DoubleBuffered := True;
   FScaleFactor := TACLScaleFactor.Create;
   FStyle := TACLStyleHint.Create(Self);
+  FLayout := TACLTextLayout.Create(Canvas.Font);
+  FLayout.Options := [tloWordWrap, tloAutoHeight];
   ScaleForPPI(Screen.PixelsPerInch);
   Font := Screen.HintFont; // after ScaleForPPI
 end;
@@ -308,6 +309,7 @@ destructor TACLHintWindow.Destroy;
 begin
   FreeAndNil(FScaleFactor);
   FreeAndNil(FStyle);
+  FreeAndNil(FLayout);
   inherited Destroy;
 end;
 
@@ -343,26 +345,19 @@ end;
 
 function TACLHintWindow.CalcHintRect(MaxWidth: Integer; const AHint: string; AData: TCustomData): TRect;
 begin
-  MeasureCanvas.Font := Font;
-  Result := Rect(0, 0, MaxWidth, 2);
-  acSysDrawText(MeasureCanvas, Result, AHint, DT_CALCRECT or HintTextDrawFlags);
-  Result := acRectOffsetNegative(Result, Result.TopLeft);
+  Layout.Bounds := Rect(0, 0, MaxWidth, 2);
+  Layout.SetText(AHint, TACLTextFormatSettings.Formatted);
+  Result := acRect(Layout.MeasureSize);
+
   Inc(Result.Right, 2 * ScaleFactor.Apply(HintTextIndentH));
   Inc(Result.Bottom, 2 * ScaleFactor.Apply(HintTextIndentV));
   Dec(Result.Bottom, HeightCorrection);
 end;
 
 procedure TACLHintWindow.Hide;
-const
-  SWP_FLAGS = SWP_NOACTIVATE or SWP_NOSIZE or SWP_NOMOVE or SWP_NOZORDER;
 begin
-  SetWindowPos(Handle, 0, 0, 0, 0, 0, SWP_HIDEWINDOW or SWP_FLAGS);
-end;
-
-procedure TACLHintWindow.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
-begin
-  if not FTextChanging then
-    inherited SetBounds(ALeft, ATop, AWidth, AHeight);
+  SetWindowPos(Handle, 0, 0, 0, 0, 0, SWP_HIDEWINDOW or
+    SWP_NOACTIVATE or SWP_NOSIZE or SWP_NOMOVE or SWP_NOZORDER);
 end;
 
 procedure TACLHintWindow.ShowFloatHint(const AHint: UnicodeString; const AScreenRect: TRect;
@@ -405,7 +400,9 @@ end;
 procedure TACLHintWindow.ShowFloatHint(const AHint: UnicodeString; const AControl: TControl;
   AHorzAlignment: TACLHintWindowHorzAlignment; AVertAligment: TACLHintWindowVertAlignment);
 begin
-  ShowFloatHint(AHint, acRectOffset(AControl.ClientRect, AControl.ClientToScreen(NullPoint)), AHorzAlignment, AVertAligment);
+  ShowFloatHint(AHint,
+    acRectOffset(AControl.ClientRect, AControl.ClientToScreen(NullPoint)),
+    AHorzAlignment, AVertAligment);
 end;
 
 procedure TACLHintWindow.CreateParams(var Params: TCreateParams);
@@ -421,23 +418,15 @@ end;
 
 procedure TACLHintWindow.Paint;
 begin
-  PaintBackground(Canvas, ClientRect);
-  PaintText(Canvas,
+  Style.Draw(Canvas, ClientRect);
+
+  Canvas.Font := Font;
+  Canvas.Font.Color := Style.ColorText.AsColor;
+  Layout.Bounds :=
     acRectInflate(ClientRect,
       -ScaleFactor.Apply(HintTextIndentH),
-      -ScaleFactor.Apply(HintTextIndentV)));
-end;
-
-procedure TACLHintWindow.PaintBackground(ACanvas: TCanvas; const R: TRect);
-begin
-  Style.Draw(ACanvas, R);
-end;
-
-procedure TACLHintWindow.PaintText(ACanvas: TCanvas; R: TRect);
-begin
-  ACanvas.Font := Font;
-  ACanvas.Font.Color := Style.ColorText.AsColor;
-  acSysDrawText(ACanvas, R, Caption, HintTextDrawFlags);
+      -ScaleFactor.Apply(HintTextIndentV));
+  Layout.Draw(Canvas);
 end;
 
 procedure TACLHintWindow.ScaleForPPI(const ATargetPPI: Integer);
@@ -449,6 +438,7 @@ begin
   begin
     ScaleFactor.Assign(ATargetPPI, acDefaultDPI);
     ChangeScale(ATargetPPI, ACurrentPPI);
+    Layout.TargetDPI := ATargetPPI;
     Style.SetTargetDPI(ATargetPPI);
   end;
 end;
@@ -465,9 +455,7 @@ end;
 
 procedure TACLHintWindow.CMTextChanged(var Message: TMessage);
 begin
-  FTextChanging := True;
-  inherited; //#AI: Reduce flicker, see THintWindow.CMTextChanged implementation
-  FTextChanging := False;
+  Layout.SetText(Caption, TACLTextFormatSettings.Formatted);
 end;
 
 procedure TACLHintWindow.WMMouseWheel(var Message: TWMMouseWheel);
