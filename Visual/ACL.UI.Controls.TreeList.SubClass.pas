@@ -3123,13 +3123,17 @@ var
   ATempValue: UnicodeString;
 begin
   if (FApplyLockCount = 0) and (Sender = Edit) then
-  try
-    ATempValue := EditIntf.InplaceGetValue;
-    SubClass.DoEditing(FParams.RowIndex, FParams.ColumnIndex, ATempValue);
-    Value := ATempValue;
-    SubClass.DoEdited(FParams.RowIndex, FParams.ColumnIndex);
-  finally
-    Close;
+  begin
+    try
+      ATempValue := EditIntf.InplaceGetValue;
+      SubClass.DoEditing(FParams.RowIndex, FParams.ColumnIndex, ATempValue);
+      Value := ATempValue;
+      SubClass.DoEdited(FParams.RowIndex, FParams.ColumnIndex);
+    finally
+      Close;
+    end;
+    // Sent notification after closing the editor to re-sort and re-group the list.
+    SubClass.NodeValuesChanged(FParams.ColumnIndex);
   end;
 end;
 
@@ -3260,7 +3264,7 @@ end;
 
 procedure TACLTreeListSorter.Sort(ARegroup: Boolean);
 begin
-  if RootNode.HasChildren and RootNode.ChildrenLoaded then
+  if RootNode.HasChildren and RootNode.ChildrenLoaded and not SubClass.EditingController.IsEditing then
   begin
     if ARegroup and (IsGroupMode or (Groups.Count > 0)) or AreSortingParametersDefined then
     begin
@@ -4518,17 +4522,20 @@ begin
 
   if tlcnSettingsFocus in AChanges then
     SetFocusedObject(nil);
+
   if tlcnSettingsIncSearch in AChanges then
   begin
     IncSearch.Cancel;
     IncSearch.Mode := OptionsBehavior.IncSearchMode;
   end;
-  if cccnStruct in AChanges then
-    ValidateFocusedObject;
-  if tlcnMakeVisible in AChanges then
-    ScrollTo(FocusedObject, TACLScrollToMode.MakeVisible, FocusedColumn);
 
   inherited ProcessChanges(AChanges);
+
+  if cccnStruct in AChanges then
+    ValidateFocusedObject;
+
+  if tlcnMakeVisible in AChanges then
+    ScrollTo(FocusedObject, TACLScrollToMode.MakeVisible, FocusedColumn);
 
   if [cccnStruct, cccnLayout, tlcnData] * AChanges <> [] then
   begin

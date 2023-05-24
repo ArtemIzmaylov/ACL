@@ -438,8 +438,8 @@ type
     procedure Assign(ANode: TACLTreeListNode);
     procedure BeforeDestruction; override;
     //
-    function AddChild(const AValues: array of UnicodeString): TACLTreeListNode; overload;
     function AddChild: TACLTreeListNode; overload;
+    function AddChild(const AValues: array of UnicodeString): TACLTreeListNode; overload;
     function AddValue(const S: UnicodeString): Integer; virtual;
     function AddValues(const S: array of UnicodeString): Integer;
     procedure ChildrenNeeded;
