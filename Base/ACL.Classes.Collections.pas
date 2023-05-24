@@ -191,9 +191,7 @@ type
     procedure GrowCheck(ACount: Integer); inline;
   protected
     FNotifications: Boolean;
-
     procedure DeleteRangeCore(AIndex, ACount: Integer; AAction: TCollectionNotification);
-
     procedure Notify(const Item: T; Action: TCollectionNotification); virtual;
     procedure UpdateNotifications; virtual;
   public
@@ -329,15 +327,13 @@ type
   TACLObjectList<T: class> = class(TACLList<T>)
   strict private
     FOwnsObjects: Boolean;
-
-    procedure SetOwnObjects(const Value: Boolean);
+    procedure SetOwnObjects(AValue: Boolean);
   protected
     procedure Notify(const Item: T; Action: TCollectionNotification); override;
     procedure UpdateNotifications; override;
   public
     constructor Create(AOwnsObjects: Boolean = True); overload;
     constructor Create(const AComparer: IComparer<T>; AOwnsObjects: Boolean = True); overload;
-    //
     property OwnsObjects: Boolean read FOwnsObjects write SetOwnObjects;
   end;
 
@@ -771,6 +767,32 @@ type
   public
     function Contains(const Value, Tolerance: Single): Boolean; overload;
     function IndexOf(const Value, Tolerance: Single): Integer; reintroduce; overload;
+  end;
+
+  { TACLFastObjectList }
+
+  TACLFastObjectList = class
+  strict private type
+  {$REGION 'Internal'}
+    TMtChunk = class
+      Count: Integer;
+      Items: PObject;
+    end;
+  {$ENDREGION}
+  strict private
+    FCapacity: Integer;
+    FCount: Integer;
+    FItems: TPointerList;
+    procedure Flush(AKeepCapacity: Boolean = False);
+    class procedure RemoveCore(AChunk: TMtChunk); static;
+  public
+    destructor Destroy; override;
+    procedure Add(AObject: TObject);
+    procedure Clear(AKeepCapacity: Boolean = False);
+    procedure ClearMultithreaded(AKeepCapacity: Boolean = False);
+    procedure EnsureCapacity(ACount: Integer);
+    property Count: Integer read FCount;
+    property List: TPointerList read FItems;
   end;
 
 implementation
@@ -2394,9 +2416,9 @@ begin
   FNotifications := Assigned(OnNotify) or OwnsObjects;
 end;
 
-procedure TACLObjectList<T>.SetOwnObjects(const Value: Boolean);
+procedure TACLObjectList<T>.SetOwnObjects(AValue: Boolean);
 begin
-  FOwnsObjects := Value;
+  FOwnsObjects := AValue;
   UpdateNotifications;
 end;
 
@@ -3340,6 +3362,92 @@ begin
       Exit(I);
   end;
   Result := -1;
+end;
+
+{ TACLFastObjectList }
+
+destructor TACLFastObjectList.Destroy;
+begin
+  Clear;
+  inherited;
+end;
+
+procedure TACLFastObjectList.Add(AObject: TObject);
+begin
+  if Count + 1 > FCapacity then // fast check
+    EnsureCapacity(Count + 1);
+  FItems[FCount] := AObject;
+  Inc(FCount);
+end;
+
+procedure TACLFastObjectList.Clear(AKeepCapacity: Boolean = False);
+begin
+  for var I := 0 to Count - 1 do
+    FreeAndNil(FItems[I]);
+  Flush(AKeepCapacity);
+end;
+
+procedure TACLFastObjectList.ClearMultiThreaded(AKeepCapacity: Boolean = False);
+var
+  AChunkCount: Integer;
+  AChunks: array of TMtChunk;
+  ACountPerChunk: Integer;
+  AIndex: Integer;
+begin
+  if Count = 0 then Exit;
+
+  AIndex := 0;
+  AChunkCount := EnsureRange(Min(CpuCount, 4), 1, Count);
+  SetLength(AChunks, AChunkCount);
+  ACountPerChunk := Count div AChunkCount;
+  try
+    for var I := 0 to AChunkCount - 1 do
+    begin
+      AChunks[I] := TMtChunk.Create;
+      AChunks[I].Items := @List[AIndex];
+      AChunks[I].Count := ACountPerChunk;
+      AIndex := AIndex + ACountPerChunk;
+    end;
+    Inc(AChunks[High(AChunks)].Count, Count - AIndex);
+    TACLMultithreadedOperation.Run(@AChunks[0], AChunkCount, @RemoveCore);
+    Flush(AKeepCapacity);
+  finally
+    for var I := 0 to AChunkCount - 1 do
+      FreeAndNil(AChunks[I]);
+  end;
+end;
+
+procedure TACLFastObjectList.EnsureCapacity(ACount: Integer);
+begin
+  if Count + ACount >= FCapacity then
+  begin
+    repeat
+      FCapacity := Max(FCapacity * 2, 4);
+      if FCapacity < 0 then
+        OutOfMemoryError;
+    until FCapacity > Count + ACount;
+    SetLength(FItems, FCapacity);
+  end;
+end;
+
+procedure TACLFastObjectList.Flush(AKeepCapacity: Boolean);
+begin
+  FCount := 0;
+  if not AKeepCapacity then
+  begin
+    FCapacity := 0;
+    SetLength(FItems, 0);
+  end;
+end;
+
+class procedure TACLFastObjectList.RemoveCore(AChunk: TMtChunk);
+begin
+  while AChunk.Count > 0 do
+  begin
+    FreeAndNil(AChunk.Items^);
+    Dec(AChunk.Count);
+    Inc(AChunk.Items);
+  end;
 end;
 
 end.

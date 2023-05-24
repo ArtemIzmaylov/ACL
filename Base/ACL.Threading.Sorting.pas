@@ -82,8 +82,10 @@ type
     procedure Merge(ALowBound, ADivider, AHiBound: Integer); override;
     procedure QuickSort(L, R: Integer); override;
   public
-    class procedure Sort(List: PPointerArray; Count: Integer; CompareProc: TACLListCompareProc; Multithreadeding: Boolean = True); overload;
-    class procedure Sort(List: TList; CompareProc: TACLListCompareProc; Multithreadeding: Boolean = True); overload;
+    class procedure Sort(List: PPointerArray; Count: Integer;
+      CompareProc: TACLListCompareProc; Multithreadeding: Boolean = True); overload;
+    class procedure Sort(List: TList;
+      CompareProc: TACLListCompareProc; Multithreadeding: Boolean = True); overload;
   end;
 
   { TACLMultithreadedStringListSorter }
@@ -98,7 +100,8 @@ type
     procedure Merge(ALowBound, ADivider, AHiBound: Integer); override;
     procedure QuickSort(L, R: Integer); override;
   public
-    class procedure Sort(List: TACLStringList; CompareProc: TACLStringListCompareProc; Multithreadeding: Boolean = True);
+    class procedure Sort(List: TACLStringList;
+      CompareProc: TACLStringListCompareProc; Multithreadeding: Boolean = True);
   end;
 
 implementation
