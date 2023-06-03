@@ -1,10 +1,10 @@
 ﻿{*********************************************}
 {*                                           *}
 {*     Artem's Visual Components Library     *}
-{*             Skinned PopupMenu             *}
+{*             Skinable PopupMenu            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -95,8 +95,8 @@ type
 
   TACLMenuItem = class(TMenuItem,
     IACLGlyph,
-    IACLMenuShowHandler,
-    IACLScaleFactor)
+    IACLCurrentDpi,
+    IACLMenuShowHandler)
   strict private
     FGlyph: TACLGlyph;
 
@@ -110,8 +110,8 @@ type
     // IACLMenuShowHandler
     procedure IACLMenuShowHandler.OnShow = DoShow;
     procedure DoShow; virtual;
-    // IACLScaleFactor
-    function GetScaleFactor: TACLScaleFactor;
+    // IACLCurrentDpi
+    function GetCurrentDpi: Integer;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -232,30 +232,30 @@ type
 
   TACLPopupMenuClass = class of TACLPopupMenu;
   TACLPopupMenu = class(TPopupMenu,
+    IACLCurrentDPI,
     IACLMenuShowHandler,
     IACLObjectLinksSupport,
-    IACLPopup,
-    IACLScaleFactor)
+    IACLPopup)
   strict private
     FAutoScale: Boolean;
+    FCurrentDpi: Integer;
     FHint: UnicodeString;
     FOptions: TACLPopupMenuOptions;
     FPopupWindow: TObject;
-    FScaleFactor: TACLScaleFactor;
     FStyle: TACLPopupMenuStyle;
 
     function GetIsShown: Boolean;
-    function GetScaleFactor: TACLScaleFactor;
-    procedure ScaleFactorChanged(Sender: TObject);
     procedure SetOptions(AValue: TACLPopupMenuOptions);
     procedure SetStyle(AValue: TACLPopupMenuStyle);
+    // IACLCurrentDPI
+    function GetCurrentDpi: Integer;
     // IACLMenuShowHandler
     procedure IACLMenuShowHandler.OnShow = DoInitialize;
   protected
     function CreateOptions: TACLPopupMenuOptions; virtual;
     function CreateStyle: TACLPopupMenuStyle; virtual;
     procedure DoInitialize; virtual;
-    procedure DoScaleFactorChanged; virtual;
+    procedure DoDpiChanged; virtual;
     procedure DoSelect(Item: TMenuItem); virtual;
     procedure DoShow(const ControlRect: TRect); virtual;
   public
@@ -263,13 +263,14 @@ type
     destructor Destroy; override;
     procedure BeforeDestruction; override;
     function CreateMenuItem: TMenuItem; override;
-    procedure Popup(X, Y: Integer); overload; override;
     procedure Popup(const P: TPoint); reintroduce; overload;
+    procedure Popup(X, Y: Integer); overload; override;
     // IACLPopup
     procedure PopupUnderControl(const ControlRect: TRect);
+    procedure ScaleForDpi(ATargetDpi: Integer);
     //
+    property CurrentDpi: Integer read GetCurrentDpi;
     property IsShown: Boolean read GetIsShown;
-    property ScaleFactor: TACLScaleFactor read GetScaleFactor;
   published
     property AutoScale: Boolean read FAutoScale write FAutoScale default True;
     property Hint: UnicodeString read FHint write FHint;
@@ -416,7 +417,7 @@ type
     procedure DoScrollTimer(Sender: TObject);
 
     function GetBorderWidths: TRect;
-    function GetScaleFactor: TACLScaleFactor;
+    function GetCurrentDpi: Integer;
     function GetStyle: TACLStyleMenu;
 
     procedure SetParentMenu(const Value: TACLMenuPopupWindow);
@@ -535,7 +536,6 @@ type
     property PopupMenu: TACLPopupMenu read FPopupMenu;
     property PopupStack: TACLMenuStack read FPopupStack;
     property RootMenu: TACLMenuPopupWindow read FRootMenu write FRootMenu;
-    property ScaleFactor: TACLScaleFactor read GetScaleFactor;
     property ScrollBar: TACLScrollBar read FScrollBar;
     property ScrollButtonDown: TRect read FScrollButtonDown;
     property ScrollButtonUp: TRect read FScrollButtonUp;
@@ -754,13 +754,11 @@ begin
   inherited Create(AOwner);
   FAutoScale := True;
   FOptions := TACLPopupMenuOptions.Create;
-  FScaleFactor := TACLScaleFactor.Create(Self, ScaleFactorChanged);
   FStyle := CreateStyle;
 end;
 
 destructor TACLPopupMenu.Destroy;
 begin
-  FreeAndNil(FScaleFactor);
   FreeAndNil(FOptions);
   FreeAndNil(FStyle);
   inherited Destroy;
@@ -811,24 +809,25 @@ end;
 
 procedure TACLPopupMenu.DoInitialize;
 var
-  AIntf: IACLScaleFactor;
-  I: Integer;
+  ATargetDpi: Integer;
 begin
   DoPopup(Self);
   if AutoScale then
   begin
-    if TACLControlsHelper.GetScaleFactor(PopupComponent, AIntf) or TACLControlsHelper.GetScaleFactor(Owner, AIntf) then
-      FScaleFactor.Assign(AIntf.GetScaleFactor)
-    else
-      FScaleFactor.Assign(acGetTargetDPI(PopupPoint), acDefaultDPI);
+    ATargetDpi := acTryGetCurrentDpi(PopupComponent);
+    if ATargetDpi = 0 then
+      ATargetDpi := acTryGetCurrentDpi(Owner);
+    if ATargetDpi = 0 then
+      ATargetDpi := acGetTargetDPI(PopupPoint);
+    ScaleForDpi(ATargetDpi);
   end;
-  for I := 0 to Items.Count - 1 do
+  for var I := 0 to Items.Count - 1 do
     Items[I].InitiateAction;
 end;
 
-procedure TACLPopupMenu.DoScaleFactorChanged;
+procedure TACLPopupMenu.DoDpiChanged;
 begin
-  Style.SetTargetDPI(ScaleFactor.TargetDPI);
+  Style.SetTargetDPI(CurrentDpi);
 end;
 
 procedure TACLPopupMenu.DoSelect(Item: TMenuItem);
@@ -850,14 +849,14 @@ begin
   end;
 end;
 
+function TACLPopupMenu.GetCurrentDpi: Integer;
+begin
+  Result := FCurrentDpi;
+end;
+
 function TACLPopupMenu.GetIsShown: Boolean;
 begin
   Result := Assigned(FPopupWindow);
-end;
-
-function TACLPopupMenu.GetScaleFactor: TACLScaleFactor;
-begin
-  Result := FScaleFactor;
 end;
 
 procedure TACLPopupMenu.SetOptions(AValue: TACLPopupMenuOptions);
@@ -870,9 +869,13 @@ begin
   FStyle.Assign(AValue);
 end;
 
-procedure TACLPopupMenu.ScaleFactorChanged(Sender: TObject);
+procedure TACLPopupMenu.ScaleForDpi(ATargetDpi: Integer);
 begin
-  DoScaleFactorChanged;
+  if FCurrentDpi <> ATargetDpi then
+  begin
+    FCurrentDpi := ATargetDpi;
+    DoDpiChanged;
+  end;
 end;
 
 { TACLPopupMenuStyle }
@@ -1319,7 +1322,7 @@ begin
     Result.Style.TextureBackgroundVert := PopupMenu.Style.TextureScrollBar;
     Result.Style.TextureButtonsVert := PopupMenu.Style.TextureScrollBarButtons;
     Result.Style.TextureThumbVert := PopupMenu.Style.TextureScrollBarThumb;
-    Result.Style.TargetDPI := ScaleFactor.TargetDPI;
+    Result.Style.TargetDPI := GetCurrentDpi;
   finally
     Result.Style.EndUpdate;
   end;
@@ -1972,14 +1975,6 @@ begin
     Result := PopupMenu.Style;
 end;
 
-function TACLMenuPopupWindow.GetScaleFactor: TACLScaleFactor;
-begin
-  if ParentMenu <> nil then
-    Result := ParentMenu.ScaleFactor
-  else
-    Result := PopupMenu.ScaleFactor;
-end;
-
 procedure TACLMenuPopupWindow.WMPaint(var Message: TWMPaint);
 begin
   if not (csCustomPaint in ControlState) then
@@ -2303,7 +2298,15 @@ end;
 
 function TACLMenuPopupWindow.GetBorderWidths: TRect;
 begin
-  Result := ScaleFactor.Apply(Style.Borders.Value);
+  Result := dpiApply(Style.Borders.Value, GetCurrentDpi);
+end;
+
+function TACLMenuPopupWindow.GetCurrentDpi: Integer;
+begin
+  if ParentMenu <> nil then
+    Result := ParentMenu.GetCurrentDpi
+  else
+    Result := PopupMenu.CurrentDpi;
 end;
 
 procedure TACLMenuPopupWindow.SetVisibleIndex(AValue: Integer);
@@ -2563,14 +2566,14 @@ begin
   CallNotifyEvent(Self, OnShow);
 end;
 
-function TACLMenuItem.GetScaleFactor: TACLScaleFactor;
-begin
-  Result := acGetScaleFactor(Menu);
-end;
-
 function TACLMenuItem.IsCheckItem: Boolean;
 begin
   Result := Checked or AutoCheck or RadioItem;
+end;
+
+function TACLMenuItem.GetCurrentDpi: Integer;
+begin
+  Result := acGetCurrentDpi(Menu);
 end;
 
 function TACLMenuItem.GetGlyph: TACLGlyph;
@@ -2726,7 +2729,7 @@ var
   ALayer: TACLBitmapLayer;
   ASrcC, ASrcG: TRect;
 begin
-  if TextureSeparator.ImageScaleFactor.Assigned then
+  if TextureSeparator.ImageDpi <> acDefaultDpi then
   begin
     ALayer := TACLBitmapLayer.Create(TextureGutter.Image.Width + TextureSeparator.Image.Width, TextureSeparator.Image.Height);
     try

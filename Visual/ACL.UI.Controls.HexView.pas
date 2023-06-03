@@ -40,6 +40,7 @@ uses
   ACL.UI.Controls.CompoundControl.SubClass,
   ACL.UI.Resources,
   ACL.Utils.Common,
+  ACL.Utils.DPIAware,
   ACL.Utils.Clipboard,
   ACL.Utils.Strings;
 
@@ -392,9 +393,7 @@ implementation
 
 uses
   System.Math,
-  System.AnsiStrings,
-  // ACL
-  ACL.Utils.DPIAware;
+  System.AnsiStrings;
 
 const
   acHexViewHitDataOffset = 'DataOffset';
@@ -1067,7 +1066,7 @@ var
 begin
   inherited;
 
-  HexView.IndentBetweenCharacters := ScaleFactor.Apply(4);
+  HexView.IndentBetweenCharacters := dpiApply(4, CurrentDpi);
 
   ARect := Bounds;
   FLabelAreaWidth := acTextSize(SubClass.Font, '00000000').cx;
@@ -1305,10 +1304,10 @@ end;
 
 procedure TACLHexViewViewInfo.CalculateContentLayout;
 begin
-  FRowViewInfo.IndentBetweenViews := ScaleFactor.Apply(IndentBetweenViews);
+  FRowViewInfo.IndentBetweenViews := dpiApply(IndentBetweenViews, CurrentDpi);
   FRowViewInfo.Calculate(Bounds, []);
 
-  FHeaderViewInfo.IndentBetweenViews := ScaleFactor.Apply(IndentBetweenViews);
+  FHeaderViewInfo.IndentBetweenViews := dpiApply(IndentBetweenViews, CurrentDpi);
   FHeaderViewInfo.Calculate(Bounds, []);
   FHeaderHeight := FHeaderViewInfo.MeasureHeight;
 
@@ -1334,7 +1333,7 @@ end;
 procedure TACLHexViewViewInfo.CalculateSubCells(const AChanges: TIntegerSet);
 begin
   inherited;
-  FClientBounds := acRectInflate(FClientBounds, -ScaleFactor.Apply(Padding));
+  FClientBounds := acRectInflate(FClientBounds, -dpiApply(Padding, CurrentDpi));
 end;
 
 procedure TACLHexViewViewInfo.CheckBufferCapacity(ACapacity: Integer);

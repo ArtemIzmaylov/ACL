@@ -4,7 +4,7 @@
 {*        Activity Indicator Control         *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -36,7 +36,8 @@ uses
   ACL.Graphics.Ex,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.Labels,
-  ACL.UI.Resources;
+  ACL.UI.Resources,
+  ACL.Utils.DPIAware;
 
 type
 
@@ -151,17 +152,16 @@ var
   ADotSize: Integer;
   AIndentBetweenDots: Integer;
   ARect: TRect;
-  I: Integer;
 begin
   inherited;
 
-  ADotSize := ScaleFactor.Apply(Style.DotSize);
-  AIndentBetweenDots := ScaleFactor.Apply(Style.IndentBetweenDots);
+  ADotSize := dpiApply(Style.DotSize, FCurrentPPI);
+  AIndentBetweenDots := dpiApply(Style.IndentBetweenDots, FCurrentPPI);
 
   // Draw dots
   ARect := acRectCenterVertically(ClientRect, ADotSize);
   ARect.Left := ARect.Right - ADotSize;
-  for I := Style.DotCount - 1 downto 0 do
+  for var I := Style.DotCount - 1 downto 0 do
   begin
     Style.DrawDot(Canvas, ARect, I = FTimer.Tag);
     ARect := acRectOffset(ARect, -ADotSize - AIndentBetweenDots, 0);
@@ -180,7 +180,7 @@ end;
 
 function TACLActivityIndicator.GetTextOffset: Integer;
 begin
-  Result := (ScaleFactor.Apply(Style.IndentBetweenDots) + ScaleFactor.Apply(Style.DotSize)) * Style.DotCount;
+  Result := (dpiApply(Style.IndentBetweenDots, FCurrentPPI) + dpiApply(Style.DotSize, FCurrentPPI)) * Style.DotCount;
 end;
 
 procedure TACLActivityIndicator.SetActive(const Value: Boolean);
@@ -205,7 +205,7 @@ begin
   if AWidth > 0 then
     Dec(AWidth, GetTextOffset);
   Result := inherited MeasureSize(AWidth);
-  Result.cy := Max(Result.cy, ScaleFactor.Apply(Style.DotSize));
+  Result.cy := Max(Result.cy, dpiApply(Style.DotSize, FCurrentPPI));
   Result.cx := Result.cx + GetTextOffset;
 end;
 

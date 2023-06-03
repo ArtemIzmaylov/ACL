@@ -4,7 +4,7 @@
 {*             Geometry Routines             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -56,57 +56,7 @@ type
   TACLRange = record
     Start: Integer;
     Finish: Integer;
-
     class function Create(AStart, AFinish: Integer): TACLRange; static;
-  end;
-
-  { TACLScaleFactor }
-
-  TACLScaleFactor = class
-  strict private
-    FDenominator: Integer;
-    FListeners: TACLList<TNotifyEvent>;
-    FNumerator: Integer;
-    FOwner: TPersistent;
-
-    function GetAssigned: Boolean; inline;
-  protected
-    procedure AssignCore(ANumerator, ADenominator: Integer);
-  public
-    constructor Create(AChangeEvent: TNotifyEvent = nil); overload;
-    constructor Create(AOwner: TPersistent; AChangeEvent: TNotifyEvent = nil); overload;
-    destructor Destroy; override;
-    procedure Assign(ANumerator, ADenominator: Integer); overload;
-    procedure Assign(ASource: TACLScaleFactor); overload;
-    procedure Change(ANumerator, ADenominator: Integer);
-    function Clone: TACLScaleFactor;
-
-    function Apply(const V: Integer): Integer; overload; inline;
-    function Apply(const V: TPoint): TPoint; overload; inline;
-    function Apply(const V: TRect): TRect; overload; inline;
-    function Apply(const V: TSize): TSize; overload; inline;
-    function ApplyF(const V: Single): Single; inline;
-
-    function Revert(const V: Integer): Integer; overload; inline;
-    function Revert(const V: TPoint): TPoint; overload; inline;
-    function Revert(const V: TRect): TRect; overload; inline;
-    function Revert(const V: TSize): TSize; overload; inline;
-
-    procedure ListenerAdd(AEvent: TNotifyEvent);
-    procedure ListenerRemove(AEvent: TNotifyEvent);
-
-    property Assigned: Boolean read GetAssigned;
-    property Denominator: Integer read FDenominator;
-    property Numerator: Integer read FNumerator;
-    property Owner: TPersistent read FOwner;
-  end;
-
-  { IACLScaleFactor }
-
-  IACLScaleFactor = interface
-  ['{F4BFC126-06AD-4895-A002-67DC336C2F6B}']
-    function GetScaleFactor: TACLScaleFactor;
-    property Value: TACLScaleFactor read GetScaleFactor;
   end;
 
   { TACLAutoSizeItem }
@@ -218,7 +168,8 @@ type
   TACLXFormHelper = record helper for TXForm
   public
     class function Combine(const AMatrix1, AMatrix2: TXForm): TXForm; static;
-    class function CreateFlip(AFlipHorizontally, AFlipVertically: Boolean; const APivotPointX, APivotPointY: Single): TXForm; static;
+    class function CreateFlip(AFlipHorizontally, AFlipVertically: Boolean;
+      const APivotPointX, APivotPointY: Single): TXForm; static;
     class function CreateIdentityMatrix: TXForm; static;
     class function CreateMatrix(M11, M12, M21, M22, DX, DY: Single): TXForm; static;
     class function CreateRotationMatrix(AAngle: Single): TXForm; static;
@@ -256,7 +207,8 @@ function acPointIsEqual(const P1, P2: TPoint): Boolean; inline;
 function acPointOffset(const P, AOffset: TPoint): TPoint; overload; inline;
 function acPointOffset(const P: TPoint; X, Y: Integer): TPoint; overload;inline;
 function acPointOffsetNegative(const P, AOffset: TPoint): TPoint; inline;
-function acPointScale(const P: TPoint; AScaleFactor: Single): TPoint; overload;inline;
+function acPointScale(const P: TPoint; AScaleFactor: Single): TPoint; overload; inline;
+function acPointScale(const P: TPoint; ANumerator, ADenominator: Integer): TPoint; overload; inline;
 
 // Sizes
 function acSize(Value: Integer): TSize; overload; inline;
@@ -565,6 +517,12 @@ function acPointScale(const P: TPoint; AScaleFactor: Single): TPoint;
 begin
   Result.X := Round(P.X * AScaleFactor);
   Result.Y := Round(P.Y * AScaleFactor);
+end;
+
+function acPointScale(const P: TPoint; ANumerator, ADenominator: Integer): TPoint;
+begin
+  Result.X := MulDiv(P.X, ANumerator, ADenominator);
+  Result.Y := MulDiv(P.Y, ANumerator, ADenominator);
 end;
 
 //==============================================================================
@@ -1030,155 +988,6 @@ class function TACLRange.Create(AStart, AFinish: Integer): TACLRange;
 begin
   Result.Start := AStart;
   Result.Finish := AFinish;
-end;
-
-{ TACLScaleFactor }
-
-constructor TACLScaleFactor.Create(AChangeEvent: TNotifyEvent = nil);
-begin
-  Create(nil, AChangeEvent);
-end;
-
-constructor TACLScaleFactor.Create(AOwner: TPersistent; AChangeEvent: TNotifyEvent = nil);
-begin
-  FDenominator := 1;
-  FNumerator := 1;
-  FOwner := AOwner;
-  ListenerAdd(AChangeEvent);
-end;
-
-destructor TACLScaleFactor.Destroy;
-begin
-  FreeAndNil(FListeners);
-  inherited;
-end;
-
-procedure TACLScaleFactor.Assign(ANumerator, ADenominator: Integer);
-var
-  I: Integer;
-begin
-  acReduceFraction(ANumerator, ADenominator);
-  if (ADenominator <> FDenominator) or (ANumerator <> FNumerator) then
-  begin
-    AssignCore(ANumerator, ADenominator);
-    if FListeners <> nil then
-    begin
-      for I := 0 to FListeners.Count - 1 do
-        FListeners.List[I](Self);
-    end;
-  end;
-end;
-
-procedure TACLScaleFactor.Assign(ASource: TACLScaleFactor);
-begin
-  Assign(ASource.Numerator, ASource.Denominator);
-end;
-
-procedure TACLScaleFactor.Change(ANumerator, ADenominator: Integer);
-begin
-  Assign(FNumerator * ANumerator, FDenominator * ADenominator);
-end;
-
-function TACLScaleFactor.Clone: TACLScaleFactor;
-begin
-  Result := TACLScaleFactor.Create;
-  Result.Assign(Self);
-end;
-
-function TACLScaleFactor.Apply(const V: TPoint): TPoint;
-begin
-  Result.X := Apply(V.X);
-  Result.Y := Apply(V.Y);
-end;
-
-function TACLScaleFactor.Apply(const V: Integer): Integer;
-begin
-  if Numerator <> Denominator then
-    Result := MulDiv(V, Numerator, Denominator)
-  else
-    Result := V;
-end;
-
-function TACLScaleFactor.Apply(const V: TSize): TSize;
-begin
-  if Numerator <> Denominator then
-    Result := acSizeScale(V, Numerator, Denominator)
-  else
-    Result := V;
-end;
-
-function TACLScaleFactor.ApplyF(const V: Single): Single;
-begin
-  Result := V * Numerator / Denominator;
-end;
-
-function TACLScaleFactor.Apply(const V: TRect): TRect;
-begin
-  if Numerator <> Denominator then
-    Result := acRectScale(V, Numerator, Denominator)
-  else
-    Result := V;
-end;
-
-function TACLScaleFactor.Revert(const V: TPoint): TPoint;
-begin
-  Result.X := Revert(V.X);
-  Result.Y := Revert(V.Y);
-end;
-
-function TACLScaleFactor.Revert(const V: Integer): Integer;
-begin
-  if Numerator <> Denominator then
-    Result := MulDiv(V, Denominator, Numerator)
-  else
-    Result := V;
-end;
-
-function TACLScaleFactor.Revert(const V: TSize): TSize;
-begin
-  if Numerator <> Denominator then
-    Result := acSizeScale(V, Denominator, Numerator)
-  else
-    Result := V;
-end;
-
-function TACLScaleFactor.Revert(const V: TRect): TRect;
-begin
-  if Numerator <> Denominator then
-    Result := acRectScale(V, Denominator, Numerator)
-  else
-    Result := V;
-end;
-
-procedure TACLScaleFactor.AssignCore(ANumerator, ADenominator: Integer);
-begin
-  FNumerator := ANumerator;
-  FDenominator := ADenominator;
-end;
-
-function TACLScaleFactor.GetAssigned: Boolean;
-begin
-  Result := Numerator <> Denominator;
-end;
-
-procedure TACLScaleFactor.ListenerAdd(AEvent: TNotifyEvent);
-begin
-  if System.Assigned(AEvent) then
-  begin
-    if FListeners = nil then
-      FListeners := TACLList<TNotifyEvent>.Create;
-    FListeners.Add(AEvent);
-  end;
-end;
-
-procedure TACLScaleFactor.ListenerRemove(AEvent: TNotifyEvent);
-begin
-  if FListeners <> nil then
-  begin
-    FListeners.Remove(AEvent);
-    if FListeners.Count = 0 then
-      FreeAndNil(FListeners);
-  end;
 end;
 
 { TACLAutoSizeCalculator }

@@ -82,10 +82,11 @@ type
     property SourceDPI: Integer read FSourceDPI write SetSourceDPI default 96;
   end;
 
-procedure acDrawImage(ACanvas: TCanvas; const R: TRect; AImageList: TCustomImageList; AImageIndex: Integer; AIsEnabled: Boolean = True);
-function acGetImageListSize(AImageList: TCustomImageList; AScaleFactor: TACLScaleFactor): TSize; overload;
-function acGetImageListSize(AImageList: TCustomImageList; ATargetDPI: Integer): TSize; overload;
-procedure acSetImageList(AValue: TCustomImageList; var AFieldValue: TCustomImageList; AChangeLink: TChangeLink; ANotifyComponent: TComponent);
+procedure acDrawImage(ACanvas: TCanvas; const R: TRect; AImageList: TCustomImageList;
+  AImageIndex: Integer; AIsEnabled: Boolean = True);
+function acGetImageListSize(AImageList: TCustomImageList; ATargetDPI: Integer): TSize;
+procedure acSetImageList(AValue: TCustomImageList; var AFieldValue: TCustomImageList;
+  AChangeLink: TChangeLink; ANotifyComponent: TComponent);
 implementation
 
 uses
@@ -116,11 +117,6 @@ begin
     else
       AImageList.Draw(ACanvas, R.Left, R.Top, AImageIndex, AIsEnabled);
   end;
-end;
-
-function acGetImageListSize(AImageList: TCustomImageList; AScaleFactor: TACLScaleFactor): TSize;
-begin
-  Result := acGetImageListSize(AImageList, AScaleFactor.TargetDPI);
 end;
 
 function acGetImageListSize(AImageList: TCustomImageList; ATargetDPI: Integer): TSize;

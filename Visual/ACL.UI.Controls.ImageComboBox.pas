@@ -298,7 +298,7 @@ begin
   inherited CalculateContent(R);
   FImageRect := acRectSetWidth(FTextRect, ImageSize.cx);
   FImageRect := acRectCenterVertically(ImageRect, ImageSize.cy);
-  FTextRect.Left := ImageRect.Right + IfThen(ImageSize.cx > 0, ScaleFactor.Apply(acTextIndent));
+  FTextRect.Left := ImageRect.Right + IfThen(ImageSize.cx > 0, dpiApply(acTextIndent, FCurrentPPI));
 end;
 
 procedure TACLImageComboBox.ImageListChanged(Sender: TObject);
@@ -346,7 +346,7 @@ end;
 
 function TACLImageComboBox.GetImageSize: TSize;
 begin
-  Result := acGetImageListSize(Images, ScaleFactor);
+  Result := acGetImageListSize(Images, FCurrentPPI);
 end;
 
 function TACLImageComboBox.GetSelectedItem: TACLImageComboBoxItem;

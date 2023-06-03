@@ -1,4 +1,5 @@
-﻿{*********************************************}
+﻿
+{*********************************************}
 {*                                           *}
 {*     Artem's Visual Components Library     *}
 {*              Styles Support               *}
@@ -375,7 +376,7 @@ type
     FAllowColoration: TACLBoolean;
     FColorSchema: TACLColorSchema;
     FImage: TACLSkinImageSetItem;
-    FImageScaleFactor: TACLScaleFactor;
+    FImageDpi: Integer;
     FImageSet: TACLSkinImageSet;
     FScalable: TACLBoolean;
 
@@ -399,7 +400,6 @@ type
     procedure SetOverriden(AValue: Boolean);
     procedure SetScalable(AValue: TACLBoolean);
     procedure SkinImageChangeHandler(Sender: TObject);
-    procedure SkinImageScaleFactorChangeHandler(Sender: TObject);
     // IACLResourceProvider
     function GetResource(const ID: string; AResourceClass: TClass; ASender: TObject = nil): TObject;
   protected
@@ -459,7 +459,7 @@ type
     property ActualColorSchema: TACLColorSchema read GetActualColorSchema;
     property ActualScalable: Boolean read GetActualScalable;
     property Image: TACLSkinImageSetItem read FImage;
-    property ImageScaleFactor: TACLScaleFactor read FImageScaleFactor;
+    property ImageDpi: Integer read FImageDpi;
     property ImageSet: TACLSkinImageSet read GetImageSet;
   published
     property ID; // must be first
@@ -1686,7 +1686,7 @@ begin
       Result := TACLResourceFont(Master).Height
     else
       // У нас все размеры определяются для 100% масштаба
-      Result := MulDiv(DefFontData.Height, acDefaultDPI, acSystemScaleFactor.TargetDPI);
+      Result := MulDiv(DefFontData.Height, acDefaultDPI, acGetSystemDpi);
 end;
 
 function TACLResourceFont.GetSize: Integer;
@@ -1890,7 +1890,6 @@ end;
 destructor TACLResourceTexture.Destroy;
 begin
   SetImage(nil);
-  FreeAndNil(FImageScaleFactor);
   FreeAndNil(FImageSet);
   inherited Destroy;
 end;
@@ -1984,7 +1983,7 @@ end;
 procedure TACLResourceTexture.Initialize;
 begin
   FScalable := TACLBoolean.Default;
-  FImageScaleFactor := TACLScaleFactor.Create(SkinImageScaleFactorChangeHandler);
+  FImageDpi := acDefaultDpi;
   inherited Initialize;
   DoMasterChanged;
 end;
@@ -2027,7 +2026,12 @@ end;
 procedure TACLResourceTexture.UpdateImageScaleFactor;
 begin
   if Image <> nil then
-    FImageScaleFactor.Assign(TargetDPI, IfThen(ActualScalable, Image.DPI, TargetDPI));
+  begin
+    if ActualScalable then
+      FImageDpi := MulDiv(acDefaultDpi, TargetDPI, Image.DPI)
+    else
+      FImageDpi := acDefaultDpi;
+  end;
 end;
 
 procedure TACLResourceTexture.Clear;
@@ -2188,7 +2192,7 @@ end;
 
 function TACLResourceTexture.GetContentOffsets: TRect;
 begin
-  Result := FImageScaleFactor.Apply(Image.ContentOffsets);
+  Result := dpiApply(Image.ContentOffsets, ImageDpi);
 end;
 
 function TACLResourceTexture.GetEmpty: Boolean;
@@ -2203,17 +2207,17 @@ end;
 
 function TACLResourceTexture.GetFrameHeight: Integer;
 begin
-  Result := FImageScaleFactor.Apply(Image.FrameHeight);
+  Result := dpiApply(Image.FrameHeight, ImageDpi);
 end;
 
 function TACLResourceTexture.GetFrameSize: TSize;
 begin
-  Result := FImageScaleFactor.Apply(Image.FrameSize);
+  Result := dpiApply(Image.FrameSize, ImageDpi);
 end;
 
 function TACLResourceTexture.GetFrameWidth: Integer;
 begin
-  Result := FImageScaleFactor.Apply(Image.FrameWidth);
+  Result := dpiApply(Image.FrameWidth, ImageDpi);
 end;
 
 function TACLResourceTexture.GetHasAlpha: Boolean;
@@ -2255,7 +2259,7 @@ end;
 
 function TACLResourceTexture.GetMargins: TRect;
 begin
-  Result := FImageScaleFactor.Apply(Image.Margins);
+  Result := dpiApply(Image.Margins, ImageDpi);
 end;
 
 function TACLResourceTexture.GetOverriden: Boolean;
@@ -2327,11 +2331,6 @@ begin
   finally
     EndUpdate;
   end;
-end;
-
-procedure TACLResourceTexture.SkinImageScaleFactorChangeHandler(Sender: TObject);
-begin
-  Changed;
 end;
 
 function TACLResourceTexture.GetResource(const ID: string; AResourceClass: TClass; ASender: TObject): TObject;

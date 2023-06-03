@@ -126,7 +126,7 @@ type
   TFontHelper = class helper for TFont
   public
     function Clone: TFont;
-    procedure SetSize(ASize: Integer; AScaleFactor: TACLScaleFactor);
+    procedure SetSize(ASize: Integer; ATargetDpi: Integer);
   end;
 
   { TACLColorList }
@@ -375,10 +375,8 @@ procedure acDeleteMemDC(AMemDC: HDC; AMemBmp: HBITMAP; AClipRegion: HRGN);
 procedure acBitBlt(DC, SourceDC: HDC; const R: TRect; const APoint: TPoint); overload; inline;
 procedure acBitBlt(DC: HDC; ABitmap: TBitmap; const ADestPoint: TPoint); overload; inline;
 procedure acBitBlt(DC: HDC; ABitmap: TBitmap; const R: TRect; const APoint: TPoint); overload; inline;
-procedure acDrawArrow(DC: HDC; R: TRect; AColor: TColor; AArrowKind: TACLArrowKind; AScaleFactor: TACLScaleFactor); overload;
-procedure acDrawArrow(DC: HDC; R: TRect; AColor: TColor; AArrowKind: TACLArrowKind; ATargetDPI: Integer); overload;
-function acGetArrowSize(AArrowKind: TACLArrowKind; AScaleFactor: TACLScaleFactor): TSize; overload;
-function acGetArrowSize(AArrowKind: TACLArrowKind; ATargetDPI: Integer): TSize; overload;
+procedure acDrawArrow(DC: HDC; R: TRect; AColor: TColor; AArrowKind: TACLArrowKind; ATargetDPI: Integer);
+function acGetArrowSize(AArrowKind: TACLArrowKind; ATargetDPI: Integer): TSize;
 procedure acDrawComplexFrame(DC: HDC; const R: TRect; AColor1, AColor2: TColor; ABorders: TACLBorders = acAllBorders); overload;
 procedure acDrawComplexFrame(DC: HDC; const R: TRect; AColor1, AColor2: TAlphaColor; ABorders: TACLBorders = acAllBorders); overload;
 procedure acDrawColorPreview(ACanvas: TCanvas; R: TRect; AColor: TAlphaColor); overload;
@@ -1482,11 +1480,6 @@ begin
   acBitBlt(DC, ABitmap.Canvas.Handle, R, APoint);
 end;
 
-procedure acDrawArrow(DC: HDC; R: TRect; AColor: TColor; AArrowKind: TACLArrowKind; AScaleFactor: TACLScaleFactor);
-begin
-  acDrawArrow(DC, R, AColor, AArrowKind, AScaleFactor.TargetDPI);
-end;
-
 procedure acDrawArrow(DC: HDC; R: TRect; AColor: TColor; AArrowKind: TACLArrowKind; ATargetDPI: Integer);
 
   procedure Draw(R: TRect; const Extends: TRect; Count: Integer);
@@ -1522,11 +1515,6 @@ begin
     makBottom:
       Draw(acRectCenter(acRectSetTop(R, R.Bottom, 1), 1, 1), Rect(-1, -1, -1, 1), ASize + 1);
   end;
-end;
-
-function acGetArrowSize(AArrowKind: TACLArrowKind; AScaleFactor: TACLScaleFactor): TSize;
-begin
-  Result := acGetArrowSize(AArrowKind, AScaleFactor.TargetDPI);
 end;
 
 function acGetArrowSize(AArrowKind: TACLArrowKind; ATargetDPI: Integer): TSize;
@@ -1788,7 +1776,7 @@ end;
 procedure acDrawDragImage(ACanvas: TCanvas; const R: TRect; AAlpha: Byte = MaxByte);
 begin
   acFillRect(ACanvas.Handle, R, TAlphaColor.FromColor($8F2929, AAlpha));
-  acDrawFrame(ACanvas.Handle, R, TAlphaColor.FromColor(clBlack, AAlpha), acSystemScaleFactor.Apply(4));
+  acDrawFrame(ACanvas.Handle, R, TAlphaColor.FromColor(clBlack, AAlpha), acGetSystemDpi);
 end;
 
 procedure acDrawDropArrow(DC: HDC; const R: TRect; AColor: TColor);
@@ -2447,13 +2435,9 @@ begin
   Result.Assign(Self);
 end;
 
-procedure TFontHelper.SetSize(ASize: Integer; AScaleFactor: TACLScaleFactor);
-var
-  M, D: Integer;
+procedure TFontHelper.SetSize(ASize, ATargetDpi: Integer);
 begin
-  M := AScaleFactor.Numerator * acDefaultDPI;
-  D := AScaleFactor.Denominator * PixelsPerInch;
-  Size := MulDiv(ASize, M, D);
+  Size := MulDiv(ASize, ATargetDpi, PixelsPerInch);
 end;
 
 { TACLBitmap }

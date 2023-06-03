@@ -844,7 +844,7 @@ end;
 procedure TACLColorPickerViewInfo.Calculate(const R: TRect; AChanges: TIntegerSet);
 begin
   inherited;
-  FIndentBetweenElements := ScaleFactor.Apply(accpIndentBetweenElements);
+  FIndentBetweenElements := dpiApply(accpIndentBetweenElements, CurrentDpi);
 end;
 
 procedure TACLColorPickerViewInfo.CalculateAutoSize(var AWidth, AHeight: Integer);
@@ -1015,7 +1015,7 @@ end;
 
 function TACLColorPickerGamutCell.MeasureSize: TSize;
 begin
-  Result := acSize(ScaleFactor.Apply(200));
+  Result := acSize(dpiApply(200, CurrentDpi));
 end;
 
 function TACLColorPickerGamutCell.CalculateCursorPosition: TPoint;
@@ -1069,7 +1069,7 @@ end;
 
 function TACLColorPickerSliderCell.MeasureSize: TSize;
 begin
-  Result := acSize(ScaleFactor.Apply(20));
+  Result := acSize(dpiApply(20, CurrentDpi));
 end;
 
 procedure TACLColorPickerSliderCell.DrawArrow(ACanvas: TCanvas);
@@ -1176,7 +1176,7 @@ end;
 
 function TACLColorPickerPreviewCell.MeasureSize: TSize;
 begin
-  Result := acSize(ScaleFactor.Apply(48));
+  Result := acSize(dpiApply(48, CurrentDpi));
 end;
 
 procedure TACLColorPickerPreviewCell.UpdateEditValue;
@@ -1224,7 +1224,7 @@ end;
 
 function TACLColorPickerCustomEditCell.MeasureSize: TSize;
 begin
-  Result.cx := acTextSize(SubClass.Font, GetCaption).cx + ScaleFactor.Apply(accpIndentBetweenElements) + MeasureEditWidth;
+  Result.cx := acTextSize(SubClass.Font, GetCaption).cx + dpiApply(accpIndentBetweenElements, CurrentDpi) + MeasureEditWidth;
   Result.cy := FEdit.Height;
 end;
 
@@ -1439,7 +1439,7 @@ end;
 
 function TACLCustomColorPicker.GetContentOffset: TRect;
 begin
-  Result := acMarginGetReal(ScaleFactor.Apply(acBorderOffsets), Borders);
+  Result := acMarginGetReal(dpiApply(acBorderOffsets, FCurrentPPI), Borders);
 end;
 
 function TACLCustomColorPicker.GetBackgroundStyle: TACLControlBackgroundStyle;

@@ -1,7 +1,7 @@
 ﻿{*********************************************}
 {*                                           *}
 {*     Artem's Visual Components Library     *}
-{*              BBLabel Control              *}
+{*        Label with Formatted Text          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
 {*                 2006-2023                 *}
@@ -16,6 +16,8 @@ unit ACL.UI.Controls.FormattedLabel;
 interface
 
 uses
+  Winapi.Windows,
+  // System
   System.Types,
   System.Classes,
   // Vcl
@@ -33,6 +35,7 @@ uses
   ACL.UI.Controls.Labels,
   ACL.UI.Resources,
   ACL.Utils.Common,
+  ACL.Utils.DPIAware,
   ACL.Utils.Shell,
   ACL.Utils.Strings;
 
@@ -437,7 +440,7 @@ end;
 
 function TACLFormattedLabel.GetContentOffset: TRect;
 begin
-  Result := acMarginGetReal(ScaleFactor.Apply(acBorderOffsets), Borders);
+  Result := acMarginGetReal(dpiApply(acBorderOffsets, FCurrentPPI), Borders);
 end;
 
 procedure TACLFormattedLabel.DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect);

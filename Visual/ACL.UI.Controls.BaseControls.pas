@@ -11,7 +11,7 @@
 
 unit ACL.UI.Controls.BaseControls;
 
-{$I ACL.Config.Inc}
+{$I ACL.Config.inc}
 
 interface
 
@@ -80,7 +80,7 @@ type
 
   { IACLControl }
 
-  IACLControl = interface(IACLScaleFactor)
+  IACLControl = interface(IACLCurrentDPI)
   ['{D41EBD0F-D2EE-4517-AD7E-EEE8FC0ACFD4}']
     procedure InvalidateRect(const R: TRect);
     procedure Update;
@@ -185,7 +185,7 @@ type
   public
     constructor Create(ADefaultValue: Integer);
     procedure Assign(Source: TPersistent); override;
-    function GetScaledMargins(const AScaleFactor: TACLScaleFactor): TRect;
+    function GetScaledMargins(ATargetDpi: Integer): TRect;
     //
     property Margins: TRect read GetMargins write SetMargins;
   published
@@ -278,17 +278,16 @@ type
   TACLGraphicControl = class(TGraphicControl,
     IACLColorSchema,
     IACLControl,
+    IACLCurrentDpi,
     IACLCursorProvider,
     IACLMouseTracking,
     IACLObjectLinksSupport,
     IACLResourceChangeListener,
-    IACLScaleFactor,
     IACLResourceCollection)
   strict private
     FMargins: TACLMargins;
     FMouseInControl: Boolean;
     FResourceCollection: TACLCustomResourceCollection;
-    FScaleFactor: TACLScaleFactor;
 
     FOnBoundsChanged: TNotifyEvent;
     FOnGetHint: TACLGetHintEvent;
@@ -320,8 +319,8 @@ type
     procedure ResourceCollectionChanged; virtual;
     // IACLResourceCollection
     function GetCollection: TACLCustomResourceCollection;
-    // IACLScaleFactor
-    function GetScaleFactor: TACLScaleFactor;
+    // IACLCurrentDpi
+    function GetCurrentDpi: Integer;
     // IACLMouseTracking
     function IsMouseAtControl: Boolean; virtual;
     procedure MouseEnter; virtual;
@@ -346,7 +345,6 @@ type
     property IsDestroying: Boolean read GetIsDestroying;
     property IsLoading: Boolean read GetIsLoading;
     property ResourceCollection: TACLCustomResourceCollection read FResourceCollection write SetResourceCollection;
-    property ScaleFactor: TACLScaleFactor read FScaleFactor;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -378,12 +376,12 @@ type
     IACLColorSchema,
     IACLControl,
     IACLCursorProvider,
+    IACLCurrentDpi,
     IACLFocusableControl,
     IACLLocalizableComponent,
     IACLMouseTracking,
     IACLObjectLinksSupport,
     IACLResourceChangeListener,
-    IACLScaleFactor,
     IACLResourceCollection)
   strict private
     FFocusOnClick: Boolean;
@@ -394,7 +392,6 @@ type
     FResourceCollection: TACLCustomResourceCollection;
     FScaleChangeCount: Integer;
     FScaleChangeState: TObject;
-    FScaleFactor: TACLScaleFactor;
     FTransparent: Boolean;
 
     FOnGetHint: TACLGetHintEvent;
@@ -403,7 +400,6 @@ type
     function GetIsDestroying: Boolean;
     function GetIsLoading: Boolean;
     function GetLangSection: UnicodeString;
-    function GetScaleFactor: TACLScaleFactor;
     procedure DrawBackground(DC: HDC; const R: TRect);
     function IsMarginsStored: Boolean;
     function IsPaddingStored: Boolean;
@@ -472,13 +468,15 @@ type
     // IACLCursorProvider
     function GetCursor(const P: TPoint): TCursor; virtual;
 
+    // IACLCurrentDpi
+    function GetCurrentDpi: Integer;
+
     // Properties
     property FocusOnClick: Boolean read FFocusOnClick write FFocusOnClick default False;
     property IsHovered: Boolean read FIsHovered;
     property LangSection: UnicodeString read GetLangSection;
     property Padding: TACLPadding read FPadding write SetPadding stored IsPaddingStored;
     property ResourceCollection: TACLCustomResourceCollection read FResourceCollection write SetResourceCollection;
-    property ScaleFactor: TACLScaleFactor read FScaleFactor;
     property Transparent: Boolean read FTransparent write SetTransparent default False;
   public
     constructor Create(AOwner: TComponent); override;
@@ -615,15 +613,12 @@ type
     class procedure WMGestureNotify(ACaller: TWinControl; var Message: TWMGestureNotify);
     class function WMSetCursor(ACaller: TWinControl; var AMessage: TWMSetCursor): Boolean;
   public
-    class function GetScaleFactor(AOwner: TComponent; out AIntf: IACLScaleFactor): Boolean; static;
     class function IsChildOrSelf(AParent, AControl: TControl): Boolean;
     class function ProcessMessage(ACaller: TWinControl; var Message: TMessage): Boolean;
-
     // Scaling
-    class function CanSetParent(AControl, ANewParent: TControl): Boolean;
     class procedure ScaleChanging(AControl: TWinControl; var AState: TObject);
     class procedure ScaleChanged(AControl: TWinControl; var AState: TObject);
-    class procedure UpdateScaleFactorOnParentChange(AControl: TControl);
+    class procedure UpdateDpiOnParentChange(AControl: TControl);
   end;
 
   { TACLMouseTracking }
@@ -693,15 +688,15 @@ function CreateControl(AClass: TControlClass; AParent: TWinControl;
   const R: TRect; AAlign: TAlign = alNone; AAnchors: TAnchors = [akLeft, akTop]): TControl; overload;
 procedure CreateControl(var Obj; AClass: TControlClass; AParent: TWinControl;
   const R: TRect; AAlign: TAlign = alNone; AAnchors: TAnchors = [akLeft, akTop]); overload;
-function GetElementWidthIncludeOffset(const R: TRect; AScaleFactor: TACLScaleFactor): Integer;
+function GetElementWidthIncludeOffset(const R: TRect; ATargetDpi: Integer): Integer;
 
 function acCalculateScrollToDelta(
   const AObjectBounds, AAreaBounds: TRect; AScrollToMode: TACLScrollToMode): TPoint; overload;
 function acCalculateScrollToDelta(AObjectTopValue, AObjectBottomValue: Integer;
   AAreaTopValue, AAreaBottomValue: Integer; AScrollToMode: TACLScrollToMode): Integer; overload;
 
-function acCanStartDragging(const ADeltaX, ADeltaY: Integer; AScaleFactor: TACLScaleFactor): Boolean; overload;
-function acCanStartDragging(const P0, P1: TPoint; AScaleFactor: TACLScaleFactor): Boolean; overload;
+function acCanStartDragging(const ADeltaX, ADeltaY, ATargetDpi: Integer): Boolean; overload;
+function acCanStartDragging(const P0, P1: TPoint; ATargetDpi: Integer): Boolean; overload;
 procedure acDesignerSetModified(AInvoker: TPersistent);
 function acGetContainer(AControl: TControl): TControl;
 function acGetTargetDPI(const AControl: TWinControl): Integer; overload;
@@ -863,14 +858,14 @@ begin
   end;
 end;
 
-function acCanStartDragging(const ADeltaX, ADeltaY: Integer; AScaleFactor: TACLScaleFactor): Boolean;
+function acCanStartDragging(const ADeltaX, ADeltaY, ATargetDpi: Integer): Boolean;
 begin
-  Result := Max(Abs(ADeltaX), Abs(ADeltaY)) >= AScaleFactor.Apply(Mouse.DragThreshold);
+  Result := Max(Abs(ADeltaX), Abs(ADeltaY)) >= dpiApply(Mouse.DragThreshold, ATargetDpi);
 end;
 
-function acCanStartDragging(const P0, P1: TPoint; AScaleFactor: TACLScaleFactor): Boolean;
+function acCanStartDragging(const P0, P1: TPoint; ATargetDpi: Integer): Boolean;
 begin
-  Result := acCanStartDragging(P1.X - P0.X, P1.Y - P0.Y, AScaleFactor);
+  Result := acCanStartDragging(P1.X - P0.X, P1.Y - P0.Y, ATargetDpi);
 end;
 
 function acGetContainer(AControl: TControl): TControl;
@@ -888,7 +883,7 @@ begin
   if IsWin8OrLater then
     Result := MonitorGet(APoint).PixelsPerInch
   else
-    Result := acSystemScaleFactor.TargetDPI;
+    Result := acGetSystemDpi;
 end;
 
 function acGetTargetDPI(const AControl: TWinControl): Integer;
@@ -913,11 +908,11 @@ begin
     Result := NullSize;
 end;
 
-function GetElementWidthIncludeOffset(const R: TRect; AScaleFactor: TACLScaleFactor): Integer;
+function GetElementWidthIncludeOffset(const R: TRect; ATargetDpi: Integer): Integer;
 begin
   Result := acRectWidth(R);
   if Result > 0 then
-    Inc(Result, AScaleFactor.Apply(acIndentBetweenElements));
+    Inc(Result, dpiApply(acIndentBetweenElements, ATargetDpi));
 end;
 
 function acIsChild(AControl, AChildToTest: TControl): Boolean;
@@ -1114,16 +1109,16 @@ begin
     end;
 end;
 
-function TACLPadding.GetScaledMargins(const AScaleFactor: TACLScaleFactor): TRect;
+function TACLPadding.GetScaledMargins(ATargetDpi: Integer): TRect;
 var
   AValue: Single;
 begin
-  if Scalable and AScaleFactor.Assigned then
+  if Scalable and (ATargetDpi <> acDefaultDpi) then
   begin
     //#AI:
     //  not using rounding up, because size of
     //  content will be too large and scroll bars will appeared
-    AValue := AScaleFactor.Numerator / AScaleFactor.Denominator;
+    AValue := ATargetDpi / acDefaultDpi;
     Result.Bottom := Trunc(Margins.Bottom * AValue);
     Result.Left := Trunc(Margins.Left * AValue);
     Result.Right := Trunc(Margins.Right * AValue);
@@ -1220,22 +1215,6 @@ end;
 
 { TACLControlsHelper }
 
-class function TACLControlsHelper.CanSetParent(AControl, ANewParent: TControl): Boolean;
-begin
-  Result := (AControl.Parent <> ANewParent) or (csReading in AControl.ComponentState);
-end;
-
-class function TACLControlsHelper.GetScaleFactor(AOwner: TComponent; out AIntf: IACLScaleFactor): Boolean;
-begin
-  while AOwner <> nil do
-  begin
-    if Supports(AOwner, IACLScaleFactor, AIntf) then
-      Exit(True);
-    AOwner := AOwner.Owner;
-  end;
-  Result := False;
-end;
-
 class function TACLControlsHelper.IsChildOrSelf(AParent, AControl: TControl): Boolean;
 begin
   Result := False;
@@ -1265,11 +1244,10 @@ end;
 class procedure TACLControlsHelper.ScaleChanging(AControl: TWinControl; var AState: TObject);
 var
   AChildControl: TControlAccess;
-  I: Integer;
 begin
   AControl.DisableAlign;
   AState := TObject(TWinControlAccess(AControl).AutoSize);
-  for I := 0 to AControl.ControlCount - 1 do
+  for var I := 0 to AControl.ControlCount - 1 do
   begin
     AChildControl := TControlAccess(AControl.Controls[I]);
     AChildControl.FAnchorMove := True;
@@ -1280,9 +1258,8 @@ end;
 class procedure TACLControlsHelper.ScaleChanged(AControl: TWinControl; var AState: TObject);
 var
   AChildControl: TControlAccess;
-  I: Integer;
 begin
-  for I := 0 to AControl.ControlCount - 1 do
+  for var I := 0 to AControl.ControlCount - 1 do
   begin
     AChildControl := TControlAccess(AControl.Controls[I]);
     AChildControl.FAnchorMove := False;
@@ -1292,28 +1269,14 @@ begin
   TWinControlAccess(AControl).EnableAlign;
 end;
 
-class procedure TACLControlsHelper.UpdateScaleFactorOnParentChange(AControl: TControl);
-var
-  AParent: IACLScaleFactor;
-  ASource: IACLScaleFactor;
-  M, D: Integer;
+class procedure TACLControlsHelper.UpdateDpiOnParentChange(AControl: TControl);
 begin
-  if Supports(AControl, IACLScaleFactor, ASource) and Supports(AControl.Parent, IACLScaleFactor, AParent) then
-  begin
-    M := AParent.Value.Numerator * ASource.Value.Denominator;
-    D := AParent.Value.Denominator * ASource.Value.Numerator;
-    acReduceFraction(M, D);
-    if M <> D then
-    begin
-      if csLoading in AControl.ComponentState then
-      begin
-        TControlAccess(AControl).FCurrentPPI := AParent.Value.TargetDPI;
-        ASource.Value.Assign(M, D);
-      end
-      else
-        TControlAccess(AControl).ScaleForPPI(AParent.Value.TargetDPI);
-    end;
-  end;
+{$IFNDEF DELPHI110ALEXANDRIA}
+  if csDestroying in AControl.ComponentState then
+    Exit;
+  if csFreeNotification in AControl.ComponentState then // а в противном случае уже сам VCL отработал как надо
+    TControlAccess(AControl).ScaleForPPI(TControlAccess(AControl).GetParentCurrentDpi);
+{$ENDIF}
 end;
 
 class procedure TACLControlsHelper.WMGesture(ACaller: TWinControl; var Message: TMessage);
@@ -1684,13 +1647,11 @@ begin
   inherited Create(AOwner);
   FMargins := TACLMargins.Create(TACLMargins.DefaultValue);
   FMargins.OnChanged := MarginsChangeHandler;
-  FScaleFactor := TACLScaleFactor.Create;
   ControlStyle := ControlStyle + [csCaptureMouse];
 end;
 
 destructor TACLGraphicControl.Destroy;
 begin
-  FreeAndNil(FScaleFactor);
   FreeAndNil(FMargins);
   inherited Destroy;
 end;
@@ -1748,9 +1709,8 @@ end;
 
 procedure TACLGraphicControl.ChangeScale(M, D: Integer; isDpiChange: Boolean);
 begin
-  ScaleFactor.Change(M, D);
   inherited ChangeScale(M, D, isDpiChange);
-  SetTargetDPI(ScaleFactor.TargetDPI);
+  SetTargetDPI(FCurrentPPI);
   MarginsChangeHandler(nil);
 end;
 
@@ -1765,6 +1725,11 @@ begin
     Winapi.Windows.InvalidateRect(Parent.Handle, acRectOffset(R, Left, Top), True);
 end;
 
+function TACLGraphicControl.GetCurrentDpi: Integer;
+begin
+  Result := FCurrentPPI;
+end;
+
 function TACLGraphicControl.GetCursor(const P: TPoint): TCursor;
 begin
   Result := Cursor;
@@ -1773,11 +1738,6 @@ end;
 function TACLGraphicControl.GetCollection: TACLCustomResourceCollection;
 begin
   Result := ResourceCollection;
-end;
-
-function TACLGraphicControl.GetScaleFactor: TACLScaleFactor;
-begin
-  Result := FScaleFactor;
 end;
 
 function TACLGraphicControl.IsMarginsStored: Boolean;
@@ -1793,11 +1753,8 @@ end;
 
 procedure TACLGraphicControl.SetParent(AParent: TWinControl);
 begin
-  if TACLControlsHelper.CanSetParent(Self, AParent) then
-  begin
-    inherited SetParent(AParent);
-    TACLControlsHelper.UpdateScaleFactorOnParentChange(Self);
-  end;
+  inherited SetParent(AParent);
+  TACLControlsHelper.UpdateDpiOnParentChange(Self);
 end;
 
 procedure TACLGraphicControl.SetResourceCollection(AValue: TACLCustomResourceCollection);
@@ -1925,7 +1882,7 @@ end;
 
 procedure TACLGraphicControl.MarginsChangeHandler(Sender: TObject);
 begin
-  acRectToMargins(Margins.GetScaledMargins(ScaleFactor), inherited Margins);
+  acRectToMargins(Margins.GetScaledMargins(FCurrentPPI), inherited Margins);
 end;
 
 function TACLGraphicControl.GetIsDesigning: Boolean;
@@ -1953,7 +1910,6 @@ end;
 constructor TACLCustomControl.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  FScaleFactor := TACLScaleFactor.Create;
   FMargins := TACLMargins.Create(TACLMargins.DefaultValue);
   FMargins.OnChanged := MarginsChangeHandler;
   FPadding := CreatePadding;
@@ -1962,7 +1918,6 @@ end;
 
 destructor TACLCustomControl.Destroy;
 begin
-  FreeAndNil(FScaleFactor);
   FreeAndNil(FPadding);
   FreeAndNil(FMargins);
   inherited Destroy;
@@ -2170,11 +2125,8 @@ end;
 
 procedure TACLCustomControl.SetParent(AParent: TWinControl);
 begin
-  if TACLControlsHelper.CanSetParent(Self, AParent) then
-  begin
-    inherited SetParent(AParent);
-    TACLControlsHelper.UpdateScaleFactorOnParentChange(Self);
-  end;
+  inherited SetParent(AParent);
+  TACLControlsHelper.UpdateDpiOnParentChange(Self);
 end;
 
 procedure TACLCustomControl.SetTargetDPI(AValue: Integer);
@@ -2371,7 +2323,7 @@ procedure TACLCustomControl.AdjustClientRect(var ARect: TRect);
 begin
   inherited AdjustClientRect(ARect);
   ARect := acRectContent(ARect, GetContentOffset);
-  ARect := acRectContent(ARect, Padding.GetScaledMargins(ScaleFactor));
+  ARect := acRectContent(ARect, Padding.GetScaledMargins(FCurrentPPI));
 end;
 
 procedure TACLCustomControl.AdjustSize;
@@ -2404,9 +2356,8 @@ procedure TACLCustomControl.ChangeScale(M, D: Integer; isDpiChange: Boolean);
 begin
   Perform(CM_SCALECHANGING, 0, 0);
   try
-    ScaleFactor.Change(M, D);
     inherited ChangeScale(M, D, isDpiChange);
-    SetTargetDPI(ScaleFactor.TargetDPI);
+    SetTargetDPI(FCurrentPPI);
     MarginsChangeHandler(nil);
   finally
     Perform(CM_SCALECHANGED, 0, 0);
@@ -2429,6 +2380,11 @@ end;
 function TACLCustomControl.GetContentOffset: TRect;
 begin
   Result := NullRect;
+end;
+
+function TACLCustomControl.GetCurrentDpi: Integer;
+begin
+  Result := FCurrentPPI;
 end;
 
 function TACLCustomControl.GetCursor(const P: TPoint): TCursor;
@@ -2456,11 +2412,6 @@ begin
   if FLangSection = '' then
     FLangSection := LangGetComponentPath(Self);
   Result := FLangSection;
-end;
-
-function TACLCustomControl.GetScaleFactor: TACLScaleFactor;
-begin
-  Result := ScaleFactor;
 end;
 
 function TACLCustomControl.GetBackgroundStyle: TACLControlBackgroundStyle;
@@ -2500,7 +2451,7 @@ procedure TACLCustomControl.MarginsChangeHandler(Sender: TObject);
 begin
   DisableAlign;
   try
-    acRectToMargins(Margins.GetScaledMargins(ScaleFactor), inherited Margins);
+    acRectToMargins(Margins.GetScaledMargins(FCurrentPPI), inherited Margins);
   finally
     EnableAlign;
   end;
@@ -2822,9 +2773,9 @@ end;
 function TACLSubControlOptions.GetActualIndentBetweenElements: Integer;
 begin
   if Position in [mRight, mLeft] then
-    Result := acGetScaleFactor(FOwner).Apply(acIndentBetweenElements)
+    Result := dpiApply(acIndentBetweenElements, acGetCurrentDpi(FOwner))
   else
-    Result := acGetScaleFactor(FOwner).Apply(2);
+    Result := dpiApply(2, acGetCurrentDpi(FOwner));
 end;
 
 function TACLSubControlOptions.Validate: Boolean;

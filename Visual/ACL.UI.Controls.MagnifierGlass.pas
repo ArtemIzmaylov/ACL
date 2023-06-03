@@ -4,7 +4,7 @@
 {*          Magnifier Glass Control          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -31,7 +31,8 @@ uses
   ACL.Graphics,
   ACL.Graphics.Ex,
   ACL.UI.Controls.BaseControls,
-  ACL.UI.Resources;
+  ACL.UI.Resources,
+  ACL.Utils.DPIAware;
 
 type
 
@@ -218,7 +219,7 @@ begin
     if acPointInRect(FBuffer.ClientRect, Point(X, Y)) then
       FColorAtPoint := TACLColors.ToColor(FBuffer.Colors^[X + Y * FBuffer.Width]);
 
-    S := ScaleFactor.Apply(6);
+    S := dpiApply(6, FCurrentPPI);
     FBuffer.Canvas.Pen.Color := GetForegroundColor(ColorAtPoint);
     FBuffer.Canvas.MoveTo(X - S + 1, Y);
     FBuffer.Canvas.LineTo(X + S, Y);
@@ -254,7 +255,7 @@ end;
 
 function TACLMagnifierGlass.GetZoomActual: Integer;
 begin
-  Result := ScaleFactor.Apply(Zoom);
+  Result := dpiApply(Zoom, FCurrentPPI);
 end;
 
 procedure TACLMagnifierGlass.SetShowGridLines(AValue: Boolean);

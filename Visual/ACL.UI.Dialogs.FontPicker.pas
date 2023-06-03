@@ -213,7 +213,7 @@ var
   AStyle: TFontStyle;
 begin
   CreateControl(FFontNameEdit, TACLEdit, Self, NullRect);
-  FFontNameEdit.Width := ScaleFactor.Apply(FontNameWidth);
+  FFontNameEdit.Width := dpiApply(FontNameWidth, FCurrentPPI);
   FFontNameEdit.OnChange := HandlerFontModified;
 
   FFontName := CreateSimpleListView;
@@ -224,7 +224,7 @@ begin
 
   CreateControl(FFontSizeEdit, TACLEdit, Self, NullRect);
   FFontSizeEdit.OnChange := HandlerFontModified;
-  FFontSizeEdit.Width := ScaleFactor.Apply(ButtonWidth);
+  FFontSizeEdit.Width := dpiApply(ButtonWidth, FCurrentPPI);
 
   FFontSize := CreateSimpleListView;
   FFontSize.Parent := Self;
@@ -244,7 +244,8 @@ begin
     ACheckBox.OnClick := HandlerFontModified;
   end;
 
-  CreateControl(FColorPicker, TACLButton, FFontStyleGroup, Rect(0, 0, FontSizeEdit.Width, ScaleFactor.Apply(ButtonHeight)), alRight);
+  CreateControl(FColorPicker, TACLButton, FFontStyleGroup,
+    Rect(0, 0, FontSizeEdit.Width, dpiApply(ButtonHeight, FCurrentPPI)), alRight);
   FColorPicker.OnClick := HandlerColorPickerClick;
   FColorPicker.Margins.Margins := Rect(3, 0, 0, 0);
   FColorPicker.AlignWithMargins := True;
@@ -316,20 +317,20 @@ procedure TACLFontPickerDialog.PlaceControls(var R: TRect);
 var
   AIndent: Integer;
 begin
-  AIndent := ScaleFactor.Apply(6);
+  AIndent := dpiApply(6, FCurrentPPI);
 
-  FontNameEdit.BoundsRect := Bounds(R.Left, R.Top, ScaleFactor.Apply(FontNameWidth), FontNameEdit.Height);
+  FontNameEdit.BoundsRect := Bounds(R.Left, R.Top, dpiApply(FontNameWidth, FCurrentPPI), FontNameEdit.Height);
   FontSizeEdit.BoundsRect := Bounds(FontNameEdit.BoundsRect.Right + AIndent, R.Top, FontSizeEdit.Width, FontSizeEdit.Height);
 
   R.Top := FontNameEdit.BoundsRect.Bottom + AIndent;
-  FontSize.BoundsRect := Bounds(FontSizeEdit.Left, R.Top, FontSizeEdit.Width, ScaleFactor.Apply(FontNameHeight));
-  FontName.BoundsRect := Bounds(FontNameEdit.Left, R.Top, FontNameEdit.Width, ScaleFactor.Apply(FontNameHeight));
+  FontSize.BoundsRect := Bounds(FontSizeEdit.Left, R.Top, FontSizeEdit.Width, dpiApply(FontNameHeight, FCurrentPPI));
+  FontName.BoundsRect := Bounds(FontNameEdit.Left, R.Top, FontNameEdit.Width, dpiApply(FontNameHeight, FCurrentPPI));
 
   R.Left := FontName.Left;
   R.Right := FontSize.BoundsRect.Right;
 
-  FFontStyleGroup.SetBounds(R.Left, FontName.BoundsRect.Bottom + AIndent, R.Width, ScaleFactor.Apply(ButtonHeight));
-  FPreview.SetBounds(R.Left, FFontStyleGroup.BoundsRect.Bottom + AIndent, R.Width, ScaleFactor.Apply(72));
+  FFontStyleGroup.SetBounds(R.Left, FontName.BoundsRect.Bottom + AIndent, R.Width, dpiApply(ButtonHeight, FCurrentPPI));
+  FPreview.SetBounds(R.Left, FFontStyleGroup.BoundsRect.Bottom + AIndent, R.Width, dpiApply(72, FCurrentPPI));
 
   R.Top := FPreview.BoundsRect.Bottom + AIndent;
 

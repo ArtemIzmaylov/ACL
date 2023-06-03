@@ -4,14 +4,14 @@
 {*            ProgressBar Control            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.ProgressBar;
 
-{$I ACL.Config.INC}
+{$I ACL.Config.inc}
 
 interface
 
@@ -32,7 +32,8 @@ uses
   ACL.Graphics.SkinImageSet,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.Buttons,
-  ACL.UI.Resources;
+  ACL.UI.Resources,
+  ACL.Utils.DPIAware;
 
 type
 
@@ -228,7 +229,7 @@ end;
 
 procedure TACLProgressBar.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
 begin
-  inherited SetBounds(ALeft, ATop, AWidth, ScaleFactor.Apply(18));
+  inherited SetBounds(ALeft, ATop, AWidth, dpiApply(18, FCurrentPPI));
 end;
 
 function TACLProgressBar.GetProgressAnimSize: Integer;

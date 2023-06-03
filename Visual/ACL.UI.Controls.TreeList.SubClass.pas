@@ -1327,7 +1327,7 @@ begin
     else
 
     if SubClass.OptionsCustomizing.ColumnWidth then
-      if CanResize and (Bounds.Right - AInfo.HitPoint.X <= ScaleFactor.Apply(acResizeHitTestAreaSize)) then
+      if CanResize and (Bounds.Right - AInfo.HitPoint.X <= dpiApply(acResizeHitTestAreaSize, CurrentDpi)) then
       begin
         AInfo.Cursor := crHSplit;
         AInfo.IsResizable := True;
@@ -1371,14 +1371,14 @@ var
   AImageSize: TSize;
 begin
   if Column.ImageIndex >= 0 then
-    AImageSize := acGetImageListSize(OptionsColumns.Images, ScaleFactor)
+    AImageSize := acGetImageListSize(OptionsColumns.Images, CurrentDpi)
   else
     AImageSize := NullSize;
 
   if AHasText then
   begin
     FImageRect := acRectCenterVertically(R, AImageSize.cY);
-    Inc(R.Left, AImageSize.cX + IfThen(AImageSize.cx > 0, ScaleFactor.Apply(acIndentBetweenElements)));
+    Inc(R.Left, AImageSize.cX + IfThen(AImageSize.cx > 0, dpiApply(acIndentBetweenElements, CurrentDpi)));
   end
   else
   begin
@@ -1396,7 +1396,7 @@ begin
     FCheckBoxRect := acRectCenterVertically(R, acRectHeight(NodeViewInfo.CheckBoxRect));
     FCheckBoxRect.Left := R.Left + NodeViewInfo.CheckBoxRect.Left;
     FCheckBoxRect.Right := R.Left + NodeViewInfo.CheckBoxRect.Right;
-    R.Left := CheckBoxRect.Right + ScaleFactor.Apply(acIndentBetweenElements);
+    R.Left := CheckBoxRect.Right + dpiApply(acIndentBetweenElements, CurrentDpi);
   end
   else
     FCheckBoxRect := NullRect;
@@ -1407,7 +1407,7 @@ begin
   R := acRectContent(R, SubClass.Style.ColumnHeader.ContentOffsets);
   CalculateCheckBox(R);
   CalculateSortArea(R);
-  R.Right := SortArrowRect.Left - IfThen(SortArrowRect.Width > 0, ScaleFactor.Apply(acIndentBetweenElements));
+  R.Right := SortArrowRect.Left - IfThen(SortArrowRect.Width > 0, dpiApply(acIndentBetweenElements, CurrentDpi));
   CalculateImageRect(R, (Column = nil) or Column.TextVisible);
   FTextRect := R;
 end;
@@ -1464,7 +1464,7 @@ end;
 
 procedure TACLTreeListColumnViewInfo.InitializeActualWidth;
 begin
-  ActualWidth := ScaleFactor.Apply(Column.Width);
+  ActualWidth := dpiApply(Column.Width, CurrentDpi);
 end;
 
 procedure TACLTreeListColumnViewInfo.OnHotTrack(Action: TACLHotTrackAction);
@@ -1558,7 +1558,7 @@ begin
   if Result = tlAutoHeight then
     Result := CalculateAutoHeight
   else
-    Result := ScaleFactor.Apply(Result);
+    Result := dpiApply(Result, CurrentDpi);
 end;
 
 function TACLTreeListColumnBarViewInfo.MeasureWidth: Integer;
@@ -1779,7 +1779,7 @@ procedure TACLTreeListGroupViewInfo.CalculateCheckBox(var R: TRect);
 begin
   FCheckBoxRect := Owner.NodeViewInfo.CheckBoxRect;
   FCheckBoxRect := acRectOffset(CheckBoxRect, 0, acRectCenterVertically(R, CheckBoxRect.Height).Top - CheckBoxRect.Top);
-  R.Left := CheckBoxRect.Left + GetElementWidthIncludeOffset(CheckBoxRect, SubClass.ScaleFactor);
+  R.Left := CheckBoxRect.Left + GetElementWidthIncludeOffset(CheckBoxRect, SubClass.CurrentDpi);
 end;
 
 procedure TACLTreeListGroupViewInfo.CalculateExpandButton(var R: TRect);
@@ -1791,7 +1791,7 @@ begin
     ASize := SubClass.Style.GroupHeaderExpandButton.FrameSize;
     FExpandButtonRect := acRectSetRight(R, R.Right, ASize.cx);
     FExpandButtonRect := acRectCenterVertically(ExpandButtonRect, ASize.cy);
-    R.Right := ExpandButtonRect.Right - GetElementWidthIncludeOffset(ExpandButtonRect, SubClass.ScaleFactor);
+    R.Right := ExpandButtonRect.Right - GetElementWidthIncludeOffset(ExpandButtonRect, SubClass.CurrentDpi);
   end;
 end;
 
@@ -1812,7 +1812,7 @@ end;
 
 function TACLTreeListGroupViewInfo.GetContentOffsets: TRect;
 begin
-  Result := SubClass.ScaleFactor.Apply(SubClass.Style.GroupHeaderContentOffsets.Value);
+  Result := dpiApply(SubClass.Style.GroupHeaderContentOffsets.Value, SubClass.CurrentDpi);
 end;
 
 function TACLTreeListGroupViewInfo.GetFocusRect: TRect;
@@ -1943,7 +1943,7 @@ var
   ACellRect: TRect;
   ASize: TSize;
 begin
-  ASize := acGetImageListSize(OptionsNodes.Images, SubClass.ScaleFactor);
+  ASize := acGetImageListSize(OptionsNodes.Images, SubClass.CurrentDpi);
   ACellRect := acRectCenterVertically(CellRect[0], ASize.cy);
 
   case OptionsNodes.ImageAlignment of
@@ -1953,13 +1953,13 @@ begin
     taLeftJustify:
       begin
         FImageRect := acRectSetLeft(ACellRect, FTextExtends[True].Left, ASize.cx);
-        Inc(FTextExtends[True].Left, GetElementWidthIncludeOffset(ImageRect, SubClass.ScaleFactor));
+        Inc(FTextExtends[True].Left, GetElementWidthIncludeOffset(ImageRect, SubClass.CurrentDpi));
       end;
 
     taRightJustify:
       begin
         FImageRect := acRectSetRight(ACellRect, ACellRect.Right - FTextExtends[True].Right, ASize.cx);
-        Inc(FTextExtends[True].Right, GetElementWidthIncludeOffset(ImageRect, SubClass.ScaleFactor));
+        Inc(FTextExtends[True].Right, GetElementWidthIncludeOffset(ImageRect, SubClass.CurrentDpi));
       end;
   end;
 end;
@@ -2216,7 +2216,7 @@ end;
 
 function TACLTreeListNodeViewInfo.GetContentOffsets: TRect;
 begin
-  Result := SubClass.ScaleFactor.Apply(SubClass.Style.RowContentOffsets.Value);
+  Result := dpiApply(SubClass.Style.RowContentOffsets.Value, SubClass.CurrentDpi);
 end;
 
 function TACLTreeListNodeViewInfo.GetNode: TACLTreeListNode;
@@ -2268,7 +2268,7 @@ begin
     ASize := NullSize;
   Result := acRectCenterVertically(Bounds, ASize.cy);
   Result := acRectSetLeft(Result, FTextExtends[True].Left, ASize.cx);
-  Inc(FTextExtends[True].Left, GetElementWidthIncludeOffset(Result, SubClass.ScaleFactor));
+  Inc(FTextExtends[True].Left, GetElementWidthIncludeOffset(Result, SubClass.CurrentDpi));
 end;
 
 procedure TACLTreeListNodeViewInfo.SetLevel(AValue: Integer);
@@ -2335,7 +2335,7 @@ end;
 
 function TACLTreeListDropTargetViewInfo.MeasureHeight: Integer;
 begin
-  Result := Owner.ScaleFactor.Apply(3);
+  Result := dpiApply(3, Owner.CurrentDpi);
 end;
 
 function TACLTreeListDropTargetViewInfo.CalculateActualTargetObject: TObject;
@@ -2527,7 +2527,7 @@ begin
     Result := FMeasuredGroupHeight;
   end
   else
-    Result := ScaleFactor.Apply(Result);
+    Result := dpiApply(Result, CurrentDpi);
 end;
 
 function TACLTreeListContentViewInfo.GetActualNodeHeight: Integer;
@@ -2540,7 +2540,7 @@ begin
     Result := FMeasuredNodeHeight;
   end
   else
-    Result := ScaleFactor.Apply(Result);
+    Result := dpiApply(Result, CurrentDpi);
 end;
 
 procedure TACLTreeListContentViewInfo.LockViewItemsPlacement;
@@ -2826,7 +2826,7 @@ end;
 
 function TACLTreeListContentViewInfo.GetLevelIndent: Integer;
 begin
-  Result := SubClass.Style.RowExpandButton.FrameWidth + ScaleFactor.Apply(acIndentBetweenElements);
+  Result := SubClass.Style.RowExpandButton.FrameWidth + dpiApply(acIndentBetweenElements, SubClass.CurrentDpi);
 end;
 
 function TACLTreeListContentViewInfo.GetOptionsBehavior: TACLTreeListOptionsBehavior;
@@ -5086,7 +5086,7 @@ begin
   begin
     BeginLongOperation;
     try
-      Result := ScaleFactor.Revert(AViewInfo.CalculateBestFit);
+      Result := dpiRevert(AViewInfo.CalculateBestFit, CurrentDpi);
     finally
       EndLongOperation;
     end;

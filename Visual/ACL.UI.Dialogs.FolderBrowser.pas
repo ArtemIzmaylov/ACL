@@ -4,7 +4,7 @@
 {*            Shell Browse Dialog            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -50,6 +50,7 @@ uses
   ACL.Utils.Common,
   ACL.Utils.FileSystem,
   ACL.Utils.Desktop,
+  ACL.Utils.DPIAware,
   ACL.Utils.Shell;
 
 type
@@ -331,9 +332,9 @@ begin
     AControl := GetParentForm(AControl);
   inherited CreateNew(AControl);
   DoubleBuffered := True;
-  SetBounds(Left, Top, ScaleFactor.Apply(360), ScaleFactor.Apply(450));
-  Constraints.MinHeight := ScaleFactor.Apply(450);
-  Constraints.MinWidth := ScaleFactor.Apply(360);
+  SetBounds(Left, Top, dpiApply(360, FCurrentPPI), dpiApply(450, FCurrentPPI));
+  Constraints.MinHeight := dpiApply(450, FCurrentPPI);
+  Constraints.MinWidth := dpiApply(360, FCurrentPPI);
   PrepareForm;
   FOptions := AOptions;
   InitializeControls;
@@ -348,7 +349,7 @@ end;
 
 procedure TACLShellFolderBrowserDialog.AdjustClientRect(var Rect: TRect);
 begin
-  Rect := acRectInflate(Rect, -ScaleFactor.Apply(ContentOffset));
+  Rect := acRectInflate(Rect, -dpiApply(ContentOffset, FCurrentPPI));
 end;
 
 procedure TACLShellFolderBrowserDialog.CreateParams(var Params: TCreateParams);
@@ -435,22 +436,22 @@ begin
 
   CreateControl(APanel, TACLCustomControl, alBottom);
   APanel.AlignWithMargins := False;
-  APanel.Height := ScaleFactor.Apply(ButtonHeight) + 2 * ScaleFactor.Apply(3);
+  APanel.Height := dpiApply(ButtonHeight, FCurrentPPI) + 2 * dpiApply(3, FCurrentPPI);
 
   CreateControl(FControlCreateNew, TACLButton, alLeft, APanel);
-  ControlCreateNew.Width := ScaleFactor.Apply(ButtonWidth);
+  ControlCreateNew.Width := dpiApply(ButtonWidth, FCurrentPPI);
   ControlCreateNew.Caption := TACLDialogsStrs.FolderBrowserNewFolder;
   ControlCreateNew.OnClick := DoNewFolderClick;
   ControlCreateNew.Visible := [ssoMultiPath, ssoRecursive] * Options = [];
   ControlCreateNew.Enabled := False;
 
   CreateControl(FControlApply, TACLButton, alRight, APanel);
-  ControlApply.Width := ScaleFactor.Apply(ButtonWidth);
+  ControlApply.Width := dpiApply(ButtonWidth, FCurrentPPI);
   ControlApply.Caption := TACLDialogsStrs.MsgDlgButtons[mbOk];
   ControlApply.ModalResult := mrOk;
 
   CreateControl(FControlCancel, TACLButton, alRight, APanel);
-  ControlCancel.Width := ScaleFactor.Apply(ButtonWidth);
+  ControlCancel.Width := dpiApply(ButtonWidth, FCurrentPPI);
   ControlCancel.Caption := TACLDialogsStrs.MsgDlgButtons[mbCancel];
   ControlCancel.ModalResult := mrCancel;
 end;

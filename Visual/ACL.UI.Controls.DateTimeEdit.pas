@@ -4,7 +4,7 @@
 {*             Editors Controls              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -42,7 +42,8 @@ uses
   ACL.UI.Controls.ComboBox,
   ACL.UI.Controls.SpinEdit,
   ACL.UI.Controls.TimeEdit,
-  ACL.UI.Forms;
+  ACL.UI.Forms,
+  ACL.Utils.DPIAware;
 
 type
 
@@ -738,18 +739,18 @@ begin
 
   CreateControl(TACLButton, FButtonOk);
   FButtonOk.Caption := TACLDialogsStrs.MsgDlgButtons[mbOK];
-  FButtonOk.Width := ScaleFactor.Apply(ButtonWidth);
+  FButtonOk.Width := dpiApply(ButtonWidth, FCurrentPPI);
   FButtonOk.Style := FOwner.StylePushButton;
   FButtonOk.OnClick := HandlerApply;
 
   CreateControl(TACLButton, FButtonCancel);
   FButtonCancel.Caption := TACLDialogsStrs.MsgDlgButtons[mbCancel];
   FButtonCancel.OnClick := HandlerCancel;
-  FButtonCancel.Width := ScaleFactor.Apply(ButtonWidth);
+  FButtonCancel.Width := dpiApply(ButtonWidth, FCurrentPPI);
   FButtonCancel.Style := FOwner.StylePushButton;
 
-  Constraints.MinWidth := ScaleFactor.Apply(290);
-  Constraints.MinHeight := ScaleFactor.Apply(320);
+  Constraints.MinWidth := dpiApply(290, FCurrentPPI);
+  Constraints.MinHeight := dpiApply(320, FCurrentPPI);
   Constraints.MaxHeight := Constraints.MinHeight;
   Constraints.MaxWidth := Constraints.MinWidth;
   SetBounds(0, 0, Constraints.MinWidth, Constraints.MinHeight);
@@ -767,7 +768,7 @@ begin
 
   AHandle := BeginDeferWindowPos(4);
   try
-    AIndent := ScaleFactor.Apply(acIndentBetweenElements);
+    AIndent := dpiApply(acIndentBetweenElements, FCurrentPPI);
     AContentRect := acRectInflate(ClientRect, -AIndent);
 
     // Buttons

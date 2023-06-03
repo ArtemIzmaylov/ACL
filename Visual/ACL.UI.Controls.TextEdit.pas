@@ -4,7 +4,7 @@
 {*                 Text Editor               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -187,7 +187,7 @@ end;
 procedure TACLCustomTextEdit.CalculateContent(const R: TRect);
 begin
   FContentRect := R;
-  FTextRect := acRectInflate(R, -ScaleFactor.Apply(acTextIndent));
+  FTextRect := acRectInflate(R, -dpiApply(acTextIndent, FCurrentPPI));
 end;
 
 function TACLCustomTextEdit.CalculateEditorPosition: TRect;

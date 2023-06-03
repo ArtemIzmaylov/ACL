@@ -4,7 +4,7 @@
 {*         TabControl & PageControl          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -41,6 +41,7 @@ uses
   ACL.UI.Insight,
   ACL.UI.Resources,
   ACL.Utils.Common,
+  ACL.Utils.DPIAware,
   ACL.Utils.Desktop,
   ACL.Utils.FileSystem,
   ACL.Utils.Strings;
@@ -505,7 +506,7 @@ end;
 procedure TACLCustomTabControl.AdjustClientRect(var Rect: TRect);
 begin
   Rect := acRectContent(FFrameRect, 1, Borders);
-  Rect := acRectContent(Rect, Padding.GetScaledMargins(ScaleFactor));
+  Rect := acRectContent(Rect, Padding.GetScaledMargins(FCurrentPPI));
 end;
 
 procedure TACLCustomTabControl.BoundsChanged;
@@ -554,11 +555,11 @@ begin
   if AItem.Active then
   begin
     Result := Rect(
-      -ScaleFactor.Apply(OptionsView.ActualTabIndent) - 1, 0,
-      -ScaleFactor.Apply(OptionsView.ActualTabIndent) - 1, -2);
+      -dpiApply(OptionsView.ActualTabIndent, FCurrentPPI) - 1, 0,
+      -dpiApply(OptionsView.ActualTabIndent, FCurrentPPI) - 1, -2);
   end
   else
-    Result := Rect(0, ScaleFactor.Apply(TabControlOffset), 0, 0);
+    Result := Rect(0, dpiApply(TabControlOffset, FCurrentPPI), 0, 0);
 end;
 
 procedure TACLCustomTabControl.CalculateTabPlaces(const R: TRect);
@@ -572,7 +573,7 @@ var
   AWidth: Integer;
   I: Integer;
 begin
-  ATabOffset := IfThen(OptionsView.Style = tsTab, ScaleFactor.Apply(OptionsView.ActualTabIndent) + 1);
+  ATabOffset := IfThen(OptionsView.Style = tsTab, dpiApply(OptionsView.ActualTabIndent, FCurrentPPI) + 1);
   AIndentBetweenTabs := OptionsView.ActualTabIndent;
 
   ACalculator := TACLAutoSizeCalculator.Create;
@@ -626,7 +627,7 @@ end;
 function TACLCustomTabControl.CalculateTabWidth(AItem: TACLTabViewItem): Integer;
 begin
   if OptionsView.TabWidth > 0 then
-    Result := ScaleFactor.Apply(OptionsView.TabWidth)
+    Result := dpiApply(OptionsView.TabWidth, FCurrentPPI)
   else
     Result := acMarginWidth(GetTabMargins) + CalculateTextSize(AItem.Tab.Caption).cx;
 end;
@@ -958,7 +959,7 @@ begin
     if OptionsView.Style = tsHeader then
       Inc(Result, OptionsView.ActualTabIndent)
     else
-      Inc(Result, ScaleFactor.Apply(TabControlOffset));
+      Inc(Result, dpiApply(TabControlOffset, FCurrentPPI));
   end;
 end;
 
@@ -969,7 +970,7 @@ begin
   else
     Result := Rect(4, 4, 4, 4);
 
-  Result := ScaleFactor.Apply(Result);
+  Result := dpiApply(Result, FCurrentPPI);
 end;
 
 procedure TACLCustomTabControl.PopulateViewItems;
@@ -1110,7 +1111,7 @@ end;
 
 function TACLTabsOptionsView.GetActualTabIndent: Integer;
 begin
-  Result := FControl.ScaleFactor.Apply(TabIndent);
+  Result := dpiApply(TabIndent, FControl.FCurrentPPI);
 end;
 
 procedure TACLTabsOptionsView.SetStyle(AValue: TACLTabsStyle);

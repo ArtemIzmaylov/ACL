@@ -185,8 +185,8 @@ type
     FLineSize: Integer;
   public
     constructor Create;
-    procedure Calculate(const ABounds: TRect; AScaleFactor: TACLScaleFactor);
-    function CalculateBounds(const AControlBounds: TRect; AScaleFactor: TACLScaleFactor): TRect;
+    procedure Calculate(const ABounds: TRect; ATargetDpi: Integer);
+    function CalculateBounds(const AControlBounds: TRect; ATargetDpi: Integer): TRect;
     function CalculateHitTest(const P: TPoint): TACLSelectionFrameHitTestCode;
     procedure Draw(ARender: TACL2DRender; ASelectedElement: TACLSelectionFrameHitTestCode = sfeNone); overload;
     procedure Draw(DC: HDC; ASelectedElement: TACLSelectionFrameHitTestCode = sfeNone); overload;
@@ -376,7 +376,7 @@ begin
     if Value <> nil then
     begin
       FPicture := Value.Create(Self);
-      FPicture.SetTargetDPI(ScaleFactor.TargetDPI);
+      FPicture.SetTargetDPI(FCurrentPPI);
     end;
     Changed;
   end;
@@ -558,7 +558,7 @@ end;
 
 function TACLImagePictureImageList.GetSize: TSize;
 begin
-  Result := acGetImageListSize(Images, FOwner.ScaleFactor)
+  Result := acGetImageListSize(Images, FOwner.FCurrentPPI)
 end;
 
 function TACLImagePictureImageList.IsEmpty: Boolean;
@@ -611,18 +611,18 @@ begin
     FElements[AElement] := NullRect;
 end;
 
-procedure TACLSelectionFrame.Calculate(const ABounds: TRect; AScaleFactor: TACLScaleFactor);
+procedure TACLSelectionFrame.Calculate(const ABounds: TRect; ATargetDpi: Integer);
 var
   ACornerSize: Integer;
   ARect: TRect;
   ASideSize: Integer;
 begin
   FBounds := ABounds;
-  FFrameSize := AScaleFactor.Apply(DefaultFrameSize);
+  FFrameSize := dpiApply(DefaultFrameSize, ATargetDpi);
 
-  FLineSize := AScaleFactor.Apply(DefaultLineSize);
-  ASideSize := AScaleFactor.Apply(DefaultSideSize);
-  ACornerSize := AScaleFactor.Apply(DefaultCornerSize);
+  FLineSize := dpiApply(DefaultLineSize, ATargetDpi);
+  ASideSize := dpiApply(DefaultSideSize, ATargetDpi);
+  ACornerSize := dpiApply(DefaultCornerSize, ATargetDpi);
   ACornerSize := Min(ACornerSize, Min(FBounds.Width, FBounds.Height) div 3);
 
   if HandleAlignment = sfhaOutside then
@@ -653,11 +653,13 @@ begin
   end;
 end;
 
-function TACLSelectionFrame.CalculateBounds(const AControlBounds: TRect; AScaleFactor: TACLScaleFactor): TRect;
+function TACLSelectionFrame.CalculateBounds(const AControlBounds: TRect; ATargetDpi: Integer): TRect;
 begin
   Result := AControlBounds;
   if HandleAlignment = sfhaOutside then
-    Result := acRectInflate(Result, AScaleFactor.Apply(DefaultFrameSize) - AScaleFactor.Apply(DefaultLineSize));
+    Result := acRectInflate(Result,
+      dpiApply(DefaultFrameSize, ATargetDpi) -
+      dpiApply(DefaultLineSize, ATargetDpi));
 end;
 
 function TACLSelectionFrame.CalculateHitTest(const P: TPoint): TACLSelectionFrameHitTestCode;
@@ -780,13 +782,15 @@ procedure TACLSubImageSelector.Calculate;
 var
   ARect: TRect;
 begin
-  FDisplayImageRect := acFitRect(ClientRect, ScaleFactor.Apply(ImageSize.cx), ScaleFactor.Apply(ImageSize.cy), afmFit);
+  FDisplayImageRect := acFitRect(ClientRect,
+    dpiApply(ImageSize.cx, FCurrentPPI),
+    dpiApply(ImageSize.cy, FCurrentPPI), afmFit);
 
   if not DisplayImageRect.IsEmpty then
   begin
     ARect := acRectScale(FImageCrop, DisplayImageRect.Width / ImageSize.cx).Round;
     ARect := acRectOffset(ARect, FDisplayImageRect.TopLeft);
-    FSelection.Calculate(ARect, ScaleFactor);
+    FSelection.Calculate(ARect, FCurrentPPI);
   end;
 
   Invalidate;

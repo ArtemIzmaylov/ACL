@@ -4,7 +4,7 @@
 {*             Category Controls             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -31,7 +31,8 @@ uses
   ACL.Graphics,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Resources,
-  ACL.Utils.Common;
+  ACL.Utils.Common,
+  ACL.Utils.DPIAware;
 
 type
 
@@ -164,7 +165,7 @@ end;
 function TACLCategory.GetContentOffset: TRect;
 begin
   Result := inherited;
-  Result.Top := FCaptionRect.Bottom + ScaleFactor.Apply(1);
+  Result.Top := FCaptionRect.Bottom + dpiApply(1, FCurrentPPI);
 end;
 
 function TACLCategory.GetStyle: TACLStyleCategory;

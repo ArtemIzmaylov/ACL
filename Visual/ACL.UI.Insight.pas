@@ -4,7 +4,7 @@
 {*  UI Insight - Search thougth app controls *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2021-2022                 *}
+{*                 2021-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -56,6 +56,7 @@ uses
   ACL.UI.Forms,
   ACL.UI.Resources,
   ACL.Utils.Common,
+  ACL.Utils.DPIAware,
   ACL.Utils.Strings;
 
 type
@@ -528,9 +529,9 @@ begin
 
   FDropDown.PopupUnderControl(
     acRectInflate(BoundsRect,
-      ScaleFactor.Apply(TACLUIInsightSearchPopupWindow.BeakSize) div 2,
-      ScaleFactor.Apply(acTextIndent)),
-    ClientToScreen(NullPoint), AAlignment, ScaleFactor);
+      dpiApply(TACLUIInsightSearchPopupWindow.BeakSize, FCurrentPPI) div 2,
+      dpiApply(acTextIndent, FCurrentPPI)),
+    ClientToScreen(NullPoint), AAlignment, FCurrentPPI);
 end;
 
 procedure TACLUIInsightButton.SetDefaultSize;
@@ -716,10 +717,10 @@ var
   ARegion: HRGN;
 begin
   ABounds := ClientRect;
-  ABeakSize.cy := ScaleFactor.Apply(BeakSize);
+  ABeakSize.cy := dpiApply(BeakSize, FCurrentPPI);
   ABeakSize.cx := {2 * }ABeakSize.cy;
   AButtonCenter := acMapRect(Owner.Handle, Handle, Owner.ClientRect).CenterPoint;
-  FContentMargins := acMargins(ScaleFactor.Apply(acIndentBetweenElements));
+  FContentMargins := acMargins(dpiApply(acIndentBetweenElements, FCurrentPPI));
 
   if (AButtonCenter.X < ABounds.Left + ABeakSize.cx) or (AButtonCenter.X > ABounds.Right - ABeakSize.cx) then
   begin
@@ -816,7 +817,8 @@ procedure TACLUIInsightSearchPopupWindow.UpdateFonts;
 begin
   FHintFont.Assign(Font);
   FHintFont.Size := FHintFont.Size - 1;
-  FSearchResults.OptionsView.Nodes.Height := ScaleFactor.Revert(acFontHeight(Font) + acFontHeight(FHintFont)) + 3 * acTextIndent;
+  FSearchResults.OptionsView.Nodes.Height := 3 * acTextIndent +
+    dpiRevert(acFontHeight(Font) + acFontHeight(FHintFont), FCurrentPPI);
 end;
 
 procedure TACLUIInsightSearchPopupWindow.HandlerSearch(Sender: TObject);
@@ -857,7 +859,7 @@ procedure TACLUIInsightSearchPopupWindow.HandlerSearchResultsDrawEntry(Sender: T
 var
   ARect: TRect;
 begin
-  ARect := acRectInflate(R, -ScaleFactor.Apply(acTextIndent));
+  ARect := acRectInflate(R, -dpiApply(acTextIndent, FCurrentPPI));
 
   ACanvas.Font := Font;
   ACanvas.Font.Color := SearchResults.Style.RowColorsText[True];

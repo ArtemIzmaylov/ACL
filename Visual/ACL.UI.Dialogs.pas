@@ -4,7 +4,7 @@
 {*          Common Dialogs Wrappes           *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -64,6 +64,7 @@ uses
   ACL.UI.ImageList,
   ACL.UI.Controls.ProgressBar,
   ACL.Utils.Common,
+  ACL.Utils.DPIAware,
   ACL.Utils.FileSystem,
   ACL.Utils.Strings;
 
@@ -228,9 +229,9 @@ type
     procedure DoUpdateState;
 
     // Layout
+    procedure DpiChanged; override;
     procedure PlaceControls(var R: TRect); virtual;
     procedure Resize; override;
-    procedure ScaleFactorChanged; override;
 
     property ButtonApply: TACLButton read FButtonApply;
     property ButtonCancel: TACLButton read FButtonCancel;
@@ -1067,12 +1068,12 @@ begin
 
   BorderStyle := bsDialog;
   DoubleBuffered := True;
-  ClientWidth := ScaleFactor.Apply(335);
+  ClientWidth := dpiApply(335, FCurrentPPI);
 
-  Padding.Left := ScaleFactor.Apply(7);
-  Padding.Top := ScaleFactor.Apply(7);
-  Padding.Right := ScaleFactor.Apply(7);
-  Padding.Bottom := ScaleFactor.Apply(7);
+  Padding.Left := dpiApply(7, FCurrentPPI);
+  Padding.Top := dpiApply(7, FCurrentPPI);
+  Padding.Right := dpiApply(7, FCurrentPPI);
+  Padding.Bottom := dpiApply(7, FCurrentPPI);
 end;
 
 procedure TACLCustomInputDialog.CreateControls;
@@ -1140,10 +1141,10 @@ var
   AButtonIndent: Integer;
   AButtonRect: TRect;
 begin
-  R.Bottom := R.Top + ScaleFactor.Apply(ButtonHeight);
+  R.Bottom := R.Top + dpiApply(ButtonHeight, FCurrentPPI);
 
-  AButtonRect := acRectSetRight(R, R.Right, ScaleFactor.Apply(ButtonWidth));
-  AButtonIndent := ScaleFactor.Apply(6) + ScaleFactor.Apply(ButtonWidth);
+  AButtonRect := acRectSetRight(R, R.Right, dpiApply(ButtonWidth, FCurrentPPI));
+  AButtonIndent := dpiApply(6, FCurrentPPI) + dpiApply(ButtonWidth, FCurrentPPI);
 
   if ButtonApply.Visible then
   begin
@@ -1177,7 +1178,7 @@ begin
   end;
 end;
 
-procedure TACLCustomInputDialog.ScaleFactorChanged;
+procedure TACLCustomInputDialog.DpiChanged;
 begin
   FPrevClientRect := NullRect;
   inherited;
@@ -1245,13 +1246,13 @@ begin
     AHeight := AControl.Height;
 
   AControl.BoundsRect := acRectSetHeight(R, AHeight);
-  R.Top := AControl.BoundsRect.Bottom + ScaleFactor.Apply(AIndent);
+  R.Top := AControl.BoundsRect.Bottom + dpiApply(AIndent, FCurrentPPI);
 end;
 
 procedure TACLCustomInputQueryDialog.PlaceControls(var R: TRect);
 begin
   PlaceEditors(R);
-  Inc(R.Top, ScaleFactor.Apply(10) - ScaleFactor.Apply(acIndentBetweenElements));
+  Inc(R.Top, dpiApply(10, FCurrentPPI) - dpiApply(acIndentBetweenElements, FCurrentPPI));
   inherited;
 end;
 
@@ -1430,7 +1431,8 @@ begin
     Result := ADialog.ShowModal = mrOk;
     if Result then
       AText := ADialog.Memo.Text;
-    ADialog.FDialogSize := acSize(ADialog.ClientWidth, ADialog.ClientHeight);
+    ADialog.FDialogSize.cx := dpiRevert(ADialog.ClientWidth, ADialog.FCurrentPPI);
+    ADialog.FDialogSize.cy := dpiRevert(ADialog.ClientHeight, ADialog.FCurrentPPI);
     ADialog.FDialogSizeAssigned := True;
   finally
     ADialog.Free;
@@ -1450,7 +1452,7 @@ end;
 
 procedure TACLMemoQueryDialog.PlaceControls(var R: TRect);
 begin
-  R.Top := FMemo.BoundsRect.Bottom + ScaleFactor.Apply(10);
+  R.Top := FMemo.BoundsRect.Bottom + dpiApply(10, FCurrentPPI);
   inherited;
 end;
 
@@ -1463,8 +1465,8 @@ begin
   end
   else
   begin
-    ClientHeight := ScaleFactor.Apply(230);
-    ClientWidth := ScaleFactor.Apply(360);
+    ClientHeight := dpiApply(230, FCurrentPPI);
+    ClientWidth := dpiApply(360, FCurrentPPI);
   end;
 end;
 
@@ -1537,20 +1539,20 @@ begin
   KeyPreview := True;
   Position := poOwnerFormCenter;
   BorderStyle := bsToolWindow;
-  ClientHeight := ScaleFactor.Apply(87);
-  ClientWidth := ScaleFactor.Apply(502);
-  Padding.Bottom := ScaleFactor.Apply(5);
-  Padding.Left := ScaleFactor.Apply(5);
-  Padding.Right := ScaleFactor.Apply(5);
-  Padding.Top := ScaleFactor.Apply(5);
+  ClientHeight := dpiApply(87, FCurrentPPI);
+  ClientWidth := dpiApply(502, FCurrentPPI);
+  Padding.Bottom := dpiApply(5, FCurrentPPI);
+  Padding.Left := dpiApply(5, FCurrentPPI);
+  Padding.Right := dpiApply(5, FCurrentPPI);
+  Padding.Top := dpiApply(5, FCurrentPPI);
 
-  CreateControl(FTextLabel, TACLLabel, Self, ScaleFactor.Apply(Rect(0, 0, 0, 15)), alTop);
+  CreateControl(FTextLabel, TACLLabel, Self, dpiApply(Rect(0, 0, 0, 15), FCurrentPPI), alTop);
   FTextLabel.AlignWithMargins := True;
 
-  CreateControl(FProgressBar, TACLProgressBar, Self, ScaleFactor.Apply(Bounds(0, 15, 0, 18)), alTop);
+  CreateControl(FProgressBar, TACLProgressBar, Self, dpiApply(Bounds(0, 15, 0, 18), FCurrentPPI), alTop);
   FProgressBar.AlignWithMargins := True;
 
-  CreateControl(FCancelButton, TACLButton, Self, ScaleFactor.Apply(Bounds(195, 54, 115, 25)), alNone);
+  CreateControl(FCancelButton, TACLButton, Self, dpiApply(Bounds(195, 54, 115, 25), FCurrentPPI), alNone);
   FCancelButton.Caption := TACLDialogsStrs.MsgDlgButtons[mbCancel];
   FCancelButton.OnClick := HandlerCancel;
 
@@ -1682,8 +1684,8 @@ begin
   FormStyle := fsStayOnTop;
   DoubleBuffered := True;
 
-  ClientWidth := ScaleFactor.Apply(220);
-  ClientHeight := ScaleFactor.Apply(75);
+  ClientWidth := dpiApply(220, FCurrentPPI);
+  ClientHeight := dpiApply(75, FCurrentPPI);
   Constraints.MinHeight := Height;
   Constraints.MinWidth := Width;
   Constraints.MaxWidth := Width;

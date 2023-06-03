@@ -219,7 +219,7 @@ var
   ARect: TRect;
 begin
   inherited CalculateButtons(R);
-  ARect := acRectInflate(R, -ScaleFactor.Apply(ButtonsIndent));
+  ARect := acRectInflate(R, -dpiApply(ButtonsIndent, FCurrentPPI));
   ButtonViewInfo.IsEnabled := Enabled;
   ButtonViewInfo.IsDown := FDropDown <> nil;
   ButtonViewInfo.Calculate(acRectSetLeft(ARect, ARect.Height));
@@ -321,7 +321,7 @@ end;
 procedure TACLCustomDropDownEdit.CreateDropDownWindow;
 begin
   FDropDown := GetDropDownFormClass.Create(Self);
-  acAssignFont(FDropDown.Font, Font, FDropDown.ScaleFactor, ScaleFactor);
+  acAssignFont(FDropDown.Font, Font, FDropDown.CurrentDPI, FCurrentPPI);
   FDropDown.OnClosePopup := HandlerDropDownClose;
 end;
 

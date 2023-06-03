@@ -4,7 +4,7 @@
 {*           Application Routines            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -19,6 +19,7 @@ uses
   Winapi.Windows,
   Winapi.Messages,
   // System
+  System.Math,
   System.UITypes,
   System.SysUtils,
   // VCL
@@ -220,7 +221,7 @@ end;
 class procedure TACLApplication.SetDefaultFont(AName: TFontName; AHeight: Integer);
 begin
   TACLFontCache.RemapFont(AName, AHeight);
-  AHeight := MulDiv(AHeight, acSystemScaleFactor.TargetDPI, acDefaultDPI);
+  AHeight := MulDiv(AHeight, acGetSystemDpi, acDefaultDpi);
   Application.DefaultFont.Name := AName;
   Application.DefaultFont.Height := AHeight;
   DefFontData.Height := AHeight;

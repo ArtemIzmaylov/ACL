@@ -4,7 +4,7 @@
 {*           Progress Box Control            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -34,7 +34,8 @@ uses
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.ProgressBar,
-  ACL.UI.Resources;
+  ACL.UI.Resources,
+  ACL.Utils.DPIAware;
 
 type
 
@@ -238,16 +239,16 @@ end;
 
 procedure TACLProgressBox.CalculateControlsPosition;
 begin
-  FBoxRect := acRectCenter(ClientRect, ScaleFactor.Apply(330), ScaleFactor.Apply(140));
+  FBoxRect := acRectCenter(ClientRect, dpiApply(330, FCurrentPPI), dpiApply(140, FCurrentPPI));
   if Assigned(FProgress) then
   begin
-    FProgress.SetBounds(BoxRect.Left + ScaleFactor.Apply(10),
-      BoxRect.Top + ScaleFactor.Apply(76), ScaleFactor.Apply(311), ScaleFactor.Apply(18));
+    FProgress.SetBounds(BoxRect.Left + dpiApply(10, FCurrentPPI),
+      BoxRect.Top + dpiApply(76, FCurrentPPI), dpiApply(311, FCurrentPPI), dpiApply(18, FCurrentPPI));
   end;
   if Assigned(FCancelButton) then
   begin
-    FCancelButton.SetBounds(BoxRect.Left + ScaleFactor.Apply(108),
-      BoxRect.Top + ScaleFactor.Apply(104), ScaleFactor.Apply(120), ScaleFactor.Apply(25));
+    FCancelButton.SetBounds(BoxRect.Left + dpiApply(108, FCurrentPPI),
+      BoxRect.Top + dpiApply(104, FCurrentPPI), dpiApply(120, FCurrentPPI), dpiApply(25, FCurrentPPI));
   end;
 end;
 

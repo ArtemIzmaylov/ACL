@@ -54,7 +54,8 @@ uses
   ACL.UI.Controls.ScrollBar,
   ACL.UI.Resources,
   ACL.Utils.Common,
-  ACL.Utils.Desktop;
+  ACL.Utils.Desktop,
+  ACL.Utils.DPIAware;
 
 const
   // CompoundControl Changes Notifications
@@ -206,10 +207,10 @@ type
   TACLCompoundControlPersistent = class(TACLUnknownObject)
   strict private
     FSubClass: TACLCompoundControlSubClass;
-    function GetScaleFactor: TACLScaleFactor;
+    function GetCurrentDpi: Integer; inline;
   public
     constructor Create(ASubClass: TACLCompoundControlSubClass); virtual;
-    property ScaleFactor: TACLScaleFactor read GetScaleFactor;
+    property CurrentDpi: Integer read GetCurrentDpi;
     property SubClass: TACLCompoundControlSubClass read FSubClass;
   end;
 
@@ -283,12 +284,12 @@ type
     FDragTargetZoneWindow: TACLCompoundControlDragWindow;
     FDragWindow: TACLCompoundControlDragWindow;
 
+    function GetCurrentDpi: Integer;
     function GetCursor: TCursor;
     function GetHitTest: TACLHitTestInfo;
     function GetMouseCapturePoint: TPoint;
-    function GetScaleFactor: TACLScaleFactor;
     function GetSubClass: TACLCompoundControlSubClass;
-    procedure SetCursor(const Value: TCursor);
+    procedure SetCursor(AValue: TCursor);
   protected
     FController: TACLCompoundControlDragAndDropController;
 
@@ -307,13 +308,13 @@ type
     procedure Draw(ACanvas: TCanvas); virtual;
     function TransformPoint(const P: TPoint): TPoint; virtual;
     //
+    property CurrentDpi: Integer read GetCurrentDpi;
     property Cursor: TCursor read GetCursor write SetCursor;
     property DragTargetScreenBounds: TRect read FDragTargetScreenBounds;
     property DragTargetZoneWindow: TACLCompoundControlDragWindow read FDragTargetZoneWindow;
     property DragWindow: TACLCompoundControlDragWindow read FDragWindow;
     property HitTest: TACLHitTestInfo read GetHitTest;
     property MouseCapturePoint: TPoint read GetMouseCapturePoint;
-    property ScaleFactor: TACLScaleFactor read GetScaleFactor;
     property SubClass: TACLCompoundControlSubClass read GetSubClass;
   end;
 
@@ -753,7 +754,7 @@ type
   TACLCompoundControlDropSourceStartEvent = procedure (Sender: TObject; var AHandled: Boolean; var AAllowAction: TACLDropSourceActions) of object;
 
   TACLCompoundControlSubClass = class(TComponent,
-    IACLScaleFactor,
+    IACLCurrentDpi,
     IACLResourceCollection,
     IACLResourceChangeListener)
   strict private
@@ -783,11 +784,11 @@ type
     FOnGetCursor: TACLCompoundControlGetCursorEvent;
     FOnUpdateState: TNotifyEvent;
 
+    function GetCurrentDpi: Integer;
     function GetFont: TFont;
     function GetIsDestroying: Boolean; inline;
     function GetLangSection: UnicodeString;
     function GetMouseCapture: Boolean;
-    function GetScaleFactor: TACLScaleFactor;
     procedure SetBounds(const AValue: TRect);
     procedure SetEnabledContent(AValue: Boolean);
     procedure SetMouseCapture(const AValue: Boolean);
@@ -920,6 +921,7 @@ type
     property ActionType: TACLCompoundControlActionType read FActionType;
     property Bounds: TRect read FBounds write SetBounds;
     property Container: IACLCompoundControlSubClassContainer read FContainer;
+    property CurrentDpi: Integer read GetCurrentDpi;
     property DragAndDropController: TACLCompoundControlDragAndDropController read FDragAndDropController;
     property EnabledContent: Boolean read FEnabledContent write SetEnabledContent;
     property Focused: Boolean read GetFocused;
@@ -932,7 +934,6 @@ type
     property MouseCapture: Boolean read GetMouseCapture write SetMouseCapture;
     property PressedObject: TObject read FPressedObject write FPressedObject;
     property ResourceCollection: TACLCustomResourceCollection read GetResourceCollection;
-    property ScaleFactor: TACLScaleFactor read GetScaleFactor;
     property StyleHint: TACLStyleHint read FStyleHint write SetStyleHint;
     property StyleScrollBox: TACLStyleScrollBox read FStyleScrollBox write SetStyleScrollBox;
     property ViewInfo: TACLCompoundControlCustomViewInfo read FViewInfo;
@@ -1027,9 +1028,9 @@ begin
   FSubClass := ASubClass;
 end;
 
-function TACLCompoundControlPersistent.GetScaleFactor: TACLScaleFactor;
+function TACLCompoundControlPersistent.GetCurrentDpi: Integer;
 begin
-  Result := SubClass.Container.GetScaleFactor;
+  Result := SubClass.Container.GetCurrentDpi;
 end;
 
 { TACLCompoundControlCustomViewInfo }
@@ -1357,6 +1358,11 @@ begin
   FController.UpdateDropTarget(ADropTarget);
 end;
 
+function TACLCompoundControlDragObject.GetCurrentDpi: Integer;
+begin
+  Result := SubClass.CurrentDpi;
+end;
+
 function TACLCompoundControlDragObject.GetCursor: TCursor;
 begin
   Result := FController.Cursor;
@@ -1372,19 +1378,14 @@ begin
   Result := FController.MouseCapturePoint;
 end;
 
-function TACLCompoundControlDragObject.GetScaleFactor: TACLScaleFactor;
-begin
-  Result := SubClass.ScaleFactor;
-end;
-
 function TACLCompoundControlDragObject.GetSubClass: TACLCompoundControlSubClass;
 begin
   Result := FController.SubClass;
 end;
 
-procedure TACLCompoundControlDragObject.SetCursor(const Value: TCursor);
+procedure TACLCompoundControlDragObject.SetCursor(AValue: TCursor);
 begin
-  FController.Cursor := Value;
+  FController.Cursor := AValue;
 end;
 
 { TACLCompoundControlDragAndDropController }
@@ -1438,7 +1439,7 @@ begin
   begin
     ADeltaX := X - MouseCapturePoint.X;
     ADeltaY := Y - MouseCapturePoint.Y;
-    if acCanStartDragging(ADeltaX, ADeltaY, ScaleFactor) then
+    if acCanStartDragging(ADeltaX, ADeltaY, CurrentDpi) then
     begin
       FStarted := True;
       SubClass.UpdateHitTest(LastPoint);
@@ -2743,6 +2744,11 @@ begin
   Changed(GetFullRefreshChanges);
 end;
 
+function TACLCompoundControlSubClass.GetCurrentDpi: Integer;
+begin
+  Result := Container.GetCurrentDpi;
+end;
+
 function TACLCompoundControlSubClass.GetCursor(const P: TPoint): TCursor;
 begin
   if FLongOperationCount > 0 then
@@ -3360,11 +3366,6 @@ begin
     Result := AIntf.GetCollection
   else
     Result := nil;
-end;
-
-function TACLCompoundControlSubClass.GetScaleFactor: TACLScaleFactor;
-begin
-  Result := Container.GetScaleFactor;
 end;
 
 procedure TACLCompoundControlSubClass.SetBounds(const AValue: TRect);

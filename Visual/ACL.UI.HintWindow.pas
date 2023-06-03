@@ -84,10 +84,8 @@ type
     HeightCorrection = 4;
   strict private
     FLayout: TACLTextLayout;
-    FScaleFactor: TACLScaleFactor;
     FStyle: TACLStyleHint;
 
-    function GetPixelsPerInch: Integer; reintroduce;
     procedure SetStyle(AValue: TACLStyleHint);
     // Messages
     procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
@@ -97,11 +95,8 @@ type
     procedure CreateParams(var Params: TCreateParams); override;
     procedure NCPaint(DC: HDC); override;
     procedure Paint; override;
-    procedure ScaleForPPI(const ATargetPPI: Integer); reintroduce;
-    //
+    procedure ScaleForPPI(ATargetDpi: Integer); reintroduce;
     property Layout: TACLTextLayout read FLayout;
-    property PixelsPerInch: Integer read GetPixelsPerInch;
-    property ScaleFactor: TACLScaleFactor read FScaleFactor;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -297,7 +292,6 @@ constructor TACLHintWindow.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   DoubleBuffered := True;
-  FScaleFactor := TACLScaleFactor.Create;
   FStyle := TACLStyleHint.Create(Self);
   FLayout := TACLTextLayout.Create(Canvas.Font);
   FLayout.Options := [tloWordWrap, tloAutoHeight];
@@ -307,7 +301,6 @@ end;
 
 destructor TACLHintWindow.Destroy;
 begin
-  FreeAndNil(FScaleFactor);
   FreeAndNil(FStyle);
   FreeAndNil(FLayout);
   inherited Destroy;
@@ -349,8 +342,8 @@ begin
   Layout.SetText(AHint, TACLTextFormatSettings.Formatted);
   Result := acRect(Layout.MeasureSize);
 
-  Inc(Result.Right, 2 * ScaleFactor.Apply(HintTextIndentH));
-  Inc(Result.Bottom, 2 * ScaleFactor.Apply(HintTextIndentV));
+  Inc(Result.Right, 2 * dpiApply(HintTextIndentH, FCurrentPPI));
+  Inc(Result.Bottom, 2 * dpiApply(HintTextIndentV, FCurrentPPI));
   Dec(Result.Bottom, HeightCorrection);
 end;
 
@@ -369,8 +362,8 @@ var
   AHintSize: TSize;
 begin
   ScaleForPPI(MonitorGet(AScreenRect.TopLeft).PixelsPerInch);
-  AHintPos.X := AScreenRect.Left - ScaleFactor.Apply(HintTextIndentH);
-  AHintPos.Y := AScreenRect.Top - ScaleFactor.Apply(HintTextIndentV);
+  AHintPos.X := AScreenRect.Left - dpiApply(HintTextIndentH, FCurrentPPI);
+  AHintPos.Y := AScreenRect.Top - dpiApply(HintTextIndentV, FCurrentPPI);
   AHintSize := acSize(CalcHintRect(Screen.Width div 3, AHint, nil));
 
   case AHorzAlignment of
@@ -382,9 +375,9 @@ begin
 
   case AVertAligment of
     hwvaAbove:
-      AHintPos.Y := AScreenRect.Top - (AHintSize.cy + HeightCorrection) - ScaleFactor.Apply(Indent);
+      AHintPos.Y := AScreenRect.Top - (AHintSize.cy + HeightCorrection) - dpiApply(Indent, FCurrentPPI);
     hwvaBelow:
-      AHintPos.Y := AScreenRect.Bottom + ScaleFactor.Apply(Indent);
+      AHintPos.Y := AScreenRect.Bottom + dpiApply(Indent, FCurrentPPI);
     hwvaOver:
       AHintPos.Y := (AScreenRect.Bottom + AScreenRect.Top - (AHintSize.cy + HeightCorrection)) div 2;
   end;
@@ -424,28 +417,19 @@ begin
   Canvas.Font.Color := Style.ColorText.AsColor;
   Layout.Bounds :=
     acRectInflate(ClientRect,
-      -ScaleFactor.Apply(HintTextIndentH),
-      -ScaleFactor.Apply(HintTextIndentV));
+      -dpiApply(HintTextIndentH, FCurrentPPI),
+      -dpiApply(HintTextIndentV, FCurrentPPI));
   Layout.Draw(Canvas);
 end;
 
-procedure TACLHintWindow.ScaleForPPI(const ATargetPPI: Integer);
-var
-  ACurrentPPI: Integer;
+procedure TACLHintWindow.ScaleForPPI(ATargetDpi: Integer);
 begin
-  ACurrentPPI := PixelsPerInch;
-  if ACurrentPPI <> ATargetPPI then
+  if FCurrentPPI <> ATargetDpi then
   begin
-    ScaleFactor.Assign(ATargetPPI, acDefaultDPI);
-    ChangeScale(ATargetPPI, ACurrentPPI);
-    Layout.TargetDPI := ATargetPPI;
-    Style.SetTargetDPI(ATargetPPI);
+    ChangeScale(ATargetDpi, FCurrentPPI, True);
+    Layout.TargetDpi := ATargetDpi;
+    Style.TargetDpi := ATargetDpi;
   end;
-end;
-
-function TACLHintWindow.GetPixelsPerInch: Integer;
-begin
-  Result := ScaleFactor.TargetDPI;
 end;
 
 procedure TACLHintWindow.SetStyle(AValue: TACLStyleHint);

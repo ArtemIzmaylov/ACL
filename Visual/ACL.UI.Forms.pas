@@ -4,7 +4,7 @@
 {*               Form Classes                *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -79,14 +79,12 @@ type
 
   { TACLBasicScalableForm }
 
-  TACLBasicScalableForm = class(TACLBasicForm, IACLScaleFactor)
+  TACLBasicScalableForm = class(TACLBasicForm, IACLCurrentDpi)
   strict private
     FLoadedClientHeight: Integer;
     FLoadedClientWidth: Integer;
     FParentFontLocked: Boolean;
-    FScaleFactor: TACLScaleFactor;
 
-    procedure ScaleFactorChangeHandler(Sender: TObject);
     procedure SetClientHeight(Value: Integer);
     procedure SetClientWidth(Value: Integer);
     procedure TakeParentFontIfNecessary;
@@ -96,28 +94,26 @@ type
   {$ENDIF}
     procedure WMDPIChanged(var Message: TMessage); message WM_DPICHANGED;
     procedure WMSettingsChanged(var Message: TWMSettingChange); message WM_SETTINGCHANGE;
-    // IACLScaleFactor
-    function GetScaleFactor: TACLScaleFactor;
+    // IACLCurrentDpi
+    function GetCurrentDpi: Integer;
   protected
     procedure ApplicationSettingsChanged(AChanges: TACLApplicationChanges); override;
     procedure ChangeScale(M, D: Integer); overload; override; final;
     procedure ChangeScale(M, D: Integer; IsDpiChange: Boolean); override;
     procedure DoShow; override;
+    procedure DpiChanged; virtual;
     procedure InitializeNewForm; override;
     function IsDesigning: Boolean;
     procedure Loaded; override;
     procedure ReadState(Reader: TReader); override;
     procedure ScaleControlsForDpi(NewPPI: Integer); override;
-    procedure ScaleFactorChanged; virtual;
     procedure SetParent(AParent: TWinControl); override;
     procedure SetPixelsPerInch(Value: Integer); {$IFDEF DELPHI110ALEXANDRIA}override;{$ENDIF}
   public
-    destructor Destroy; override;
     procedure ScaleForCurrentDPI; override;
     procedure ScaleForPPI(ATargetDPI: Integer; AWindowRect: PRect); reintroduce; overload; virtual;
     procedure ScaleForPPI(NewPPI: Integer); overload; override; final;
-    //
-    property ScaleFactor: TACLScaleFactor read FScaleFactor;
+    property CurrentDpi: Integer read FCurrentPPI;
   published
     property ClientHeight write SetClientHeight;
     property ClientWidth write SetClientWidth;
@@ -154,7 +150,7 @@ type
     procedure BeforeFormCreate; virtual;
     function CanCloseByEscape: Boolean; virtual;
     procedure CreateParams(var Params: TCreateParams); override;
-    procedure ScaleFactorChanged; override;
+    procedure DpiChanged; override;
     procedure UpdateImageLists; virtual;
 
     // Config
@@ -236,7 +232,7 @@ type
     procedure PopupClose;
     procedure PopupUnderControl(Control: TControl; Alignment: TAlignment = taLeftJustify); overload;
     procedure PopupUnderControl(const AControlBounds: TRect; const AControlOrigin: TPoint;
-      AAlignment: TAlignment = taLeftJustify; AScaleFactor: TACLScaleFactor = nil); overload;
+      AAlignment: TAlignment = taLeftJustify; ATargetDpi: Integer = 0); overload;
     //
     property Popuped: Boolean read FPopuped;
     //
@@ -328,7 +324,6 @@ const
   DWMWCP_ROUNDSMALL = 3; // Round the corners if appropriate, with a small radius.
 
 type
-  TACLScaleFactorAccess = class(TACLScaleFactor);
   TApplicationAccess = class(TApplication);
   TCustomFormAccess = class(TCustomForm);
   TScrollingWinControlAccess = class(TScrollingWinControl);
@@ -468,12 +463,6 @@ end;
 
 { TACLBasicScalableForm }
 
-destructor TACLBasicScalableForm.Destroy;
-begin
-  inherited;
-  FreeAndNil(FScaleFactor);
-end;
-
 procedure TACLBasicScalableForm.ScaleForPPI(ATargetDPI: Integer; AWindowRect: PRect);
 begin
   TACLFormScalingHelper.ScaleForPPI(TCustomFormAccess(Self), ATargetDPI, AWindowRect);
@@ -515,11 +504,10 @@ var
 begin
   TACLControlsHelper.ScaleChanging(Self, AState);
   try
-    ScaleFactor.Change(M, D);
     inherited ChangeScale(M, D, IsDpiChange);
     PixelsPerInch := MulDiv(PixelsPerInch, M, D);
     TakeParentFontIfNecessary;
-    ScaleFactorChanged;
+    DpiChanged;
   finally
     TACLControlsHelper.ScaleChanged(Self, AState);
   end;
@@ -538,12 +526,9 @@ begin
   // На Wine зз-за этого форма на секунду становится видимой в нулевых координатах.
   Visible := False;
   inherited;
-  FCurrentPPI := PixelsPerInch;
-  FScaleFactor := TACLScaleFactor.Create;
-  FScaleFactor.Assign(TACLFormScalingHelper.GetCurrentPPI(Self), acDefaultDPI);
-  FScaleFactor.ListenerAdd(ScaleFactorChangeHandler);
+  FCurrentPPI := TACLFormScalingHelper.GetCurrentPPI(Self);
   if not ParentFont then
-    Font.Height := acGetFontHeight(ScaleFactor.TargetDPI, Font.Size);
+    Font.Height := acGetFontHeight(FCurrentPPI, Font.Size);
 end;
 
 function TACLBasicScalableForm.IsDesigning: Boolean;
@@ -557,18 +542,15 @@ begin
   TakeParentFontIfNecessary;
 end;
 
-procedure TACLBasicScalableForm.ScaleFactorChanged;
+procedure TACLBasicScalableForm.DpiChanged;
 begin
   // do nothing
 end;
 
 procedure TACLBasicScalableForm.SetParent(AParent: TWinControl);
 begin
-  if TACLControlsHelper.CanSetParent(Self, AParent) then
-  begin
-    inherited SetParent(AParent);
-    TACLControlsHelper.UpdateScaleFactorOnParentChange(Self);
-  end;
+  inherited SetParent(AParent);
+  TACLControlsHelper.UpdateDpiOnParentChange(Self);
 end;
 
 procedure TACLBasicScalableForm.ScaleControlsForDpi(NewPPI: Integer);
@@ -576,7 +558,6 @@ begin
   DisableAlign;
   try
     inherited ScaleControlsForDpi(NewPPI);
-    ScaleFactor.Change(NewPPI, TACLFormScalingHelper.GetCurrentPPI(Self));
   finally
     EnableAlign;
   end;
@@ -663,10 +644,7 @@ end;
 procedure TACLBasicScalableForm.SetPixelsPerInch(Value: Integer);
 begin
   if csReadingState in ControlState then
-  begin
-    TACLScaleFactorAccess(FScaleFactor).AssignCore(Value, acDefaultDPI);
     FCurrentPPI := Value;
-  end;
 {$IFDEF DELPHI110ALEXANDRIA}
   inherited;
 {$ELSE}
@@ -674,14 +652,9 @@ begin
 {$ENDIF}
 end;
 
-function TACLBasicScalableForm.GetScaleFactor: TACLScaleFactor;
+function TACLBasicScalableForm.GetCurrentDpi: Integer;
 begin
-  Result := FScaleFactor;
-end;
-
-procedure TACLBasicScalableForm.ScaleFactorChangeHandler(Sender: TObject);
-begin
-  ScaleFactorChanged;
+  Result := FCurrentPPI;
 end;
 
 procedure TACLBasicScalableForm.TakeParentFontIfNecessary;
@@ -696,7 +669,7 @@ begin
       if (Parent <> nil) and not IsDesigning then
         Font := TWinControlAccess(Parent).Font
       else
-        acAssignFont(Font, Application.DefaultFont, ScaleFactor, acSystemScaleFactor);
+        acAssignFont(Font, Application.DefaultFont, FCurrentPPI, acGetSystemDpi);
 
       ParentFont := True;
     finally
@@ -760,6 +733,7 @@ end;
 procedure TACLBasicScalableForm.WMSettingsChanged(var Message: TWMSettingChange);
 begin
   inherited;
+  FSystemDpiCache := 0;
   if (Message.Section <> nil) and (Message.Section = 'ImmersiveColorSet') then
     TACLApplication.UpdateColorSet;
 end;
@@ -767,12 +741,10 @@ end;
 { TACLWindowHooks }
 
 function TACLWindowHooks.Process(var Message: TMessage): Boolean;
-var
-  I: Integer;
 begin
   if Self = nil then
     Exit(False);
-  for I := Count - 1 downto 0 do
+  for var I := Count - 1 downto 0 do
     if List[I](Message) then
       Exit(True);
   Result := False;
@@ -859,8 +831,8 @@ begin
 
       if IsFormResizable then
       begin
-        APlacement.rcNormalPosition.Height := ScaleFactor.Apply(APlacement.rcNormalPosition.Height);
-        APlacement.rcNormalPosition.Width := ScaleFactor.Apply(APlacement.rcNormalPosition.Width);
+        APlacement.rcNormalPosition.Height := dpiApply(APlacement.rcNormalPosition.Height, FCurrentPPI);
+        APlacement.rcNormalPosition.Width := dpiApply(APlacement.rcNormalPosition.Width, FCurrentPPI);
       end
       else
         APlacement.rcNormalPosition := acRectSetSize(APlacement.rcNormalPosition, Width, Height);
@@ -888,11 +860,8 @@ begin
   APlacement.Length := SizeOf(TWindowPlacement);
   if HandleAllocated and GetWindowPlacement(Handle, APlacement) then
   begin
-    if ScaleFactor.Assigned then
-    begin
-      APlacement.rcNormalPosition.Height := ScaleFactor.Revert(APlacement.rcNormalPosition.Height);
-      APlacement.rcNormalPosition.Width := ScaleFactor.Revert(APlacement.rcNormalPosition.Width);
-    end;
+    APlacement.rcNormalPosition.Height := dpiRevert(APlacement.rcNormalPosition.Height, FCurrentPPI);
+    APlacement.rcNormalPosition.Width := dpiRevert(APlacement.rcNormalPosition.Width, FCurrentPPI);
     case WindowState of
       wsMaximized:
         AIsMaximized := True;
@@ -954,7 +923,7 @@ begin
   end;
 end;
 
-procedure TACLForm.ScaleFactorChanged;
+procedure TACLForm.DpiChanged;
 begin
   if FFormCreated then
     ResourceChanged;
@@ -963,7 +932,7 @@ end;
 
 procedure TACLForm.UpdateImageLists;
 begin
-  TACLFormImageListReplacer.Execute(ScaleFactor.TargetDPI, Self);
+  TACLFormImageListReplacer.Execute(FCurrentPPI, Self);
 end;
 
 function TACLForm.ShouldBeStayOnTop: Boolean;
@@ -1155,11 +1124,11 @@ end;
 
 procedure TACLCustomPopupForm.PopupUnderControl(Control: TControl; Alignment: TAlignment = taLeftJustify);
 begin
-  PopupUnderControl(Control.BoundsRect, Control.ClientToScreen(NullPoint), Alignment, acGetScaleFactor(Control));
+  PopupUnderControl(Control.BoundsRect, Control.ClientToScreen(NullPoint), Alignment, acGetCurrentDpi(Control));
 end;
 
 procedure TACLCustomPopupForm.PopupUnderControl(const AControlBounds: TRect;
-  const AControlOrigin: TPoint; AAlignment: TAlignment = taLeftJustify; AScaleFactor: TACLScaleFactor = nil);
+  const AControlOrigin: TPoint; AAlignment: TAlignment = taLeftJustify; ATargetDpi: Integer = 0);
 
   function CalculateOffset(const ARect: TRect): TPoint;
   begin
@@ -1183,8 +1152,8 @@ begin
   DoPopup;
   if AutoSize then
     HandleNeeded;
-  if AScaleFactor <> nil then
-    ScaleForPPI(AScaleFactor.TargetDPI);
+  if ATargetDpi >= acMinDpi then
+    ScaleForPPI(ATargetDpi);
   AdjustSize;
 
   ARect := acRectOffset(AControlBounds, -AControlBounds.Left, -AControlBounds.Top);
@@ -1255,7 +1224,7 @@ end;
 
 procedure TACLCustomPopupForm.Initialize;
 var
-  AScaleFactor: IACLScaleFactor;
+  ASourceDPI: IACLCurrentDpi;
   ATargetDPI: Integer;
 begin
   Visible := False;
@@ -1264,9 +1233,9 @@ begin
   Position := poDesigned;
   FormStyle := fsStayOnTop;
 
-  if Supports(Owner, IACLScaleFactor, AScaleFactor) then
+  if Supports(Owner, IACLCurrentDpi, ASourceDPI) then
   begin
-    ATargetDPI := AScaleFactor.Value.TargetDPI;
+    ATargetDPI := ASourceDPI.GetCurrentDpi;
     if ATargetDPI <> acDefaultDPI then
       Perform(WM_DPICHANGED, MakeLong(ATargetDPI, ATargetDPI), 0);
   end;
@@ -1398,7 +1367,7 @@ end;
 
 class function TACLFormImageListReplacer.GetReplacement(AImageList: TCustomImageList; AForm: TCustomForm): TCustomImageList;
 begin
-  Result := GetReplacement(AImageList, acGetScaleFactor(AForm).TargetDPI, TACLApplication.IsDarkMode);
+  Result := GetReplacement(AImageList, TCustomFormAccess(AForm).FCurrentPPI, TACLApplication.IsDarkMode);
 end;
 
 class function TACLFormImageListReplacer.GetReplacement(

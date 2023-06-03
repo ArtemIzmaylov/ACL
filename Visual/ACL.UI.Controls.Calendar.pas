@@ -4,7 +4,7 @@
 {*             Calendar Control              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -35,6 +35,7 @@ uses
   ACL.UI.Controls.CompoundControl.SubClass,
   ACL.UI.Resources,
   ACL.Utils.Common,
+  ACL.Utils.DPIAware,
   ACL.Utils.Date;
 
 const
@@ -500,7 +501,7 @@ const
   FrameSize = 2;
 begin
   if AColor <> TAlphaColor.None then
-    acDrawFrame(ACanvas.Handle, Bounds, AColor, ScaleFactor.Apply(FrameSize));
+    acDrawFrame(ACanvas.Handle, Bounds, AColor, dpiApply(FrameSize, CurrentDpi));
 end;
 
 function TACLCalendarViewCustomCell.GetTextColor: TColor;

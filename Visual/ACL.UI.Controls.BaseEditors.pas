@@ -541,7 +541,7 @@ begin
   if ViewInfo <> nil then
   begin
     ViewInfo.IsEnabled := Enabled and ((Collection.ButtonEdit = nil) or Collection.ButtonEdit.ButtonsGetEnabled);
-    ViewInfo.Calculate(acRectSetLeft(R, IfThen(Visible, ViewInfo.ScaleFactor.Apply(Width))));
+    ViewInfo.Calculate(acRectSetLeft(R, IfThen(Visible, dpiApply(Width, ViewInfo.CurrentDpi))));
     R.Right := ViewInfo.Bounds.Left;
   end;
 end;
@@ -810,7 +810,7 @@ end;
 
 procedure TACLCustomEdit.CalculateAutoHeight(var ANewHeight: Integer);
 begin
-  ANewHeight := CalculateTextHeight + ScaleFactor.Apply(4) + IfThen(Borders, 2 * EditorBorderSize);
+  ANewHeight := CalculateTextHeight + dpiApply(4, FCurrentPPI) + IfThen(Borders, 2 * EditorBorderSize);
 end;
 
 procedure TACLCustomEdit.CalculateButtons(var R: TRect);
@@ -819,7 +819,7 @@ var
   AIndex: Integer;
   ARect: TRect;
 begin
-  AIndent := ScaleFactor.Apply(ButtonsIndent);
+  AIndent := dpiApply(ButtonsIndent, FCurrentPPI);
   ARect := acRectInflate(R, -AIndent);
   for AIndex := Buttons.Count - 1 downto 0 do
   begin

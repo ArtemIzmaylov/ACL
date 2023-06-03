@@ -4,14 +4,14 @@
 {*              Slider Control               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.Slider;
 
-{$I ACL.Config.Inc}
+{$I ACL.Config.inc}
 
 interface
 
@@ -44,6 +44,7 @@ uses
   ACL.UI.HintWindow,
   ACL.UI.Resources,
   ACL.Utils.Common,
+  ACL.Utils.DPIAware,
   ACL.Utils.Strings,
   ACL.Utils.FileSystem;
 
@@ -211,11 +212,11 @@ type
 
   TACLSliderViewInfo = class
   strict private
+    function GetCurrentDpi: Integer; inline;
     function GetDrawingPosition: Single;
     function GetOptions: TACLSliderOptions; inline;
     function GetOptionsLabels: TACLSliderOptionsLabels; inline;
     function GetOptionsValue: TACLSliderOptionsValue; inline;
-    function GetScaleFactor: TACLScaleFactor; inline;
     function GetStyle: TACLStyleSlider; inline;
   protected const
     DefaultValueAreaSize = 1;
@@ -252,6 +253,7 @@ type
     function CalculateProgress(X, Y: Integer): Single; virtual; abstract;
     function MeasureSize: TSize; virtual;
     //
+    property CurrentDpi: Integer read GetCurrentDpi;
     property DefaultValueRect: TRect read FDefaultValueRect;
     property LabelCurrentValue: TACLSliderTextViewInfo read FLabelCurrentValue;
     property LabelMaxValue: TACLSliderTextViewInfo read FLabelMaxValue;
@@ -259,7 +261,6 @@ type
     property Options: TACLSliderOptions read GetOptions;
     property OptionsLabels: TACLSliderOptionsLabels read GetOptionsLabels;
     property OptionsValue: TACLSliderOptionsValue read GetOptionsValue;
-    property ScaleFactor: TACLScaleFactor read GetScaleFactor;
     property Style: TACLStyleSlider read GetStyle;
     property ThumbBarRect: TRect read FThumbBarRect;
     property ThumbRect: TRect read FThumbRect;
@@ -764,7 +765,7 @@ begin
   MeasureCanvas.Font := FOwner.Font;
   CalculateLabels(MeasureCanvas, R);
 
-  R := acRectContent(R, FOwner.Padding.GetScaledMargins(ScaleFactor));
+  R := acRectContent(R, FOwner.Padding.GetScaledMargins(CurrentDpi));
   CalculateThumbBarRect(R);
   CalculateTrackBarRect;
   CalculateThumbRect;
@@ -877,6 +878,11 @@ begin
     Result := FOwner.Position;
 end;
 
+function TACLSliderViewInfo.GetCurrentDpi: Integer;
+begin
+  Result := FOwner.FCurrentPPI;
+end;
+
 function TACLSliderViewInfo.GetDefaultValuePosition: Integer;
 var
   AValue: Single;
@@ -890,7 +896,7 @@ end;
 function TACLSliderViewInfo.GetMarkSize: Integer;
 begin
   if Options.MarkVisible then
-    Result := ScaleFactor.Apply(Options.MarkSize)
+    Result := dpiApply(Options.MarkSize, CurrentDpi)
   else
     Result := 0;
 end;
@@ -910,11 +916,6 @@ begin
   Result := FOwner.OptionsValue;
 end;
 
-function TACLSliderViewInfo.GetScaleFactor: TACLScaleFactor;
-begin
-  Result := FOwner.ScaleFactor;
-end;
-
 function TACLSliderViewInfo.GetStyle: TACLStyleSlider;
 begin
   Result := FOwner.Style;
@@ -922,12 +923,12 @@ end;
 
 function TACLSliderViewInfo.GetTrackAreaOffset: Integer;
 begin
-  Result := ScaleFactor.Apply(Options.TrackAreaOffset);
+  Result := dpiApply(Options.TrackAreaOffset, CurrentDpi);
 end;
 
 function TACLSliderViewInfo.MeasureSize: TSize;
 begin
-  Result.cy := 2 * GetTrackAreaOffset + 2 * GetMarkSize + 3 + ScaleFactor.Apply(6);
+  Result.cy := 2 * GetTrackAreaOffset + 2 * GetMarkSize + 3 + dpiApply(6, CurrentDpi);
   Result.cx := 3 * GetThumbSize;
 end;
 
@@ -940,7 +941,7 @@ var
 begin
   Result := inherited;
 
-  AMargins := FOwner.Padding.GetScaledMargins(ScaleFactor);
+  AMargins := FOwner.Padding.GetScaledMargins(CurrentDpi);
   Inc(Result.cx, acMarginWidth(AMargins));
   Inc(Result.cy, acMarginHeight(AMargins));
 
@@ -952,11 +953,11 @@ begin
           ALabelHeight := Max(ALabelHeight, LabelMinValue.TextSize.cy);
           ALabelHeight := Max(ALabelHeight, LabelCurrentValue.TextSize.cy);
 
-          Inc(Result.cy, ScaleFactor.Apply(acIndentBetweenElements));
+          Inc(Result.cy, dpiApply(acIndentBetweenElements, CurrentDpi));
           Inc(Result.cy, ALabelHeight);
 
           Result.cx := Max(Result.cx, LabelCurrentValue.TextSize.cx + LabelMaxValue.TextSize.cx +
-            LabelMinValue.TextSize.cx + 2 * ScaleFactor.Apply(acIndentBetweenElements));
+            LabelMinValue.TextSize.cx + 2 * dpiApply(acIndentBetweenElements, CurrentDpi));
         end;
 
       sllAroundEdges:
@@ -964,14 +965,14 @@ begin
         begin
           Inc(Result.cx, LabelMaxValue.TextSize.cx);
           Inc(Result.cx, LabelMinValue.TextSize.cx);
-          Inc(Result.cx, 2 * ScaleFactor.Apply(acIndentBetweenElements));
+          Inc(Result.cx, 2 * dpiApply(acIndentBetweenElements, CurrentDpi));
 
           Result.cy := Max(Result.cy, LabelMaxValue.TextSize.cy);
           Result.cy := Max(Result.cy, LabelMinValue.TextSize.cy);
 
           if LabelCurrentValue.Assigned then
           begin
-            Inc(Result.cy, ScaleFactor.Apply(acIndentBetweenElements));
+            Inc(Result.cy, dpiApply(acIndentBetweenElements, CurrentDpi));
             Inc(Result.cy, LabelCurrentValue.TextSize.cy);
           end;
         end
@@ -979,7 +980,7 @@ begin
           if LabelCurrentValue.Assigned then
           begin
             Result.cy := Max(Result.cy, LabelCurrentValue.TextSize.cy);
-            Inc(Result.cx, ScaleFactor.Apply(acIndentBetweenElements));
+            Inc(Result.cx, dpiApply(acIndentBetweenElements, CurrentDpi));
             Inc(Result.cx, LabelCurrentValue.TextSize.cx);
           end;
     end;
@@ -1009,14 +1010,14 @@ begin
     sllAfterTrackBar:
       begin
         PlaceLabels(acRectSetBottom(R, R.Bottom, GetMaxLabelHeight));
-        Dec(R.Bottom, ScaleFactor.Apply(acIndentBetweenElements));
+        Dec(R.Bottom, dpiApply(acIndentBetweenElements, CurrentDpi));
         Dec(R.Bottom, GetMaxLabelHeight);
       end;
 
     sllBeforeTrackBar:
       begin
         PlaceLabels(acRectSetHeight(R, GetMaxLabelHeight));
-        Inc(R.Top, ScaleFactor.Apply(acIndentBetweenElements));
+        Inc(R.Top, dpiApply(acIndentBetweenElements, CurrentDpi));
         Inc(R.Top, GetMaxLabelHeight);
       end;
 
@@ -1026,14 +1027,14 @@ begin
         if LabelCurrentValue.Assigned then
         begin
           FLabelCurrentValue.Bounds := acRectSetBottom(R, R.Bottom, LabelCurrentValue.TextSize.cy);
-          R.Bottom := LabelCurrentValue.Bounds.Top - ScaleFactor.Apply(acIndentBetweenElements);
+          R.Bottom := LabelCurrentValue.Bounds.Top - dpiApply(acIndentBetweenElements, CurrentDpi);
         end;
 
         PlaceRangeLabels(acRectCenterVertically(R, Max(LabelMaxValue.TextSize.cy, LabelMinValue.TextSize.cy)));
         if LabelMinValue.Assigned then
-          R.Left := LabelMinValue.Bounds.Right + ScaleFactor.Apply(acIndentBetweenElements);
+          R.Left := LabelMinValue.Bounds.Right + dpiApply(acIndentBetweenElements, CurrentDpi);
         if LabelMaxValue.Assigned then
-          R.Right := LabelMaxValue.Bounds.Left - ScaleFactor.Apply(acIndentBetweenElements);
+          R.Right := LabelMaxValue.Bounds.Left - dpiApply(acIndentBetweenElements, CurrentDpi);
         FLabelMinValue.HorzAlignment := taRightJustify;
         FLabelMaxValue.HorzAlignment := taLeftJustify;
       end
@@ -1043,7 +1044,7 @@ begin
           FLabelCurrentValue.HorzAlignment := taLeftJustify;
           FLabelCurrentValue.Bounds := acRectSetRight(R, R.Right, LabelCurrentValue.TextSize.cx);
           FLabelCurrentValue.Bounds := acRectCenterVertically(FLabelCurrentValue.Bounds, LabelCurrentValue.TextSize.cy);
-          R.Right := LabelCurrentValue.Bounds.Left - ScaleFactor.Apply(acIndentBetweenElements);
+          R.Right := LabelCurrentValue.Bounds.Left - dpiApply(acIndentBetweenElements, CurrentDpi);
         end;
   end;
 end;
@@ -1086,7 +1087,7 @@ var
 begin
   APosition := GetThumbSize div 2;
   AMaxPosition := acRectWidth(ThumbBarRect) - APosition + 1;
-  AMarkThickness := ScaleFactor.Apply(1);
+  AMarkThickness := dpiApply(1, CurrentDpi);
   AMarkSize := GetMarkSize;
 
   X0 := FThumbBarRect.Left;
@@ -1110,7 +1111,7 @@ begin
   begin
     FDefaultValueRect := acRectInflate(FTrackBarRect, 0, -1);
     FDefaultValueRect.Left := FTrackBarRect.Left + GetDefaultValuePosition;
-    FDefaultValueRect.Right := FDefaultValueRect.Left + ScaleFactor.Apply(DefaultValueAreaSize);
+    FDefaultValueRect.Right := FDefaultValueRect.Left + dpiApply(DefaultValueAreaSize, CurrentDpi);
   end
   else
     FDefaultValueRect := NullRect;
@@ -1154,7 +1155,7 @@ begin
   Result := inherited;
   acExchangeIntegers(Result.cx, Result.cy);
 
-  AMargins := FOwner.Padding.GetScaledMargins(ScaleFactor);
+  AMargins := FOwner.Padding.GetScaledMargins(CurrentDpi);
   Inc(Result.cx, acMarginWidth(AMargins));
   Inc(Result.cy, acMarginHeight(AMargins));
 
@@ -1162,13 +1163,13 @@ begin
     case OptionsLabels.Layout of
       sllAfterTrackBar, sllBeforeTrackBar:
         begin
-          Inc(Result.cx, ScaleFactor.Apply(acIndentBetweenElements));
+          Inc(Result.cx, dpiApply(acIndentBetweenElements, CurrentDpi));
           Inc(Result.cx, GetMaxLabelWidth);
 
           Result.cy := Max(Result.cy,
             LabelCurrentValue.TextSize.cy +
             LabelMaxValue.TextSize.cy +
-            LabelMinValue.TextSize.cy + 2 * ScaleFactor.Apply(acIndentBetweenElements));
+            LabelMinValue.TextSize.cy + 2 * dpiApply(acIndentBetweenElements, CurrentDpi));
         end;
 
       sllAroundEdges:
@@ -1176,21 +1177,21 @@ begin
         begin
           if LabelMinValue.Assigned then
           begin
-            Inc(Result.cy, ScaleFactor.Apply(acIndentBetweenElements));
+            Inc(Result.cy, dpiApply(acIndentBetweenElements, CurrentDpi));
             Inc(Result.cy, LabelMinValue.TextSize.cy);
             Result.cx := Max(Result.cx, LabelMinValue.TextSize.cx);
           end;
 
           if LabelMaxValue.Assigned then
           begin
-            Inc(Result.cy, ScaleFactor.Apply(acIndentBetweenElements));
+            Inc(Result.cy, dpiApply(acIndentBetweenElements, CurrentDpi));
             Inc(Result.cy, LabelMaxValue.TextSize.cy);
             Result.cx := Max(Result.cx, LabelMaxValue.TextSize.cx);
           end;
 
           if LabelCurrentValue.Assigned then
           begin
-            Inc(Result.cx, ScaleFactor.Apply(acIndentBetweenElements));
+            Inc(Result.cx, dpiApply(acIndentBetweenElements, CurrentDpi));
             Inc(Result.cx, LabelCurrentValue.TextSize.cx);
           end;
         end
@@ -1198,7 +1199,7 @@ begin
           if LabelCurrentValue.Assigned then
           begin
             Inc(Result.cy, LabelCurrentValue.TextSize.cy);
-            Inc(Result.cy, ScaleFactor.Apply(acIndentBetweenElements));
+            Inc(Result.cy, dpiApply(acIndentBetweenElements, CurrentDpi));
             Result.cx := Max(Result.cx, LabelCurrentValue.TextSize.cx);
           end;
     end;
@@ -1231,14 +1232,14 @@ begin
     sllAfterTrackBar:
       begin
         PlaceLabels(acRectSetRight(R, R.Right, GetMaxLabelWidth), taLeftJustify);
-        Dec(R.Right, ScaleFactor.Apply(acIndentBetweenElements));
+        Dec(R.Right, dpiApply(acIndentBetweenElements, CurrentDpi));
         Dec(R.Right, GetMaxLabelWidth);
       end;
 
     sllBeforeTrackBar:
       begin
         PlaceLabels(acRectSetWidth(R, GetMaxLabelWidth), taRightJustify);
-        Inc(R.Left, ScaleFactor.Apply(acIndentBetweenElements));
+        Inc(R.Left, dpiApply(acIndentBetweenElements, CurrentDpi));
         Inc(R.Left, GetMaxLabelWidth);
       end;
 
@@ -1248,20 +1249,20 @@ begin
         if LabelCurrentValue.Assigned then
         begin
           PlaceCurrentValueLabel(acRectSetRight(R, R.Right, LabelCurrentValue.TextSize.cx), taLeftJustify);
-          R.Right := LabelCurrentValue.Bounds.Left - ScaleFactor.Apply(acIndentBetweenElements);
+          R.Right := LabelCurrentValue.Bounds.Left - dpiApply(acIndentBetweenElements, CurrentDpi);
         end;
 
         PlaceRangeLabels(acRectCenterHorizontally(R, GetMaxLabelWidth), taCenter);
         if LabelMinValue.Assigned then
-          R.Top := LabelMinValue.Bounds.Bottom + ScaleFactor.Apply(acIndentBetweenElements);
+          R.Top := LabelMinValue.Bounds.Bottom + dpiApply(acIndentBetweenElements, CurrentDpi);
         if LabelMaxValue.Assigned then
-          R.Bottom := LabelMaxValue.Bounds.Top - ScaleFactor.Apply(acIndentBetweenElements);
+          R.Bottom := LabelMaxValue.Bounds.Top - dpiApply(acIndentBetweenElements, CurrentDpi);
       end
       else
         if LabelCurrentValue.Assigned then
         begin
           PlaceCurrentValueLabel(acRectSetHeight(R, LabelCurrentValue.TextSize.cy), taCenter);
-          R.Top := LabelCurrentValue.Bounds.Bottom + ScaleFactor.Apply(acIndentBetweenElements);
+          R.Top := LabelCurrentValue.Bounds.Bottom + dpiApply(acIndentBetweenElements, CurrentDpi);
         end;
   end;
 end;
@@ -1279,7 +1280,7 @@ begin
   begin
     FDefaultValueRect := acRectInflate(FTrackBarRect, -1, 0);
     FDefaultValueRect.Top := FTrackBarRect.Top + GetDefaultValuePosition;
-    FDefaultValueRect.Bottom := FDefaultValueRect.Top + ScaleFactor.Apply(DefaultValueAreaSize);
+    FDefaultValueRect.Bottom := FDefaultValueRect.Top + dpiApply(DefaultValueAreaSize, CurrentDpi);
   end
   else
     FDefaultValueRect := NullRect;
@@ -1301,7 +1302,7 @@ var
 begin
   APosition := GetThumbSize div 2;
   AMaxPosition := acRectHeight(ThumbBarRect) - APosition + 1;
-  AMarkThickness := ScaleFactor.Apply(1);
+  AMarkThickness := dpiApply(1, CurrentDpi);
   AMarkSize := GetMarkSize;
 
   Y0 := FThumbBarRect.Top;

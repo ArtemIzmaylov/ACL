@@ -4,7 +4,7 @@
 {*             TrayIcon Classes              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -40,6 +40,7 @@ uses
   ACL.Hashes,
   ACL.UI.Controls.BaseControls,
   ACL.Utils.Common,
+  ACL.Utils.DPIAware,
   ACL.Utils.FileSystem;
 
 type
@@ -48,7 +49,7 @@ type
   { TACLTrayIcon }
 
   TACLTrayIcon = class(TACLComponent,
-    IACLScaleFactor,
+    IACLCurrentDpi,
     IACLMouseTracking)
   strict private
     FClickTimer: TACLTimer;
@@ -95,8 +96,8 @@ type
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; const P: TPoint);
     procedure MouseMove(Shift: TShiftState; const P: TPoint);
     procedure MouseUp(Button: TMouseButton; Shift: TShiftState; const P: TPoint);
-    // IACLScaleFactor
-    function GetScaleFactor: TACLScaleFactor;
+    // IACLCurrentDpi
+    function GetCurrentDpi: Integer;
     // IACLMouseTracking
     function IsMouseAtControl: Boolean;
     procedure MouseEnter;
@@ -144,7 +145,6 @@ uses
   // ACL
   ACL.Utils.Messaging,
   ACL.Utils.Desktop,
-  ACL.Utils.DPIAware,
   ACL.Utils.Strings;
 
 const
@@ -272,9 +272,9 @@ begin
     UpdateIconState(NIM_MODIFY);
 end;
 
-function TACLTrayIcon.GetScaleFactor: TACLScaleFactor;
+function TACLTrayIcon.GetCurrentDpi: Integer;
 begin
-  Result := acSystemScaleFactor;
+  Result := acGetSystemDpi;
 end;
 
 function TACLTrayIcon.IsMouseAtControl: Boolean;

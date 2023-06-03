@@ -4,7 +4,7 @@
 {*          Compoud Control Classes          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -105,7 +105,6 @@ type
     function IACLCompoundControlSubClassContainer.GetFocused = Focused;
     function GetFont: TFont;
     function GetMouseCapture: Boolean;
-    function GetScaleFactor: TACLScaleFactor;
     function ScreenToClient(const P: TPoint): TPoint; overload;
     procedure SetMouseCapture(const AValue: Boolean);
     procedure UpdateCursor;
@@ -459,11 +458,6 @@ end;
 function TACLCompoundControl.GetOnUpdateState: TNotifyEvent;
 begin
   Result := SubClass.OnUpdateState;
-end;
-
-function TACLCompoundControl.GetScaleFactor: TACLScaleFactor;
-begin
-  Result := ScaleFactor;
 end;
 
 function TACLCompoundControl.GetStyleHint: TACLStyleHint;

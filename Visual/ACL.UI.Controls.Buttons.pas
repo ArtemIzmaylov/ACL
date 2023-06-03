@@ -46,7 +46,8 @@ uses
   ACL.UI.Controls.Labels,
   ACL.UI.ImageList,
   ACL.UI.Resources,
-  ACL.Utils.Common;
+  ACL.Utils.Common,
+  ACL.Utils.DPIAware;
 
 const
   DefaultButtonHeight = 25;
@@ -114,9 +115,9 @@ type
 
     FOnClick: TNotifyEvent;
 
+    function GetCurrentDpi: Integer;
     function GetFlag(Index: TACLButtonStateFlag): Boolean;
     function GetFont: TFont;
-    function GetScaleFactor: TACLScaleFactor;
     function GetStyle: TACLStyleButton;
     function GetTextureSize: TSize;
     procedure SetAlignment(AValue: TAlignment);
@@ -175,9 +176,9 @@ type
     property Bounds: TRect read FBounds;
     property ButtonRect: TRect read FButtonRect;
     property Caption: UnicodeString read FCaption write SetCaption;
+    property CurrentDpi: Integer read GetCurrentDpi;
     property FocusRect: TRect read FFocusRect;
     property Font: TFont read GetFont;
-    property ScaleFactor: TACLScaleFactor read GetScaleFactor;
     property State: TACLButtonState read FState;
     property Tag: Integer read FTag write FTag;
     property TextColor: TColor read GetTextColor;
@@ -621,7 +622,6 @@ uses
   System.Math,
   // ACL
   ACL.UI.PopupMenu,
-  ACL.Utils.DPIAware,
   ACL.Utils.Strings;
 
 { TACLStyleButton }
@@ -838,7 +838,7 @@ end;
 
 function TACLCustomButtonViewInfo.GetIndentBetweenElements: Integer;
 begin
-  Result := ScaleFactor.Apply(acIndentBetweenElements);
+  Result := dpiApply(acIndentBetweenElements, CurrentDpi);
 end;
 
 function TACLCustomButtonViewInfo.GetTextColor: TColor;
@@ -913,14 +913,14 @@ begin
   Owner.ButtonOwnerRecalculate;
 end;
 
+function TACLCustomButtonViewInfo.GetCurrentDpi: Integer;
+begin
+  Result := Owner.GetCurrentDpi;
+end;
+
 function TACLCustomButtonViewInfo.GetFlag(Index: TACLButtonStateFlag): Boolean;
 begin
   Result := Index in FFlags;
-end;
-
-function TACLCustomButtonViewInfo.GetScaleFactor: TACLScaleFactor;
-begin
-  Result := Owner.GetScaleFactor;
 end;
 
 function TACLCustomButtonViewInfo.GetStyle: TACLStyleButton;
@@ -1208,7 +1208,7 @@ begin
     if Part <> abpDropDownArrow then
     begin
       FArrowRect.Right := FArrowRect.Right - GetIndentBetweenElements;
-      FArrowRect.Left := FArrowRect.Right - ScaleFactor.Apply(acDropArrowSize.cx);
+      FArrowRect.Left := FArrowRect.Right - dpiApply(acDropArrowSize.cx, CurrentDpi);
     end;
     R.Right := FArrowRect.Left - GetIndentBetweenElements;
   end;
@@ -1236,7 +1236,7 @@ end;
 
 procedure TACLButtonViewInfo.CalculateTextRect(var R: TRect);
 begin
-  FTextRect := acRectInflate(R, -ScaleFactor.Apply(acTextIndent - 1), 0);
+  FTextRect := acRectInflate(R, -dpiApply(acTextIndent - 1, CurrentDpi), 0);
 end;
 
 function TACLButtonViewInfo.CanClickOnDialogChar(Char: Word): Boolean;
@@ -1275,7 +1275,7 @@ begin
   inherited DrawContent(ACanvas);
 
   if FHasArrow then
-    acDrawDropArrow(ACanvas.Handle, ArrowRect, TextColor, ScaleFactor.Apply(acDropArrowSize));
+    acDrawDropArrow(ACanvas.Handle, ArrowRect, TextColor, dpiApply(acDropArrowSize, CurrentDpi));
 
   if not acRectIsEmpty(ImageRect) then
   begin
@@ -1296,7 +1296,7 @@ begin
   if Glyph <> nil then
     Result := Glyph.FrameSize
   else
-    Result := acGetImageListSize(Images, ScaleFactor);
+    Result := acGetImageListSize(Images, CurrentDpi);
 end;
 
 procedure TACLButtonViewInfo.SetImageIndex(AValue: Integer);

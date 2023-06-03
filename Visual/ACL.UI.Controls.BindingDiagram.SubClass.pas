@@ -842,13 +842,11 @@ begin
 end;
 
 function TACLBindingDiagramObjectViewInfo.MeasureSize: TSize;
-var
-  I: Integer;
 begin
   Result := CalculateCaptionSize;
-  for I := 0 to ChildCount - 1 do
+  for var I := 0 to ChildCount - 1 do
     Result.cx := Max(Result.cx, TACLBindingDiagramObjectPinViewInfo(Children[I]).MeasureSize.cx);
-  Inc(Result.cx, 2 * BorderWidth + 4 * ScaleFactor.Apply(TACLBindingDiagramObjectPinViewInfo.ConnectorSize));
+  Inc(Result.cx, 2 * BorderWidth + 4 * dpiApply(TACLBindingDiagramObjectPinViewInfo.ConnectorSize, CurrentDpi));
   Inc(Result.cy, 2 * BorderWidth + ChildCount * FOwner.FTextLineHeight);
 end;
 
@@ -857,8 +855,8 @@ begin
   if (FCaptionSize = NullSize) and SubClass.OptionsView.ShowCaption then
   begin
     FCaptionSize := acTextSize(SubClass.CaptionFont, &Object.Caption);
-    Inc(FCaptionSize.cx, 2 * ScaleFactor.Apply(acTextIndent));
-    Inc(FCaptionSize.cy, 2 * ScaleFactor.Apply(acTextIndent));
+    Inc(FCaptionSize.cx, 2 * dpiApply(acTextIndent, CurrentDpi));
+    Inc(FCaptionSize.cy, 2 * dpiApply(acTextIndent, CurrentDpi));
     if HasRemoveButton then
       Inc(FCaptionSize.cx, FOwner.FTextLineHeight);
     FCaptionSize.cy := Max(FCaptionSize.cy, FOwner.FTextLineHeight);
@@ -880,7 +878,7 @@ begin
     begin
       FRemoveButtonRect := acRectSetRight(CaptionRect, CaptionRect.Right, CaptionRect.Height);
       FRemoveButtonRect := acRectCenterVertically(RemoveButtonRect, FOwner.FTextLineHeight);
-      FRemoveButtonRect := acRectInflate(RemoveButtonRect, -2 * ScaleFactor.Apply(acTextIndent));
+      FRemoveButtonRect := acRectInflate(RemoveButtonRect, -2 * dpiApply(acTextIndent, CurrentDpi));
     end
     else
       FRemoveButtonRect := NullRect;
@@ -995,7 +993,7 @@ end;
 
 function TACLBindingDiagramObjectViewInfo.GetBorderBounds: TRect;
 begin
-  Result := acRectInflate(Bounds, -ScaleFactor.Apply(TACLBindingDiagramObjectPinViewInfo.ConnectorSize), 0);
+  Result := acRectInflate(Bounds, -dpiApply(TACLBindingDiagramObjectPinViewInfo.ConnectorSize, CurrentDpi), 0);
 end;
 
 function TACLBindingDiagramObjectViewInfo.GetCaptionTextRect: TRect;
@@ -1003,7 +1001,7 @@ begin
   Result := CaptionRect;
   if not IsRectEmpty(RemoveButtonRect) then
     Result.Right := RemoveButtonRect.Left;
-  Result := acRectInflate(Result, -ScaleFactor.Apply(acTextIndent));
+  Result := acRectInflate(Result, -dpiApply(acTextIndent, CurrentDpi));
 end;
 
 function TACLBindingDiagramObjectViewInfo.GetContentRect: TRect;
@@ -1054,7 +1052,7 @@ end;
 function TACLBindingDiagramObjectPinViewInfo.MeasureSize: TSize;
 begin
   Result := acTextSize(SubClass.Font, Pin.Caption);
-  Result.cx := Result.cx + 2 * ScaleFactor.Apply(acTextIndent);
+  Result.cx := Result.cx + 2 * dpiApply(acTextIndent, CurrentDpi);
   Result.cy := FOwner.Owner.FTextLineHeight;
 end;
 
@@ -1067,14 +1065,17 @@ begin
 end;
 
 procedure TACLBindingDiagramObjectPinViewInfo.DoCalculate(AChanges: TIntegerSet);
+var
+  AConnectorSize: Integer;
 begin
   inherited;
 
+  AConnectorSize := dpiApply(ConnectorSize, CurrentDpi);
   if opmInput in Pin.Mode then
   begin
     FInputConnectorRect := Bounds;
-    FInputConnectorRect.Right := Bounds.Left + ScaleFactor.Apply(ConnectorSize) - 1;
-    FInputConnectorRect.Left := Bounds.Left - ScaleFactor.Apply(ConnectorSize) - FOwner.BorderWidth;
+    FInputConnectorRect.Right := Bounds.Left + AConnectorSize - 1;
+    FInputConnectorRect.Left := Bounds.Left - AConnectorSize - FOwner.BorderWidth;
     FInputConnectorRect := acRectCenterVertically(FInputConnectorRect, FInputConnectorRect.Width);
   end
   else
@@ -1083,8 +1084,8 @@ begin
   if opmOutput in Pin.Mode then
   begin
     FOutputConnectorRect := Bounds;
-    FOutputConnectorRect.Right := Bounds.Right + ScaleFactor.Apply(ConnectorSize) + FOwner.BorderWidth;
-    FOutputConnectorRect.Left := Bounds.Right - ScaleFactor.Apply(ConnectorSize) + 1;
+    FOutputConnectorRect.Right := Bounds.Right + AConnectorSize + FOwner.BorderWidth;
+    FOutputConnectorRect.Left := Bounds.Right - AConnectorSize + 1;
     FOutputConnectorRect := acRectCenterVertically(FOutputConnectorRect, FOutputConnectorRect.Width);
   end
   else
@@ -1162,19 +1163,19 @@ function TACLBindingDiagramObjectPinViewInfo.GetInputConnectorHitTestRect: TRect
 begin
   Result := InputConnectorRect;
   if not acRectIsEmpty(Result) then
-    Result := acRectCenter(Result, 2 * ScaleFactor.Apply(ConnectorHitTestSize));
+    Result := acRectCenter(Result, 2 * dpiApply(ConnectorHitTestSize, CurrentDpi));
 end;
 
 function TACLBindingDiagramObjectPinViewInfo.GetOutputConnectorHitTestRect: TRect;
 begin
   Result := OutputConnectorRect;
   if not acRectIsEmpty(Result) then
-    Result := acRectCenter(Result, 2 * ScaleFactor.Apply(ConnectorHitTestSize));
+    Result := acRectCenter(Result, 2 * dpiApply(ConnectorHitTestSize, CurrentDpi));
 end;
 
 function TACLBindingDiagramObjectPinViewInfo.GetTextRect: TRect;
 begin
-  Result := acRectInflate(Bounds, -ScaleFactor.Apply(ConnectorSize) - ScaleFactor.Apply(acTextIndent), 0);
+  Result := acRectInflate(Bounds, -dpiApply(ConnectorSize, CurrentDpi) - dpiApply(acTextIndent, CurrentDpi), 0);
 end;
 
 { TACLBindingDiagramLinkCustomPathBuilder }
@@ -1581,11 +1582,11 @@ end;
 
 procedure TACLBindingDiagramSubClassViewInfo.CalculateMetrics;
 begin
-  FLineOffset := ScaleFactor.Apply(LineOffset);
+  FLineOffset := dpiApply(LineOffset, CurrentDpi);
   if SubClass.OptionsView.RowHeight > 0 then
-    FTextLineHeight := ScaleFactor.Apply(SubClass.OptionsView.RowHeight)
+    FTextLineHeight := dpiApply(SubClass.OptionsView.RowHeight, CurrentDpi)
   else
-    FTextLineHeight := acFontHeight(SubClass.Font) + 2 * ScaleFactor.Apply(acTextIndent);
+    FTextLineHeight := acFontHeight(SubClass.Font) + 2 * dpiApply(acTextIndent, CurrentDpi);
 end;
 
 procedure TACLBindingDiagramSubClassViewInfo.CalculateObjects;
@@ -1867,7 +1868,7 @@ begin
     FBounds := acRect(FPoints.First);
     for I := 1 to FPoints.Count - 1 do
       acRectUnion(FBounds, acRect(FPoints.List[I]));
-    FBounds := acRectInflate(FBounds, ScaleFactor.Apply(HitTestSize));
+    FBounds := acRectInflate(FBounds, dpiApply(HitTestSize, CurrentDpi));
   end;
 end;
 
@@ -1882,7 +1883,7 @@ begin
     for I := 0 to FPoints.Count - 2 do
     begin
       R := acRectAdjust(Rect(FPoints.List[I], FPoints.List[I + 1]));
-      R := acRectInflate(R, ScaleFactor.Apply(HitTestSize));
+      R := acRectInflate(R, dpiApply(HitTestSize, CurrentDpi));
       if PtInRect(R, AInfo.HitPoint) then
       begin
         DoCalculateHitTest(AInfo);
@@ -1904,7 +1905,7 @@ var
   AArrowSize: Integer;
   APoint: TPoint;
 begin
-  AArrowSize := ScaleFactor.Apply(ArrowSize);
+  AArrowSize := dpiApply(ArrowSize, CurrentDpi);
 
   if laOutput in Link.Arrows then
   begin

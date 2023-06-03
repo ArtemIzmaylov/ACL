@@ -4,7 +4,7 @@
 {*             TreeList Control              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -39,7 +39,8 @@ uses
   ACL.UI.DropSource,
   ACL.UI.DropTarget,
   ACL.UI.Resources,
-  ACL.Utils.Common;
+  ACL.Utils.Common,
+  ACL.Utils.DPIAware;
 
 type
 
@@ -848,9 +849,9 @@ begin
       DragMoveAutoWidthColumns(P, ADeltaX, ADeltaY)
     else
     begin
-      APrevWidth := ScaleFactor.Apply(Column.Width);
-      Column.Width := ScaleFactor.Revert(APrevWidth + ADeltaX);
-      ADeltaX := ScaleFactor.Apply(Column.Width) - APrevWidth;
+      APrevWidth := dpiApply(Column.Width, CurrentDpi);
+      Column.Width := dpiRevert(APrevWidth + ADeltaX, CurrentDpi);
+      ADeltaX := dpiApply(Column.Width, CurrentDpi) - APrevWidth;
     end;
   finally
     SubClass.ViewInfo.Content.UnlockViewItemsPlacement;
@@ -867,31 +868,30 @@ var
   AColumnViewInfo: TACLTreeListColumnViewInfo;
   ANextSibling: TACLTreeListColumn;
   APrevWidth: Integer;
-  I: Integer;
 begin
   SubClass.BeginUpdate;
   try
-    for I := 0 to ColumnBarViewInfo.ChildCount - 1 do
+    for var I := 0 to ColumnBarViewInfo.ChildCount - 1 do
     begin
       AColumnViewInfo := ColumnBarViewInfo.Children[I];
-      AColumnViewInfo.Column.Width := ScaleFactor.Revert(AColumnViewInfo.ActualWidth);
+      AColumnViewInfo.Column.Width := dpiRevert(AColumnViewInfo.ActualWidth, CurrentDpi);
     end;
     ANextSibling := Column.NextSibling;
     if ANextSibling <> nil then
     begin
       if ADeltaX > 0 then
       begin
-        APrevWidth := ScaleFactor.Apply(ANextSibling.Width);
-        ANextSibling.Width := ScaleFactor.Revert(APrevWidth - ADeltaX);
-        ADeltaX := APrevWidth - ScaleFactor.Apply(ANextSibling.Width);
-        Column.Width := ScaleFactor.Revert(ScaleFactor.Apply(Column.Width) + ADeltaX);
+        APrevWidth := dpiApply(ANextSibling.Width, CurrentDpi);
+        ANextSibling.Width := dpiRevert(APrevWidth - ADeltaX, CurrentDpi);
+        ADeltaX := APrevWidth - dpiApply(ANextSibling.Width, CurrentDpi);
+        Column.Width := dpiRevert(dpiApply(Column.Width, CurrentDpi) + ADeltaX, CurrentDpi);
       end
       else
       begin
-        APrevWidth := ScaleFactor.Apply(Column.Width);
-        Column.Width := ScaleFactor.Revert(APrevWidth + ADeltaX);
-        ADeltaX := ScaleFactor.Apply(Column.Width) - APrevWidth;
-        ANextSibling.Width := ScaleFactor.Revert(ScaleFactor.Apply(ANextSibling.Width) - ADeltaX);
+        APrevWidth := dpiApply(Column.Width, CurrentDpi);
+        Column.Width := dpiRevert(APrevWidth + ADeltaX, CurrentDpi);
+        ADeltaX := dpiApply(Column.Width, CurrentDpi) - APrevWidth;
+        ANextSibling.Width := dpiRevert(dpiApply(ANextSibling.Width, CurrentDpi) - ADeltaX, CurrentDpi);
       end;
     end;
   finally

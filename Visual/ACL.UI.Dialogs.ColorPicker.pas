@@ -204,7 +204,7 @@ end;
 procedure TACLColorPickerDialog.PlaceControls(var R: TRect);
 begin
   FPanel.Width := Max(FPicker.Width, FPalette.Width);
-  R.Top := FPanel.BoundsRect.Bottom + ScaleFactor.Apply(8);
+  R.Top := FPanel.BoundsRect.Bottom + dpiApply(8, FCurrentPPI);
   R.Right := FPanel.BoundsRect.Right;
   inherited;
 end;

@@ -4,7 +4,7 @@
 {*             Splitter Control              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -36,6 +36,7 @@ uses
   ACL.UI.Forms,
   ACL.UI.Resources,
   ACL.Utils.Common,
+  ACL.Utils.DPIAware,
   ACL.Utils.FileSystem;
 
 type
@@ -180,9 +181,9 @@ begin
   if Control <> nil then
   begin
     Control.Visible := AConfig.ReadBool(ASection, AItem + 'Visible', Control.Visible);
-    ViewInfo.FStoredSize := ScaleFactor.Apply(AConfig.ReadInteger(ASection, AItem + 'StoredSize'));
+    ViewInfo.FStoredSize := dpiApply(AConfig.ReadInteger(ASection, AItem + 'StoredSize'), FCurrentPPI);
     if AConfig.ExistsKey(ASection, AItem + 'Value') then
-      ViewInfo.ControlSize := ScaleFactor.Apply(AConfig.ReadInteger(ASection, AItem + 'Value'));
+      ViewInfo.ControlSize := dpiApply(AConfig.ReadInteger(ASection, AItem + 'Value'), FCurrentPPI);
   end;
 end;
 
@@ -191,8 +192,8 @@ begin
   if Control <> nil then
   begin
     AConfig.WriteBool(ASection, AItem + 'Visible', Control.Visible);
-    AConfig.WriteInteger(ASection, AItem + 'StoredSize', ScaleFactor.Revert(ViewInfo.StoredSize));
-    AConfig.WriteInteger(ASection, AItem + 'Value', ScaleFactor.Revert(ViewInfo.ControlSize));
+    AConfig.WriteInteger(ASection, AItem + 'StoredSize', dpiRevert(ViewInfo.StoredSize, FCurrentPPI));
+    AConfig.WriteInteger(ASection, AItem + 'Value', dpiRevert(ViewInfo.ControlSize, FCurrentPPI));
   end;
 end;
 

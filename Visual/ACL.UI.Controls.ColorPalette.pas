@@ -4,7 +4,7 @@
 {*               Color Palette               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -30,7 +30,8 @@ uses
   ACL.Graphics,
   ACL.Graphics.Ex.Gdip,
   ACL.UI.Controls.BaseControls,
-  ACL.UI.Resources;
+  ACL.UI.Resources,
+  ACL.Utils.DPIAware;
 
 type
   TACLColorPalette = class;
@@ -108,9 +109,9 @@ type
     FWidth: Integer;
 
     function AdjustColor(AColor: TAlphaColor; ALightness: Single): TAlphaColor;
+    function GetCurrentDpi: Integer;
     function GetItems: TACLColorPaletteItems;
     function GetOptions: TACLColorPaletteOptionsView;
-    function GetScaleFactor: TACLScaleFactor;
   protected
     function CalculateCellSpacing(ACellSize, AWidth: Integer): Integer;
     procedure CalculateClassicLayout(ABounds: TRect);
@@ -122,11 +123,11 @@ type
     procedure Draw(ACanvas: TCanvas);
     function HitTest(const P: TPoint): TACLColorPaletteItemViewInfo;
     //
+    property CurrentDpi: Integer read GetCurrentDpi;
     property Height: Integer read FHeight;
     property Items: TACLColorPaletteItems read GetItems;
     property Options: TACLColorPaletteOptionsView read GetOptions;
     property Owner: TACLColorPalette read FOwner;
-    property ScaleFactor: TACLScaleFactor read GetScaleFactor;
     property Width: Integer read FWidth;
   end;
 
@@ -390,7 +391,7 @@ end;
 function TACLColorPaletteViewInfo.CalculateCellSpacing(ACellSize, AWidth: Integer): Integer;
 begin
   if Options.CellSpacing >= 0 then
-    Result := ScaleFactor.Apply(Options.CellSpacing)
+    Result := dpiApply(Options.CellSpacing, CurrentDpi)
   else
     if Items.Count < 2 then
       Result := 0
@@ -410,7 +411,7 @@ var
   ASpace: Integer;
   I: Integer;
 begin
-  ASize := ScaleFactor.Apply(Options.CellSize);
+  ASize := dpiApply(Options.CellSize, CurrentDpi);
   ASpace := CalculateCellSpacing(ASize, acRectWidth(ABounds));
 
   AItemBounds := acRectSetSize(ABounds, ASize, ASize);
@@ -456,7 +457,7 @@ var
   ASpace: Integer;
   I, J: Integer;
 begin
-  ASize := ScaleFactor.Apply(Options.CellSize);
+  ASize := dpiApply(Options.CellSize, CurrentDpi);
   ASpace := CalculateCellSpacing(ASize, acRectWidth(ABounds));
 
   FWidth := ASize * Items.Count + ASpace * (Items.Count - 1);
@@ -529,6 +530,11 @@ begin
   Result := TAlphaColor.FromColor(AColorQuad);
 end;
 
+function TACLColorPaletteViewInfo.GetCurrentDpi: Integer;
+begin
+  Result := FOwner.FCurrentPPI;
+end;
+
 function TACLColorPaletteViewInfo.GetItems: TACLColorPaletteItems;
 begin
   Result := FOwner.Items;
@@ -537,11 +543,6 @@ end;
 function TACLColorPaletteViewInfo.GetOptions: TACLColorPaletteOptionsView;
 begin
   Result := FOwner.OptionsView;
-end;
-
-function TACLColorPaletteViewInfo.GetScaleFactor: TACLScaleFactor;
-begin
-  Result := FOwner.ScaleFactor;
 end;
 
 { TACLStyleColorPalette }

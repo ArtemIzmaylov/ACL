@@ -4,7 +4,7 @@
 {*             GroupBox Controls             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -39,6 +39,7 @@ uses
   ACL.UI.Controls.Buttons,
   ACL.UI.Resources,
   ACL.Utils.Common,
+  ACL.Utils.DPIAware,
   ACL.Utils.FileSystem;
 
 type
@@ -99,7 +100,6 @@ type
     procedure IACLButtonOwner.ButtonOwnerRecalculate = FullRefresh;
     function ButtonOwnerGetFont: TFont;
     function ButtonOwnerGetImages: TCustomImageList;
-    function ButtonOwnerGetScaleFactor: TACLScaleFactor;
     function ButtonOwnerGetStyle: TACLStyleButton;
   public
     constructor Create(AOwner: TComponent); override;
@@ -247,8 +247,8 @@ begin
     AHeight := -1;
     CaptionViewInfo.CalculateAutoSize(AWidth, AHeight);
 
-    AIndent := Trunc(ScaleFactor.ApplyF(TACLMargins.DefaultValue));
-    AMargins := Padding.GetScaledMargins(ScaleFactor);
+    AIndent := Trunc(TACLMargins.DefaultValue * FCurrentPPI / acDefaultDPI);
+    AMargins := Padding.GetScaledMargins(FCurrentPPI);
     acMarginAdd(AMargins, GetContentOffset);
     acMarginAdd(AMargins, AIndent, 0, AIndent, 0);
 
@@ -257,7 +257,7 @@ begin
     Dec(FCaptionContentRect.Right, AMargins.Right);
     FCaptionContentRect := acRectSetSize(FCaptionContentRect, Min(AWidth, FCaptionContentRect.Width), AHeight);
 
-    FCaptionArea := acRectInflate(FCaptionContentRect, ScaleFactor.Apply(acTextIndent), 0)
+    FCaptionArea := acRectInflate(FCaptionContentRect, dpiApply(acTextIndent, FCurrentPPI), 0)
   end
   else
   begin
@@ -423,11 +423,6 @@ end;
 function TACLCustomGroupBox.ButtonOwnerGetImages: TCustomImageList;
 begin
   Result := nil;
-end;
-
-function TACLCustomGroupBox.ButtonOwnerGetScaleFactor: TACLScaleFactor;
-begin
-  Result := ScaleFactor;
 end;
 
 function TACLCustomGroupBox.ButtonOwnerGetStyle: TACLStyleButton;

@@ -41,6 +41,7 @@ uses
   ACL.UI.Forms,
   ACL.UI.Resources,
   ACL.Utils.Common,
+  ACL.Utils.DPIAware,
   ACL.Utils.FileSystem,
   ACL.Utils.Shell;
 
@@ -741,7 +742,7 @@ end;
 
 function TACLValidationLabel.GetTextOffset: Integer;
 begin
-  Result := Style.Icons.FrameWidth + ScaleFactor.Apply(acIndentBetweenElements);
+  Result := Style.Icons.FrameWidth + dpiApply(acIndentBetweenElements, FCurrentPPI);
 end;
 
 function TACLValidationLabel.MeasureSize(AWidth: Integer = 0): TSize;
