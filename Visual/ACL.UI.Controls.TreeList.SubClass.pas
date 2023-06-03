@@ -585,6 +585,7 @@ type
   strict private
     FEdit: TComponent;
     FEditIntf: IACLInplaceControl;
+    FLockCount: Integer;
     FParams: TACLInplaceInfo;
 
     procedure InitializeParams(ANode: TACLTreeListNode; AColumn: TACLTreeListColumn = nil);
@@ -593,10 +594,7 @@ type
     function GetValue: UnicodeString;
     procedure SetValue(const AValue: UnicodeString);
   protected
-    FApplyLockCount: Integer;
-
-    procedure Close(AChanges: TIntegerSet = []);
-    //
+    procedure Close(AChanges: TIntegerSet = []; AAccepted: Boolean = False);
     procedure EditApplyHandler(Sender: TObject); virtual;
     procedure EditCancelHandler(Sender: TObject); virtual;
     procedure EditKeyDownHandler(Sender: TObject; var Key: Word; Shift: TShiftState); virtual;
@@ -608,6 +606,7 @@ type
     function IsEditing: Boolean; overload;
     function IsEditing(AItemIndex, AColumnIndex: Integer): Boolean; overload;
     function IsEditing(ANode: TACLTreeListNode; AColumn: TACLTreeListColumn = nil): Boolean; overload;
+    function IsLocked: Boolean;
     //
     procedure Apply;
     procedure Cancel;
@@ -3003,6 +3002,11 @@ begin
   Result := IsEditing and (ANode.AbsoluteVisibleIndex = FParams.RowIndex) and ((AColumn = nil) or (AColumn.Index = FParams.ColumnIndex));
 end;
 
+function TACLTreeListEditingController.IsLocked: Boolean;
+begin
+  Result := FLockCount > 0;
+end;
+
 procedure TACLTreeListEditingController.Apply;
 begin
   if IsEditing then
@@ -3020,7 +3024,7 @@ begin
   Cancel;
   if SubClass.OptionsBehavior.Editing then
   begin
-    Inc(FApplyLockCount);
+    Inc(FLockCount);
     try
       SubClass.FocusedColumn := AColumn;
       SubClass.HintController.Cancel;
@@ -3036,19 +3040,21 @@ begin
           Cancel;
       end;
     finally
-      Dec(FApplyLockCount);
+      Dec(FLockCount);
     end;
   end;
 end;
 
-procedure TACLTreeListEditingController.Close(AChanges: TIntegerSet = []);
+procedure TACLTreeListEditingController.Close(AChanges: TIntegerSet = []; AAccepted: Boolean = False);
 begin
-  if IsEditing then
+  if IsEditing and not IsLocked then
   begin
     TACLMainThread.RunPostponed(FEdit.Free, Self);
     FEditIntf := nil;
     FEdit := nil;
 
+    if AAccepted then // Sent notification after closing the editor to re-sort and re-group the list
+      SubClass.NodeValuesChanged(FParams.ColumnIndex);
     if not (cccnViewport in AChanges) then
       SubClass.MakeVisible(SubClass.FocusedNode);
     if SubClass.Focused then
@@ -3056,7 +3062,8 @@ begin
   end;
 end;
 
-procedure TACLTreeListEditingController.InitializeParams(ANode: TACLTreeListNode; AColumn: TACLTreeListColumn = nil);
+procedure TACLTreeListEditingController.InitializeParams(
+  ANode: TACLTreeListNode; AColumn: TACLTreeListColumn = nil);
 
   procedure CalculateCellRect(var AParams: TACLInplaceInfo);
   var
@@ -3083,7 +3090,8 @@ procedure TACLTreeListEditingController.InitializeParams(ANode: TACLTreeListNode
     if ContentViewInfo.NodeViewInfo.HasVertSeparators then
       Dec(AParams.Bounds.Right);
     AParams.Bounds := acRectInflate(AParams.Bounds, 0, -1);
-    AParams.TextBounds := acRectContent(AParams.Bounds, ContentViewInfo.NodeViewInfo.CellTextExtends[AColumnViewInfo]);
+    AParams.TextBounds := acRectContent(AParams.Bounds,
+      ContentViewInfo.NodeViewInfo.CellTextExtends[AColumnViewInfo]);
   end;
 
 begin
@@ -3122,18 +3130,19 @@ procedure TACLTreeListEditingController.EditApplyHandler(Sender: TObject);
 var
   ATempValue: UnicodeString;
 begin
-  if (FApplyLockCount = 0) and (Sender = Edit) then
-  begin
+  if not IsLocked and (Sender = Edit) then
+  try
+    Inc(FLockCount);
     try
       ATempValue := EditIntf.InplaceGetValue;
       SubClass.DoEditing(FParams.RowIndex, FParams.ColumnIndex, ATempValue);
       Value := ATempValue;
       SubClass.DoEdited(FParams.RowIndex, FParams.ColumnIndex);
     finally
-      Close;
+      Dec(FLockCount);
     end;
-    // Sent notification after closing the editor to re-sort and re-group the list.
-    SubClass.NodeValuesChanged(FParams.ColumnIndex);
+  finally
+    Close([], True);
   end;
 end;
 

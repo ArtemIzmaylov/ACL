@@ -963,7 +963,7 @@ end;
 
 procedure TACLObjectInspectorEditingController.EditApplyHandler(Sender: TObject);
 begin
-  if (FApplyLockCount = 0) and (Sender = Edit) then
+  if not IsLocked and (Sender = Edit) then
   begin
     Value := EditIntf.InplaceGetValue;
     if IsEditing then
