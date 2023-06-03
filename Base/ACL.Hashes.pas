@@ -4,7 +4,7 @@
 {*            Hashing Algorithms             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -22,7 +22,8 @@ uses
   System.Hash,
   System.SysUtils,
   // ACL
-  ACL.Classes;
+  ACL.Classes,
+  ACL.Utils.Strings;
 
 type
   TMD5Byte16 = array[0..15] of Byte;
@@ -219,6 +220,7 @@ type
 function ElfHash(S: PWideChar; ACount: Integer; AIgnoryCase: Boolean): Integer; overload;
 function ElfHash(const S: UnicodeString; AIgnoryCase: Boolean = True): Integer; overload; inline;
 
+function acFileNameHash(const S: UnicodeString): Cardinal; inline;
 implementation
 
 {$R-} { Range-Checking }
@@ -233,8 +235,7 @@ uses
   // ACL
   ACL.FastCode,
   ACL.Utils.Common,
-  ACL.Utils.FileSystem,
-  ACL.Utils.Strings;
+  ACL.Utils.FileSystem;
 
 {$IFDEF MSWINDOWS}
 
@@ -327,6 +328,13 @@ function CryptDestroyKey(hKey: HCRYPTKEY): BOOL; stdcall; external advapi32;
 {$ENDREGION}
 {$ENDIF}
 
+function acFileNameHash(const S: UnicodeString): Cardinal; inline;
+begin
+  // тоже самое, но просто с меньшим числом вызовов
+//  Result := TACLHashBobJenkins.Calculate(acLowerCase(S), nil);
+  Result := THashBobJenkins.GetHashValue(acLowerCase(S));
+end;
+
 //==============================================================================
 // ELF Hash
 //==============================================================================
@@ -416,7 +424,7 @@ class function TACLHash.Calculate(const AText: UnicodeString; AEncoding: TEncodi
 var
   AState: Pointer;
 begin
-   Initialize(AState);
+  Initialize(AState);
   Update(AState, AText, AEncoding);
   Result := Finalize(AState);
 end;
