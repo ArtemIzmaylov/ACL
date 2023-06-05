@@ -3349,8 +3349,7 @@ end;
 
 function TACLTreeListSorter.GetGroupName(ANode: TACLTreeListNode): UnicodeString;
 var
-  ABuilder: TStringBuilder;
-  I: Integer;
+  ABuilder: TACLStringBuilder;
 begin
   if IsCustomGroupping then
   begin
@@ -3364,9 +3363,9 @@ begin
   if GroupBy.Count = 1 then
     Exit(ANode.Values[GroupBy.List[0].Index]);
 
-  ABuilder := TACLStringBuilderManager.Get;
+  ABuilder := TACLStringBuilder.Get;
   try
-    for I := 0 to GroupBy.Count - 1 do
+    for var I := 0 to GroupBy.Count - 1 do
     begin
       if I > 0 then
         ABuilder.Append(' / ');
@@ -3374,7 +3373,7 @@ begin
     end;
     Result := ABuilder.ToString;
   finally
-    TACLStringBuilderManager.Release(ABuilder);
+    ABuilder.Release;
   end;
 end;
 

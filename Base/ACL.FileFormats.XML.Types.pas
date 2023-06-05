@@ -191,14 +191,16 @@ type
   strict private
     class var FMap: TACLStringsMap;
 
-    class function IsEncodedCharacter(const S: string; APosition, ALength: Integer; out ACode: Integer): Boolean; static;
+    class function IsEncodedCharacter(const S: string;
+      APosition, ALength: Integer; out ACode: Integer): Boolean; inline;
   public
     class constructor Create;
     class destructor Destroy;
     class function DecodeBoolean(const S: string): Boolean; static;
     class function DecodeName(const S: string): string; static;
     class function EncodeName(const S: string): string; static;
-    class function EncodeString(const S: string; ARemoveBreakLines, ASkipServiceCharacters: Boolean): string; static;
+    class function EncodeString(const S: string;
+      ARemoveBreakLines, ASkipServiceCharacters: Boolean): string; static;
     class function IsHTMLCode(var P: PWideChar; var L: Integer): Boolean; static;
     class function IsInvalidXmlChar(const C: Word): Boolean; inline;
   end;
@@ -638,7 +640,8 @@ begin
   FreeAndNil(FMap);
 end;
 
-class function TACLXMLConvert.IsEncodedCharacter(const S: string; APosition, ALength: Integer; out ACode: Integer): Boolean;
+class function TACLXMLConvert.IsEncodedCharacter(
+  const S: string; APosition, ALength: Integer; out ACode: Integer): Boolean;
 begin
   Result := (APosition <= ALength - 6) and (S[APosition] = '_') and (S[APosition + 1] = 'x') and
     (S[APosition + 6] = '_') and TryStrToInt('$' + Copy(S, APosition + 2, 4), ACode);
@@ -673,14 +676,14 @@ class function TACLXMLConvert.DecodeName(const S: string): string;
   end;
 
 var
-  B: TStringBuilder;
+  B: TACLStringBuilder;
   L, LS: Integer;
   P, PS: PWideChar;
   V: UnicodeString;
 begin
   P := PWideChar(S);
   L := Length(S);
-  B := TACLStringBuilderManager.Get(L);
+  B := TACLStringBuilder.Get(L);
   try
     while L > 0 do
     begin
@@ -710,7 +713,7 @@ begin
     end;
     Result := B.ToString;
   finally
-    TACLStringBuilderManager.Release(B);
+    B.Release;
   end;
 end;
 
@@ -737,14 +740,14 @@ class function TACLXMLConvert.EncodeString(const S: string; ARemoveBreakLines, A
   end;
 
 var
-  ABuilder: TStringBuilder;
+  ABuilder: TACLStringBuilder;
   AChar: Char;
   ALength: Integer;
   AReplacement: string;
   I, X: Integer;
 begin
   ALength := Length(S);
-  ABuilder := TStringBuilder.Create((ALength * 3) div 2);
+  ABuilder := TACLStringBuilder.Get((ALength * 3) div 2);
   try
     for I := 1 to ALength do
     begin
@@ -762,7 +765,7 @@ begin
     end;
     Result := ABuilder.ToString;
   finally
-    ABuilder.Free;
+    ABuilder.Release;
   end;
 end;
 

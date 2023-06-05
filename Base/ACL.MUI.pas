@@ -282,13 +282,13 @@ end;
 function LangExpandMacros(const AText: UnicodeString; const ADefaultSection: UnicodeString = ''): UnicodeString;
 var
   K, I, J, L: Integer;
-  S: TStringBuilder;
+  S: TACLStringBuilder;
   V: UnicodeString;
 begin
   if Pos(sLangMacroBegin, AText) = 0 then
     Exit(AText);
 
-  S := TACLStringBuilderManager.Get(Length(AText));
+  S := TACLStringBuilder.Get(Length(AText));
   try
     I := 1;
     repeat
@@ -314,7 +314,7 @@ begin
     until False;
     Result := S.ToString;
   finally
-    TACLStringBuilderManager.Release(S);
+    S.Release;
   end;
 end;
 

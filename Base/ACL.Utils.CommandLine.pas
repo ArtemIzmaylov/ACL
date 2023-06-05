@@ -107,7 +107,7 @@ type
   protected
     FCommand: TACLCommandLineProcessor.TCommand;
     FHandlers: array[TState] of TTokenHandler;
-    FParamBuffer: TStringBuilder;
+    FParamBuffer: TACLStringBuilder;
     FPrevToken: TACLParserToken;
     FState: TState;
     FTarget: TACLCommandLineProcessor.TCommands;
@@ -119,7 +119,7 @@ type
     procedure HandlerWaitingForParamSeparator(const AToken: TACLParserToken);
     //
     procedure PutParam(AParam: string); overload;
-    procedure PutParam(AParamBuffer: TStringBuilder); overload;
+    procedure PutParam(AParamBuffer: TACLStringBuilder); overload;
   public
     constructor Create; reintroduce;
     procedure Parse(ATarget: TACLCommandLineProcessor.TCommands);
@@ -343,10 +343,10 @@ end;
 
 function TACLCommandLineProcessor.TCommands.ToString: string;
 var
-  R: TStringBuilder;
+  R: TACLStringBuilder;
   I, J: Integer;
 begin
-  R := TStringBuilder.Create;
+  R := TACLStringBuilder.Create;
   try
     for I := 0 to Count - 1 do
     begin
@@ -390,7 +390,7 @@ var
   AToken: TACLParserToken;
 begin
   FTarget := ATarget;
-  FParamBuffer := TStringBuilder.Create;
+  FParamBuffer := TACLStringBuilder.Create;
   try
     FCommand := nil;
     FPrevToken.Reset;
@@ -530,7 +530,7 @@ begin
   end;
 end;
 
-procedure TACLCommandLineParser.PutParam(AParamBuffer: TStringBuilder);
+procedure TACLCommandLineParser.PutParam(AParamBuffer: TACLStringBuilder);
 begin
   PutParam(AParamBuffer.ToString);
   AParamBuffer.Length := 0;

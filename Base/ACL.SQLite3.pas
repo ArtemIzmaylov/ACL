@@ -166,7 +166,7 @@ type
 
   TACLSQLQueryBuilder = class
   strict private
-    FBuffer: TStringBuilder;
+    FBuffer: TACLStringBuilder;
     FPrevIsValue: Boolean;
 
     function TypeCore(const APreparedValue: string): TACLSQLQueryBuilder;
@@ -981,7 +981,7 @@ end;
 
 constructor TACLSQLQueryBuilder.Create;
 begin
-  FBuffer := TStringBuilder.Create(256);
+  FBuffer := TACLStringBuilder.Create(256);
 end;
 
 destructor TACLSQLQueryBuilder.Destroy;

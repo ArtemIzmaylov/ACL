@@ -141,7 +141,7 @@ type
     constructor Create;
     procedure OnBufferInvalidated; inline;
 
-    procedure CopyTo(AValueOffset: Integer; ASb: TStringBuilder);
+    procedure CopyTo(AValueOffset: Integer; ASb: TACLStringBuilder);
     function GetNameWPrefix(ANameTable: TACLXMLNameTable): string; inline;
     procedure SetNamedNode(AType: TACLXMLNodeType; const ALocalName, APrefix, ANameWPrefix: string); inline;
     procedure SetValue(const AChars: TCharArray; AStartPos, ALength: Integer); overload;
@@ -587,7 +587,7 @@ type
     FReadValueOffset: Integer;
     FRootElementParsed: Boolean;
     FStandalone: Boolean;
-    FStringBuilder: TStringBuilder;
+    FStringBuilder: TACLStringBuilder;
     FXmlContext: TXmlContext;
 
     function DetectEncoding: TEncoding;
@@ -628,12 +628,12 @@ type
     function ParseDocumentContent: Boolean;
     function ParseElementContent: Boolean;
     function ParseName: Integer; inline;
-    function ParseNamedCharRef(AExpand: Boolean; AInternalSubsetBuilder: TStringBuilder): Integer;
-    function ParseNamedCharRefInline(AStartPosition: Integer; AExpand: Boolean; AInternalSubsetBuilder: TStringBuilder): Integer;
-    function ParseNumericCharRef(AExpand: Boolean; AInternalSubsetBuilder: TStringBuilder; out AEntityType: TEntityType): Integer;
-    function ParseNumericCharRefInline(AStartPosition: Integer; AExpand: Boolean; AInternalSubsetBuilder: TStringBuilder;
+    function ParseNamedCharRef(AExpand: Boolean; AInternalSubsetBuilder: TACLStringBuilder): Integer;
+    function ParseNamedCharRefInline(AStartPosition: Integer; AExpand: Boolean; AInternalSubsetBuilder: TACLStringBuilder): Integer;
+    function ParseNumericCharRef(AExpand: Boolean; AInternalSubsetBuilder: TACLStringBuilder; out AEntityType: TEntityType): Integer;
+    function ParseNumericCharRefInline(AStartPosition: Integer; AExpand: Boolean; AInternalSubsetBuilder: TACLStringBuilder;
       out ACharCount: Integer; out AEntityType: TEntityType): Integer;
-    function ParsePI(APiInDtdStringBuilder: TStringBuilder = nil): Boolean;
+    function ParsePI(APiInDtdStringBuilder: TACLStringBuilder = nil): Boolean;
     function ParsePIValue(out AOutStartPosition, AOutEndPosition: Integer): Boolean;
     function ParseQName(AIsQName: Boolean; AStartOffset: Integer; out AColonPosition: Integer): Integer; overload;
     function ParseQName(out AColonPosition: Integer): Integer; overload;
@@ -687,7 +687,7 @@ type
     procedure ThrowUnclosedElements;
     procedure ThrowWithoutLineInfo(const ARes, AArg: string);
 
-    function EatWhitespaces(ASb: TStringBuilder): Integer;
+    function EatWhitespaces(ASb: TACLStringBuilder): Integer;
     procedure ShiftBuffer(ASourcePosition, ADestPosition, ACount: Integer); inline;
     procedure UnDecodeChars;
   protected
@@ -1068,7 +1068,7 @@ begin
   Result := FNameWPrefix;
 end;
 
-procedure TACLXMLNodeData.CopyTo(AValueOffset: Integer; ASb: TStringBuilder);
+procedure TACLXMLNodeData.CopyTo(AValueOffset: Integer; ASb: TACLStringBuilder);
 begin
   if FValue = '' then
   begin
@@ -1357,7 +1357,7 @@ constructor TACLXMLTextReader.Create(const ASettings: TACLXMLReaderSettings);
 begin
   Create;
   FXmlContext := TXmlContext.Create;
-  FStringBuilder := TStringBuilder.Create;
+  FStringBuilder := TACLStringBuilder.Create;
 
   FNameTable := TACLXMLNameTable.Create;
   FNamespaceManager := TACLXMLNamespaceManager.Create(FNameTable);
@@ -3216,7 +3216,7 @@ begin
   FParsingState.LineStartPos := APosition - 1;
 end;
 
-function TACLXMLTextReader.EatWhitespaces(ASb: TStringBuilder): Integer;
+function TACLXMLTextReader.EatWhitespaces(ASb: TACLStringBuilder): Integer;
 var
   APosition, AWsCount, ATmp1, ATmp2, ATmp3: Integer;
   AChars: TCharArray;
@@ -3453,12 +3453,12 @@ end;
 
 //# Parses processing instruction; if piInDtdStringBuilder != null, the processing instruction is in DTD and
 //# it will be saved in the passed string builder (target, whitespace & value).
-function TACLXMLTextReader.ParsePI(APiInDtdStringBuilder: TStringBuilder): Boolean;
+function TACLXMLTextReader.ParsePI(APiInDtdStringBuilder: TACLStringBuilder): Boolean;
 var
   ANameEndPos, AStartPos, AEndPos: Integer;
   ATarget: string;
   ACh: Char;
-  ASb: TStringBuilder;
+  ASb: TACLStringBuilder;
 begin
   if FParsingMode = TParsingMode.Full then
     FCurrentNode.LineInfo.Init(FParsingState.LineNo, FParsingState.LinePos);
@@ -3779,7 +3779,7 @@ end;
 //#        character or surrogates pair (if expand == true)
 //#      - returns position of the end of the character reference, that is of the character next to the original ';'
 function TACLXMLTextReader.ParseNumericCharRefInline(AStartPosition: Integer; AExpand: Boolean;
-  AInternalSubsetBuilder: TStringBuilder; out ACharCount: Integer; out AEntityType: TEntityType): Integer;
+  AInternalSubsetBuilder: TACLStringBuilder; out ACharCount: Integer; out AEntityType: TEntityType): Integer;
 label
   Return;
 var
@@ -3896,7 +3896,7 @@ end;
 //#      - replaces the last character of the entity reference (';') with the referenced character (if expand == true)
 //#      - returns position of the end of the character reference, that is of the character next to the original ';'
 function TACLXMLTextReader.ParseNamedCharRefInline(AStartPosition: Integer; AExpand: Boolean;
-  AInternalSubsetBuilder: TStringBuilder): Integer;
+  AInternalSubsetBuilder: TACLStringBuilder): Integer;
 label
   FoundCharRef;
 var
@@ -4021,7 +4021,7 @@ end;
 //#        character or surrogates pair (if expand == true)
 //#      - returns position of the end of the character reference, that is of the character next to the original ';'
 //#      - if (expand == true) then ps.CharPos is changed to point to the replaced character
-function TACLXMLTextReader.ParseNumericCharRef(AExpand: Boolean; AInternalSubsetBuilder: TStringBuilder;
+function TACLXMLTextReader.ParseNumericCharRef(AExpand: Boolean; AInternalSubsetBuilder: TACLStringBuilder;
   out AEntityType: TEntityType): Integer;
 var
   ANewPos, ACharCount: Integer;
@@ -4053,7 +4053,7 @@ end;
 //#      - replaces the last character of the entity reference (';') with the referenced character (if expand == true)
 //#      - returns position of the end of the character reference, that is of the character next to the original ';'
 //#      - if (expand == true) then ps.CharPos is changed to point to the replaced character
-function TACLXMLTextReader.ParseNamedCharRef(AExpand: Boolean; AInternalSubsetBuilder: TStringBuilder): Integer;
+function TACLXMLTextReader.ParseNamedCharRef(AExpand: Boolean; AInternalSubsetBuilder: TACLStringBuilder): Integer;
 var
   ANewPos: Integer;
 begin
@@ -4359,7 +4359,7 @@ function TACLXMLTextReader.ParseXmlDeclaration(AIsTextDecl: Boolean): Boolean;
 label
   NoXmlDecl, LblReadData, LblContinue;
 var
-  ASb: TStringBuilder;
+  ASb: TACLStringBuilder;
   AXmlDeclState, AOriginalSbLen, AWsCount, ANameEndPos, APosition: Integer;
   AEncoding: TEncoding;
   AEncodingName: string;
@@ -4385,7 +4385,7 @@ begin
 
   Assert((FStringBuilder.Length = 0) or AIsTextDecl);
   if AIsTextDecl then
-    ASb := TStringBuilder.Create
+    ASb := TACLStringBuilder.Create
   else
     ASb := FStringBuilder;
 

@@ -285,18 +285,15 @@ end;
 
 function acURLEncode(const B: TArray<Byte>): UnicodeString;
 var
-  S: TStringBuilder;
+  S: TACLStringBuilder;
 begin
-  S := TACLStringBuilderManager.Get(Length(B) * 3);
+  S := TACLStringBuilder.Get(Length(B) * 3);
   try
     for var I := Low(B) to High(B) do
-    begin
-      S.Append('%');
-      S.Append(IntToHex(B[I], 2));
-    end;
+      S.Append('%').Append(IntToHex(B[I], 2));
     Result := S.ToString;
   finally
-    TACLStringBuilderManager.Release(S);
+    S.Release;
   end;
 end;
 
@@ -401,31 +398,25 @@ end;
 
 function TACLWebURL.ToString: UnicodeString;
 var
-  B: TStringBuilder;
+  B: TACLStringBuilder;
 begin
   if Host = '' then
     Exit('');
 
-  B := TStringBuilder.Create;
+  B := TACLStringBuilder.Get;
   try
     if Protocol <> '' then
-    begin
-      B.Append(Protocol);
-      B.Append(acProtocolDelimiter);
-    end;
+      B.Append(Protocol).Append(acProtocolDelimiter);
     B.Append(Host);
     if not PortIsDefault then
-    begin
-      B.Append(acPortDelimiter);
-      B.Append(Port);
-    end;
+      B.Append(acPortDelimiter).Append(Port);
     if Path <> '' then
       B.Append(Path);
     if CustomHeaders <> '' then
       B.AppendLine.Append(CustomHeaders);
     Result := B.ToString;
   finally
-    B.Free;
+    B.Release;
   end;
 end;
 

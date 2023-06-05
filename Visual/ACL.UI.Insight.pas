@@ -362,8 +362,7 @@ end;
 
 function TACLUIInsightSearchQueueBuilder.GetCurrentLocation: string;
 var
-  I: Integer;
-  B: TStringBuilder;
+  B: TACLStringBuilder;
 {$IFNDEF DELPHI110ALEXANDRIA}
   C: TArray<string>;
 {$ENDIF}
@@ -371,12 +370,12 @@ begin
   Result := '';
   if FNestedCaptions.Count > 0 then
   begin
-    B := TACLStringBuilderManager.Get;
+    B := TACLStringBuilder.Get;
     try
     {$IFNDEF DELPHI110ALEXANDRIA}
       C := FNestedCaptions.ToArray;
     {$ENDIF}
-      for I := 0 to FNestedCaptions.Count - 1 do
+      for var I := 0 to FNestedCaptions.Count - 1 do
       begin
         if B.Length > 0 then
           B.Append(' » ');
@@ -388,7 +387,7 @@ begin
       end;
       Result := B.ToString;
     finally
-      TACLStringBuilderManager.Release(B)
+      B.Release;
     end;
   end;
 end;

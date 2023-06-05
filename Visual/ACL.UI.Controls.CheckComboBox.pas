@@ -415,22 +415,21 @@ end;
 
 procedure TACLCheckComboBox.UpdateText;
 var
-  AText: TStringBuilder;
+  AText: TACLStringBuilder;
 begin
-  AText := TStringBuilder.Create;
+  AText := TACLStringBuilder.Get;
   try
     Items.EnumChecked(
       procedure (const Item: TACLCheckComboBoxItem)
       begin
-        AText.Append(Item.Text);
-        AText.Append(Separator);
+        AText.Append(Item.Text).Append(Separator);
       end);
 
     FText := AText.ToString;
     if Assigned(OnGetDisplayText) then
       OnGetDisplayText(Self, FText);
   finally
-    AText.Free;
+    AText.Release;
   end;
   Invalidate;
 end;

@@ -2222,19 +2222,16 @@ end;
 
 class function TACLXMLWellFormedWriter.DupAttrException(const APrefix, ALocalName: string): EACLXMLException;
 var
-  ASb: TStringBuilder;
+  ASb: TACLStringBuilder;
 begin
-  ASb := TStringBuilder.Create;
+  ASb := TACLStringBuilder.Get;
   try
     if APrefix <> '' then
-    begin
-      ASb.Append(APrefix);
-      ASb.Append(':');
-    end;
+      ASb.Append(APrefix).Append(':');
     ASb.Append(ALocalName);
     Result := EACLXMLException.CreateFmt(SXmlDupAttributeName, [ASb.ToString]);
   finally
-    ASb.Free;
+    ASb.Release;
   end;
 end;
 

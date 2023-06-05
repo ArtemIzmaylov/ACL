@@ -135,7 +135,7 @@ type
     procedure Optimize; override;
     function Evaluate(AContext: TObject): Variant; override;
     function IsConstant: Boolean; override;
-    procedure ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory); override;
+    procedure ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory); override;
     //
     property Params: TACLExpressionElements read FParams;
   end;
@@ -144,7 +144,7 @@ type
 
   TACLFormatStringFunction = class(TACLExpressionElementFunction)
   public
-    procedure ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory); override;
+    procedure ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory); override;
   end;
 
   { TACLFormatStringMacroEvalFunction }
@@ -164,7 +164,7 @@ type
   public
     function Evaluate(AContext: TObject): Variant; override;
     function IsConstant: Boolean; override;
-    procedure ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory); override;
+    procedure ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory); override;
   end;
 
 implementation
@@ -788,7 +788,7 @@ end;
 
 procedure TACLFormatStringConcatenateFunction.Optimize;
 var
-  ABuffer: TStringBuilder;
+  ABuffer: TACLStringBuilder;
   AParams: TACLExpressionElementsAccess;
   I, J: Integer;
 begin
@@ -806,7 +806,7 @@ begin
       Dec(J);
       if I < J then
       begin
-        ABuffer := TACLStringBuilderManager.Get(256);
+        ABuffer := TACLStringBuilder.Get(256);
         try
           while I <= J do
           begin
@@ -817,7 +817,7 @@ begin
           end;
           AParams.FList.Insert(I, TACLExpressionElementConstant.Create(ABuffer.ToString));
         finally
-          TACLStringBuilderManager.Release(ABuffer);
+          ABuffer.Release;
         end;
       end;
     end;
@@ -827,21 +827,20 @@ end;
 
 function TACLFormatStringConcatenateFunction.Evaluate(AContext: TObject): Variant;
 var
-  ABuffer: TStringBuilder;
-  I: Integer;
+  ABuffer: TACLStringBuilder;
 begin
   if FParams.Count = 0 then
     Exit('');
   if FParams.Count = 1 then
     Exit(FParams[0].Evaluate(AContext));
 
-  ABuffer := TACLStringBuilderManager.Get(256);
+  ABuffer := TACLStringBuilder.Get(256);
   try
-    for I := 0 to FParams.Count - 1 do
+    for var I := 0 to FParams.Count - 1 do
       ABuffer.Append(UnicodeString(FParams[I].Evaluate(AContext)));
     Result := ABuffer.ToString;
   finally
-    TACLStringBuilderManager.Release(ABuffer);
+    ABuffer.Release;
   end;
 end;
 
@@ -850,14 +849,14 @@ begin
   Result := Params.IsConstant;
 end;
 
-procedure TACLFormatStringConcatenateFunction.ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory);
+procedure TACLFormatStringConcatenateFunction.ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory);
 begin
   FParams.ToString(ABuffer, AFactory, '');
 end;
 
 { TACLFormatStringFunction }
 
-procedure TACLFormatStringFunction.ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory);
+procedure TACLFormatStringFunction.ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory);
 var
   AFormatStringFactory: TACLFormatStringFactory absolute AFactory;
 begin
@@ -893,7 +892,7 @@ begin
   Result := False;
 end;
 
-procedure TACLFormatStringReverseMacro.ToString(ABuffer: TStringBuilder; AFactory: TACLCustomExpressionFactory);
+procedure TACLFormatStringReverseMacro.ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory);
 var
   AFormatStringFactory: TACLFormatStringFactory absolute AFactory;
 begin

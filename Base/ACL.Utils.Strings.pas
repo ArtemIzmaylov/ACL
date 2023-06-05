@@ -124,7 +124,6 @@ type
     TDiffState = (tsEquals, tsInserted, tsDeleted);
     TDiffCompareProc = reference to function (ASourceIndex, ATargetIndex: Integer): Boolean;
     TDiffResultProc = reference to procedure (AIndex: Integer; AState: TDiffState);
-
     TStringDiff = TPair<Char, TDiffState>;
   public
     // Compliance
@@ -137,25 +136,59 @@ type
       const AEqualsNearbyTokens: Integer = 1); overload;
   end;
 
-  { TACLStringBuilderHelper }
+  { TACLStringBuilder }
 
-  TACLStringBuilderHelper = class helper for TStringBuilder
-  public
-    function Append(const AValue: PWideChar; ALength: Integer): TStringBuilder; overload;
-  end;
-
-  { TACLStringBuilderManager }
-
-  TACLStringBuilderManager = class
+  TACLStringBuilder = class
   strict private const
     CacheSize = 4;
+    DefaultCapacity = $10;
     HugeCapacityThreshold = 1048576;
   strict private
-    class var Cache: array[0..Pred(CacheSize)] of TStringBuilder;
+    class var Cache: array[0..Pred(CacheSize)] of TACLStringBuilder;
+  strict private
+    FCapacity: Integer;
+    FData: TArray<WideChar>;
+    FDataLength: Integer;
+
+    procedure GrowCapacity(ACountNeeded: Integer);
+    procedure SetCapacity(AValue: Integer);
+    procedure SetDataLength(AValue: Integer);
   public
+    constructor Create(ACapacity: Integer = DefaultCapacity);
+  {$REGION 'Pool'}
     class destructor Finalize;
-    class function Get(ACapacity: Integer = 0): TStringBuilder;
-    class procedure Release(var ABuilder: TStringBuilder);
+    class function Get(ACapacity: Integer = DefaultCapacity): TACLStringBuilder;
+    procedure Release; // Push the builder back to pool
+  {$ENDREGION}
+
+    function Append(const AValue: Boolean): TACLStringBuilder; overload; inline;
+    function Append(const AValue: Byte): TACLStringBuilder; overload; inline;
+    function Append(const AValue: Cardinal): TACLStringBuilder; overload; inline;
+    function Append(const AValue: Currency): TACLStringBuilder; overload; inline;
+    function Append(const AValue: Double): TACLStringBuilder; overload; inline;
+    function Append(const AValue: Int64): TACLStringBuilder; overload; inline;
+    function Append(const AValue: Integer): TACLStringBuilder; overload; inline;
+    function Append(const AValue: PWideChar; ALength: Integer): TACLStringBuilder; overload;
+    function Append(const AValue: Shortint): TACLStringBuilder; overload; inline;
+    function Append(const AValue: Single): TACLStringBuilder; overload; inline;
+    function Append(const AValue: Smallint): TACLStringBuilder; overload; inline;
+    function Append(const AValue: TCharArray; AStartIndex: Integer; ACount: Integer): TACLStringBuilder; overload; inline;
+    function Append(const AValue: TObject): TACLStringBuilder; overload; inline;
+    function Append(const AValue: UInt64): TACLStringBuilder; overload; inline;
+    function Append(const AValue: UnicodeString): TACLStringBuilder; overload; inline;
+    function Append(const AValue: UnicodeString; AStartIndex: Integer; ACount: Integer = -1): TACLStringBuilder; overload;
+    function Append(const AValue: WideChar): TACLStringBuilder; overload; inline;
+    function Append(const AValue: Word): TACLStringBuilder; overload; inline;
+    function AppendFormat(const AFormat: UnicodeString; const AArgs: array of const): TACLStringBuilder; overload;
+    function AppendLine(const AValue: UnicodeString): TACLStringBuilder; overload; inline;
+    function AppendLine: TACLStringBuilder; overload; inline;
+    function Insert(AIndex: Integer; const AValue: string): TACLStringBuilder;
+    function ToString: string; overload; override;
+    function ToString(AStartIndex, ACount: Integer): string; reintroduce; overload;
+
+    property Capacity: Integer read FCapacity write SetCapacity;
+    property Chars: TArray<WideChar> read FData; // ReadOnly !!!
+    property Length: Integer read FDataLength write SetDataLength;
   end;
 
   { TACLAppVersion }
@@ -450,6 +483,7 @@ implementation
 uses
   // System
   System.AnsiStrings,
+  System.RTLConsts,
   // ACL
   ACL.Classes.Collections,
   ACL.Classes.StringList,
@@ -463,7 +497,7 @@ const
   MaxPreambleLength = 3;
 
 type
-  TStringBuilderAccess = class(TStringBuilder);
+  TACLStringBuilderAccess = class(TACLStringBuilder);
 
 function StrToIntDef(const S: AnsiString; ADefault: Integer): Integer;
 begin
@@ -1410,7 +1444,7 @@ end;
 
 function acRemoveSurrogates(const S: UnicodeString; const AReplaceBy: WideChar = #0): UnicodeString;
 var
-  ABuffer: TStringBuilder;
+  ABuffer: TACLStringBuilder;
   AHasSurrogates: Boolean;
   AScan: PWideChar;
 begin
@@ -1428,7 +1462,7 @@ begin
 
   if AHasSurrogates then
   begin
-    ABuffer := TACLStringBuilderManager.Get(Length(S));
+    ABuffer := TACLStringBuilder.Get(Length(S));
     try
       AScan := PWideChar(S);
       while Ord(AScan^) <> 0 do
@@ -1447,7 +1481,7 @@ begin
       end;
       Result := ABuffer.ToString;
     finally
-      TACLStringBuilderManager.Release(ABuffer);
+      ABuffer.Release;
     end;
   end
   else
@@ -1570,14 +1604,14 @@ end;
 
 function acDupeString(const AText: UnicodeString; ACount: Integer): UnicodeString;
 var
-  ABuffer: TStringBuilder;
+  ABuffer: TACLStringBuilder;
   ACapacity: Integer;
 begin
   ACapacity := Length(AText) * ACount;
   if ACapacity <= 0 then
     Exit('');
 
-  ABuffer := TACLStringBuilderManager.Get(ACapacity);
+  ABuffer := TACLStringBuilder.Get(ACapacity);
   try
     while ACount > 0 do
     begin
@@ -1586,7 +1620,7 @@ begin
     end;
     Result := ABuffer.ToString;
   finally
-    TACLStringBuilderManager.Release(ABuffer);
+    ABuffer.Release
   end;
 end;
 
@@ -1765,7 +1799,7 @@ end;
 class function TACLTimeFormat.FormatEx(ATimeInSeconds: Single; AParts: TACLFormatTimeParts;
   const APartDelimiter: UnicodeString = ':'; ASuppressZeroValues: Boolean = False): UnicodeString;
 
-  procedure AppendResult(ABuffer: TStringBuilder; const APartDelimiter, AValue: UnicodeString); inline;
+  procedure AppendResult(ABuffer: TACLStringBuilder; const APartDelimiter, AValue: UnicodeString); inline;
   begin
     if ABuffer.Length > 0 then
       ABuffer.Append(APartDelimiter);
@@ -1796,7 +1830,7 @@ class function TACLTimeFormat.FormatEx(ATimeInSeconds: Single; AParts: TACLForma
 const
   Factors: array[TACLFormatTimePart] of Integer = (1, 1, SecsPerMin, SecsPerHour, SecsPerDay);
 var
-  ABuffer: TStringBuilder;
+  ABuffer: TACLStringBuilder;
   AHasSign: Boolean;
   APart: TACLFormatTimePart;
 begin
@@ -1813,7 +1847,7 @@ begin
   end;
 
   // format
-  ABuffer := TACLStringBuilderManager.Get(16);
+  ABuffer := TACLStringBuilder.Get(16);
   try
     for APart := High(TACLFormatTimePart) downto ftpSeconds do
     begin
@@ -1829,7 +1863,7 @@ begin
 
     Result := ABuffer.ToString;
   finally
-    TACLStringBuilderManager.Release(ABuffer);
+    ABuffer.Release;
   end;
 end;
 
@@ -2191,32 +2225,20 @@ begin
   ComputeDifferences(CreateMatrix, ASourceLength, ATargetLength);
 end;
 
-{ TACLStringBuilderHelper }
+{ TACLStringBuilder }
 
-function TACLStringBuilderHelper.Append(const AValue: PWideChar; ALength: Integer): TStringBuilder;
-var
-  APosition: Integer;
+constructor TACLStringBuilder.Create(ACapacity: Integer);
 begin
-  if ALength > 0 then
-  begin
-    APosition := Length{$IFDEF DELPHI103RIO} + 1{$ENDIF};
-    Length := Length + ALength;
-    FastMove(AValue^, FData[APosition], ALength * SizeOf(WideChar));
-  end;
-  Result := Self;
+  Capacity := ACapacity;
 end;
 
-{ TACLStringBuilderManager }
-
-class destructor TACLStringBuilderManager.Finalize;
-var
-  I: Integer;
+class destructor TACLStringBuilder.Finalize;
 begin
-  for I := 0 to CacheSize - 1 do
+  for var I := 0 to CacheSize - 1 do
     FreeAndNil(Cache[I]);
 end;
 
-class function TACLStringBuilderManager.Get(ACapacity: Integer): TStringBuilder;
+class function TACLStringBuilder.Get(ACapacity: Integer): TACLStringBuilder;
 var
   AIndex: Integer;
 begin
@@ -2230,23 +2252,97 @@ begin
 
   if Result <> nil then
   begin
-    Result.Length := 0;
-    ACapacity := Max(Result.Capacity, ACapacity);
-    if ACapacity <> Result.Capacity then
-      Result.Capacity := ACapacity
-  {$IFDEF DELPHI103RIO}
-    else
-      UniqueString(TStringBuilderAccess(Result).FData);
-  {$ENDIF}
+    Result.Length := 0; // first
+    Result.Capacity := ACapacity;
   end
   else
-    Result := TStringBuilder.Create(ACapacity);
+    Result := TACLStringBuilder.Create(ACapacity);
 end;
 
-class procedure TACLStringBuilderManager.Release(var ABuilder: TStringBuilder);
+function TACLStringBuilder.Append(const AValue: PWideChar; ALength: Integer): TACLStringBuilder;
 var
+  ANewLength: Integer;
+begin
+  if ALength > 0 then
+  begin
+    ANewLength := FDataLength + ALength;
+    if ANewLength > Capacity then
+      GrowCapacity(ANewLength);
+    FastMove(AValue^, FData[FDataLength], ALength * SizeOf(WideChar));
+    FDataLength := ANewLength;
+  end;
+  Result := Self;
+end;
+
+function TACLStringBuilder.Append(const AValue: UnicodeString): TACLStringBuilder;
+begin
+  Result := Append(PWideChar(AValue), System.Length(AValue));
+end;
+
+function TACLStringBuilder.Append(const AValue: WideChar): TACLStringBuilder;
+begin
+  if FDataLength = Capacity then
+    GrowCapacity(FDataLength + 1);
+  FData[FDataLength] := AValue;
+  Inc(FDataLength);
+  Result := Self;
+end;
+
+function TACLStringBuilder.Append(const AValue: UnicodeString; AStartIndex, ACount: Integer): TACLStringBuilder;
+begin
+  if ACount < 0 then
+    ACount := System.Length(AValue) - AStartIndex;
+  if AStartIndex + ACount > System.Length(AValue) then
+    raise ERangeError.CreateResFmt(@SListIndexError, [AStartIndex]);
+  if AStartIndex < 0 then
+    raise ERangeError.CreateResFmt(@SListIndexError, [AStartIndex]);
+  if ACount > 0 then
+    Append(@AValue[AStartIndex], ACount);
+  Result := Self;
+end;
+
+function TACLStringBuilder.AppendLine: TACLStringBuilder;
+begin
+  Result := Append(sLineBreak);
+end;
+
+function TACLStringBuilder.Insert(AIndex: Integer; const AValue: string): TACLStringBuilder;
+var
+  ALength: Integer;
+begin
+  if AIndex < 0 then
+    raise ERangeError.CreateResFmt(@SParamIsNegative, ['Index']); // DO NOT LOCALIZE
+  if AIndex > Length then
+    raise ERangeError.CreateResFmt(@SListIndexError, [AIndex]);
+  ALength := System.Length(AValue);
+  if ALength > 0 then
+  begin
+    if FDataLength > AIndex then
+      FastMove(FData[AIndex], FData[AIndex + ALength], (FDataLength - AIndex) * SizeOf(WideChar));
+    FastMove(AValue[1], FData[AIndex], ALength * SizeOf(WideChar));
+    Inc(FDataLength, ALength);
+  end;
+  Result := Self;
+end;
+
+procedure TACLStringBuilder.GrowCapacity(ACountNeeded: Integer);
+var
+  ANewCapacity: Integer;
+begin
+  ANewCapacity := (Capacity * 3) div 2;
+  if ANewCapacity < ACountNeeded then
+    ANewCapacity := ACountNeeded * 2; // this line may overflow ANewCapacity to a negative value
+  if ANewCapacity < 0 then // if ANewCapacity has been overflowed
+    ANewCapacity := ACountNeeded;
+  Capacity := ANewCapacity;
+end;
+
+procedure TACLStringBuilder.Release;
+var
+  ABuilder: TACLStringBuilder;
   AIndex: Integer;
 begin
+  ABuilder := Self;
   if ABuilder.Capacity < HugeCapacityThreshold then
   begin
     AIndex := 0;
@@ -2257,6 +2353,124 @@ begin
     end;
   end;
   FreeAndNil(ABuilder);
+end;
+
+procedure TACLStringBuilder.SetCapacity(AValue: Integer);
+begin
+  if AValue <> Capacity then
+  begin
+    if AValue < Length then
+      raise ERangeError.CreateResFmt(@SListCapacityError, [AValue]);
+    FCapacity := AValue;
+    SetLength(FData, Capacity);
+  end;
+end;
+
+procedure TACLStringBuilder.SetDataLength(AValue: Integer);
+begin
+  // Keep the order
+  if AValue < 0 then
+    raise ERangeError.CreateResFmt(@SParamIsNegative, ['Value']); // DO NOT LOCALIZE
+  if AValue > Capacity then
+    GrowCapacity(AValue);
+  FDataLength := AValue;
+end;
+
+function TACLStringBuilder.ToString: string;
+begin
+  if Length > 0 then
+    SetString(Result, PChar(@FData[0]), Length)
+  else
+    Result := '';
+end;
+
+function TACLStringBuilder.ToString(AStartIndex, ACount: Integer): string;
+begin
+  {$MESSAGE 'TODO - check the bounds'}
+  if ACount > 0 then
+    SetString(Result, PChar(@FData[AStartIndex]), ACount)
+  else
+    Result := '';
+end;
+
+function TACLStringBuilder.Append(const AValue: Currency): TACLStringBuilder;
+begin
+  Result := Append(CurrToStr(AValue));
+end;
+
+function TACLStringBuilder.Append(const AValue: Double): TACLStringBuilder;
+begin
+  Result := Append(FloatToStr(AValue));
+end;
+
+function TACLStringBuilder.Append(const AValue: Int64): TACLStringBuilder;
+begin
+  Result := Append(IntToStr(AValue));
+end;
+
+function TACLStringBuilder.Append(const AValue: Boolean): TACLStringBuilder;
+begin
+  Result := Append(BoolToStr(AValue, True));
+end;
+
+function TACLStringBuilder.Append(const AValue: Byte): TACLStringBuilder;
+begin
+  Result := Append(IntToStr(AValue));
+end;
+
+function TACLStringBuilder.Append(const AValue: Cardinal): TACLStringBuilder;
+begin
+  Result := Append(UIntToStr(AValue));
+end;
+
+function TACLStringBuilder.Append(const AValue: Integer): TACLStringBuilder;
+begin
+  Result := Append(IntToStr(AValue));
+end;
+
+function TACLStringBuilder.Append(const AValue: TObject): TACLStringBuilder;
+begin
+  Result := Append(AValue.ToString);
+end;
+
+function TACLStringBuilder.Append(const AValue: UInt64): TACLStringBuilder;
+begin
+  Result := Append(UIntToStr(AValue));
+end;
+
+function TACLStringBuilder.Append(const AValue: Word): TACLStringBuilder;
+begin
+  Result := Append(IntToStr(AValue));
+end;
+
+function TACLStringBuilder.AppendFormat(const AFormat: UnicodeString; const AArgs: array of const): TACLStringBuilder;
+begin
+  Result := Append(Format(AFormat, AArgs));
+end;
+
+function TACLStringBuilder.AppendLine(const AValue: UnicodeString): TACLStringBuilder;
+begin
+  Result := Append(AValue).AppendLine;
+end;
+
+function TACLStringBuilder.Append(const AValue: TCharArray; AStartIndex, ACount: Integer): TACLStringBuilder;
+begin
+  Result := Append(@AValue[AStartIndex], ACount);
+end;
+
+function TACLStringBuilder.Append(const AValue: Shortint): TACLStringBuilder;
+begin
+  Result := Append(IntToStr(AValue));
+end;
+
+function TACLStringBuilder.Append(const AValue: Single): TACLStringBuilder;
+begin
+  Result := Append(FloatToStr(AValue));
+end;
+
+function TACLStringBuilder.Append(const AValue: Smallint): TACLStringBuilder;
+begin
+  Result := Append(IntToStr(AValue));
 end;
 
 { TACLAppVersion }
@@ -2296,9 +2510,9 @@ end;
 
 function TACLAppVersion.ToScriptString: string;
 var
-  ABuffer: TStringBuilder;
+  ABuffer: TACLStringBuilder;
 begin
-  ABuffer := TACLStringBuilderManager.Get;
+  ABuffer := TACLStringBuilder.Get;
   try
     ABuffer.Append(MajorVersion);
     ABuffer.Append('.');
@@ -2309,15 +2523,15 @@ begin
     ABuffer.Append(BuildNumber);
     Result := ABuffer.ToString;
   finally
-    TACLStringBuilderManager.Release(ABuffer);
+    ABuffer.Release;
   end;
 end;
 
 function TACLAppVersion.ToString: string;
 var
-  ABuffer: TStringBuilder;
+  ABuffer: TACLStringBuilder;
 begin
-  ABuffer := TACLStringBuilderManager.Get;
+  ABuffer := TACLStringBuilder.Get;
   try
     ABuffer.Append(MajorVersion);
     ABuffer.Append('.');
@@ -2329,7 +2543,7 @@ begin
       ABuffer.Append(' ').Append(BuildSuffix);
     Result := ABuffer.ToString;
   finally
-    TACLStringBuilderManager.Release(ABuffer);
+    ABuffer.Release
   end;
 end;
 

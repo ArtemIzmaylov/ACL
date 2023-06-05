@@ -494,9 +494,9 @@ type
 
   TACLTextPlainTextExporter = class(TACLTextLayoutExporter)
   strict private
-    FTarget: TStringBuilder;
+    FTarget: TACLStringBuilder;
   public
-    constructor Create(ASource: TACLTextLayout; ATarget: TStringBuilder); reintroduce;
+    constructor Create(ASource: TACLTextLayout; ATarget: TACLStringBuilder); reintroduce;
     function OnLineBreak: Boolean; override;
     function OnSpace(ABlock: TACLTextLayoutBlockSpace): Boolean; override;
     function OnText(ABlock: TACLTextLayoutBlockText): Boolean; override;
@@ -1123,14 +1123,14 @@ end;
 
 function TACLTextLayout.ToString: string;
 var
-  B: TStringBuilder;
+  B: TACLStringBuilder;
 begin
-  B := TACLStringBuilderManager.Get(Length(Text));
+  B := TACLStringBuilder.Get(Length(Text));
   try
     FBlocks.Export(TACLTextPlainTextExporter.Create(Self, B), True);
     Result := B.ToString;
   finally
-    TACLStringBuilderManager.Release(B);
+    B.Release
   end;
 end;
 
@@ -2146,7 +2146,7 @@ end;
 
 { TACLTextPlainTextExporter }
 
-constructor TACLTextPlainTextExporter.Create(ASource: TACLTextLayout; ATarget: TStringBuilder);
+constructor TACLTextPlainTextExporter.Create(ASource: TACLTextLayout; ATarget: TACLStringBuilder);
 begin
   inherited Create(ASource);
   FTarget := ATarget;

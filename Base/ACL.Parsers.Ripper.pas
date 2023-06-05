@@ -341,7 +341,7 @@ end;
 
 procedure TACLRipperRuleRemoveHtmlTags.ProcessCore(const ATarget: TACLList<string>; const ASource: string);
 var
-  ABuffer: TStringBuilder;
+  ABuffer: TACLStringBuilder;
   ACount: Integer;
   AData: string;
   AScan: PWideChar;
@@ -358,7 +358,7 @@ begin
 //    until P1 = 0;
 
   AData := TACLXMLConvert.DecodeName(ASource);
-  ABuffer := TStringBuilder.Create(Length(AData));
+  ABuffer := TACLStringBuilder.Get(Length(AData));
   try
     AScan := PWideChar(AData);
     ACount := Length(AData);
@@ -410,7 +410,7 @@ begin
 
     ATarget.Add(acTrim(ABuffer.ToString));
   finally
-    ABuffer.Free;
+    ABuffer.Release;
   end;
 end;
 

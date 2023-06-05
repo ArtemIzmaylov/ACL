@@ -1139,17 +1139,17 @@ end;
 
 class function TACLImageFormatRepository.GetExtList: string;
 var
-  ABuilder: TStringBuilder;
+  ABuilder: TACLStringBuilder;
 begin
   if FFormats <> nil then
   begin
-    ABuilder := TACLStringBuilderManager.Get;
+    ABuilder := TACLStringBuilder.Get;
     try
       for var I := 0 to FFormats.Count - 1 do
-        ABuilder.Append('*' + TACLImageFormatClass(FFormats.List[I]).Ext + ';');
+        ABuilder.Append('*').Append(TACLImageFormatClass(FFormats.List[I]).Ext).Append(';');
       Result := ABuilder.ToString;
     finally
-      TACLStringBuilderManager.Release(ABuilder)
+      ABuilder.Release;
     end;
   end
   else

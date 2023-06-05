@@ -406,20 +406,6 @@ begin
     Result := AFileName;
 end;
 
-function acMakePathFromParts(const AParts: TStringDynArray; ALastPathDelimeter: Boolean): UnicodeString;
-var
-  I: Integer;
-begin
-  Result := '';
-  for I := 0 to Length(AParts) - 1 do
-  begin
-    if AParts[I] <> '' then
-      Result := Result + AParts[I] + PathDelim;
-  end;
-  if not ALastPathDelimeter then
-    Result := ExcludeTrailingPathDelimiter(Result);
-end;
-
 function acCompareFileNames(const AFileName1, AFileName2: UnicodeString): Integer;
 var
   ADelim1: Integer;
@@ -495,13 +481,13 @@ const
   InvalidChars = '\"<>*:?|/';
   MaxNameLength = MAX_PATH;
 var
-  ABuffer: TStringBuilder;
+  ABuffer: TACLStringBuilder;
   AChar: Char;
   AIndex: Integer;
   ALength: Integer;
 begin
   ALength := Length(Name);
-  ABuffer := TACLStringBuilderManager.Get(ALength);
+  ABuffer := TACLStringBuilder.Get(ALength);
   try
     for AIndex := 1 to ALength do
     begin
@@ -529,7 +515,7 @@ begin
       ALength := AIndex + MaxNameLength - 1;
     Result := ABuffer.ToString(AIndex, ALength - AIndex + 1);
   finally
-    TACLStringBuilderManager.Release(ABuffer);
+    ABuffer.Release;
   end;
 end;
 
@@ -547,17 +533,30 @@ end;
 function acValidateSubPath(const Path: UnicodeString): UnicodeString;
 var
   AArr: TStringDynArray;
+  ABuilder: TACLStringBuilder;
   AHasPathDelimeter: Boolean;
-  I: Integer;
 begin
   Result := '';
-  if Length(Path) > 0 then
+  if Path <> '' then
   begin
     AHasPathDelimeter := Path[Length(Path)] = PathDelim;
     acExplodeString(Path, PathDelim, AArr);
-    for I := 0 to Length(AArr) - 1 do
+    for var I := 0 to Length(AArr) - 1 do
       AArr[I] := acValidateFileName(AArr[I]);
-    Result := acMakePathFromParts(AArr, AHasPathDelimeter);
+
+    ABuilder := TACLStringBuilder.Get(Length(Path));
+    try
+      for var I := 0 to Length(AArr) - 1 do
+      begin
+        if AArr[I] <> '' then
+          ABuilder.Append(AArr[I]).Append(PathDelim);
+      end;
+      if not AHasPathDelimeter then
+        ABuilder.Length := ABuilder.Length - 1;
+      Result := ABuilder.ToString;
+    finally
+      ABuilder.Release;
+    end;
   end;
 end;
 
@@ -1600,12 +1599,11 @@ end;
 
 function TACLSearchPaths.ToString: string;
 var
-  B: TStringBuilder;
-  I: Integer;
+  B: TACLStringBuilder;
 begin
-  B := TACLStringBuilderManager.Get(Count * 32);
+  B := TACLStringBuilder.Get(Count * 32);
   try
-    for I := 0 to Count - 1 do
+    for var I := 0 to Count - 1 do
     begin
       if I > 0 then
         B.Append(';');
@@ -1614,7 +1612,7 @@ begin
     end;
     Result := B.ToString;
   finally
-    TACLStringBuilderManager.Release(B);
+    B.Release;
   end;
 end;
 

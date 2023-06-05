@@ -400,16 +400,15 @@ const
 
 function FormatHex(const ABytes: TBytes): string;
 var
-  S: TStringBuilder;
-  I: Integer;
+  S: TACLStringBuilder;
 begin
   if ABytes = nil then
-    Exit(EmptyStr);
+    Exit(acEmptyStr);
 
-  S := TStringBuilder.Create;
+  S := TACLStringBuilder.Get(Length(ABytes) * 3);
   try
     S.Capacity := Length(ABytes) * 3;
-    for I := 0 to Length(ABytes) - 1 do
+    for var I := 0 to Length(ABytes) - 1 do
     begin
       if I > 0 then
         S.Append(' ');
@@ -417,7 +416,7 @@ begin
     end;
     Result := S.ToString;
   finally
-    S.Free;
+    S.Release;
   end;
 end;
 

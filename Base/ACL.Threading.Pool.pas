@@ -563,9 +563,9 @@ end;
 
 function TACLTaskDispatcher.ToString: string;
 var
-  ABuffer: TStringBuilder;
+  ABuffer: TACLStringBuilder;
 begin
-  ABuffer := TACLStringBuilderManager.Get(64);
+  ABuffer := TACLStringBuilder.Get(64);
   try
     ABuffer.Append('Active: ').Append(FActiveTasks.Count);
     if FTasks.Count > 0 then
@@ -577,7 +577,7 @@ begin
 //    end;
     Result := ABuffer.ToString;
   finally
-    TACLStringBuilderManager.Release(ABuffer);
+    ABuffer.Release;
   end;
 end;
 
