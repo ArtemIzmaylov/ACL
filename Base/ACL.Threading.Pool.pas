@@ -120,7 +120,6 @@ type
     FTasks: TACLObjectList<TACLTask>;
 
     procedure AsyncRun(ATask: TACLTask);
-    procedure CancelAll;
     procedure CheckActiveTasks;
     procedure HandlerCpuUsageMonitor(Sender: TObject);
     function GetUseCpuUsageMonitor: Boolean;
@@ -137,14 +136,18 @@ type
     procedure BeforeDestruction; override;
 
     function Run(AProc: TACLTaskProc): THandle; overload;
-    function Run(AProc: TThreadMethod; ACompleteEvent: TThreadMethod; ACompleteEventCallMode: TACLThreadMethodCallMode): THandle; overload;
-    function Run(AProc: TACLTaskProc; ACompleteEvent: TThreadMethod; ACompleteEventCallMode: TACLThreadMethodCallMode): THandle; overload;
+    function Run(AProc: TThreadMethod; ACompleteEvent: TThreadMethod;
+      ACompleteEventCallMode: TACLThreadMethodCallMode): THandle; overload;
+    function Run(AProc: TACLTaskProc; ACompleteEvent: TThreadMethod;
+      ACompleteEventCallMode: TACLThreadMethodCallMode): THandle; overload;
     function Run(ATask: TACLTask): THandle; overload;
-    function Run(ATask: TACLTask; ACompleteEvent: TThreadMethod; ACompleteEventCallMode: TACLThreadMethodCallMode): THandle; overload;
+    function Run(ATask: TACLTask; ACompleteEvent: TThreadMethod;
+      ACompleteEventCallMode: TACLThreadMethodCallMode): THandle; overload;
     function RunInCurrentThread(ATask: TACLTask): THandle;
 
     function Cancel(ATaskHandle: THandle; AWaitFor: Boolean = False): Boolean; overload;
     function Cancel(ATaskHandle: THandle; AWaitTimeOut: Cardinal): TWaitResult; overload;
+    procedure CancelAll(AWaitFor: Boolean);
     function CurrentTask: TACLTask;
     function ToString: string; override;
 
@@ -435,7 +438,7 @@ begin
   UseCpuUsageMonitor := False;
   FActualMaxActiveTasks := 0;
   FMaxActiveTasks := 0;
-  CancelAll;
+  CancelAll(True);
 end;
 
 function TACLTaskDispatcher.Cancel(ATaskHandle: THandle; AWaitFor: Boolean = False): Boolean;
@@ -628,34 +631,36 @@ begin
   end;
 end;
 
-procedure TACLTaskDispatcher.CancelAll;
+procedure TACLTaskDispatcher.CancelAll(AWaitFor: Boolean);
 var
   ATaskHandle: THandle;
-  I: Integer; 
 begin
   // Mark all as canceled
   FLock.Enter;
   try
-    for I := 0 to FActiveTasks.Count - 1 do 
+    for var I := FTasks.Count - 1 downto 0 do
+      Cancel(FTasks[I].Handle, False);
+    for var I := FActiveTasks.Count - 1 downto 0 do
       Cancel(FActiveTasks[I].Handle, False);
   finally
     FLock.Leave;
   end;
 
   // Wait while all tasks will be finished
-  while FActiveTasks.Count > 0 do
-  begin
-    FLock.Enter;
-    try
-      if FActiveTasks.Count > 0 then
-        ATaskHandle := FActiveTasks.First.Handle
-      else
-        ATaskHandle := 0;
-    finally
-      FLock.Leave;
+  if AWaitFor then
+    while FActiveTasks.Count > 0 do
+    begin
+      FLock.Enter;
+      try
+        if FActiveTasks.Count > 0 then
+          ATaskHandle := FActiveTasks.First.Handle
+        else
+          ATaskHandle := 0;
+      finally
+        FLock.Leave;
+      end;
+      Cancel(ATaskHandle, True);
     end;
-    Cancel(ATaskHandle, True);
-  end;
 end;
 
 procedure TACLTaskDispatcher.CheckActiveTasks;
