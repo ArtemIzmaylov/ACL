@@ -103,7 +103,7 @@ type
     function LoadFromFile(const AFileName: UnicodeString; AEncoding: TEncoding = nil): Boolean;
     procedure LoadFromStream(AStream: TStream; AEncoding: TEncoding = nil); virtual;
     procedure LoadFromResource(AInstance: HINST; const AName: UnicodeString; AType: PChar);
-    function SaveToFile(const AFile: UnicodeString; AEncoding: TEncoding = nil): Boolean;
+    function SaveToFile(const AFileName: UnicodeString; AEncoding: TEncoding = nil): Boolean;
     procedure SaveToStream(AStream: TStream; AEncoding: TEncoding = nil); virtual;
 
     // Inserting
@@ -363,12 +363,12 @@ begin
   end;
 end;
 
-function TACLStringList.SaveToFile(const AFile: UnicodeString; AEncoding: TEncoding = nil): Boolean;
+function TACLStringList.SaveToFile(const AFileName: UnicodeString; AEncoding: TEncoding = nil): Boolean;
 var
   AStream: TStream;
 begin
-  acFileSetAttr(AFile, 0);
-  Result := StreamCreateWriter(AFile, AStream);
+  acFileSetAttr(AFileName, 0);
+  Result := StreamCreateWriter(AFileName, AStream);
   if Result then
   try
     SaveToStream(AStream, AEncoding);

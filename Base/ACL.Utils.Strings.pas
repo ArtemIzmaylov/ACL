@@ -4,7 +4,7 @@
 {*             Strings Utilities             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -183,8 +183,9 @@ type
     function AppendLine(const AValue: UnicodeString): TACLStringBuilder; overload; inline;
     function AppendLine: TACLStringBuilder; overload; inline;
     function Insert(AIndex: Integer; const AValue: string): TACLStringBuilder;
-    function ToString: string; overload; override;
     function ToString(AStartIndex, ACount: Integer): string; reintroduce; overload;
+    function ToString: string; overload; override;
+    function ToTrimmedString: string;
 
     property Capacity: Integer read FCapacity write SetCapacity;
     property Chars: TArray<WideChar> read FData; // ReadOnly !!!
@@ -381,21 +382,19 @@ function acUtf8IsWellformed(Source: PAnsiChar; SourceBytes: Integer): Boolean;
 function acUtf8ToUnicode(Dest: PWideChar; MaxDestChars: Integer; Source: PAnsiChar; SourceBytes: Integer): Integer;
 
 // Search
-function acFindString(const ACharToSearch: WideChar; const AString: UnicodeString; out AIndex: Integer): Boolean; overload;
-function acFindString(const AStringToSearch, AString: UnicodeString; out AIndex: Integer; AIgnoreCase: Boolean = False; AOffset: Integer = 1): Boolean; overload;
+function acContains(const AChar: WideChar; const AString: UnicodeString): Boolean; inline; overload;
+function acContains(const ASubStr, AString: UnicodeString; AIgnoreCase: Boolean = False): Boolean; inline; overload;
 function acFindStringInMemoryA(const S: AnsiString; AMem: PByte; AMemSize, AMemOffset: Integer; out AOffset: Integer): Boolean;
 function acFindStringInMemoryW(const S: UnicodeString; AMem: PByte; AMemSize, AMemOffset: Integer; out AOffset: Integer): Boolean;
+function acPos(const ACharToSearch: WideChar; const AString: UnicodeString): Integer; overload;
+function acPos(const ASubStr, AString: UnicodeString; AIgnoreCase: Boolean = False; AOffset: Integer = 1): Integer; overload; inline;
+function acPos(const ASubStr, AString: UnicodeString; AIgnoreCase, AWholeWords: Boolean; AOffset: Integer = 1): Integer; overload;
 
 // Allocation
 function acAllocStr(const S: UnicodeString): PWideChar; overload;
 function acAllocStr(const S: UnicodeString; out ALength: Integer): PWideChar; overload;
 function acMakeString(const P: PWideChar; L: Integer): UnicodeString; overload; inline;
 function acMakeString(const P: PAnsiChar; L: Integer): AnsiString; overload; inline;
-
-// Pos
-function acPos(const ACharToSearch: WideChar; const AString: UnicodeString): Integer; overload;
-function acPos(const ASubStr, AString: UnicodeString; AIgnoreCase, AWholeWords: Boolean; AOffset: Integer = 1): Integer; overload;
-function acPos(const ASubStr, AString: UnicodeString; AIgnoreCase: Boolean = False; AOffset: Integer = 1): Integer; overload;
 
 // Explode
 function acExplodeString(AScan: PAnsiChar; AScanCount: Integer; ADelimiter: AnsiChar; AReceiveProc: TAnsiExplodeStringReceiveResultProc): Integer; overload;
@@ -764,6 +763,16 @@ end;
 // Search
 //==============================================================================
 
+function acContains(const AChar: WideChar; const AString: UnicodeString): Boolean; inline;
+begin
+  Result := WStrScan(Pointer(AString), AChar) <> nil;
+end;
+
+function acContains(const ASubStr, AString: UnicodeString; AIgnoreCase: Boolean = False): Boolean;
+begin
+  Result := acPos(ASubStr, AString, AIgnoreCase) > 0;
+end;
+
 function FindDataInMemory(const AData, AMem: PByte; ADataSize, AMemSize, AMemOffset: Integer; out AOffset: Integer): Boolean;
 var
   P: PByte;
@@ -775,9 +784,10 @@ begin
   C := AMemSize - AMemOffset;
   while C >= ADataSize do
   begin
-    Result := (PByteArray(P)^[0] = PByteArray(AData)^[0]) and
+    Result :=
+      (PByteArray(P)^[0] = PByteArray(AData)^[0]) and
       (PByteArray(P)^[ADataSize - 1] = PByteArray(AData)^[ADataSize - 1]) and
-       CompareMem(P, AData, ADataSize);
+      (CompareMem(P, AData, ADataSize));
 
     if Result then
     begin
@@ -797,56 +807,6 @@ end;
 function acFindStringInMemoryW(const S: UnicodeString; AMem: PByte; AMemSize, AMemOffset: Integer; out AOffset: Integer): Boolean;
 begin
   Result := FindDataInMemory(PByte(@S[1]), AMem, Length(S) * SizeOf(WideChar), AMemSize, AMemOffset, AOffset);
-end;
-
-//==============================================================================
-// Allocation
-//==============================================================================
-
-function acAllocStr(const S: UnicodeString): PWideChar;
-var
-  L: Integer;
-begin
-  Result := acAllocStr(S, L);
-end;
-
-function acAllocStr(const S: UnicodeString; out ALength: Integer): PWideChar;
-begin
-  ALength := Length(S);
-  Result := AllocMem((ALength + 1) * SizeOf(WideChar));
-  FastMove(S[1], Result^, ALength * SizeOf(WideChar));
-end;
-
-function acMakeString(const P: PAnsiChar; L: Integer): AnsiString; inline;
-begin
-  if L > 0 then
-    SetString(Result, P, L)
-  else
-    Result := '';
-end;
-
-function acMakeString(const P: PWideChar; L: Integer): UnicodeString;
-begin
-  if L > 0 then
-    SetString(Result, P, L)
-  else
-    Result := '';
-end;
-
-//==============================================================================
-// Position
-//==============================================================================
-
-function acFindString(const ACharToSearch: WideChar; const AString: UnicodeString; out AIndex: Integer): Boolean;
-begin
-  AIndex := acPos(ACharToSearch, AString);
-  Result := AIndex > 0;
-end;
-
-function acFindString(const AStringToSearch, AString: UnicodeString; out AIndex: Integer; AIgnoreCase: Boolean = False; AOffset: Integer = 1): Boolean;
-begin
-  AIndex := acPos(AStringToSearch, AString, AIgnoreCase, AOffset);
-  Result := AIndex > 0;
 end;
 
 function acPos(const ACharToSearch: WideChar; const AString: UnicodeString): Integer;
@@ -896,6 +856,44 @@ begin
   else
     Result := acPos(ASubStr, AString, AIgnoreCase, AOffset);
 end;
+
+//==============================================================================
+// Allocation
+//==============================================================================
+
+function acAllocStr(const S: UnicodeString): PWideChar;
+var
+  L: Integer;
+begin
+  Result := acAllocStr(S, L);
+end;
+
+function acAllocStr(const S: UnicodeString; out ALength: Integer): PWideChar;
+begin
+  ALength := Length(S);
+  Result := AllocMem((ALength + 1) * SizeOf(WideChar));
+  FastMove(S[1], Result^, ALength * SizeOf(WideChar));
+end;
+
+function acMakeString(const P: PAnsiChar; L: Integer): AnsiString; inline;
+begin
+  if L > 0 then
+    SetString(Result, P, L)
+  else
+    Result := '';
+end;
+
+function acMakeString(const P: PWideChar; L: Integer): UnicodeString;
+begin
+  if L > 0 then
+    SetString(Result, P, L)
+  else
+    Result := '';
+end;
+
+//==============================================================================
+// UTF8
+//==============================================================================
 
 function acUtf8IsWellformed(Source: PAnsiChar; SourceBytes: Integer): Boolean;
 begin
@@ -1013,7 +1011,8 @@ end;
 // ExplodeString
 // ---------------------------------------------------------------------------------------------------------------------
 
-function acExplodeString(AScan: PAnsiChar; AScanCount: Integer; ADelimiter: AnsiChar; AReceiveProc: TAnsiExplodeStringReceiveResultProc): Integer;
+function acExplodeString(AScan: PAnsiChar; AScanCount: Integer;
+  ADelimiter: AnsiChar; AReceiveProc: TAnsiExplodeStringReceiveResultProc): Integer;
 var
   ACanContinue: Boolean;
   ACursor: PAnsiChar;
@@ -1065,7 +1064,8 @@ begin
   end;
 end;
 
-function acExplodeString(const S, ADelimiters: UnicodeString; AReceiveProc: TWideExplodeStringReceiveResultProc): Integer;
+function acExplodeString(const S, ADelimiters: UnicodeString;
+  AReceiveProc: TWideExplodeStringReceiveResultProc): Integer;
 begin
   Result := acExplodeString(PWideChar(S), Length(S), ADelimiters, AReceiveProc);
 end;
@@ -1075,7 +1075,7 @@ function acExplodeString(AScan: PWideChar; AScanCount: Integer;
 var
   ACanContinue: Boolean;
   ACursor: PWideChar;
-  ADelimiterCode: Word;
+  ADelimiterCode: WideChar;
   AIsDelimiter: Boolean;
   AIsFastWay: Boolean;
 begin
@@ -1087,16 +1087,16 @@ begin
 
     AIsFastWay := Length(ADelimiters) = 1;
     if AIsFastWay then
-      ADelimiterCode := Ord(ADelimiters[1])
+      ADelimiterCode := ADelimiters[1]
     else
-      ADelimiterCode := 0;
+      ADelimiterCode := #0;
 
     while (AScanCount >= 0) and ACanContinue do
     begin
       if AIsFastWay then
-        AIsDelimiter := Ord(AScan^) = ADelimiterCode
+        AIsDelimiter := AScan^ = ADelimiterCode
       else
-        AIsDelimiter := acPos(AScan^, ADelimiters) > 0;
+        AIsDelimiter := acContains(AScan^, ADelimiters);
 
       if (AScanCount = 0) or AIsDelimiter then
       begin
@@ -1138,7 +1138,7 @@ begin
   Result := 0;
   while ALength > 0 do
   begin
-    if acPos(P^, ACharacters) > 0 then
+    if acContains(P^, ACharacters) then
       Inc(Result);
     Dec(ALength);
     Inc(P);
@@ -1193,7 +1193,7 @@ begin
     AChar1 := Result[APos];
     if AEndOfWordFound then
       Result[APos] := acUpperCase(AChar1);
-    AEndOfWordFound := (AChar1 <> #39) and (acPos(AChar1, acParserDefaultDelimiterChars) > 0);
+    AEndOfWordFound := (AChar1 <> #39) and acContains(AChar1, acParserDefaultDelimiterChars);
     Inc(APos);
   end;
 end;
@@ -1397,7 +1397,7 @@ end;
 // Replacing
 // ---------------------------------------------------------------------------------------------------------------------
 
-function acStringReplace(const S, OldPattern, NewPattern: string; AIgnoreCase: Boolean = False; AWholeWords: Boolean = False): string;
+function acStringReplace(const S, OldPattern, NewPattern: string; AIgnoreCase, AWholeWords: Boolean): string;
 var
  ALength: Integer;
  AOffset: Integer;
@@ -1436,7 +1436,7 @@ end;
 
 function acRemoveChar(const S: UnicodeString; const ACharToRemove: WideChar): UnicodeString;
 begin
-  if acPos(ACharToRemove, S) > 0 then
+  if acContains(ACharToRemove, S) then
     Result := acStringReplace(S, ACharToRemove, '')
   else
     Result := S;
@@ -1492,23 +1492,23 @@ function acReplaceChar(const S: UnicodeString; const ACharToReplace, AReplaceBy:
 var
   P: PWideChar;
 begin
-  if Ord(ACharToReplace) = Ord(AReplaceBy) then
+  if ACharToReplace = AReplaceBy then
     Exit(S);
-  if acPos(ACharToReplace, S) = 0 then
+  if not acContains(ACharToReplace, S) then
     Exit(S);
 
   Result := S;
   UniqueString(Result);
   P := PWideChar(Result);
-  while Ord(P^) <> 0 do
+  while P^ <> #0 do
   begin
-    if Ord(P^) = Ord(ACharToReplace) then
+    if P^ = ACharToReplace then
       P^ := AReplaceBy;
     Inc(P);
   end;
 end;
 
-function acReplaceChars(const S: UnicodeString; const ACharsToReplace: UnicodeString; const AReplaceBy: WideChar = '_'): UnicodeString;
+function acReplaceChars(const S, ACharsToReplace: UnicodeString; const AReplaceBy: WideChar = '_'): UnicodeString;
 begin
   Result := S;
   for var AChar in ACharsToReplace do
@@ -1663,9 +1663,9 @@ function WStrScan(Str: PWideChar; C: WideChar): PWideChar;
 begin
   Result := Str;
   if Result <> nil then
-    while (Ord(Result^) <> Ord(C)) do
+    while Result^ <> C do
     begin
-      if Ord(Result^) = Ord(#0) then
+      if Result^ = #0 then
         Exit(nil);
       Inc(Result);
     end;
@@ -1674,7 +1674,7 @@ end;
 function WStrScan(Str: PWideChar; ACount: Integer; C: WideChar): PWideChar;
 begin
   Result := Str;
-  while (Result <> nil) and (Ord(Result^) <> Ord(C)) do
+  while (Result <> nil) and (Result^ <> C) do
   begin
     Dec(ACount);
     Inc(Result);
@@ -1886,7 +1886,7 @@ class function TACLTimeFormat.FormatEx(ATimeInSeconds: Single; const AFormatStri
     Result := [];
     for APart := Low(TACLFormatTimePart) to High(TACLFormatTimePart) do
     begin
-      if acPos(Map[APart], S) > 0 then
+      if acContains(Map[APart], S) then
         Include(Result, APart);
     end;
   end;
@@ -1896,7 +1896,7 @@ var
 begin
   acExplodeString(AFormatString, ';', AParts);
   Result := FormatEx(ATimeInSeconds, GetTimeParts(GetPartValue(AParts, 0)),
-    GetPartValue(AParts, 1, ':'), acPos('Z', GetPartValue(AParts, 2)) > 0);
+    GetPartValue(AParts, 1, ':'), acContains('Z', GetPartValue(AParts, 2)));
 end;
 
 class function TACLTimeFormat.Parse(S: string; out ATimeInSeconds: Single): Boolean;
@@ -2370,7 +2370,7 @@ procedure TACLStringBuilder.SetDataLength(AValue: Integer);
 begin
   // Keep the order
   if AValue < 0 then
-    raise ERangeError.CreateResFmt(@SParamIsNegative, ['Value']); // DO NOT LOCALIZE
+    raise ERangeError.CreateResFmt(@SParamIsNegative, ['Value']);
   if AValue > Capacity then
     GrowCapacity(AValue);
   FDataLength := AValue;
@@ -2384,9 +2384,27 @@ begin
     Result := '';
 end;
 
+function TACLStringBuilder.ToTrimmedString: string;
+var
+  S, L: Integer;
+begin
+  S := 0;
+  L := FDataLength - 1;
+  while (S <= L) and (FData[S] <= ' ') do
+    Inc(S);
+  while (L >= 1) and (FData[L] <= ' ') do
+    Dec(L);
+  Result := ToString(S, L - S + 1);
+end;
+
 function TACLStringBuilder.ToString(AStartIndex, ACount: Integer): string;
 begin
-  {$MESSAGE 'TODO - check the bounds'}
+  if ACount < 0 then
+    raise ERangeError.CreateResFmt(@SParamIsNegative, ['ACount']);
+  if not InRange(AStartIndex, 0, FDataLength - 1) then
+    raise ERangeError.CreateResFmt(@SListIndexError, [AStartIndex]);
+  if not InRange(AStartIndex + ACount, 0, FDataLength) then
+    raise ERangeError.CreateResFmt(@SListIndexError, [AStartIndex + ACount - 1]);
   if ACount > 0 then
     SetString(Result, PChar(@FData[AStartIndex]), ACount)
   else

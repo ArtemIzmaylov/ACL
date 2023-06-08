@@ -235,10 +235,10 @@ function acExtractFileFormat(const FileName: UnicodeString): UnicodeString;
 function acExtractFileName(const FileName: UnicodeString): UnicodeString;
 function acExtractFileNameWithoutExt(const FileName: UnicodeString): UnicodeString;
 function acExtractFilePath(const FileName: UnicodeString): UnicodeString;
+function acExtractFileScheme(const AFileName: UnicodeString): UnicodeString;
 function acGetCurrentDir: UnicodeString;
 function acGetFreeFileName(const AFileName: UnicodeString): UnicodeString;
 function acGetMinimalCommonPath(var ACommonPath: UnicodeString; const AFilePath: UnicodeString): Boolean;
-function acGetScheme(const AFileName: UnicodeString): UnicodeString;
 function acGetShortFileName(const APath: UnicodeString): UnicodeString;
 function acIncludeTrailingPathDelimiter(const Path: UnicodeString): UnicodeString;
 function acIsDoubleExtFile(const AFileName: UnicodeString): Boolean;
@@ -256,7 +256,7 @@ function acSetCurrentDir(const ADir: UnicodeString): Boolean;
 function acSimplifyLongFileName(const AFileName: UnicodeString): UnicodeString;
 function acTempFileName(const APrefix: UnicodeString): UnicodeString; overload;
 function acTempPath: UnicodeString;
-function acValidateFileName(const Name: UnicodeString; const ReplacementForInvalidChars: Char = #0): UnicodeString;
+function acValidateFileName(const Name: UnicodeString; ReplacementForInvalidChars: Char = #0): UnicodeString;
 function acValidateFilePath(const Name: UnicodeString): UnicodeString;
 function acValidateSubPath(const Path: UnicodeString): UnicodeString;
 function acUnixPathToWindows(const Path: UnicodeString): UnicodeString;
@@ -374,8 +374,12 @@ begin
 end;
 
 function acIsUrlFileName(const AFileName: UnicodeString): Boolean;
+var
+  P: PWideChar;
 begin
-  Result := acGetScheme(AFileName) <> '';
+  P := WStrScan(PWideChar(AFileName), ':');
+  Result := (P <> nil) and ((P + 1)^ = '/') and ((P + 1)^ = (P + 2)^);
+//  Result := acExtractFileScheme(AFileName) <> '';
 end;
 
 function acPrepareFileName(const AFileName: UnicodeString): UnicodeString; inline;
@@ -454,13 +458,13 @@ var
   W: TFileLongPath;
 begin
   Result := AFileName;
-  if acPos('.\', Result) > 0 then
+  if acContains('.\', Result) then
   begin
     L := GetFullPathNameW(PWideChar(AFileName), Length(W), @W[0], N);
     if L > 0 then
       SetString(Result, W, L)
   end;
-  if acPos('~', Result) > 0  then
+  if acContains('~', Result) then
   begin
     L := GetLongPathNameW(PWideChar(AFileName), @W[0], Length(W));
     if L > 0 then
@@ -476,7 +480,7 @@ begin
 end;
 {$ENDIF}
 
-function acValidateFileName(const Name: UnicodeString; const ReplacementForInvalidChars: Char = #0): UnicodeString;
+function acValidateFileName(const Name: UnicodeString; ReplacementForInvalidChars: Char = #0): UnicodeString;
 const
   InvalidChars = '\"<>*:?|/';
   MaxNameLength = MAX_PATH;
@@ -712,6 +716,20 @@ begin
   Result := Copy(FileName, 1, acLastDelimiter(sFilePathDelims, FileName));
 end;
 
+function acExtractFileScheme(const AFileName: UnicodeString): UnicodeString;
+var
+  C, P: PWideChar;
+begin
+  P := PWideChar(AFileName);
+  C := P;
+  while CharInSet(P^, ['A'..'Z', 'a'..'z', '0'..'9']) do
+    Inc(P);
+  if (P^ = ':') and CharInSet((P + 1)^, ['\', '/']) and ((P + 1)^ = (P + 2)^) then
+    Result := acExtractString(C, P)
+  else
+    Result := '';
+end;
+
 function acIsRelativeFileName(const AFileName: UnicodeString): Boolean;
 begin
   Result := (Length(AFileName) >= 2) and (AFileName[2] <> DriveDelim) and not
@@ -775,20 +793,6 @@ begin
     ACommonPath := acExtractFilePath(ExcludeTrailingPathDelimiter(ACommonPath));
     Result := (Length(ATemp) > Length(ACommonPath)) and acGetMinimalCommonPath(ACommonPath, AFilePath);
   end;
-end;
-
-function acGetScheme(const AFileName: UnicodeString): UnicodeString;
-var
-  C, P: PWideChar;
-begin
-  P := PWideChar(AFileName);
-  C := P;
-  while CharInSet(P^, ['A'..'Z', 'a'..'z', '0'..'9']) do
-    Inc(P);
-  if (P^ = ':') and CharInSet((P + 1)^, ['\', '/']) and ((P + 1)^ = (P + 2)^) then
-    Result := acExtractString(C, P)
-  else
-    Result := '';
 end;
 
 function acGetShortFileName(const APath: UnicodeString): UnicodeString;

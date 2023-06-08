@@ -506,7 +506,7 @@ end;
 procedure TACLSliderOptionsLabels.DoChanged(AChanges: TACLPersistentChanges);
 begin
   inherited;
-  FIsCurrentValueMasked := acPos('%', CurrentValue) > 0;
+  FIsCurrentValueMasked := acContains('%', CurrentValue);
 end;
 
 function TACLSliderOptionsLabels.FormatCurrentValue(const AValue: Single): string;

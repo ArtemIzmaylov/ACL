@@ -342,21 +342,11 @@ end;
 procedure TACLRipperRuleRemoveHtmlTags.ProcessCore(const ATarget: TACLList<string>; const ASource: string);
 var
   ABuffer: TACLStringBuilder;
+  AByte1, AByte2: Byte;
   ACount: Integer;
   AData: string;
   AScan: PWideChar;
 begin
-//    Result := acStringReplace(Result, #13, '');
-//    Result := acStringReplace(Result, #10, '');
-//    Result := acStringReplace(Result, '<br', #13#10'<br', True);
-//
-//    repeat
-//      P1 := acPos('<', Result);
-//      P2 := acPos('>', Result, False, P1);
-//      if (P1 > 0) and (P2 > 0) then
-//        Delete(Result, P1, P2 - P1 + 1);
-//    until P1 = 0;
-
   AData := TACLXMLConvert.DecodeName(ASource);
   ABuffer := TACLStringBuilder.Get(Length(AData));
   try
@@ -374,7 +364,7 @@ begin
           end;
 
         '\':
-          if (ACount > 1) and ((AScan + 1)^ = 'n') then // \n
+          if (AScan + 1)^ = 'n' then // \n
           begin
             ABuffer.AppendLine;
             Dec(ACount, 2);
@@ -408,7 +398,7 @@ begin
       end;
     until ACount = 0;
 
-    ATarget.Add(acTrim(ABuffer.ToString));
+    ATarget.Add(ABuffer.ToTrimmedString);
   finally
     ABuffer.Release;
   end;

@@ -341,7 +341,8 @@ class function TACLWebURL.Parse(S: UnicodeString; const AProtocol: UnicodeString
 var
   ADelimPos: Integer;
 begin
-  if acFindString(acCRLF, S, ADelimPos) then
+  ADelimPos := acPos(acCRLF, S);
+  if ADelimPos > 0 then
   begin
     Result.CustomHeaders := Copy(S, ADelimPos + Length(acCRLF), MaxInt);
     S := Copy(S, 1, ADelimPos - 1);
@@ -350,7 +351,8 @@ begin
     Result.CustomHeaders := '';
 
   // Protocol
-  if acFindString(acProtocolDelimiter, S, ADelimPos) then
+  ADelimPos := acPos(acProtocolDelimiter, S);
+  if ADelimPos > 0 then
   begin
     Result.Protocol := Copy(S, 1, ADelimPos - 1);
     Result.Secured := SameText(Result.Protocol, AProtocol + 's');
@@ -363,7 +365,8 @@ begin
   end;
 
   // Host & Path
-  if acFindString('/', S, ADelimPos) then
+  ADelimPos := acPos('/', S);
+  if ADelimPos > 0 then
   begin
     Result.Host := Copy(S, 1, ADelimPos - 1);
     Result.Path := Copy(S, ADelimPos, MaxInt);
@@ -375,8 +378,8 @@ begin
   end;
 
   // Port
-  ADelimPos := Pos(acPortDelimiter, S);
-  if (ADelimPos > 0) and (ADelimPos < Pos('/', S)) then
+  ADelimPos := acPos(acPortDelimiter, S);
+  if (ADelimPos > 0) and (ADelimPos < acPos('/', S)) then
   begin
     Result.Port := StrToIntDef(Copy(Result.Host, ADelimPos + 1, MaxInt), -1);
     Result.PortIsDefault := False;
