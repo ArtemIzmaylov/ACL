@@ -371,11 +371,20 @@ begin
             Inc(AScan, 2);
           end
           else
-          begin
-            ABuffer.Append('\');
-            Dec(ACount);
-            Inc(AScan);
-          end;
+            if ((AScan + 1)^ = 'u') and (ACount >= 6) and // \uXXXX
+              TACLHexcode.Decode((AScan + 2)^, (AScan + 3)^, AByte1) and
+              TACLHexcode.Decode((AScan + 4)^, (AScan + 5)^, AByte2) then
+            begin
+              ABuffer.Append(WideChar(AByte1 shl 8 or AByte2));
+              Dec(ACount, 6);
+              Inc(AScan, 6);
+            end
+            else
+            begin
+              ABuffer.Append('\');
+              Dec(ACount);
+              Inc(AScan);
+            end;
 
         '<':
           begin
