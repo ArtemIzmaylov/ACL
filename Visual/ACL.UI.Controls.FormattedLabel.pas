@@ -36,6 +36,7 @@ uses
   ACL.UI.Resources,
   ACL.Utils.Common,
   ACL.Utils.DPIAware,
+  ACL.Utils.FileSystem,
   ACL.Utils.Shell,
   ACL.Utils.Strings;
 
@@ -69,12 +70,18 @@ type
     constructor Create(AOwner: TACLFormattedLabelSubClass);
   end;
 
+  { TACLFormattedLabelOptions }
+
+  TACLFormattedLabelOption = (floAutoDetectEmails, floAutoDetectURLs, floAutoDetectTimeCodes);
+  TACLFormattedLabelOptions = set of TACLFormattedLabelOption;
+
   { TACLFormattedLabelSubClass }
 
   TACLFormattedLabelSubClass = class(TACLCompoundControlSubClass)
   strict private
     FAutoScroll: Boolean;
     FFormattedText: TACLFormattedLabelFormattedText;
+    FOptions: TACLFormattedLabelOptions;
     FStyle: TACLStyleFormattedLabel;
 
     FOnLinkExecute: TACLFormattedLabelLinkExecuteEvent;
@@ -84,12 +91,13 @@ type
     function GetViewInfo: TACLFormattedLabelViewInfo; inline;
     function GetWordWrap: Boolean;
     procedure SetAlignment(AValue: TAlignment);
-    procedure SetAutoScroll(const Value: Boolean);
+    procedure SetAutoScroll(AValue: Boolean);
+    procedure SetOptions(AValue: TACLFormattedLabelOptions);
     procedure SetText(const AValue: UnicodeString);
-    procedure SetWordWrap(const AValue: Boolean);
+    procedure SetTextCore(const AValue: UnicodeString);
+    procedure SetWordWrap(AValue: Boolean);
   protected
     function CreateViewInfo: TACLCompoundControlCustomViewInfo; override;
-    function DoLinkExecute(const ALink: UnicodeString): Boolean;
     procedure ExecuteLink(const ALink: UnicodeString);
     procedure ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState); override;
     procedure ProcessMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState); override;
@@ -104,6 +112,7 @@ type
     //
     property Alignment: TAlignment read GetAlignment write SetAlignment;
     property AutoScroll: Boolean read FAutoScroll write SetAutoScroll;
+    property Options: TACLFormattedLabelOptions read FOptions write SetOptions;
     property Style: TACLStyleFormattedLabel read FStyle;
     property Text: UnicodeString read GetText write SetText;
     property WordWrap: Boolean read GetWordWrap write SetWordWrap;
@@ -137,18 +146,20 @@ type
     function GetAlignment: TAlignment; inline;
     function GetAutoScroll: Boolean; inline;
     function GetOnLinkExecute: TACLFormattedLabelLinkExecuteEvent;
+    function GetOptions: TACLFormattedLabelOptions;
     function GetStyle: TACLStyleFormattedLabel;
     function GetSubClass: TACLFormattedLabelSubClass; inline;
     function GetText: UnicodeString; inline;
     function GetWordWrap: Boolean; inline;
-    procedure SetAlignment(const Value: TAlignment); inline;
-    procedure SetAutoScroll(const Value: Boolean); inline;
-    procedure SetBorders(const AValue: TACLBorders);
+    procedure SetAlignment(AValue: TAlignment); inline;
+    procedure SetAutoScroll(AValue: Boolean); inline;
+    procedure SetBorders(AValue: TACLBorders);
     procedure SetOnLinkExecute(AValue: TACLFormattedLabelLinkExecuteEvent);
-    procedure SetStyle(const AValue: TACLStyleFormattedLabel);
+    procedure SetOptions(AValue: TACLFormattedLabelOptions);
+    procedure SetStyle(AValue: TACLStyleFormattedLabel);
     procedure SetText(const AValue: UnicodeString); inline;
-    procedure SetWordWrap(const Value: Boolean); inline;
-    //
+    procedure SetWordWrap(AValue: Boolean); inline;
+    // Backward compatibility
     procedure ReadText(Reader: TReader);
   protected
     function CreateSubClass: TACLCompoundControlSubClass; override;
@@ -159,6 +170,8 @@ type
     procedure ResourceChanged; override;
     procedure SetDefaultSize; override;
     procedure SetTargetDPI(AValue: Integer); override;
+  public const
+    DefaultOptions = [floAutoDetectURLs, floAutoDetectEmails];
   public
     constructor Create(AOwner: TComponent); override;
     procedure MakeVisible(ARow: Integer);
@@ -172,11 +185,12 @@ type
     property FocusOnClick default True;
     property Padding;
     property ResourceCollection;
+    property Options: TACLFormattedLabelOptions read GetOptions write SetOptions default DefaultOptions;
     property Style: TACLStyleFormattedLabel read GetStyle write SetStyle;
     property StyleScrollBox;
     property Transparent;
     property WordWrap: Boolean read GetWordWrap write SetWordWrap default True;
-    //
+    // Events
     property OnCalculated;
     property OnLinkExecute: TACLFormattedLabelLinkExecuteEvent read GetOnLinkExecute write SetOnLinkExecute;
     property OnUpdateState;
@@ -228,6 +242,7 @@ constructor TACLFormattedLabelSubClass.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   FAutoScroll := True;
+  FOptions := TACLFormattedLabel.DefaultOptions;
   FStyle := TACLStyleFormattedLabel.Create(Self);
   FFormattedText := TACLFormattedLabelFormattedText.Create(Self);
   FFormattedText.SetOption(tloWordWrap, True);
@@ -255,13 +270,6 @@ end;
 function TACLFormattedLabelSubClass.CreateViewInfo: TACLCompoundControlCustomViewInfo;
 begin
   Result := TACLFormattedLabelViewInfo.Create(Self);
-end;
-
-function TACLFormattedLabelSubClass.DoLinkExecute(const ALink: UnicodeString): Boolean;
-begin
-  Result := False;
-  if Assigned(OnLinkExecute) then
-    OnLinkExecute(Self, ALink, Result);
 end;
 
 function TACLFormattedLabelSubClass.GetAlignment: TAlignment;
@@ -293,12 +301,21 @@ begin
   end;
 end;
 
-procedure TACLFormattedLabelSubClass.SetAutoScroll(const Value: Boolean);
+procedure TACLFormattedLabelSubClass.SetAutoScroll(AValue: Boolean);
 begin
-  if FAutoScroll <> Value then
+  if FAutoScroll <> AValue then
   begin
-    FAutoScroll := Value;
+    FAutoScroll := AValue;
     FullRefresh;
+  end;
+end;
+
+procedure TACLFormattedLabelSubClass.SetOptions(AValue: TACLFormattedLabelOptions);
+begin
+  if FOptions <> AValue then
+  begin
+    FOptions := AValue;
+    SetTextCore(Text);
   end;
 end;
 
@@ -311,13 +328,22 @@ end;
 procedure TACLFormattedLabelSubClass.SetText(const AValue: UnicodeString);
 begin
   if Text <> AValue then
-  begin
-    FormattedText.SetText(AValue, TACLTextFormatSettings.Default);
-    FullRefresh;
-  end;
+    SetTextCore(AValue);
 end;
 
-procedure TACLFormattedLabelSubClass.SetWordWrap(const AValue: Boolean);
+procedure TACLFormattedLabelSubClass.SetTextCore(const AValue: UnicodeString);
+var
+  ASettings: TACLTextFormatSettings;
+begin
+  ASettings := TACLTextFormatSettings.Default;
+  ASettings.AllowAutoEmailDetect := floAutoDetectEmails in Options;
+  ASettings.AllowAutoTimeCodeDetect := floAutoDetectTimeCodes in Options;
+  ASettings.AllowAutoURLDetect := floAutoDetectURLs in Options;
+  FormattedText.SetText(AValue, ASettings);
+  FullRefresh;
+end;
+
+procedure TACLFormattedLabelSubClass.SetWordWrap(AValue: Boolean);
 begin
   if WordWrap <> AValue then
   begin
@@ -327,8 +353,13 @@ begin
 end;
 
 procedure TACLFormattedLabelSubClass.ExecuteLink(const ALink: UnicodeString);
+var
+  AHandled: Boolean;
 begin
-  if not DoLinkExecute(ALink) then
+  AHandled := False;
+  if Assigned(OnLinkExecute) then
+    OnLinkExecute(Self, ALink, AHandled);
+  if not AHandled and acIsUrlFileName(ALink) then
     ShellExecuteURL(ALink);
 end;
 
@@ -475,6 +506,11 @@ begin
   Result := SubClass.OnLinkExecute
 end;
 
+function TACLFormattedLabel.GetOptions: TACLFormattedLabelOptions;
+begin
+  Result := SubClass.Options;
+end;
+
 function TACLFormattedLabel.GetStyle: TACLStyleFormattedLabel;
 begin
   Result := SubClass.Style;
@@ -495,17 +531,17 @@ begin
   Result := SubClass.WordWrap;
 end;
 
-procedure TACLFormattedLabel.SetAlignment(const Value: TAlignment);
+procedure TACLFormattedLabel.SetAlignment(AValue: TAlignment);
 begin
-  SubClass.Alignment := Value;
+  SubClass.Alignment := AValue;
 end;
 
-procedure TACLFormattedLabel.SetAutoScroll(const Value: Boolean);
+procedure TACLFormattedLabel.SetAutoScroll(AValue: Boolean);
 begin
-  SubClass.AutoScroll := Value;
+  SubClass.AutoScroll := AValue;
 end;
 
-procedure TACLFormattedLabel.SetBorders(const AValue: TACLBorders);
+procedure TACLFormattedLabel.SetBorders(AValue: TACLBorders);
 begin
   if FBorders <> AValue then
   begin
@@ -524,7 +560,12 @@ begin
   SubClass.OnLinkExecute := AValue;
 end;
 
-procedure TACLFormattedLabel.SetStyle(const AValue: TACLStyleFormattedLabel);
+procedure TACLFormattedLabel.SetOptions(AValue: TACLFormattedLabelOptions);
+begin
+  SubClass.Options := AValue;
+end;
+
+procedure TACLFormattedLabel.SetStyle(AValue: TACLStyleFormattedLabel);
 begin
   SubClass.Style.Assign(AValue);
 end;
@@ -534,9 +575,9 @@ begin
   SubClass.Text := AValue;
 end;
 
-procedure TACLFormattedLabel.SetWordWrap(const Value: Boolean);
+procedure TACLFormattedLabel.SetWordWrap(AValue: Boolean);
 begin
-  SubClass.WordWrap := Value;
+  SubClass.WordWrap := AValue;
 end;
 
 procedure TACLFormattedLabel.ReadText(Reader: TReader);
