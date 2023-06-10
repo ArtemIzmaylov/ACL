@@ -654,29 +654,32 @@ end;
 
 class function TProcessHelper.Execute(const ACmdLine: UnicodeString;
   ALog: IStringReceiver; AOptions: TExecuteOptions = [eoShowGUI]): LongBool;
-
-  procedure Log(const S: UnicodeString);
-  begin
-    if ALog <> nil then
-      ALog.Add(S);
-  end;
-
 var
   AErrorData: TStringStream;
+  AExitCode: Cardinal;
   AOutputData: TStringStream;
 begin
+  AExitCode := 0;
   AErrorData := TStringStream.Create;
   AOutputData := TStringStream.Create;
   try
-    Log('Executing: ' + ACmdLine);
-    Result := Execute(ACmdLine, AOptions, AOutputData, AErrorData);
-    if Result then
+    if ALog <> nil then
+      ALog.Add('Executing: ' + ACmdLine);
+    if Execute(ACmdLine, AOptions, AOutputData, AErrorData, nil, @AExitCode) then
     begin
-      Log(AOutputData.DataString);
-      Log(AErrorData.DataString);
+      if ALog <> nil then
+      begin
+        ALog.Add(AOutputData.DataString);
+        ALog.Add(AErrorData.DataString);
+      end;
+      Result := AExitCode = 0;
     end
     else
-      Log(SysErrorMessage(GetLastError));
+    begin
+      if ALog <> nil then
+        ALog.Add(SysErrorMessage(GetLastError));
+      Result := False;
+    end;
   finally
     AOutputData.Free;
     AErrorData.Free;

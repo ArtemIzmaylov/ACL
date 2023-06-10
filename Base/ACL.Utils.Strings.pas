@@ -2399,16 +2399,15 @@ end;
 
 function TACLStringBuilder.ToString(AStartIndex, ACount: Integer): string;
 begin
+  if ACount = 0 then
+    Exit(acEmptyStr);
   if ACount < 0 then
     raise ERangeError.CreateResFmt(@SParamIsNegative, ['ACount']);
   if not InRange(AStartIndex, 0, FDataLength - 1) then
     raise ERangeError.CreateResFmt(@SListIndexError, [AStartIndex]);
   if not InRange(AStartIndex + ACount, 0, FDataLength) then
     raise ERangeError.CreateResFmt(@SListIndexError, [AStartIndex + ACount - 1]);
-  if ACount > 0 then
-    SetString(Result, PChar(@FData[AStartIndex]), ACount)
-  else
-    Result := '';
+  SetString(Result, PChar(@FData[AStartIndex]), ACount);
 end;
 
 function TACLStringBuilder.Append(const AValue: Currency): TACLStringBuilder;
