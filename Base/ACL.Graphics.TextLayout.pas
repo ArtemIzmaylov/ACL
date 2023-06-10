@@ -18,6 +18,7 @@ interface
 uses
   Winapi.Windows,
   // System
+  System.Character,
   System.Classes,
   System.Contnrs,
   System.Generics.Collections,
@@ -59,6 +60,7 @@ type
 
   TACLTextFormatSettings = record
     AllowAutoEmailDetect: Boolean;
+    AllowAutoTimeCodeDetect: Boolean;
     AllowAutoURLDetect: Boolean;
     AllowCppLikeLineBreaks: Boolean; // \n
     AllowFormatting: Boolean;
@@ -74,6 +76,8 @@ type
   { TACLTextLayout }
 
   TACLTextLayout = class
+  public const
+    TimeCodePrefix = 'time:';
   strict private
     FBounds: TRect;
     FFont: TFont;
@@ -115,7 +119,7 @@ type
     function IsTruncated: Boolean;
     function MeasureSize: TSize; virtual;
     procedure SetOption(AOption: TACLTextLayoutOption; AState: Boolean);
-    procedure SetText(const AText: string; const AFormatSettings: TACLTextFormatSettings);
+    procedure SetText(const AText: string; const ASettings: TACLTextFormatSettings);
     function ToString: string; override;
     //
     property Bounds: TRect read FBounds write SetBounds;
@@ -472,9 +476,9 @@ type
   protected type
     TTokenController = function (var Ctx: TContext; var Scan: PWideChar): Boolean;
   protected
-    FTokenControllers: TACLList<TTokenController>;
-
-    procedure PopulateTokenControllers(const ASettings: TACLTextFormatSettings); virtual;
+    class procedure PopulateTokenControllers(
+      const AList: TACLList<TTokenController>;
+      const ASettings: TACLTextFormatSettings); virtual;
     //# Token Controllers
     class function IsCppLikeLineBreakToken(var Ctx: TContext; var Scan: PWideChar): Boolean; static;
     class function IsDelimiterToken(var Ctx: TContext; var Scan: PWideChar): Boolean; static;
@@ -483,6 +487,7 @@ type
     class function IsSpaceToken(var Ctx: TContext; var Scan: PWideChar): Boolean; static;
     class function IsStyleToken(var Ctx: TContext; var Scan: PWideChar): Boolean; static;
     class function IsTextToken(var Ctx: TContext; var Scan: PWideChar): Boolean; static;
+    class function IsTimeCode(var Ctx: TContext; var Scan: PWideChar): Boolean; static;
     class function IsURL(var Ctx: TContext; var Scan: PWideChar): Boolean; static;
     //# Utils
     class procedure AddTextBlock(const Ctx: TContext; AText: PWideChar; ALength: Integer); static; inline;
@@ -490,9 +495,6 @@ type
       AFirstBlockToReplace: TACLTextLayoutBlockText; AScan: PWideChar; const AHyperlinkPrefix: string); static;
   public
     class constructor Create;
-    constructor Create(const ASettings: TACLTextFormatSettings);
-    destructor Destroy; override;
-    procedure Run(ATarget: TACLTextLayout; const AText: string);
   end;
 
   { TACLTextPlainTextExporter }
@@ -1074,19 +1076,31 @@ begin
     Options := Options - [AOption];
 end;
 
-procedure TACLTextLayout.SetText(const AText: string; const AFormatSettings: TACLTextFormatSettings);
+procedure TACLTextLayout.SetText(const AText: string; const ASettings: TACLTextFormatSettings);
 var
-  AImporter: TACLTextImporter;
+  AScan: PChar;
+  AContext: TACLTextImporter.TContext;
+  ATokens: TACLList<TACLTextImporter.TTokenController>;
 begin
-  AImporter := TACLTextImporter.Create(AFormatSettings);
+  FLayoutIsDirty := True;
+  FLayout.Clear;
+  FBlocks.Clear;
+  FText := AText;
+
+  ATokens := TACLList<TACLTextImporter.TTokenController>.Create;
   try
-    FLayout.Clear;
-    FBlocks.Clear;
-    FText := AText;
-    AImporter.Run(Self, Text);
-    FLayoutIsDirty := True;
+    AScan := PChar(FText);
+    AContext.Blocks := FBlocks;
+    AContext.HyperlinkDepth := 0;
+    TACLTextImporter.PopulateTokenControllers(ATokens, ASettings);
+    while AScan^ <> #0 do
+      for var I := 0 to ATokens.Count - 1 do
+      begin
+        if ATokens.List[I](AContext, AScan) then
+          Break;
+      end;
   finally
-    AImporter.Free;
+    ATokens.Free;
   end;
 end;
 
@@ -2180,53 +2194,28 @@ begin
   FEmailValidator := TRegEx.Create(EmailPattern);
 end;
 
-constructor TACLTextImporter.Create(const ASettings: TACLTextFormatSettings);
+class procedure TACLTextImporter.PopulateTokenControllers(
+  const AList: TACLList<TTokenController>; const ASettings: TACLTextFormatSettings);
 begin
-  FTokenControllers := TACLList<TTokenController>.Create;
-  PopulateTokenControllers(ASettings);
-end;
-
-destructor TACLTextImporter.Destroy;
-begin
-  FreeAndNil(FTokenControllers);
-  inherited;
-end;
-
-procedure TACLTextImporter.Run(ATarget: TACLTextLayout; const AText: string);
-var
-  AContext: TContext;
-  AScan: PChar;
-begin
-  AScan := PChar(AText);
-  AContext.Blocks := ATarget.FBlocks;
-  AContext.HyperlinkDepth := 0;
-  while AScan^ <> #0 do
-    for var I := 0 to FTokenControllers.Count - 1 do
-    begin
-      if FTokenControllers.List[I](AContext, AScan) then
-        Break;
-    end;
-end;
-
-procedure TACLTextImporter.PopulateTokenControllers(const ASettings: TACLTextFormatSettings);
-begin
-  FTokenControllers.Capacity := 8;
+  AList.EnsureCapacity(9);
 
   if ASettings.AllowFormatting then
-    FTokenControllers.Add(IsStyleToken);
+    AList.Add(IsStyleToken);
 
-  FTokenControllers.Add(IsLineBreakToken);
+  AList.Add(IsLineBreakToken);
   if ASettings.AllowCppLikeLineBreaks then
-    FTokenControllers.Add(IsCppLikeLineBreakToken);
+    AList.Add(IsCppLikeLineBreakToken);
 
   if ASettings.AllowAutoEmailDetect then
-    FTokenControllers.Add(IsEmail);
+    AList.Add(IsEmail);
   if ASettings.AllowAutoURLDetect then
-    FTokenControllers.Add(IsURL);
+    AList.Add(IsURL);
+  if ASettings.AllowAutoTimeCodeDetect then
+    AList.Add(IsTimeCode);
 
-  FTokenControllers.Add(IsSpaceToken);
-  FTokenControllers.Add(IsDelimiterToken);
-  FTokenControllers.Add(IsTextToken);
+  AList.Add(IsSpaceToken);
+  AList.Add(IsDelimiterToken);
+  AList.Add(IsTextToken);
 end;
 
 class function TACLTextImporter.IsDelimiterToken(var Ctx: TContext; var Scan: PWideChar): Boolean;
@@ -2403,6 +2392,28 @@ begin
     end;
   until False;
   Result := True;
+end;
+
+class function TACLTextImporter.IsTimeCode(var Ctx: TContext; var Scan: PWideChar): Boolean;
+var
+  APrev: PWideChar;
+  ATime: Single;
+begin
+  if Ctx.HyperlinkDepth > 0 then
+    Exit(False);
+  if not Scan^.IsDigit then
+    Exit(False);
+  if (Ctx.Blocks.Count > 0) and ((Scan - 1)^ > ' ') then
+    Exit(False);
+  APrev := Scan;
+  Result := TACLTimeFormat.Parse(Scan, ATime);
+  if Result then
+  begin
+    Ctx.Blocks.Add(TACLTextLayoutBlockHyperlink.Create(
+      TACLTextLayout.TimeCodePrefix + IntToStr(Trunc(ATime)), True));
+    Ctx.Blocks.Add(TACLTextLayoutBlockText.Create(APrev, acStringLength(APrev, Scan)));
+    Ctx.Blocks.Add(TACLTextLayoutBlockHyperlink.Create(EmptyStr, False));
+  end;
 end;
 
 class function TACLTextImporter.IsURL(var Ctx: TContext; var Scan: PWideChar): Boolean;

@@ -59,8 +59,10 @@ type
   TACLTimeFormat = class
   public
     class function Format(const ATimeInMilliSeconds: Int64;
-      AParts: TACLFormatTimeParts = [ftpSeconds..ftpHours]; ASuppressZeroValues: Boolean = True): UnicodeString; inline;
-    class function FormatEx(ATimeInSeconds: Single; AParts: TACLFormatTimeParts; ASuppressZeroValues: Boolean): UnicodeString; overload;
+      AParts: TACLFormatTimeParts = [ftpSeconds..ftpHours];
+      ASuppressZeroValues: Boolean = True): UnicodeString; inline;
+    class function FormatEx(ATimeInSeconds: Single; AParts: TACLFormatTimeParts;
+      ASuppressZeroValues: Boolean): UnicodeString; overload;
     class function FormatEx(ATimeInSeconds: Single; AParts: TACLFormatTimeParts;
       const APartDelimiter: UnicodeString = ':'; ASuppressZeroValues: Boolean = False): UnicodeString; overload;
     // Parts;Delimiter;Flags
@@ -80,7 +82,8 @@ type
     // m:ss.msec
     // s
     // s.msec
-    class function Parse(S: string; out ATimeInSeconds: Single): Boolean;
+    class function Parse(const S: string; out ATimeInSeconds: Single): Boolean; overload; inline;
+    class function Parse(var Scan: PWideChar; out ATimeInSeconds: Single): Boolean; overload;
   end;
 
   { TACLSearchString }
@@ -1899,52 +1902,80 @@ begin
     GetPartValue(AParts, 1, ':'), acContains('Z', GetPartValue(AParts, 2)));
 end;
 
-class function TACLTimeFormat.Parse(S: string; out ATimeInSeconds: Single): Boolean;
-
-  function ExtractValue(const ADelimiters: string; var S: string; out AValue: Integer): Boolean;
-  var
-    ADelimPos: Integer;
-  begin
-    Result := False;
-    ADelimPos := LastDelimiter(ADelimiters, S);
-    if ADelimPos > 0 then
-    begin
-      Result := TryStrToInt(Copy(S, ADelimPos + 1, MaxWord), AValue);
-      if Result then
-        Delete(S, ADelimPos, MaxInt);
-    end;
-  end;
-
-  procedure Append(AValue: Integer; AModifier: Single);
-  begin
-    if ATimeInSeconds < 0 then
-      ATimeInSeconds := 0;
-    ATimeInSeconds := ATimeInSeconds + AValue * AModifier;
-  end;
-
+class function TACLTimeFormat.Parse(var Scan: PWideChar; out ATimeInSeconds: Single): Boolean;
 var
-  AValue: Integer;
+  ACurr, ACurr2: PWideChar;
+  AMillis: Int64;
 begin
-  ATimeInSeconds := -1; // Invalid
+  if not Scan^.IsDigit then
+    Exit(False);
 
-  if ExtractValue('.', S, AValue) then // milliseconds
-    Append(AValue, 1 / 1000);
-
-  if ExtractValue(':', S, AValue) then // seconds
+  // [h]h or [m]m
+  ACurr := Scan + 1;
+  ATimeInSeconds := Ord(Scan^) - Ord('0');
+  if ACurr^.IsDigit then
   begin
-    Append(AValue, 1);
-    if ExtractValue(':', S, AValue) then // minutes
-    begin
-      Append(AValue, 60);
-      Append(StrToIntDef(S, 0), 3600);
-    end
-    else
-      Append(StrToIntDef(S, 0), 60);
+    ATimeInSeconds := ATimeInSeconds * 10 + Ord(ACurr^) - Ord('0');
+    Inc(ACurr);
+  end;
+  if ACurr^ <> ':' then
+    Exit(False);
+
+  // mm or ss
+  if (ACurr + 1)^.IsDigit and (ACurr + 2)^.IsDigit then
+  begin
+    ATimeInSeconds := ATimeInSeconds * 60 +
+      (Ord((ACurr + 1)^) - Ord('0')) * 10 +
+      (Ord((ACurr + 2)^) - Ord('0'));
+    Inc(ACurr, 3);
   end
   else
-    Append(StrToIntDef(S, 0), 1);
+    Exit(False);
 
-  Result := ATimeInSeconds >= 0;
+  // ss
+  if ACurr^ = ':' then
+  begin
+    if (ACurr + 1)^.IsDigit and (ACurr + 2)^.IsDigit then
+    begin
+      ATimeInSeconds := ATimeInSeconds * 60 +
+        (Ord((ACurr + 1)^) - Ord('0')) * 10 +
+        (Ord((ACurr + 2)^) - Ord('0'));
+      Inc(ACurr, 3);
+    end
+    else
+      Exit(False);
+  end;
+
+  // milliseconds
+  if ACurr^ = '.' then
+  begin
+    Inc(ACurr);
+    ACurr2 := ACurr;
+    while ACurr2^.IsDigit do
+      Inc(ACurr2);
+    if acTryPWideCharToInt(ACurr, acStringLength(ACurr, ACurr2), AMillis) then
+    begin
+      if AMillis > 0 then
+        ATimeInSeconds := ATimeInSeconds + 1 / AMillis;
+      ACurr := ACurr2;
+    end
+    else
+      Exit(False);
+  end;
+
+  Result := ACurr^ <= ' ';
+  if Result then
+    Scan := ACurr;
+end;
+
+class function TACLTimeFormat.Parse(const S: string; out ATimeInSeconds: Single): Boolean;
+var
+  P: PWideChar;
+begin
+  P := PWideChar(S);
+  while (P^ <> #0) and (P^ <= ' ') do
+    Inc(P);
+  Result := Parse(P, ATimeInSeconds);
 end;
 
 { TACLSearchString }
