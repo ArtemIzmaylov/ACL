@@ -4,7 +4,7 @@
 {*             Editors Controls              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -84,9 +84,7 @@ type
 
     function GetSizeGripArea: TRect;
     procedure SetStyleScrollBox(AValue: TACLStyleScrollBox);
-    //
     procedure ScrollBarHandler(Sender: TObject; ScrollCode: TScrollCode; var ScrollPos: Integer);
-    //
     procedure WMCommand(var Message: TWMCommand); message WM_COMMAND;
   protected
     procedure CalculateContent(const R: TRect); override;
@@ -174,8 +172,8 @@ type
 implementation
 
 uses
-  System.SysUtils,
   System.Math,
+  System.SysUtils,
   // ACL
   ACL.Geometry,
   ACL.Utils.Common,
@@ -307,6 +305,7 @@ end;
 function TACLCustomEditContainer.CreateScrollBar(AKind: TScrollBarKind): TACLScrollBar;
 begin
   Result := TACLScrollBar.Create(Self);
+  Result.ControlStyle := Result.ControlStyle + [csNoDesignVisible];
   Result.OnScroll := ScrollBarHandler;
   Result.Style := StyleScrollBox;
   Result.Parent := Self;

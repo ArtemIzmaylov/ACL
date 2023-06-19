@@ -491,6 +491,9 @@ var
   ALength: Integer;
 begin
   ALength := Length(Name);
+  if ALength = 0 then
+    Exit(acEmptyStr);
+
   ABuffer := TACLStringBuilder.Get(ALength);
   try
     for AIndex := 1 to ALength do
@@ -499,7 +502,7 @@ begin
       if AChar = '"' then
         ABuffer.Append(#39)
       else
-        if acPos(AChar, InvalidChars) > 0 then
+        if acContains(AChar, InvalidChars) then
         begin
           if ReplacementForInvalidChars <> #0 then
             ABuffer.Append(ReplacementForInvalidChars);

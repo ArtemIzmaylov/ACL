@@ -1176,6 +1176,7 @@ begin
     FBorders := AValue;
     AdjustSize;
     Realign;
+    Invalidate;
   end;
 end;
 
