@@ -4,7 +4,7 @@
 {*          Texture Property Editor          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -45,6 +45,7 @@ uses
   ACL.UI.Controls.ComboBox,
   ACL.UI.Controls.DropDown,
   ACL.UI.Controls.GroupBox,
+  ACL.UI.Controls.Labels,
   ACL.UI.Controls.Panel,
   ACL.UI.Controls.SpinEdit,
   ACL.UI.Controls.TextEdit,
@@ -72,9 +73,10 @@ type
     gbContentOffsets: TACLGroupBox;
     gbFrames: TACLGroupBox;
     gbMargins: TACLGroupBox;
+    ilImages: TACLImageList;
     ImportExportDialog: TACLFileDialog;
-    Label1: TLabel;
-    Label2: TLabel;
+    Label1: TACLLabel;
+    Label2: TACLLabel;
     pbDisplay: TPaintBox;
     pnlButtons: TACLPanel;
     pnlPreview: TACLPanel;
@@ -92,7 +94,6 @@ type
     seMarginTop: TACLSpinEdit;
     seMax: TACLSpinEdit;
     TextureFileDialog: TACLFileDialog;
-    ilImages: TACLImageList;
 
     procedure btnClearClick(Sender: TObject);
     procedure btnExportClick(Sender: TObject);
