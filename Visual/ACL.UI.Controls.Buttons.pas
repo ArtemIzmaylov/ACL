@@ -532,6 +532,12 @@ type
     procedure SetStyle(AStyle: TACLStyleCheckBox);
     procedure SetSubControl(AValue: TACLCheckBoxSubControlOptions);
     procedure SetWordWrap(AValue: Boolean);
+    // Messages
+    procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
+    procedure CMHitTest(var Message: TCMHitTest); message CM_HITTEST;
+    procedure CMVisibleChanged(var Message: TMessage); message CM_VISIBLECHANGED;
+    procedure WMMove(var Message: TWMMove); message WM_MOVE;
+    procedure WMNCHitTest(var Message: TWMNCHitTest); message WM_NCHITTEST;
   protected
     procedure Calculate(R: TRect); override;
     function CanAutoSize(var NewWidth, NewHeight: Integer): Boolean; override;
@@ -544,11 +550,6 @@ type
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     procedure SetState(AValue: TCheckBoxState); virtual;
     procedure UpdateSubControlEnabled;
-    // Messages
-    procedure CMEnabledChanged(var Message: TMessage); override;
-    procedure CMHitTest(var Message: TCMHitTest); message CM_HITTEST;
-    procedure WMMove(var Message: TWMMove); message WM_MOVE;
-    procedure WMNCHitTest(var Message: TWMNCHitTest); message WM_NCHITTEST;
     //
     property AllowGrayed: Boolean read FAllowGrayed write FAllowGrayed default False;
     property Checked: Boolean read GetChecked write SetChecked;
@@ -584,6 +585,8 @@ type
   { TACLInplaceCheckBox }
 
   TACLInplaceCheckBox = class(TACLCustomCheckBox, IACLInplaceControl)
+  strict private
+    procedure CMHitTest(var Message: TWMNCHitTest); message CM_HITTEST;
   protected
     procedure SetDefaultSize; override;
 
@@ -592,8 +595,6 @@ type
     function IACLInplaceControl.InplaceIsFocused = Focused;
     procedure InplaceSetValue(const AValue: string);
     procedure IACLInplaceControl.InplaceSetFocus = SetFocus;
-    //
-    procedure CMHitTest(var Message: TWMNCHitTest); override;
   public
     constructor CreateInplace(const AParams: TACLInplaceInfo);
     property AllowGrayed;
@@ -2017,6 +2018,12 @@ begin
     PtInRect(ViewInfo.ButtonRect, P) or
     PtInRect(ViewInfo.FocusRect, P) or
     PtInRect(ViewInfo.LineRect, P));
+end;
+
+procedure TACLCustomCheckBox.CMVisibleChanged(var Message: TMessage);
+begin
+  SubControl.UpdateVisibility;
+  inherited;
 end;
 
 procedure TACLCustomCheckBox.WMMove(var Message: TWMMove);

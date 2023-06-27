@@ -564,6 +564,7 @@ type
     procedure BeforeAutoSize(var AWidth, AHeight: Integer); virtual;
     procedure Notification(AComponent: TComponent; AOperation: TOperation); virtual;
     function TrySetFocus: Boolean;
+    procedure UpdateVisibility; virtual;
     //
     property Owner: TControl read FOwner;
   public
@@ -2770,6 +2771,12 @@ begin
     TWinControlAccess(Control).SetFocus;  
 end;
 
+procedure TACLSubControlOptions.UpdateVisibility;
+begin
+  if Control <> nil then
+    Control.Visible := Owner.Visible;
+end;
+
 function TACLSubControlOptions.GetActualIndentBetweenElements: Integer;
 begin
   if Position in [mRight, mLeft] then
@@ -2823,6 +2830,7 @@ begin
         FControl.WindowProc := WindowProc;
         FControl.FreeNotification(FOwner);
         FControl.BringToFront;
+        UpdateVisibility;
       end
       else
         raise EInvalidArgument.Create(sErrorUnsupportedControl);

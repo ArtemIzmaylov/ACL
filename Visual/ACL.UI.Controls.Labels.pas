@@ -109,10 +109,11 @@ type
     procedure SetSubControl(AValue: TACLLabelSubControlOptions);
     procedure SetTransparent(AValue: Boolean);
     procedure SetUrl(const AValue: UnicodeString);
-    //
+    // Messages
     procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
     procedure CMHitTest(var Message: TCMHitTest); message CM_HITTEST;
     procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
+    procedure CMVisibleChanged(var Message: TMessage); message CM_VISIBLECHANGED;
   protected
     function CanAutoSize(var ANewWidth, ANewHeight: Integer): Boolean; override;
     function CreateStyle: TACLStyleLabel; virtual;
@@ -692,6 +693,12 @@ begin
   Calculate;
   if AutoSize then
     AdjustSize
+end;
+
+procedure TACLLabel.CMVisibleChanged(var Message: TMessage);
+begin
+  SubControl.UpdateVisibility;
+  inherited;
 end;
 
 { TACLStyleValidationLabel }
