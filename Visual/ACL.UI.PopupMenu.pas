@@ -252,6 +252,7 @@ type
     // IACLMenuShowHandler
     procedure IACLMenuShowHandler.OnShow = DoInitialize;
   protected
+    function CalculateTargetDpi: Integer; virtual;
     function CreateOptions: TACLPopupMenuOptions; virtual;
     function CreateStyle: TACLPopupMenuStyle; virtual;
     procedure DoInitialize; virtual;
@@ -772,6 +773,15 @@ begin
   TACLObjectLinks.Release(Self);
 end;
 
+function TACLPopupMenu.CalculateTargetDpi: Integer;
+begin
+  Result := acTryGetCurrentDpi(PopupComponent);
+  if Result = 0 then
+    Result := acTryGetCurrentDpi(Owner);
+  if Result = 0 then
+    Result := acGetTargetDPI(PopupPoint);
+end;
+
 function TACLPopupMenu.CreateMenuItem: TMenuItem;
 begin
   Result := TACLMenuItem.Create(Self);
@@ -808,19 +818,10 @@ begin
 end;
 
 procedure TACLPopupMenu.DoInitialize;
-var
-  ATargetDpi: Integer;
 begin
   DoPopup(Self);
   if AutoScale then
-  begin
-    ATargetDpi := acTryGetCurrentDpi(PopupComponent);
-    if ATargetDpi = 0 then
-      ATargetDpi := acTryGetCurrentDpi(Owner);
-    if ATargetDpi = 0 then
-      ATargetDpi := acGetTargetDPI(PopupPoint);
-    ScaleForDpi(ATargetDpi);
-  end;
+    ScaleForDpi(CalculateTargetDpi);
   for var I := 0 to Items.Count - 1 do
     Items[I].InitiateAction;
 end;
