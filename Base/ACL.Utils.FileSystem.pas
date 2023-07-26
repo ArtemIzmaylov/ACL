@@ -248,7 +248,8 @@ function acIsOurFile(const AExtsList, AFileName: UnicodeString; ADoubleExt: Bool
 function acIsOurFileEx(const AExtsList, ATestExt: UnicodeString): Boolean;
 function acIsRelativeFileName(const AFileName: UnicodeString): Boolean;
 function acIsUncFileName(const AFileName: UnicodeString): Boolean;
-function acIsUrlFileName(const AFileName: UnicodeString): Boolean;
+function acIsUrlFileName(const AFileName: UnicodeString): Boolean; overload;
+function acIsUrlFileName(const AFileName: PWideChar; ACount: Integer): Boolean; overload;
 function acLastDelimiter(const Delimiters, Str: UnicodeString): Integer; overload;
 function acLastDelimiter(Delimiters, Str: PWideChar; DelimitersLength, StrLength: Integer): Integer; overload;
 function acRelativeFileName(const AFileName: UnicodeString; ARootPath: UnicodeString): UnicodeString;
@@ -380,6 +381,14 @@ begin
   P := WStrScan(PWideChar(AFileName), ':');
   Result := (P <> nil) and ((P + 1)^ = '/') and ((P + 1)^ = (P + 2)^);
 //  Result := acExtractFileScheme(AFileName) <> '';
+end;
+
+function acIsUrlFileName(const AFileName: PWideChar; ACount: Integer): Boolean; overload;
+var
+  P: PWideChar;
+begin
+  P := WStrScan(PWideChar(AFileName), ACount, ':');
+  Result := (P <> nil) and ((P + 1)^ = '/') and ((P + 1)^ = (P + 2)^);
 end;
 
 function acPrepareFileName(const AFileName: UnicodeString): UnicodeString; inline;

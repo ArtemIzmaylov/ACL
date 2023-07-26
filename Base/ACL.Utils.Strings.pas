@@ -57,6 +57,9 @@ type
   TACLFormatTimeParts = set of TACLFormatTimePart;
 
   TACLTimeFormat = class
+  public const
+    BracketsIn  = ['(', '['];
+    BracketsOut = [')', ']'];
   public
     class function Format(const ATimeInMilliSeconds: Int64;
       AParts: TACLFormatTimeParts = [ftpSeconds..ftpHours];
@@ -1963,7 +1966,7 @@ begin
       Exit(False);
   end;
 
-  Result := ACurr^ <= ' ';
+  Result := (ACurr^ <= ' ') or CharInSet(ACurr^, BracketsOut);
   if Result then
     Scan := ACurr;
 end;
