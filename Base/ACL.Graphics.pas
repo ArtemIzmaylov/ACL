@@ -1776,7 +1776,7 @@ end;
 procedure acDrawDragImage(ACanvas: TCanvas; const R: TRect; AAlpha: Byte = MaxByte);
 begin
   acFillRect(ACanvas.Handle, R, TAlphaColor.FromColor($8F2929, AAlpha));
-  acDrawFrame(ACanvas.Handle, R, TAlphaColor.FromColor(clBlack, AAlpha), acGetSystemDpi);
+  acDrawFrame(ACanvas.Handle, R, TAlphaColor.FromColor(clBlack, AAlpha), MulDiv(1, acGetSystemDpi, acDefaultDpi));
 end;
 
 procedure acDrawDropArrow(DC: HDC; const R: TRect; AColor: TColor);
