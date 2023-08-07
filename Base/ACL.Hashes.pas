@@ -33,7 +33,7 @@ type
   TACLHashClass = class of TACLHash;
   TACLHash = class abstract
   public
-    class function Calculate(AData: PByte; ASize: Integer): Variant; overload; inline;
+    class function Calculate(AData: PByte; ASize: Cardinal): Variant; overload; inline;
     class function Calculate(AStream: TMemoryStream): Variant; overload; inline;
     class function Calculate(AStream: TStream; AProgressEvent: TACLProgressEvent = nil): Variant; overload; inline;
     class function Calculate(const ABytes: TBytes): Variant; overload; inline;
@@ -45,7 +45,7 @@ type
     class function Finalize(var AState: Pointer): Variant; virtual; abstract;
     class procedure Initialize(out AState: Pointer); virtual; abstract;
     class procedure Reset(var AState: Pointer); virtual;
-    class procedure Update(var AState: Pointer; AData: PByte; ASize: Integer); overload; virtual; abstract;
+    class procedure Update(var AState: Pointer; AData: PByte; ASize: Cardinal); overload; virtual; abstract;
     class procedure Update(var AState: Pointer; AStream: TStream; AProgressEvent: TACLProgressEvent = nil); overload;
     class procedure Update(var AState: Pointer; const ABytes: TBytes); overload;
     class procedure Update(var AState: Pointer; const AText: AnsiString); overload;
@@ -67,7 +67,7 @@ type
 
   TACLHashBobJenkins = class(TACLHash32Bit)
   public
-    class procedure Update(var AState: Pointer; AData: PByte; ASize: Integer); override;
+    class procedure Update(var AState: Pointer; AData: PByte; ASize: Cardinal); override;
   end;
 
   { TACLHashCRC32 }
@@ -133,8 +133,8 @@ type
     class function Finalize(var AState: Pointer): Variant; override;
     class procedure Initialize(out AState: Pointer); overload; override;
     class procedure Initialize(out AState: Pointer; ABase: Integer; ATable: PCRC32Table = nil); reintroduce; overload;
-    class procedure Update(var AState: Pointer; AData: PByte; ASize: Integer); override;
-    class procedure UpdateCore(var AAccumulator: LongWord; AData: PByte; ASize: Integer; ATable: PCRC32Table);
+    class procedure Update(var AState: Pointer; AData: PByte; ASize: Cardinal); override;
+    class procedure UpdateCore(var AAccumulator: LongWord; AData: PByte; ASize: Cardinal; ATable: PCRC32Table);
   end;
 
 {$IFDEF MSWINDOWS}
@@ -160,7 +160,7 @@ type
     class procedure Finalize(var AState: Pointer; out AHash: TBytes); reintroduce; overload;
     class procedure Initialize(out AState: Pointer); override;
     class procedure Reset(var AState: Pointer); override;
-    class procedure Update(var AState: Pointer; AData: PByte; ASize: Integer); override;
+    class procedure Update(var AState: Pointer; AData: PByte; ASize: Cardinal); override;
   end;
 
   { TACLHashCustomHMAC }
@@ -379,7 +379,7 @@ end;
 
 { TACLHash }
 
-class function TACLHash.Calculate(AData: PByte; ASize: Integer): Variant;
+class function TACLHash.Calculate(AData: PByte; ASize: Cardinal): Variant;
 var
   AState: Pointer;
 begin
@@ -529,8 +529,16 @@ end;
 
 { TACLHashBobJenkins }
 
-class procedure TACLHashBobJenkins.Update(var AState: Pointer; AData: PByte; ASize: Integer);
+class procedure TACLHashBobJenkins.Update(var AState: Pointer; AData: PByte; ASize: Cardinal);
 begin
+{$REGION ' Overflow workaround '}
+  while ASize >= SIZE_ONE_GIGABYTE do
+  begin
+    AState := Pointer(THashBobJenkins.GetHashValue(AData^, SIZE_ONE_GIGABYTE, Integer(AState)));
+    Inc(AData, SIZE_ONE_GIGABYTE);
+    Dec(ASize, SIZE_ONE_GIGABYTE);
+  end;
+{$ENDREGION}
   AState := Pointer(THashBobJenkins.GetHashValue(AData^, ASize, Integer(AState)));
 end;
 
@@ -560,13 +568,14 @@ begin
   FreeMemAndNil(AState);
 end;
 
-class procedure TACLHashCRC32.Update(var AState: Pointer; AData: PByte; ASize: Integer);
+class procedure TACLHashCRC32.Update(var AState: Pointer; AData: PByte; ASize: Cardinal);
 begin
   with PState(AState)^ do
     UpdateCore(Accumulator, AData, ASize, Table);
 end;
 
-class procedure TACLHashCRC32.UpdateCore(var AAccumulator: LongWord; AData: PByte; ASize: Integer; ATable: PCRC32Table);
+class procedure TACLHashCRC32.UpdateCore(var AAccumulator: LongWord;
+  AData: PByte; ASize: Cardinal; ATable: PCRC32Table);
 begin
   while ASize > 0 do
   begin
@@ -633,7 +642,7 @@ begin
   CryptCheck(CryptCreateHash(PState(AState).ProviderHandle, AHashAlgorithm, 0, 0, PState(AState).Handle));
 end;
 
-class procedure TACLHashCryptoApiBased.Update(var AState: Pointer; AData: PByte; ASize: Integer);
+class procedure TACLHashCryptoApiBased.Update(var AState: Pointer; AData: PByte; ASize: Cardinal);
 begin
   CryptCheck(CryptHashData(PState(AState).Handle, AData, ASize, 0));
 end;

@@ -96,18 +96,20 @@ type
   TACLSkinImageBitsStorage = class
   public
     Data: Pointer;
-    DataSize: Integer;
+    DataSize: Cardinal;
     HasAlpha: TACLBoolean;
     State: TACLSkinImageBitsState;
 
     constructor Create; overload;
-    constructor Create(ABits: PRGBQuadArray; ACount: Integer; AHasAlpha: TACLBoolean; AState: TACLSkinImageBitsState); overload;
+    constructor Create(ABits: PRGBQuadArray; ACount: Integer;
+      AHasAlpha: TACLBoolean; AState: TACLSkinImageBitsState); overload;
     constructor Create(AStream: TStream); overload;
     destructor Destroy; override;
     function Clone: TACLSkinImageBitsStorage;
     function Equals(Obj: TObject): Boolean; override;
     function GetHashCode: Integer; override;
-    procedure Restore(ABits: PRGBQuadArray; ACount: Integer; out AHasAlpha: TACLBoolean; out AState: TACLSkinImageBitsState);
+    procedure Restore(ABits: PRGBQuadArray; ACount: Integer;
+      out AHasAlpha: TACLBoolean; out AState: TACLSkinImageBitsState);
     procedure SaveToStream(AStream: TStream);
   end;
 
@@ -526,10 +528,25 @@ begin
     FastMove(ASrc^, ADst^, ACount * SizeOf(TRGBQuad));
 end;
 
-procedure ZDecompressCheck(code: Integer); inline;
+function ZCompressCheck(code: Integer): Integer; overload;
 begin
+  Result := code;
   if code < 0 then
-    raise EZDecompressionError.Create(string(_z_errmsg[2 - code]));
+    raise EZCompressionError.Create(string(_z_errmsg[2 - code])) at ReturnAddress;
+end;
+
+function ZCompressCheckWithoutBufferError(code: Integer): Integer; overload;
+begin
+  Result := code;
+  if (code < 0) and (code <> Z_BUF_ERROR) then
+    raise EZCompressionError.Create(string(_z_errmsg[2 - code])) at ReturnAddress;
+end;
+
+function ZDecompressCheck(code: Integer): Integer; overload;
+begin
+  Result := code;
+  if code < 0 then
+    raise EZDecompressionError.Create(string(_z_errmsg[2 - code])) at ReturnAddress;
 end;
 
 { TACLSkinImageTiledAreas }
@@ -586,15 +603,50 @@ end;
 
 constructor TACLSkinImageBitsStorage.Create(ABits: PRGBQuadArray;
   ACount: Integer; AHasAlpha: TACLBoolean; AState: TACLSkinImageBitsState);
+const
+  Delta = 256;
+var
+  AInSize: Cardinal;
+  AOutSize: Cardinal;
+  ZStream: TZStreamRec;
 begin
-  ZCompress(ABits, ACount * SizeOf(TRGBQuad), Data, DataSize, FSkinImageCompressionLevel);
+  // Our own ZCompress implementation, because standard version works with Integer, not Cardinal.
+  AInSize := ACount * SizeOf(TRGBQuad);
+  AOutSize := MulDiv(AInSize, 3, 4);
+  GetMem(Data, AOutSize);
+  try
+    FillChar(ZStream, SizeOf(ZStream), 0);
+    ZStream.next_in := PByte(ABits);
+    ZStream.next_out := Data;
+    ZStream.avail_in := AInSize;
+    ZStream.avail_out := AOutSize;
+
+    ZCompressCheck(DeflateInit(ZStream, ZLevels[FSkinImageCompressionLevel]));
+    try
+      while ZCompressCheckWithoutBufferError(deflate(ZStream, Z_FINISH)) <> Z_STREAM_END do
+      begin
+        Inc(AOutSize, Delta);
+        ReallocMem(Data, AOutSize);
+        ZStream.next_out := PByte(Data) + ZStream.total_out;
+        ZStream.avail_out := Delta;
+      end;
+    finally
+      ZCompressCheck(deflateEnd(ZStream));
+    end;
+
+    ReallocMem(Data, ZStream.total_out);
+    DataSize := ZStream.total_out;
+  except
+    FreeMemAndNil(Data);
+    raise;
+  end;
   HasAlpha := AHasAlpha;
   State := AState;
 end;
 
 constructor TACLSkinImageBitsStorage.Create(AStream: TStream);
 begin
-  DataSize := AStream.ReadInt32;
+  AStream.ReadBuffer(DataSize, SizeOf(Cardinal));
   GetMem(Data, DataSize);
   AStream.ReadBuffer(Data^, DataSize);
 end;
@@ -656,7 +708,7 @@ end;
 
 procedure TACLSkinImageBitsStorage.SaveToStream(AStream: TStream);
 begin
-  AStream.WriteInt32(DataSize);
+  AStream.WriteBuffer(DataSize, SizeOf(Cardinal));
   AStream.WriteBuffer(Data^, DataSize);
 end;
 
