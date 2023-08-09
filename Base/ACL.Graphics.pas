@@ -68,6 +68,7 @@ type
     HueIntensity: Byte;
 
     constructor Create(AHue: Byte; AHueIntensity: Byte = 100);
+    class function CreateFromColor(AColor: TAlphaColor): TACLColorSchema; static;
     class function Default: TACLColorSchema; static;
     function IsAssigned: Boolean;
 
@@ -2405,6 +2406,19 @@ constructor TACLColorSchema.Create(AHue, AHueIntensity: Byte);
 begin
   Hue := AHue;
   HueIntensity := AHueIntensity;
+end;
+
+class function TACLColorSchema.CreateFromColor(AColor: TAlphaColor): TACLColorSchema;
+var
+  H, S, L: Byte;
+begin
+  if AColor.IsValid then
+  begin
+    TACLColors.RGBtoHSLi(AColor.R, AColor.G, AColor.B, H, S, L);
+    Result := TACLColorSchema.Create(H, MulDiv(100, S, MaxByte));
+  end
+  else
+    Result := TACLColorSchema.Default;
 end;
 
 class function TACLColorSchema.Default: TACLColorSchema;

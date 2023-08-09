@@ -234,7 +234,6 @@ var
   AActualDarkMode: Boolean;
   AActualDarkModeForSystem: Boolean;
   AChanges: TACLApplicationChanges;
-  H, S, L: Byte;
 begin
   AChanges := [];
 
@@ -255,14 +254,7 @@ begin
 
   if ColorSchemaUseNative then
   begin
-    if AccentColor.IsValid then
-    begin
-      TACLColors.RGBtoHSLi(AccentColor.R, AccentColor.G, AccentColor.B, H, S, L);
-      AActualColorSchema := TACLColorSchema.Create(H, MulDiv(100, S, MaxByte));
-    end
-    else
-      AActualColorSchema := TACLColorSchema.Default;
-
+    AActualColorSchema := TACLColorSchema.CreateFromColor(AccentColor);
     if AActualColorSchema <> FColorSchema then
     begin
       FColorSchema := AActualColorSchema;
