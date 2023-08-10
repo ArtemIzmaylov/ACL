@@ -710,7 +710,6 @@ type
   { TACLCustomResourceCollection }
 
   TACLCustomResourceCollection = class(TACLComponent,
-    IACLApplicationListener,
     IACLColorSchema,
     IACLResourceChangeListener,
     IACLResourceChangeNotifier,
@@ -721,14 +720,12 @@ type
     FListeners: TACLResourceListenerList;
 
     procedure SetItems(AValue: TACLResourceCollectionItems);
-    // IACLApplicationListener
-    procedure IACLApplicationListener.Changed = ApplicationSettingsChanged;
     // IACLResourceChangeListener
     procedure IACLResourceChangeListener.ResourceChanged = _ResourceChanged;
     procedure _ResourceChanged(Sender: TObject; Resource: TACLResource = nil);
   protected
-    procedure ApplicationSettingsChanged(AChanges: TACLApplicationChanges); virtual;
-    function GetDefaultResource(const ID: string; AResourceClass: TClass; ASender: TObject = nil): TObject; virtual;
+    function GetDefaultResource(const ID: string;
+      AResourceClass: TClass; ASender: TObject = nil): TObject; virtual;
     procedure ResourceChanged(AResource: TACLResource = nil); virtual;
 
     property Listeners: TACLResourceListenerList read FListeners;
@@ -768,7 +765,8 @@ type
 
     procedure SetMasterCollection(const AValue: TACLCustomResourceCollection);
   protected
-    function GetDefaultResource(const ID: string; AResourceClass: TClass; ASender: TObject = nil): TObject; override;
+    function GetDefaultResource(const ID: string;
+      AResourceClass: TClass; ASender: TObject = nil): TObject; override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
   public
     procedure BeforeDestruction; override;
@@ -816,14 +814,17 @@ type
 
   { TACLRootResourceCollectionImpl }
 
-  TACLRootResourceCollectionImpl = class(TACLCustomResourceCollection)
+  TACLRootResourceCollectionImpl = class(TACLCustomResourceCollection,
+    IACLApplicationListener)
   strict private
     procedure InheritIfNecessary(const AResourceName, ASuffix: string);
-  protected
-    procedure ApplicationSettingsChanged(AChanges: TACLApplicationChanges); override;
     procedure InitializeResources;
+  protected
+    // IACLApplicationListener
+    procedure Changed(AChanges: TACLApplicationChanges);
   public
     constructor Create; reintroduce;
+    procedure BeforeDestruction; override;
   end;
 
 procedure acApplyColorSchemaForPublishedProperties(AObject: TObject; const AColorSchema: TACLColorSchema);
@@ -3102,7 +3103,6 @@ begin
   inherited Create(AOwner);
   FListeners := TACLResourceListenerList.Create;
   FItems := TACLResourceCollectionItems.Create(Self);
-  TACLApplication.ListenerAdd(Self);
 end;
 
 destructor TACLCustomResourceCollection.Destroy;
@@ -3114,7 +3114,6 @@ end;
 
 procedure TACLCustomResourceCollection.BeforeDestruction;
 begin
-  TACLApplication.ListenerRemove(Self);
   FListeners.NotifyRemoving(Self);
   FListeners.Clear;
   inherited BeforeDestruction;
@@ -3126,12 +3125,14 @@ begin
   Items.EnumResources(AProc);
 end;
 
-procedure TACLCustomResourceCollection.EnumResources(AResourceClass: TClass; AProc: TACLResourceCollectionItems.TEnumProc);
+procedure TACLCustomResourceCollection.EnumResources(
+  AResourceClass: TClass; AProc: TACLResourceCollectionItems.TEnumProc);
 begin
   Items.EnumResources(AResourceClass, AProc);
 end;
 
-procedure TACLCustomResourceCollection.EnumResources(AResourceClass: TClass; AList: TACLStringList);
+procedure TACLCustomResourceCollection.EnumResources(
+  AResourceClass: TClass; AList: TACLStringList);
 begin
   EnumResources(AResourceClass,
     function (AResource: TACLResourceCollectionItem): Boolean
@@ -3145,12 +3146,11 @@ end;
 procedure TACLCustomResourceCollection.EnumResources(AResourceClass: TClass; AList: TStrings);
 var
   ATempList: TACLStringList;
-  I: Integer;
 begin
   ATempList := TACLStringList.Create;
   try
     EnumResources(AResourceClass, ATempList);
-    for I := 0 to ATempList.Count - 1 do
+    for var I := 0 to ATempList.Count - 1 do
       AList.AddObject(ATempList[I], ATempList.Objects[I]);
   finally
     ATempList.Free;
@@ -3158,12 +3158,10 @@ begin
 end;
 
 procedure TACLCustomResourceCollection.ApplyColorSchema(const AColorSchema: TACLColorSchema);
-var
-  I: Integer;
 begin
   BeginUpdate;
   try
-    for I := 0 to Items.Count - 1 do
+    for var I := 0 to Items.Count - 1 do
       acApplyColorSchema(Items[I].Resource, AColorSchema);
   finally
     EndUpdate;
@@ -3182,7 +3180,8 @@ begin
   Listeners.NotifyEndUpdate;
 end;
 
-function TACLCustomResourceCollection.GetResource(const ID: string; AResourceClass: TClass; ASender: TObject = nil): TObject;
+function TACLCustomResourceCollection.GetResource(
+  const ID: string; AResourceClass: TClass; ASender: TObject = nil): TObject;
 begin
   Result := Items.GetResource(ID, AResourceClass);
   if (Result = nil) or (Result = ASender) then
@@ -3273,12 +3272,6 @@ begin
   finally
     EndUpdate
   end;
-end;
-
-procedure TACLCustomResourceCollection.ApplicationSettingsChanged(AChanges: TACLApplicationChanges);
-begin
-  if acColorSchema in AChanges then
-    ApplyColorSchema(TACLApplication.ColorSchema);
 end;
 
 procedure TACLCustomResourceCollection._ResourceChanged(Sender: TObject; Resource: TACLResource);
@@ -3401,7 +3394,22 @@ end;
 constructor TACLRootResourceCollectionImpl.Create;
 begin
   inherited Create(nil);
+  TACLApplication.ListenerAdd(Self);
   InitializeResources;
+end;
+
+procedure TACLRootResourceCollectionImpl.BeforeDestruction;
+begin
+  TACLApplication.ListenerRemove(Self);
+  inherited;
+end;
+
+procedure TACLRootResourceCollectionImpl.Changed(AChanges: TACLApplicationChanges);
+begin
+  if acDarkMode in AChanges then
+    InitializeResources
+  else if acColorSchema in AChanges then
+    ApplyColorSchema(TACLApplication.ColorSchema);
 end;
 
 procedure TACLRootResourceCollectionImpl.InitializeResources;
@@ -3416,16 +3424,11 @@ begin
       InheritIfNecessary('Popup.Margins.CornerRadius', '.W11');
       InheritIfNecessary('Slider.Textures.Thumb', '.W11');
     end;
+    if TACLApplication.ColorSchema.IsAssigned then
+      ApplyColorSchema(TACLApplication.ColorSchema);
   finally
     EndUpdate;
   end;
-end;
-
-procedure TACLRootResourceCollectionImpl.ApplicationSettingsChanged(AChanges: TACLApplicationChanges);
-begin
-  if acDarkMode in AChanges then
-    InitializeResources;
-  inherited;
 end;
 
 procedure TACLRootResourceCollectionImpl.InheritIfNecessary(const AResourceName, ASuffix: string);
