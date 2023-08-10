@@ -612,7 +612,8 @@ var
 begin
   // Our own ZCompress implementation, because standard version works with Integer, not Cardinal.
   AInSize := ACount * SizeOf(TRGBQuad);
-  AOutSize := MulDiv(AInSize, 3, 4);
+  AOutSize := 12{ZLib Header} + AInSize div 2 + IfThen(AInSize < 100, AInSize div 3);
+
   GetMem(Data, AOutSize);
   try
     FillChar(ZStream, SizeOf(ZStream), 0);
@@ -634,7 +635,9 @@ begin
       ZCompressCheck(deflateEnd(ZStream));
     end;
 
-    ReallocMem(Data, ZStream.total_out);
+    if Abs(ZStream.total_out - AOutSize) > Delta then
+      ReallocMem(Data, ZStream.total_out);
+
     DataSize := ZStream.total_out;
   except
     FreeMemAndNil(Data);
