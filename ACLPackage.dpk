@@ -102,7 +102,7 @@ contains
   ACL.UI.Forms in 'Visual\ACL.UI.Forms.pas',
   ACL.UI.HintWindow in 'Visual\ACL.UI.HintWindow.pas',
   ACL.UI.ImageList in 'Visual\ACL.UI.ImageList.pas',
-  ACL.UI.PopupMenu in 'Visual\ACL.UI.PopupMenu.pas',
+  ACL.UI.Menus in 'Visual\ACL.UI.Menus.pas',
   ACL.UI.Resources in 'Visual\ACL.UI.Resources.pas',
   ACL.UI.TrayIcon in 'Visual\ACL.UI.TrayIcon.pas',
   ACL.UI.Insight in 'Visual\ACL.UI.Insight.pas',

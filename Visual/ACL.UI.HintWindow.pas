@@ -30,7 +30,7 @@ uses
   ACL.Classes.Timer,
   ACL.Geometry,
   ACL.Graphics.TextLayout,
-  ACL.UI.PopupMenu,
+  ACL.UI.Menus,
   ACL.UI.Resources,
   ACL.Utils.DPIAware,
   ACL.Utils.Strings;

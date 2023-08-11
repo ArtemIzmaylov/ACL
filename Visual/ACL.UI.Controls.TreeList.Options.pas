@@ -48,7 +48,7 @@ uses
   ACL.UI.Controls.Category,
   ACL.UI.Controls.Panel,
   ACL.UI.Controls.Labels,
-  ACL.UI.PopupMenu,
+  ACL.UI.Menus,
   ACL.UI.Resources,
   ACL.UI.Controls.TreeList.Types,
   ACL.Utils.Common,

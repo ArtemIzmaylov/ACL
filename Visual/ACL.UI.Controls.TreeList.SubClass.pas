@@ -58,7 +58,7 @@ uses
   ACL.UI.DropTarget,
   ACL.UI.HintWindow,
   ACL.UI.ImageList,
-  ACL.UI.PopupMenu,
+  ACL.UI.Menus,
   ACL.UI.Resources,
   ACL.Utils.Common,
   ACL.Utils.DPIAware,

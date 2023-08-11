@@ -93,7 +93,7 @@ uses
   ACL.UI.Forms,
   ACL.UI.ImageList,
   ACL.UI.Insight,
-  ACL.UI.PopupMenu,
+  ACL.UI.Menus,
   ACL.UI.Resources,
   ACL.UI.TrayIcon,
   ACL.Utils.Common,

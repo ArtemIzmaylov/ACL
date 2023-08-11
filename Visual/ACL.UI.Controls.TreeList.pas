@@ -39,7 +39,7 @@ uses
   ACL.UI.Controls.TreeList.SubClass,
   ACL.UI.Controls.TreeList.Types,
   ACL.UI.HintWindow,
-  ACL.UI.PopupMenu,
+  ACL.UI.Menus,
   ACL.UI.Resources;
 
 type

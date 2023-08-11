@@ -76,7 +76,7 @@ type
 implementation
 
 uses
-  ACL.UI.PopupMenu;
+  ACL.UI.Menus;
 
 { TACLRecentList }
 

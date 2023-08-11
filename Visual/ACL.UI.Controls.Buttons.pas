@@ -622,7 +622,7 @@ implementation
 uses
   System.Math,
   // ACL
-  ACL.UI.PopupMenu,
+  ACL.UI.Menus,
   ACL.Utils.Strings;
 
 { TACLStyleButton }
