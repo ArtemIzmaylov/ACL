@@ -758,7 +758,7 @@ type
     FSorter: TACLTreeListSorter;
     FStyleInplaceEdit: TACLStyleEdit;
     FStyleInplaceEditButton: TACLStyleEditButton;
-    FStyleMenu: TACLStyleMenu;
+    FStyleMenu: TACLStylePopupMenu;
     FStyleTreeList: TACLStyleTreeList;
 
     FOnCanDeleteSelected: TACLTreeListConfirmationEvent;
@@ -825,7 +825,7 @@ type
     procedure SetOptionsView(AValue: TACLTreeListOptionsView);
     procedure SetStyleInplaceEdit(AValue: TACLStyleEdit);
     procedure SetStyleInplaceEditButton(AValue: TACLStyleEditButton);
-    procedure SetStyleMenu(AValue: TACLStyleMenu);
+    procedure SetStyleMenu(AValue: TACLStylePopupMenu);
     procedure SetStyle(AValue: TACLStyleTreeList);
     procedure SetViewportX(const Value: Integer);
     procedure SetViewportY(const Value: Integer);
@@ -1062,7 +1062,7 @@ type
     property OptionsView: TACLTreeListOptionsView read FOptionsView write SetOptionsView;
     property StyleInplaceEdit: TACLStyleEdit read FStyleInplaceEdit write SetStyleInplaceEdit;
     property StyleInplaceEditButton: TACLStyleEditButton read FStyleInplaceEditButton write SetStyleInplaceEditButton;
-    property StyleMenu: TACLStyleMenu read FStyleMenu write SetStyleMenu;
+    property StyleMenu: TACLStylePopupMenu read FStyleMenu write SetStyleMenu;
     property Style: TACLStyleTreeList read FStyleTreeList write SetStyle;
 
     // Events
@@ -3530,7 +3530,7 @@ begin
   FStyleInplaceEdit := TACLStyleEdit.Create(Self);
   FStyleInplaceEditButton := TACLStyleEditButton.Create(Self);
   FStyleTreeList := CreateStyle;
-  FStyleMenu := TACLStyleMenu.Create(Self);
+  FStyleMenu := TACLStylePopupMenu.Create(Self);
 end;
 
 destructor TACLTreeListSubClass.Destroy;
@@ -5428,7 +5428,7 @@ begin
   FStyleInplaceEditButton.Assign(AValue);
 end;
 
-procedure TACLTreeListSubClass.SetStyleMenu(AValue: TACLStyleMenu);
+procedure TACLTreeListSubClass.SetStyleMenu(AValue: TACLStylePopupMenu);
 begin
   FStyleMenu.Assign(AValue);
 end;

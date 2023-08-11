@@ -103,7 +103,7 @@ type
     function GetSelectedCount: Integer; inline;
     function GetStyleInplaceEdit: TACLStyleEdit;
     function GetStyleInplaceEditButton: TACLStyleEditButton;
-    function GetStyleMenu: TACLStyleMenu;
+    function GetStyleMenu: TACLStylePopupMenu;
     function GetStyle: TACLStyleTreeList;
     function GetSubClass: TACLTreeListSubClass; inline;
     function GetViewportX: Integer;
@@ -153,7 +153,7 @@ type
     procedure SetOptionsView(const AValue: TACLTreeListOptionsView);
     procedure SetStyleInplaceEdit(const AValue: TACLStyleEdit);
     procedure SetStyleInplaceEditButton(const Value: TACLStyleEditButton);
-    procedure SetStyleMenu(const AValue: TACLStyleMenu);
+    procedure SetStyleMenu(const AValue: TACLStylePopupMenu);
     procedure SetStyle(const AValue: TACLStyleTreeList);
     procedure SetViewportX(const Value: Integer);
     procedure SetViewportY(const Value: Integer);
@@ -173,7 +173,7 @@ type
     property OptionsView: TACLTreeListOptionsView read GetOptionsView write SetOptionsView;
     property StyleInplaceEdit: TACLStyleEdit read GetStyleInplaceEdit write SetStyleInplaceEdit;
     property StyleInplaceEditButton: TACLStyleEditButton read GetStyleInplaceEditButton write SetStyleInplaceEditButton;
-    property StyleMenu: TACLStyleMenu read GetStyleMenu write SetStyleMenu;
+    property StyleMenu: TACLStylePopupMenu read GetStyleMenu write SetStyleMenu;
     property Style: TACLStyleTreeList read GetStyle write SetStyle;
     //
     property OnCanDeleteSelected: TACLTreeListConfirmationEvent read GetOnCanDeleteSelected write SetOnCanDeleteSelected;
@@ -775,7 +775,7 @@ begin
   Result := SubClass.StyleInplaceEditButton;
 end;
 
-function TACLCustomTreeList.GetStyleMenu: TACLStyleMenu;
+function TACLCustomTreeList.GetStyleMenu: TACLStylePopupMenu;
 begin
   Result := SubClass.StyleMenu;
 end;
@@ -1020,7 +1020,7 @@ begin
   SubClass.StyleInplaceEditButton := Value;
 end;
 
-procedure TACLCustomTreeList.SetStyleMenu(const AValue: TACLStyleMenu);
+procedure TACLCustomTreeList.SetStyleMenu(const AValue: TACLStylePopupMenu);
 begin
   SubClass.StyleMenu := AValue;
 end;
