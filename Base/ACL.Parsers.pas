@@ -114,8 +114,8 @@ function acExtractString(var P: PWideChar; var C: Integer; out AToken: TACLParse
 function acStringLength(const AScanStart, AScanNext: PAnsiChar): Integer; overload; inline;
 function acStringLength(const AScanStart, AScanNext: PWideChar): Integer; overload; inline;
 
-procedure acUnquot(var AToken: TACLParserToken); overload;
-procedure acUnquot(var S: UnicodeString); overload;
+function acUnquot(var AToken: TACLParserToken): Boolean; overload;
+function acUnquot(var S: UnicodeString): Boolean; overload;
 
 function acCompareTokens(B1, B2: PWideChar; L1, L2: Integer): Boolean; overload;
 function acCompareTokens(const S: UnicodeString; P: PWideChar; L: Integer): Boolean; overload; inline;
@@ -223,32 +223,36 @@ begin
     Result := 0;
 end;
 
-procedure acUnquot(var AToken: TACLParserToken);
+function acUnquot(var AToken: TACLParserToken): Boolean;
 begin
-  if (AToken.DataLength >= 2) and (acPos(AToken.Data^, acParserDefaultQuotes) > 0) then
+  Result := False;
+  if (AToken.DataLength >= 2) and acContains(AToken.Data^, acParserDefaultQuotes) then
   begin
     if PWideChar(NativeUInt(AToken.Data) + SizeOf(WideChar) * NativeUInt(AToken.DataLength - 1))^ = AToken.Data^ then
     begin
       Dec(AToken.DataLength, 2);
       Inc(AToken.Data);
+      Result := True;
     end;
   end;
 end;
 
-procedure acUnquot(var S: UnicodeString); overload;
+function acUnquot(var S: UnicodeString): Boolean;
 var
   I, J: Integer;
 begin
+  Result := False;
   I := 1;
   J := Length(S);
   if J >= 2 then
   begin
-    if (acPos(S[I], acParserDefaultQuotes) > 0) and (S[J] = S[I]) then
+    if acContains(S[I], acParserDefaultQuotes) and (S[J] = S[I]) then
     begin
       Inc(I);
       Dec(J);
     end;
-    if (I <> 1) or (J <> Length(S)) then
+    Result := (I <> 1) or (J <> Length(S));
+    if Result then
       S := Copy(S, I, J - I + 1);
   end;
 end;

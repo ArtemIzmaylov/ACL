@@ -103,7 +103,7 @@ type
     function GetValueIsNumeric: Boolean;
     function PrepareString(const AValue: UnicodeString): UnicodeString;
     procedure SetIgnoreCase(const AValue: Boolean);
-    procedure SetValue(const AValue: UnicodeString);
+    procedure SetValue(AValue: UnicodeString);
   public
     constructor Create; overload;
     constructor Create(const AMask: UnicodeString; AIgnoreCase: Boolean = True); overload;
@@ -2006,11 +2006,9 @@ begin
 end;
 
 procedure TACLSearchString.BeginComparing;
-var
-  I: Integer;
 begin
   TMonitor.Enter(Self);
-  for I := 0 to Length(FMaskResult) - 1 do
+  for var I := 0 to Length(FMaskResult) - 1 do
     FMaskResult[I] := False;
 end;
 
@@ -2020,13 +2018,12 @@ var
   AMask: UnicodeString;
   AScan: PByte;
   ASize: Integer;
-  I: Integer;
 begin
   S := PrepareString(S);
   UniqueString(S);
   AScan := PByte(@S[1]);
   ASize := Length(S) * SizeOf(WideChar);
-  for I := 0 to Length(FMask) - 1 do
+  for var I := 0 to Length(FMask) - 1 do
   begin
     if not FMaskResult[I] then
     begin
@@ -2043,11 +2040,9 @@ begin
 end;
 
 function TACLSearchString.EndComparing: Boolean;
-var
-  I: Integer;
 begin
   Result := True;
-  for I := 0 to Length(FMaskResult) - 1 do
+  for var I := 0 to Length(FMaskResult) - 1 do
     Result := Result and FMaskResult[I];
   TMonitor.Exit(Self);
 end;
@@ -2076,7 +2071,7 @@ begin
   end;
 end;
 
-procedure TACLSearchString.SetValue(const AValue: UnicodeString);
+procedure TACLSearchString.SetValue(AValue: UnicodeString);
 begin
   TMonitor.Enter(Self);
   try
@@ -2089,7 +2084,14 @@ begin
     end
     else
     begin
-      acExplodeString(PrepareString(AValue), Separator, FMask);
+      if acUnquot(AValue) then
+      begin
+        SetLength(FMask, 1);
+        FMask[0] := PrepareString(AValue);
+      end
+      else
+        acExplodeString(PrepareString(AValue), Separator, FMask);
+
       SetLength(FMaskResult, Length(FMask));
     end;
   finally
