@@ -2331,7 +2331,7 @@ begin
   if AStartIndex < 0 then
     raise ERangeError.CreateResFmt(@SListIndexError, [AStartIndex]);
   if ACount > 0 then
-    Append(@AValue[AStartIndex], ACount);
+    Append(@AValue[AStartIndex + Low(string)], ACount);
   Result := Self;
 end;
 
@@ -2353,7 +2353,7 @@ begin
   begin
     if FDataLength > AIndex then
       FastMove(FData[AIndex], FData[AIndex + ALength], (FDataLength - AIndex) * SizeOf(WideChar));
-    FastMove(AValue[1], FData[AIndex], ALength * SizeOf(WideChar));
+    FastMove(AValue[Low(string)], FData[AIndex], ALength * SizeOf(WideChar));
     Inc(FDataLength, ALength);
   end;
   Result := Self;
