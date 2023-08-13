@@ -133,13 +133,18 @@ var
   AItem: TMenuItem;
   AMenu: TMenuItem;
 begin
-  AMenu := lvItems.FocusedNodeData;
   AItem := AItemClass.Create(FMenu.Owner);
   AItem.Caption := ACaption;
 {$IFDEF DESIGNER_AVAILABLE}
   AItem.Name := Designer.UniqueName('N');
 {$ENDIF}
-  AMenu.Parent.Insert(AMenu.MenuIndex + 1, AItem);
+
+  AMenu := lvItems.FocusedNodeData;
+  if AMenu <> nil then
+    AMenu.Parent.Insert(AMenu.MenuIndex + 1, AItem)
+  else
+    FMenu.Items.Add(AItem);
+
   PopulateTree;
   lvItems.FocusedNodeData := AItem;
 end;
