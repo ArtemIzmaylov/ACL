@@ -67,7 +67,8 @@ uses
   ACL.UI.Resources,
   ACL.Utils.Common,
   ACL.Utils.Desktop,
-  ACL.Utils.DPIAware;
+  ACL.Utils.DPIAware,
+  ACL.Utils.Strings;
 
 const
   CM_ENTERMENULOOP = CM_BASE + $0402;
@@ -118,6 +119,7 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     function HasSubItems: Boolean; virtual;
+    function ToString: string; override;
   published
     property Glyph: TACLGlyph read FGlyph write SetGlyph stored IsGlyphStored;
     property OnShow: TNotifyEvent read FOnShow write FOnShow;
@@ -154,6 +156,7 @@ type
   public
     destructor Destroy; override;
     function HasSubItems: Boolean; override;
+    function ToString: string; override;
   published
     property Link: TComponent read FLink write SetLink;
   end;
@@ -177,6 +180,7 @@ type
     destructor Destroy; override;
     procedure Click; override;
     function HasSubItems: Boolean; override;
+    function ToString: string; override;
   published
     property AutoCheck: Boolean read FAutoCheck write FAutoCheck default False;
     property Items: TStrings read FItems write SetItems;
@@ -229,7 +233,7 @@ type
     function GetSeparatorHeight: Integer; inline;
   protected
     function CalculateItemHeight: Integer; override;
-    procedure DoDrawText(ACanvas: TCanvas; const R: TRect; const S: UnicodeString); virtual;
+    procedure DoDrawText(ACanvas: TCanvas; ARect: TRect; const S: UnicodeString); virtual;
     procedure DoSplitRect(const R: TRect; AGutterWidth: Integer; out AGutterRect, AContentRect: TRect);
     procedure InitializeResources; override;
   public
@@ -283,7 +287,7 @@ type
     FAllowTextFormatting: Boolean;
   protected
     procedure DoAssign(Source: TPersistent); override;
-    procedure DoDrawText(ACanvas: TCanvas; const R: TRect; const S: string); override;
+    procedure DoDrawText(ACanvas: TCanvas; R: TRect; const S: string); override;
     procedure DoReset; override;
   published
     property AllowTextFormatting: Boolean read FAllowTextFormatting write FAllowTextFormatting default False;
@@ -325,11 +329,11 @@ type
     destructor Destroy; override;
     procedure BeforeDestruction; override;
     function CreateMenuItem: TMenuItem; override;
+    procedure ScaleForDpi(ATargetDpi: Integer);
     procedure Popup(const P: TPoint); reintroduce; overload;
     procedure Popup(X, Y: Integer); overload; override;
     // IACLPopup
     procedure PopupUnderControl(const ControlRect: TRect);
-    procedure ScaleForDpi(ATargetDpi: Integer);
 
     property CurrentDpi: Integer read GetCurrentDpi;
     property IsShown: Boolean read GetIsShown;
@@ -873,6 +877,11 @@ begin
   FGlyph.Assign(AValue);
 end;
 
+function TACLMenuItem.ToString: string;
+begin
+  Result := Caption;
+end;
+
 { TACLMenuContainerItem }
 
 procedure TACLMenuContainerItem.AssignTo(Dest: TPersistent);
@@ -956,6 +965,14 @@ begin
   acComponentFieldSet(FLink, Self, AValue);
 end;
 
+function TACLMenuItemLink.ToString: string;
+begin
+  if Link <> nil then
+    Result := '[' + Link.Name + ']'
+  else
+    Result := '[unassigned]';
+end;
+
 { TACLMenuListItem }
 
 constructor TACLMenuListItem.Create(AOwner: TComponent);
@@ -1019,6 +1036,11 @@ end;
 procedure TACLMenuListItem.SetItems(AValue: TStrings);
 begin
   FItems.Assign(AValue);
+end;
+
+function TACLMenuListItem.ToString: string;
+begin
+  Result := '(' + IfThenW(Caption, 'list') + ')';
 end;
 
 { TACLStyleMenu }
@@ -1221,9 +1243,9 @@ begin
   end;
 end;
 
-procedure TACLStylePopupMenu.DoDrawText(ACanvas: TCanvas; const R: TRect; const S: UnicodeString);
+procedure TACLStylePopupMenu.DoDrawText(ACanvas: TCanvas; ARect: TRect; const S: UnicodeString);
 begin
-  acTextDraw(ACanvas, S, R, taLeftJustify, taVerticalCenter, True);
+  acSysDrawText(ACanvas, ARect, S, DT_LEFT or DT_SINGLELINE or DT_VCENTER);
 end;
 
 procedure TACLStylePopupMenu.DoSplitRect(const R: TRect;
@@ -1464,7 +1486,7 @@ end;
 procedure TACLPopupMenu.DoShow(const ControlRect: TRect);
 begin
   if not IsShown then
-  begin
+  try
     FPopupWindow := TACLMenuPopupWindow.Create(Self);
     try
       TACLMenuPopupWindow(FPopupWindow).FPopupMenu := Self;
@@ -1473,6 +1495,8 @@ begin
       FreeAndNil(FPopupWindow);
   //Lose Focus: MyRefreshStayOnTop;
     end;
+  finally
+    DoClose;
   end;
 end;
 
@@ -1514,10 +1538,10 @@ begin
     AllowTextFormatting := TACLPopupMenuStyle(Source).AllowTextFormatting;
 end;
 
-procedure TACLPopupMenuStyle.DoDrawText(ACanvas: TCanvas; const R: TRect; const S: string);
+procedure TACLPopupMenuStyle.DoDrawText(ACanvas: TCanvas; R: TRect; const S: string);
 begin
   if AllowTextFormatting then
-    acDrawFormattedText(ACanvas, S, R, taLeftJustify, taVerticalCenter, False)
+    acDrawFormattedText(ACanvas, StripHotkey(S), R, taLeftJustify, taVerticalCenter, False)
   else
     inherited DoDrawText(ACanvas, R, S);
 end;
