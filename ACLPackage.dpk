@@ -92,6 +92,7 @@ contains
   ACL.UI.DesignTime.PropEditors in 'Visual\ACL.UI.DesignTime.PropEditors.pas',
   ACL.UI.DesignTime.PropEditors.ImageList in 'Visual\ACL.UI.DesignTime.PropEditors.ImageList.pas',
   ACL.UI.DesignTime.PropEditors.Texture in 'Visual\ACL.UI.DesignTime.PropEditors.Texture.pas',
+  ACL.UI.DesignTime.PropEditors.Menu in 'Visual\ACL.UI.DesignTime.PropEditors.Menu.pas',
   ACL.UI.DesignTime.Reg in 'Visual\ACL.UI.DesignTime.Reg.pas',
   ACL.UI.Dialogs in 'Visual\ACL.UI.Dialogs.pas',
   ACL.UI.Dialogs.FolderBrowser in 'Visual\ACL.UI.Dialogs.FolderBrowser.pas',

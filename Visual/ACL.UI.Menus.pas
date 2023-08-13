@@ -571,15 +571,13 @@ type
 
   { TACLMainMenu }
 
-  {$MESSAGE 'TODO - DesignTime - click -> select MenuItem'}
-  {$MESSAGE 'TODO - DesignTime - designer'}
-
   TACLMainMenu = class(TACLMenuWindow)
   strict private
     FCancelMenu: Boolean;
     FMenu: TACLPopupMenu;
     FStyle: TACLStyleMenu;
 
+    procedure HandlerMenuChange(Sender: TObject; Source: TMenuItem; Rebuild: Boolean);
     procedure SetMenu(AValue: TACLPopupMenu);
     procedure SetStyle(AValue: TACLStyleMenu);
     procedure WMSysCommand(var Message: TWMSysCommand); message WM_SYSCOMMAND;
@@ -3229,6 +3227,11 @@ begin
   Result := 1;
 end;
 
+procedure TACLMainMenu.HandlerMenuChange(Sender: TObject; Source: TMenuItem; Rebuild: Boolean);
+begin
+  Self.Rebuild;
+end;
+
 procedure TACLMainMenu.Notification(AComponent: TComponent; AOperation: TOperation);
 begin
   inherited;
@@ -3255,9 +3258,21 @@ end;
 
 procedure TACLMainMenu.SetMenu(AValue: TACLPopupMenu);
 begin
-  if acComponentFieldSet(FMenu, Self, AValue) then
+  if FMenu <> AValue then
   begin
-    FPopupMenu := AValue;
+    if FMenu <> nil then
+    begin
+      FMenu.RemoveFreeNotification(Self);
+      FMenu.OnChange := nil;
+      FMenu := nil;
+    end;
+    if AValue <> nil then
+    begin
+      FMenu := AValue;
+      FMenu.FreeNotification(Self);
+      FMenu.OnChange := HandlerMenuChange;
+    end;
+    FPopupMenu := Menu;
     Rebuild;
   end;
 end;

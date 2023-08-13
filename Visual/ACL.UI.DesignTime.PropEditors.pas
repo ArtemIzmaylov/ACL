@@ -4,7 +4,7 @@
 {*              Styles Support               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -24,9 +24,10 @@ uses
   System.Classes,
   System.Math,
   // Vcl
-  Vcl.Graphics,
   Vcl.Dialogs,
+  Vcl.Graphics,
   Vcl.ImgList,
+  Vcl.Menus,
   // PropertyEditors
   ColnEdit,
   DesignEditors,
@@ -50,8 +51,10 @@ uses
   ACL.UI.Controls.TreeList.Types,
   ACL.UI.DesignTime.PropEditors.ImageList,
   ACL.UI.DesignTime.PropEditors.Texture,
+  ACL.UI.DesignTime.PropEditors.Menu,
   ACL.UI.Dialogs.ColorPicker,
   ACL.UI.Dialogs.FontPicker,
+  ACL.UI.Menus,
   ACL.UI.Resources,
   ACL.Utils.Common,
   ACL.Utils.DPIAware,
@@ -340,6 +343,30 @@ type
   TACLTreeListColumnImageIndexProperty = class(TACLImageIndexProperty)
   protected
     function GetImages: TCustomImageList; override;
+  end;
+
+  { TACLMenuPropertyEditor }
+
+  TACLMenuPropertyEditor = class(TClassProperty)
+  public
+    procedure Edit; override;
+    function GetAttributes: TPropertyAttributes; override;
+  end;
+
+  { TACLPopupMenuEditor }
+
+  TACLPopupMenuEditor = class(TComponentEditor)
+  public
+    procedure ExecuteVerb(Index: Integer); override;
+    function GetVerb(Index: Integer): string; override;
+    function GetVerbCount: Integer; override;
+  end;
+
+  { TACLMainMenuEditor }
+
+  TACLMainMenuEditor = class(TACLPopupMenuEditor)
+  public
+    procedure ExecuteVerb(Index: Integer); override;
   end;
 
 implementation
@@ -1188,6 +1215,58 @@ end;
 function TACLDropDownImageIndexProperty.GetImages: TCustomImageList;
 begin
   Result := TACLDropDown(GetComponent(0)).Images;
+end;
+
+{ TACLMenuPropertyEditor }
+
+procedure TACLMenuPropertyEditor.Edit;
+begin
+  TACLMenuEditorDialog.Execute(GetComponent(0) as TACLPopupMenu, Designer);
+end;
+
+function TACLMenuPropertyEditor.GetAttributes: TPropertyAttributes;
+begin
+  Result := [paDialog];
+end;
+
+{ TACLPopupMenuEditor }
+
+procedure TACLPopupMenuEditor.ExecuteVerb(Index: Integer);
+begin
+  if Index = 0 then
+    TACLMenuEditorDialog.Execute(GetComponent as TACLPopupMenu, Designer)
+  else
+    inherited;
+end;
+
+function TACLPopupMenuEditor.GetVerb(Index: Integer): string;
+begin
+  if Index = 0 then
+    Result := 'Menu Designer...'
+  else
+    Result := inherited;
+end;
+
+function TACLPopupMenuEditor.GetVerbCount: Integer;
+begin
+  Result := 1;
+end;
+
+{ TACLMainMenuEditor }
+
+procedure TACLMainMenuEditor.ExecuteVerb(Index: Integer);
+var
+  AMainMenu: TACLMainMenu;
+begin
+  if Index = 0 then
+  begin
+    AMainMenu := GetComponent as TACLMainMenu;
+    if AMainMenu.Menu = nil then
+      raise Exception.Create(AMainMenu.Name + '.Menu is not set');
+    TACLMenuEditorDialog.Execute(AMainMenu.Menu, Designer);
+  end
+  else
+    inherited;
 end;
 
 end.

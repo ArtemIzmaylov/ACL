@@ -4,7 +4,7 @@
 {*        Register Components Helper         *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -19,16 +19,17 @@ interface
 uses
   Vcl.Graphics,
   Vcl.ImgList,
+  Vcl.Menus,
   // System
   System.Classes,
   System.Types,
   System.TypInfo,
   System.UITypes,
   // Designer
-  DesignIntf,
   DesignEditors,
-  VCLEditors,
+  DesignIntf,
   FiltEdit,
+  VCLEditors,
   // ACL
   ACL.UI.DesignTime.PropEditors;
 
@@ -39,10 +40,11 @@ procedure Register;
 implementation
 
 uses
-  System.SysUtils,
   System.Math,
+  System.SysUtils,
+  // Vcl
   Vcl.Controls,
-  //
+  // ACL
   ACL.Classes,
   ACL.Classes.StringList,
   ACL.Classes.Timer,
@@ -101,10 +103,9 @@ uses
 
 procedure HideProperties(AClass: TClass; const PropertyNames: array of string);
 var
-  I: Integer;
   APropInfo: PPropInfo;
 begin
-  for I := 0 to Length(PropertyNames) - 1 do
+  for var I := 0 to Length(PropertyNames) - 1 do
   begin
     APropInfo := GetPropInfo(AClass, PropertyNames[I]);
     if APropInfo = nil then
@@ -161,8 +162,12 @@ begin
   RegisterComponents(sACLComponentsPage, [TACLButton, TACLCheckBox, TACLRadioBox, TACLUIInsightButton]);
 
   // Menus
-  RegisterComponents(sACLComponentsPage, [TACLPopupMenu]);
-  RegisterNoIcon([TACLMenuItem, TACLMenuItemLink]);
+  HideProperties(TACLPopupMenu, ['OnChange']);
+  RegisterNoIcon([TACLMenuItem, TACLMenuItemLink, TACLMenuListItem]);
+  RegisterComponents(sACLComponentsPage, [TACLPopupMenu, TACLMainMenu]);
+  RegisterComponentEditor(TACLMainMenu, TACLMainMenuEditor);
+  RegisterComponentEditor(TACLPopupMenu, TACLPopupMenuEditor);
+  RegisterPropertyEditor(TypeInfo(TMenuItem), TACLPopupMenu, 'Items', TACLMenuPropertyEditor);
 
   // Images
   RegisterComponents(sACLComponentsPage, [TACLImageBox, TACLImageList, TACLSubImageSelector]);
