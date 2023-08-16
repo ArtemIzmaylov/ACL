@@ -464,7 +464,7 @@ type
     procedure CalculateBounds; virtual;
     procedure CalculateLayout; virtual; abstract;
     function CalculateMaxSize: TSize; virtual; abstract;
-    function CalculatePopupBounds(const ASize: TSize; AChild: TACLMenuWindow = nil): TRect; virtual; abstract;
+    function CalculatePopupBounds(ASize: TSize; AChild: TACLMenuWindow = nil): TRect; virtual; abstract;
 
     //# Menu Message Loop
     procedure DoneMenuLoop;
@@ -532,7 +532,7 @@ type
     procedure CalculateBounds; override;
     procedure CalculateLayout; override;
     function CalculateMaxSize: TSize; override;
-    function CalculatePopupBounds(const ASize: TSize; AChild: TACLMenuWindow = nil): TRect; override;
+    function CalculatePopupBounds(ASize: TSize; AChild: TACLMenuWindow = nil): TRect; override;
     procedure CalculateScrollBar(var R: TRect);
     //# Parent
     procedure CreateParams(var Params: TCreateParams); override;
@@ -589,7 +589,7 @@ type
     //# Calculate
     procedure CalculateLayout; override;
     function CalculateMaxSize: TSize; override;
-    function CalculatePopupBounds(const ASize: TSize; AChild: TACLMenuWindow = nil): TRect; override;
+    function CalculatePopupBounds(ASize: TSize; AChild: TACLMenuWindow = nil): TRect; override;
 
     //# Capabilities
     function CanAutoSize(var NewWidth, NewHeight: Integer): Boolean; override;
@@ -2685,7 +2685,9 @@ begin
     FreeAndNil(FScrollBar);
 end;
 
-function TACLMenuPopupWindow.CalculatePopupBounds(const ASize: TSize; AChild: TACLMenuWindow): TRect;
+function TACLMenuPopupWindow.CalculatePopupBounds(ASize: TSize; AChild: TACLMenuWindow): TRect;
+const
+  ShadowOffset = 4;
 var
   AParentRect: TRect;
   AWorkArea: TRect;
@@ -2704,16 +2706,25 @@ begin
   end
   else
   begin
-    Result := ClientToScreen(ClientRect);
-    if Result.Top + ASize.Height > AWorkArea.Bottom then
-      Result.Top := Max(AWorkArea.Top, FControlRect.Top - ASize.Height - 4);
+    Result := acGetWindowRect(Handle);
     if Result.Left + ASize.Width > AWorkArea.Right then
       Result.Left := AWorkArea.Right - ASize.Width;
     if Result.Top + ASize.Height > AWorkArea.Bottom then
-      Result.Top := AWorkArea.Bottom - ASize.Height;
+    begin
+      if FControlRect.IsEmpty then
+        Result.Top := AWorkArea.Bottom - ASize.Height
+      else if ((FControlRect.Top - AWorkArea.Top) > ASize.Height) then
+        Result.Top := FControlRect.Top - ASize.Height - ShadowOffset
+      else if ((FControlRect.Top - AWorkArea.Top) > (AWorkArea.Bottom - Result.Top)) or (Result.Top < FControlRect.Top) then
+      begin
+        Result.Top := AWorkArea.Top;
+        ASize.cy := FControlRect.Top - AWorkArea.Top - ShadowOffset;
+      end;
+    end;
   end;
-  Result.Right := Result.Left + ASize.Width;
+  Result.Top := Max(AWorkArea.Top, Result.Top);
   Result.Bottom := Min(Result.Top + ASize.Height, AWorkArea.Bottom);
+  Result.Right := Result.Left + ASize.Width;
 end;
 
 procedure TACLMenuPopupWindow.CheckAutoScrollTimer(const P: TPoint);
@@ -3184,7 +3195,7 @@ begin
   Result := acSize(1, Style.ItemHeight);
 end;
 
-function TACLMainMenu.CalculatePopupBounds(const ASize: TSize; AChild: TACLMenuWindow): TRect;
+function TACLMainMenu.CalculatePopupBounds(ASize: TSize; AChild: TACLMenuWindow): TRect;
 begin
   Result.TopLeft := ClientToScreen(Point(0, Height));
   if AChild <> nil then

@@ -248,7 +248,7 @@ end;
 
 procedure TACLMenuEditorDialog.miCreateItemClick(Sender: TObject);
 begin
-  CreateItem(TACLMenuItem);
+  CreateItem(TACLMenuItem, 'MenuItem');
 end;
 
 procedure TACLMenuEditorDialog.miCreateLinkClick(Sender: TObject);

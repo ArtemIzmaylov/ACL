@@ -141,14 +141,11 @@ type
     FTabIndent: Integer;
     FTabWidth: Integer;
 
-    function GetActualTabIndent: Integer;
     procedure SetStyle(AValue: TACLTabsStyle);
     procedure SetTabIndent(AValue: Integer);
     procedure SetTabWidth(AValue: Integer);
   protected
     procedure Changed;
-    //
-    property ActualTabIndent: Integer read GetActualTabIndent;
   public
     constructor Create(AControl: TACLCustomTabControl);
     procedure Assign(Source: TPersistent); override;
@@ -555,8 +552,8 @@ begin
   if AItem.Active then
   begin
     Result := Rect(
-      -dpiApply(OptionsView.ActualTabIndent, FCurrentPPI) - 1, 0,
-      -dpiApply(OptionsView.ActualTabIndent, FCurrentPPI) - 1, -2);
+      -dpiApply(OptionsView.TabIndent, FCurrentPPI) - 1, 0,
+      -dpiApply(OptionsView.TabIndent, FCurrentPPI) - 1, -2);
   end
   else
     Result := Rect(0, dpiApply(TabControlOffset, FCurrentPPI), 0, 0);
@@ -573,8 +570,8 @@ var
   AWidth: Integer;
   I: Integer;
 begin
-  ATabOffset := IfThen(OptionsView.Style = tsTab, dpiApply(OptionsView.ActualTabIndent, FCurrentPPI) + 1);
-  AIndentBetweenTabs := OptionsView.ActualTabIndent;
+  ATabOffset := IfThen(OptionsView.Style = tsTab, dpiApply(OptionsView.TabIndent, FCurrentPPI) + 1);
+  AIndentBetweenTabs := dpiApply(OptionsView.TabIndent, FCurrentPPI);
 
   ACalculator := TACLAutoSizeCalculator.Create;
   try
@@ -957,7 +954,7 @@ begin
   begin
     Result := CalculateTextSize('Wg').cy + acMarginHeight(GetTabMargins);
     if OptionsView.Style = tsHeader then
-      Inc(Result, OptionsView.ActualTabIndent)
+      Inc(Result, dpiApply(OptionsView.TabIndent, FCurrentPPI))
     else
       Inc(Result, dpiApply(TabControlOffset, FCurrentPPI));
   end;
@@ -1107,11 +1104,6 @@ end;
 procedure TACLTabsOptionsView.Changed;
 begin
   FControl.FullRefresh;
-end;
-
-function TACLTabsOptionsView.GetActualTabIndent: Integer;
-begin
-  Result := dpiApply(TabIndent, FControl.FCurrentPPI);
 end;
 
 procedure TACLTabsOptionsView.SetStyle(AValue: TACLTabsStyle);
