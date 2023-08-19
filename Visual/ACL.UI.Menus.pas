@@ -607,6 +607,7 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure AdjustSize; override;
+    procedure CheckShortCut(var Msg: TWMKey; var Handled: Boolean);
     procedure Rebuild;
   published
     property Menu: TACLPopupMenu read FMenu write SetMenu;
@@ -3221,6 +3222,12 @@ begin
     Menu.ScaleForDpi(FCurrentPPI);
   Style.SetTargetDPI(FCurrentPPI);
   AdjustSize;
+end;
+
+procedure TACLMainMenu.CheckShortCut(var Msg: TWMKey; var Handled: Boolean);
+begin
+  if (Menu <> nil) and Menu.IsShortCut(Msg) then
+    Handled := True;
 end;
 
 function TACLMainMenu.CreateMenuItemControl(AMenuItem: TMenuItem): TACLMenuItemControl;
