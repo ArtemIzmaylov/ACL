@@ -873,8 +873,9 @@ type
     procedure DoNodeChecked(ANode: TACLTreeListNode); virtual;
     function DoNodeDblClicked(ANode: TACLTreeListNode): Boolean; virtual;
     procedure DoSelectionChanged; virtual;
-    procedure DoSorted; virtual;
     procedure DoSorting; virtual;
+    procedure DoSorted; virtual;
+    procedure DoSortReset; virtual;
 
     // CustomDraw Events
     function DoCustomDrawColumnBar(ACanvas: TCanvas; const R: TRect): Boolean; virtual;
@@ -1003,8 +1004,10 @@ type
     procedure ResetSortingParams;
     procedure Resort;
     procedure Sort(ACustomSortProc: TACLTreeListNodeCompareEvent);
-    procedure SortBy(AColumn: TACLTreeListColumn; ADirection: TACLSortDirection; AResetPrevSortingParams: Boolean = False); overload;
-    procedure SortBy(AColumn: TACLTreeListColumn; AResetPrevSortingParams: Boolean = False); overload;
+    procedure SortBy(AColumn: TACLTreeListColumn; ADirection: TACLSortDirection;
+      AResetPrevSortingParams: Boolean = False); overload;
+    procedure SortBy(AColumn: TACLTreeListColumn;
+      AResetPrevSortingParams: Boolean = False); overload;
 
     // Paths
     function FindByPath(APath: UnicodeString; AIgnoreCase: Boolean = True; AExactMatch: Boolean = False): TACLTreeListNode;
@@ -3800,10 +3803,7 @@ begin
       begin
         ASortByList.Remove(AColumn);
         if ASortByList.Count = 0 then
-        begin
-          if Assigned(OnSortReset) then
-            OnSortReset(Self);
-        end;
+          DoSortReset;
       end
       else
         if AColumn.SortByIndex < 0 then
@@ -4314,14 +4314,19 @@ begin
   CallNotifyEvent(Self, OnSelectionChanged);
 end;
 
+procedure TACLTreeListSubClass.DoSorting;
+begin
+  CallNotifyEvent(Self, OnSorting);
+end;
+
 procedure TACLTreeListSubClass.DoSorted;
 begin
   CallNotifyEvent(Self, OnSorted);
 end;
 
-procedure TACLTreeListSubClass.DoSorting;
+procedure TACLTreeListSubClass.DoSortReset;
 begin
-  CallNotifyEvent(Self, OnSorting);
+  CallNotifyEvent(Self, OnSortReset);
 end;
 
 function TACLTreeListSubClass.DoCustomDrawColumnBar(ACanvas: TCanvas; const R: TRect): Boolean;
@@ -4331,7 +4336,8 @@ begin
     OnCustomDrawColumnBar(Self, ACanvas, R, Result);
 end;
 
-function TACLTreeListSubClass.DoCustomDrawNode(ACanvas: TCanvas; const R: TRect; ANode: TACLTreeListNode): Boolean;
+function TACLTreeListSubClass.DoCustomDrawNode(
+  ACanvas: TCanvas; const R: TRect; ANode: TACLTreeListNode): Boolean;
 begin
   Result := False;
   if Assigned(OnCustomDrawNode) then

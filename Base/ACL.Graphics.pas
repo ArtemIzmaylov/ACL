@@ -52,6 +52,8 @@ const
   acFocusRectIndent = 1;
   acTextIndent = 2;
 
+  acDragImageAlpha = 100;
+  acDragImageColor = $8F2929;
   acHatchDefaultColor1 = clWhite;
   acHatchDefaultColor2 = $BFBFBF;
   acHatchDefaultSize = 8;
@@ -384,7 +386,7 @@ procedure acDrawColorPreview(ACanvas: TCanvas; R: TRect; AColor: TAlphaColor); o
 procedure acDrawColorPreview(ACanvas: TCanvas; R: TRect; AColor: TAlphaColor; ABorderColor, AHatchColor1, AHatchColor2: TColor); overload;
 procedure acDrawDotsLineH(DC: HDC; X1, X2, Y: Integer; AColor: TColor);
 procedure acDrawDotsLineV(DC: HDC; X, Y1, Y2: Integer; AColor: TColor);
-procedure acDrawDragImage(ACanvas: TCanvas; const R: TRect; AAlpha: Byte = MaxByte);
+procedure acDrawDragImage(ACanvas: TCanvas; const R: TRect; AAlpha: Byte = acDragImageAlpha);
 procedure acDrawDropArrow(DC: HDC; const R: TRect; AColor: TColor); overload;
 procedure acDrawDropArrow(DC: HDC; const R: TRect; AColor: TColor; const AArrowSize: TSize); overload;
 procedure acDrawExpandButton(DC: HDC; const R: TRect; ABorderColor, AColor: TColor; AExpanded: Boolean);
@@ -1774,9 +1776,9 @@ begin
   end;
 end;
 
-procedure acDrawDragImage(ACanvas: TCanvas; const R: TRect; AAlpha: Byte = MaxByte);
+procedure acDrawDragImage(ACanvas: TCanvas; const R: TRect; AAlpha: Byte);
 begin
-  acFillRect(ACanvas.Handle, R, TAlphaColor.FromColor($8F2929, AAlpha));
+  acFillRect(ACanvas.Handle, R, TAlphaColor.FromColor(acDragImageColor, AAlpha));
   acDrawFrame(ACanvas.Handle, R, TAlphaColor.FromColor(clBlack, AAlpha), MulDiv(1, acGetSystemDpi, acDefaultDpi));
 end;
 

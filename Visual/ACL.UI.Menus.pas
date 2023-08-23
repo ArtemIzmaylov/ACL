@@ -481,6 +481,7 @@ type
     procedure ClearSubMenus;
     procedure CloseMenu;
     procedure TrackMenu;
+    function TrackMenuOnSelect: Boolean; virtual;
 
     //# Actions
     function CanCloseMenuOnItemClick(AItem: TMenuItem): Boolean; virtual;
@@ -598,6 +599,9 @@ type
     //# Navigation
     function TranslateCharCode(Code: Word): Word; override;
 
+    //# Tracking
+    function TrackMenuOnSelect: Boolean; override;
+
     function GetCurrentDpi: Integer; override;
     function GetMenuDelayTime: Integer; override;
     
@@ -676,10 +680,11 @@ type
     class var FMenus: TList;
 
     class function CallWindowHook(Code: Integer; wparam: WPARAM; Msg: PCWPStruct): Longint; stdcall; static;
+  protected
+    class function IsValid(AMenu: TACLMenuWindow): Boolean;
   public
     class procedure Register(ABar: TACLMenuWindow);
     class procedure Unregister(ABar: TACLMenuWindow);
-    //
     class property ActiveMenu: TACLMenuWindow read FActiveMenu write FActiveMenu;
   end;
 
@@ -1894,7 +1899,6 @@ end;
 procedure TACLMenuWindow.ProcessMenuLoop;
 var
   Msg: TMsg;
-  Temp: PMessage;
 begin
   if FInMenuLoop then
     Exit;
@@ -1945,10 +1949,7 @@ begin
             end
             else
               if (Msg.wParam <> VK_F1) or (KeyboardStateToShiftState = [ssCtrl]) then
-              begin
-                Temp := PMessage(@Msg.message);
-                FPopupStack.Peek.Dispatch(Temp^);
-              end;
+                FPopupStack.Peek.Dispatch(Msg.message);
 
           WM_MOUSEFIRST..WM_MOUSELAST:
             begin
@@ -2089,6 +2090,11 @@ begin
         DoSelect(FSelectedItem);
     end;
   end;
+end;
+
+function TACLMenuWindow.TrackMenuOnSelect: Boolean;
+begin
+  Result := False;
 end;
 
 function TACLMenuWindow.TranslateCharCode(Code: Word): Word;
@@ -2381,10 +2387,13 @@ begin
   begin
     if FChildMenu <> nil then
       FChildMenu.CloseMenu;
-    if (RootMenu.PopupStack.Peek = Self) then
+    if RootMenu.PopupStack.Peek = Self then
     begin
       EnsureNextItemVisible(ANextItem);
-      SelectItem(ANextItem);
+      if TrackMenuOnSelect then
+        ANextItem.Keyed
+      else
+        SelectItem(ANextItem);
     end
     else
       if (ANextItem.Parent = Self) and Assigned(ANextItem.Action) then
@@ -2445,6 +2454,9 @@ begin
         if RootMenu <> Self then
           RootMenu.Dispatch(Message);
   end;
+
+  if not TACLMenuController.IsValid(Self) then
+    Exit;
 
   inherited;
 
@@ -3100,6 +3112,11 @@ end;
 
 { TACLMenuController }
 
+class function TACLMenuController.IsValid(AMenu: TACLMenuWindow): Boolean;
+begin
+  Result := (FMenus <> nil) and (FMenus.IndexOf(AMenu) >= 0);
+end;
+
 class procedure TACLMenuController.Register(ABar: TACLMenuWindow);
 begin
   if FMenus = nil then
@@ -3298,6 +3315,11 @@ end;
 procedure TACLMainMenu.SetStyle(AValue: TACLStyleMenu);
 begin
   FStyle.Assign(AValue);
+end;
+
+function TACLMainMenu.TrackMenuOnSelect: Boolean;
+begin
+  Result := True;
 end;
 
 function TACLMainMenu.TranslateCharCode(Code: Word): Word;

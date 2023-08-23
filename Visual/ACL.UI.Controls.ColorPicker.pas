@@ -121,6 +121,7 @@ type
     procedure OptionsChangeHandler(Sender: TObject);
   protected
     function CreateViewInfo: TACLCompoundControlCustomViewInfo; override;
+    function GetFullRefreshChanges: TIntegerSet; override;
     procedure ProcessMouseDown(AButton: TMouseButton; AShift: TShiftState); override;
   public
     constructor Create(AOwner: TComponent); override;
@@ -777,6 +778,11 @@ begin
   FreeAndNil(FColor);
   FreeAndNil(FStyle);
   inherited Destroy;
+end;
+
+function TACLColorPickerSubClass.GetFullRefreshChanges: TIntegerSet;
+begin
+  Result := inherited + [cpcnValue];
 end;
 
 function TACLColorPickerSubClass.CalculateAutoSize(var AWidth, AHeight: Integer): Boolean;

@@ -181,6 +181,8 @@ type
     function NodeValueByName(const ANodeName: UnicodeString): UnicodeString; overload;
     function NodeValueByName(const ANodesNames: array of UnicodeString): UnicodeString; overload;
     function NodeValueByNameAsInteger(const ANodeName: UnicodeString): Integer;
+    function NextSibling: TACLXMLNode;
+    function PrevSibling: TACLXMLNode;
 
     procedure Assign(ANode: TACLXMLNode); virtual;
     procedure Clear; virtual;
@@ -949,6 +951,14 @@ begin
     Result := acEmptyStr;
 end;
 
+function TACLXMLNode.NextSibling: TACLXMLNode;
+begin
+  if Parent <> nil then
+    Result := Parent.Nodes[Index + 1]
+  else
+    Result := nil;
+end;
+
 function TACLXMLNode.NodeValueByName(const ANodesNames: array of UnicodeString): UnicodeString;
 var
   ANode: TACLXMLNode;
@@ -968,6 +978,14 @@ begin
     Result := ANode.NodeValueAsInteger
   else
     Result := 0
+end;
+
+function TACLXMLNode.PrevSibling: TACLXMLNode;
+begin
+  if Parent <> nil then
+    Result := Parent.Nodes[Index - 1]
+  else
+    Result := nil;
 end;
 
 procedure TACLXMLNode.Sort(ASortProc: TListSortCompare);

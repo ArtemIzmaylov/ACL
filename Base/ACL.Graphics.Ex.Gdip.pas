@@ -1079,27 +1079,36 @@ begin
     GdipDrawEllipse(FGraphics, TACLGdiplusResourcesCache.PenGet(Color, StrokeWidth, StrokeStyle), X1, Y1, X2 - X1, Y2 - Y1);
 end;
 
-procedure TACLGdiplusRender.DrawPath(Path: TACL2DRenderPath; Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
+procedure TACLGdiplusRender.DrawPath(Path: TACL2DRenderPath;
+  Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
 begin
   if Color.IsValid and (Width > 0) then
-    GdipDrawPath(FGraphics, TACLGdiplusResourcesCache.PenGet(Color, Width, Style), TACLGdiplusRenderPath(Path).Handle);
+    GdipDrawPath(FGraphics,
+      TACLGdiplusResourcesCache.PenGet(Color, Width, Style),
+      TACLGdiplusRenderPath(Path).Handle);
 end;
 
-procedure TACLGdiplusRender.DrawPolygon(const Points: array of TPoint; Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
+procedure TACLGdiplusRender.DrawPolygon(const Points: array of TPoint;
+  Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
 begin
   if (Length(Points) > 1) and Color.IsValid and (Width > 0) then
-    GdipDrawPolygonI(FGraphics, TACLGdiplusResourcesCache.PenGet(Color, Width, Style), @Points[0], Length(Points));
+    GdipDrawPolygonI(FGraphics,
+      TACLGdiplusResourcesCache.PenGet(Color, Width, Style),
+      @Points[0], Length(Points));
 end;
 
-procedure TACLGdiplusRender.DrawRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor; StrokeWidth: Single; StrokeStyle: TACL2DRenderStrokeStyle);
+procedure TACLGdiplusRender.DrawRectangle(X1, Y1, X2, Y2: Single;
+  Color: TAlphaColor; StrokeWidth: Single; StrokeStyle: TACL2DRenderStrokeStyle);
 begin
   AdjustRectToGdiLikeAppearance(X2, Y2);
   if (X2 > X1) and (Y2 > Y1) and Color.IsValid and (StrokeWidth > 0) then
-    GdipDrawRectangle(FGraphics, TACLGdiplusResourcesCache.PenGet(Color, StrokeWidth, StrokeStyle), X1, Y1, X2 - X1, Y2 - Y1);
+    GdipDrawRectangle(FGraphics,
+      TACLGdiplusResourcesCache.PenGet(Color, StrokeWidth, StrokeStyle), X1, Y1, X2 - X1, Y2 - Y1);
 end;
 
-procedure TACLGdiplusRender.DrawText(const Text: string; const R: TRect; Color: TAlphaColor;
-  Font: TFont; HorzAlign: TAlignment; VertAlign: TVerticalAlignment; WordWrap: Boolean);
+procedure TACLGdiplusRender.DrawText(const Text: string; const R: TRect;
+  Color: TAlphaColor; Font: TFont; HorzAlign: TAlignment; VertAlign: TVerticalAlignment;
+  WordWrap: Boolean);
 const
   AlignmentToStringAlignment: array[TAlignment] of TStringAlignment = (
     StringAlignmentNear, StringAlignmentFar, StringAlignmentCenter
@@ -1108,23 +1117,48 @@ const
     StringAlignmentNear, StringAlignmentFar, StringAlignmentCenter
   );
 var
+  AFlags: Integer;
+  AFont: GpFont;
   ARectF: TGPRectF;
   AStringFormat: GpStringFormat;
 begin
   if Color.IsValid and not R.IsEmpty and (Text <> '') then
   begin
-    GdipCheck(GdipCreateStringFormat(StringFormatFlagsMeasureTrailingSpaces or
-      IfThen(WordWrap, 0, StringFormatFlagsNoWrap), 0, AStringFormat));
-    try
-      GdipCheck(GdipSetStringFormatAlign(AStringFormat, AlignmentToStringAlignment[HorzAlign]));
-      GdipCheck(GdipSetStringFormatLineAlign(AStringFormat, VerticalAlignmentToLineAlignment[VertAlign]));
+//    SaveClipRegion;
+//    try
+//      IntersectClipRect(R);
+
+      AFont := TACLGdiplusResourcesCache.FontGet(Font);
       ARectF := MakeRect(Single(R.Left), R.Top, R.Width, R.Height);
-      GdipDrawString(FGraphics, PChar(Text), Length(Text),
-        TACLGdiplusResourcesCache.FontGet(Font), @ARectF, AStringFormat,
-        TACLGdiplusResourcesCache.BrushGet(Color));
-    finally
-      GdipCheck(GdipDeleteStringFormat(AStringFormat));
-    end;
+
+//      // GDI+ adds a small amount (1/6 em) to each end of every string displayed.
+//      // This 1/6 em allows >for glyphs with overhanging ends (such as italic 'f'),
+//      // and also gives GDI+ a small amount >of leeway to help with grid fitting expansion.
+//      if GdipGetFontSize(AFont, APadding) = Ok then
+//      begin
+//        APadding := APadding / 6;
+//        ARectF.X := ARectF.X - APadding;
+//        ARectF.Y := ARectF.Y - APadding;
+//        ARectF.Height := ARectF.Height + 2 * APadding;
+//        ARectF.Width := ARectF.Width + 2 * APadding;
+//      end;
+
+      AFlags := StringFormatFlagsMeasureTrailingSpaces;
+      if not WordWrap then
+        AFlags := AFlags or StringFormatFlagsNoWrap;
+
+      GdipCheck(GdipCreateStringFormat(AFlags, 0, AStringFormat));
+      try
+        GdipSetStringFormatAlign(AStringFormat, AlignmentToStringAlignment[HorzAlign]);
+        GdipSetStringFormatLineAlign(AStringFormat, VerticalAlignmentToLineAlignment[VertAlign]);
+        GdipDrawString(FGraphics, PChar(Text), Length(Text), AFont,
+          @ARectF, AStringFormat, TACLGdiplusResourcesCache.BrushGet(Color));
+      finally
+        GdipDeleteStringFormat(AStringFormat);
+      end;
+//    finally
+//      RestoreClipRegion;
+//    end;
   end;
 end;
 

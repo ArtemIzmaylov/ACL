@@ -161,6 +161,7 @@ type
     function CreateEditingController: TACLTreeListEditingController; override;
     function CreateNode: TACLTreeListNode; override;
     function CreateViewInfo: TACLCompoundControlCustomViewInfo; override;
+    procedure DoSortReset; override;
 
     function CanStartEditingByMouse(AButton: TMouseButton): Boolean;
     procedure ProcessKeyDown(AKey: Word; AShift: TShiftState); override;
@@ -179,7 +180,8 @@ type
     function GetStyleHatch: TACLStyleHatch;
 
     function DoEditCreate(const AParams: TACLInplaceInfo): TComponent; overload; override;
-    function DoEditCreate(const AParams: TACLInplaceInfo; AEditor: TACLPropertyEditor): TComponent; reintroduce; overload;
+    function DoEditCreate(const AParams: TACLInplaceInfo;
+      AEditor: TACLPropertyEditor): TComponent; reintroduce; overload;
     procedure ShowExternalDialogHandler(Sender: TObject);
 
     procedure Notification(AComponent: TComponent; AOperation: TOperation); override;
@@ -188,17 +190,18 @@ type
     destructor Destroy; override;
     function FindItem(const AProperyName: UnicodeString): TACLObjectInspectorNode;
     procedure ExecutePropertyEditor(const AProperyName: UnicodeString);
+    function GoToNextProperty(AForward: Boolean): Boolean;
     procedure Regroup;
     procedure ReloadProperties;
-    //
+    //# Properties
     property FocusedNode: TACLObjectInspectorNode read GetFocusedNode write SetFocusedNode;
     property InspectedObject: TComponent read FInspectedObject write SetInspectedObject;
     property OptionsBehavior: TACLObjectInspectorOptionsBehavior read FOptionsBehavior;
     property OptionsView: TACLObjectInspectorOptionsView read FOptionsView;
     property SearchString: string read FSearchString write SetSearchString;
-    //
+    //# Styles
     property StyleHatch: TACLStyleHatch read FStyleHatch;
-    //
+    //# Events
     property OnPopulated: TNotifyEvent read FOnPopulated write FOnPopulated;
     property OnPropertyAdd: TACLObjectInspectorPropertyAddEvent read FOnPropertyAdd write FOnPropertyAdd;
     property OnPropertyChanging: TACLObjectInspectorPropertyChangingEvent read FOnPropertyChanging write FOnPropertyChanging;
@@ -234,7 +237,8 @@ type
     function GetOptionsView: TACLObjectInspectorOptionsView;
   protected
     procedure DoDraw(ACanvas: TCanvas); override;
-    procedure DoDrawCellContent(ACanvas: TCanvas; const R: TRect; AColumnViewInfo: TACLTreeListColumnViewInfo); override;
+    procedure DoDrawCellContent(ACanvas: TCanvas; const R: TRect;
+      AColumnViewInfo: TACLTreeListColumnViewInfo); override;
     procedure DoGetHitTest(const P: TPoint; const AOrigin: TPoint; AInfo: TACLHitTestInfo); override;
     function GetCellTextExtends(AColumn: TACLTreeListColumnViewInfo): TRect; override;
     function HasButton: Boolean; virtual;
@@ -334,12 +338,13 @@ type
     procedure SetStyleSearchEdit(const Value: TACLStyleEdit);
     procedure SetStyleSearchEditButton(const Value: TACLStyleButton);
     procedure SetStyle(const Value: TACLStyleTreeList);
-    //
+    //# Internal
     procedure InnerControlKeyDownHandler(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure SearchBoxChangeHandler(Sender: TObject);
   protected
     procedure ResourceCollectionChanged; override;
     procedure SetDefaultSize; override;
+    //# Messages
     procedure CMChildKey(var Message: TCMChildKey); message CM_CHILDKEY;
   public
     constructor Create(AOwner: TComponent); override;
@@ -727,6 +732,12 @@ begin
   end;
 end;
 
+procedure TACLObjectInspectorSubClass.DoSortReset;
+begin
+  ReloadProperties;
+  inherited;
+end;
+
 procedure TACLObjectInspectorSubClass.PropertyChanged(AEditor: TACLPropertyEditor);
 begin
   if Assigned(OnPropertyChanged) then
@@ -750,6 +761,23 @@ procedure TACLObjectInspectorSubClass.ShowExternalDialogHandler(Sender: TObject)
 begin
   FocusedNode.Edit;
   EditingController.Cancel;
+end;
+
+function TACLObjectInspectorSubClass.GoToNextProperty(AForward: Boolean): Boolean;
+var
+  AIndex: Integer;
+begin
+  if EditingController.IsEditing then
+    EditingController.Apply;
+
+  AIndex := AbsoluteVisibleNodes.IndexOf(FocusedNode) + Signs[AForward];
+  Result := (AIndex >= 0) and (AIndex < AbsoluteVisibleNodes.Count);
+  if Result then
+  begin
+    FocusedNode := AbsoluteVisibleNodes.List[AIndex];
+    if FocusedNode <> nil then
+      StartEditing(FocusedNode, Columns[1]);
+  end;
 end;
 
 procedure TACLObjectInspectorSubClass.Notification(AComponent: TComponent; AOperation: TOperation);
@@ -925,6 +953,8 @@ procedure TACLObjectInspectorSubClass.ProcessMouseClick(AButton: TMouseButton; A
 var
   AInplaceControl: TWinControl;
   AInplaceControlPoint: TPoint;
+  AKeys: Integer;
+  AParam: LPARAM;
 begin
   if HitTest.HitObjectFlags[obhtButton] then
     ProcessMouseClickAtNodeButton(HitTest.Node)
@@ -938,8 +968,10 @@ begin
         AInplaceControlPoint := AInplaceControl.ScreenToClient(Mouse.CursorPos);
         if PtInRect(AInplaceControl.ClientRect, AInplaceControlPoint) then
         begin
-          PostMessage(AInplaceControl.Handle, WM_LBUTTONDOWN, acShiftStateToKeys(AShift), PointToLParam(AInplaceControlPoint));
-          PostMessage(AInplaceControl.Handle, WM_LBUTTONUP, acShiftStateToKeys(AShift), PointToLParam(AInplaceControlPoint));
+          AKeys := acShiftStateToKeys(AShift);
+          AParam := PointToLParam(AInplaceControlPoint);
+          PostMessage(AInplaceControl.Handle, WM_LBUTTONDOWN, AKeys, AParam);
+          PostMessage(AInplaceControl.Handle, WM_LBUTTONUP, AKeys, AParam);
         end;
       end;
     end
@@ -1183,6 +1215,11 @@ begin
   begin
     InnerControlKeyDownHandler(Self, Message.CharCode, []);
     Message.Result := 1;
+  end;
+  if Message.CharCode = VK_TAB then
+  begin
+    Message.Result := Ord(InnerControl.SubClass.GoToNextProperty(
+      not (ssShift in KeyboardStateToShiftState)));
   end;
 end;
 

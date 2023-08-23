@@ -1428,7 +1428,7 @@ begin
   Parent := AParams.Parent;
 
   ARect := AParams.Bounds;
-  ARect.Left := AParams.TextBounds.Left - 2;
+  ARect.Left := AParams.TextBounds.Left - dpiApply(2, FCurrentPPI);
   BoundsRect := ARect;
 end;
 
