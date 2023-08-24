@@ -136,9 +136,12 @@ type
     class function AppVersion: Cardinal; virtual; abstract;
 
     class procedure RegisterApplication(const AIconLibraryFileName: string); virtual;
-    class procedure RegisterFileTypeCommand(AKey: HKEY; const ATypeRoot, AName, ACaption, ACmdLine, ADropTargetClass: string);
-    class procedure RegisterFileTypeCommands(AKey: HKEY; const ATypeRoot: string; const AInfo: TACLFileTypeInfo); virtual;
-    class function RegisterFileTypeInfo(AKey: HKEY; const AInfo: TACLFileTypeInfo; ALibrary: TACLFileTypeIconLibrary): Boolean; virtual;
+    class procedure RegisterFileTypeCommand(AKey: HKEY;
+      const ATypeRoot, AName, ACaption, ACmdLine, ADropTargetClass: string);
+    class procedure RegisterFileTypeCommands(AKey: HKEY;
+      const ATypeRoot: string; const AInfo: TACLFileTypeInfo); virtual;
+    class function RegisterFileTypeInfo(AKey: HKEY;
+      const AInfo: TACLFileTypeInfo; ALibrary: TACLFileTypeIconLibrary): Boolean; virtual;
     class procedure UnregisterApplication; virtual;
     class function UnregisterFileTypeInfo(AKey: HKEY; const AInfo: TACLFileTypeInfo): Boolean; virtual;
     class procedure UpdateUserChoice(AState: Boolean);
@@ -376,7 +379,9 @@ begin
 
   if not AResult then
   begin
-    if IsWinVistaOrLater then
+    if IsWin10OrLater and (TOSVersion.Build >= 19045) then
+      ShellExecute('ms-settings:defaultapps?registeredAppMachine=' + AppName)
+    else if IsWinVistaOrLater then
       ShellExecute('control.exe', '/NAME Microsoft.DefaultPrograms /PAGE pageDefaultProgram')
     else
       ShellExecute('control.exe', 'appwiz.cpl,,3');
