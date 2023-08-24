@@ -4,7 +4,7 @@
 {*              Stream Utilities             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -23,6 +23,7 @@ uses
   System.Classes,
   System.SysUtils,
   System.Types,
+  System.Variants,
   // ACL
   ACL.Classes,
   ACL.Classes.ByteBuffer,
@@ -187,6 +188,7 @@ type
     function ReadStringA(ALength: Integer): AnsiString;
     function ReadStringWithLength: UnicodeString;
     function ReadStringWithLengthA: AnsiString;
+    function ReadVariant: Variant;
     function ReadWord: Word; inline;
     function ReadWordBE: Word; inline;
 
@@ -208,6 +210,7 @@ type
     function WriteStringA(const S: AnsiString): Integer;
     function WriteStringWithLength(const S: UnicodeString): Word;
     function WriteStringWithLengthA(const S: AnsiString): Word;
+    procedure WriteVariant(const AValue: Variant);
     procedure WriteWord(const AValue: Word); inline;
     procedure WriteWordBE(const AValue: Word); inline;
 
@@ -299,6 +302,7 @@ uses
 
 const
   sErrorCannotModifyReadOnlyStream = 'You cannot modify read-only stream';
+  sErrorUnsupportedVariantType = 'Unsupported Variant Type';
 
 type
   TMemoryStreamAccess = class(TMemoryStream);
@@ -1019,6 +1023,59 @@ begin
   Result := ReadStringA(ReadWord);
 end;
 
+function TACLStreamHelper.ReadVariant: Variant;
+const
+  ValTtoVarT: array[TValueType] of Integer =
+  (
+    varNull, varError, varShortInt, varSmallInt, varInteger, varDouble, varString, varError, varBoolean,
+    varBoolean, varError, varError, varString, varEmpty, varError, varSingle, varCurrency, varDate, varOleStr,
+    varInt64, varError, varDouble
+  );
+var
+  ASize: Integer;
+  AValueType: TValueType;
+begin
+  VarClear(Result);
+  AValueType := TValueType(ReadByte);
+  case AValueType of
+    vaNil:
+      Exit;
+    vaNull:
+      Exit(Null);
+    vaInt8:
+      TVarData(Result).VShortInt := ReadByte;
+    vaInt16:
+      TVarData(Result).VSmallint := ReadWord;
+    vaInt32:
+      TVarData(Result).VInteger := ReadInt32;
+    vaInt64:
+      TVarData(Result).VInt64 := ReadInt64;
+    vaExtended:
+      TVarData(Result).VDouble := ReadDouble;
+    vaSingle:
+      TVarData(Result).VSingle := ReadSingle;
+    vaCurrency:
+      TVarData(Result).VCurrency := ReadSingle;
+    vaDate:
+      TVarData(Result).VDate := ReadDouble;
+    vaFalse, vaTrue:
+      TVarData(Result).VBoolean := AValueType = vaTrue;
+    vaString:
+      Exit(ReadStringWithLength);
+    vaList:
+      begin
+        ASize := ReadVariant;
+        Result := VarArrayCreate([0, ASize - 1], varVariant);
+        for var I := 0 to ASize - 1 do
+          Result[I] := ReadVariant;
+        Exit;
+      end;
+  else
+    raise EReadError.Create(sErrorUnsupportedVariantType);
+  end;
+  TVarData(Result).VType := ValTtoVarT[AValueType];
+end;
+
 function TACLStreamHelper.ReadWord: Word;
 begin
   ReadBuffer(Result, SizeOf(Result));
@@ -1381,6 +1438,129 @@ begin
   if Result > 0 then
     WriteBuffer(S[1], Result);
   Inc(Result, SizeOf(Result));
+end;
+
+procedure TACLStreamHelper.WriteVariant(const AValue: Variant);
+
+  procedure WriteValueType(Value: TValueType);
+  begin
+    WriteByte(Ord(Value));
+  end;
+
+  procedure WriteInteger(Value: Integer);
+  begin
+  {$IFDEF ACL_PACK_VARIANT_INTEGERS}
+    if (Value >= Low(ShortInt)) and (Value <= High(ShortInt)) then
+    begin
+      WriteValueType(vaInt8);
+      WriteByte(Value);
+    end
+    else
+      if (Value >= Low(SmallInt)) and (Value <= High(SmallInt)) then
+      begin
+        WriteValueType(vaInt16);
+        WriteWord(Value);
+      end
+      else
+  {$ENDIF}
+      begin
+        WriteValueType(vaInt32);
+        WriteInt32(Value);
+      end;
+  end;
+
+  procedure WriteCardinal(Value: Cardinal); // to prevent from Variant conversion error
+  begin
+    WriteInteger(Value);
+  end;
+
+  procedure WriteArrayProc(const Value: Variant);
+  var
+    I, L, H: Integer;
+  begin
+    if VarArrayDimCount(Value) <> 1 then
+      raise EWriteError.Create(sErrorUnsupportedVariantType);
+    L := VarArrayLowBound(Value, 1);
+    H := VarArrayHighBound(Value, 1);
+  {$IFDEF ACL_PACK_VARIANT_ARRAYS}
+    if L = H then
+    begin
+      WriteVariant(Value[L]);
+      Exit;
+    end;
+  {$ENDIF}
+    WriteValueType(vaList);
+    WriteInteger(H - L + 1);
+    for I := L to H do
+      WriteVariant(Value[I]);
+  end;
+
+var
+  AVarType: Integer;
+begin
+  if VarIsArray(AValue) then
+  begin
+    WriteArrayProc(AValue);
+    Exit;
+  end;
+
+  AVarType := VarType(AValue) and varTypeMask;
+  case AVarType of
+    varEmpty:
+      WriteValueType(vaNil);
+    varNull:
+      WriteValueType(vaNull);
+
+    varLongWord:
+      WriteCardinal(AValue);
+
+    varByte, varShortInt, varSmallInt, varWord, varInteger:
+      WriteInteger(AValue);
+
+    varString, varUString, varOleStr:
+      begin
+        WriteValueType(vaString);
+        WriteStringWithLength(AValue);
+      end;
+
+    varInt64:
+      begin
+        WriteValueType(vaInt64);
+        WriteInt64(AValue);
+      end;
+
+    varSingle:
+      begin
+        WriteValueType(vaSingle);
+        WriteSingle(AValue);
+      end;
+
+    varDouble:
+      begin
+        WriteValueType(vaExtended);
+        WriteDouble(AValue);
+      end;
+
+    varCurrency:
+      begin
+        WriteValueType(vaCurrency);
+        WriteSingle(AValue);
+      end;
+
+    varDate:
+      begin
+        WriteValueType(vaDate);
+        WriteDouble(AValue);
+      end;
+
+    varBoolean:
+      if AValue then
+        WriteValueType(vaTrue)
+      else
+        WriteValueType(vaFalse);
+  else
+    raise EWriteError.Create(sErrorUnsupportedVariantType);
+  end;
 end;
 
 procedure TACLStreamHelper.WriteWord(const AValue: Word);
