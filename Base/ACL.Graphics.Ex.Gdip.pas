@@ -79,7 +79,7 @@ type
     property Status: GpStatus read FStatus;
   end;
 
-{$REGION 'GDI+ Cache'}
+{$REGION ' GDI+ Cache '}
 
   { TACLGdiplusResourcesCache }
 
@@ -110,7 +110,7 @@ type
 
 {$ENDREGION}
 
-{$REGION '2D Render'}
+{$REGION ' 2D Render '}
 
   { TACLGdiplusRender }
 
@@ -183,6 +183,7 @@ type
     procedure DrawText(const Text: string; const R: TRect; Color: TAlphaColor; Font: TFont;
       HorzAlign: TAlignment = taLeftJustify; VertAlign: TVerticalAlignment = taVerticalCenter;
       WordWrap: Boolean = False); override;
+    procedure MeasureText(const Text: string; Font: TFont; var Rect: TRect; WordWrap: Boolean);
 
     // Path
     function CreatePath: TACL2DRenderPath; override;
@@ -588,7 +589,8 @@ begin
     if FHandle = nil then
       GdipCheck(GdipCreateImageAttributes(FHandle));
     if FHandle <> nil then
-      GdipCheck(GdipSetImageAttributesColorMatrix(FHandle, ColorAdjustTypeBitmap, True, @FColorMatrix, nil, ColorMatrixFlagsDefault));
+      GdipCheck(GdipSetImageAttributesColorMatrix(FHandle,
+        ColorAdjustTypeBitmap, True, @FColorMatrix, nil, ColorMatrixFlagsDefault));
   end;
   Result := FHandle;
 end;
@@ -605,7 +607,7 @@ end;
 // GDI + Cache
 //----------------------------------------------------------------------------------------------------------------------
 
-{$REGION 'GDI+ Cache'}
+{$REGION ' GDI+ Cache '}
 
 function acCreateFont(const AData: TACLFontData): GpFont;
 const
@@ -743,7 +745,7 @@ end;
 // 2D Render
 //----------------------------------------------------------------------------------------------------------------------
 
-{$REGION '2D Render'}
+{$REGION ' 2D Render '}
 
 { TACLGdiplusRenderImage }
 
@@ -1159,6 +1161,31 @@ begin
 //    finally
 //      RestoreClipRegion;
 //    end;
+  end;
+end;
+
+procedure TACLGdiplusRender.MeasureText(const Text: string; Font: TFont; var Rect: TRect; WordWrap: Boolean);
+var
+  ACalcRect: TGPRectF;
+  AFlags: Integer;
+  AStringFormat: GpStringFormat;
+begin
+  ACalcRect := MakeRect(Single(Rect.Left), Rect.Top, Rect.Width, Rect.Height);
+
+  AFlags := StringFormatFlagsMeasureTrailingSpaces;
+  if not WordWrap then
+    AFlags := AFlags or StringFormatFlagsNoWrap;
+
+  GdipCheck(GdipCreateStringFormat(AFlags, LANG_NEUTRAL, AStringFormat));
+  try
+    GdipCheck(GdipMeasureString(FGraphics, PWideChar(Text), Length(Text),
+      TACLGdiplusResourcesCache.FontGet(Font), @ACalcRect, AStringFormat, @ACalcRect, nil, nil));
+    Rect.Left := Trunc(ACalcRect.X);
+    Rect.Top := Trunc(ACalcRect.Y);
+    Rect.Right := Trunc(ACalcRect.X + ACalcRect.Width);
+    Rect.Bottom := Trunc(ACalcRect.Y + ACalcRect.Height);
+  finally
+    GdipDeleteStringFormat(AStringFormat);
   end;
 end;
 
