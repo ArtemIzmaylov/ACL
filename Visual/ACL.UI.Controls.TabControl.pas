@@ -33,6 +33,7 @@ uses
   ACL.Classes.StringList,
   ACL.Geometry,
   ACL.Graphics,
+  ACL.Graphics.Ex,
   ACL.Graphics.SkinImage,
   ACL.Graphics.SkinImageSet,
   ACL.Math,
@@ -55,10 +56,12 @@ type
   TACLTabsStyle = (tsTab, tsHeader);
 
   TACLStyleTabControl = class(TACLStyle)
+  public const
+    Offset = 2;
   protected
     procedure InitializeResources; override;
   public
-    procedure Draw(ACanvas: TCanvas; const R: TRect; AActive: Boolean; AStyle: TACLTabsStyle);
+    procedure DrawTab(ACanvas: TCanvas; const R: TRect; AActive, AFocused: Boolean; AStyle: TACLTabsStyle);
   published
     property ColorBorder1: TACLResourceColor index 0 read GetColor write SetColor stored IsColorStored;
     property ColorBorder2: TACLResourceColor index 1 read GetColor write SetColor stored IsColorStored;
@@ -81,7 +84,7 @@ type
   public
     constructor Create(Collection: TCollection); override;
     procedure Assign(Source: TPersistent); override;
-    //
+    //# Properties
     property Data: Pointer read FData write FData;
   published
     property Caption: UnicodeString read FCaption write SetCaption;
@@ -103,7 +106,7 @@ type
     function Add: TACLTab; overload;
     function Add(const ACaption: UnicodeString; AData: Pointer = nil): TACLTab; overload;
     function FindByCaption(const ACaption: UnicodeString; out ATab: TACLTab): Boolean;
-    //
+    //# Properties
     property Items[Index: Integer]: TACLTab read GetItem; default;
   end;
 
@@ -128,21 +131,25 @@ type
     function GetItem(Index: Integer): TACLTabViewItem;
   public
     function FindByTab(ATab: TACLTab; out AItem: TACLTabViewItem): Boolean;
-
+    //# Properties
     property Items[Index: Integer]: TACLTabViewItem read GetItem; default;
   end;
 
   { TACLTabsOptionsView }
+
+  TACLTabsPosition = (tpTop, tpBottom);
 
   TACLTabsOptionsView = class(TPersistent)
   strict private
     FControl: TACLCustomTabControl;
     FStyle: TACLTabsStyle;
     FTabIndent: Integer;
+    FTabPosition: TACLTabsPosition;
     FTabWidth: Integer;
 
     procedure SetStyle(AValue: TACLTabsStyle);
     procedure SetTabIndent(AValue: Integer);
+    procedure SetTabPosition(AValue: TACLTabsPosition);
     procedure SetTabWidth(AValue: Integer);
   protected
     procedure Changed;
@@ -151,6 +158,7 @@ type
     procedure Assign(Source: TPersistent); override;
   published
     property Style: TACLTabsStyle read FStyle write SetStyle default tsTab;
+    property TabPosition: TACLTabsPosition read FTabPosition write SetTabPosition default tpTop;
     property TabIndent: Integer read FTabIndent write SetTabIndent default 3;
     property TabWidth: Integer read FTabWidth write SetTabWidth default -1;
   end;
@@ -163,20 +171,17 @@ type
   strict private
     FActiveIndex: Integer;
     FBorders: TACLBorders;
-    FFrameRect: TRect;
     FHoverTab: TACLTab;
     FIsUserAction: Boolean;
     FLoadedActiveIndex: Integer;
     FOptionsView: TACLTabsOptionsView;
     FStyle: TACLStyleTabControl;
-    FTabAreaRect: TRect;
     FTabs: TACLTabsList;
     FViewItems: TACLTabViewItemList;
 
     FOnTabChanging: TACLTabsActiveChangeEvent;
     FOnTabChanged: TACLTabsActiveChangeEvent;
 
-    function GetTabHeight: Integer;
     procedure SetActiveIndex(AValue: Integer);
     procedure SetBorders(AValue: TACLBorders);
     procedure SetHoverTab(AValue: TACLTab);
@@ -184,6 +189,9 @@ type
     procedure SetStyle(AValue: TACLStyleTabControl);
     procedure SetTabs(AValue: TACLTabsList);
   protected
+    FFrameRect: TRect;
+    FTabAreaRect: TRect;
+
     function CreatePadding: TACLPadding; override;
     function GetBackgroundStyle: TACLControlBackgroundStyle; override;
     function HitTest(X, Y: Integer; var AViewItem: TACLTabViewItem): Boolean;
@@ -197,14 +205,15 @@ type
     procedure ValidateFocus; virtual;
 
     // Calculating
-    function CalculateTabArea: TRect; virtual;
     function CalculateTabPlaceIndents(AItem: TACLTabViewItem): TRect; virtual;
     function CalculateTabTextOffsets(AItem: TACLTabViewItem): TRect; virtual;
     function CalculateTabWidth(AItem: TACLTabViewItem): Integer; virtual;
     function CalculateTextSize(const ACaption: UnicodeString): TSize; virtual;
-    procedure Calculate; virtual;
+    procedure Calculate;
+    procedure CalculateCore; virtual;
     procedure CalculateTabPlaces(const R: TRect); virtual;
     procedure CalculateTabStates; virtual;
+    function GetTabHeight: Integer;
     function GetTabMargins: TRect; virtual;
     procedure PopulateViewItems; virtual;
 
@@ -234,16 +243,14 @@ type
     procedure CMChildKey(var Message: TCMChildKey); message CM_CHILDKEY;
     procedure CMDesignHitTest(var Message: TCMDesignHitTest); message CM_DESIGNHITTEST;
     procedure WMGetDlgCode(var Message: TWMGetDlgCode); message WM_GETDLGCODE;
-    //
-    property FrameRect: TRect read FFrameRect;
-    property TabAreaRect: TRect read FTabAreaRect;
+    //# Properties
     property Tabs: TACLTabsList read FTabs write SetTabs;
     property ViewItems: TACLTabViewItemList read FViewItems;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure JumpToNextPage(AForward: Boolean);
-    //
+    //# Properties
     property HoverTab: TACLTab read FHoverTab;
     property IsUserAction: Boolean read FIsUserAction;
   published
@@ -257,7 +264,7 @@ type
     property ResourceCollection;
     property Style: TACLStyleTabControl read FStyle write SetStyle;
     property Visible;
-    //
+    //# Events
     property OnTabChanging: TACLTabsActiveChangeEvent read FOnTabChanging write FOnTabChanging;
     property OnTabChanged: TACLTabsActiveChangeEvent read FOnTabChanged write FOnTabChanged;
     property OnMouseDown;
@@ -272,7 +279,7 @@ type
     function GetActiveTab: TACLTab;
   public
     procedure Localize(const ASection: string); override;
-    //
+    //# Properties
     property ActiveTab: TACLTab read GetActiveTab;
   published
     property Tabs;
@@ -290,7 +297,7 @@ type
     procedure SetPageControl(AValue: TACLPageControl);
     procedure SetPageIndex(AValue: Integer);
     procedure SetPageVisible(AValue: Boolean);
-    //
+    //# Messages
     procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
   protected
     FTab: TACLTab;
@@ -301,7 +308,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    //
+    //# Properties
     property Active: Boolean read GetActive;
     property PageControl: TACLPageControl read GetPageControl write SetPageControl;
   published
@@ -309,7 +316,7 @@ type
     property Padding;
     property PageIndex: Integer read GetPageIndex write SetPageIndex stored False;
     property PageVisible: Boolean read FPageVisible write SetPageVisible default True;
-    //
+    //# Useless
     property Height stored False;
     property Left stored False;
     property Top stored False;
@@ -338,7 +345,7 @@ type
     procedure GetChildren(Proc: TGetChildProc; Root: TComponent); override;
     procedure GetTabOrderList(List: TList); override;
     procedure ShowControl(AControl: TControl); override;
-    //
+    //# Properties
     property ActivePage: TACLPageControlPage read GetActivePage write SetActivePage;
     property PageCount: Integer read GetPageCount;
     property Pages[Index: Integer]: TACLPageControlPage read GetPages;
@@ -367,16 +374,17 @@ uses
   ACL.MUI;
 
 const
-  TabControlOffset = 2;
-
   sErrorWrongChild = 'Only %s can be placed on %s';
   sErrorWrongParent = '%s should be placed on %s';
 
 { TACLStyleTabControl }
 
-procedure TACLStyleTabControl.Draw(ACanvas: TCanvas; const R: TRect; AActive: Boolean; AStyle: TACLTabsStyle);
+procedure TACLStyleTabControl.DrawTab(ACanvas: TCanvas;
+  const R: TRect; AActive, AFocused: Boolean; AStyle: TACLTabsStyle);
 begin
   HeaderTexture.Draw(ACanvas.Handle, R, Ord(AStyle) * 2 + Ord(AActive));
+  if AActive and AFocused then
+    acDrawFocusRect(ACanvas, acRectContent(R, HeaderTexture.ContentOffsets));
 end;
 
 procedure TACLStyleTabControl.InitializeResources;
@@ -393,8 +401,9 @@ end;
 
 constructor TACLTab.Create(Collection: TCollection);
 begin
-  inherited Create(Collection);
+  FCaption := 'Tab';
   FVisible := True;
+  inherited Create(Collection);
 end;
 
 procedure TACLTab.Assign(Source: TPersistent);
@@ -534,29 +543,43 @@ begin
   if HandleAllocated then
   begin
     PopulateViewItems;
-    FTabAreaRect := CalculateTabArea;
-    FFrameRect := ClientRect;
-    FFrameRect.Top := FTabAreaRect.Bottom;
+    CalculateCore;
     CalculateTabStates;
-    CalculateTabPlaces(TabAreaRect);
+    CalculateTabPlaces(FTabAreaRect);
   end;
 end;
 
-function TACLCustomTabControl.CalculateTabArea: TRect;
+procedure TACLCustomTabControl.CalculateCore;
 begin
-  Result := acRectSetHeight(ClientRect, GetTabHeight);
+  FFrameRect := ClientRect;
+  if OptionsView.TabPosition = tpBottom then
+  begin
+    FTabAreaRect := FFrameRect;
+    FTabAreaRect.Top := FTabAreaRect.Bottom - GetTabHeight;
+    FFrameRect.Bottom := FTabAreaRect.Top;
+  end
+  else
+  begin
+    FTabAreaRect := FFrameRect;
+    FTabAreaRect.Bottom := FTabAreaRect.Top + GetTabHeight;
+    FFrameRect.Top := FTabAreaRect.Bottom;
+  end;
 end;
 
 function TACLCustomTabControl.CalculateTabPlaceIndents(AItem: TACLTabViewItem): TRect;
 begin
+  Result := NullRect;
   if AItem.Active then
   begin
-    Result := Rect(
-      -dpiApply(OptionsView.TabIndent, FCurrentPPI) - 1, 0,
-      -dpiApply(OptionsView.TabIndent, FCurrentPPI) - 1, -2);
+    Result.Left := -dpiApply(OptionsView.TabIndent, FCurrentPPI) - 1;
+    Result.Right := Result.Left;
+    Result.Bottom := -2;
   end
   else
-    Result := Rect(0, dpiApply(TabControlOffset, FCurrentPPI), 0, 0);
+    Result.Top := dpiApply(TACLStyleTabControl.Offset, FCurrentPPI);
+
+  if OptionsView.TabPosition = tpBottom then
+    acExchangeIntegers(Result.Top, Result.Bottom);
 end;
 
 procedure TACLCustomTabControl.CalculateTabPlaces(const R: TRect);
@@ -568,16 +591,18 @@ var
   ATabOffset: Integer;
   ATextSize: TSize;
   AWidth: Integer;
-  I: Integer;
 begin
-  ATabOffset := IfThen(OptionsView.Style = tsTab, dpiApply(OptionsView.TabIndent, FCurrentPPI) + 1);
   AIndentBetweenTabs := dpiApply(OptionsView.TabIndent, FCurrentPPI);
+  if OptionsView.Style = tsTab then
+    ATabOffset := dpiApply(OptionsView.TabIndent, FCurrentPPI) + 1
+  else
+    ATabOffset := 0;
 
   ACalculator := TACLAutoSizeCalculator.Create;
   try
     ACalculator.Capacity := ViewItems.Count;
     ACalculator.AvailableSize := acRectWidth(R) - 2 * ATabOffset;
-    for I := 0 to ViewItems.Count - 1 do
+    for var I := 0 to ViewItems.Count - 1 do
     begin
       if OptionsView.Style = tsTab then
         AWidth := CalculateTabWidth(ViewItems[I]) + IfThen(I + 1 < ViewItems.Count, AIndentBetweenTabs)
@@ -589,7 +614,7 @@ begin
     ACalculator.Calculate;
 
     Inc(ATabOffset, R.Left);
-    for I := 0 to ViewItems.Count - 1 do
+    for var I := 0 to ViewItems.Count - 1 do
     begin
       AItem := ViewItems[I];
       AItem.Bounds := Bounds(ATabOffset, R.Top, ACalculator[I].Size, acRectHeight(R));
@@ -599,8 +624,10 @@ begin
 
       if OptionsView.Style = tsTab then
         AItem.Bounds := acRectContent(AItem.Bounds, CalculateTabPlaceIndents(AItem))
+      else if OptionsView.TabPosition = tpTop then
+        Dec(AItem.Bounds.Bottom, AIndentBetweenTabs)
       else
-        Dec(AItem.Bounds.Bottom, AIndentBetweenTabs);
+        Inc(AItem.Bounds.Top, AIndentBetweenTabs);
 
       if AItem.Tab.Caption <> '' then
       begin
@@ -632,9 +659,8 @@ end;
 procedure TACLCustomTabControl.CalculateTabStates;
 var
   AViewItem: TACLTabViewItem;
-  I: Integer;
 begin
-  for I := 0 to ViewItems.Count - 1 do
+  for var I := 0 to ViewItems.Count - 1 do
   begin
     AViewItem := ViewItems[I];
     AViewItem.Active := ActiveIndex = AViewItem.Tab.Index;
@@ -689,38 +715,57 @@ end;
 
 procedure TACLCustomTabControl.DrawContentAreaBackground(ACanvas: TCanvas);
 begin
-  acFillRect(ACanvas.Handle, FrameRect, Style.ColorContent.AsColor);
-  acDrawComplexFrame(ACanvas.Handle, FrameRect, Style.ColorBorder1.AsColor, Style.ColorBorder2.AsColor, Borders);
+  acFillRect(ACanvas.Handle, FFrameRect, Style.ColorContent.AsColor);
+  acDrawComplexFrame(ACanvas.Handle, FFrameRect,
+    Style.ColorBorder1.AsColor, Style.ColorBorder2.AsColor, Borders);
 end;
 
 procedure TACLCustomTabControl.DrawItem(ACanvas: TCanvas; AViewItem: TACLTabViewItem);
+var
+  ATemp: TACLBitmapLayer;
 begin
-  Style.Draw(ACanvas, AViewItem.Bounds, AViewItem.Active, OptionsView.Style);
-  if AViewItem.Active and Focused then
-    acDrawFocusRect(ACanvas, acRectContent(AViewItem.Bounds, Style.HeaderTexture.ContentOffsets));
-  DrawItemText(ACanvas, AViewItem);
+  if not AViewItem.Bounds.IsEmpty then
+  begin
+    if (OptionsView.Style = tsTab) and (OptionsView.TabPosition = tpBottom) then
+    begin
+      ATemp := TACLBitmapLayer.Create(AViewItem.Bounds);
+      try
+        acBitBlt(ATemp.Handle, ACanvas.Handle, ATemp.ClientRect, AViewItem.Bounds.TopLeft);
+        Style.DrawTab(ATemp.Canvas, ATemp.ClientRect, AViewItem.Active, Focused, OptionsView.Style);
+        ATemp.Flip(False, True);
+        ATemp.DrawCopy(ACanvas.Handle, AViewItem.Bounds.TopLeft);
+      finally
+        ATemp.Free;
+      end;
+    end
+    else
+      Style.DrawTab(ACanvas, AViewItem.Bounds, AViewItem.Active, Focused, OptionsView.Style);
+
+    DrawItemText(ACanvas, AViewItem);
+  end;
 end;
 
 procedure TACLCustomTabControl.DrawItems(ACanvas: TCanvas);
 var
-  I: Integer;
+  AActiveViewItem: TACLTabViewItem;
+  AViewItem: TACLTabViewItem;
 begin
-  for I := 0 to ViewItems.Count - 1 do
+  AActiveViewItem := nil;
+  for var I := 0 to ViewItems.Count - 1 do
   begin
-    if not ViewItems[I].Active then
-      DrawItem(ACanvas, ViewItems[I]);
+    AViewItem := ViewItems.List[I];
+    if AViewItem.Active then
+      AActiveViewItem := AViewItem
+    else
+      DrawItem(ACanvas, AViewItem);
   end;
-  for I := 0 to ViewItems.Count - 1 do
-    if ViewItems[I].Active then
-    begin
-      DrawItem(ACanvas, ViewItems[I]);
-      Break;
-    end;
+  if AActiveViewItem <> nil then
+    DrawItem(ACanvas, AActiveViewItem);
 end;
 
 procedure TACLCustomTabControl.DrawItemText(ACanvas: TCanvas; AViewItem: TACLTabViewItem);
 begin
-  if not acRectIsEmpty(AViewItem.TextRect) then
+  if not AViewItem.TextRect.IsEmpty then
   begin
     if AViewItem.Active then
       ACanvas.Font.Assign(Style.HeaderFontActive)
@@ -739,7 +784,7 @@ var
 begin
   ASaveIndex := SaveDC(DC);
   try
-    if acIntersectClipRegion(DC, TabAreaRect) then
+    if acIntersectClipRegion(DC, FTabAreaRect) then
       inherited;
   finally
     RestoreDC(DC, ASaveIndex)
@@ -774,10 +819,8 @@ begin
 end;
 
 function TACLCustomTabControl.HitTest(X, Y: Integer; var AViewItem: TACLTabViewItem): Boolean;
-var
-  I: Integer;
 begin
-  for I := 0 to ViewItems.Count - 1 do
+  for var I := 0 to ViewItems.Count - 1 do
     if PtInRect(ViewItems[I].Bounds, Point(X, Y)) then
     begin
       AViewItem := ViewItems[I];
@@ -811,7 +854,7 @@ end;
 
 function TACLCustomTabControl.DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean;
 begin
-  Result := acUIMouseWheelSwitchesTabs and PtInRect(TabAreaRect, ScreenToClient(MousePos));
+  Result := acUIMouseWheelSwitchesTabs and PtInRect(FTabAreaRect, ScreenToClient(MousePos));
   if Result then
     ActiveIndex := ActiveIndex + Signs[WheelDelta < 0];
 end;
@@ -956,7 +999,7 @@ begin
     if OptionsView.Style = tsHeader then
       Inc(Result, dpiApply(OptionsView.TabIndent, FCurrentPPI))
     else
-      Inc(Result, dpiApply(TabControlOffset, FCurrentPPI));
+      Inc(Result, dpiApply(TACLStyleTabControl.Offset, FCurrentPPI));
   end;
 end;
 
@@ -971,11 +1014,9 @@ begin
 end;
 
 procedure TACLCustomTabControl.PopulateViewItems;
-var
-  I: Integer;
 begin
   ViewItems.Clear;
-  for I := 0 to Tabs.Count - 1 do
+  for var I := 0 to Tabs.Count - 1 do
   begin
     if Tabs[I].Visible then
       ViewItems.Add(TACLTabViewItem.Create(Tabs[I]));
@@ -1086,6 +1127,7 @@ constructor TACLTabsOptionsView.Create(AControl: TACLCustomTabControl);
 begin
   inherited Create;
   FControl := AControl;
+  FTabPosition := tpTop;
   FTabWidth := -1;
   FTabIndent := 3;
 end;
@@ -1095,6 +1137,7 @@ begin
   if Source is TACLTabsOptionsView then
   begin
     FStyle := TACLTabsOptionsView(Source).Style;
+    FTabPosition := TACLTabsOptionsView(Source).TabPosition;
     FTabWidth := TACLTabsOptionsView(Source).TabWidth;
     FTabIndent := TACLTabsOptionsView(Source).TabIndent;
     Changed;
@@ -1121,6 +1164,15 @@ begin
   if AValue <> FTabIndent then
   begin
     FTabIndent := AValue;
+    Changed;
+  end;
+end;
+
+procedure TACLTabsOptionsView.SetTabPosition(AValue: TACLTabsPosition);
+begin
+  if FTabPosition <> AValue then
+  begin
+    FTabPosition := AValue;
     Changed;
   end;
 end;
@@ -1366,7 +1418,8 @@ end;
 
 { TACLPageControlUIInsightAdapter }
 
-class procedure TACLPageControlUIInsightAdapter.GetChildren(AObject: TObject; ABuilder: TACLUIInsightSearchQueueBuilder);
+class procedure TACLPageControlUIInsightAdapter.GetChildren(
+  AObject: TObject; ABuilder: TACLUIInsightSearchQueueBuilder);
 var
   APage: TACLPageControlPage;
   APageControl: TACLPageControl absolute AObject;
