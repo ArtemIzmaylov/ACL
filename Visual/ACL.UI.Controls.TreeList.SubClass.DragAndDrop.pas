@@ -863,12 +863,28 @@ begin
   Result := Column.CanResize;
 end;
 
-procedure TACLTreeListColumnDragResizeObject.DragMoveAutoWidthColumns(const P: TPoint; var ADeltaX, ADeltaY: Integer);
+procedure TACLTreeListColumnDragResizeObject.DragMoveAutoWidthColumns(
+  const P: TPoint; var ADeltaX, ADeltaY: Integer);
+
+  procedure DoResize(ACurr, ANext: TACLTreeListColumn; AModifier: Integer);
+  var
+    APrevWidth: Integer;
+    APrevWidthScaled: Integer;
+  begin
+    APrevWidth := ANext.Width;
+    APrevWidthScaled := dpiApply(APrevWidth, CurrentDpi);
+    ANext.Width := dpiRevert(APrevWidthScaled - AModifier * ADeltaX, CurrentDpi);
+    ADeltaX := AModifier * (APrevWidthScaled - dpiApply(ANext.Width, CurrentDpi));
+    ACurr.Width := ACurr.Width - (ANext.Width - APrevWidth);  
+  end;
+  
 var
   AColumnViewInfo: TACLTreeListColumnViewInfo;
   ANextSibling: TACLTreeListColumn;
-  APrevWidth: Integer;
 begin
+  ANextSibling := Column.NextSibling;
+  if ANextSibling = nil then Exit;
+
   SubClass.BeginUpdate;
   try
     for var I := 0 to ColumnBarViewInfo.ChildCount - 1 do
@@ -876,24 +892,10 @@ begin
       AColumnViewInfo := ColumnBarViewInfo.Children[I];
       AColumnViewInfo.Column.Width := dpiRevert(AColumnViewInfo.ActualWidth, CurrentDpi);
     end;
-    ANextSibling := Column.NextSibling;
-    if ANextSibling <> nil then
-    begin
-      if ADeltaX > 0 then
-      begin
-        APrevWidth := dpiApply(ANextSibling.Width, CurrentDpi);
-        ANextSibling.Width := dpiRevert(APrevWidth - ADeltaX, CurrentDpi);
-        ADeltaX := APrevWidth - dpiApply(ANextSibling.Width, CurrentDpi);
-        Column.Width := dpiRevert(dpiApply(Column.Width, CurrentDpi) + ADeltaX, CurrentDpi);
-      end
-      else
-      begin
-        APrevWidth := dpiApply(Column.Width, CurrentDpi);
-        Column.Width := dpiRevert(APrevWidth + ADeltaX, CurrentDpi);
-        ADeltaX := dpiApply(Column.Width, CurrentDpi) - APrevWidth;
-        ANextSibling.Width := dpiRevert(dpiApply(ANextSibling.Width, CurrentDpi) - ADeltaX, CurrentDpi);
-      end;
-    end;
+    if ADeltaX > 0 then
+      DoResize(Column, ANextSibling, 1)
+    else
+      DoResize(ANextSibling, Column, -1);
   finally
     SubClass.EndUpdate;
   end;
