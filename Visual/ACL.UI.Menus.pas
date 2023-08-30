@@ -57,6 +57,7 @@ uses
   ACL.Graphics.SkinImage,
   ACL.Graphics.SkinImageSet,
   ACL.Math,
+  ACL.MUI,
   ACL.ObjectLinks,
   ACL.Threading,
   ACL.UI.Application,
@@ -572,7 +573,7 @@ type
 
   { TACLMainMenu }
 
-  TACLMainMenu = class(TACLMenuWindow)
+  TACLMainMenu = class(TACLMenuWindow, IACLLocalizableComponent)
   strict private
     FCancelMenu: Boolean;
     FMenu: TACLPopupMenu;
@@ -601,6 +602,9 @@ type
 
     //# Tracking
     function TrackMenuOnSelect: Boolean; override;
+
+    // IACLLocalizableComponent
+    procedure Localize(const ASection: string);
 
     function GetCurrentDpi: Integer; override;
     function GetMenuDelayTime: Integer; override;
@@ -3172,6 +3176,7 @@ end;
 
 destructor TACLMainMenu.Destroy;
 begin
+  TACLMainThread.Unsubscribe(Self);
   FreeAndNil(FStyle);
   inherited;
 end;
@@ -3265,6 +3270,12 @@ end;
 procedure TACLMainMenu.HandlerMenuChange(Sender: TObject; Source: TMenuItem; Rebuild: Boolean);
 begin
   Self.Rebuild;
+end;
+
+procedure TACLMainMenu.Localize(const ASection: string);
+begin
+  if Menu <> nil then
+    TACLMainThread.RunPostponed(Rebuild, Self);
 end;
 
 procedure TACLMainMenu.Notification(AComponent: TComponent; AOperation: TOperation);
