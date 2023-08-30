@@ -96,6 +96,8 @@ type
   public
     class procedure Execute(AMenu: TACLPopupMenu{$IFDEF DESIGNER_AVAILABLE}; ADesigner: IDesigner{$ENDIF});
   {$IFDEF DESIGNER_AVAILABLE}
+    procedure ItemDeleted(const ADesigner: IDesigner; Item: TPersistent); override;
+    procedure ItemInserted(const ADesigner: IDesigner; Item: TPersistent); override;
     procedure ItemsModified(const ADesigner: IDesigner); override;
     procedure SelectionChanged(const ADesigner: IDesigner; const ASelection: IDesignerSelections); override;
   {$ENDIF}
@@ -188,12 +190,27 @@ begin
 end;
 
 {$IFDEF DESIGNER_AVAILABLE}
+procedure TACLMenuEditorDialog.ItemDeleted(const ADesigner: IDesigner; Item: TPersistent);
+begin
+  inherited;
+  if Item is TMenuItem then
+    PopulateTree;
+end;
+
+procedure TACLMenuEditorDialog.ItemInserted(const ADesigner: IDesigner; Item: TPersistent);
+begin
+  inherited;
+  if Item is TMenuItem then
+    PopulateTree;
+end;
+
 procedure TACLMenuEditorDialog.ItemsModified(const ADesigner: IDesigner);
 begin
   lvItems.Invalidate;
 end;
 
-procedure TACLMenuEditorDialog.SelectionChanged(const ADesigner: IDesigner; const ASelection: IDesignerSelections);
+procedure TACLMenuEditorDialog.SelectionChanged(
+  const ADesigner: IDesigner; const ASelection: IDesignerSelections);
 begin
   if ASelection.Count > 0 then
     lvItems.FocusedNodeData := ASelection.Items[0]
