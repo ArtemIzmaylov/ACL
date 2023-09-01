@@ -344,9 +344,9 @@ type
     FTabs: array of TTab;
     FTabsArea: TRect;
 
-    procedure AlignHorizontally(var ARect: TRect);
-    procedure AlignTabbed(var ARect: TRect);
-    procedure AlignVertically(var ARect: TRect);
+    procedure AlignHorizontally(ABounds: TACLDeferPlacementUpdate; var ARect: TRect);
+    procedure AlignTabbed(ABounds: TACLDeferPlacementUpdate; var ARect: TRect);
+    procedure AlignVertically(ABounds: TACLDeferPlacementUpdate; var ARect: TRect);
     procedure CalculateTabs(ARect: TRect);
     procedure DrawTabs(ACanvas: TCanvas);
     procedure DrawTabText(ACanvas: TCanvas; const ATab: TTab);
@@ -1846,6 +1846,7 @@ end;
 
 procedure TACLDockGroup.AlignControls(AControl: TControl; var ARect: TRect);
 var
+  ABounds: TACLDeferPlacementUpdate;
   AChildren: TList;
 begin
   ControlsAligning;
@@ -1864,14 +1865,21 @@ begin
       end;
     end;
 
-    case Layout of
-      TACLDockGroupLayout.Tabbed:
-        AlignTabbed(ARect);
-      TACLDockGroupLayout.Horizontal:
-        AlignHorizontally(ARect);
-      TACLDockGroupLayout.Vertical:
-        AlignVertically(ARect);
+    ABounds := TACLDeferPlacementUpdate.Create;
+    try
+      case Layout of
+        TACLDockGroupLayout.Tabbed:
+          AlignTabbed(ABounds, ARect);
+        TACLDockGroupLayout.Horizontal:
+          AlignHorizontally(ABounds, ARect);
+        TACLDockGroupLayout.Vertical:
+          AlignVertically(ABounds, ARect);
+      end;
+      ABounds.Apply;
+    finally
+      ABounds.Free;
     end;
+
     FRestSpace := ARect;
   finally
     ControlsAligned;
@@ -1879,7 +1887,7 @@ begin
 end;
 
 {$REGION ' Layouts '}
-procedure TACLDockGroup.AlignHorizontally(var ARect: TRect);
+procedure TACLDockGroup.AlignHorizontally(ABounds: TACLDeferPlacementUpdate; var ARect: TRect);
 var
   AChild: TACLDockControl;
   AChildNext: TACLDockControl;
@@ -1927,9 +1935,9 @@ begin
       if AChildPrev <> nil then
         AChildPrev.FNeighbours[mRight] := AChild;
       AChildSize := MulDiv(AChild.CustomWidth, AZoom, 100);
-      AChild.BoundsRect := acRectSetWidth(ARect, AChildSize);
+      ABounds.Add(AChild, acRectSetWidth(ARect, AChildSize));
       AChildPrev := AChild;
-      Inc(ARect.Left, AChild.Width);
+      Inc(ARect.Left, AChildSize);
     end;
   end;
 
@@ -1944,9 +1952,9 @@ begin
       if AChildNext <> nil then
         AChildNext.FNeighbours[mLeft] := AChild;
       AChildSize := MulDiv(AChild.CustomWidth, AZoom, 100);
-      AChild.BoundsRect := acRectSetRight(ARect, ARect.Right, AChildSize);
+      ABounds.Add(AChild, acRectSetRight(ARect, ARect.Right, AChildSize));
       AChildNext := AChild;
-      Dec(ARect.Right, AChild.Width);
+      Dec(ARect.Right, AChildSize);
     end;
   end;
 
@@ -1964,14 +1972,14 @@ begin
       if AChildNext <> nil then
         AChildNext.FNeighbours[mLeft] := AChild;
       AChildSize := MulDiv(AChild.CustomWidth, ALeftSize, AClientSize);
-      AChild.BoundsRect := acRectSetWidth(ARect, AChildSize);
+      ABounds.Add(AChild, acRectSetWidth(ARect, AChildSize));
       AChildPrev := AChild;
-      Inc(ARect.Left, AChild.Width);
+      Inc(ARect.Left, AChildSize);
     end;
   end;
 end;
 
-procedure TACLDockGroup.AlignTabbed(var ARect: TRect);
+procedure TACLDockGroup.AlignTabbed(ABounds: TACLDeferPlacementUpdate; var ARect: TRect);
 var
   AInvisibleRect: TRect;
   AOuterPadding: TRect;
@@ -1995,17 +2003,17 @@ begin
   for var I := 0 to ControlCount - 1 do
   begin
     if I <> ActiveControlIndex then
-      Controls[I].BoundsRect := AInvisibleRect;
+      ABounds.Add(Controls[I], AInvisibleRect);
   end;
 
   if ActiveControlIndex >= 0 then
   begin
-    ActiveControl.BoundsRect := ARect;
+    ABounds.Add(ActiveControl, ARect);
     ARect := NullRect;
   end;
 end;
 
-procedure TACLDockGroup.AlignVertically(var ARect: TRect);
+procedure TACLDockGroup.AlignVertically(ABounds: TACLDeferPlacementUpdate; var ARect: TRect);
 var
   AChild: TACLDockControl;
   AChildNext: TACLDockControl;
@@ -2053,9 +2061,9 @@ begin
       if AChildPrev <> nil then
         AChildPrev.FNeighbours[mBottom] := AChild;
       AChildSize := MulDiv(AChild.CustomHeight, AZoom, 100);
-      AChild.BoundsRect := acRectSetHeight(ARect, AChildSize);
+      ABounds.Add(AChild, acRectSetHeight(ARect, AChildSize));
       AChildPrev := AChild;
-      Inc(ARect.Top, AChild.Height);
+      Inc(ARect.Top, AChildSize);
     end;
   end;
 
@@ -2070,9 +2078,9 @@ begin
       if AChildNext <> nil then
         AChildNext.FNeighbours[mTop] := AChild;
       AChildSize := MulDiv(AChild.CustomHeight, AZoom, 100);
-      AChild.BoundsRect := acRectSetBottom(ARect, ARect.Bottom, AChildSize);
+      ABounds.Add(AChild, acRectSetBottom(ARect, ARect.Bottom, AChildSize));
       AChildNext := AChild;
-      Dec(ARect.Bottom, AChild.Height);
+      Dec(ARect.Bottom, AChildSize);
     end;
   end;
 
@@ -2090,9 +2098,9 @@ begin
       if AChildNext <> nil then
         AChildNext.FNeighbours[mTop] := AChild;
       AChildSize := MulDiv(AChild.CustomHeight, ALeftSize, AClientSize);
-      AChild.BoundsRect := acRectSetHeight(ARect, AChildSize);
+      ABounds.Add(AChild, acRectSetHeight(ARect, AChildSize));
       AChildPrev := AChild;
-      Inc(ARect.Top, AChild.Height);
+      Inc(ARect.Top, AChildSize);
     end;
   end;
 end;

@@ -658,14 +658,16 @@ type
 
   TACLDeferPlacementUpdate = class
   strict private
-    FDictionary: TACLDictionary<TWinControl, TRect>;
-    function GetBounds(AControl: TWinControl): TRect;
+    FBounds: TACLDictionary<TControl, TRect>;
+
+    function GetBounds(AControl: TControl): TRect;
   public
-    procedure Add(AControl: TWinControl; ALeft, ATop, AWidth, AHeight: Integer); overload;
-    procedure Add(AControl: TWinControl; const ABounds: TRect); overload;
-    procedure BeginUpdate;
-    procedure EndUpdate;
-    property Bounds[AControl: TWinControl]: TRect read GetBounds;
+    constructor Create;
+    destructor Destroy; override;
+    procedure Add(AControl: TControl; ALeft, ATop, AWidth, AHeight: Integer); overload;
+    procedure Add(AControl: TControl; const ABounds: TRect); overload;
+    procedure Apply;
+    property Bounds[AControl: TControl]: TRect read GetBounds;
   end;
 
   { TACLScrollToMode }
@@ -2572,44 +2574,78 @@ end;
 
 { TACLDeferPlacementUpdate }
 
-procedure TACLDeferPlacementUpdate.Add(AControl: TWinControl; const ABounds: TRect);
+constructor TACLDeferPlacementUpdate.Create;
 begin
-  FDictionary.AddOrSetValue(AControl, ABounds);
+  FBounds := TACLDictionary<TControl, TRect>.Create;
 end;
 
-procedure TACLDeferPlacementUpdate.Add(AControl: TWinControl; ALeft, ATop, AWidth, AHeight: Integer);
+destructor TACLDeferPlacementUpdate.Destroy;
 begin
-  Add(AControl, System.Classes.Bounds(ALeft, ATop, AWidth, AHeight));
+  FreeAndNil(FBounds);
+  inherited;
 end;
 
-procedure TACLDeferPlacementUpdate.BeginUpdate;
+procedure TACLDeferPlacementUpdate.Add(AControl: TControl; const ABounds: TRect);
 begin
-  FDictionary := TACLDictionary<TWinControl, TRect>.Create;
+  FBounds.AddOrSetValue(AControl, ABounds);
 end;
 
-procedure TACLDeferPlacementUpdate.EndUpdate;
+procedure TACLDeferPlacementUpdate.Add(AControl: TControl; ALeft, ATop, AWidth, AHeight: Integer);
+begin
+  Add(AControl, Rect(ALeft, ATop, ALeft + AWidth, ATop + AHeight));
+end;
+
+procedure TACLDeferPlacementUpdate.Apply;
 var
+  ABounds: TRect;
   AHandle: THandle;
+  AVclControls: TList;
+  AWinControls: TList;
 begin
-  if FDictionary.Count > 0 then
+  if FBounds.Count > 0 then
   begin
-    AHandle := BeginDeferWindowPos(FDictionary.Count);
+    AVclControls := TList.Create;
+    AWinControls := TList.Create;
     try
-      FDictionary.Enum(
-        procedure (const AControl: TWinControl; const R: TRect)
+      AVclControls.Capacity := FBounds.Count;
+      AWinControls.Capacity := FBounds.Count;
+
+      FBounds.Enum(
+        procedure (const AControl: TControl; const R: TRect)
         begin
-          DeferWindowPos(AHandle, AControl.Handle, 0, R.Left, R.Top, R.Width, R.Height, SWP_NOZORDER);
+          if (AControl is TWinControl) and TWinControl(AControl).HandleAllocated then
+            AWinControls.Add(AControl)
+          else
+            AVclControls.Add(AControl);
         end);
+
+      if AWinControls.Count > 0 then
+      begin
+        AHandle := BeginDeferWindowPos(AWinControls.Count);
+        try
+          for var I := 0 to AWinControls.Count - 1 do
+          begin
+            ABounds := Bounds[AWinControls.List[I]];
+            DeferWindowPos(AHandle, TWinControl(AWinControls.List[I]).Handle, 0,
+              ABounds.Left, ABounds.Top, ABounds.Width, ABounds.Height, SWP_NOZORDER);
+          end;
+        finally
+          EndDeferWindowPos(AHandle)
+        end;
+      end;
+
+      for var I := 0 to AVclControls.Count - 1 do
+        TControl(AVclControls.List[I]).BoundsRect := Bounds[AVclControls.List[I]];
     finally
-      EndDeferWindowPos(AHandle)
+      AWinControls.Free;
+      AVclControls.Free;
     end;
   end;
-  FreeAndNil(FDictionary);
 end;
 
-function TACLDeferPlacementUpdate.GetBounds(AControl: TWinControl): TRect;
+function TACLDeferPlacementUpdate.GetBounds(AControl: TControl): TRect;
 begin
-  Result := FDictionary[AControl];
+  Result := FBounds[AControl];
 end;
 
 { TACLSubControlOptions }
