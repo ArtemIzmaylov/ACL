@@ -508,7 +508,6 @@ type
     property Enabled;
     property Font;
     property Margins: TACLMargins read FMargins write SetMargins stored IsMarginsStored;
-    property ParentBiDiMode;
     property ParentColor;
     property ParentCtl3D;
     property ParentFont;
@@ -594,7 +593,7 @@ type
     function GetContentOffset: TRect; override;
     procedure Paint; override;
     procedure SetTargetDPI(AValue: Integer); override;
-    //
+    //# Properties
     property Borders: TACLBorders read FBorders write SetBorders default acAllBorders;
   public
     constructor Create(AOwner: TComponent); override;
@@ -612,7 +611,7 @@ type
   protected
     class procedure WMGesture(ACaller: TWinControl; var Message: TMessage);
     class procedure WMGestureNotify(ACaller: TWinControl; var Message: TWMGestureNotify);
-    class function WMSetCursor(ACaller: TWinControl; var AMessage: TWMSetCursor): Boolean;
+    class function WMSetCursor(ACaller: TWinControl; var Message: TWMSetCursor): Boolean;
   public
     class function IsChildOrSelf(AParent, AControl: TControl): Boolean;
     class function ProcessMessage(ACaller: TWinControl; var Message: TMessage): Boolean;
@@ -660,14 +659,12 @@ type
   TACLDeferPlacementUpdate = class
   strict private
     FDictionary: TACLDictionary<TWinControl, TRect>;
-  private
     function GetBounds(AControl: TWinControl): TRect;
   public
     procedure Add(AControl: TWinControl; ALeft, ATop, AWidth, AHeight: Integer); overload;
     procedure Add(AControl: TWinControl; const ABounds: TRect); overload;
     procedure BeginUpdate;
     procedure EndUpdate;
-    //
     property Bounds[AControl: TWinControl]: TRect read GetBounds;
   end;
 
@@ -703,11 +700,8 @@ function acGetContainer(AControl: TControl): TControl;
 function acGetTargetDPI(const AControl: TWinControl): Integer; overload;
 function acGetTargetDPI(const APoint: TPoint): Integer; overload;
 function acIsChild(AControl, AChildToTest: TControl): Boolean;
-function acIsDropDownCommand(Key: Word; Shift: TShiftState): Boolean;
 function acIsSemitransparentFill(AContentColor1, AContentColor2: TACLResourceColor): Boolean;
-function acIsShiftPressed(ATest, AState: TShiftState): Boolean;
 function acOpacityToAlphaBlendValue(AOpacity: Integer): Byte;
-function acShiftStateToKeys(AShift: TShiftState): WORD;
 
 procedure acRestoreDC(ACanvas: TCanvas; ASaveIndex: Integer);
 procedure acRestoreFocus(ASavedFocus: HWND);
@@ -723,6 +717,9 @@ procedure acUnlockRedraw(AControl: TWinControl; ARedraw: Boolean);
 function acGetShiftState: TShiftState;
 function acIsAltKeyPressed: Boolean;
 function acIsCtrlKeyPressed: Boolean;
+function acIsDropDownCommand(Key: Word; Shift: TShiftState): Boolean;
+function acIsShiftPressed(ATest, AState: TShiftState): Boolean;
+function acShiftStateToKeys(AShift: TShiftState): Word;
 
 function MouseTracker: TACLMouseTracking;
 implementation
@@ -1466,43 +1463,41 @@ begin
   Message.Result := 1;
 end;
 
-class function TACLControlsHelper.WMSetCursor(ACaller: TWinControl; var AMessage: TWMSetCursor): Boolean;
+class function TACLControlsHelper.WMSetCursor(ACaller: TWinControl; var Message: TWMSetCursor): Boolean;
 
-  function GetCursor(AControl: TControl; const P: TPoint): TCursor;
+  function GetCursor(AControl: TControl): TCursor;
   var
     ACursorProvider: IACLCursorProvider;
   begin
-    if csDesigning in AControl.ComponentState then
-      Result := crArrow
+    if Supports(AControl, IACLCursorProvider, ACursorProvider) then
+      Result := ACursorProvider.GetCursor(TControlAccess(AControl).CalcCursorPos)
     else
-      if Supports(AControl, IACLCursorProvider, ACursorProvider) then
-        Result := ACursorProvider.GetCursor(P)
-      else
-        Result := AControl.Cursor;
+      Result := AControl.Cursor;
   end;
 
 var
-  ACursor: TCursor;
   AControl: TControl;
-  APoint: TPoint;
+  ACursor: TCursor;
 begin
   Result := False;
-  if (AMessage.CursorWnd = ACaller.Handle) and (AMessage.HitTest = HTCLIENT) then
+  if (Message.HitTest = HTCLIENT) and not (csDesigning in ACaller.ComponentState) and
+     (ACaller.HandleAllocated and (Message.CursorWnd = ACaller.Handle)) then
   begin
     ACursor := Screen.Cursor;
     if ACursor = crDefault then
     begin
-      APoint := ACaller.ScreenToClient(Mouse.CursorPos);
-      AControl := ACaller.ControlAtPos(APoint, False);
+      AControl := GetCaptureControl;
+      if AControl = nil then
+        AControl := ACaller.ControlAtPos(TControlAccess(ACaller).CalcCursorPos, False);
       if AControl <> nil then
-        ACursor := GetCursor(AControl, acPointOffset(APoint, AControl.Left, AControl.Top));
+        ACursor := GetCursor(AControl);
       if ACursor = crDefault then
-        ACursor := GetCursor(ACaller, APoint);
+        ACursor := GetCursor(ACaller);
     end;
     if ACursor <> crDefault then
     begin
       Winapi.Windows.SetCursor(Screen.Cursors[ACursor]);
-      AMessage.Result := 1;
+      Message.Result := 1;
       Result := True;
     end;
   end;

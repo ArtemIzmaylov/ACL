@@ -4,7 +4,7 @@
 {*             Object Inspector              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -98,7 +98,7 @@ type
   public
     destructor Destroy; override;
     procedure Edit;
-    //
+    //# Properties
     property PropertyEditor: TACLPropertyEditor read FPropertyEditor;
   end;
 
@@ -118,14 +118,14 @@ type
   TACLObjectInspectorOptionsView = class(TACLTreeListCustomOptions)
   strict private
     FHighlightNonStorableProperties: Boolean;
-
-    procedure SetHighlightNonStorableProperties(const Value: Boolean);
+    procedure SetHighlightNonStorableProperties(AValue: Boolean);
   protected
     procedure DoAssign(Source: TPersistent); override;
   public
     procedure AfterConstruction; override;
   published
-    property HighlightNonStorableProperties: Boolean read FHighlightNonStorableProperties write SetHighlightNonStorableProperties default True;
+    property HighlightNonStorableProperties: Boolean
+      read FHighlightNonStorableProperties write SetHighlightNonStorableProperties default True;
   end;
 
   { TACLObjectInspectorSubClass }
@@ -244,7 +244,7 @@ type
     function HasButton: Boolean; virtual;
   public
     procedure Calculate(AWidth: Integer; AHeight: Integer); override;
-    //
+    //# Properties
     property ButtonRect: TRect read FButtonRect;
     property Node: TACLObjectInspectorNode read GetNode;
     property OptionsView: TACLObjectInspectorOptionsView read GetOptionsView;
@@ -342,6 +342,7 @@ type
     procedure InnerControlKeyDownHandler(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure SearchBoxChangeHandler(Sender: TObject);
   protected
+    procedure AlignControls(AControl: TControl; var Rect: TRect); override;
     procedure ResourceCollectionChanged; override;
     procedure SetDefaultSize; override;
     //# Messages
@@ -354,7 +355,7 @@ type
     function FindItem(const AProperyName: UnicodeString): TACLObjectInspectorNode;
     procedure Localize(const ASection: string); override;
     procedure ReloadData;
-    //
+    //# Properties
     property FocusedNode: TACLObjectInspectorNode read GetFocusedNode write SetFocusedNode;
     property InnerControl: TACLObjectInspectorControl read FInnerControl;
     property SearchString: string read GetSearchString write SetSearchString;
@@ -366,7 +367,7 @@ type
     property OptionsView: TACLObjectInspectorOptionsView read GetOptionsView write SetOptionsView;
     property SearchBox: Boolean read GetSearchBox write SetSearchBox default False;
     property SearchBoxTextHint: string read GetSearchBoxTextHint write SetSearchBoxTextHint;
-    //
+    //# Styles
     property Style: TACLStyleTreeList read GetStyle write SetStyle;
     property StyleHatch: TACLStyleHatch read GetStyleHatch write SetStyleHatch;
     property StyleInplaceEdit: TACLStyleEdit read GetStyleInplaceEdit write SetStyleInplaceEdit;
@@ -374,7 +375,7 @@ type
     property StyleScrollBox: TACLStyleScrollBox read GetStyleScrollBox write SetStyleScrollBox;
     property StyleSearchEdit: TACLStyleEdit read GetStyleSearchEdit write SetStyleSearchEdit;
     property StyleSearchEditButton: TACLStyleButton read GetStyleSearchEditButton write SetStyleSearchEditButton;
-    //
+    //# Events
     property OnPopulated: TNotifyEvent read GetOnPopulated write SetOnPopulated;
     property OnPropertyAdd: TACLObjectInspectorPropertyAddEvent read GetOnPropertyAdd write SetOnPropertyAdd;
     property OnPropertyChanged: TACLObjectInspectorPropertyChangedEvent read GetOnPropertyChanged write SetOnPropertyChanged;
@@ -525,9 +526,9 @@ begin
     HighlightNonStorableProperties := TACLObjectInspectorOptionsView(Source).HighlightNonStorableProperties;
 end;
 
-procedure TACLObjectInspectorOptionsView.SetHighlightNonStorableProperties(const Value: Boolean);
+procedure TACLObjectInspectorOptionsView.SetHighlightNonStorableProperties(AValue: Boolean);
 begin
-  SetBooleanFieldValue(FHighlightNonStorableProperties, Value, [apcContent]);
+  SetBooleanFieldValue(FHighlightNonStorableProperties, AValue, [apcContent]);
 end;
 
 { TACLObjectInspectorSubClass }
@@ -1207,6 +1208,13 @@ end;
 procedure TACLObjectInspector.SetDefaultSize;
 begin
   SetBounds(0, 0, 200, 400);
+end;
+
+procedure TACLObjectInspector.AlignControls(AControl: TControl; var Rect: TRect);
+begin
+  inherited;
+  FInnerControl.Update;
+  FSearchEdit.Update;
 end;
 
 procedure TACLObjectInspector.CMChildKey(var Message: TCMChildKey);

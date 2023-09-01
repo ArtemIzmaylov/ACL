@@ -52,7 +52,7 @@ const
   acFocusRectIndent = 1;
   acTextIndent = 2;
 
-  acDragImageAlpha = 100;
+  acDragImageAlpha = 150;
   acDragImageColor = $8F2929;
   acHatchDefaultColor1 = clWhite;
   acHatchDefaultColor2 = $BFBFBF;

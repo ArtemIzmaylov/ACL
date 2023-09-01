@@ -29,6 +29,7 @@ uses
   DesignEditors,
   DesignIntf,
   FiltEdit,
+  TreeIntf,
   VCLEditors,
   // ACL
   ACL.UI.DesignTime.PropEditors;
@@ -64,6 +65,7 @@ uses
   ACL.UI.Controls.ColorPicker,
   ACL.UI.Controls.ComboBox,
   ACL.UI.Controls.DateTimeEdit,
+  ACL.UI.Controls.Docking,
   ACL.UI.Controls.DropDown,
   ACL.UI.Controls.FormattedLabel,
   ACL.UI.Controls.GroupBox,
@@ -100,6 +102,25 @@ uses
   ACL.UI.TrayIcon,
   ACL.Utils.Common,
   ACL.Utils.FileSystem;
+
+type
+  TACLDockGroupSprig = class(TComponentSprig)
+  public
+    function Ghosted: Boolean; override;
+    function UniqueName: string; override;
+  end;
+
+{ TACLDockGroupSprig }
+
+function TACLDockGroupSprig.Ghosted: Boolean;
+begin
+  Result := True;
+end;
+
+function TACLDockGroupSprig.UniqueName: string;
+begin
+  Result := '(Group)';
+end;
 
 procedure HideProperties(AClass: TClass; const PropertyNames: array of string);
 var
@@ -228,6 +249,11 @@ begin
 
   // Scene2D
   RegisterComponents(sACLComponentsPage, [TACLPaintBox2D]);
+
+  // Docking
+  RegisterComponents('ACL', [TACLDockPanel, TACLDockSite]);
+  RegisterSprigType(TACLDockGroup, TACLDockGroupSprig);
+  RegisterSprigType(TACLDockSite, TComponentSprig);
 end;
 
 end.

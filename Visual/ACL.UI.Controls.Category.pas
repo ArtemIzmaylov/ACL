@@ -17,6 +17,7 @@ interface
 
 uses
   Winapi.Windows,
+  Winapi.Messages,
   // System
   System.Classes,
   System.Math,
@@ -49,6 +50,7 @@ type
   public
     procedure DrawHeader(DC: HDC; const R: TRect);
     procedure DrawHeaderText(ACanvas: TCanvas; const R: TRect; const AText: UnicodeString);
+    function MeasureHeaderHeight: Integer;
   published
     property HeaderColorContent1: TACLResourceColor index 4 read GetColor write SetColor stored IsColorStored;
     property HeaderColorContent2: TACLResourceColor index 5 read GetColor write SetColor stored IsColorStored;
@@ -60,16 +62,13 @@ type
 
   TACLCategory = class(TACLContainer)
   strict private
-    FCaption: UnicodeString;
     FCaptionRect: TRect;
-    FFrameRect: TRect;
 
     function GetStyle: TACLStyleCategory;
-    procedure SetCaption(const AValue: UnicodeString);
-    procedure SetStyle(const Value: TACLStyleCategory);
+    procedure SetStyle(AValue: TACLStyleCategory);
+    procedure WMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
   protected
     procedure BoundsChanged; override;
-    function CalculateTextSize: TSize;
     function CreatePadding: TACLPadding; override;
     function CreateStyle: TACLStyleBackground; override;
     function GetContentOffset: TRect; override;
@@ -79,7 +78,7 @@ type
   published
     property AutoSize;
     property Borders;
-    property Caption: UnicodeString read FCaption write SetCaption;
+    property Caption;
     property Padding;
     property Style: TACLStyleCategory read GetStyle write SetStyle;
   end;
@@ -117,7 +116,13 @@ procedure TACLStyleCategory.DrawHeaderText(ACanvas: TCanvas; const R: TRect; con
 begin
   ACanvas.Brush.Style := bsClear;
   ACanvas.Font.Assign(HeaderTextFont);
-  acTextDraw(ACanvas, AText, acRectInflate(R, -4, 0), HeaderTextAlignment, taVerticalCenter);
+  acTextDraw(ACanvas, AText, acRectInflate(R, -4, 0), HeaderTextAlignment, taVerticalCenter, True, True);
+end;
+
+function TACLStyleCategory.MeasureHeaderHeight: Integer;
+begin
+  MeasureCanvas.Font.Assign(HeaderTextFont);
+  Result := Max(acFontHeight(MeasureCanvas) + 8, 22);
 end;
 
 procedure TACLStyleCategory.SetHeaderTextAlignment(AValue: TAlignment);
@@ -134,22 +139,14 @@ end;
 constructor TACLCategory.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  ControlStyle := ControlStyle + [csAcceptsControls];
+  ControlStyle := ControlStyle + [csAcceptsControls, csSetCaption];
 end;
 
 procedure TACLCategory.BoundsChanged;
 begin
   inherited;
-  FFrameRect := ClientRect;
-  FCaptionRect := acRectSetHeight(FFrameRect, Max(CalculateTextSize.cy + 8, 22));
-  FFrameRect.Top := FCaptionRect.Bottom;
+  FCaptionRect := acRectSetHeight(ClientRect, Style.MeasureHeaderHeight);
   Realign;
-end;
-
-function TACLCategory.CalculateTextSize: TSize;
-begin
-  MeasureCanvas.Font.Assign(Style.HeaderTextFont);
-  Result := acTextSize(MeasureCanvas, Caption);
 end;
 
 function TACLCategory.CreatePadding: TACLPadding;
@@ -165,7 +162,7 @@ end;
 function TACLCategory.GetContentOffset: TRect;
 begin
   Result := inherited;
-  Result.Top := FCaptionRect.Bottom + dpiApply(1, FCurrentPPI);
+  Result.Top := FCaptionRect.Bottom + 1{visual border};
 end;
 
 function TACLCategory.GetStyle: TACLStyleCategory;
@@ -180,18 +177,15 @@ begin
   Style.DrawHeaderText(Canvas, FCaptionRect, Caption);
 end;
 
-procedure TACLCategory.SetCaption(const AValue: UnicodeString);
+procedure TACLCategory.SetStyle(AValue: TACLStyleCategory);
 begin
-  if AValue <> FCaption then
-  begin
-    FCaption := AValue;
-    FullRefresh;
-  end;
+  Style.Assign(AValue);
 end;
 
-procedure TACLCategory.SetStyle(const Value: TACLStyleCategory);
+procedure TACLCategory.WMTextChanged(var Message: TMessage);
 begin
-  Style.Assign(Value);
+  inherited;
+  FullRefresh;
 end;
 
 end.

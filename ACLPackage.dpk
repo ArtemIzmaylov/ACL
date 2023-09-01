@@ -25,7 +25,7 @@
 {$IMAGEBASE $400000}
 {$DEFINE DEBUG}
 {$ENDIF IMPLICITBUILDING}
-{$DESCRIPTION 'Artem''s Components Library v2023.8'}
+{$DESCRIPTION 'Artem''s Components Library v2023.9.1'}
 {$DESIGNONLY}
 {$IMPLICITBUILD ON}
 
@@ -56,6 +56,7 @@ contains
   ACL.UI.Controls.ComboBox in 'Visual\ACL.UI.Controls.ComboBox.pas',
   ACL.UI.Controls.CompoundControl in 'Visual\ACL.UI.Controls.CompoundControl.pas',
   ACL.UI.Controls.CompoundControl.SubClass in 'Visual\ACL.UI.Controls.CompoundControl.SubClass.pas',
+  ACL.UI.Controls.Docking in 'Visual\ACL.UI.Controls.Docking.pas',
   ACL.UI.Controls.DropDown in 'Visual\ACL.UI.Controls.DropDown.pas',
   ACL.UI.Controls.FormattedLabel in 'Visual\ACL.UI.Controls.FormattedLabel.pas',
   ACL.UI.Controls.GroupBox in 'Visual\ACL.UI.Controls.GroupBox.pas',
