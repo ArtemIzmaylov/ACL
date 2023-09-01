@@ -314,7 +314,7 @@ begin
   if (AHint <> Caption) or not IsWindowVisible(Handle) then
   begin
     AMonitor := MonitorGet(Rect.TopLeft);
-    if AMonitor.PixelsPerInch <> PixelsPerInch then
+    if AMonitor.PixelsPerInch <> FCurrentPPI then
     begin
       ScaleForPPI(AMonitor.PixelsPerInch);
       Rect := acRectOffset(CalcHintRect(Screen.Width div 3, AHint, nil), Rect.TopLeft);
@@ -338,6 +338,7 @@ end;
 
 function TACLHintWindow.CalcHintRect(MaxWidth: Integer; const AHint: string; AData: TCustomData): TRect;
 begin
+  Canvas.Font := Font;
   Layout.Bounds := Rect(0, 0, MaxWidth, 2);
   Layout.SetText(AHint, TACLTextFormatSettings.Formatted);
   Result := acRect(Layout.MeasureSize);
