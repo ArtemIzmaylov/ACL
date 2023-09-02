@@ -4,7 +4,7 @@
 {*       Custom Expressions Processor        *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -142,7 +142,7 @@ type
   public
     procedure Optimize; virtual;
     function Evaluate(AContext: TObject): Variant; virtual; abstract;
-    function IsConstant: Boolean; virtual; abstract;
+    function IsConstant: Boolean; virtual;
     procedure ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory); reintroduce; virtual; abstract;
   end;
 
@@ -162,7 +162,8 @@ type
     constructor Create; virtual;
     destructor Destroy; override;
     function IsConstant: Boolean;
-    procedure ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory; const ASeparator: string = ','); reintroduce;
+    procedure ToString(ABuffer: TACLStringBuilder;
+      AFactory: TACLCustomExpressionFactory; const ASeparator: string = ','); reintroduce;
     //
     property Count: Integer read GetCount;
     property Items[Index: Integer]: TACLExpressionElement read GetItem; default;
@@ -286,7 +287,6 @@ type
     FRegisteredOperators: TACLExpressionFunctionInfoList;
 
     procedure ParseParametersList(AFunctionElement: TACLExpressionElementFunction);
-    function PushConstant(const AValue: Variant): Boolean; inline;
   protected
     ClassFunction: TACLExpressionElementFunctionClass;
     ClassOperator: TACLExpressionElementFunctionClass;
@@ -295,27 +295,26 @@ type
 
     procedure Error(const AMessage: UnicodeString); overload;
     procedure Error(const AMessage: UnicodeString; const AArguments: array of const); overload;
-    // Parser
-    function ParserGetDelimiters: UnicodeString; virtual;
-    function ParserGetQuotes: UnicodeString; virtual;
-    function ParserGetSpaces: UnicodeString; virtual;
-    // Compiler
+    //# Compiler
     function CompileCore: TACLExpressionElement; virtual;
     function ProcessToken: Boolean; virtual;
-    function ProcessTokenAsDelimiter: Boolean; virtual;
+    function ProcessTokenAsDelimiter: Boolean; inline;
     function ProcessTokenAsFunction: Boolean; inline;
-    function ProcessTokenAsIdent: Boolean; virtual;
     function ProcessTokenAsOperator: Boolean; inline;
-    // Internal
+    function PushConstant(const AValue: Variant): Boolean; inline;
+    function PushOperand(AOperand: TACLExpressionElement): Boolean; inline;
+    //# Internal
     procedure OutputOperator(AOperator: TACLExpressionOperatorInfo);
-    //
+    //# Properties
     property Factory: TACLCustomExpressionFactory read FFactory;
     property OperatorStack: TACLExpressionFastStack<TACLExpressionOperatorInfo> read FOperatorStack;
     property OutputBuffer: TACLExpressionFastStack<TACLExpressionElement> read FOutputBuffer;
     property RegisteredFunctions: TACLExpressionFunctionInfoList read FRegisteredFunctions;
     property RegisteredOperators: TACLExpressionFunctionInfoList read FRegisteredOperators;
   public
-    constructor Create(AFactory: TACLCustomExpressionFactory); reintroduce; virtual;
+    constructor Create(
+      const AFactory: TACLCustomExpressionFactory;
+      const ADelimiters, AQuotes, ASpaces: UnicodeString); reintroduce; virtual;
     function Compile: TACLExpressionElement; virtual;
   end;
 
@@ -509,6 +508,11 @@ begin
 end;
 
 { TACLExpressionElement }
+
+function TACLExpressionElement.IsConstant: Boolean;
+begin
+  Result := False;
+end;
 
 procedure TACLExpressionElement.Optimize;
 begin
@@ -859,7 +863,8 @@ var
   AFunction: TACLExpressionFunctionInfo;
 begin
   if FRegisteredFunctions.Find(ANewName, AFunction) then
-    RegisterFunction(AOldName, AFunction.Proc, AFunction.ParamCount, AFunction.DependedFromParametersOnly, CategoryHidden)
+    RegisterFunction(AOldName, AFunction.Proc, AFunction.ParamCount,
+      AFunction.DependedFromParametersOnly, CategoryHidden)
   else
     raise EACLExpression.CreateFmt(sErrorFunctionNotFound, [ANewName]);
 end;
@@ -874,10 +879,14 @@ end;
 
 function TACLCustomExpressionFactory.CreateCompiler: TACLExpressionCompiler;
 begin
-  Result := TACLExpressionCompiler.Create(Self);
+  Result := TACLExpressionCompiler.Create(Self,
+    acParserDefaultDelimiterChars,
+    acParserDefaultQuotes,
+    acParserDefaultSpaceChars);
 end;
 
-function TACLCustomExpressionFactory.CreateExpression(const AExpression: UnicodeString; ARoot: TACLExpressionElement): TACLExpression;
+function TACLCustomExpressionFactory.CreateExpression(
+  const AExpression: UnicodeString; ARoot: TACLExpressionElement): TACLExpression;
 begin
   Result := TACLExpression.Create(Self, ARoot);
 end;
@@ -922,10 +931,12 @@ end;
 
 { TACLExpressionCompiler }
 
-constructor TACLExpressionCompiler.Create(AFactory: TACLCustomExpressionFactory);
+constructor TACLExpressionCompiler.Create(
+  const AFactory: TACLCustomExpressionFactory;
+  const ADelimiters, AQuotes, ASpaces: UnicodeString);
 begin
   FFactory := AFactory;
-  inherited Create(ParserGetDelimiters, ParserGetQuotes, ParserGetSpaces);
+  inherited Create(ADelimiters, AQuotes, ASpaces);
   FRegisteredFunctions := FFactory.FRegisteredFunctions;
   FRegisteredOperators := FFactory.FRegisteredOperators;
   ClassOperator := TACLExpressionElementOperator;
@@ -969,21 +980,6 @@ begin
   Error(Format(AMessage, AArguments));
 end;
 
-function TACLExpressionCompiler.ParserGetDelimiters: UnicodeString;
-begin
-  Result := acParserDefaultDelimiterChars;
-end;
-
-function TACLExpressionCompiler.ParserGetQuotes: UnicodeString;
-begin
-  Result := acParserDefaultQuotes;
-end;
-
-function TACLExpressionCompiler.ParserGetSpaces: UnicodeString;
-begin
-  Result := acParserDefaultSpaceChars;
-end;
-
 function TACLExpressionCompiler.CompileCore: TACLExpressionElement;
 begin
   PrevSolidToken := ecsttNone;
@@ -1013,14 +1009,12 @@ begin
       Result := ProcessTokenAsOperator;
     acExprTokenFunction:
       Result := ProcessTokenAsFunction;
-    acExprTokenConstantFloat:
-      Result := TryStrToFloat(Token.ToString, AValueD, InvariantFormatSettings) and PushConstant(AValueD);
-    acExprTokenConstantInt:
-      Result := TryStrToInt(Token.ToString, AValueI) and PushConstant(AValueI);
     acTokenQuotedText:
       Result := PushConstant(Token.ToString);
-    acTokenIdent:
-      Result := ProcessTokenAsIdent;
+    acExprTokenConstantInt:
+      Result := TryStrToInt(Token.ToString, AValueI) and PushConstant(AValueI);
+    acExprTokenConstantFloat:
+      Result := TryStrToFloat(Token.ToString, AValueD, InvariantFormatSettings) and PushConstant(AValueD);
   else
     Result := False;
   end;
@@ -1077,14 +1071,7 @@ begin
     FreeAndNil(AFunctionElement);
     raise;
   end;
-  OutputBuffer.Push(AFunctionElement);
-  PrevSolidToken := ecsttOperand;
-  Result := True;
-end;
-
-function TACLExpressionCompiler.ProcessTokenAsIdent: Boolean;
-begin
-  Result := False;
+  Result := PushOperand(AFunctionElement);
 end;
 
 function TACLExpressionCompiler.ProcessTokenAsOperator: Boolean;
@@ -1111,6 +1098,18 @@ begin
   until AOperatorPeek = nil;
   OperatorStack.Push(AOperator);
   PrevSolidToken := ecsttOperator;
+  Result := True;
+end;
+
+function TACLExpressionCompiler.PushConstant(const AValue: Variant): Boolean;
+begin
+  Result := PushOperand(TACLExpressionElementConstant.Create(AValue));
+end;
+
+function TACLExpressionCompiler.PushOperand(AOperand: TACLExpressionElement): Boolean;
+begin
+  OutputBuffer.Push(AOperand);
+  PrevSolidToken := ecsttOperand;
   Result := True;
 end;
 
@@ -1192,13 +1191,6 @@ begin
 
   if ABracketLevel <> 0 then
     Error(sErrorUnequalBrackets);
-end;
-
-function TACLExpressionCompiler.PushConstant(const AValue: Variant): Boolean;
-begin
-  OutputBuffer.Push(TACLExpressionElementConstant.Create(AValue));
-  PrevSolidToken := ecsttOperand;
-  Result := True;
 end;
 
 end.

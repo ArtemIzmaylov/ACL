@@ -4,7 +4,7 @@
 {*             Macros Processor              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -110,17 +110,16 @@ type
     acExprTokenReverse = -1;
   strict private
     function GetFactory: TACLFormatStringFactory; inline;
+    procedure PopulateOutputBuffer;
   protected
     function CompileCore: TACLExpressionElement; override;
     function FetchToken(var P: PWideChar; var C: Integer; var AToken: TACLParserToken): Boolean; override;
-    function ParserGetDelimiters: UnicodeString; override;
-    procedure PopulateOutputBuffer;
     function ProcessToken: Boolean; override;
-    function ProcessTokenAsDelimiter: Boolean; override;
-    //
-    property Factory: TACLFormatStringFactory read GetFactory;
   public
-    constructor Create(AFactory: TACLCustomExpressionFactory); override;
+    constructor Create(
+      const AFactory: TACLCustomExpressionFactory;
+      const ADelimiters, AQuotes, ASpaces: UnicodeString); override;
+    property Factory: TACLFormatStringFactory read GetFactory;
   end;
 
   { TACLFormatStringConcatenateFunction }
@@ -136,7 +135,7 @@ type
     function Evaluate(AContext: TObject): Variant; override;
     function IsConstant: Boolean; override;
     procedure ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory); override;
-    //
+    //# Properties
     property Params: TACLExpressionElements read FParams;
   end;
 
@@ -152,7 +151,6 @@ type
   TACLFormatStringMacroEvalFunction = class(TACLExpressionFunctionInfo)
   protected
     FMacroProc: TACLFormatStringMacroProc;
-
     function EvalProc(AContext: TObject; AParams: TACLExpressionElements): Variant; virtual;
   public
     constructor Create(const AName: UnicodeString; AMacroProc: TACLFormatStringMacroProc; ACategory: Byte);
@@ -163,7 +161,6 @@ type
   TACLFormatStringReverseMacro = class(TACLExpressionElement)
   public
     function Evaluate(AContext: TObject): Variant; override;
-    function IsConstant: Boolean; override;
     procedure ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory); override;
   end;
 
@@ -346,7 +343,9 @@ end;
 
 function TACLFormatStringFactory.CreateCompiler: TACLExpressionCompiler;
 begin
-  Result := TACLFormatStringCompiler.Create(Self);
+  Result := TACLFormatStringCompiler.Create(Self,
+    acParserDefaultIdentDelimiters + MacroDelimiter,
+    acParserDefaultQuotes, acParserDefaultSpaceChars);
 end;
 
 function TACLFormatStringFactory.CreateExpression(const AExpression: string; ARoot: TACLExpressionElement): TACLExpression;
@@ -653,9 +652,9 @@ end;
 
 { TACLFormatStringCompiler }
 
-constructor TACLFormatStringCompiler.Create(AFactory: TACLCustomExpressionFactory);
+constructor TACLFormatStringCompiler.Create;
 begin
-  inherited Create(AFactory);
+  inherited;
   ClassFunction := TACLFormatStringFunction;
   QuotedTextAsSingleToken := False;
   SkipSpaces := False;
@@ -717,11 +716,6 @@ begin
   end;
 end;
 
-function TACLFormatStringCompiler.ParserGetDelimiters: UnicodeString;
-begin
-  Result := acParserDefaultIdentDelimiters + Factory.MacroDelimiter;
-end;
-
 procedure TACLFormatStringCompiler.PopulateOutputBuffer;
 begin
   try
@@ -744,21 +738,12 @@ end;
 
 function TACLFormatStringCompiler.ProcessToken: Boolean;
 begin
-  if Token.TokenType = acExprTokenReverse then
-  begin
-    OutputBuffer.Push(TACLFormatStringReverseMacro.Create);
-    PrevSolidToken := ecsttOperand;
-    Result := True;
-  end
+  if Token.TokenType = acTokenDelimiter then
+    Result := PushConstant(Token.ToString)
+  else if Token.TokenType = acExprTokenReverse then
+    Result := PushOperand(TACLFormatStringReverseMacro.Create)
   else
     Result := inherited;
-end;
-
-function TACLFormatStringCompiler.ProcessTokenAsDelimiter: Boolean;
-begin
-  OutputBuffer.Push(TACLExpressionElementConstant.Create(Token.ToString));
-  PrevSolidToken := ecsttOperand;
-  Result := True;
 end;
 
 function TACLFormatStringCompiler.GetFactory: TACLFormatStringFactory;
@@ -849,7 +834,8 @@ begin
   Result := Params.IsConstant;
 end;
 
-procedure TACLFormatStringConcatenateFunction.ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory);
+procedure TACLFormatStringConcatenateFunction.ToString(
+  ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory);
 begin
   FParams.ToString(ABuffer, AFactory, '');
 end;
@@ -868,14 +854,15 @@ end;
 
 { TACLFormatStringMacroEvalFunction }
 
-constructor TACLFormatStringMacroEvalFunction.Create(const AName: UnicodeString;
-  AMacroProc: TACLFormatStringMacroProc; ACategory: Byte);
+constructor TACLFormatStringMacroEvalFunction.Create(
+  const AName: UnicodeString; AMacroProc: TACLFormatStringMacroProc; ACategory: Byte);
 begin
   inherited Create(AName, 0, False, EvalProc, ACategory);
   FMacroProc := AMacroProc;
 end;
 
-function TACLFormatStringMacroEvalFunction.EvalProc(AContext: TObject; AParams: TACLExpressionElements): Variant;
+function TACLFormatStringMacroEvalFunction.EvalProc(
+  AContext: TObject; AParams: TACLExpressionElements): Variant;
 begin
   Result := FMacroProc(AContext);
 end;
@@ -887,12 +874,8 @@ begin
   Result := EmptyStr;
 end;
 
-function TACLFormatStringReverseMacro.IsConstant: Boolean;
-begin
-  Result := False;
-end;
-
-procedure TACLFormatStringReverseMacro.ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory);
+procedure TACLFormatStringReverseMacro.ToString(
+  ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory);
 var
   AFormatStringFactory: TACLFormatStringFactory absolute AFactory;
 begin

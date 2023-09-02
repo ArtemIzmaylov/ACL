@@ -4,7 +4,7 @@
 {*        Math Expressions Processor         *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -150,7 +150,10 @@ end;
 
 function TACLMathExpressionFactory.CreateCompiler: TACLExpressionCompiler;
 begin
-  Result := TACLMathExpressionCompiler.Create(Self);
+  Result := TACLMathExpressionCompiler.Create(Self,
+    acParserDefaultDelimiterChars,
+    acParserDefaultQuotes,
+    acParserDefaultSpaceChars);
 end;
 
 class function TACLMathExpressionFactory.FunctionAbs(AContext: TObject; AParams: TACLExpressionElements): Variant;
@@ -326,7 +329,8 @@ end;
 
 { TACLMathExpressionCompiler }
 
-function TACLMathExpressionCompiler.FetchNumericToken(var P: PWideChar; var C: Integer; var AToken: TACLParserToken): Boolean;
+function TACLMathExpressionCompiler.FetchNumericToken(
+  var P: PWideChar; var C: Integer; var AToken: TACLParserToken): Boolean;
 const
   NumericStateMachine: array[0..3, -1..14] of SmallInt = (
     {    0  1  2  3  4  5  6  7  8  9   +   -   .   E  #0}
@@ -386,7 +390,8 @@ begin
   Result := True;
 end;
 
-function TACLMathExpressionCompiler.FetchToken(var P: PWideChar; var C: Integer; var AToken: TACLParserToken): Boolean;
+function TACLMathExpressionCompiler.FetchToken(
+  var P: PWideChar; var C: Integer; var AToken: TACLParserToken): Boolean;
 var
   AEvalFunction: TACLExpressionFunctionInfo;
   ALength: Integer;
@@ -431,12 +436,11 @@ begin
       AToken.Context := AEvalFunction;
     end
     else
-
-    if RegisteredOperators.Find(AToken.Data, AToken.DataLength, AEvalFunction) then
-    begin
-      AToken.TokenType := acExprTokenOperator;
-      AToken.Context := AEvalFunction;
-    end;
+      if RegisteredOperators.Find(AToken.Data, AToken.DataLength, AEvalFunction) then
+      begin
+        AToken.TokenType := acExprTokenOperator;
+        AToken.Context := AEvalFunction;
+      end;
   end;
 end;
 
