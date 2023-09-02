@@ -404,7 +404,7 @@ var
   ALastNodeCell: TACLCompoundControlBaseContentCell;
   AViewItems: TACLCompoundControlContentCellList;
 begin
-  Result := 0;
+  Result := 2;
   if Control.RootNode.ChildrenCount > 0 then
   begin
     AFirstNode := Control.RootNode.Children[0];
