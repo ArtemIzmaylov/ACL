@@ -60,6 +60,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    function IsHardwareAccelerationUsed: Boolean;
   published
     property UseHardwareAcceleration: Boolean read FUseHardwareAcceleration write SetUseHardwareAcceleration default True;
   end;
@@ -135,6 +136,11 @@ end;
 procedure TACLCustom2DScene.DoDestroy;
 begin
   // do nothing
+end;
+
+function TACLCustom2DScene.IsHardwareAccelerationUsed: Boolean;
+begin
+  Result := Render is TACLDirect2DHwndBasedRender;
 end;
 
 procedure TACLCustom2DScene.Paint(ARender: TACL2DRender);
