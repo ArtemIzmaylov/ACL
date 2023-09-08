@@ -414,8 +414,10 @@ type
 
     function EqualsValuesCore(AResource: TACLResource): Boolean; override;
     procedure Initialize; override;
-    procedure LoadFromBitmapResourceCore(AInstance: HINST; const AName: UnicodeString; const AMargins, AContentOffsets: TRect;
-      AFrameCount: Integer; ALayout: TACLSkinImageLayout = ilHorizontal; AStretchMode: TACLStretchMode = isStretch);
+    procedure LoadFromBitmapResourceCore(AInstance: HINST;
+      const AName: UnicodeString; const AMargins, AContentOffsets: TRect;
+      AFrameCount: Integer; ALayout: TACLSkinImageLayout = ilHorizontal;
+      AStretchMode: TACLStretchMode = isStretch);
 
     function GetActualImage(ATargetDPI: Integer; AAllowColoration: TACLBoolean): TACLSkinImageSetItem; virtual;
     function GetHitTestMode: TACLSkinImageHitTestMode; virtual;
@@ -438,7 +440,8 @@ type
       AFrameCount: Integer; ALayout: TACLSkinImageLayout = ilHorizontal; AStretchMode: TACLStretchMode = isStretch); reintroduce; overload;
     procedure ImportFromImage(const AImage: TBitmap; DPI: Integer = acDefaultDPI);
     procedure ImportFromImageFile(const AFileName: string; DPI: Integer = acDefaultDPI);
-    procedure ImportFromImageResource(const AInstance: HINST; const AResName: string; AResType: PWideChar; DPI: Integer = acDefaultDPI);
+    procedure ImportFromImageResource(const AInstance: HINST;
+      const AResName: string; AResType: PWideChar; DPI: Integer = acDefaultDPI);
     procedure ImportFromImageStream(const AStream: TStream; DPI: Integer = acDefaultDPI);
     procedure MakeUnique;
     // IACLColorSchema
