@@ -23,9 +23,9 @@ uses
   System.Types,
   System.Classes,
   // Vcl
+  Vcl.Forms,
   Vcl.Controls,
   Vcl.Graphics,
-  Vcl.Forms,
   // ACL
   ACL.Classes.Timer,
   ACL.Geometry,
@@ -80,7 +80,7 @@ type
   { TACLHintWindow }
 
   TACLHintWindow = class(THintWindow)
-  strict private const
+  public const
     HeightCorrection = 4;
   strict private
     FLayout: TACLTextLayout;
@@ -95,21 +95,24 @@ type
     procedure CreateParams(var Params: TCreateParams); override;
     procedure NCPaint(DC: HDC); override;
     procedure Paint; override;
-    procedure ScaleForPPI(ATargetDpi: Integer); reintroduce;
+    procedure ScaleForPPI(ATargetDpi: Integer); reintroduce; virtual;
+    procedure SetHintData(const AHint: string; AData: TCustomData); virtual;
     property Layout: TACLTextLayout read FLayout;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    procedure AfterConstruction; override;
     procedure ActivateHint(Rect: TRect; const AHint: string); override;
+    procedure ActivateHintData(Rect: TRect; const AHint: string; AData: TCustomData); override;
     function CalcHintRect(MaxWidth: Integer; const AHint: string; AData: TCustomData): TRect; overload; override;
     procedure Hide;
-    //
+    //# FloatHints
     procedure ShowFloatHint(const AHint: UnicodeString; const AScreenRect: TRect;
       AHorzAlignment: TACLHintWindowHorzAlignment; AVertAligment: TACLHintWindowVertAlignment); overload;
     procedure ShowFloatHint(const AHint: UnicodeString; const AControl: TControl;
       AHorzAlignment: TACLHintWindowHorzAlignment; AVertAligment: TACLHintWindowVertAlignment); overload;
     procedure ShowFloatHint(const AHint: UnicodeString; const P: TPoint); overload;
-    //
+    //# Properties
     property Style: TACLStyleHint read FStyle write SetStyle;
   end;
 
@@ -295,8 +298,6 @@ begin
   FStyle := TACLStyleHint.Create(Self);
   FLayout := TACLTextLayout.Create(Canvas.Font);
   FLayout.Options := [tloWordWrap, tloAutoHeight];
-  ScaleForPPI(Screen.PixelsPerInch);
-  Font := Screen.HintFont; // after ScaleForPPI
 end;
 
 destructor TACLHintWindow.Destroy;
@@ -307,6 +308,11 @@ begin
 end;
 
 procedure TACLHintWindow.ActivateHint(Rect: TRect; const AHint: string);
+begin
+  ActivateHintData(Rect, AHint, nil);
+end;
+
+procedure TACLHintWindow.ActivateHintData(Rect: TRect; const AHint: string; AData: TCustomData);
 var
   AMonitor: TACLMonitor;
   AMonitorBounds: TRect;
@@ -317,11 +323,12 @@ begin
     if AMonitor.PixelsPerInch <> FCurrentPPI then
     begin
       ScaleForPPI(AMonitor.PixelsPerInch);
-      Rect := acRectOffset(CalcHintRect(Screen.Width div 3, AHint, nil), Rect.TopLeft);
+      Rect := acRectOffset(CalcHintRect(Screen.Width div 3, AHint, AData), Rect.TopLeft);
     end;
 
     Caption := AHint;
-    Inc(Rect.Bottom, 4);
+    SetHintData(AHint, AData);
+    Inc(Rect.Bottom, HeightCorrection);
     UpdateBoundsRect(Rect);
 
     AMonitorBounds := AMonitor.BoundsRect;
@@ -336,11 +343,18 @@ begin
   end;
 end;
 
+procedure TACLHintWindow.AfterConstruction;
+begin
+  inherited;
+  ScaleForPPI(Screen.PixelsPerInch);
+  Font := Screen.HintFont; // after ScaleForPPI
+end;
+
 function TACLHintWindow.CalcHintRect(MaxWidth: Integer; const AHint: string; AData: TCustomData): TRect;
 begin
   Canvas.Font := Font;
   Layout.Bounds := Rect(0, 0, MaxWidth, 2);
-  Layout.SetText(AHint, TACLTextFormatSettings.Formatted);
+  SetHintData(AHint, AData);
   Result := acRect(Layout.MeasureSize);
 
   Inc(Result.Right, 2 * dpiApply(HintTextIndentH, FCurrentPPI));
@@ -394,9 +408,7 @@ end;
 procedure TACLHintWindow.ShowFloatHint(const AHint: UnicodeString; const AControl: TControl;
   AHorzAlignment: TACLHintWindowHorzAlignment; AVertAligment: TACLHintWindowVertAlignment);
 begin
-  ShowFloatHint(AHint,
-    acRectOffset(AControl.ClientRect, AControl.ClientToScreen(NullPoint)),
-    AHorzAlignment, AVertAligment);
+  ShowFloatHint(AHint, acRectOffset(AControl.ClientRect, AControl.ClientOrigin), AHorzAlignment, AVertAligment);
 end;
 
 procedure TACLHintWindow.CreateParams(var Params: TCreateParams);
@@ -431,6 +443,11 @@ begin
     Layout.TargetDpi := ATargetDpi;
     Style.TargetDpi := ATargetDpi;
   end;
+end;
+
+procedure TACLHintWindow.SetHintData(const AHint: string; AData: TCustomData);
+begin
+  Layout.SetText(AHint, TACLTextFormatSettings.Formatted);
 end;
 
 procedure TACLHintWindow.SetStyle(AValue: TACLStyleHint);
