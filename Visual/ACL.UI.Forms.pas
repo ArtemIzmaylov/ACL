@@ -142,6 +142,7 @@ type
 
     procedure SetShowOnTaskBar(AValue: Boolean);
     procedure SetStayOnTop(AValue: Boolean);
+    procedure UpdateNonClientColors;
   protected
     FOwnerHandle: THandle;
     FRecreateWndLockCount: Integer;
@@ -149,6 +150,7 @@ type
     procedure AfterFormCreate; virtual;
     procedure BeforeFormCreate; virtual;
     function CanCloseByEscape: Boolean; virtual;
+    procedure CreateHandle; override;
     procedure CreateParams(var Params: TCreateParams); override;
     procedure DpiChanged; override;
     procedure UpdateImageLists; virtual;
@@ -448,10 +450,8 @@ begin
 end;
 
 procedure TACLBasicForm.ApplyColorSchema;
-var
-  I: Integer;
 begin
-  for I := 0 to ComponentCount - 1 do
+  for var I := 0 to ComponentCount - 1 do
     acApplyColorSchema(Components[I], TACLApplication.ColorSchema);
 end;
 
@@ -775,6 +775,12 @@ begin
     Create(AOwner);
 end;
 
+procedure TACLForm.CreateHandle;
+begin
+  inherited;
+  UpdateNonClientColors;
+end;
+
 constructor TACLForm.CreateNew(AOwner: TComponent; Dummy: Integer = 0);
 begin
   BeforeFormCreate;
@@ -935,6 +941,27 @@ begin
   TACLFormImageListReplacer.Execute(FCurrentPPI, Self);
 end;
 
+procedure TACLForm.UpdateNonClientColors;
+const
+  DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+var
+  LValue: LongBool;
+  LWidth: Integer;
+begin
+  // https://stackoverflow.com/questions/39261826/change-the-color-of-the-title-bar-caption-of-a-win32-application
+  if IsWin10OrLater and HandleAllocated and (TOSVersion.Build >= 18985) then
+  begin
+    LValue := TACLApplication.IsDarkMode;
+    DwmSetWindowAttribute(Handle, DWMWA_USE_IMMERSIVE_DARK_MODE, @LValue, SizeOf(LValue));
+    // Fully recalculate and redraw the window
+    LWidth := Width;
+    SetWindowPos(Handle, 0, 0, 0, LWidth + 1,
+      Height, SWP_NOZORDER or SWP_NOACTIVATE or SWP_NOMOVE);
+    SetWindowPos(Handle, 0, 0, 0, LWidth,
+      Height, SWP_NOZORDER or SWP_NOACTIVATE or SWP_NOMOVE);
+  end;
+end;
+
 function TACLForm.ShouldBeStayOnTop: Boolean;
 begin
   Result := StayOnTop or TACLStayOnTopHelper.ShouldBeStayOnTop(GetOwnerWindow);
@@ -968,7 +995,10 @@ procedure TACLForm.ApplicationSettingsChanged(AChanges: TACLApplicationChanges);
 begin
   inherited;
   if acDarkMode in AChanges then
+  begin
+    UpdateNonClientColors;
     UpdateImageLists;
+  end;
 end;
 
 procedure TACLForm.CMDialogKey(var Message: TCMDialogKey);
