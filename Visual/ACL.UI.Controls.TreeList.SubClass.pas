@@ -598,20 +598,22 @@ type
     procedure EditApplyHandler(Sender: TObject); virtual;
     procedure EditCancelHandler(Sender: TObject); virtual;
     procedure EditKeyDownHandler(Sender: TObject; var Key: Word; Shift: TShiftState); virtual;
-    //
+    //# Properties
     property ContentViewInfo: TACLTreeListContentViewInfo read GetContentViewInfo;
     property Value: UnicodeString read GetValue write SetValue;
   public
     destructor Destroy; override;
+    //# States
     function IsEditing: Boolean; overload;
     function IsEditing(AItemIndex, AColumnIndex: Integer): Boolean; overload;
     function IsEditing(ANode: TACLTreeListNode; AColumn: TACLTreeListColumn = nil): Boolean; overload;
     function IsLocked: Boolean;
-    //
+    function IsModified: Boolean;
+    //# Actions
     procedure Apply;
     procedure Cancel;
     procedure StartEditing(ANode: TACLTreeListNode; AColumn: TACLTreeListColumn = nil);
-    //
+    //# Properties
     property ColumnIndex: Integer read FParams.ColumnIndex;
     property Edit: TComponent read FEdit;
     property EditIntf: IACLInplaceControl read FEditIntf;
@@ -3008,6 +3010,11 @@ end;
 function TACLTreeListEditingController.IsLocked: Boolean;
 begin
   Result := FLockCount > 0;
+end;
+
+function TACLTreeListEditingController.IsModified: Boolean;
+begin
+  Result := IsEditing and (Value <> EditIntf.InplaceGetValue);
 end;
 
 procedure TACLTreeListEditingController.Apply;

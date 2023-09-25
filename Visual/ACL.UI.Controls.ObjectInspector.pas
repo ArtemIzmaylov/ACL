@@ -768,7 +768,7 @@ function TACLObjectInspectorSubClass.GoToNextProperty(AForward: Boolean): Boolea
 var
   AIndex: Integer;
 begin
-  if EditingController.IsEditing then
+  if EditingController.IsModified then
     EditingController.Apply;
 
   AIndex := AbsoluteVisibleNodes.IndexOf(FocusedNode) + Signs[AForward];
@@ -853,11 +853,10 @@ procedure TACLObjectInspectorSubClass.LoadObject(AObject: TObject; AParentNode: 
 var
   ACount: Integer;
   AList: PPropList;
-  I: Integer;
 begin
   if TRTTI.GetProperties(AObject, AList, ACount) then
   try
-    for I := 0 to ACount - 1 do
+    for var I := 0 to ACount - 1 do
       LoadObjectProperty(AList[I], AObject, AParentNode);
   finally
     FreeMemAndNil(Pointer(AList));
