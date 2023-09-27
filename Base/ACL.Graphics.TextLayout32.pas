@@ -263,28 +263,32 @@ const
 var
   AAlpha: Integer;
   Q: PRGBQuad;
-  I: Integer;
 begin
   if not FGammaTableInitialized then
   begin
-    for I := 0 to MaxByte do
+    for var I := 0 to MaxByte do
       FGammaTable[I] := FastTrunc(MaxByte * Power(I / MaxByte, 1000 / K));
     FGammaTableInitialized := True;
   end;
+
   Q := PRGBQuad(ALayer.Colors);
-  for I := 1 to ALayer.ColorCount do
+  for var I := 1 to ALayer.ColorCount do
   begin
-    if (Q^.rgbBlue <> 0) or (Q^.rgbGreen <> 0) or (Q^.rgbRed <> 0) then
+    if PDWORD(Q)^ and $00FFFFFF <> 0 then
     begin
-      AAlpha := (128 +
+      AAlpha := 128 +
         FGammaTable[Q^.rgbRed] * 77 +
         FGammaTable[Q^.rgbGreen] * 151 +
-        FGammaTable[Q^.rgbBlue] * 28) * ATextColor.rgbReserved shr 16;
+        FGammaTable[Q^.rgbBlue] * 28;
+      AAlpha := AAlpha * ATextColor.rgbReserved shr 16;
       Q^.rgbBlue := TACLColors.PremultiplyTable[ATextColor.rgbBlue, AAlpha];
       Q^.rgbGreen := TACLColors.PremultiplyTable[ATextColor.rgbGreen, AAlpha];
       Q^.rgbRed := TACLColors.PremultiplyTable[ATextColor.rgbRed, AAlpha];
       Q^.rgbReserved := AAlpha;
-    end;
+    end
+    else
+      Q^.rgbReserved := 0;
+
     Inc(Q);
   end;
 end;

@@ -1587,6 +1587,11 @@ begin
   acFillBitmapInfoHeader(AInfo.bmiHeader, Width, Height);
   FBitmap := CreateDIBSection(0, AInfo, DIB_RGB_COLORS, Pointer(FColors), 0, 0);
   FOldBmp := SelectObject(Handle, Bitmap);
+  if FColors = nil then
+  begin
+    FreeHandles;
+    raise EInvalidGraphicOperation.CreateFmt('Unable to create bitmap layer (%dx%d)', [W, H]);
+  end;
 end;
 
 procedure TACLBitmapLayer.FreeHandles;
