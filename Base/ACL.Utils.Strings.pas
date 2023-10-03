@@ -1708,8 +1708,6 @@ begin
 end;
 
 class procedure TACLEncodings.EnumAnsiCodePages(const AProc: TProc<Integer, string>);
-var
-  I: Integer;
 begin
   if FCodePages = nil then
   begin
@@ -1718,7 +1716,7 @@ begin
     TACLStringList(FCodePages).SortLogical;
     TACLStringList(FCodePages).Insert(0, 'Default', TObject(CP_ACP));
   end;
-  for I := 0 to TACLStringList(FCodePages).Count - 1 do
+  for var I := 0 to TACLStringList(FCodePages).Count - 1 do
     AProc(Integer(TACLStringList(FCodePages).Objects[I]), TACLStringList(FCodePages).Strings[I]);
 end;
 
@@ -1780,11 +1778,8 @@ var
   ACodePageInfo: TCPInfoEx;
 begin
   ACodePage := StrToIntDef(lpCodePageString, -1);
-  if ACodePage > 0 then
-  begin
-    if GetCPInfoEx(ACodePage, 0, ACodePageInfo) and (ACodePageInfo.MaxCharSize = 1) then
-      TACLStringList(FCodePages).Add(ACodePageInfo.CodePageName, ACodePage);
-  end;
+  if (ACodePage > 0) and GetCPInfoEx(ACodePage, 0, ACodePageInfo) then
+    TACLStringList(FCodePages).Add(ACodePageInfo.CodePageName, ACodePage);
   Result := 1;
 end;
 
