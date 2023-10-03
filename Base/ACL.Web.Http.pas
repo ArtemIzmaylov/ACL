@@ -848,7 +848,7 @@ begin
   CallEvent(
     procedure
     begin
-      FHandler.OnComplete(FError, Canceled);
+      FHandler.OnComplete(FError, IsCanceled);
     end,
     hcoSyncEventComplete in Options);
 end;
@@ -856,7 +856,7 @@ end;
 procedure TACLHttpClientTask.Complete;
 begin
   inherited Complete;
-  if Canceled then
+  if IsCanceled then
     FError.Initialize(acWebErrorCanceled, sErrorCancel);
   DoComplete;
 end;
@@ -869,12 +869,12 @@ begin
   try
     AConnection := THttpConnection.Create(URL.Host, URL.Port, URL.Secured);
     try
-      if not Canceled then
+      if not IsCanceled then
       begin
         ARequest := THttpRequest.Create(AConnection, Method, URL.Path);
         try
           ARequest.Send(URL.CustomHeaders, FRange, FPostData, HandlerProgress);
-          if CheckContentType(ARequest) and not Canceled then
+          if CheckContentType(ARequest) and not IsCanceled then
             ARequest.Receive(HandlerData, HandlerProgress);
         finally
           ARequest.Free;
@@ -918,7 +918,7 @@ end;
 
 function TACLHttpClientTask.HandlerProgress(const APosition, ASize: Int64): Boolean;
 begin
-  Result := not Canceled;
+  Result := not IsCanceled;
   CallEvent(
     procedure
     begin

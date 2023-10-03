@@ -4,7 +4,7 @@
 {*           Thread Pool Routines            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -18,12 +18,12 @@ interface
 uses
   Winapi.Windows,
   // System
-  System.SyncObjs,
-  System.Types,
-  System.SysUtils,
   System.Classes,
   System.Generics.Collections,
   System.Generics.Defaults,
+  System.SyncObjs,
+  System.SysUtils,
+  System.Types,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -68,10 +68,32 @@ type
   public
     procedure Cancel;
     function IsCanceled: Boolean;
-    //
+    //# Properties
     property Caption: string read GetCaption;
-    property Canceled: Boolean read IsCanceled; // deprecated 'Use IsCanceled';
     property Handle: THandle read GetHandle;
+  end;
+
+  { TACLTaskGroup }
+
+  TACLTaskGroup = class
+  strict private
+    FActiveTasks: Integer;
+    FEvent: TACLEvent;
+    FTasks: TACLList<THandle>;
+
+    FOnAsyncFinished: TNotifyEvent;
+
+    procedure AsyncFinished;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure Add(ATask: TACLTask);
+    procedure Cancel;
+    procedure Initialize;
+    function IsActive: Boolean;
+    procedure Run(AWaitFor: Boolean);
+    //# Properties
+    property OnAsyncFinished: TNotifyEvent read FOnAsyncFinished write FOnAsyncFinished;
   end;
 
   { TACLTaskQueue }
@@ -94,7 +116,7 @@ type
     procedure BeforeDestruction; override;
     procedure Cancel;
     function IsActive: Boolean;
-    //
+    //# Properties
     property OnAsyncFinished: TNotifyEvent read FOnAsyncFinished write FOnAsyncFinished;
   end;
 
@@ -240,6 +262,66 @@ begin
   Result := FCanceled <> 0;
 end;
 
+{ TACLTaskGroup }
+
+constructor TACLTaskGroup.Create;
+begin
+  FEvent := TACLEvent.Create(True, True);
+  FTasks := TACLList<THandle>.Create;
+end;
+
+destructor TACLTaskGroup.Destroy;
+begin
+  Cancel;
+  FreeAndNil(FTasks);
+  FreeAndNil(FEvent);
+  inherited;
+end;
+
+procedure TACLTaskGroup.Add(ATask: TACLTask);
+begin
+  InterlockedIncrement(FActiveTasks); // first
+  FTasks.Add(TaskDispatcher.Run(ATask, AsyncFinished, tmcmAsync));
+end;
+
+procedure TACLTaskGroup.AsyncFinished;
+begin
+  if InterlockedDecrement(FActiveTasks) = 0 then
+  try
+    if Assigned(OnAsyncFinished) then
+      OnAsyncFinished(Self);
+  finally
+    FEvent.Signal;
+  end;
+end;
+
+procedure TACLTaskGroup.Cancel;
+begin
+  for var I := FTasks.Count - 1 downto 0 do
+    TaskDispatcher.Cancel(FTasks.List[I], False);
+  FEvent.WaitFor;
+end;
+
+procedure TACLTaskGroup.Initialize;
+begin
+  Cancel;
+  FEvent.Reset;
+  FTasks.Clear;
+  FActiveTasks := 1; // to prevent from OnAsyncFinished fired before call the Run
+end;
+
+function TACLTaskGroup.IsActive: Boolean;
+begin
+  Result := FActiveTasks > 0;
+end;
+
+procedure TACLTaskGroup.Run(AWaitFor: Boolean);
+begin
+  AsyncFinished;
+  if AWaitFor then
+    FEvent.WaitFor;
+end;
+
 { TACLTaskQueue }
 
 constructor TACLTaskQueue.Create;
@@ -350,6 +432,29 @@ begin
     FProc(IsCanceled);
   if Assigned(FProc2) then
     FProc2();
+end;
+
+{ TACLTaskEvent }
+
+constructor TACLTaskEvent.Create;
+begin
+  FHandle := CreateEvent(nil, True, False, nil);
+end;
+
+destructor TACLTaskEvent.Destroy;
+begin
+  CloseHandle(FHandle);
+  inherited Destroy;
+end;
+
+function TACLTaskEvent.Signal: Boolean;
+begin
+  Result := SetEvent(FHandle);
+end;
+
+function TACLTaskEvent.WaitFor(ATimeOut: Cardinal): TWaitResult;
+begin
+  Result := WaitForSyncObject(FHandle, ATimeOut);
 end;
 
 { TACLTaskDispatcher }
@@ -733,29 +838,6 @@ begin
     raise EInvalidArgument.Create('');
 
   TACLTimer(FCpuUsageMonitor).Enabled := AValue;
-end;
-
-{ TACLTaskEvent }
-
-constructor TACLTaskEvent.Create;
-begin
-  FHandle := CreateEvent(nil, True, False, nil);
-end;
-
-destructor TACLTaskEvent.Destroy;
-begin
-  CloseHandle(FHandle);
-  inherited Destroy;
-end;
-
-function TACLTaskEvent.Signal: Boolean;
-begin
-  Result := SetEvent(FHandle);
-end;
-
-function TACLTaskEvent.WaitFor(ATimeOut: Cardinal): TWaitResult;
-begin
-  Result := WaitForSyncObject(FHandle, ATimeOut);
 end;
 
 initialization
