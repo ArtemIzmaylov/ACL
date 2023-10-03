@@ -127,7 +127,8 @@ type
 
   Safe = class
   public
-    class function Cast(const AObject: TObject; const AClass: TClass; out AValue): Boolean; inline;
+    class function Cast(AObject: TObject; AClass: TClass; out AValue): Boolean; inline;
+    class function CastOrNil<T: class>(AObject: TObject): T; inline;
   end;
 
 var
@@ -791,13 +792,21 @@ end;
 
 { Safe }
 
-class function Safe.Cast(const AObject: TObject; const AClass: TClass; out AValue): Boolean;
+class function Safe.Cast(AObject: TObject; AClass: TClass; out AValue): Boolean;
 begin
   Result := (AObject <> nil) and AObject.InheritsFrom(AClass);
   if Result then
     TObject(AValue) := AObject
   else
     TObject(AValue) := nil;
+end;
+
+class function Safe.CastOrNil<T>(AObject: TObject): T;
+begin
+  if (AObject <> nil) and AObject.InheritsFrom(GetTypeData(TypeInfo(T)).ClassType) then
+    Result := T(AObject)
+  else
+    Result := nil;
 end;
 
 initialization
