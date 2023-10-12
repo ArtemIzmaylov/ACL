@@ -187,6 +187,7 @@ procedure TACLProgressBar.SetTargetDPI(AValue: Integer);
 begin
   inherited SetTargetDPI(AValue);
   Style.SetTargetDPI(AValue);
+  AdjustSize;
 end;
 
 procedure TACLProgressBar.DoTimer(Sender: TObject);
