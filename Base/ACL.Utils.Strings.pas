@@ -161,7 +161,7 @@ type
     procedure SetDataLength(AValue: Integer);
   public
     constructor Create(ACapacity: Integer = DefaultCapacity);
-  {$REGION 'Pool'}
+  {$REGION ' Pool '}
     class destructor Finalize;
     class function Get(ACapacity: Integer = DefaultCapacity): TACLStringBuilder;
     procedure Release; // Push the builder back to pool
@@ -388,13 +388,19 @@ function acUtf8IsWellformed(Source: PAnsiChar; SourceBytes: Integer): Boolean;
 function acUtf8ToUnicode(Dest: PWideChar; MaxDestChars: Integer; Source: PAnsiChar; SourceBytes: Integer): Integer;
 
 // Search
-function acContains(const AChar: WideChar; const AString: UnicodeString): Boolean; inline; overload;
-function acContains(const ASubStr, AString: UnicodeString; AIgnoreCase: Boolean = False): Boolean; inline; overload;
-function acFindStringInMemoryA(const S: AnsiString; AMem: PByte; AMemSize, AMemOffset: Integer; out AOffset: Integer): Boolean;
-function acFindStringInMemoryW(const S: UnicodeString; AMem: PByte; AMemSize, AMemOffset: Integer; out AOffset: Integer): Boolean;
+function acContains(const AChar: WideChar;
+  const AString: UnicodeString): Boolean; inline; overload;
+function acContains(const ASubStr, AString: UnicodeString;
+  AIgnoreCase: Boolean = False): Boolean; inline; overload;
+function acFindStringInMemoryA(const S: AnsiString;
+  AMem: PByte; AMemSize, AMemOffset: Integer; out AOffset: Integer): Boolean;
+function acFindStringInMemoryW(const S: UnicodeString;
+  AMem: PByte; AMemSize, AMemOffset: Integer; out AOffset: Integer): Boolean;
 function acPos(const ACharToSearch: WideChar; const AString: UnicodeString): Integer; overload;
-function acPos(const ASubStr, AString: UnicodeString; AIgnoreCase: Boolean = False; AOffset: Integer = 1): Integer; overload; inline;
-function acPos(const ASubStr, AString: UnicodeString; AIgnoreCase, AWholeWords: Boolean; AOffset: Integer = 1): Integer; overload;
+function acPos(const ASubStr, AString: UnicodeString;
+  AIgnoreCase: Boolean = False; AOffset: Integer = 1): Integer; overload; inline;
+function acPos(const ASubStr, AString: UnicodeString;
+  AIgnoreCase, AWholeWords: Boolean; AOffset: Integer = 1): Integer; overload;
 
 // Allocation
 function acAllocStr(const S: UnicodeString): PWideChar; overload;
@@ -403,11 +409,16 @@ function acMakeString(const P: PWideChar; L: Integer): UnicodeString; overload; 
 function acMakeString(const P: PAnsiChar; L: Integer): AnsiString; overload; inline;
 
 // Explode
-function acExplodeString(AScan: PAnsiChar; AScanCount: Integer; ADelimiter: AnsiChar; AReceiveProc: TAnsiExplodeStringReceiveResultProc): Integer; overload;
-function acExplodeString(AScan: PWideChar; AScanCount: Integer; const ADelimiters: UnicodeString; AReceiveProc: TWideExplodeStringReceiveResultProc): Integer; overload;
-function acExplodeString(const S: UnicodeString; const ADelimiters: UnicodeString; AReceiveProc: TWideExplodeStringReceiveResultProc): Integer; overload;
-function acExplodeString(const S: UnicodeString; const ADelimiters: UnicodeString; out AParts: TStringDynArray): Integer; overload;
-function acExplodeStringAsIntegerArray(const S: UnicodeString; ADelimiter: WideChar; AArray: PInteger; AArrayLength: Integer): Integer;
+function acExplodeString(AScan: PAnsiChar; AScanCount: Integer;
+  ADelimiter: AnsiChar; AReceiveProc: TAnsiExplodeStringReceiveResultProc): Integer; overload;
+function acExplodeString(AScan: PWideChar; AScanCount: Integer;
+  const ADelimiters: UnicodeString; AReceiveProc: TWideExplodeStringReceiveResultProc): Integer; overload;
+function acExplodeString(const S: UnicodeString;
+  const ADelimiters: UnicodeString; AReceiveProc: TWideExplodeStringReceiveResultProc): Integer; overload;
+function acExplodeString(const S: UnicodeString;
+  const ADelimiters: UnicodeString; out AParts: TStringDynArray): Integer; overload;
+function acExplodeStringAsIntegerArray(const S: UnicodeString;
+  ADelimiter: WideChar; AArray: PInteger; AArrayLength: Integer): Integer;
 function acGetCharacterCount(const S, ACharacters: UnicodeString): Integer; overload;
 function acGetCharacterCount(P: PWideChar; ALength: Integer; const ACharacters: UnicodeString): Integer; overload;
 
@@ -431,16 +442,22 @@ function acSameText(const S1, S2: UnicodeString): Boolean;
 function acSameTextEx(const S: UnicodeString; const AStrs: array of UnicodeString): Boolean;
 
 // Encoding
-function acDetectEncoding(ABuffer: PByte; ABufferSize: Integer; ADefaultEncoding: TEncoding = nil): TEncoding; overload; deprecated;
-function acDetectEncoding(ABuffer: TBytes; out AEncoding: TEncoding; ADefaultEncoding: TEncoding = nil): Integer; overload;
-function acDetectEncoding(AStream: TStream; ADefaultEncoding: TEncoding = nil): TEncoding; overload;
+function acDetectEncoding(ABuffer: PByte; ABufferSize: Integer;
+  ADefaultEncoding: TEncoding = nil): TEncoding; overload; deprecated;
+function acDetectEncoding(ABuffer: TBytes;
+  out AEncoding: TEncoding; ADefaultEncoding: TEncoding = nil): Integer; overload;
+function acDetectEncoding(AStream: TStream;
+  ADefaultEncoding: TEncoding = nil): TEncoding; overload;
 
 // Replacing
 function acRemoveChar(const S: UnicodeString; const ACharToRemove: WideChar): UnicodeString;
 function acRemoveSurrogates(const S: UnicodeString; const AReplaceBy: WideChar = #0): UnicodeString;
-function acReplaceChar(const S: UnicodeString; const ACharToReplace, AReplaceBy: WideChar): UnicodeString;
-function acReplaceChars(const S: UnicodeString; const ACharsToReplace: UnicodeString; const AReplaceBy: WideChar = '_'): UnicodeString;
-function acStringReplace(const S, OldPattern, NewPattern: string; AIgnoreCase: Boolean = False; AWholeWords: Boolean = False): string;
+function acReplaceChar(const S: UnicodeString;
+  const ACharToReplace, AReplaceBy: WideChar): UnicodeString;
+function acReplaceChars(const S: UnicodeString;
+  const ACharsToReplace: UnicodeString; const AReplaceBy: WideChar = '_'): UnicodeString;
+function acStringReplace(const S, OldPattern, NewPattern: string;
+  AIgnoreCase: Boolean = False; AWholeWords: Boolean = False): string;
 
 // Integer <-> PWideChar;
 function acPWideCharToIntDef(AChars: PWideChar; ACount: Integer; const ADefaultValue: Int64): Int64; inline;
@@ -457,7 +474,8 @@ function acReplaceLineBreaks(const S, ReplaceBy: UnicodeString): UnicodeString;
 function acFontStyleDecode(const Style: TFontStyles): Byte;
 function acFontStyleEncode(Style: Integer): TFontStyles;
 function acFontToString(AFont: TFont): UnicodeString; overload;
-function acFontToString(const AName: UnicodeString; AColor: TColor; AHeight: Integer; AStyle: TFontStyles): UnicodeString; overload;
+function acFontToString(const AName: UnicodeString; AColor: TColor;
+  AHeight: Integer; AStyle: TFontStyles): UnicodeString; overload;
 procedure acStringToFont(const S: UnicodeString; const Font: TFont);
 procedure acStringToFontData(const S: UnicodeString; out AFontData: TACLFontData);
 {$ENDIF}
@@ -469,8 +487,10 @@ function acStringToRect(const S: UnicodeString): TRect;
 function acStringToSize(const S: UnicodeString): TSize;
 
 // Formatting
-function acFormatFloat(const AFormat: UnicodeString; const AValue: Double; AShowPlusSign: Boolean): UnicodeString; overload;
-function acFormatFloat(const AFormat: UnicodeString; const AValue: Double; const ADecimalSeparator: Char = '.'): UnicodeString; overload;
+function acFormatFloat(const AFormat: UnicodeString;
+  const AValue: Double; AShowPlusSign: Boolean): UnicodeString; overload;
+function acFormatFloat(const AFormat: UnicodeString;
+  const AValue: Double; const ADecimalSeparator: Char = '.'): UnicodeString; overload;
 function acFormatSize(const AValue: Int64; AAllowGigaBytes: Boolean = True): UnicodeString;
 function acFormatTrackNo(ATrack: Integer): UnicodeString;
 
@@ -500,9 +520,6 @@ uses
 
 const
   MaxPreambleLength = 3;
-
-type
-  TACLStringBuilderAccess = class(TACLStringBuilder);
 
 function StrToIntDef(const S: AnsiString; ADefault: Integer): Integer;
 begin
