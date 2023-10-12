@@ -1,5 +1,6 @@
 {$R-} { Range-Checking }
 {$Q-} { Overflow checking }
+{$Z1} { Minumum enum size = 1}
 
 {$IF NOT DEFINED(ACL_RTTI_ALL)}
   {$WEAKLINKRTTI ON}

@@ -67,7 +67,7 @@ type
     function GetPriority: TACLTaskPriority; virtual;
   public
     procedure Cancel;
-    function IsCanceled: Boolean;
+    function IsCanceled: Boolean; virtual;
     //# Properties
     property Caption: string read GetCaption;
     property Handle: THandle read GetHandle;

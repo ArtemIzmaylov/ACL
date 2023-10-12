@@ -4,7 +4,7 @@
 {*             System Utilities              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -23,10 +23,12 @@ uses
   Winapi.PsAPI,
 {$ENDIF}
   // System
-  System.UITypes,
-  System.Types,
-  System.SysUtils,
+  System.AnsiStrings,
   System.Classes,
+  System.SysUtils,
+  System.Types,
+  System.TypInfo,
+  System.UITypes,
   System.Math;
 
 const
@@ -198,9 +200,6 @@ uses
 {$IFNDEF ACL_BASE_NOVCL}
   Vcl.Forms,
 {$ENDIF}
-  // System
-  System.AnsiStrings,
-  System.TypInfo,
   // ACL
   ACL.Math,
   ACL.Utils.Strings,

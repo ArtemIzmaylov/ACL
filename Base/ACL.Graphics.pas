@@ -2825,8 +2825,9 @@ begin
   begin
     with AColors^ do
     begin
-      if Max(Max(rgbBlue, rgbGreen), rgbRed) > rgbReserved then
-        Exit(False);
+      if rgbRed   > rgbReserved then Exit(False);
+      if rgbGreen > rgbReserved then Exit(False);
+      if rgbBlue  > rgbReserved then Exit(False);
     end;
     Inc(AColors);
     Dec(ACount);
