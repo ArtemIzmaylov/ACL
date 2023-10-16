@@ -341,6 +341,7 @@ type
     FLayout: TACLDockGroupLayout;
     FTabActiveIndex: Integer;
     FTabCapture: TTab;
+    FTabDropTarget: TACLDockControl;
     FTabs: array of TTab;
     FTabsArea: TRect;
 
@@ -363,6 +364,7 @@ type
     procedure AlignControls(AControl: TControl; var ARect: TRect); override;
     procedure ControlsAligned; override;
     procedure ControlsAligning; override;
+    function HasTabs: Boolean; inline;
     procedure Paint; override;
     function ResizeChild(AChild: TACLDockControl; ASide: TACLBorder; ADelta: Integer): Integer;
     procedure ValidateInsert(AComponent: TComponent); override;
@@ -807,7 +809,7 @@ end;
 procedure TACLDockZone.CreateParams(var Params: TCreateParams);
 begin
   inherited;
-  Params.ExStyle := WS_EX_TOPMOST or WS_EX_LAYERED;
+  Params.ExStyle := WS_EX_TOPMOST or WS_EX_LAYERED or WS_EX_TOOLWINDOW;
   Params.Style := WS_POPUP;
 end;
 
@@ -1986,7 +1988,7 @@ var
 begin
   ActiveControlIndex := Max(ActiveControlIndex, 0);
 
-  if (ActiveControlIndex >= 0){ and not IsMinimized} then
+  if (ActiveControlIndex >= 0) and (VisibleControlCount > 1) { and not IsMinimized} then
   begin
     AOuterPadding := GetOuterPadding;
     FTabsArea := Rect(ARect.Left, ARect.Top, ARect.Right, ARect.Bottom - 2{visual borders});
@@ -2371,6 +2373,11 @@ begin
   end;
 end;
 
+function TACLDockGroup.HasTabs: Boolean;
+begin
+  Result := (Layout = TACLDockGroupLayout.Tabbed) and not FTabsArea.IsEmpty;
+end;
+
 procedure TACLDockGroup.LayoutLoad(ANode: TACLXMLNode);
 var
   ADockGroup: TACLDockGroup;
@@ -2406,6 +2413,7 @@ begin
     end;
 
     ActiveControlIndex := ANode.Attributes.GetValueAsInteger(TACLDockingSchema.AttrIndex, -1);
+    Perform(CM_DOCKING_VISIBILITY, 0, 0);
   finally
     EnableAlign;
   end;
@@ -2432,6 +2440,7 @@ begin
     if GetTabAtPos(Point(X, Y), ATab)  then
     begin
       ActiveControlIndex := IndexOfControl(ATab.Control);
+      FTabDropTarget := nil;
       FTabCapture := ATab;
       UpdateCursor;
     end;
@@ -2444,12 +2453,16 @@ var
 begin
   if (ssLeft in Shift) and (FTabCapture.Control <> nil) then
   begin
-    if GetTabAtPos(Point(X, Y), ATab) and (ATab.Control <> FTabCapture.Control)  then
+    if GetTabAtPos(Point(X, Y), ATab) and (ATab.Control <> FTabDropTarget) then
     begin
-      SetChildOrder(FTabCapture.Control, IndexOfControl(ATab.Control));
-      Realign;
-      // актуализируем после реордеринга
-      ActiveControlIndex := IndexOfControl(FTabCapture.Control);
+      FTabDropTarget := ATab.Control;
+      if ATab.Control <> FTabCapture.Control then
+      begin
+        SetChildOrder(FTabCapture.Control, IndexOfControl(ATab.Control));
+        Realign;
+        // актуализируем после реордеринга
+        ActiveControlIndex := IndexOfControl(FTabCapture.Control);
+      end;
     end;
   end
   else
@@ -2778,7 +2791,7 @@ begin
   Result := inherited;
   if (SideBar = nil) and Safe.Cast(Parent, TACLDockGroup, AGroup) then
   begin
-    if AGroup.Layout = TACLDockGroupLayout.Tabbed then
+    if AGroup.HasTabs then
       Result.Bottom := -2; // hide outer visual border
   end;
 end;
@@ -2790,7 +2803,7 @@ begin
   if Safe.Cast(Parent, TACLDockGroup, ADockGroup) then
   begin
     Result := not (
-      (ADockGroup.Layout <> TACLDockGroupLayout.Tabbed) and
+      (not ADockGroup.HasTabs) and
       (ADockGroup.Parent is TACLFloatDockForm) and
       (ADockGroup.VisibleControlCount = 1));
   end
@@ -3002,7 +3015,9 @@ end;
 
 procedure TACLFloatDockForm.DoClose(var Action: TCloseAction);
 begin
-  Action := TCloseAction.caHide;
+  for var I := 0 to DockGroup.ControlCount - 1 do
+    DockGroup.Controls[I].Visible := False;
+  Action := TCloseAction.caNone;
 end;
 
 function TACLFloatDockForm.GetNonClientExtends: TRect;
@@ -3744,7 +3759,7 @@ var
   AControl: TACLDockControl;
 begin
   AControl := TACLDockControl(Message.LParam);
-  if AControl.SideBar <> nil then
+  if (AControl <> nil) and (AControl.SideBar <> nil) then
   begin
     if Message.WParam <> 0 then
     begin
