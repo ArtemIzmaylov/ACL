@@ -222,14 +222,20 @@ end;
 procedure TACLMenuEditorDialog.lvItemsCustomDrawNodeCell(Sender: TObject; ACanvas: TCanvas;
   const R: TRect; ANode: TACLTreeListNode; AColumn: TACLTreeListColumn; var AHandled: Boolean);
 var
-  AItem: TMenuItem;
+  LCaption: string;
+  LItem: TMenuItem;
 begin
-  AItem := ANode.Data;
-  ANode.ImageIndex := AItem.ImageIndex;
-  if AItem is TACLMenuItem then
-    ANode.Caption := AItem.ToString
+  LItem := ANode.Data;
+  if LItem is TACLMenuItem then
+    LCaption := LItem.ToString
   else
-    ANode.Caption := AItem.Caption;
+    LCaption := LItem.Caption;
+
+  if LCaption = '' then
+    LCaption := LItem.Name;
+
+  ANode.ImageIndex := LItem.ImageIndex;
+  ANode.Caption := LCaption;
 end;
 
 procedure TACLMenuEditorDialog.lvItemsDragSortingNodeDrop(Sender: TObject;
