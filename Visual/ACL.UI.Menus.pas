@@ -694,7 +694,7 @@ type
 
 function acMenusHasActivePopup: Boolean;
 begin
-  Result := TACLMenuController.FMenus <> nil;
+  Result := TACLMenuController.ActiveMenu <> nil;
 end;
 
 {$REGION ' Helpers '}
@@ -1276,22 +1276,17 @@ end;
 
 procedure TACLStylePopupMenu.DrawBorder(ACanvas: TCanvas; const R: TRect);
 var
-  ACornerRadius: Integer;
+  LRadius: Integer;
 begin
+  ACanvas.Pen.Color := ColorBorder1.AsColor;
   if ColorBorder2.IsEmpty then
-  begin
-    ACanvas.Pen.Style := psClear;
-    ACanvas.Brush.Color := ColorBorder1.AsColor;
-  end
+    ACanvas.Brush.Color := ColorBorder1.AsColor
   else
-  begin
-    ACanvas.Pen.Color := ColorBorder1.AsColor;
     ACanvas.Brush.Color := ColorBorder2.AsColor;
-  end;
 
-  ACornerRadius := 2 * CornerRadius.Value;
-  if ACornerRadius > 0 then
-    ACanvas.RoundRect(R, ACornerRadius, ACornerRadius)
+  LRadius := 2 * CornerRadius.Value;
+  if LRadius > 0 then
+    ACanvas.RoundRect(R, LRadius, LRadius)
   else
     ACanvas.Rectangle(R);
 end;
@@ -2871,14 +2866,29 @@ end;
 
 procedure TACLMenuPopupWindow.Resize;
 var
-  ARadius: Integer;
+  LBitmap: TACLBitmapLayer;
+  LRadius: Integer;
+  LRegion: HRGN;
 begin
   inherited;
-  ARadius := Style.CornerRadius.Value;
-  if ARadius > 0 then
-    SetWindowRgn(Handle, CreateRoundRectRgn(0, 0, Width + 1, Height + 1, 2 * ARadius - 1, 2 * ARadius - 1), True)
-  else
-    SetWindowRgn(Handle, 0, True);
+
+  LRegion := 0;
+  LRadius := 2 * Style.CornerRadius.Value;
+  if LRadius > 0 then
+  begin
+    LBitmap := TACLBitmapLayer.Create(BoundsRect);
+    try
+      LBitmap.Canvas.Brush.Color := clFuchsia;
+      LBitmap.Canvas.FillRect(LBitmap.ClientRect);
+      LBitmap.Canvas.Pen.Color := clWhite;
+      LBitmap.Canvas.Brush.Color := clWhite;
+      LBitmap.Canvas.RoundRect(LBitmap.ClientRect, LRadius, LRadius);
+      LRegion := acRegionFromBitmap(@LBitmap.Colors[0], LBitmap.Width, LBitmap.Height, clFuchsia);
+    finally
+      LBitmap.Free;
+    end;
+  end;
+  SetWindowRgn(Handle, LRegion, True);
 end;
 
 procedure TACLMenuPopupWindow.DrawScrollButton(ACanvas: TCanvas; const R: TRect; ATop, AEnabled: Boolean);
