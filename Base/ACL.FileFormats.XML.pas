@@ -1112,7 +1112,11 @@ end;
 constructor TACLXMLDocument.CreateEx(const AFileName: UnicodeString);
 begin
   Create;
-  LoadFromFile(AFileName);
+  try
+    LoadFromFile(AFileName);
+  except
+    Clear;
+  end;
 end;
 
 constructor TACLXMLDocument.CreateEx(const AStream: TStream);
