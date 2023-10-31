@@ -328,11 +328,15 @@ function CryptDestroyKey(hKey: HCRYPTKEY): BOOL; stdcall; external advapi32;
 {$ENDREGION}
 {$ENDIF}
 
-function acFileNameHash(const S: UnicodeString): Cardinal; inline;
+function acFileNameHash(const S: UnicodeString): Cardinal;
+var
+  LCount: Integer;
+  LPath: TFileLongPath;
 begin
   // тоже самое, но просто с меньшим числом вызовов
 //  Result := TACLHashBobJenkins.Calculate(acLowerCase(S), nil);
-  Result := THashBobJenkins.GetHashValue(acLowerCase(S));
+  LCount := LCMapString(LOCALE_INVARIANT, LCMAP_LOWERCASE, PChar(S), Length(S), @LPath[0], Length(LPath));
+  Result := THashBobJenkins.GetHashValue(LPath[0], LCount, 0);
 end;
 
 //==============================================================================
