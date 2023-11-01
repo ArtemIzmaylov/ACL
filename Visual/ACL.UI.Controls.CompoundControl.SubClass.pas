@@ -1267,6 +1267,7 @@ begin
 
   ABitmap := TACLBitmap.CreateEx(ASourceViewInfo.Bounds, pf24bit);
   try
+    SubClass.StyleHint.Draw(ABitmap.Canvas, ABitmap.ClientRect);
     ASourceViewInfo.DrawTo(ABitmap.Canvas, 0, 0);
     DragWindow.SetBitmap(ABitmap, True);
     DragWindow.BoundsRect := SubClass.ClientToScreen(ASourceViewInfo.Bounds);
@@ -1477,10 +1478,8 @@ begin
 end;
 
 procedure TACLCompoundControlDragAndDropController.AutoScrollTimerHandler(Sender: TObject);
-var
-  I: Integer;
 begin
-  for I := 0 to Abs(FAutoScrollTimer.Tag) - 1 do
+  for var I := 0 to Abs(FAutoScrollTimer.Tag) - 1 do
   begin
     if FAutoScrollTimer.Tag < 0 then
       SubClass.MouseWheel(mwdDown, [])

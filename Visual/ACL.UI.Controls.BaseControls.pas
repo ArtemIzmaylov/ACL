@@ -180,13 +180,13 @@ type
   protected
     procedure Changed; virtual;
     function IsStored: Boolean; virtual;
-    //
+    // Events
     property OnChanged: TNotifyEvent read FOnChanged write FOnChanged;
   public
     constructor Create(ADefaultValue: Integer);
     procedure Assign(Source: TPersistent); override;
     function GetScaledMargins(ATargetDpi: Integer): TRect;
-    //
+    // Properties
     property Margins: TRect read GetMargins write SetMargins;
   published
     property All: Integer read GetAll write SetAll stored IsAllStored;
@@ -279,7 +279,6 @@ type
     IACLColorSchema,
     IACLControl,
     IACLCurrentDpi,
-    IACLCursorProvider,
     IACLMouseTracking,
     IACLObjectLinksSupport,
     IACLResourceChangeListener,
@@ -294,9 +293,6 @@ type
     FOnMouseEnter: TNotifyEvent;
     FOnMouseLeave: TNotifyEvent;
 
-    function GetIsDesigning: Boolean;
-    function GetIsDestroying: Boolean;
-    function GetIsLoading: Boolean;
     function IsMarginsStored: Boolean;
     procedure MarginsChangeHandler(Sender: TObject);
     procedure SetMargins(const Value: TACLMargins);
@@ -306,11 +302,10 @@ type
     procedure DoGetHint(const P: TPoint; var AHint: string); virtual;
     procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
     function GetBackgroundStyle: TACLControlBackgroundStyle; virtual;
-    procedure SetParent(AParent: TWinControl); override;
-    procedure SetDefaultSize; virtual;
-    procedure SetTargetDPI(AValue: Integer); virtual;
     procedure Loaded; override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
+    procedure SetDefaultSize; virtual;
+    procedure SetTargetDPI(AValue: Integer); virtual;
     procedure UpdateTransparency;
 
     // IACLResourcesChangeListener
@@ -325,25 +320,20 @@ type
     function IsMouseAtControl: Boolean; virtual;
     procedure MouseEnter; virtual;
     procedure MouseLeave; virtual;
-    // IACLCursorProvider
-    function GetCursor(const P: TPoint): TCursor; virtual;
-    procedure UpdateCursor;
 
     // Mouse
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
+
     // Messages
     procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
     procedure CMHintShow(var Message: TCMHintShow); message CM_HINTSHOW;
     procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
     procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
-    //
+    // Mouse
     property MouseInControl: Boolean read FMouseInControl;
     property OnMouseEnter: TNotifyEvent read FOnMouseEnter write FOnMouseEnter;
     property OnMouseLeave: TNotifyEvent read FOnMouseLeave write FOnMouseLeave;
-    //
-    property IsDesigning: Boolean read GetIsDesigning;
-    property IsDestroying: Boolean read GetIsDestroying;
-    property IsLoading: Boolean read GetIsLoading;
+    //# Resources
     property ResourceCollection: TACLCustomResourceCollection read FResourceCollection write SetResourceCollection;
   public
     constructor Create(AOwner: TComponent); override;
@@ -355,7 +345,7 @@ type
     procedure ApplyColorSchema(const ASchema: TACLColorSchema); virtual;
     // IACLControl
     procedure InvalidateRect(const R: TRect); virtual;
-    //
+    // Properties
     property Canvas;
   published
     property Align;
@@ -364,7 +354,7 @@ type
     property Hint;
     property Margins: TACLMargins read FMargins write SetMargins stored IsMarginsStored;
     property Visible;
-    //
+    // Events
     property OnBoundsChanged: TNotifyEvent read FOnBoundsChanged write FOnBoundsChanged;
     property OnGetHint: TACLGetHintEvent read FOnGetHint write FOnGetHint;
   end;
@@ -375,7 +365,6 @@ type
   TACLCustomControl = class(TCustomControl,
     IACLColorSchema,
     IACLControl,
-    IACLCursorProvider,
     IACLCurrentDpi,
     IACLFocusableControl,
     IACLLocalizableComponent,
@@ -385,9 +374,9 @@ type
     IACLResourceCollection)
   strict private
     FFocusOnClick: Boolean;
-    FIsHovered: Boolean;
     FLangSection: UnicodeString;
     FMargins: TACLMargins;
+    FMouseInClient: Boolean;
     FPadding: TACLPadding;
     FResourceCollection: TACLCustomResourceCollection;
     FScaleChangeCount: Integer;
@@ -396,21 +385,17 @@ type
 
     FOnGetHint: TACLGetHintEvent;
 
-    function GetIsDesigning: Boolean;
-    function GetIsDestroying: Boolean;
-    function GetIsLoading: Boolean;
     function GetLangSection: UnicodeString;
-    procedure DrawBackground(DC: HDC; const R: TRect);
     function IsMarginsStored: Boolean;
     function IsPaddingStored: Boolean;
     procedure SetMargins(const Value: TACLMargins);
     procedure SetPadding(const Value: TACLPadding);
     procedure SetResourceCollection(AValue: TACLCustomResourceCollection);
     procedure SetTransparent(AValue: Boolean);
-    //
+    //# Handlers
     procedure MarginsChangeHandler(Sender: TObject);
     procedure PaddingChangeHandler(Sender: TObject);
-    // Messages
+    //# Messages
     procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
     procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
     procedure CMHintShow(var Message: TCMHintShow); message CM_HINTSHOW;
@@ -421,60 +406,54 @@ type
     procedure WMMouseMove(var Message: TWMMouseMove); message WM_MOUSEMOVE;
     procedure WMMouseWheelHorz(var Message: TWMMouseWheel); message WM_MOUSEHWHEEL;
     procedure WMPaint(var Message: TWMPaint); message WM_PAINT;
+    procedure WMSetCursor(var Message: TWMSetCursor); message WM_SETCURSOR;
     procedure WMSetFocus(var Message: TWMSetFocus); message WM_SETFOCUS;
     procedure WMSize(var Message: TWMSize); message WM_SIZE;
   protected
     procedure AdjustClientRect(var ARect: TRect); override;
     procedure AdjustSize; override;
-    function AllowCompositionPainting: Boolean; virtual;
     procedure BoundsChanged; virtual;
     procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
     function CreatePadding: TACLPadding; virtual;
     function GetClientRect: TRect; override;
     function GetContentOffset: TRect; virtual;
-    function GetBackgroundStyle: TACLControlBackgroundStyle; virtual;
     procedure DoFullRefresh; virtual;
     procedure DoGetHint(const P: TPoint; var AHint: string); virtual;
     procedure DoLoaded; virtual;
-    procedure DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect); virtual;
-    procedure DrawTransparentBackground(DC: HDC; const R: TRect); virtual;
     procedure FocusChanged; virtual;
     procedure Loaded; override;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer); override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
-    procedure PaintWindow(DC: HDC); override;
     procedure Resize; override;
     procedure SetDefaultSize; virtual;
     procedure SetFocusOnClick; virtual;
-    procedure SetParent(AParent: TWinControl); override;
     procedure SetTargetDPI(AValue: Integer); virtual;
     procedure UpdateCursor;
     procedure UpdateTransparency;
-    procedure WndProc(var Message: TMessage); override;
 
+    // Drawing
+    procedure DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect); virtual;
+    procedure DrawTransparentBackground(ACanvas: TCanvas; const R: TRect); virtual;
+    function GetBackgroundStyle: TACLControlBackgroundStyle; virtual;
+    procedure PaintWindow(DC: HDC); override;
+
+    // IACLCurrentDpi
+    function GetCurrentDpi: Integer;
     // IACLMouseTracking
     function IsMouseAtControl: Boolean; virtual;
     procedure MouseEnter; virtual;
     procedure MouseLeave; virtual;
-
     // IACLResourceCollection
     function GetCollection: TACLCustomResourceCollection;
-
     // IACLResourcesChangeListener
     procedure ResourceChanged(Sender: TObject; Resource: TACLResource = nil); overload;
     procedure ResourceChanged; overload; virtual;
     procedure ResourceCollectionChanged; virtual;
 
-    // IACLCursorProvider
-    function GetCursor(const P: TPoint): TCursor; virtual;
-
-    // IACLCurrentDpi
-    function GetCurrentDpi: Integer;
-
     // Properties
     property FocusOnClick: Boolean read FFocusOnClick write FFocusOnClick default False;
-    property IsHovered: Boolean read FIsHovered;
     property LangSection: UnicodeString read GetLangSection;
+    property MouseInClient: Boolean read FMouseInClient;
     property Padding: TACLPadding read FPadding write SetPadding stored IsPaddingStored;
     property ResourceCollection: TACLCustomResourceCollection read FResourceCollection write SetResourceCollection;
     property Transparent: Boolean read FTransparent write SetTransparent default False;
@@ -485,6 +464,7 @@ type
     procedure BeforeDestruction; override;
     procedure FullRefresh;
     procedure Invalidate; override;
+    procedure ScaleForPPI(NewPPI: Integer); override;
     // IACLControl
     procedure InvalidateRect(const R: TRect); virtual;
     // IACLColorSchema
@@ -492,10 +472,6 @@ type
     // IACLLocalizableComponent
     procedure Localize; overload;
     procedure Localize(const ASection: UnicodeString); overload; virtual;
-    procedure ScaleForPPI(NewPPI: Integer); override;
-    property IsDesigning: Boolean read GetIsDesigning;
-    property IsDestroying: Boolean read GetIsDestroying;
-    property IsLoading: Boolean read GetIsLoading;
   published
     property Align;
     property Anchors;
@@ -606,19 +582,12 @@ type
   { TACLControlsHelper }
 
   TACLControlsHelper = class
-  strict private
-    class var TouchControl: TControl;
-  protected
-    class procedure WMGesture(ACaller: TWinControl; var Message: TMessage);
-    class procedure WMGestureNotify(ACaller: TWinControl; var Message: TWMGestureNotify);
-    class function WMSetCursor(ACaller: TWinControl; var Message: TWMSetCursor): Boolean;
   public
-    class function IsChildOrSelf(AParent, AControl: TControl): Boolean;
-    class function ProcessMessage(ACaller: TWinControl; var Message: TMessage): Boolean;
     // Scaling
     class procedure ScaleChanging(AControl: TWinControl; var AState: TObject);
     class procedure ScaleChanged(AControl: TWinControl; var AState: TObject);
-    class procedure UpdateDpiOnParentChange(AControl: TControl);
+    // Messages
+    class function WMSetCursor(ACaller: TWinControl; var Message: TWMSetCursor): Boolean;
   end;
 
   { TACLMouseTracking }
@@ -710,10 +679,6 @@ procedure acRestoreFocus(ASavedFocus: HWND);
 function acSaveDC(ACanvas: TCanvas): Integer;
 function acSaveFocus: HWND;
 function acSafeSetFocus(AControl: TWinControl): Boolean;
-
-procedure acLockRedraw(AControl: TWinControl);
-procedure acFullRedraw(AControl: TWinControl);
-procedure acUnlockRedraw(AControl: TWinControl; ARedraw: Boolean);
 
 // Keyboard
 function acGetShiftState: TShiftState;
@@ -999,23 +964,6 @@ begin
   end;
 end;
 
-procedure acLockRedraw(AControl: TWinControl);
-begin
-  SendMessage(AControl.Handle, WM_SETREDRAW, 0, 0);
-end;
-
-procedure acFullRedraw(AControl: TWinControl);
-begin
-  RedrawWindow(AControl.Handle, nil, 0, RDW_INVALIDATE or RDW_ALLCHILDREN or RDW_ERASE);
-end;
-
-procedure acUnlockRedraw(AControl: TWinControl; ARedraw: Boolean);
-begin
-  SendMessage(AControl.Handle, WM_SETREDRAW, 1, 1);
-  if ARedraw then
-    acFullRedraw(AControl);
-end;
-
 function CallCustomDrawEvent(Sender: TObject; AEvent: TACLCustomDrawEvent; ACanvas: TCanvas; const R: TRect): Boolean;
 begin
   Result := False;
@@ -1215,32 +1163,6 @@ end;
 
 { TACLControlsHelper }
 
-class function TACLControlsHelper.IsChildOrSelf(AParent, AControl: TControl): Boolean;
-begin
-  Result := False;
-  while AControl <> nil do
-  begin
-    if AControl = AParent then
-      Exit(True);
-    AControl := AControl.Parent;
-  end;
-end;
-
-class function TACLControlsHelper.ProcessMessage(ACaller: TWinControl; var Message: TMessage): Boolean;
-begin
-  Result := True;
-  case Message.Msg of
-    WM_GESTURE:
-      WMGesture(ACaller, Message);
-    WM_GESTURENOTIFY:
-      WMGestureNotify(ACaller, TWMGestureNotify(Message));
-    WM_SETCURSOR:
-      Result := WMSetCursor(ACaller, TWMSetCursor(Message));
-    else
-      Result := False;
-  end;
-end;
-
 class procedure TACLControlsHelper.ScaleChanging(AControl: TWinControl; var AState: TObject);
 var
   AChildControl: TControlAccess;
@@ -1267,202 +1189,6 @@ begin
   end;
   TWinControlAccess(AControl).AutoSize := Boolean(AState);
   TWinControlAccess(AControl).EnableAlign;
-end;
-
-class procedure TACLControlsHelper.UpdateDpiOnParentChange(AControl: TControl);
-begin
-{$IFNDEF DELPHI110ALEXANDRIA}
-  if csDestroying in AControl.ComponentState then
-    Exit;
-  if csFreeNotification in AControl.ComponentState then // а в противном случае уже сам VCL отработал как надо
-    TControlAccess(AControl).ScaleForPPI(TControlAccess(AControl).GetParentCurrentDpi);
-{$ENDIF}
-end;
-
-class procedure TACLControlsHelper.WMGesture(ACaller: TWinControl; var Message: TMessage);
-const
-  GestureMap: array[0..4] of TInteractiveGesture = (
-    igZoom, igPan, igRotate, igTwoFingerTap, igPressAndTap
-  );
-var
-  AControl: TControl;
-  AEventInfo: TGestureEventInfo;
-  AGestureInfo: GestureInfo;
-  APoint: TPoint;
-begin
-  if TouchControl = nil then
-  begin
-    Message.Result := DefWindowProc(ACaller.Handle, Message.Msg, Message.WParam, Message.LParam);
-    Exit;
-  end;
-
-  ZeroMemory(@AGestureInfo, SizeOf(AGestureInfo));
-  AGestureInfo.cbSize := Sizeof(AGestureInfo);
-  if GetGestureInfo(Message.LParam, AGestureInfo) then
-  try
-    ZeroMemory(@AEventInfo, SizeOf(AEventInfo));
-    AEventInfo.GestureID := AGestureInfo.dwID + igiFirst;
-
-    AControl := TouchControl;
-    while (AControl.Parent <> nil) and
-      (igoParentPassthrough in AControl.Touch.InteractiveGestureOptions) and not
-      (GestureMap[AEventInfo.GestureID - igiZoom] in AControl.Touch.InteractiveGestures)
-    do
-      AControl := AControl.Parent;
-
-    APoint := SmallPointToPoint(AGestureInfo.ptsLocation);
-    if not IsWin8OrLater then
-      PhysicalToLogicalPoint(ACaller.Handle, APoint);
-    AEventInfo.Location := AControl.ScreenToClient(APoint);
-    AEventInfo.Flags := [];
-
-    if AGestureInfo.dwFlags and GF_BEGIN = GF_BEGIN then
-      Include(AEventInfo.Flags, gfBegin);
-    if AGestureInfo.dwFlags and GF_INERTIA = GF_INERTIA then
-      Include(AEventInfo.Flags, gfInertia);
-    if AGestureInfo.dwFlags and GF_END = GF_END then
-      Include(AEventInfo.Flags, gfEnd);
-
-    case AEventInfo.GestureID of
-      igiRotate:
-        AEventInfo.Angle := RotateAngleFromArgument(AGestureInfo.ullArguments);
-
-      igiZoom, igiTwoFingerTap:
-        AEventInfo.Distance := Cardinal(AGestureInfo.ullArguments);
-
-      igiPan:
-        begin
-          AEventInfo.Distance := Cardinal(AGestureInfo.ullArguments);
-          AEventInfo.InertiaVector := InertiaVectorFromArgument(AGestureInfo.ullArguments);
-        end;
-
-      igiPressAndTap:
-        begin
-          APoint := SmallPointToPoint(TSmallPoint(Cardinal(AGestureInfo.ullArguments)));
-          Inc(APoint.X, AGestureInfo.ptsLocation.X);
-          Inc(APoint.Y, AGestureInfo.ptsLocation.Y);
-
-          if AControl is TWinControl then
-            PhysicalToLogicalPoint(TWinControl(AControl).Handle, APoint)
-          else
-            PhysicalToLogicalPoint(AControl.Parent.Handle, APoint);
-
-          AEventInfo.TapLocation := PointToSmallPoint(AControl.ScreenToClient(APoint));
-        end;
-    end;
-
-    // Send the event to the control, if not handled pass to Windows
-    Message.Result := AControl.Perform(CM_GESTURE, 0, @AEventInfo);
-    if Message.Result <> 1 then
-      Message.Result := DefWindowProc(ACaller.Handle, Message.Msg, Message.WParam, Message.LParam);
-  finally
-    CloseGestureInfoHandle(Message.LParam);
-    if AEventInfo.GestureID = igiEnd then
-      TouchControl := nil;
-  end;
-end;
-
-class procedure TACLControlsHelper.WMGestureNotify(ACaller: TWinControl; var Message: TWMGestureNotify);
-const
-  // All pan gesture options
-  CPanOoptions: TInteractiveGestureOptions = [igoPanSingleFingerHorizontal, igoPanSingleFingerVertical, igoPanInertia, igoPanGutter];
-  // Gestures
-  CPan: array[Boolean] of Cardinal = (0, GC_PAN);
-  CZoom: array[Boolean] of Cardinal = (0, GC_ZOOM);
-  CRotate: array[Boolean] of Cardinal = (0, GC_ROTATE);
-  CPressAndTap: array[Boolean] of Cardinal = (0, GC_PRESSANDTAP);
-  CTwoFingerTap: array[Boolean] of Cardinal = (0, GC_TWOFINGERTAP);
-  // Options
-  CPanSingleFingerVertical: array[Boolean] of Cardinal = (0, GC_PAN_WITH_SINGLE_FINGER_VERTICALLY);
-  CPanSingleFingerHorizontal: array[Boolean] of Cardinal = (0, GC_PAN_WITH_SINGLE_FINGER_HORIZONTALLY);
-  CPanWithGutter: array[Boolean] of Cardinal = (0, GC_PAN_WITH_GUTTER);
-  CPanWithInertia: array[Boolean] of Cardinal = (0, GC_PAN_WITH_INERTIA);
-var
-  AConfigs: array of TGestureConfig;
-  AControl: TControl;
-  AGestureOptions, AControlGestureOptions: TInteractiveGestureOptions;
-  AGestures, AControlGestures: TInteractiveGestures;
-  APoint: TPoint;
-begin
-  // Convert incoming point to logical client coordinates
-  APoint := SmallPointToPoint(Message.NotifyStruct^.ptsLocation);
-  PhysicalToLogicalPoint(ACaller.Handle, APoint);
-  APoint := ACaller.ScreenToClient(APoint);
-
-  AGestures := [];
-  if PtInRect(ACaller.ClientRect, APoint) then
-  begin
-    // Find control to gesture will be sent to
-    TouchControl := ACaller.ControlAtPos(APoint, True);
-    if TouchControl = nil then
-      TouchControl := ACaller;
-
-    // Build complete list of gestures
-    AControl := TouchControl;
-    TControlAccess(AControl).DoGetGestureOptions(AGestures, AGestureOptions);
-    while (AControl.Parent <> nil) and (igoParentPassthrough in AControl.Touch.InteractiveGestureOptions) do
-    begin
-      AControl := AControl.Parent;
-      TControlAccess(AControl).DoGetGestureOptions(AControlGestures, AControlGestureOptions);
-      // Include Pan options if igPan isn't in LGestures
-      if (igPan in AGestures) then
-        AGestureOptions := AGestureOptions + (AControlGestureOptions - CPanOoptions)
-      else
-        AGestureOptions := AGestureOptions + AControlGestureOptions;
-      AGestures := AGestures + AControlGestures;
-    end;
-  end;
-
-  // Call SetGestureConfig with the gestures the control wants
-  if AGestures = [] then
-  begin
-    SetLength(AConfigs, 1);
-    AConfigs[0].dwID := 0;
-    AConfigs[0].dwWant := 0;
-    AConfigs[0].dwBlock := GC_ALLGESTURES;
-  end
-  else
-  begin
-    SetLength(AConfigs, 5);
-    ZeroMemory(@AConfigs[0], SizeOf(GestureConfig) * 5);
-
-    // Pan gesture & options
-    AConfigs[0].dwID := GID_PAN;
-    AConfigs[0].dwWant := CPan[igPan in AGestures] or
-      CPanSingleFingerVertical[igoPanSingleFingerVertical in AGestureOptions] or
-      CPanSingleFingerHorizontal[igoPanSingleFingerHorizontal in AGestureOptions] or
-      CPanWithGutter[igoPanGutter in AGestureOptions] or
-      CPanWithInertia[igoPanInertia in AGestureOptions];
-    AConfigs[0].dwBlock := CPan[not (igPan in AGestures)] or
-      CPanSingleFingerVertical[not (igoPanSingleFingerVertical in AGestureOptions)] or
-      CPanSingleFingerHorizontal[not (igoPanSingleFingerHorizontal in AGestureOptions)] or
-      CPanWithGutter[not (igoPanGutter in AGestureOptions)] or
-      CPanWithInertia[not (igoPanInertia in AGestureOptions)];
-
-    // Zoom gesture
-    AConfigs[1].dwID := GID_ZOOM;
-    AConfigs[1].dwWant := CZoom[igZoom in AGestures];
-    AConfigs[1].dwBlock := CZoom[not (igZoom in AGestures)];
-
-    // Rotate gesture
-    AConfigs[2].dwID := GID_ROTATE;
-    AConfigs[2].dwWant := CRotate[igRotate in AGestures];
-    AConfigs[2].dwBlock := CRotate[not (igRotate in AGestures)];
-
-    // TwoFingerTap gesture
-    AConfigs[3].dwID := GID_TWOFINGERTAP;
-    AConfigs[3].dwWant := CTwoFingerTap[igTwoFingerTap in AGestures];
-    AConfigs[3].dwBlock := CTwoFingerTap[not (igTwoFingerTap in AGestures)];
-
-    // PressAnTap gesture
-    AConfigs[4].dwID := GID_PRESSANDTAP;
-    AConfigs[4].dwWant := CPressAndTap[igPressAndTap in AGestures];
-    AConfigs[4].dwBlock := CPressAndTap[not (igPressAndTap in AGestures)];
-  end;
-
-  SetGestureConfig(ACaller.Handle, 0, Length(AConfigs), @AConfigs[0], SizeOf(TGestureConfig));
-  TWinControlAccess(ACaller).UpdateTIPStatus;
-  Message.Result := 1;
 end;
 
 class function TACLControlsHelper.WMSetCursor(ACaller: TWinControl; var Message: TWMSetCursor): Boolean;
@@ -1498,7 +1224,7 @@ begin
     end;
     if ACursor <> crDefault then
     begin
-      Winapi.Windows.SetCursor(Screen.Cursors[ACursor]);
+      SetCursor(Screen.Cursors[ACursor]);
       Message.Result := 1;
       Result := True;
     end;
@@ -1728,11 +1454,6 @@ begin
   Result := FCurrentPPI;
 end;
 
-function TACLGraphicControl.GetCursor(const P: TPoint): TCursor;
-begin
-  Result := Cursor;
-end;
-
 function TACLGraphicControl.GetCollection: TACLCustomResourceCollection;
 begin
   Result := ResourceCollection;
@@ -1747,12 +1468,6 @@ function TACLGraphicControl.IsMouseAtControl: Boolean;
 begin
   Result := Assigned(Parent) and Parent.HandleAllocated and ((GetCaptureControl = Self) or
     PtInRect(ClientRect, CalcCursorPos) and (Perform(CM_HITTEST, 0, PointToLParam(CalcCursorPos)) <> 0));
-end;
-
-procedure TACLGraphicControl.SetParent(AParent: TWinControl);
-begin
-  inherited SetParent(AParent);
-  TACLControlsHelper.UpdateDpiOnParentChange(Self);
 end;
 
 procedure TACLGraphicControl.SetResourceCollection(AValue: TACLCustomResourceCollection);
@@ -1815,7 +1530,7 @@ end;
 
 procedure TACLGraphicControl.ResourceChanged;
 begin
-  if not IsDestroying then
+  if not (csDestroying in ComponentState) then
   begin
     AdjustSize;
     UpdateTransparency;
@@ -1826,15 +1541,6 @@ end;
 procedure TACLGraphicControl.ResourceCollectionChanged;
 begin
   TACLStyle.Refresh(Self);
-end;
-
-procedure TACLGraphicControl.UpdateCursor;
-begin
-  if (Parent <> nil) and Parent.HandleAllocated then
-  begin
-    if IsMouseAtControl then
-      Perform(WM_SETCURSOR, Parent.Handle, HTCLIENT);
-  end;
 end;
 
 procedure TACLGraphicControl.UpdateTransparency;
@@ -1881,21 +1587,6 @@ end;
 procedure TACLGraphicControl.MarginsChangeHandler(Sender: TObject);
 begin
   acRectToMargins(Margins.GetScaledMargins(FCurrentPPI), inherited Margins);
-end;
-
-function TACLGraphicControl.GetIsDesigning: Boolean;
-begin
-  Result := csDesigning in ComponentState;
-end;
-
-function TACLGraphicControl.GetIsDestroying: Boolean;
-begin
-  Result := csDestroying in ComponentState;
-end;
-
-function TACLGraphicControl.GetIsLoading: Boolean;
-begin
-  Result := csLoading in ComponentState;
 end;
 
 procedure TACLGraphicControl.SetMargins(const Value: TACLMargins);
@@ -1966,7 +1657,7 @@ end;
 
 procedure TACLCustomControl.InvalidateRect(const R: TRect);
 begin
-  if HandleAllocated and not IsDestroying then
+  if HandleAllocated and not (csDestroying in ComponentState) then
     Winapi.Windows.InvalidateRect(Handle, R, True);
 end;
 
@@ -1983,29 +1674,6 @@ end;
 procedure TACLCustomControl.Localize(const ASection: UnicodeString);
 begin
   FLangSection := ASection;
-end;
-
-procedure TACLCustomControl.DrawBackground(DC: HDC; const R: TRect);
-var
-  ACanvas: TCanvas;
-  AStyle: TACLControlBackgroundStyle;
-begin
-  AStyle := GetBackgroundStyle;
-  if AStyle <> cbsOpaque then
-    DrawTransparentBackground(DC, R);
-  if AStyle <> cbsTransparent then
-  begin
-    ACanvas := TCanvas.Create;
-    try
-      ACanvas.Lock;
-      ACanvas.Handle := DC;
-      DrawOpaqueBackground(ACanvas, R);
-      ACanvas.Handle := 0;
-      ACanvas.Unlock;
-    finally
-      ACanvas.Free;
-    end;
-  end;
 end;
 
 procedure TACLCustomControl.DoFullRefresh;
@@ -2029,9 +1697,9 @@ begin
   acFillRect(ACanvas.Handle, R, Color);
 end;
 
-procedure TACLCustomControl.DrawTransparentBackground(DC: HDC; const R: TRect);
+procedure TACLCustomControl.DrawTransparentBackground(ACanvas: TCanvas; const R: TRect);
 begin
-  acDrawTransparentControlBackground(Self, DC, ClientRect, False)
+  acDrawTransparentControlBackground(Self, ACanvas.Handle, R, False);
 end;
 
 procedure TACLCustomControl.FocusChanged;
@@ -2066,13 +1734,13 @@ end;
 
 procedure TACLCustomControl.MouseEnter;
 begin
-  FIsHovered := True;
+  FMouseInClient := True;
   UpdateCursor;
 end;
 
 procedure TACLCustomControl.MouseLeave;
 begin
-  FIsHovered := False;
+  FMouseInClient := False;
 end;
 
 procedure TACLCustomControl.Notification(AComponent: TComponent; Operation: TOperation);
@@ -2094,15 +1762,31 @@ begin
 end;
 
 procedure TACLCustomControl.PaintWindow(DC: HDC);
+var
+  LStyle: TACLControlBackgroundStyle;
 begin
-  DrawBackground(DC, ClientRect);
-  inherited PaintWindow(DC);
+  Canvas.Lock;
+  try
+    Canvas.Handle := DC;
+    try
+      LStyle := GetBackgroundStyle;
+      if LStyle <> cbsOpaque then
+        DrawTransparentBackground(Canvas, ClientRect);
+      if LStyle <> cbsTransparent then
+        DrawOpaqueBackground(Canvas, ClientRect);
+      Paint;
+    finally
+      Canvas.Handle := 0;
+    end;
+  finally
+    Canvas.Unlock;
+  end;
 end;
 
 procedure TACLCustomControl.Resize;
 begin
   inherited Resize;
-  if not IsDestroying then
+  if not (csDestroying in ComponentState) then
     BoundsChanged;
 end;
 
@@ -2119,12 +1803,6 @@ end;
 procedure TACLCustomControl.SetMargins(const Value: TACLMargins);
 begin
   Margins.Assign(Value);
-end;
-
-procedure TACLCustomControl.SetParent(AParent: TWinControl);
-begin
-  inherited SetParent(AParent);
-  TACLControlsHelper.UpdateDpiOnParentChange(Self);
 end;
 
 procedure TACLCustomControl.SetTargetDPI(AValue: Integer);
@@ -2146,7 +1824,7 @@ end;
 
 procedure TACLCustomControl.ResourceChanged;
 begin
-  if not IsDestroying then
+  if not (csDestroying in ComponentState) then
   begin
     UpdateTransparency;
     FullRefresh;
@@ -2161,7 +1839,7 @@ end;
 
 procedure TACLCustomControl.UpdateCursor;
 begin
-  if IsHovered then
+  if MouseInClient and HandleAllocated and not (csDestroying in ComponentState) then
     Perform(WM_SETCURSOR, Handle, HTCLIENT);
 end;
 
@@ -2202,13 +1880,13 @@ var
   AClipRgn: HRGN;
   AMemBmp: HBITMAP;
   AMemDC: HDC;
-  APaintStruct: TPaintStruct;
   APaintBuffer: HPAINTBUFFER;
+  APaintStruct: TPaintStruct;
 begin
   if (Message.DC <> 0) or not DoubleBuffered then
     PaintHandler(Message)
   else
-    if DwmCompositionEnabled and AllowCompositionPainting then
+    if (csGlassPaint in ControlState) and DwmCompositionEnabled then
     begin
       BeginPaint(Handle, APaintStruct);
       try
@@ -2246,6 +1924,12 @@ begin
     end;
 end;
 
+procedure TACLCustomControl.WMSetCursor(var Message: TWMSetCursor);
+begin
+  if not TACLControlsHelper.WMSetCursor(Self, Message) then
+    inherited;
+end;
+
 procedure TACLCustomControl.WMSetFocus(var Message: TWMSetFocus);
 begin
   inherited;
@@ -2255,7 +1939,7 @@ end;
 procedure TACLCustomControl.WMSize(var Message: TWMSize);
 begin
   // для корректной работы anchor-ов при смене dpi
-  if not IsDestroying then
+  if not (csDestroying in ComponentState) then
   begin
     UpdateBounds;
     BoundsChanged;
@@ -2268,12 +1952,6 @@ begin
     if TWinControlAccess(Parent).AutoSize then
       TWinControlAccess(Parent).AdjustSize;
   end;
-end;
-
-procedure TACLCustomControl.WndProc(var Message: TMessage);
-begin
-  if not TACLControlsHelper.ProcessMessage(Self, Message) then
-    inherited WndProc(Message);
 end;
 
 procedure TACLCustomControl.CMScaleChanging(var Message: TMessage);
@@ -2330,11 +2008,6 @@ begin
   inherited AdjustSize;
 end;
 
-function TACLCustomControl.AllowCompositionPainting: Boolean;
-begin
-  Result := True;
-end;
-
 procedure TACLCustomControl.BoundsChanged;
 begin
   // do nothing
@@ -2383,26 +2056,6 @@ end;
 function TACLCustomControl.GetCurrentDpi: Integer;
 begin
   Result := FCurrentPPI;
-end;
-
-function TACLCustomControl.GetCursor(const P: TPoint): TCursor;
-begin
-  Result := Cursor;
-end;
-
-function TACLCustomControl.GetIsDesigning: Boolean;
-begin
-  Result := csDesigning in ComponentState;
-end;
-
-function TACLCustomControl.GetIsDestroying: Boolean;
-begin
-  Result := csDestroying in ComponentState;
-end;
-
-function TACLCustomControl.GetIsLoading: Boolean;
-begin
-  Result := csLoading in ComponentState;
 end;
 
 function TACLCustomControl.GetLangSection: UnicodeString;

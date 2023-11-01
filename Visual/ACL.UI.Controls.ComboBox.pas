@@ -595,7 +595,7 @@ end;
 
 function TACLComboBox.CanOpenEditor: Boolean;
 begin
-  Result := (Mode = cbmEdit) and not IsDesigning;
+  Result := (Mode = cbmEdit) and not (csDesigning in ComponentState);
 end;
 
 function TACLComboBox.CreateEditor: TWinControl;
@@ -707,7 +707,7 @@ end;
 
 procedure TACLBasicComboBox.ChangeItemIndex(AValue: Integer);
 begin
-  if IsLoading then
+  if csLoading in ComponentState then
   begin
     FLoadedItemIndex := AValue;
     Exit;
@@ -775,7 +775,7 @@ procedure TACLBasicComboBox.ItemIndexChanged;
 begin
   if FDropDown is TACLBasicComboBoxDropDownForm then
     TACLBasicComboBoxDropDownForm(FDropDown).SyncItemIndex;
-  if (FChangeLockCount = 0) and not IsLoading then
+  if (FChangeLockCount = 0) and not (csLoading in ComponentState) then
     DoSelect;
 end;
 

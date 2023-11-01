@@ -1375,7 +1375,7 @@ end;
 
 procedure TACLSlider.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
 begin
-  if IsLoading then
+  if csLoading in ComponentState then
     inherited SetBounds(ALeft, ATop, AWidth, AHeight)
   else
   begin
@@ -1391,7 +1391,7 @@ end;
 
 procedure TACLSlider.Calculate;
 begin
-  if not IsDestroying then
+  if not (csDestroying in ComponentState) then
     ViewInfo.Calculate;
 end;
 
@@ -1411,7 +1411,7 @@ begin
   if not Enabled then
     Result := absDisabled
   else
-    if PtInRect(ViewInfo.ThumbRect, P) or Focused and not IsDesigning then
+    if PtInRect(ViewInfo.ThumbRect, P) or Focused and not (csDesigning in ComponentState) then
     begin
       if Moving then
         Result := absPressed
@@ -1778,7 +1778,7 @@ begin
   if AValue <> FOrientation then
   begin
     FOrientation := AValue;
-    if IsDesigning and not IsLoading then
+    if [csDesigning, csLoading] * ComponentState = [csDesigning] then
       SetBounds(Left, Top, Height, Width);
     FreeAndNil(FViewInfo);
     FViewInfo := CreateViewInfo;

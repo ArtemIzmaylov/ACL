@@ -142,7 +142,7 @@ end;
 procedure TACLSearchEdit.Changed;
 begin
   Buttons[0].Visible := Text <> '';
-  if not IsLoading then
+  if not (csLoading in ComponentState) then
     FWaitTimer.Restart;
   Invalidate;
 end;

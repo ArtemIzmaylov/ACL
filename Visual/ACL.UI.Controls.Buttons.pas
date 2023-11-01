@@ -261,7 +261,7 @@ type
     property Align;
     property Anchors;
     property Caption;
-    property Cursor;
+    property Cursor default crHandPoint;
     property DoubleBuffered default True;
     property DragCursor;
     property DragKind;
@@ -361,7 +361,6 @@ type
   protected
     function CreateStyle: TACLStyleButton; override;
     function CreateViewInfo: TACLCustomButtonViewInfo; override;
-    function GetCursor(const P: TPoint): TCursor; override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     procedure PerformClick; virtual;
     procedure SetTargetDPI(AValue: Integer); override;
@@ -526,6 +525,7 @@ type
     function GetStyle: TACLStyleCheckBox;
     function GetViewInfo: TACLCheckBoxViewInfo;
     function GetWordWrap: Boolean;
+    function IsCursorStored: Boolean;
     procedure SetChecked(AValue: Boolean);
     procedure SetShowCheckMark(AValue: Boolean);
     procedure SetShowLine(AValue: Boolean);
@@ -545,7 +545,6 @@ type
     function CreateSubControlOptions: TACLCheckBoxSubControlOptions; virtual;
     function CreateViewInfo: TACLCustomButtonViewInfo; override;
     function GetActionLinkClass: TControlActionLinkClass; override;
-    function GetCursor(const P: TPoint): TCursor; override;
     procedure Loaded; override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     procedure SetState(AValue: TCheckBoxState); virtual;
@@ -566,6 +565,7 @@ type
   published
     property Alignment default taLeftJustify;
     property AutoSize default True;
+    property Cursor stored IsCursorStored;
     property ShowCheckMark: Boolean read GetShowCheckMark write SetShowCheckMark default True;
     property ShowLine: Boolean read GetShowLine write SetShowLine default False;
     property Style: TACLStyleCheckBox read GetStyle write SetStyle;
@@ -972,6 +972,7 @@ end;
 constructor TACLCustomButton.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  Cursor := crHandPoint;
   FocusOnClick := True;
   DoubleBuffered := True;
   TabStop := True;
@@ -1038,7 +1039,7 @@ end;
 procedure TACLCustomButton.FocusChanged;
 begin
   inherited FocusChanged;
-  if not IsDesigning then
+  if not (csDesigning in ComponentState) then
   begin
     ViewInfo.IsFocused := Focused;
     ViewInfo.Invalidate;
@@ -1370,13 +1371,6 @@ end;
 function TACLSimpleButton.CreateViewInfo: TACLCustomButtonViewInfo;
 begin
   Result := TACLButtonViewInfo.Create(Self);
-end;
-
-function TACLSimpleButton.GetCursor(const P: TPoint): TCursor;
-begin
-  Result := inherited GetCursor(P);
-  if Result = crDefault then
-    Result := crHandPoint;
 end;
 
 procedure TACLSimpleButton.Notification(AComponent: TComponent; Operation: TOperation);
@@ -1988,13 +1982,6 @@ begin
   Result := TACLCheckBoxActionLink;
 end;
 
-function TACLCustomCheckBox.GetCursor(const P: TPoint): TCursor;
-begin
-  Result := inherited GetCursor(P);
-  if (Result = crDefault) and ShowCheckMark then
-    Result := crHandPoint;
-end;
-
 procedure TACLCustomCheckBox.SetChecked(AValue: Boolean);
 begin
   if AValue then
@@ -2076,6 +2063,14 @@ begin
   Result := ViewInfo.WordWrap;
 end;
 
+function TACLCustomCheckBox.IsCursorStored: Boolean;
+begin
+  if ShowCheckMark then
+    Result := Cursor <> crHandPoint
+  else
+    Result := Cursor <> crDefault;
+end;
+
 procedure TACLCustomCheckBox.Loaded;
 begin
   inherited;
@@ -2091,6 +2086,13 @@ end;
 
 procedure TACLCustomCheckBox.SetShowCheckMark(AValue: Boolean);
 begin
+  if not IsCursorStored then
+  begin
+    if AValue then
+      Cursor := crHandPoint
+    else
+      Cursor := crDefault;
+  end;
   ViewInfo.ShowCheckMark := AValue;
 end;
 

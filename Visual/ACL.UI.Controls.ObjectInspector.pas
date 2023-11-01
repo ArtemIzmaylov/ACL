@@ -1461,7 +1461,7 @@ begin
   if SearchBox <> Value then
   begin
     SearchString := '';
-    if IsDesigning then
+    if csDesigning in ComponentState then
     begin
       if Value then
         FSearchEdit.ControlStyle := FSearchEdit.ControlStyle - [csNoDesignVisible]

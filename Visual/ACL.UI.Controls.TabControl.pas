@@ -222,7 +222,7 @@ type
     procedure DrawItem(ACanvas: TCanvas; AViewItem: TACLTabViewItem); virtual;
     procedure DrawItems(ACanvas: TCanvas); virtual;
     procedure DrawItemText(ACanvas: TCanvas; AViewItem: TACLTabViewItem); virtual;
-    procedure DrawTransparentBackground(DC: HDC; const R: TRect); override;
+    procedure DrawTransparentBackground(ACanvas: TCanvas; const R: TRect); override;
     procedure Paint; override;
 
     // Keyboard
@@ -778,16 +778,16 @@ begin
   end;
 end;
 
-procedure TACLCustomTabControl.DrawTransparentBackground(DC: HDC; const R: TRect);
+procedure TACLCustomTabControl.DrawTransparentBackground(ACanvas: TCanvas; const R: TRect);
 var
-  ASaveIndex: Integer;
+  LPrevRgn: HRGN;
 begin
-  ASaveIndex := SaveDC(DC);
+  LPrevRgn := acSaveClipRegion(ACanvas.Handle);
   try
-    if acIntersectClipRegion(DC, FTabAreaRect) then
+    if acIntersectClipRegion(ACanvas.Handle, FTabAreaRect) then
       inherited;
   finally
-    RestoreDC(DC, ASaveIndex)
+    acRestoreClipRegion(ACanvas.Handle, LPrevRgn);
   end;
 end;
 
@@ -1025,7 +1025,7 @@ end;
 
 procedure TACLCustomTabControl.SetActiveIndex(AValue: Integer);
 begin
-  if IsLoading then
+  if csLoading in ComponentState then
   begin
     FLoadedActiveIndex := AValue;
     Exit;
@@ -1064,7 +1064,7 @@ begin
   if HoverTab <> AValue then
   begin
     FHoverTab := AValue;
-    if not IsDesigning then
+    if not (csDesigning in ComponentState) then
     begin
       Application.CancelHint;
       if ViewItems.FindByTab(HoverTab, AItem) and AItem.TextTruncated then

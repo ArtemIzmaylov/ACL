@@ -4,7 +4,7 @@
 {*             Editors Controls              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -98,7 +98,7 @@ type
     function Focused: Boolean; override;
   published
     property DoubleBuffered default True;
-    //
+    // Events
     property OnDropDown: TNotifyEvent read FOnDropDown write FOnDropDown;
   end;
 
@@ -341,7 +341,7 @@ end;
 
 procedure TACLCustomDropDownEdit.ShowDropDownWindow;
 begin
-  FDropDown.PopupUnderControl(Self, DropDownAlignment);
+  FDropDown.PopupUnderControl(ClientToScreen(ClientRect), DropDownAlignment, FCurrentPPI);
 end;
 
 procedure TACLCustomDropDownEdit.MouseLeave;
@@ -548,7 +548,8 @@ end;
 
 procedure TACLDropDown.CreateDropDownWindow;
 begin
-  if IsDesigning or (Control = nil) then Exit;
+  if (csDesigning in ComponentState) or (Control = nil) then
+    Exit;
 
   inherited CreateDropDownWindow;
 
@@ -562,7 +563,7 @@ end;
 
 procedure TACLDropDown.FreeDropDownWindow;
 begin
-  if Assigned(FControl) and not (IsDestroying or IsDesigning) then
+  if Assigned(FControl) and ([csDestroying, csDesigning] * ComponentState = []) then
   begin
     FControl.Align := alNone;
     FControl.Parent := Self;
@@ -580,22 +581,9 @@ end;
 
 procedure TACLDropDown.SetControl(AValue: TControl);
 begin
-  if TACLControlsHelper.IsChildOrSelf(Self, AValue) then
+  if acIsChild(Self, AValue) then
     raise EInvalidArgument.CreateFmt('The %s cannot be used as child', [AValue.Name]);
-
-  if FControl <> AValue then
-  begin
-    if FControl <> nil then
-    begin
-      FControl.RemoveFreeNotification(Self);
-      FControl := nil;
-    end;
-    if AValue <> nil then
-    begin
-      FControl := AValue;
-      FControl.FreeNotification(Self);
-    end;
-  end;
+  acComponentFieldSet(FControl, Self, AValue);
 end;
 
 { TACLDropDownButtonViewInfo }

@@ -38,24 +38,11 @@
 // IDE Versions
 // ---------------------------------------------------------------------------------------------------------------------
 
-{$IFDEF VER320} // 10.2 Tokyo
-  {$DEFINE DELPHI102TOKYO}
-{$ENDIF}
-
-{$IFDEF VER330} // 10.3 Rio
-  {$DEFINE DELPHI102TOKYO}
-  {$DEFINE DELPHI103RIO}
-{$ENDIF}
-
-{$IFDEF VER340} // 10.4 Sydney
-  {$DEFINE DELPHI102TOKYO}
-  {$DEFINE DELPHI103RIO}
-  {$DEFINE DELPHI104SYDNEY}
-{$ENDIF}
-
 {$IFDEF VER350} // 11.0 Alexandria
-  {$DEFINE DELPHI102TOKYO}
-  {$DEFINE DELPHI103RIO}
-  {$DEFINE DELPHI104SYDNEY}
   {$DEFINE DELPHI110ALEXANDRIA}
+{$ENDIF}
+
+{$IFNDEF DELPHI110ALEXANDRIA}
+  You need Delphi 11.0 Alexandria for this library,
+  Previous Delphi versions has too many bugs with dpi scaling.
 {$ENDIF}

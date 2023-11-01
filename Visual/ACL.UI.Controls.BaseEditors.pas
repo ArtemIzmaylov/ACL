@@ -179,7 +179,8 @@ type
 
   TACLCustomEdit = class(TACLCustomControl,
     IACLButtonOwner,
-    IACLButtonEdit)
+    IACLButtonEdit,
+    IACLCursorProvider)
   protected const
     ButtonsIndent = 1;
   strict private
@@ -213,7 +214,6 @@ type
     FEditor: TWinControl;
 
     function CreateStyleButton: TACLStyleButton; virtual;
-    function GetCursor(const P: TPoint): TCursor; override;
     procedure AssignTextDrawParams(ACanvas: TCanvas); virtual;
     procedure Changed; virtual;
     procedure CreateHandle; override;
@@ -271,14 +271,18 @@ type
     procedure IACLButtonEdit.ButtonOwnerRecalculate = FullRefresh;
     function ButtonsGetEnabled: Boolean;
     function ButtonsGetOwner: TComponent;
-    //
+
+    // IACLCursorProvider
+    function GetCursor(const P: TPoint): TCursor; virtual;
+
+    // Properties
     property AutoHeight: Boolean read FAutoHeight write SetAutoHeight default True;
     property Borders: Boolean read FBorders write SetBorders default True;
     property Buttons: TACLEditButtons read FButtons write SetButtons;
     property ButtonsImages: TCustomImageList read FButtonsImages write SetButtonsImages;
     property Style: TACLStyleEdit read FStyle write SetStyle;
     property StyleButton: TACLStyleButton read FStyleButton write SetStyleButton;
-    //
+    // Events
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
   public
     constructor Create(AOwner: TComponent); override;
@@ -846,7 +850,7 @@ end;
 
 procedure TACLCustomEdit.Changed;
 begin
-  if not IsLoading then
+  if not (csLoading in ComponentState) then
     DoChange;
   Invalidate;
 end;
@@ -903,7 +907,7 @@ end;
 
 function TACLCustomEdit.CanOpenEditor: Boolean;
 begin
-  Result := not IsDesigning;
+  Result := not (csDesigning in ComponentState);
 end;
 
 function TACLCustomEdit.CreateEditor: TWinControl;
@@ -937,7 +941,7 @@ procedure TACLCustomEdit.DrawEditorBackground(ACanvas: TCanvas; const R: TRect);
 begin
   acFillRect(ACanvas.Handle, R, Style.ColorsContent[Enabled]);
   if Borders then
-    Style.DrawBorders(ACanvas, R, not IsDesigning and Focused);
+    Style.DrawBorders(ACanvas, R, Focused and not (csDesigning in ComponentState));
 end;
 
 procedure TACLCustomEdit.DrawContent(ACanvas: TCanvas);
@@ -1050,7 +1054,7 @@ end;
 
 procedure TACLCustomEdit.Recalculate;
 begin
-  if not IsDestroying then
+  if not (csDestroying in ComponentState) then
     Calculate(ClientRect);
 end;
 
@@ -1115,7 +1119,7 @@ begin
   if Buttons.Find(P, AItem) and AItem.Enabled then
     Result := crHandPoint
   else
-    Result := inherited GetCursor(P);
+    Result := Cursor;
 end;
 
 procedure TACLCustomEdit.GetTabOrderList(List: TList);
@@ -1192,7 +1196,7 @@ end;
 
 procedure TACLCustomEdit.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
 begin
-  if AutoHeight and not IsLoading then
+  if AutoHeight and not (csLoading in ComponentState) then
     CalculateAutoHeight(AHeight);
   inherited SetBounds(ALeft, ATop, AWidth, AHeight);
 end;
@@ -1392,7 +1396,7 @@ end;
 
 procedure TACLInnerEdit.WMNCHitTest(var Message: TWMNCHitTest);
 begin
-  if Container.IsDesigning then
+  if csDesigning in Container.ComponentState then
     Message.Result := HTTRANSPARENT
   else
     inherited;

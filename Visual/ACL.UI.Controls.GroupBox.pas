@@ -47,7 +47,9 @@ type
 
   { TACLCustomGroupBox }
 
-  TACLCustomGroupBox = class(TACLContainer, IACLButtonOwner)
+  TACLCustomGroupBox = class(TACLContainer,
+    IACLButtonOwner,
+    IACLCursorProvider)
   strict private
     FCaptionViewInfo: TACLCheckBoxViewInfo;
     FStyleCaption: TACLStyleCheckBox;
@@ -75,7 +77,6 @@ type
     procedure DoCheckBoxClick; virtual;
     procedure FocusChanged; override;
     function GetContentOffset: TRect; override;
-    function GetCursor(const P: TPoint): TCursor; override;
     procedure ResourceChanged; override;
     procedure SetDefaultSize; override;
     procedure SetTargetDPI(AValue: Integer); override;
@@ -101,6 +102,9 @@ type
     function ButtonOwnerGetFont: TFont;
     function ButtonOwnerGetImages: TCustomImageList;
     function ButtonOwnerGetStyle: TACLStyleButton;
+
+    // IACLCursorProvider
+    function GetCursor(const P: TPoint): TCursor;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -324,12 +328,12 @@ begin
   if CaptionViewInfo.ShowCheckMark and PtInRect(CaptionViewInfo.Bounds, P) then
     Result := crHandPoint
   else
-    Result := inherited GetCursor(P);
+    Result := Cursor;
 end;
 
 procedure TACLCustomGroupBox.ResourceChanged;
 begin
-  if not IsDestroying then
+  if not (csDestroying in ComponentState) then
     FullRefresh;
   inherited;
 end;
@@ -567,7 +571,7 @@ end;
 
 procedure TACLGroupBox.ApplyCheckBoxState;
 begin
-  if IsDesigning or not CheckBox.Visible then
+  if (csDesigning in ComponentState) or not CheckBox.Visible then
     Exit;
   if CheckBox.Action in [cbaToggleChildrenEnableState, cbaToggleMinimizeState] then
   begin

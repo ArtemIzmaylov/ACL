@@ -290,7 +290,7 @@ end;
 
 function TACLCustomTextEdit.CanOpenEditor: Boolean;
 begin
-  Result := not IsDesigning;
+  Result := not (csDestroying in ComponentState);
 end;
 
 function TACLCustomTextEdit.CreateEditor: TWinControl;

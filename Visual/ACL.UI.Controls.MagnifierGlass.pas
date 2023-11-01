@@ -172,7 +172,7 @@ procedure TACLMagnifierGlass.PrepareBuffer(const ACursorPos: TPoint);
 
   procedure DrawBackground(DC: HDC; const R: TRect);
   begin
-    if IsDesigning then
+    if csDesigning in ComponentState then
       acFillRect(DC, R, Style.ColorContent1.AsColor)
     else
     begin

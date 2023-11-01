@@ -248,7 +248,6 @@ type
     procedure SetStyleEditButton(const Value: TACLStyleButton);
     procedure SetStyleHatch(const Value: TACLStyleHatch);
   protected
-    function AllowCompositionPainting: Boolean; override;
     function CreateSubClass: TACLCompoundControlSubClass; override;
     procedure DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect); override;
     function GetContentOffset: TRect; override;
@@ -1404,11 +1403,6 @@ begin
     AWidth := Max(AWidth, AMinWidth);
   end;
   inherited SetBounds(ALeft, ATop, AWidth, AHeight);
-end;
-
-function TACLCustomColorPicker.AllowCompositionPainting: Boolean;
-begin
-  Result := False;
 end;
 
 function TACLCustomColorPicker.CreateSubClass: TACLCompoundControlSubClass;

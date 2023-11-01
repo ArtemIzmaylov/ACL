@@ -264,7 +264,7 @@ end;
 
 procedure TACLInnerMemo.WMNCHitTest(var Message: TWMNCHitTest);
 begin
-  if Container.IsDesigning then
+  if csDesigning in Container.ComponentState then
     Message.Result := HTTRANSPARENT
   else
     Message.Result := HTCLIENT;

@@ -337,7 +337,7 @@ end;
 
 procedure TACLImageBox.Paint;
 begin
-  if IsDesigning then
+  if csDesigning in ComponentState then
     acDrawHatch(Canvas.Handle, ClientRect);
   if (Picture <> nil) and not Picture.IsEmpty then
     Picture.Draw(Canvas, PictureRect, Enabled);

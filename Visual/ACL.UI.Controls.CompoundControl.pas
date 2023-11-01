@@ -40,7 +40,8 @@ type
   { TACLCompoundControl }
 
   TACLCompoundControl = class(TACLCustomControl,
-    IACLCompoundControlSubClassContainer)
+    IACLCompoundControlSubClassContainer,
+    IACLCursorProvider)
   strict private
     FSubClass: TACLCompoundControlSubClass;
 
@@ -77,7 +78,6 @@ type
     procedure DoContextPopup(MousePos: TPoint; var Handled: Boolean); override;
     procedure DoFullRefresh; override;
     procedure FocusChanged; override;
-    function GetCursor(const P: TPoint): TCursor; override;
     procedure Loaded; override;
     procedure Paint; override;
     procedure SetDefaultSize; override;
@@ -107,11 +107,13 @@ type
     function GetMouseCapture: Boolean;
     function ScreenToClient(const P: TPoint): TPoint; overload;
     procedure SetMouseCapture(const AValue: Boolean);
-    procedure UpdateCursor;
+
+    // IACLCursorProvider
+    function GetCursor(const P: TPoint): TCursor; virtual;
 
     property StyleHint: TACLStyleHint read GetStyleHint write SetStyleHint;
     property StyleScrollBox: TACLStyleScrollBox read GetStyleScrollBox write SetStyleScrollBox;
-    //
+    // Events
     property OnCalculated: TNotifyEvent read GetOnCalculated write SetOnCalculated;
     property OnDropSourceData: TACLCompoundControlDropSourceDataEvent read GetOnDropSourceData write SetOnDropSourceData;
     property OnDropSourceFinish: TACLCompoundControlDropSourceFinishEvent read GetOnDropSourceFinish write SetOnDropSourceFinish;
@@ -271,7 +273,7 @@ end;
 
 procedure TACLCompoundControl.ResourceChanged;
 begin
-  if not IsDestroying then
+  if not (csDestroying in ComponentState) then
   begin
     SubClass.BeginUpdate;
     try
@@ -422,12 +424,6 @@ end;
 procedure TACLCompoundControl.SetMouseCapture(const AValue: Boolean);
 begin
   MouseCapture := AValue;
-end;
-
-procedure TACLCompoundControl.UpdateCursor;
-begin
-  if HandleAllocated and not IsDestroying then
-    Perform(WM_SETCURSOR, Handle, HTCLIENT);
 end;
 
 function TACLCompoundControl.GetOnCalculated: TNotifyEvent;

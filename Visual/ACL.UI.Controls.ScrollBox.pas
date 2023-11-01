@@ -437,7 +437,7 @@ end;
 
 procedure TACLCustomScrollBox.WMNCHitTest(var Message: TWMNCHitTest);
 begin
-  if IsDesigning then
+  if csDesigning in ComponentState then
   begin
     inherited;
     Exit;
@@ -452,7 +452,7 @@ end;
 
 procedure TACLCustomScrollBox.WMNCLButtonDown(var Message: TWMNCLButtonDown);
 begin
-  if IsDesigning then
+  if csDesigning in ComponentState then
     inherited
   else
     with TranslatePoint(Message.XCursor, Message.YCursor) do
@@ -461,7 +461,7 @@ end;
 
 procedure TACLCustomScrollBox.WMNCLButtonUp(var Message: TWMNCLButtonUp);
 begin
-  if IsDesigning then
+  if csDesigning in ComponentState then
     inherited
   else
     with TranslatePoint(Message.XCursor, Message.YCursor) do
@@ -470,7 +470,7 @@ end;
 
 procedure TACLCustomScrollBox.WMNCMouseMove(var Message: TWMNCMouseMove);
 begin
-  if IsDesigning then
+  if csDesigning in ComponentState then
     inherited
   else
   begin

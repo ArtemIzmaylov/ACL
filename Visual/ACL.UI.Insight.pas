@@ -515,22 +515,23 @@ end;
 
 procedure TACLUIInsightButton.ShowDropDownWindow;
 var
-  AAlignment: TAlignment;
-  AThreshold: Integer;
+  LAlignment: TAlignment;
+  LBounds: TRect;
+  LThreshold: Integer;
 begin
-  AThreshold := Parent.Width div 4;
-  if Left > Parent.Width - AThreshold then
-    AAlignment := taRightJustify
-  else if Left < AThreshold then
-    AAlignment := taLeftJustify
+  LThreshold := Parent.Width div 4;
+  if Left > Parent.Width - LThreshold then
+    LAlignment := taRightJustify
+  else if Left < LThreshold then
+    LAlignment := taLeftJustify
   else
-    AAlignment := taCenter;
+    LAlignment := taCenter;
 
-  FDropDown.PopupUnderControl(
-    acRectInflate(BoundsRect,
-      dpiApply(TACLUIInsightSearchPopupWindow.BeakSize, FCurrentPPI) div 2,
-      dpiApply(acTextIndent, FCurrentPPI)),
-    ClientToScreen(NullPoint), AAlignment, FCurrentPPI);
+  LBounds := ClientToScreen(ClientRect);
+  LBounds.Inflate(
+    dpiApply(TACLUIInsightSearchPopupWindow.BeakSize, FCurrentPPI) div 2,
+    dpiApply(acTextIndent, FCurrentPPI));
+  FDropDown.PopupUnderControl(LBounds, LAlignment, FCurrentPPI);
 end;
 
 procedure TACLUIInsightButton.SetDefaultSize;

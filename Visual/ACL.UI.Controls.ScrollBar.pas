@@ -1173,7 +1173,7 @@ end;
 
 procedure TACLScrollBar.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
 begin
-  if not IsLoading then
+  if not (csLoading in ComponentState) then
     ViewInfo.CheckScrollBarSizes(AWidth, AHeight);
   inherited SetBounds(ALeft, ATop, AWidth, AHeight);
   ViewInfo.Calculate(ClientRect);

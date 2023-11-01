@@ -199,7 +199,7 @@ type
 
   { TACLDragSelection }
 
-  TACLDragSelection = class(TACLBasicForm)
+  TACLDragSelection = class(TForm)
   strict private
     procedure CMDesignHitTest(var Message: TCMDesignHitTest); message CM_DESIGNHITTEST;
     procedure WMNCHitTest(var Message: TWMNCHitTest); message WM_NCHITTEST;
@@ -237,7 +237,7 @@ type
   { TACLDockControl }
 
   TACLDockControlClass = class of TACLDockControl;
-  TACLDockControl = class(TACLCustomControl)
+  TACLDockControl = class(TACLCustomControl, IACLCursorProvider)
   protected const
     CursorMap: array[TACLBorder] of TCursor = (crHSplit, crVSplit, crHSplit, crVSplit);
   protected type
@@ -271,8 +271,9 @@ type
     procedure ControlsAligning; virtual;
     function CreateStyle: TACLStyleDocking; virtual;
     procedure DefineProperties(Filer: TFiler); override;
+    //# IACLCursorProvider
+    function GetCursor(const P: TPoint): TCursor; virtual;
     //# Dragging
-    function GetCursor(const P: TPoint): TCursor; override;
     procedure GetDockZones(ASource: TACLDockControl; AList: TACLDockZones); virtual;
     procedure StartDrag(const P: TPoint);
     procedure StartResize(const P: TPoint; ABorder: TACLBorder);
@@ -1322,7 +1323,7 @@ begin
       FDragTargetZone.CreateLayout(FExecutor);
   end
   else
-    if not FExecutor.IsDesigning then
+    if not (csDesigning in FExecutor.ComponentState) then
       CreateFloatLayout;
 
   PostMessage(FExecutor.Handle, CM_DOCKING_PACK, 0, 0);
@@ -1801,7 +1802,7 @@ begin
   if Parent <> nil then
     Parent.Perform(CM_DOCKING_VISIBILITY, Message.WParam, LPARAM(Self));
   inherited;
-  if IsDesigning and HandleAllocated then
+  if (csDesigning in ComponentState) and HandleAllocated then
     RedrawWindow(Parent.Handle, nil, 0, RDW_ALLCHILDREN or RDW_INVALIDATE);
 end;
 
@@ -1930,7 +1931,7 @@ begin
   for var I := 0 to ControlCount - 1 do
   begin
     AChild := Controls[I];
-    if IsDesigning or AChild.Visible then
+    if (csDesigning in ComponentState) or AChild.Visible then
     begin
       if AChild.Align in AlignFirst + AlignLast then
         Inc(AFixedSize, AChild.CustomWidth);
@@ -1953,7 +1954,7 @@ begin
   for var I := 0 to ControlCount - 1 do
   begin
     AChild := Controls[I];
-    if (IsDesigning or AChild.Visible) and (AChild.Align in AlignFirst) then
+    if ((csDesigning in ComponentState) or AChild.Visible) and (AChild.Align in AlignFirst) then
     begin
       AChild.FNeighbours[mLeft] := AChildPrev;
       if AChildPrev <> nil then
@@ -1970,7 +1971,7 @@ begin
   for var I := ControlCount - 1 downto 0 do
   begin
     AChild := Controls[I];
-    if (IsDesigning or AChild.Visible) and (AChild.Align in AlignLast) then
+    if ((csDesigning in ComponentState) or AChild.Visible) and (AChild.Align in AlignLast) then
     begin
       AChild.FNeighbours[mRight] := AChildNext;
       if AChildNext <> nil then
@@ -1987,7 +1988,7 @@ begin
   for var I := 0 to ControlCount - 1 do
   begin
     AChild := Controls[I];
-    if (IsDesigning or AChild.Visible) and (AChild.Align in AlignClient) then
+    if ((csDesigning in ComponentState) or AChild.Visible) and (AChild.Align in AlignClient) then
     begin
       AChild.FNeighbours[mRight] := AChildNext;
       AChild.FNeighbours[mLeft] := AChildPrev;
@@ -2056,7 +2057,7 @@ begin
   for var I := 0 to ControlCount - 1 do
   begin
     AChild := Controls[I];
-    if IsDesigning or AChild.Visible then
+    if (csDesigning in ComponentState) or AChild.Visible then
     begin
       if AChild.Align in AlignFirst + AlignLast then
         Inc(AFixedSize, AChild.CustomHeight);
@@ -2079,7 +2080,7 @@ begin
   for var I := 0 to ControlCount - 1 do
   begin
     AChild := Controls[I];
-    if (IsDesigning or AChild.Visible) and (AChild.Align in AlignFirst) then
+    if ((csDesigning in ComponentState) or AChild.Visible) and (AChild.Align in AlignFirst) then
     begin
       AChild.FNeighbours[mTop] := AChildPrev;
       if AChildPrev <> nil then
@@ -2096,7 +2097,7 @@ begin
   for var I := ControlCount - 1 downto 0 do
   begin
     AChild := Controls[I];
-    if (IsDesigning or AChild.Visible) and (AChild.Align in AlignLast) then
+    if ((csDesigning in ComponentState) or AChild.Visible) and (AChild.Align in AlignLast) then
     begin
       AChild.FNeighbours[mBottom] := AChildNext;
       if AChildNext <> nil then
@@ -2113,7 +2114,7 @@ begin
   for var I := 0 to ControlCount - 1 do
   begin
     AChild := Controls[I];
-    if (IsDesigning or AChild.Visible) and (AChild.Align in AlignClient) then
+    if ((csDesigning in ComponentState) or AChild.Visible) and (AChild.Align in AlignClient) then
     begin
       AChild.FNeighbours[mBottom] := AChildNext;
       AChild.FNeighbours[mTop] := AChildPrev;
@@ -2160,7 +2161,7 @@ begin
     for var I := 0 to ControlCount - 1 do
     begin
       AChild := Controls[I];
-      if IsDesigning or AChild.Visible then
+      if (csDesigning in ComponentState) or AChild.Visible then
       begin
         ATabWidth := Style.MeasureTabWidth(AChild.ToString) + ATabIndent;
         ACalculator.Add(ATabWidth, 4, ATabWidth, True);
@@ -2175,7 +2176,7 @@ begin
     for var I := 0 to ControlCount - 1 do
     begin
       AChild := Controls[I];
-      if IsDesigning or AChild.Visible then
+      if (csDesigning in ComponentState) or AChild.Visible then
       begin
         ATab.Control := AChild;
         ATab.Bounds := acRectSetWidth(ARect, ACalculator[ATabIndex].Size);
@@ -2947,7 +2948,7 @@ begin
       acRestoreClipRegion(Canvas.Handle, AClipRgn);
     end;
   end;
-  if IsDesigning and not Visible then
+  if (csDesigning in ComponentState) and not Visible then
     acFillRect(Canvas.Handle, acRectContent(ClientRect, GetOuterPadding), TAlphaColor.FromColor(clBlack, 30));
 end;
 

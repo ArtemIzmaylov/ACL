@@ -101,8 +101,8 @@ type
     FTransparent: Boolean;
     FURL: UnicodeString;
 
-    function GetIsURLMode: Boolean;
     function GetTextColor: TColor;
+    function IsCursorStored: Boolean;
     procedure SetAlignment(AValue: TAlignment);
     procedure SetAlignmentVert(AValue: TVerticalAlignment);
     procedure SetStyle(AValue: TACLStyleLabel);
@@ -118,7 +118,6 @@ type
     function CanAutoSize(var ANewWidth, ANewHeight: Integer): Boolean; override;
     function CreateStyle: TACLStyleLabel; virtual;
     function CreateSubControlOptions: TACLLabelSubControlOptions; virtual;
-    function GetCursor(const P: TPoint): TCursor; override;
     function GetBackgroundStyle: TACLControlBackgroundStyle; override;
     function MeasureSize(AWidth: Integer = 0): TSize; virtual;
     //
@@ -132,14 +131,15 @@ type
     procedure Resize; override;
     procedure SetDefaultSize; override;
     procedure SetTargetDPI(AValue: Integer); override;
-    //
+
+    //# Drawing
     procedure DrawBackground(ACanvas: TCanvas); virtual;
     procedure DrawLabelLine(ACanvas: TCanvas); virtual;
     procedure DrawText(ACanvas: TCanvas; const R: TRect; AColor: TColor); virtual;
     procedure DrawTextEffects(ACanvas: TCanvas; var R: TRect); virtual;
     procedure Paint; override;
-    //
-    property IsURLMode: Boolean read GetIsURLMode;
+
+    //# Properties
     property TextColor: TColor read GetTextColor;
   public
     constructor Create(AOwner: TComponent); override;
@@ -153,19 +153,19 @@ type
     property SubControl: TACLLabelSubControlOptions read FSubControl write SetSubControl;
     property Transparent: Boolean read FTransparent write SetTransparent default True;
     property URL: UnicodeString read FURL write SetUrl; // before Font and Cursor
-    //
+    //# Inherited
     property Align;
     property Anchors;
     property AutoSize;
     property Caption;
-    property Cursor;
+    property Cursor stored IsCursorStored;
     property Enabled;
     property Font;
     property Height;
     property ParentFont;
     property Visible;
     property Width;
-    //
+    //# Events
     property OnClick;
     property OnDblClick;
     property OnMouseDown;
@@ -416,7 +416,7 @@ begin
   if (Action <> nil) or Assigned(OnClick) then
     inherited Click
   else
-    if IsURLMode then
+    if URL <> '' then
       ShellExecute(URL)
     else
       if not SubControl.TrySetFocus then
@@ -431,13 +431,6 @@ end;
 function TACLLabel.CreateSubControlOptions: TACLLabelSubControlOptions;
 begin
   Result := TACLLabelSubControlOptions.Create(Self);
-end;
-
-function TACLLabel.GetCursor(const P: TPoint): TCursor;
-begin
-  Result := inherited GetCursor(P);
-  if (Result = crDefault) and IsURLMode then
-    Result := crHandPoint;
 end;
 
 function TACLLabel.GetBackgroundStyle: TACLControlBackgroundStyle;
@@ -476,21 +469,15 @@ end;
 procedure TACLLabel.MouseEnter;
 begin
   inherited MouseEnter;
-  if IsURLMode then
-  begin
-    UpdateCursor;
+  if URL <> '' then
     Invalidate;
-  end;
 end;
 
 procedure TACLLabel.MouseLeave;
 begin
   inherited MouseLeave;
-  if IsURLMode then
-  begin
-    UpdateCursor;
+  if URL <> '' then
     Invalidate;
-  end;
 end;
 
 procedure TACLLabel.Notification(AComponent: TComponent; AOperation: TOperation);
@@ -524,6 +511,8 @@ begin
     ACanvas.Font := Font;
     ACanvas.Font.Color := AColor;
     ACanvas.Brush.Style := bsClear;
+    if URL <> '' then
+      ACanvas.Font.Style := ACanvas.Font.Style + [fsUnderline];
     if Style.WordWrap then
       acTextDraw(ACanvas, Caption, R, taLeftJustify, taAlignTop, False, False, True)
     else
@@ -557,8 +546,6 @@ procedure TACLLabel.DrawTextEffects(ACanvas: TCanvas; var R: TRect);
     DrawText(ACanvas, acRectOffset(R, dX, dY), Style.ColorShadow.AsColor);
   end;
 
-var
-  I: Integer;
 begin
   if Style.EffectSize <> 0 then
   begin
@@ -568,7 +555,7 @@ begin
         DrawLabelText(Style.EffectSize, Style.EffectSize);
 
       sleContour:
-        for I := 1 to Abs(Style.EffectSize) do
+        for var I := 1 to Abs(Style.EffectSize) do
         begin
           DrawLabelText( I,  I);
           DrawLabelText( I, -I);
@@ -593,21 +580,24 @@ begin
     DrawLabelLine(Canvas);
 end;
 
-function TACLLabel.GetIsURLMode: Boolean;
-begin
-  Result := (URL <> '') and not IsDesigning;
-end;
-
 function TACLLabel.GetTextColor: TColor;
 begin
   Result := Font.Color;
   if (Result = clWindowText) or (Result = clDefault) then
   begin
-    if IsURLMode and MouseInControl then
+    if (URL <> '') and MouseInControl and not (csDesigning in ComponentState) then
       Result := Style.ColorTextHyperlink.AsColor
     else
       Result := Style.TextColor[Enabled];
   end;
+end;
+
+function TACLLabel.IsCursorStored: Boolean;
+begin
+  if URL <> '' then
+    Result := Cursor <> crHandPoint
+  else
+    Result := Cursor <> crDefault;
 end;
 
 procedure TACLLabel.SetAlignment(AValue: TAlignment);
@@ -660,13 +650,14 @@ procedure TACLLabel.SetUrl(const AValue: UnicodeString);
 begin
   if AValue <> FURL then
   begin
+    if not IsCursorStored then
+    begin
+      if AValue <> '' then
+        Cursor := crHandPoint
+      else
+        Cursor := crDefault;
+    end;
     FURL := AValue;
-
-    if URL <> '' then
-      Font.Style := Font.Style + [fsUnderline]
-    else
-      Font.Style := Font.Style - [fsUnderline];
-
     Calculate;
     Invalidate;
   end;
@@ -677,13 +668,13 @@ begin
   inherited;
   Calculate;
   if AutoSize then
-    AdjustSize
+    AdjustSize;
 end;
 
 procedure TACLLabel.CMHitTest(var Message: TCMHitTest);
 begin
   inherited;
-  if IsURLMode then
+  if URL <> '' then
     Message.Result := Ord(PtInRect(FTextRect, SmallPointToPoint(Message.Pos)));
 end;
 
