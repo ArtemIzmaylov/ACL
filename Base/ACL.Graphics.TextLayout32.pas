@@ -4,7 +4,7 @@
 {* Formatted Text with alpha channel support *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -807,9 +807,8 @@ function TACLTextLayoutShadowRender32.OnText(ABlock: TACLTextLayoutBlockText): B
 var
   APoint: TPoint;
   AWindowOrg: TPoint;
-  I, J: Integer;
 begin
-  if ABlock.TextSize.Width > 0 then
+  if ABlock.TextWidth > 0 then
   begin
     SetBkColor(Canvas.Handle, clBlack);
     SetBkMode(Canvas.Handle, TRANSPARENT);
@@ -820,8 +819,8 @@ begin
       APoint := acPointOffsetNegative(AWindowOrg, FOrigin);
       if Shadow.Direction = mzClient then
       begin
-        for I := -Shadow.Size to Shadow.Size do
-        for J := -Shadow.Size to Shadow.Size do
+        for var I := -Shadow.Size to Shadow.Size do
+        for var J := -Shadow.Size to Shadow.Size do
           if I <> J then
           begin
             SetWindowOrgEx(Canvas.Handle, APoint.X - I, APoint.Y - J, nil);
@@ -829,7 +828,7 @@ begin
           end;
       end
       else
-        for I := 1 to Shadow.Size do
+        for var I := 1 to Shadow.Size do
         begin
           APoint := acPointOffsetNegative(APoint, MapTextOffsets[Shadow.Direction]);
           SetWindowOrgEx(Canvas.Handle, APoint.X, APoint.Y, nil);
