@@ -2683,7 +2683,7 @@ class constructor TACLColors.Create;
 var
   I, J: Integer;
 begin
-  for I := 0 to 255 do
+  for I := 1 to 255 do
     for J := I to 255 do
     begin
       PremultiplyTable[I, J] := MulDiv(I, J, 255);
