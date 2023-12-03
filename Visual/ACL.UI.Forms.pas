@@ -99,7 +99,7 @@ type
   public
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
-    procedure ScaleForCurrentDPI; override;
+    procedure ScaleForCurrentDPI{$IFDEF DELPHI120}(ForceScaling: Boolean = False){$ENDIF}; override;
     procedure ScaleForPPI(ATargetPPI: Integer); overload; override; final;
     procedure ScaleForPPI(ATargetPPI: Integer; AWindowRect: PRect); reintroduce; overload; virtual;
     property CurrentDpi: Integer read FCurrentPPI;

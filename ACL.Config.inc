@@ -42,6 +42,11 @@
   {$DEFINE DELPHI110ALEXANDRIA}
 {$ENDIF}
 
+{$IFDEF VER360} // 12.0
+  {$DEFINE DELPHI110ALEXANDRIA}
+  {$DEFINE DELPHI120}
+{$ENDIF}
+
 {$IFNDEF DELPHI110ALEXANDRIA}
   You need Delphi 11.0 Alexandria for this library,
   Previous Delphi versions has too many bugs with dpi scaling.

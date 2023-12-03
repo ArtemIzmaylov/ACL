@@ -1743,7 +1743,7 @@ begin
   if Assigned(FOnKeyNotify) then
     FOnKeyNotify(Self, Key, Action);
   if (Action = cnRemoved) and (doOwnsKeys in FOwnerships) then
-    PObject(@Key)^.DisposeOf;
+    PObject(@Key)^.Free;
 end;
 
 procedure TACLDictionary<TKey, TValue>.ValueNotify(const Value: TValue; Action: TCollectionNotification);
@@ -1751,7 +1751,7 @@ begin
   if Assigned(FOnValueNotify) then
     FOnValueNotify(Self, Value, Action);
   if (Action = cnRemoved) and (doOwnsValues in FOwnerships) then
-    PObject(@Value)^.DisposeOf;
+    PObject(@Value)^.Free;
 end;
 
 procedure TACLDictionary<TKey, TValue>.DoAddCore(HashCode, Index: Integer; const Key: TKey; const Value: TValue);
@@ -2008,7 +2008,9 @@ end;
 
 function TACLDictionary<TKey, TValue>.TCustomEnumerator.MoveNext: Boolean;
 begin
+{$IFNDEF DELPHI120}
   Result := False;
+{$ENDIF}
   repeat
     Inc(FIndex);
     if FIndex >= FOwner.Capacity then
@@ -2132,7 +2134,6 @@ end;
 function TACLThreadList<T>.Read(AIndex: Integer; out AValue: T): Boolean;
 var
   AList: TACLList<T>;
-  I: Integer;
 begin
   AList := BeginRead;
   try
@@ -2839,7 +2840,9 @@ end;
 
 function TACLHashSet<T>.TEnumerator.MoveNext: Boolean;
 begin
+{$IFNDEF DELPHI120}
   Result := False;
+{$ENDIF}
   repeat
     Inc(FIndex);
     if FIndex >= Length(FOwner.FItems) then
