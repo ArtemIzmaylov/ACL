@@ -51,12 +51,12 @@ type
   {$REGION 'InternalTypes'}
     TCommandHandler = record
       Flags: Cardinal;
-      Proc0: TProcedureRef;
+      Proc0: TProc;
       Proc1: TCommandSingleParamProc;
       Proc2: TCommandMultipleParamsProc;
 
       constructor Create(
-        AProc0: TProcedureRef; AProc1: TCommandSingleParamProc;
+        AProc0: TProc; AProc1: TCommandSingleParamProc;
         AProc2: TCommandMultipleParamsProc; AFlags: Cardinal);
       procedure Execute(AParams: TACLStringList);
     end;
@@ -94,7 +94,7 @@ type
 
     class procedure Register(const ACommand: string; AProc: TCommandMultipleParamsProc; AFlags: Cardinal = 0); overload;
     class procedure Register(const ACommand: string; AProc: TCommandSingleParamProc; AFlags: Cardinal = 0); overload;
-    class procedure Register(const ACommand: string; AProc: TProcedureRef; AFlags: Cardinal = 0); overload;
+    class procedure Register(const ACommand: string; AProc: TProc; AFlags: Cardinal = 0); overload;
     class procedure Unregister(const ACommand: string);
   end;
 
@@ -263,7 +263,7 @@ begin
 end;
 
 class procedure TACLCommandLineProcessor.Register(
-  const ACommand: string; AProc: TProcedureRef; AFlags: Cardinal);
+  const ACommand: string; AProc: TProc; AFlags: Cardinal);
 begin
   FCommands.AddOrSetValue(ACommand, TCommandHandler.Create(AProc, nil, nil, AFlags));
 end;
@@ -313,7 +313,7 @@ end;
 
 { TACLCommandLineProcessor.TCommand }
 
-constructor TACLCommandLineProcessor.TCommandHandler.Create(AProc0: TProcedureRef;
+constructor TACLCommandLineProcessor.TCommandHandler.Create(AProc0: TProc;
   AProc1: TCommandSingleParamProc; AProc2: TCommandMultipleParamsProc; AFlags: Cardinal);
 begin
   Flags := AFlags;

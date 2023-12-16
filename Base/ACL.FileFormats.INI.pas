@@ -98,7 +98,7 @@ type
     procedure WriteColor(const AKey: UnicodeString; AColor: TColor);
     procedure WriteFont(const AKey: UnicodeString; AFont: TFont);
   {$ENDIF}
-    //
+    // Properties
     property Name: UnicodeString read FName write SetName;
     property ValueFromName[const Name: UnicodeString]: UnicodeString read GetValueFromName write WriteString;
   end;
@@ -125,7 +125,8 @@ type
     FModified: Boolean;
     FSections: TACLObjectList<TACLIniFileSection>;
 
-    function FindValue(const AName, AKey: UnicodeString; out ASection: TACLIniFileSection; out AIndex: Integer): Boolean;
+    function FindValue(const AName, AKey: UnicodeString;
+      out ASection: TACLIniFileSection; out AIndex: Integer): Boolean;
     procedure Changed; virtual;
   public
     constructor Create; overload;

@@ -169,7 +169,7 @@ type
     PSynchronizeRecord = ^TSynchronizeRecord;
     TSynchronizeRecord = record
       Method: TThreadMethod;
-      Proc: TProcedureRef;
+      Proc: TProc;
       Receiver: Pointer;
     end;
   {$ENDREGION}
@@ -180,7 +180,7 @@ type
     class var FQueue: TThreadList<PSynchronizeRecord>;
 
     class function Allocate(AReceiver: Pointer; AProc: TThreadMethod): PSynchronizeRecord; overload;
-    class function Allocate(AReceiver: Pointer; AProc: TProcedureRef): PSynchronizeRecord; overload;
+    class function Allocate(AReceiver: Pointer; AProc: TProc): PSynchronizeRecord; overload;
     class procedure Execute; overload;
     class procedure Execute(ARecord: PSynchronizeRecord); overload;
     class procedure Run(ARecord: PSynchronizeRecord; AWaitFor: Boolean); overload;
@@ -191,11 +191,11 @@ type
     class constructor Create;
     class destructor Destroy;
     class procedure CheckSynchronize;
-    class procedure Run(AProc: TProcedureRef; AWaitFor: Boolean; AReceiver: Pointer = nil); overload;
+    class procedure Run(AProc: TProc; AWaitFor: Boolean; AReceiver: Pointer = nil); overload;
     class procedure Run(AProc: TThreadMethod; AWaitFor: Boolean; AReceiver: Pointer = nil); overload;
-    class procedure RunImmediately(AProc: TProcedureRef); overload;
+    class procedure RunImmediately(AProc: TProc); overload;
     class procedure RunImmediately(AProc: TThreadMethod); overload;
-    class procedure RunPostponed(AProc: TProcedureRef; AReceiver: Pointer = nil); overload;
+    class procedure RunPostponed(AProc: TProc; AReceiver: Pointer = nil); overload;
     class procedure RunPostponed(AProc: TThreadMethod; AReceiver: Pointer = nil); overload;
     class procedure Unsubscribe(AProc: TThreadMethod); overload;
     class procedure Unsubscribe(AReceiver: Pointer); overload;
@@ -212,7 +212,7 @@ function LockCompareExchange(const ACompareValue, ANewValue: Byte; AReturnAddres
 procedure CallThreadMethod(AMethod: TThreadMethod; ACallInMainThread: Boolean); overload;
 procedure CallThreadMethod(AMethod: TThreadMethod; AMode: TACLThreadMethodCallMode); overload;
 
-procedure RunInMainThread(AProc: TProcedureRef; AWaitFor: Boolean = True); overload; inline;
+procedure RunInMainThread(AProc: TProc; AWaitFor: Boolean = True); overload; inline;
 procedure RunInMainThread(AProc: TThreadMethod; AWaitFor: Boolean = True); overload; inline;
 procedure RunInThread(Func: TThreadStartRoutine; Context: Pointer);
 implementation
@@ -330,7 +330,7 @@ begin
   end;
 end;
 
-procedure RunInMainThread(AProc: TProcedureRef; AWaitFor: Boolean = True);
+procedure RunInMainThread(AProc: TProc; AWaitFor: Boolean = True);
 begin
   TACLMainThread.Run(AProc, AWaitFor);
 end;
@@ -802,7 +802,7 @@ begin
   Execute;
 end;
 
-class procedure TACLMainThread.Run(AProc: TProcedureRef; AWaitFor: Boolean; AReceiver: Pointer);
+class procedure TACLMainThread.Run(AProc: TProc; AWaitFor: Boolean; AReceiver: Pointer);
 begin
   Run(Allocate(AReceiver, AProc), AWaitFor);
 end;
@@ -817,7 +817,7 @@ begin
   Run(AProc, True);
 end;
 
-class procedure TACLMainThread.RunImmediately(AProc: TProcedureRef);
+class procedure TACLMainThread.RunImmediately(AProc: TProc);
 begin
   Run(AProc, True);
 end;
@@ -827,7 +827,7 @@ begin
   Run(AProc, False, AReceiver);
 end;
 
-class procedure TACLMainThread.RunPostponed(AProc: TProcedureRef; AReceiver: Pointer);
+class procedure TACLMainThread.RunPostponed(AProc: TProc; AReceiver: Pointer);
 begin
   Run(AProc, False, AReceiver);
 end;
@@ -874,7 +874,7 @@ begin
   Result^.Receiver := AReceiver;
 end;
 
-class function TACLMainThread.Allocate(AReceiver: Pointer; AProc: TProcedureRef): PSynchronizeRecord;
+class function TACLMainThread.Allocate(AReceiver: Pointer; AProc: TProc): PSynchronizeRecord;
 begin
   New(Result);
   Result^.Method := nil;

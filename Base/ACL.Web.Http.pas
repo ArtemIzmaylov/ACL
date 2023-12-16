@@ -331,7 +331,7 @@ type
     destructor Destroy; override;
   end;
 
-procedure CallEvent(AProc: TProcedureRef; ASync: Boolean);
+procedure CallEvent(AProc: TProc; ASync: Boolean);
 begin
   if ASync then
     RunInMainThread(AProc)

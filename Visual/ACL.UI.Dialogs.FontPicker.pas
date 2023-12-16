@@ -16,9 +16,10 @@ interface
 uses
   Winapi.Windows,
   // System
+  System.Classes,
+  System.SysUtils,
   System.Types,
   System.UITypes,
-  System.Classes,
   // Vcl
   Vcl.ExtCtrls,
   Vcl.Graphics,
@@ -82,7 +83,7 @@ type
     FFontSizeSign: Integer;
     FHasBeenApplied: Boolean;
 
-    FOnApply: TProcedureRef;
+    FOnApply: TProc;
 
     procedure CreateControls; override;
     function CreateSimpleListView: TACLTreeList;
@@ -95,7 +96,7 @@ type
     procedure PopulateFontSize;
     procedure UpdateColorPickerPreview;
 
-    procedure Initialize(AFont: TFont; AOnApply: TProcedureRef = nil);
+    procedure Initialize(AFont: TFont; AOnApply: TProc = nil);
     procedure LoadFontParams(AFont: TFont);
     procedure SaveFontParams(AFont: TFont);
 
@@ -108,14 +109,13 @@ type
   public
     destructor Destroy; override;
     procedure AfterConstruction; override;
-    class function Execute(AFont: TFont; AOwnerWnd: THandle = 0; AOnApply: TProcedureRef = nil): Boolean;
+    class function Execute(AFont: TFont; AOwnerWnd: THandle = 0; AOnApply: TProc = nil): Boolean;
   end;
 
 implementation
 
 uses
-  System.Math,
-  System.SysUtils;
+  System.Math;
 
 { TACLFontPickerDialog }
 
@@ -134,7 +134,7 @@ begin
   inherited;
 end;
 
-class function TACLFontPickerDialog.Execute(AFont: TFont; AOwnerWnd: THandle = 0; AOnApply: TProcedureRef = nil): Boolean;
+class function TACLFontPickerDialog.Execute(AFont: TFont; AOwnerWnd: THandle = 0; AOnApply: TProc = nil): Boolean;
 begin
   with TACLFontPickerDialog.CreateDialog(AOwnerWnd, True) do
   try
@@ -145,7 +145,7 @@ begin
   end;
 end;
 
-procedure TACLFontPickerDialog.Initialize(AFont: TFont; AOnApply: TProcedureRef = nil);
+procedure TACLFontPickerDialog.Initialize(AFont: TFont; AOnApply: TProc = nil);
 begin
   FFont := AFont;
   FFontOriginal.Assign(FFont);
@@ -275,7 +275,7 @@ begin
   FHasBeenApplied := True;
   SaveFontParams(FFont);
   inherited;
-  CallProcedure(FOnApply);
+  if Assigned(FOnApply) then FOnApply();
 end;
 
 procedure TACLFontPickerDialog.DoCancel(Sender: TObject);

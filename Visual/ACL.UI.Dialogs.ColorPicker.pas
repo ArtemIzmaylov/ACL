@@ -53,14 +53,14 @@ type
 
     FColor: PAlphaColor;
     FColorOriginal: TAlphaColor;
-    FOnApply: TProcedureRef;
+    FOnApply: TProc;
   protected
     procedure AfterFormCreate; override;
     procedure ColorChangeHandler(Sender: TObject);
     procedure CreateControls; override;
     procedure DoApply(Sender: TObject = nil); override;
     procedure DoCancel(Sender: TObject = nil); override;
-    procedure Initialize(AAllowEditAlpha: Boolean; AColor: PAlphaColor; AOnApply: TProcedureRef);
+    procedure Initialize(AAllowEditAlpha: Boolean; AColor: PAlphaColor; AOnApply: TProc);
     procedure PlaceControls(var R: TRect); override;
   public
     class function Execute(var AColor: TColor;
@@ -68,7 +68,7 @@ type
     class function Execute(var AColor: TAlphaColor;
       AOwnerWnd: THandle = 0; const ACaption: string = ''): Boolean; overload;
     class function Execute(var AColor: TAlphaColor; AAllowEditAlpha: Boolean;
-      AOwnerWnd: THandle = 0; const ACaption: string = ''; AOnApply: TProcedureRef = nil): Boolean; overload;
+      AOwnerWnd: THandle = 0; const ACaption: string = ''; AOnApply: TProc = nil): Boolean; overload;
     class function ExecuteQuery(AColor: TAlphaColor;
       AOwnerWnd: THandle = 0; const ACaption: string = ''): TAlphaColor; overload;
     class function ExecuteQuery(AColor: TAlphaColor; AAllowEditAlpha: Boolean;
@@ -98,7 +98,7 @@ begin
 end;
 
 class function TACLColorPickerDialog.Execute(var AColor: TAlphaColor; AAllowEditAlpha: Boolean;
-  AOwnerWnd: THandle; const ACaption: string; AOnApply: TProcedureRef): Boolean;
+  AOwnerWnd: THandle; const ACaption: string; AOnApply: TProc): Boolean;
 var
   ADialog: TACLColorPickerDialog;
 begin
@@ -172,7 +172,7 @@ procedure TACLColorPickerDialog.DoApply(Sender: TObject);
 begin
   FColor^ := FPicker.Color;
   inherited;
-  CallProcedure(FOnApply);
+  if Assigned(FOnApply) then FOnApply();
 end;
 
 procedure TACLColorPickerDialog.DoCancel(Sender: TObject);
@@ -185,7 +185,7 @@ begin
   inherited;
 end;
 
-procedure TACLColorPickerDialog.Initialize(AAllowEditAlpha: Boolean; AColor: PAlphaColor; AOnApply: TProcedureRef);
+procedure TACLColorPickerDialog.Initialize(AAllowEditAlpha: Boolean; AColor: PAlphaColor; AOnApply: TProc);
 begin
   FColor := AColor;
   FColorOriginal := AColor^;

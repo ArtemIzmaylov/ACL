@@ -240,7 +240,6 @@ type
 
 // Notify Helpers
 procedure CallNotifyEvent(ASender: TObject; AEvent: TNotifyEvent); inline;
-procedure CallProcedure(AProc: TProcedureRef); inline;
 procedure CallProgressEvent(AEvent: TACLProgressEvent; const APosition, ATotal: Int64; ASender: TObject = nil); inline;
 
 function acComponentFieldSet(var AField; AOwner, ANewValue: TComponent): Boolean;
@@ -268,12 +267,6 @@ type
 procedure CallNotifyEvent(ASender: TObject; AEvent: TNotifyEvent);
 begin
   if Assigned(AEvent) then AEvent(ASender);
-end;
-
-procedure CallProcedure(AProc: TProcedureRef);
-begin
-  if Assigned(AProc) then
-    AProc();
 end;
 
 procedure CallProgressEvent(AEvent: TACLProgressEvent; const APosition, ATotal: Int64; ASender: TObject = nil);

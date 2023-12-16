@@ -63,7 +63,6 @@ const
   acTrue = TACLBoolean.True;
 
 type
-  TProcedureRef = reference to procedure;
 
   { IObject }
 

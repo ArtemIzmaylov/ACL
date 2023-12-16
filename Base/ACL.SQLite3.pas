@@ -142,7 +142,7 @@ type
 
     procedure Compress; overload;
     procedure Compress(out AOldSize, ANewSize: Int64); overload;
-    procedure Transaction(Proc: TProcedureRef);
+    procedure Transaction(Proc: TProc);
 
     // Statements
     procedure Exec(const AFormatLine: UnicodeString; const AArguments: array of const); overload;
@@ -715,7 +715,7 @@ begin
   end;
 end;
 
-procedure TACLSQLiteBase.Transaction(Proc: TProcedureRef);
+procedure TACLSQLiteBase.Transaction(Proc: TProc);
 begin
   Lock;
   try
