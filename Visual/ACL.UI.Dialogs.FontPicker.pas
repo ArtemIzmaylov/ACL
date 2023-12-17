@@ -4,7 +4,7 @@
 {*            Font Picker Dialog             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -310,7 +310,7 @@ begin
     acExchangeIntegers(ABackgroundColor, AForegroundColor);
 
   acDrawFrame(ACanvas.Handle, R, FontNameEdit.Style.ColorBorder.AsColor);
-  acFillRect(ACanvas.Handle, acRectInflate(R, -1), ABackgroundColor);
+  acFillRect(ACanvas.Handle, R.InflateTo(-1, -1), ABackgroundColor);
 end;
 
 procedure TACLFontPickerDialog.PlaceControls(var R: TRect);
@@ -370,10 +370,13 @@ end;
 procedure TACLFontPickerDialog.UpdateColorPickerPreview;
 var
   ABitmap: TACLBitmap;
+  AFocusRect: TRect;
 begin
-  if not acRectIsEmpty(ColorPicker.ViewInfo.FocusRect) then
+  if not ColorPicker.ViewInfo.FocusRect.IsEmpty then
   begin
-    ABitmap := TACLBitmap.CreateEx(acRectInflate(ColorPicker.ViewInfo.FocusRect, -1), pf32bit, True);
+    AFocusRect := ColorPicker.ViewInfo.FocusRect;
+    AFocusRect.Inflate(-1);
+    ABitmap := TACLBitmap.CreateEx(AFocusRect, pf32bit, True);
     try
       acFillRect(ABitmap.Canvas.Handle, ABitmap.ClientRect, TAlphaColor(ColorPicker.Tag));
       ColorPicker.Glyph.Overriden := True;

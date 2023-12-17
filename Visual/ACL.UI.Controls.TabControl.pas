@@ -384,7 +384,7 @@ procedure TACLStyleTabControl.DrawTab(ACanvas: TCanvas;
 begin
   HeaderTexture.Draw(ACanvas.Handle, R, Ord(AStyle) * 2 + Ord(AActive));
   if AActive and AFocused then
-    acDrawFocusRect(ACanvas, acRectContent(R, HeaderTexture.ContentOffsets));
+    acDrawFocusRect(ACanvas, R.Split(HeaderTexture.ContentOffsets));
 end;
 
 procedure TACLStyleTabControl.InitializeResources;
@@ -511,8 +511,9 @@ end;
 
 procedure TACLCustomTabControl.AdjustClientRect(var Rect: TRect);
 begin
-  Rect := acRectContent(FFrameRect, 1, Borders);
-  Rect := acRectContent(Rect, Padding.GetScaledMargins(FCurrentPPI));
+  Rect := FFrameRect;
+  Rect.Content(1, Borders);
+  Rect.Content(Padding.GetScaledMargins(FCurrentPPI));
 end;
 
 procedure TACLCustomTabControl.BoundsChanged;
@@ -601,7 +602,7 @@ begin
   ACalculator := TACLAutoSizeCalculator.Create;
   try
     ACalculator.Capacity := ViewItems.Count;
-    ACalculator.AvailableSize := acRectWidth(R) - 2 * ATabOffset;
+    ACalculator.AvailableSize := R.Width - 2 * ATabOffset;
     for var I := 0 to ViewItems.Count - 1 do
     begin
       if OptionsView.Style = tsTab then
@@ -617,13 +618,13 @@ begin
     for var I := 0 to ViewItems.Count - 1 do
     begin
       AItem := ViewItems[I];
-      AItem.Bounds := Bounds(ATabOffset, R.Top, ACalculator[I].Size, acRectHeight(R));
+      AItem.Bounds := Bounds(ATabOffset, R.Top, ACalculator[I].Size, R.Height);
       if I + 1 < ViewItems.Count then
         Dec(AItem.Bounds.Right, AIndentBetweenTabs);
       ATabOffset := AItem.Bounds.Right + AIndentBetweenTabs;
 
       if OptionsView.Style = tsTab then
-        AItem.Bounds := acRectContent(AItem.Bounds, CalculateTabPlaceIndents(AItem))
+        AItem.Bounds.Content(CalculateTabPlaceIndents(AItem))
       else if OptionsView.TabPosition = tpTop then
         Dec(AItem.Bounds.Bottom, AIndentBetweenTabs)
       else
@@ -637,8 +638,10 @@ begin
           MeasureCanvas.Font.Assign(Style.HeaderFont);
 
         ATextSize := acTextSize(MeasureCanvas, AItem.Tab.Caption);
-        AContentRect := acRectContent(AItem.Bounds, CalculateTabTextOffsets(AItem));
-        AItem.TextRect := acRectCenter(AContentRect, ATextSize);
+        AContentRect := AItem.Bounds;
+        AContentRect.Content(CalculateTabTextOffsets(AItem));
+        AItem.TextRect := AContentRect;
+        AItem.TextRect.Center(ATextSize);
         AItem.TextTruncated := ATextSize.cx > AContentRect.Width;
         IntersectRect(AItem.TextRect, AItem.TextRect, AContentRect);
       end;
@@ -653,7 +656,7 @@ begin
   if OptionsView.TabWidth > 0 then
     Result := dpiApply(OptionsView.TabWidth, FCurrentPPI)
   else
-    Result := acMarginWidth(GetTabMargins) + CalculateTextSize(AItem.Tab.Caption).cx;
+    Result := GetTabMargins.MarginsWidth + CalculateTextSize(AItem.Tab.Caption).cx;
 end;
 
 procedure TACLCustomTabControl.CalculateTabStates;
@@ -677,9 +680,9 @@ function TACLCustomTabControl.CalculateTextSize(const ACaption: UnicodeString): 
 begin
   Result := NullSize;
   Canvas.Font.Assign(Style.HeaderFont);
-  Result := acSizeMax(Result, acTextSize(Canvas, ACaption));
+  Result := Max(Result, acTextSize(Canvas, ACaption));
   Canvas.Font.Assign(Style.HeaderFontActive);
-  Result := acSizeMax(Result, acTextSize(Canvas, ACaption));
+  Result := Max(Result, acTextSize(Canvas, ACaption));
 end;
 
 procedure TACLCustomTabControl.SetTargetDPI(AValue: Integer);
@@ -995,7 +998,7 @@ begin
   Result := 0;
   if ViewItems.Count > 0 then
   begin
-    Result := CalculateTextSize('Wg').cy + acMarginHeight(GetTabMargins);
+    Result := CalculateTextSize('Wg').cy + GetTabMargins.MarginsHeight;
     if OptionsView.Style = tsHeader then
       Inc(Result, dpiApply(OptionsView.TabIndent, FCurrentPPI))
     else

@@ -140,9 +140,9 @@ type
   TACLTextLayoutBlockClass = class of TACLTextLayoutBlock;
   TACLTextLayoutBlock = class abstract
   protected
-    FLength: Word;
     FPosition: TPoint;
     FPositionInText: PWideChar;
+    FLength: Word;
   public
     function Bounds: TRect; virtual;
     function Export(AExporter: TACLTextLayoutExporter): Boolean; virtual;
@@ -182,7 +182,7 @@ type
 
   TACLTextLayoutBlockText = class(TACLTextLayoutBlock)
   protected
-    FCharacterCount: Integer;
+    FCharacterCount: Word;
     FCharacterWidths: PInteger;
     FWidth, FHeight: Word;
   public
@@ -196,6 +196,7 @@ type
 
     property Text: PWideChar read FPositionInText;
     property TextLength: Word read FLength;
+    property TextLengthVisible: Word read FCharacterCount;
     property TextHeight: Word read FHeight;
     property TextWidth: Word read FWidth;
   end;
@@ -908,7 +909,7 @@ var
   AFont: TFont;
   AText: TACLTextLayout;
 begin
-  if not R.IsEmpty and (S <> '') and RectVisible(ACanvas.Handle, R) then
+  if (S <> '') and acRectVisible(ACanvas.Handle, R) then
   begin
     AFont := ACanvas.Font.Clone;
     try
@@ -974,7 +975,7 @@ begin
     FLayoutIsDirty := False;
     FLayout.Count := 0;
     FTruncated := False;
-    CalculateCore(acRectWidth(Bounds), acRectHeight(Bounds));
+    CalculateCore(Bounds.Width, Bounds.Height);
   end;
 end;
 
@@ -987,7 +988,7 @@ procedure TACLTextLayout.Draw(ACanvas: TCanvas; const AClipRect: TRect);
 var
   AClipRegion: Integer;
 begin
-  if RectVisible(ACanvas.Handle, AClipRect) then
+  if acRectVisible(ACanvas.Handle, AClipRect) then
   begin
     Calculate;
     AClipRegion := acSaveClipRegion(ACanvas.Handle);
@@ -1008,7 +1009,7 @@ begin
   begin
     APrevOrigin := acMoveWindowOrg(ACanvas.Handle, AOrigin);
     try
-      Draw(ACanvas, acRectOffsetNegative(AClipRect, AOrigin));
+      Draw(ACanvas, AClipRect - AOrigin);
     finally
       acRestoreWindowOrg(ACanvas.Handle, APrevOrigin);
     end;
@@ -1072,7 +1073,7 @@ end;
 function TACLTextLayout.MeasureSize: TSize;
 begin
   Calculate;
-  Result := acSize(FLayout.BoundingRect);
+  Result := FLayout.BoundingRect.Size;
 end;
 
 procedure TACLTextLayout.Refresh;
@@ -1277,7 +1278,7 @@ begin
 
   Result := First.Bounds;
   for var I := 1 to Count - 1 do
-    acRectUnion(Result, List[I].Bounds);
+    Result.Add(List[I].Bounds);
 end;
 
 function TACLTextLayoutBlockList.Export(AExporter: TACLTextLayoutExporter; AFreeExporter: Boolean): Boolean;
@@ -1561,7 +1562,7 @@ begin
     Exit(NullRect);
   Result := List[0].Bounds;
   for var I := 1 to Count - 1 do
-    Result.Union(List[I].Bounds);
+    Result.Add(List[I].Bounds);
 end;
 
 function TACLTextLayoutRows.Export(AExporter: TACLTextLayoutExporter; AFreeExporter: Boolean): Boolean;
@@ -1828,7 +1829,7 @@ begin
     Exit(False);
 
   if (ABlock.TextWidth = 0) or
-     (ABlock.FCharacterCount < ABlock.TextLength) // Блок был сжат - его метрики более невалидны
+     (ABlock.TextLengthVisible < ABlock.TextLength) // Блок был сжат - его метрики более невалидны
   then
     MeasureSize(ABlock);
 
@@ -1887,6 +1888,7 @@ end;
 
 procedure TACLTextLayoutCalculator.MeasureSize(ABlock: TACLTextLayoutBlockText);
 var
+  LCount: Integer;
   LDistance: Integer;
   LTextSize: TSize;
   LWidthScan: PInteger;
@@ -1894,7 +1896,8 @@ begin
   if ABlock.FCharacterWidths = nil then
     ABlock.FCharacterWidths := AllocMem(ABlock.TextLength * SizeOf(Integer));
   GetTextExtentExPoint(Canvas.Handle, ABlock.Text, ABlock.TextLength,
-    MaxInt, @ABlock.FCharacterCount, ABlock.FCharacterWidths, LTextSize);
+    MaxInt, @LCount, ABlock.FCharacterWidths, LTextSize);
+  ABlock.FCharacterCount := LCount;
   ABlock.FHeight := LTextSize.cy;
   ABlock.FWidth := LTextSize.cx;
 
@@ -1910,15 +1913,19 @@ end;
 
 procedure TACLTextLayoutCalculator.Reorder(ABlocks: TACLTextLayoutBlockList; const ARange: TACLRange);
 var
-  R: TRect;
+  R, L: TRect;
 begin
   if ARange.Finish > ARange.Start then
   begin
     R := ABlocks.List[ARange.Start].Bounds;
     for var I := ARange.Start + 1 to ARange.Finish do
-      acRectUnion(R, ABlocks.List[I].Bounds);
+      R.Add(ABlocks.List[I].Bounds);
     for var I := ARange.Start to ARange.Finish do
-      ABlocks.List[I].FPosition := acRectMirror(ABlocks.List[I].Bounds, R).TopLeft;
+    begin
+      L := ABlocks.List[I].Bounds;
+      L.Mirror(R);
+      ABlocks.List[I].FPosition := L.TopLeft;
+    end;
   end;
 end;
 
@@ -2136,7 +2143,7 @@ var
   ABounds: TRect;
 begin
   ABounds := ABlock.Bounds;
-  if not acRectIsEmpty(ABounds) then
+  if not ABounds.IsEmpty then
   begin
     if HasBackground then
       Canvas.FillRect(ABounds);
@@ -2148,10 +2155,10 @@ end;
 
 function TACLTextLayoutRender.OnText(AText: TACLTextLayoutBlockText): Boolean;
 begin
-  if AText.FCharacterCount > 0 then
+  if AText.TextLengthVisible > 0 then
   begin
     ExtTextOut(Canvas.Handle, AText.FPosition.X, AText.FPosition.Y, 
-      0, nil, AText.Text, AText.FCharacterCount, AText.FCharacterWidths);
+      0, nil, AText.Text, AText.TextLengthVisible, AText.FCharacterWidths);
   end;
   Result := True;
 end;

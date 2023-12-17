@@ -1028,7 +1028,8 @@ procedure TACLObjectInspectorNodeViewInfo.Calculate(AWidth, AHeight: Integer);
 begin
   inherited Calculate(AWidth, AHeight);
 
-  FButtonRect := acRectInflate(CellRect[CellCount - 1], -1);
+  FButtonRect := CellRect[CellCount - 1];
+  FButtonRect.Inflate(-1);
   FButtonRect.Left := FButtonRect.Right - FButtonRect.Height;
 
   FLastCellTextExtends := FTextExtends[False];
@@ -1059,7 +1060,7 @@ begin
       Exit;
     if Supports(Node.PropertyEditor, IACLPropertyEditorCustomDraw, AIntf) then
     begin
-      AIntf.Draw(ACanvas, R, acRectContent(R, CellTextExtends[AColumnViewInfo]));
+      AIntf.Draw(ACanvas, R, R.Split(CellTextExtends[AColumnViewInfo]));
       Exit;
     end;
     if not Node.PropertyEditor.HasData then

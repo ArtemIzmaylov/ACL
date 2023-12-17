@@ -216,13 +216,14 @@ end;
 
 procedure TACLCustomDropDownEdit.CalculateButtons(var R: TRect);
 var
-  ARect: TRect;
+  LRect: TRect;
 begin
   inherited CalculateButtons(R);
-  ARect := acRectInflate(R, -dpiApply(ButtonsIndent, FCurrentPPI));
+  LRect := R;
+  LRect.Inflate(-dpiApply(ButtonsIndent, FCurrentPPI));
   ButtonViewInfo.IsEnabled := Enabled;
   ButtonViewInfo.IsDown := FDropDown <> nil;
-  ButtonViewInfo.Calculate(acRectSetLeft(ARect, ARect.Height));
+  ButtonViewInfo.Calculate(LRect.Split(srRight, LRect.Height));
   R.Right := ButtonViewInfo.Bounds.Left;
 end;
 

@@ -765,7 +765,7 @@ begin
   MeasureCanvas.Font := FOwner.Font;
   CalculateLabels(MeasureCanvas, R);
 
-  R := acRectContent(R, FOwner.Padding.GetScaledMargins(CurrentDpi));
+  R.Content(FOwner.Padding.GetScaledMargins(CurrentDpi));
   CalculateThumbBarRect(R);
   CalculateTrackBarRect;
   CalculateThumbRect;
@@ -828,7 +828,7 @@ begin
         FLabelCurrentValue.TextSize.cy := acFontHeight(ACanvas);
       end
       else
-        FLabelCurrentValue.TextSize := acSizeMax(
+        FLabelCurrentValue.TextSize := Max(
           acTextSize(ACanvas, OptionsLabels.FormatCurrentValue(OptionsValue.Max)),
           acTextSize(ACanvas, OptionsLabels.FormatCurrentValue(OptionsValue.Min)));
     end;
@@ -942,8 +942,8 @@ begin
   Result := inherited;
 
   AMargins := FOwner.Padding.GetScaledMargins(CurrentDpi);
-  Inc(Result.cx, acMarginWidth(AMargins));
-  Inc(Result.cy, acMarginHeight(AMargins));
+  Inc(Result.cx, AMargins.MarginsWidth);
+  Inc(Result.cy, AMargins.MarginsHeight);
 
   if OptionsLabels.HasLabels then
     case OptionsLabels.Layout of
@@ -990,17 +990,19 @@ procedure TACLSliderHorizontalViewInfo.CalculateLabelsCore(var R: TRect);
 
   procedure PlaceRangeLabels(const R: TRect);
   begin
-    FLabelMinValue.Bounds := acRectSetSize(R, LabelMinValue.TextSize);
+    FLabelMinValue.Bounds := TRect.Create(R.TopLeft, LabelMinValue.TextSize);
     FLabelMinValue.HorzAlignment := taLeftJustify;
 
-    FLabelMaxValue.Bounds := acRectSetHeight(acRectSetRight(R, R.Right, LabelMaxValue.TextSize.cx), LabelMaxValue.TextSize.cy);
+    FLabelMaxValue.Bounds := R.Split(srRight, LabelMaxValue.TextSize.cx);
+    FLabelMaxValue.Bounds.Height := LabelMaxValue.TextSize.cy;
     FLabelMaxValue.HorzAlignment := taRightJustify;
   end;
 
   procedure PlaceLabels(const R: TRect);
   begin
     PlaceRangeLabels(R);
-    FLabelCurrentValue.Bounds := acRectCenter(R, LabelCurrentValue.TextSize);
+    FLabelCurrentValue.Bounds := R;
+    FLabelCurrentValue.Bounds.Center(LabelCurrentValue.TextSize);
   end;
 
 begin
@@ -1009,14 +1011,14 @@ begin
   case OptionsLabels.Layout of
     sllAfterTrackBar:
       begin
-        PlaceLabels(acRectSetBottom(R, R.Bottom, GetMaxLabelHeight));
+        PlaceLabels(R.Split(srBottom, GetMaxLabelHeight));
         Dec(R.Bottom, dpiApply(acIndentBetweenElements, CurrentDpi));
         Dec(R.Bottom, GetMaxLabelHeight);
       end;
 
     sllBeforeTrackBar:
       begin
-        PlaceLabels(acRectSetHeight(R, GetMaxLabelHeight));
+        PlaceLabels(R.Split(srTop, GetMaxLabelHeight));
         Inc(R.Top, dpiApply(acIndentBetweenElements, CurrentDpi));
         Inc(R.Top, GetMaxLabelHeight);
       end;
@@ -1026,11 +1028,11 @@ begin
       begin
         if LabelCurrentValue.Assigned then
         begin
-          FLabelCurrentValue.Bounds := acRectSetBottom(R, R.Bottom, LabelCurrentValue.TextSize.cy);
+          FLabelCurrentValue.Bounds := R.Split(srBottom, LabelCurrentValue.TextSize.cy);
           R.Bottom := LabelCurrentValue.Bounds.Top - dpiApply(acIndentBetweenElements, CurrentDpi);
         end;
 
-        PlaceRangeLabels(acRectCenterVertically(R, Max(LabelMaxValue.TextSize.cy, LabelMinValue.TextSize.cy)));
+        PlaceRangeLabels(R.CenterTo(R.Width, Max(LabelMaxValue.TextSize.cy, LabelMinValue.TextSize.cy)));
         if LabelMinValue.Assigned then
           R.Left := LabelMinValue.Bounds.Right + dpiApply(acIndentBetweenElements, CurrentDpi);
         if LabelMaxValue.Assigned then
@@ -1042,8 +1044,8 @@ begin
         if LabelCurrentValue.Assigned then
         begin
           FLabelCurrentValue.HorzAlignment := taLeftJustify;
-          FLabelCurrentValue.Bounds := acRectSetRight(R, R.Right, LabelCurrentValue.TextSize.cx);
-          FLabelCurrentValue.Bounds := acRectCenterVertically(FLabelCurrentValue.Bounds, LabelCurrentValue.TextSize.cy);
+          FLabelCurrentValue.Bounds := R.Split(srRight, LabelCurrentValue.TextSize.cx);
+          FLabelCurrentValue.Bounds.CenterVert(LabelCurrentValue.TextSize.cy);
           R.Right := LabelCurrentValue.Bounds.Left - dpiApply(acIndentBetweenElements, CurrentDpi);
         end;
   end;
@@ -1068,13 +1070,14 @@ end;
 
 procedure TACLSliderHorizontalViewInfo.CalculateThumbBarRect(const R: TRect);
 begin
-  FThumbBarRect := acRectInflate(R, 0, -(GetMarkSize + 1));
+  FThumbBarRect := R;
+  FThumbBarRect.Inflate(0, -(GetMarkSize + 1));
 end;
 
 procedure TACLSliderHorizontalViewInfo.CalculateThumbRect(AProgress: Single);
 begin
-  FThumbRect := acRectSetWidth(FThumbBarRect, GetThumbSize);
-  FThumbRect := acRectOffset(FThumbRect, Trunc(GetTrackSize * AProgress), 0);
+  FThumbRect := FThumbBarRect.Split(srLeft, GetThumbSize);
+  FThumbRect.Offset(Trunc(GetTrackSize * AProgress), 0);
 end;
 
 procedure TACLSliderHorizontalViewInfo.CalculateTickMarks(AInterval: Single);
@@ -1086,7 +1089,7 @@ var
   X0, Y1, Y2, X: Integer;
 begin
   APosition := GetThumbSize div 2;
-  AMaxPosition := acRectWidth(ThumbBarRect) - APosition + 1;
+  AMaxPosition := ThumbBarRect.Width - APosition + 1;
   AMarkThickness := dpiApply(1, CurrentDpi);
   AMarkSize := GetMarkSize;
 
@@ -1105,11 +1108,13 @@ end;
 
 procedure TACLSliderHorizontalViewInfo.CalculateTrackBarRect;
 begin
-  FTrackBarRect := acRectInflate(FThumbBarRect, 0, -GetTrackAreaOffset);
+  FTrackBarRect := FThumbBarRect;
+  FTrackBarRect.Inflate(0, -GetTrackAreaOffset);
 
   if OptionsValue.IsDefaultAssigned then
   begin
-    FDefaultValueRect := acRectInflate(FTrackBarRect, 0, -1);
+    FDefaultValueRect := FTrackBarRect;
+    FDefaultValueRect.Inflate(0, -1);
     FDefaultValueRect.Left := FTrackBarRect.Left + GetDefaultValuePosition;
     FDefaultValueRect.Right := FDefaultValueRect.Left + dpiApply(DefaultValueAreaSize, CurrentDpi);
   end
@@ -1131,7 +1136,7 @@ end;
 
 function TACLSliderHorizontalViewInfo.GetTrackSize: Integer;
 begin
-  Result := acRectWidth(ThumbBarRect) - GetThumbSize;
+  Result := ThumbBarRect.Width - GetThumbSize;
 end;
 
 { TACLSliderVerticalViewInfo }
@@ -1156,8 +1161,8 @@ begin
   acExchangeIntegers(Result.cx, Result.cy);
 
   AMargins := FOwner.Padding.GetScaledMargins(CurrentDpi);
-  Inc(Result.cx, acMarginWidth(AMargins));
-  Inc(Result.cy, acMarginHeight(AMargins));
+  Inc(Result.cx, AMargins.MarginsWidth);
+  Inc(Result.cy, AMargins.MarginsHeight);
 
   if OptionsLabels.HasLabels then
     case OptionsLabels.Layout of
@@ -1209,15 +1214,16 @@ procedure TACLSliderVerticalViewInfo.CalculateLabelsCore(var R: TRect);
 
   procedure PlaceRangeLabels(const R: TRect; AAlignment: TAlignment);
   begin
-    FLabelMinValue.Bounds := acRectSetHeight(R, LabelMinValue.TextSize.cy);
+    FLabelMinValue.Bounds := R.Split(srTop, LabelMinValue.TextSize.cy);
     FLabelMinValue.HorzAlignment := AAlignment;
-    FLabelMaxValue.Bounds := acRectSetBottom(R, R.Bottom, LabelMaxValue.TextSize.cy);
+    FLabelMaxValue.Bounds := R.Split(srBottom, LabelMaxValue.TextSize.cy);
     FLabelMaxValue.HorzAlignment := AAlignment;
   end;
 
   procedure PlaceCurrentValueLabel(const R: TRect; AAlignment: TAlignment);
   begin
-    FLabelCurrentValue.Bounds := acRectCenterVertically(R, LabelCurrentValue.TextSize.cy);
+    FLabelCurrentValue.Bounds := R;
+    FLabelCurrentValue.Bounds.CenterVert(LabelCurrentValue.TextSize.cy);
     FLabelCurrentValue.HorzAlignment := AAlignment;
   end;
 
@@ -1231,14 +1237,14 @@ begin
   case OptionsLabels.Layout of
     sllAfterTrackBar:
       begin
-        PlaceLabels(acRectSetRight(R, R.Right, GetMaxLabelWidth), taLeftJustify);
+        PlaceLabels(R.Split(srRight, GetMaxLabelWidth), taLeftJustify);
         Dec(R.Right, dpiApply(acIndentBetweenElements, CurrentDpi));
         Dec(R.Right, GetMaxLabelWidth);
       end;
 
     sllBeforeTrackBar:
       begin
-        PlaceLabels(acRectSetWidth(R, GetMaxLabelWidth), taRightJustify);
+        PlaceLabels(R.Split(srLeft, GetMaxLabelWidth), taRightJustify);
         Inc(R.Left, dpiApply(acIndentBetweenElements, CurrentDpi));
         Inc(R.Left, GetMaxLabelWidth);
       end;
@@ -1248,11 +1254,11 @@ begin
       begin
         if LabelCurrentValue.Assigned then
         begin
-          PlaceCurrentValueLabel(acRectSetRight(R, R.Right, LabelCurrentValue.TextSize.cx), taLeftJustify);
+          PlaceCurrentValueLabel(R.Split(srRight, LabelCurrentValue.TextSize.cx), taLeftJustify);
           R.Right := LabelCurrentValue.Bounds.Left - dpiApply(acIndentBetweenElements, CurrentDpi);
         end;
 
-        PlaceRangeLabels(acRectCenterHorizontally(R, GetMaxLabelWidth), taCenter);
+        PlaceRangeLabels(R.CenterTo(GetMaxLabelWidth, R.Height), taCenter);
         if LabelMinValue.Assigned then
           R.Top := LabelMinValue.Bounds.Bottom + dpiApply(acIndentBetweenElements, CurrentDpi);
         if LabelMaxValue.Assigned then
@@ -1261,7 +1267,7 @@ begin
       else
         if LabelCurrentValue.Assigned then
         begin
-          PlaceCurrentValueLabel(acRectSetHeight(R, LabelCurrentValue.TextSize.cy), taCenter);
+          PlaceCurrentValueLabel(R.Split(srTop, LabelCurrentValue.TextSize.cy), taCenter);
           R.Top := LabelCurrentValue.Bounds.Bottom + dpiApply(acIndentBetweenElements, CurrentDpi);
         end;
   end;
@@ -1274,11 +1280,13 @@ end;
 
 procedure TACLSliderVerticalViewInfo.CalculateThumbBarRect(const R: TRect);
 begin
-  FThumbBarRect := acRectInflate(R, -(GetMarkSize + 1), 0);
+  FThumbBarRect := R;
+  FThumbBarRect.Inflate(-(GetMarkSize + 1), 0);
 
   if OptionsValue.IsDefaultAssigned then
   begin
-    FDefaultValueRect := acRectInflate(FTrackBarRect, -1, 0);
+    FDefaultValueRect := FTrackBarRect;
+    FDefaultValueRect.Inflate(-1, 0);
     FDefaultValueRect.Top := FTrackBarRect.Top + GetDefaultValuePosition;
     FDefaultValueRect.Bottom := FDefaultValueRect.Top + dpiApply(DefaultValueAreaSize, CurrentDpi);
   end
@@ -1288,8 +1296,8 @@ end;
 
 procedure TACLSliderVerticalViewInfo.CalculateThumbRect(AProgress: Single);
 begin
-  FThumbRect := acRectSetHeight(FThumbBarRect, GetThumbSize);
-  FThumbRect := acRectOffset(FThumbRect, 0, Trunc(GetTrackSize * AProgress));
+  FThumbRect := FThumbBarRect.Split(srTop, GetThumbSize);
+  FThumbRect.Offset(0, Trunc(GetTrackSize * AProgress));
 end;
 
 procedure TACLSliderVerticalViewInfo.CalculateTickMarks(AInterval: Single);
@@ -1301,7 +1309,7 @@ var
   Y0, X1, X2, Y: Integer;
 begin
   APosition := GetThumbSize div 2;
-  AMaxPosition := acRectHeight(ThumbBarRect) - APosition + 1;
+  AMaxPosition := ThumbBarRect.Height - APosition + 1;
   AMarkThickness := dpiApply(1, CurrentDpi);
   AMarkSize := GetMarkSize;
 
@@ -1320,7 +1328,8 @@ end;
 
 procedure TACLSliderVerticalViewInfo.CalculateTrackBarRect;
 begin
-  FTrackBarRect := acRectInflate(FThumbBarRect, -GetTrackAreaOffset, 0);
+  FTrackBarRect := FThumbBarRect;
+  FTrackBarRect.Inflate(-GetTrackAreaOffset, 0);
 end;
 
 function TACLSliderVerticalViewInfo.GetMaxLabelWidth: Integer;
@@ -1337,7 +1346,7 @@ end;
 
 function TACLSliderVerticalViewInfo.GetTrackSize: Integer;
 begin
-  Result := acRectHeight(ThumbBarRect) - GetThumbSize;
+  Result := ThumbBarRect.Height - GetThumbSize;
 end;
 
 { TACLSlider }
@@ -1652,7 +1661,7 @@ end;
 
 procedure TACLSlider.DrawText(ACanvas: TCanvas; const AViewInfo: TACLSliderTextViewInfo);
 begin
-  if not acRectIsEmpty(AViewInfo.Bounds) then
+  if not AViewInfo.Bounds.IsEmpty then
   begin
     Canvas.Font := Font;
     Canvas.Font.Color := AViewInfo.TextColor;
@@ -1684,7 +1693,7 @@ procedure TACLSlider.DrawTrackBar(ACanvas: TCanvas; const ARect: TRect);
 begin
   if not CallCustomDrawEvent(Self, OnDrawBackground, ACanvas, ARect) then
     Style.Draw(ACanvas.Handle, ARect, Enabled);
-  if not acRectIsEmpty(ViewInfo.DefaultValueRect) then
+  if not ViewInfo.DefaultValueRect.IsEmpty then
     acFillRect(ACanvas.Handle, ViewInfo.DefaultValueRect, Style.ColorDefaultValue.Value);
 end;
 

@@ -18,12 +18,14 @@ interface
 uses
   Winapi.Windows,
   // System
-  System.Types,
-  System.SysUtils,
   System.Classes,
+  System.Math,
+  System.SysUtils,
+  System.Types,
   // VCL
   Vcl.Graphics,
   Vcl.Controls,
+  Vcl.Forms,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -266,6 +268,8 @@ type
     FOwner: TACLBindingDiagramObjectViewInfo;
     FPin: TACLBindingDiagramObjectPin;
 
+    function GetInputConnectorLine: TRect;
+    function GetOutputConnectorLine: TRect;
     function GetInputConnectorHitTestRect: TRect;
     function GetOutputConnectorHitTestRect: TRect;
     function GetTextRect: TRect;
@@ -288,10 +292,12 @@ type
     destructor Destroy; override;
     function CalculateHitTest(const AInfo: TACLHitTestInfo): Boolean; override;
     function MeasureSize: TSize;
-    //
+    //# Properties
     property InputConnectorHitTestRect: TRect read GetInputConnectorHitTestRect;
+    property InputConnectorLine: TRect read GetInputConnectorLine;
     property InputConnectorRect: TRect read FInputConnectorRect;
     property OutputConnectorHitTestRect: TRect read GetOutputConnectorHitTestRect;
+    property OutputConnectorLine: TRect read GetOutputConnectorLine;
     property OutputConnectorRect: TRect read FOutputConnectorRect;
     property Owner: TACLBindingDiagramObjectViewInfo read FOwner;
     property Pin: TACLBindingDiagramObjectPin read FPin;
@@ -319,7 +325,7 @@ type
     Matrix: array of array of Integer;
     Rows: TACLList<Integer>;
 
-    procedure Add(const AObjectViewInfo: TACLBindingDiagramObjectViewInfo); overload;
+    procedure Add(AObjectViewInfo: TACLBindingDiagramObjectViewInfo); overload;
     procedure Add(const R: TRect); overload;
     procedure Clean;
     function CheckBounds(X, Y: Integer): Boolean; inline;
@@ -486,16 +492,19 @@ type
   public
     constructor Create(AOwner: TACLCompoundControlSubClass); override;
     destructor Destroy; override;
-    function FindViewInfo(ALink: TACLBindingDiagramLink; out AViewInfo: TACLBindingDiagramLinkViewInfo): Boolean; overload;
-    function FindViewInfo(AObject: TACLBindingDiagramObject; out AViewInfo: TACLBindingDiagramObjectViewInfo): Boolean; overload;
-    //
+    function FindViewInfo(ALink: TACLBindingDiagramLink;
+      out AViewInfo: TACLBindingDiagramLinkViewInfo): Boolean; overload;
+    function FindViewInfo(AObject: TACLBindingDiagramObject;
+      out AViewInfo: TACLBindingDiagramObjectViewInfo): Boolean; overload;
+    //# Properties
     property SubClass: TACLBindingDiagramSubClass read GetSubClass;
   end;
 
 implementation
 
 uses
-  Math, Forms, ACL.Utils.DPIAware, ACL.Utils.Strings;
+  ACL.Utils.DPIAware,
+  ACL.Utils.Strings;
 
 type
   TACLBindingDiagramLinkAccess = class(TACLBindingDiagramLink);
@@ -505,15 +514,15 @@ type
 procedure TACLStyleBindingDiagram.DrawObjectBorders(ACanvas: TCanvas; const R: TRect);
 begin
   acDrawFrame(ACanvas.Handle, R, ColorObjectBorder.Value);
-  acFillRect(ACanvas.Handle, acRectInflate(R, -1), ColorObjectContent.Value);
+  acFillRect(ACanvas.Handle, R.InflateTo(-1), ColorObjectContent.Value);
 end;
 
 procedure TACLStyleBindingDiagram.DrawSelection(ACanvas: TCanvas; const R: TRect);
 var
-  ASize: Integer;
+  LSize: Integer;
 begin
-  ASize := MulDiv(TargetDPI, SelectionSize, acDefaultDPI);
-  acDrawFrame(ACanvas.Handle, acRectInflate(R, ASize), ColorObjectSelection.Value, ASize);
+  LSize := MulDiv(TargetDPI, SelectionSize, acDefaultDPI);
+  acDrawFrame(ACanvas.Handle, R.InflateTo(LSize), ColorObjectSelection.Value, LSize);
 end;
 
 procedure TACLStyleBindingDiagram.InitializeResources;
@@ -873,12 +882,12 @@ var
 begin
   if cccnLayout in AChanges then
   begin
-    FCaptionRect := acRectSetHeight(ContentRect, CalculateCaptionSize.cy);
+    FCaptionRect := ContentRect.Split(srTop, CalculateCaptionSize.cy);
     if HasRemoveButton then
     begin
-      FRemoveButtonRect := acRectSetRight(CaptionRect, CaptionRect.Right, CaptionRect.Height);
-      FRemoveButtonRect := acRectCenterVertically(RemoveButtonRect, FOwner.FTextLineHeight);
-      FRemoveButtonRect := acRectInflate(RemoveButtonRect, -2 * dpiApply(acTextIndent, CurrentDpi));
+      FRemoveButtonRect := CaptionRect.Split(srRight, CaptionRect.Height);
+      FRemoveButtonRect.CenterVert(FOwner.FTextLineHeight);
+      FRemoveButtonRect.Inflate(-2 * dpiApply(acTextIndent, CurrentDpi));
     end
     else
       FRemoveButtonRect := NullRect;
@@ -892,7 +901,7 @@ begin
     for I := 0 to ChildCount - 2 do
     begin
       ACell := TACLBindingDiagramObjectPinViewInfo(Children[I]);
-      ACell.Calculate(acRectSetHeight(R, ACellHeight), AChanges);
+      ACell.Calculate(R.Split(srTop, ACellHeight), AChanges);
       R.Top := ACell.Bounds.Bottom;
     end;
     TACLBindingDiagramObjectPinViewInfo(Children[ChildCount - 1]).Calculate(R, AChanges);
@@ -993,7 +1002,8 @@ end;
 
 function TACLBindingDiagramObjectViewInfo.GetBorderBounds: TRect;
 begin
-  Result := acRectInflate(Bounds, -dpiApply(TACLBindingDiagramObjectPinViewInfo.ConnectorSize, CurrentDpi), 0);
+  Result := Bounds;
+  Result.Inflate(-dpiApply(TACLBindingDiagramObjectPinViewInfo.ConnectorSize, CurrentDpi), 0);
 end;
 
 function TACLBindingDiagramObjectViewInfo.GetCaptionTextRect: TRect;
@@ -1001,12 +1011,13 @@ begin
   Result := CaptionRect;
   if not IsRectEmpty(RemoveButtonRect) then
     Result.Right := RemoveButtonRect.Left;
-  Result := acRectInflate(Result, -dpiApply(acTextIndent, CurrentDpi));
+  Result.Inflate(-dpiApply(acTextIndent, CurrentDpi));
 end;
 
 function TACLBindingDiagramObjectViewInfo.GetContentRect: TRect;
 begin
-  Result := acRectInflate(BorderBounds, -BorderWidth);
+  Result := BorderBounds;
+  Result.Inflate(-BorderWidth);
 end;
 
 function TACLBindingDiagramObjectViewInfo.GetStyle: TACLStyleBindingDiagram;
@@ -1076,7 +1087,7 @@ begin
     FInputConnectorRect := Bounds;
     FInputConnectorRect.Right := Bounds.Left + AConnectorSize - 1;
     FInputConnectorRect.Left := Bounds.Left - AConnectorSize - FOwner.BorderWidth;
-    FInputConnectorRect := acRectCenterVertically(FInputConnectorRect, FInputConnectorRect.Width);
+    FInputConnectorRect.CenterVert(FInputConnectorRect.Width);
   end
   else
     FInputConnectorRect := NullRect;
@@ -1086,7 +1097,7 @@ begin
     FOutputConnectorRect := Bounds;
     FOutputConnectorRect.Right := Bounds.Right + AConnectorSize + FOwner.BorderWidth;
     FOutputConnectorRect.Left := Bounds.Right - AConnectorSize + 1;
-    FOutputConnectorRect := acRectCenterVertically(FOutputConnectorRect, FOutputConnectorRect.Width);
+    FOutputConnectorRect.CenterVert(FOutputConnectorRect.Width);
   end
   else
     FOutputConnectorRect := NullRect;
@@ -1124,26 +1135,26 @@ procedure TACLBindingDiagramObjectPinViewInfo.DoDrawBackground(ACanvas: TCanvas)
   end;
 
 var
-  AColorArea: TRect;
-  I: Integer;
+  LColorArea: TRect;
 begin
   if FLinks.Count > 0 then
   begin
-    AColorArea := Bounds;
-    AColorArea.Right := AColorArea.Left + AColorArea.Width div FLinks.Count;
-    for I := 0 to FLinks.Count - 2 do
+    LColorArea := Bounds;
+    LColorArea.Right := LColorArea.Left + LColorArea.Width div FLinks.Count;
+    for var I := 0 to FLinks.Count - 2 do
     begin
-      acFillRect(ACanvas.Handle, AColorArea, GetColor(FLinks.List[I]));
-      AColorArea := acRectOffset(AColorArea, AColorArea.Width, 0);
+      acFillRect(ACanvas.Handle, LColorArea, GetColor(FLinks.List[I]));
+      LColorArea.Offset(LColorArea.Width, 0);
     end;
-    AColorArea.Right := Bounds.Right;
-    acFillRect(ACanvas.Handle, AColorArea, GetColor(FLinks.Last));
+    LColorArea.Right := Bounds.Right;
+    acFillRect(ACanvas.Handle, LColorArea, GetColor(FLinks.Last));
   end;
 end;
 
-procedure TACLBindingDiagramObjectPinViewInfo.DoDrawConnector(ACanvas: TCanvas; const R: TRect; AMode: TACLBindingDiagramObjectPinMode);
+procedure TACLBindingDiagramObjectPinViewInfo.DoDrawConnector(
+  ACanvas: TCanvas; const R: TRect; AMode: TACLBindingDiagramObjectPinMode);
 begin
-  if not acRectIsEmpty(R) then
+  if not R.IsEmpty then
   begin
     FOwner.Style.DrawObjectBorders(ACanvas, R);
     if AMode in FHighlightedConnectors then
@@ -1151,7 +1162,8 @@ begin
   end;
 end;
 
-function TACLBindingDiagramObjectPinViewInfo.CreateDragObject(const AInfo: TACLHitTestInfo): TACLCompoundControlDragObject;
+function TACLBindingDiagramObjectPinViewInfo.CreateDragObject(
+  const AInfo: TACLHitTestInfo): TACLCompoundControlDragObject;
 begin
   if TACLBindingDiagramSubClass(SubClass).OptionsBehavior.AllowCreateLinks and (Pin.Mode <> []) then
     Result := TACLBindingDiagramCreateLinkDragObject.Create(Self)
@@ -1162,20 +1174,35 @@ end;
 function TACLBindingDiagramObjectPinViewInfo.GetInputConnectorHitTestRect: TRect;
 begin
   Result := InputConnectorRect;
-  if not acRectIsEmpty(Result) then
-    Result := acRectCenter(Result, 2 * dpiApply(ConnectorHitTestSize, CurrentDpi));
+  if not Result.IsEmpty then
+    Result.Center(TSize.Create(2 * dpiApply(ConnectorHitTestSize, CurrentDpi)));
+end;
+
+function TACLBindingDiagramObjectPinViewInfo.GetInputConnectorLine: TRect;
+begin
+  Result := InputConnectorRect;
+  if not Result.IsEmpty then
+    Result.CenterVert(1);
 end;
 
 function TACLBindingDiagramObjectPinViewInfo.GetOutputConnectorHitTestRect: TRect;
 begin
   Result := OutputConnectorRect;
-  if not acRectIsEmpty(Result) then
-    Result := acRectCenter(Result, 2 * dpiApply(ConnectorHitTestSize, CurrentDpi));
+  if not Result.IsEmpty then
+    Result.Center(TSize.Create(2 * dpiApply(ConnectorHitTestSize, CurrentDpi)));
+end;
+
+function TACLBindingDiagramObjectPinViewInfo.GetOutputConnectorLine: TRect;
+begin
+  Result := OutputConnectorRect;
+  if not Result.IsEmpty then
+    Result.CenterVert(1);
 end;
 
 function TACLBindingDiagramObjectPinViewInfo.GetTextRect: TRect;
 begin
-  Result := acRectInflate(Bounds, -dpiApply(ConnectorSize, CurrentDpi) - dpiApply(acTextIndent, CurrentDpi), 0);
+  Result := Bounds;
+  Result.Inflate(-dpiApply(ConnectorSize, CurrentDpi) - dpiApply(acTextIndent, CurrentDpi), 0);
 end;
 
 { TACLBindingDiagramLinkCustomPathBuilder }
@@ -1238,7 +1265,7 @@ procedure TACLBindingDiagramComplexPathBuilder.Build(APoints: TACLList<TPoint>; 
     ALevel := 1;
     Matrix[AStart.Y, AStart.X] := ALevel;
     Matrix[AFinish.Y, AFinish.X] := ID_EMPTY;
-    AWaveBounds := acRect(AStart);
+    AWaveBounds := TRect.Create(AStart);
     repeat
       AMarked := False;
       for Y := AWaveBounds.Top to AWaveBounds.Bottom do
@@ -1283,14 +1310,14 @@ var
   AStart: TPoint;
   AStartPoint: TPoint;
 begin
-  S := RectToIndexes(acRectCenterVertically(ASource.OutputConnectorRect, 1));;
-  T := RectToIndexes(acRectCenterVertically(ATarget.InputConnectorRect, 1));;
+  S := RectToIndexes(ASource.OutputConnectorLine);
+  T := RectToIndexes(ATarget.InputConnectorLine);
 
   AFinish := Point(T.Left - 1, T.Top);
   AStart := Point(S.Right, S.Top);
 
-  AStartPoint := acRectCenter(acRectSetWidth(ATarget.InputConnectorRect, 0));
-  AFinishPoint := acRectCenter(acRectSetRight(ASource.OutputConnectorRect, ASource.OutputConnectorRect.Right - 1, 0));
+  AStartPoint := ATarget.InputConnectorRect.Split(srLeft, 0).CenterPoint;
+  AFinishPoint := ASource.OutputConnectorRect.Split(srRight, ASource.OutputConnectorRect.Right - 1, 0).CenterPoint;
 
   APoints.Count := 0;
   TracePath(AStart, AFinish);
@@ -1307,35 +1334,30 @@ begin
 end;
 
 procedure TACLBindingDiagramComplexPathBuilder.Initialize(AViewInfo: TACLBindingDiagramSubClassViewInfo);
-var
-  I: Integer;
 begin
   Columns.Capacity := 8 * AViewInfo.ChildCount;
   Rows.Capacity := Columns.Capacity;
-
-  for I := 0 to AViewInfo.ChildCount - 1 do
+  for var I := 0 to AViewInfo.ChildCount - 1 do
     Add(TACLBindingDiagramObjectViewInfo(AViewInfo.FChildren.List[I]));
 
   SetLength(Matrix, Rows.Count, Columns.Count);
-
-  for I := 0 to AViewInfo.ChildCount - 1 do
+  for var I := 0 to AViewInfo.ChildCount - 1 do
     MarkObject(AViewInfo.Children[I].Bounds);
 end;
 
-procedure TACLBindingDiagramComplexPathBuilder.Add(const AObjectViewInfo: TACLBindingDiagramObjectViewInfo);
+procedure TACLBindingDiagramComplexPathBuilder.Add(AObjectViewInfo: TACLBindingDiagramObjectViewInfo);
 var
   APinViewInfo: TACLBindingDiagramObjectPinViewInfo;
-  I: Integer;
 begin
   Add(AObjectViewInfo.Bounds);
-  Add(acRectInflate(AObjectViewInfo.BorderBounds, AObjectViewInfo.Owner.FLineOffset));
-  for I := 0 to AObjectViewInfo.ChildCount - 1 do
+  Add(AObjectViewInfo.BorderBounds.InflateTo(AObjectViewInfo.Owner.FLineOffset));
+  for var I := 0 to AObjectViewInfo.ChildCount - 1 do
   begin
     APinViewInfo := TACLBindingDiagramObjectPinViewInfo(AObjectViewInfo.FChildren.List[I]);
-    if not acRectIsEmpty(APinViewInfo.InputConnectorRect) then
-      Add(acRectCenterVertically(APinViewInfo.InputConnectorRect, 1));
-    if not acRectIsEmpty(APinViewInfo.OutputConnectorRect) then
-      Add(acRectCenterVertically(APinViewInfo.OutputConnectorRect, 1));
+    if not APinViewInfo.InputConnectorRect.IsEmpty then
+      Add(APinViewInfo.InputConnectorLine);
+    if not APinViewInfo.OutputConnectorRect.IsEmpty then
+      Add(APinViewInfo.OutputConnectorLine);
   end;
 end;
 
@@ -1451,13 +1473,13 @@ end;
 
 procedure TACLBindingDiagramScrollDragObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
 var
-  APrevViewport: TPoint;
+  LOldViewport: TPoint;
 begin
   Cursor := crSizeAll;
-  APrevViewport := FOwner.Viewport;
-  FOwner.Viewport := acPointOffset(FOwner.Viewport, -ADeltaX, -ADeltaY);
-  ADeltaX := APrevViewport.X - FOwner.ViewportX;
-  ADeltaY := APrevViewport.Y - FOwner.ViewportY;
+  LOldViewport := FOwner.Viewport;
+  FOwner.Viewport := Point(LOldViewport.X - ADeltaX, LOldViewport.Y - ADeltaY);
+  ADeltaX := LOldViewport.X - FOwner.ViewportX;
+  ADeltaY := LOldViewport.Y - FOwner.ViewportY;
 end;
 
 function TACLBindingDiagramScrollDragObject.DragStart: Boolean;
@@ -1543,16 +1565,15 @@ end;
 procedure TACLBindingDiagramSubClassViewInfo.CalculateContentLayout;
 var
   ABoundingRect: TRect;
-  I: Integer;
 begin
   if ChildCount > 0 then
   begin
     ABoundingRect := Children[0].Bounds;
-    for I := 1 to ChildCount - 1 do
-      acRectUnion(ABoundingRect, Children[I].Bounds);
-    for I := 0 to FLinks.Count - 1 do
-      acRectUnion(ABoundingRect, FLinks[I].Bounds);
-    FContentSize := acSize(ABoundingRect.Right, ABoundingRect.Bottom);
+    for var I := 1 to ChildCount - 1 do
+      ABoundingRect.Add(Children[I].Bounds);
+    for var I := 0 to FLinks.Count - 1 do
+      ABoundingRect.Add(FLinks[I].Bounds);
+    FContentSize := TSize.Create(ABoundingRect.Right, ABoundingRect.Bottom);
   end
   else
     FContentSize := NullSize;
@@ -1600,16 +1621,17 @@ var
 begin
   ACanvas := MeasureCanvas;
   ACanvas.Font := SubClass.Font;
-  ABasePosition := acPointOffset(Bounds.TopLeft, FLineOffset, FLineOffset);
+  ABasePosition := Bounds.TopLeft;
+  ABasePosition.Offset(FLineOffset, FLineOffset);
   ACardWidth := SubClass.OptionsView.CardWidth;
 
   for I := 0 to ChildCount - 1 do
   begin
     AObjectViewInfo := TACLBindingDiagramObjectViewInfo(Children[I]);
-    AObjectBounds := acRectSetSize(AlignWithCells(AObjectViewInfo.&Object.Position), AObjectViewInfo.MeasureSize);
+    AObjectBounds := TRect.Create(AlignWithCells(AObjectViewInfo.&Object.Position), AObjectViewInfo.MeasureSize);
     if ACardWidth > 0 then
-      AObjectBounds := acRectSetWidth(AObjectBounds, ACardWidth);
-    AObjectBounds := acRectOffset(AObjectBounds, ABasePosition);
+      AObjectBounds.Width := ACardWidth;
+    AObjectBounds.Offset(ABasePosition);
     AObjectViewInfo.Calculate(AObjectBounds, [cccnLayout]);
   end;
 end;
@@ -1633,7 +1655,7 @@ procedure TACLBindingDiagramSubClassViewInfo.DoCalculateHitTest(const AInfo: TAC
 var
   I: Integer;
 begin
-  AInfo.HitPoint := acPointOffset(AInfo.HitPoint, Viewport);
+  AInfo.HitPoint := AInfo.HitPoint + Viewport;
   try
     inherited;
     if AInfo.HitObject = Self then
@@ -1643,7 +1665,7 @@ begin
           Break;
       end;
   finally
-    AInfo.HitPoint := acPointOffsetNegative(AInfo.HitPoint, Viewport);
+    AInfo.HitPoint := AInfo.HitPoint - Viewport;
   end;
 end;
 
@@ -1815,7 +1837,7 @@ begin
   else
     Result := Point(APinViewInfo.InputConnectorRect.Left, APinViewInfo.InputConnectorRect.CenterPoint.Y);
 
-  Result := acPointOffset(Result, ViewOrigin);
+  Result := Result + ViewOrigin;
 end;
 
 function TACLBindingDiagramCustomLinkDragObject.GetStyle: TACLStyleBindingDiagram;
@@ -1857,18 +1879,18 @@ begin
 end;
 
 procedure TACLBindingDiagramLinkViewInfo.Calculate(APathBuilder: TACLBindingDiagramLinkCustomPathBuilder);
-var
-  I: Integer;
 begin
-  if (FOwner.FMoving = nil) or (FOwner.FMoving = FSourcePin.Owner.&Object) or (FOwner.FMoving = FTargetPin.Owner.&Object) then
+  if (FOwner.FMoving = nil) or
+     (FOwner.FMoving = FSourcePin.Owner.&Object) or
+     (FOwner.FMoving = FTargetPin.Owner.&Object) then
   begin
     APathBuilder.Build(FPoints, FSourcePin, FTargetPin);
     CalculateArrows;
 
-    FBounds := acRect(FPoints.First);
-    for I := 1 to FPoints.Count - 1 do
-      acRectUnion(FBounds, acRect(FPoints.List[I]));
-    FBounds := acRectInflate(FBounds, dpiApply(HitTestSize, CurrentDpi));
+    FBounds := TRect.Create(FPoints.First);
+    for var I := 1 to FPoints.Count - 1 do
+      FBounds.Add(TRect.Create(FPoints.List[I]));
+    FBounds.Inflate(dpiApply(HitTestSize, CurrentDpi));
   end;
 end;
 
@@ -1877,13 +1899,13 @@ var
   I: Integer;
   R: TRect;
 begin
-  Result := False;
   if PtInRect(Bounds, AInfo.HitPoint) then
   begin
     for I := 0 to FPoints.Count - 2 do
     begin
-      R := acRectAdjust(Rect(FPoints.List[I], FPoints.List[I + 1]));
-      R := acRectInflate(R, dpiApply(HitTestSize, CurrentDpi));
+      R := TRect.Create(FPoints.List[I], FPoints.List[I + 1]);
+      R.NormalizeRect;
+      R.Inflate(dpiApply(HitTestSize, CurrentDpi));
       if PtInRect(R, AInfo.HitPoint) then
       begin
         DoCalculateHitTest(AInfo);
@@ -1891,6 +1913,7 @@ begin
       end;
     end;
   end;
+  Result := False;
 end;
 
 function TACLBindingDiagramLinkViewInfo.IsHighlighted: Boolean;
@@ -2007,8 +2030,8 @@ var
   ADistanceToSource: Double;
   ADistanceToTarget: Double;
 begin
-  ADistanceToSource := acPointDistance(HitTest.HitPoint, FLink.FSourcePin.OutputConnectorRect.CenterPoint);
-  ADistanceToTarget := acPointDistance(HitTest.HitPoint, FLink.FTargetPin.InputConnectorRect.CenterPoint);
+  ADistanceToSource := HitTest.HitPoint.Distance(FLink.FSourcePin.OutputConnectorRect.CenterPoint);
+  ADistanceToTarget := HitTest.HitPoint.Distance(FLink.FTargetPin.InputConnectorRect.CenterPoint);
   if ADistanceToSource < ADistanceToTarget then
   begin
     FStartPin := FLink.FTargetPin;

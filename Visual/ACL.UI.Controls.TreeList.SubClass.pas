@@ -1292,7 +1292,7 @@ end;
 
 function TACLTreeListColumnViewInfo.CalculateAutoWidth: Integer;
 begin
-  Result := acRectWidth(Bounds) - acRectWidth(TextRect);
+  Result := Bounds.Width - TextRect.Width;
   if Column.TextVisible then
   begin
     SubClass.StylePrepareFont(MeasureCanvas, TACLStyleTreeList.IndexColumnHeaderFont);
@@ -1316,13 +1316,13 @@ begin
       AInfo.HintData.ScreenBounds := SubClass.ClientToScreen(Bounds);
     end
     else
-      if CalculateAutoWidth > acRectWidth(Bounds) then
+      if CalculateAutoWidth > Bounds.Width then
       begin
         AInfo.HintData.Text := Column.Caption;
         AInfo.HintData.ScreenBounds := SubClass.ClientToScreen(TextRect);
       end;
 
-    if acPointInRect(CheckBoxRect, AInfo.HitPoint) then
+    if PtInRect(CheckBoxRect, AInfo.HitPoint) then
     begin
       AInfo.Cursor := crHandPoint;
       AInfo.IsCheckable := True;
@@ -1354,8 +1354,8 @@ begin
   SortByIndex := Column.SortByIndex;
 
   ASortArrowSize := SortArrowIndexSize;
-  FSortArrowIndexRect := acRectSetLeft(R, ASortArrowSize.cx);
-  FSortArrowIndexRect := acRectSetHeight(FSortArrowIndexRect, ASortArrowSize.cy);
+  FSortArrowIndexRect := R.Split(srRight, ASortArrowSize.cx);
+  FSortArrowIndexRect.Height := ASortArrowSize.cy;
   R.Right := SortArrowIndexRect.Left;
 
   if SortByIndex >= 0 then
@@ -1363,30 +1363,31 @@ begin
   else
     ASortArrowSize := NullSize;
 
-  FSortArrowRect := acRectSetLeft(R, ASortArrowSize.cx);
-  FSortArrowRect := acRectCenterVertically(SortArrowRect, ASortArrowSize.cy);
+  FSortArrowRect := R.Split(srRight, ASortArrowSize.cx);
+  FSortArrowRect.CenterVert(ASortArrowSize.cy);
   R.Right := SortArrowRect.Left;
 
-  FSortArrowIndexRect := acRectSetTop(SortArrowIndexRect, SortArrowRect.Top + 4, SortArrowIndexRect.Height);
+  FSortArrowIndexRect.SetLocation(FSortArrowIndexRect.Left, SortArrowRect.Top + 4);
 end;
 
 procedure TACLTreeListColumnViewInfo.CalculateImageRect(var R: TRect; AHasText: Boolean);
 var
-  AImageSize: TSize;
+  LImageSize: TSize;
 begin
   if Column.ImageIndex >= 0 then
-    AImageSize := acGetImageListSize(OptionsColumns.Images, CurrentDpi)
+    LImageSize := acGetImageListSize(OptionsColumns.Images, CurrentDpi)
   else
-    AImageSize := NullSize;
+    LImageSize := NullSize;
 
+  FImageRect := R;
   if AHasText then
   begin
-    FImageRect := acRectCenterVertically(R, AImageSize.cY);
-    Inc(R.Left, AImageSize.cX + IfThen(AImageSize.cx > 0, dpiApply(acIndentBetweenElements, CurrentDpi)));
+    FImageRect.CenterVert(LImageSize.cY);
+    Inc(R.Left, LImageSize.cX + IfThen(LImageSize.cx > 0, dpiApply(acIndentBetweenElements, CurrentDpi)));
   end
   else
   begin
-    FImageRect := acRectCenter(R, AImageSize);
+    FImageRect.Center(LImageSize);
     R.Left := R.Right;
   end;
 end;
@@ -1397,7 +1398,8 @@ begin
   begin
     NodeViewInfo.Initialize(nil);
     Dec(R.Left, NodeViewInfo.FTextExtends[False].Left);
-    FCheckBoxRect := acRectCenterVertically(R, acRectHeight(NodeViewInfo.CheckBoxRect));
+    FCheckBoxRect := R;
+    FCheckBoxRect.CenterVert(NodeViewInfo.CheckBoxRect.Height);
     FCheckBoxRect.Left := R.Left + NodeViewInfo.CheckBoxRect.Left;
     FCheckBoxRect.Right := R.Left + NodeViewInfo.CheckBoxRect.Right;
     R.Left := CheckBoxRect.Right + dpiApply(acIndentBetweenElements, CurrentDpi);
@@ -1408,7 +1410,7 @@ end;
 
 procedure TACLTreeListColumnViewInfo.CalculateContentRects(R: TRect);
 begin
-  R := acRectContent(R, SubClass.Style.ColumnHeader.ContentOffsets);
+  R.Content(SubClass.Style.ColumnHeader.ContentOffsets);
   CalculateCheckBox(R);
   CalculateSortArea(R);
   R.Right := SortArrowRect.Left - IfThen(SortArrowRect.Width > 0, dpiApply(acIndentBetweenElements, CurrentDpi));
@@ -1461,7 +1463,7 @@ begin
   begin
     SubClass.StylePrepareFont(ACanvas, TACLStyleTreeList.IndexColumnHeaderFont, True);
     SubClass.Style.DrawHeaderSortingArrow(ACanvas, SortArrowRect, Column.SortDirection <> sdDescending, True);
-    if not acRectIsEmpty(SortArrowIndexRect) then
+    if not SortArrowIndexRect.IsEmpty then
       acTextOut(ACanvas, SortArrowIndexRect.Left, SortArrowIndexRect.Top, IntToStr(SortByIndex + 1), 0);
   end;
 end;
@@ -1590,7 +1592,7 @@ end;
 function TACLTreeListColumnBarViewInfo.CalculateAutoHeight: Integer;
 begin
   SubClass.StylePrepareFont(MeasureCanvas, TACLStyleTreeList.IndexColumnHeaderFont);
-  Result := acMarginHeight(SubClass.Style.ColumnHeader.ContentOffsets) +
+  Result := SubClass.Style.ColumnHeader.ContentOffsets.MarginsHeight +
     Max(SubClass.Style.CheckMark.FrameHeight, acFontHeight(MeasureCanvas));
 end;
 
@@ -1611,7 +1613,7 @@ begin
       AOverlap := 0;
       repeat
         AOverlapPrev := AOverlap;
-        AOverlap := acRectWidth(R) - MeasureWidth;
+        AOverlap := R.Width - MeasureWidth;
         ADelta := AOverlap div AList.Count;
         if ADelta = 0 then
           ADelta := Sign(AOverlap);
@@ -1632,8 +1634,9 @@ end;
 
 procedure TACLTreeListColumnBarViewInfo.CalculateChildren(R: TRect; const AChanges: TIntegerSet);
 var
-  AViewInfo: TACLTreeListColumnViewInfo;
   I: Integer;
+  LRect: TRect;
+  LViewInfo: TACLTreeListColumnViewInfo;
 begin
   for I := 0 to ChildCount - 1 do
     Children[I].InitializeActualWidth;
@@ -1647,9 +1650,11 @@ begin
 
   for I := 0 to ChildCount - 1 do
   begin
-    AViewInfo := Children[I];
-    AViewInfo.Calculate(acRectSetWidth(R, AViewInfo.ActualWidth), AChanges);
-    R.Left := AViewInfo.Bounds.Right;
+    LRect := R;
+    LViewInfo := Children[I];
+    LRect.Width := LViewInfo.ActualWidth;
+    LViewInfo.Calculate(LRect, AChanges);
+    R.Left := LViewInfo.Bounds.Right;
   end;
 end;
 
@@ -1751,7 +1756,8 @@ procedure TACLTreeListGroupViewInfo.Calculate(AWidth, AHeight: Integer);
 begin
   inherited Calculate(AWidth, AHeight);
   FExpandButtonVisible := SubClass.OptionsBehavior.GroupsAllowCollapse;
-  FTextRect := acRectContent(Bounds, GetContentOffsets);
+  FTextRect := Bounds;
+  FTextRect.Content(GetContentOffsets);
   CalculateExpandButton(FTextRect);
   CalculateCheckBox(FTextRect);
   FBackgroundBounds := Bounds;
@@ -1762,7 +1768,7 @@ end;
 function TACLTreeListGroupViewInfo.CalculateAutoHeight: Integer;
 begin
   SubClass.StylePrepareFont(MeasureCanvas, TACLStyleTreeList.IndexGroupHeaderFont);
-  Result := acFontHeight(MeasureCanvas) + acMarginHeight(GetContentOffsets);
+  Result := acFontHeight(MeasureCanvas) + GetContentOffsets.MarginsHeight;
 end;
 
 procedure TACLTreeListGroupViewInfo.Initialize(AData: TObject);
@@ -1782,19 +1788,19 @@ end;
 procedure TACLTreeListGroupViewInfo.CalculateCheckBox(var R: TRect);
 begin
   FCheckBoxRect := Owner.NodeViewInfo.CheckBoxRect;
-  FCheckBoxRect := acRectOffset(CheckBoxRect, 0, acRectCenterVertically(R, CheckBoxRect.Height).Top - CheckBoxRect.Top);
+  FCheckBoxRect.SetLocation(FCheckBoxRect.Left, (R.Top + R.Bottom - CheckBoxRect.Height) div 2);
   R.Left := CheckBoxRect.Left + GetElementWidthIncludeOffset(CheckBoxRect, SubClass.CurrentDpi);
 end;
 
 procedure TACLTreeListGroupViewInfo.CalculateExpandButton(var R: TRect);
 var
-  ASize: TSize;
+  LSize: TSize;
 begin
   if ExpandButtonVisible then
   begin
-    ASize := SubClass.Style.GroupHeaderExpandButton.FrameSize;
-    FExpandButtonRect := acRectSetRight(R, R.Right, ASize.cx);
-    FExpandButtonRect := acRectCenterVertically(ExpandButtonRect, ASize.cy);
+    LSize := SubClass.Style.GroupHeaderExpandButton.FrameSize;
+    FExpandButtonRect := R.Split(srRight, LSize.cx);
+    FExpandButtonRect.CenterVert(LSize.cy);
     R.Right := ExpandButtonRect.Right - GetElementWidthIncludeOffset(ExpandButtonRect, SubClass.CurrentDpi);
   end;
 end;
@@ -1864,7 +1870,7 @@ end;
 function TACLTreeListNodeViewInfo.CalculateAutoHeight: Integer;
 begin
   SubClass.StylePrepareFont(MeasureCanvas);
-  Result := acFontHeight(MeasureCanvas) + acMarginHeight(GetContentOffsets);
+  Result := acFontHeight(MeasureCanvas) + GetContentOffsets.MarginsHeight;
 end;
 
 function TACLTreeListNodeViewInfo.CalculateCellAutoWidth(ACanvas: TCanvas;
@@ -1878,7 +1884,7 @@ begin
   SubClass.StylePrepareFont(ACanvas);
   SubClass.DoGetNodeCellDisplayText(ANode, AColumnIndex, AText);
   SubClass.DoGetNodeCellStyle(ACanvas.Font, ANode, GetColumnForViewInfo(AColumnViewInfo), ATextAlign);
-  Result := acTextSize(ACanvas, AText).cx + acMarginWidth(CellTextExtends[AColumnViewInfo]);
+  Result := acTextSize(ACanvas, AText).cx + CellTextExtends[AColumnViewInfo].MarginsWidth;
 end;
 
 function TACLTreeListNodeViewInfo.CalculateCellAutoWidth(
@@ -1922,7 +1928,7 @@ var
   I: Integer;
 begin
   for I := 0 to CellCount - 1 do
-    if acPointInRect(CellRect[I], P) then
+    if PtInRect(CellRect[I], P) then
     begin
       ACellIndex := I;
       Exit(True);
@@ -1944,25 +1950,30 @@ end;
 
 procedure TACLTreeListNodeViewInfo.CalculateImageRect;
 var
-  ACellRect: TRect;
-  ASize: TSize;
+  LCellRect: TRect;
+  LSize: TSize;
 begin
-  ASize := acGetImageListSize(OptionsNodes.Images, SubClass.CurrentDpi);
-  ACellRect := acRectCenterVertically(CellRect[0], ASize.cy);
+  LSize := acGetImageListSize(OptionsNodes.Images, SubClass.CurrentDpi);
+  LCellRect := CellRect[0];
+  LCellRect.CenterVert(LSize.cy);
 
   case OptionsNodes.ImageAlignment of
     taCenter:
-      FImageRect := acRectCenterHorizontally(acRectContent(ACellRect, CellTextExtends[nil]), ASize.cx);
+      begin
+        FImageRect := LCellRect;
+        FImageRect.Content(CellTextExtends[nil]);
+        FImageRect.CenterHorz(LSize.cx);
+      end;
 
     taLeftJustify:
       begin
-        FImageRect := acRectSetLeft(ACellRect, FTextExtends[True].Left, ASize.cx);
+        FImageRect := LCellRect.Split(srLeft, FTextExtends[True].Left, LSize.cx);
         Inc(FTextExtends[True].Left, GetElementWidthIncludeOffset(ImageRect, SubClass.CurrentDpi));
       end;
 
     taRightJustify:
       begin
-        FImageRect := acRectSetRight(ACellRect, ACellRect.Right - FTextExtends[True].Right, ASize.cx);
+        FImageRect := LCellRect.Split(srRight, LCellRect.Right - FTextExtends[True].Right, LSize.cx);
         Inc(FTextExtends[True].Right, GetElementWidthIncludeOffset(ImageRect, SubClass.CurrentDpi));
       end;
   end;
@@ -1983,29 +1994,30 @@ begin
 
     AColumnViewInfo := CellColumnViewInfo[ACellIndex];
     ACellRect := GetCellRect(AColumnViewInfo);
-    ACellAutoWidth := CalculateCellAutoWidth(MeasureCanvas, Node, GetColumnAbsoluteIndex(AColumnViewInfo), AColumnViewInfo);
-    ACellTextRect := acRectContent(ACellRect, CellTextExtends[AColumnViewInfo]);
+    ACellAutoWidth := CalculateCellAutoWidth(MeasureCanvas,
+      Node, GetColumnAbsoluteIndex(AColumnViewInfo), AColumnViewInfo);
+    ACellTextRect := ACellRect.Split(CellTextExtends[AColumnViewInfo]);
     AHitTest.ColumnViewInfo := AColumnViewInfo;
 
-    if ACellAutoWidth > acRectWidth(ACellRect) then
+    if ACellAutoWidth > ACellRect.Width then
     begin
       AHitTest.HintData.Text := Node[GetColumnAbsoluteIndex(AColumnViewInfo)];
-      AHitTest.HintData.ScreenBounds := SubClass.ClientToScreen(acRectOffset(ACellTextRect, AOrigin));
+      AHitTest.HintData.ScreenBounds := SubClass.ClientToScreen(ACellTextRect + AOrigin);
     end;
 
-    if acPointInRect(ACellTextRect, P) then
+    if PtInRect(ACellTextRect, P) then
       AHitTest.IsText := True
     else
       if ACellIndex = 0 then
       begin
-        if acPointInRect(ImageRect, P) then
+        if PtInRect(ImageRect, P) then
           AHitTest.IsImage := True
         else
-          inherited DoGetHitTest(acPointOffsetNegative(P, ACellRect.TopLeft), AOrigin, AHitTest);
+          inherited DoGetHitTest(P - ACellRect.TopLeft, AOrigin, AHitTest);
       end;
 
     DoGetHitTestSubPart(P, AOrigin, AHitTest,
-      ACellAutoWidth - acMarginWidth(CellTextExtends[AColumnViewInfo]),
+      ACellAutoWidth - CellTextExtends[AColumnViewInfo].MarginsWidth,
       ACellRect, ACellTextRect, AColumnViewInfo);
   end;
 end;
@@ -2094,7 +2106,7 @@ procedure TACLTreeListNodeViewInfo.DoDrawCell(
 var
   ASaveIndex: HRGN;
 begin
-  if RectVisible(ACanvas.Handle, R) then
+  if acRectVisible(ACanvas.Handle, R) then
   begin
     if Node <> nil then
     begin
@@ -2133,7 +2145,7 @@ begin
     AValue := Node.Values[AValueIndex];
     SubClass.DoGetNodeCellDisplayText(Node, AValueIndex, AValue);
     SubClass.DoGetNodeCellStyle(ACanvas.Font, Node, GetColumnForViewInfo(AColumnViewInfo), AAlignment);
-    DoDrawCellValue(ACanvas, acRectContent(R, CellTextExtends[AColumnViewInfo]), AValue, AValueIndex, AAlignment);
+    DoDrawCellValue(ACanvas, R.Split(CellTextExtends[AColumnViewInfo]), AValue, AValueIndex, AAlignment);
   end;
 end;
 
@@ -2172,7 +2184,9 @@ end;
 
 function TACLTreeListNodeViewInfo.GetBottomSeparatorRect: TRect;
 begin
-  Result := acRectSetTop(Bounds, Bounds.Bottom, 1);
+  Result := Bounds;
+  Result.Top := Result.Bottom;
+  Result.Height := 1;
 end;
 
 function TACLTreeListNodeViewInfo.GetCellColumnViewInfo(Index: Integer): TACLTreeListColumnViewInfo;
@@ -2195,14 +2209,12 @@ end;
 
 function TACLTreeListNodeViewInfo.GetCellRect(AViewInfo: TACLTreeListColumnViewInfo): TRect;
 begin
+  Result := Bounds;
   if AViewInfo <> nil then
   begin
-    Result := acRectOffset(AViewInfo.Bounds, -ColumnBarViewInfo.Bounds.Left, 0);
-    Result.Bottom := Bounds.Bottom;
-    Result.Top := Bounds.Top;
-  end
-  else
-    Result := Bounds;
+    Result.Left := AViewInfo.Bounds.Left - ColumnBarViewInfo.Bounds.Left;
+    Result.Width := AViewInfo.Bounds.Width;
+  end;
 end;
 
 function TACLTreeListNodeViewInfo.GetColumnBarViewInfo: TACLTreeListColumnBarViewInfo;
@@ -2270,8 +2282,9 @@ function TACLTreeListNodeViewInfo.PlaceLeftAlignedElement(ASize: TSize; AVisible
 begin
   if not AVisible then
     ASize := NullSize;
-  Result := acRectCenterVertically(Bounds, ASize.cy);
-  Result := acRectSetLeft(Result, FTextExtends[True].Left, ASize.cx);
+  Result := Bounds;
+  Result.CenterVert(ASize.cy);
+  Result := Result.Split(srLeft, FTextExtends[True].Left, ASize.cx);
   Inc(FTextExtends[True].Left, GetElementWidthIncludeOffset(Result, SubClass.CurrentDpi));
 end;
 
@@ -2371,15 +2384,15 @@ begin
   FInsertMode := DragAndDropController.DropTargetObjectInsertMode;
   case FInsertMode of
     dtimBefore:
-      FBounds := acRectSetHeight(FBounds, 0);
+      FBounds.Height := 0;
     dtimAfter:
-      FBounds := acRectSetBottom(FBounds, FBounds.Bottom, 0);
+      FBounds := FBounds.Split(srBottom, 0);
     dtimInto:
       FBounds := Rect(FBounds.Left + 2 * Owner.GetLevelIndent, FBounds.Bottom, FBounds.Right, FBounds.Bottom);
     dtimOver:
       Exit;
   end;
-  FBounds := acRectCenterVertically(FBounds, MeasureHeight);
+  FBounds.CenterVert(MeasureHeight);
 end;
 
 function TACLTreeListDropTargetViewInfo.GetDragAndDropController: TACLTreeListDragAndDropController;
@@ -2568,7 +2581,7 @@ end;
 
 procedure TACLTreeListContentViewInfo.CalculateContentLayout;
 begin
-  FContentSize.cx := Max(MeasureContentWidth, acRectWidth(ViewItemsArea));
+  FContentSize.cx := Max(MeasureContentWidth, ViewItemsArea.Width);
   CalculateContentCellViewInfo;
   if FLockViewItemsPlacement = 0 then
     CalculateViewItemsPlace;
@@ -2633,10 +2646,11 @@ end;
 
 function TACLTreeListContentViewInfo.GetColumnBarBounds: TRect;
 begin
-  Result := acRectSetHeight(Bounds, GetActualColumnBarHeight);
+  Result := Bounds;
+  Result.Height := GetActualColumnBarHeight;
   if not OptionsView.Columns.AutoWidth then
   begin
-    Result := acRectSetLeft(Result, Result.Left - ViewportX, ContentSize.cx);
+    Result := Result.Split(srLeft, Result.Left - ViewportX, ContentSize.cx);
     Result.Right := Max(Result.Right, Bounds.Right);
   end;
 end;
@@ -2779,7 +2793,7 @@ begin
   begin
     ViewItems.Draw(ACanvas);
     DoDrawFreeSpaceBackground(ACanvas);
-    DoDrawSelectionRect(ACanvas, acRectOffset(SelectionRect, ViewItemsOrigin));
+    DoDrawSelectionRect(ACanvas, SelectionRect + ViewItemsOrigin);
     DropTargetViewInfo.Draw(ACanvas);
   end;
 end;
@@ -2788,17 +2802,17 @@ procedure TACLTreeListContentViewInfo.DoDrawFreeSpaceBackground(ACanvas: TCanvas
 var
   ARect: TRect;
 begin
-  ARect := acRectSetPos(acRect(ContentSize), ViewItemsOrigin);
+  ARect := TRect.Create(ViewItemsOrigin, ContentSize);
   if ViewItems.Count > 0 then
     ARect.Top := ViewItems.Last.Bounds.Bottom;
 
   NodeViewInfo.Initialize(nil);
   NodeViewInfo.FAbsoluteNodeIndex := AbsoluteVisibleNodes.Count;
-  ARect := acRectSetHeight(ARect, NodeViewInfo.MeasureHeight);
+  ARect.Height := NodeViewInfo.MeasureHeight;
   while ARect.Top < Bounds.Bottom do
   begin
     NodeViewInfo.Draw(ACanvas, nil, ARect);
-    OffsetRect(ARect, 0, ARect.Height);
+    ARect.Offset(0, ARect.Height);
     Inc(NodeViewInfo.FAbsoluteNodeIndex);
   end;
 end;
@@ -2883,7 +2897,8 @@ end;
 
 function TACLTreeListViewInfo.GetContentBounds: TRect;
 begin
-  Result := acRectContent(Bounds, BorderWidths, Borders);
+  Result := Bounds;
+  Result.Content(BorderWidths, Borders);
 end;
 
 procedure TACLTreeListViewInfo.DoCalculate(AChanges: TIntegerSet);
@@ -3096,12 +3111,12 @@ procedure TACLTreeListEditingController.InitializeParams(
 
     ContentViewInfo.NodeViewInfo.Initialize(ANode);
     AParams.Bounds := ContentViewInfo.NodeViewInfo.CellRect[AColumnVisibleIndex];
-    AParams.Bounds := acRectOffset(AParams.Bounds, AContentCell.Bounds.TopLeft);
+    AParams.Bounds.Offset(AContentCell.Bounds.TopLeft);
     if ContentViewInfo.NodeViewInfo.HasVertSeparators then
       Dec(AParams.Bounds.Right);
-    AParams.Bounds := acRectInflate(AParams.Bounds, 0, -1);
-    AParams.TextBounds := acRectContent(AParams.Bounds,
-      ContentViewInfo.NodeViewInfo.CellTextExtends[AColumnViewInfo]);
+    AParams.Bounds.Inflate(0, -1);
+    AParams.TextBounds := AParams.Bounds;
+    AParams.TextBounds.Content(ContentViewInfo.NodeViewInfo.CellTextExtends[AColumnViewInfo]);
   end;
 
 begin

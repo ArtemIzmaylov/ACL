@@ -4,7 +4,7 @@
 {*  UI Insight - Search thougth app controls *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2021-2023                 *}
+{*                 2023-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -720,7 +720,7 @@ begin
   ABeakSize.cy := dpiApply(BeakSize, FCurrentPPI);
   ABeakSize.cx := {2 * }ABeakSize.cy;
   AButtonCenter := acMapRect(Owner.Handle, Handle, Owner.ClientRect).CenterPoint;
-  FContentMargins := acMargins(dpiApply(acIndentBetweenElements, FCurrentPPI));
+  FContentMargins := TRect.CreateMargins(dpiApply(acIndentBetweenElements, FCurrentPPI));
 
   if (AButtonCenter.X < ABounds.Left + ABeakSize.cx) or (AButtonCenter.X > ABounds.Right - ABeakSize.cx) then
   begin
@@ -766,7 +766,7 @@ end;
 
 procedure TACLUIInsightSearchPopupWindow.AdjustClientRect(var Rect: TRect);
 begin
-  Rect := acRectContent(Rect, FContentMargins);
+  Rect.Content(FContentMargins);
 end;
 
 procedure TACLUIInsightSearchPopupWindow.Paint;
@@ -857,17 +857,18 @@ end;
 procedure TACLUIInsightSearchPopupWindow.HandlerSearchResultsDrawEntry(Sender: TObject;
   ACanvas: TCanvas; const R: TRect; ANode: TACLTreeListNode; var AHandled: Boolean);
 var
-  ARect: TRect;
+  LRect: TRect;
 begin
-  ARect := acRectInflate(R, -dpiApply(acTextIndent, FCurrentPPI));
+  LRect := R;
+  LRect.Inflate(-dpiApply(acTextIndent, FCurrentPPI));
 
   ACanvas.Font := Font;
   ACanvas.Font.Color := SearchResults.Style.RowColorsText[True];
-  acTextDraw(ACanvas, ANode.Caption, ARect, taLeftJustify, taAlignTop, True);
+  acTextDraw(ACanvas, ANode.Caption, LRect, taLeftJustify, taAlignTop, True);
 
   ACanvas.Font := FHintFont;
   ACanvas.Font.Color := SearchResults.Style.RowColorsText[ANode.Selected];
-  acTextDraw(ACanvas, ANode.Caption, ARect, taLeftJustify, taAlignBottom, True);
+  acTextDraw(ACanvas, ANode.Caption, LRect, taLeftJustify, taAlignBottom, True);
 
   AHandled := True;
 end;

@@ -4,7 +4,7 @@
 {*                  Images                   *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -596,24 +596,26 @@ begin
   GdipDeleteGraphics(AGraphics);
 end;
 
-procedure TACLImage.Draw(Graphics: GpGraphics; const R, ASource, AMargins: TRect; AAlpha: Byte = $FF; ATile: Boolean = False);
+procedure TACLImage.Draw(Graphics: GpGraphics;
+  const R, ASource, AMargins: TRect; AAlpha: Byte = $FF; ATile: Boolean = False);
 var
   ADestParts: TACLMarginPartBounds;
   ASourceParts: TACLMarginPartBounds;
   APart: TACLMarginPart;
 begin
-  if acMarginIsEmpty(AMargins) then
+  if AMargins.IsZero then
     Draw(Graphics, R, ASource, AAlpha, ATile)
   else
   begin
-    acMarginCalculateRects(R, AMargins, ASource, ADestParts);
-    acMarginCalculateRects(ASource, AMargins, ASource, ASourceParts);
+    acCalcPartBounds(ADestParts, AMargins, R, ASource);
+    acCalcPartBounds(ASourceParts, AMargins, ASource, ASource);
     for APart := Low(APart) to High(APart) do
       Draw(Graphics, ADestParts[APart], ASourceParts[APart], AAlpha, ATile);
   end;
 end;
 
-procedure TACLImage.Draw(Graphics: GpGraphics; const R, ASource: TRect; AAlpha: Byte = $FF; ATile: Boolean = False);
+procedure TACLImage.Draw(Graphics: GpGraphics;
+  const R, ASource: TRect; AAlpha: Byte = $FF; ATile: Boolean = False);
 const
   PixelOffsetModeMap: array[TACLImagePixelOffsetMode] of TPixelOffsetMode = (
     PixelOffsetModeDefault, PixelOffsetModeHalf, PixelOffsetModeNone
@@ -684,7 +686,7 @@ end;
 
 procedure TACLImage.Crop(const ACropMargins: TRect);
 begin
-  CropAndResize(ACropMargins, Width - acMarginWidth(ACropMargins), Height - acMarginHeight(ACropMargins));
+  CropAndResize(ACropMargins, Width - ACropMargins.MarginsWidth, Height - ACropMargins.MarginsHeight);
 end;
 
 procedure TACLImage.CropAndResize(const ACropMargins: TRect; AWidth, AHeight: Integer);
@@ -702,7 +704,7 @@ begin
     begin
       GdipGetImageGraphicsContext(AHandle, AGraphics);
       GdipSetPixelOffsetMode(AGraphics, PixelOffsetModeHalf);
-      Draw(AGraphics, Rect(0, 0, AWidth, AHeight), acRectContent(ClientRect, ACropMargins));
+      Draw(AGraphics, Rect(0, 0, AWidth, AHeight), ClientRect.Split(ACropMargins));
       GdipDeleteGraphics(AGraphics);
       SetHandle(AHandle);
     end;

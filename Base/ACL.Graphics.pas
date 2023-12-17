@@ -383,7 +383,8 @@ function acGetArrowSize(AArrowKind: TACLArrowKind; ATargetDPI: Integer): TSize;
 procedure acDrawComplexFrame(DC: HDC; const R: TRect; AColor1, AColor2: TColor; ABorders: TACLBorders = acAllBorders); overload;
 procedure acDrawComplexFrame(DC: HDC; const R: TRect; AColor1, AColor2: TAlphaColor; ABorders: TACLBorders = acAllBorders); overload;
 procedure acDrawColorPreview(ACanvas: TCanvas; R: TRect; AColor: TAlphaColor); overload;
-procedure acDrawColorPreview(ACanvas: TCanvas; R: TRect; AColor: TAlphaColor; ABorderColor, AHatchColor1, AHatchColor2: TColor); overload;
+procedure acDrawColorPreview(ACanvas: TCanvas; R: TRect; AColor: TAlphaColor;
+  ABorderColor, AHatchColor1, AHatchColor2: TColor); overload;
 procedure acDrawDotsLineH(DC: HDC; X1, X2, Y: Integer; AColor: TColor);
 procedure acDrawDotsLineV(DC: HDC; X, Y1, Y2: Integer; AColor: TColor);
 procedure acDrawDragImage(ACanvas: TCanvas; const R: TRect; AAlpha: Byte = acDragImageAlpha);
@@ -676,7 +677,7 @@ procedure acDrawTransparentControlBackground(AControl: TWinControl; DC: HDC; R: 
           if (AChildControl is TWinControl) and AChildControl.Visible then
           begin
             R := AChildControl.BoundsRect;
-            OffsetRect(R, -R.Left, -R.Top);
+            R.Offset(-R.Left, -R.Top);
             PaintControlTo(TWinControl(AChildControl),
               AChildControl.Left, AChildControl.Top, R);
           end;
@@ -702,7 +703,7 @@ begin
     ASaveIndex := SaveDC(DC);
     try
       acIntersectClipRegion(DC, R);
-      OffsetRect(R, AControl.Left, AControl.Top);
+      R.Offset(AControl.Left, AControl.Top);
       PaintControlTo(AParentControl, -R.Left, -R.Top, R);
     finally
       RestoreDC(DC, ASaveIndex);
@@ -1000,7 +1001,7 @@ var
 begin
   ATextRect := Rect(0, 0, AMaxWidth, 2);
   acSysDrawText(ACanvas, ATextRect, AText, DT_CALCRECT or DT_WORDBREAK);
-  Result := acSize(ATextRect);
+  Result := ATextRect.Size;
 end;
 
 procedure acTextDraw(ACanvas: TCanvas; const S: UnicodeString; const R: TRect; AHorzAlignment: TAlignment;
@@ -1139,15 +1140,15 @@ begin
   begin
     AEllipsisSize := acTextSize(ACanvas, acEndEllipsis);
     GetTextExtentExPointW(ACanvas.Handle, PWideChar(AText), Length(AText),
-      Max(0, acRectWidth(R) - AEllipsisSize.cx), @Result, nil, ATextSize);
+      Max(0, R.Width - AEllipsisSize.cx), @Result, nil, ATextSize);
     AText := Copy(AText, 1, Result) + acEndEllipsis;
     ATextSize := acTextSize(ACanvas, AText);
   end
   else
     Result := Length(AText);
 
-  Inc(ATextSize.cy, acMarginHeight(ATextExtends));
-  Inc(ATextSize.cx, acMarginWidth(ATextExtends));
+  Inc(ATextSize.cy, ATextExtends.MarginsHeight);
+  Inc(ATextSize.cx, ATextExtends.MarginsWidth);
 
   ATextOffset := acAlignText(R, ATextSize, AHorzAlignment, AVertAlignment, APreventTopLeftExceed);
 end;
@@ -1435,7 +1436,7 @@ begin
   ABlendFunc.SourceConstantAlpha := AAlpha;
 
   N := NullPoint;
-  ASize := acSize(R);
+  ASize := R.Size;
   ATopLeft := R.TopLeft;
   UpdateLayeredWindow(Wnd, 0, @ATopLeft, @ASize, SrcDC, @N, 0, @ABlendFunc, ULW_ALPHA);
 end;
@@ -1489,11 +1490,13 @@ procedure acDrawArrow(DC: HDC; R: TRect; AColor: TColor; AArrowKind: TACLArrowKi
   var
     ABrush: HBRUSH;
   begin
+    R.CenterHorz(1);
+    R.CenterVert(1);
     ABrush := CreateSolidBrush(ColorToRGB(AColor));
     while Count > 0 do
     begin
       FillRect(DC, R, ABrush);
-      R := acRectContent(R, Extends);
+      R.Content(Extends);
       Dec(Count);
     end;
     DeleteObject(ABrush);
@@ -1504,19 +1507,25 @@ var
 begin
   ASize := MulDiv(2, ATargetDPI, acDefaultDPI);
   if AArrowKind in [makLeft, makRight] then
-    R := acRectCenter(R, ASize + 1, ASize * 2 + 1)
+  begin
+    R.CenterHorz(ASize + 1);
+    R.CenterVert(ASize * 2 + 1);
+  end
   else
-    R := acRectCenter(R, ASize * 2 + 1, ASize + 1);
+  begin
+    R.CenterHorz(ASize * 2 + 1);
+    R.CenterVert(ASize + 1);
+  end;
 
   case AArrowKind of
     makLeft:
-      Draw(acRectCenter(acRectSetWidth(R, 1), 1, 1), Rect(1, -1, -1, -1), ASize + 1);
+      Draw(R.Split(srLeft, 1), Rect(1, -1, -1, -1), ASize + 1);
     makRight:
-      Draw(acRectCenter(acRectSetLeft(R, R.Right, 1), 1, 1), Rect(-1, -1, 1, -1), ASize + 1);
+      Draw(R.Split(srLeft, R.Right, 1), Rect(-1, -1, 1, -1), ASize + 1);
     makTop:
-      Draw(acRectCenter(acRectSetHeight(R, 1), 1, 1), Rect(-1, 1, -1, -1), ASize + 1);
+      Draw(R.Split(srTop, 1), Rect(-1, 1, -1, -1), ASize + 1);
     makBottom:
-      Draw(acRectCenter(acRectSetTop(R, R.Bottom, 1), 1, 1), Rect(-1, -1, -1, 1), ASize + 1);
+      Draw(R.Split(srTop, R.Bottom, 1), Rect(-1, -1, -1, 1), ASize + 1);
   end;
 end;
 
@@ -1526,9 +1535,9 @@ var
 begin
   ASize := MulDiv(2, ATargetDPI, acDefaultDPI);
   if AArrowKind in [makLeft, makRight] then
-    Result := acSize(ASize + 1, ASize * 2 + 1)
+    Result := TSize.Create(ASize + 1, ASize * 2 + 1)
   else
-    Result := acSize(ASize * 2 + 1, ASize + 1);
+    Result := TSize.Create(ASize * 2 + 1, ASize + 1);
 end;
 
 procedure acDrawDotsLineV(DC: HDC; X, Y1, Y2: Integer; AColor: TColor);
@@ -1574,14 +1583,15 @@ begin
   acDrawColorPreview(ACanvas, R, AColor, clGray, acHatchDefaultColor1, acHatchDefaultColor2);
 end;
 
-procedure acDrawColorPreview(ACanvas: TCanvas; R: TRect; AColor: TAlphaColor; ABorderColor, AHatchColor1, AHatchColor2: TColor);
+procedure acDrawColorPreview(ACanvas: TCanvas; R: TRect;
+  AColor: TAlphaColor; ABorderColor, AHatchColor1, AHatchColor2: TColor);
 var
   APrevFontColor: TColor;
 begin
   acDrawFrame(ACanvas.Handle, R, ABorderColor);
-  InflateRect(R, -1, -1);
+  R.Inflate(-1);
   acDrawFrame(ACanvas.Handle, R, AHatchColor1);
-  InflateRect(R, -1, -1);
+  R.Inflate(-1);
   if AColor.IsDefault then
   begin
     APrevFontColor := ACanvas.Font.Color;
@@ -1596,7 +1606,7 @@ begin
     acDrawHatch(ACanvas.Handle, R, AHatchColor1, AHatchColor2, 4);
     acFillRect(ACanvas.Handle, R, AColor);
   end;
-  acExcludeFromClipRegion(ACanvas.Handle, acRectInflate(R, 2));
+  acExcludeFromClipRegion(ACanvas.Handle, R.InflateTo(2));
 end;
 
 procedure acDrawFocusRect(ACanvas: TCanvas; const R: TRect);
@@ -1637,15 +1647,12 @@ begin
 end;
 
 function acHatchCreatePattern(ASize: Integer; AColor1, AColor2: TColor): TBitmap;
-var
-  ARect: TRect;
 begin
   Result := TACLBitmap.CreateEx(2 * ASize, 2 * ASize, pf24bit);
-  ARect := Rect(0, 0, ASize, ASize);
-  acFillRect(Result.Canvas.Handle, ARect, AColor2);
-  acFillRect(Result.Canvas.Handle, acRectOffset(ARect, 0, ASize), AColor1);
-  acFillRect(Result.Canvas.Handle, acRectOffset(ARect, ASize, 0), AColor1);
-  acFillRect(Result.Canvas.Handle, acRectOffset(ARect, ASize, ASize), AColor2);
+  acFillRect(Result.Canvas.Handle, Bounds(0,         0, ASize, ASize), AColor2);
+  acFillRect(Result.Canvas.Handle, Bounds(0,     ASize, ASize, ASize), AColor1);
+  acFillRect(Result.Canvas.Handle, Bounds(ASize,     0, ASize, ASize), AColor1);
+  acFillRect(Result.Canvas.Handle, Bounds(ASize, ASize, ASize, ASize), AColor2);
 end;
 
 procedure acDrawSelectionRect(DC: HDC; const R: TRect; AColor: TAlphaColor);
@@ -1697,12 +1704,12 @@ var
   R1: TRect;
 begin
   R1 := R;
-  InflateRect(R1, -1, -1);
+  R1.Inflate(-1);
   acDrawFrame(DC, R1, ABorderColor);
-  InflateRect(R1, -2, -2);
-  acFillRect(DC, acRectCenter(R1, R1.Right - R1.Left, 1), AColor);
+  R1.Inflate(-2);
+  acFillRect(DC, R1.CenterTo(R1.Right - R1.Left, 1), AColor);
   if not AExpanded then
-    acFillRect(DC, acRectCenter(R1, 1, R1.Bottom - R1.Top), AColor);
+    acFillRect(DC, R1.CenterTo(1, R1.Bottom - R1.Top), AColor);
 end;
 
 procedure acTileBlt(DC, SourceDC: HDC; const ADest, ASource: TRect);
@@ -1715,11 +1722,12 @@ var
   W, H: Integer;
   X, Y, XCount, YCount: Integer;
 begin
-  if not (acRectIsEmpty(ADest) or acRectIsEmpty(ASource)) and RectVisible(DC, ADest) then
+  if not (ADest.IsEmpty or ASource.IsEmpty) and RectVisible(DC, ADest) then
   begin
     W := ASource.Right - ASource.Left;
     H := ASource.Bottom - ASource.Top;
-    R := acRectSetHeight(ADest, H);
+    R := ADest;
+    R.Height := H;
     XCount := acCalcPatternCount(ADest.Right - ADest.Left, W);
     YCount := acCalcPatternCount(ADest.Bottom - ADest.Top, H);
 
@@ -1820,34 +1828,42 @@ begin
   acDrawFrameEx(DC, ARect, AColor, acAllBorders, AThickness);
 end;
 
-procedure acDrawFrameEx(DC: HDC; const ARect: TRect; AColor: TColor; ABorders: TACLBorders; AThickness: Integer = 1);
+procedure acDrawFrameEx(DC: HDC; const ARect: TRect;
+  AColor: TColor; ABorders: TACLBorders; AThickness: Integer = 1);
 var
-  AClipRegion: HRGN;
+  LClipRegion: HRGN;
+  LClipRect: TRect;
 begin
   if AColor <> clNone then
   begin
-    AClipRegion := acSaveClipRegion(DC);
+    LClipRegion := acSaveClipRegion(DC);
     try
-      acExcludeFromClipRegion(DC, acRectContent(ARect, AThickness, ABorders));
+      LClipRect := ARect;
+      LClipRect.Content(AThickness, ABorders);
+      acExcludeFromClipRegion(DC, LClipRect);
       acFillRect(DC, ARect, AColor);
     finally
-      acRestoreClipRegion(DC, AClipRegion);
+      acRestoreClipRegion(DC, LClipRegion);
     end;
   end;
 end;
 
-procedure acDrawFrameEx(DC: HDC; ARect: TRect; AColor: TAlphaColor; ABorders: TACLBorders; AThickness: Integer = 1);
+procedure acDrawFrameEx(DC: HDC; ARect: TRect;
+  AColor: TAlphaColor; ABorders: TACLBorders; AThickness: Integer = 1);
 var
-  AClipRegion: HRGN;
+  LClipRegion: HRGN;
+  LClipRect: TRect;
 begin
   if AColor.IsValid then
   begin
-    AClipRegion := acSaveClipRegion(DC);
+    LClipRegion := acSaveClipRegion(DC);
     try
-      acExcludeFromClipRegion(DC, acRectContent(ARect, AThickness, ABorders));
+      LClipRect := ARect;
+      LClipRect.Content(AThickness, ABorders);
+      acExcludeFromClipRegion(DC, LClipRect);
       acFillRect(DC, ARect, AColor);
     finally
-      acRestoreClipRegion(DC, AClipRegion);
+      acRestoreClipRegion(DC, LClipRegion);
     end;
   end;
 end;
@@ -1873,21 +1889,31 @@ begin
     GdipCreateFromHDC(DC, AHandle);
     GdipFillRectangleI(AHandle,
       TACLGdiplusResourcesCache.BrushGet(AColor),
-      ARect.Left, ARect.Top, acRectWidth(ARect), acRectHeight(ARect));
+      ARect.Left, ARect.Top, ARect.Width, ARect.Height);
     GdipDeleteGraphics(AHandle);
   end;
 end;
 
-procedure acDrawComplexFrame(DC: HDC; const R: TRect; AColor1, AColor2: TColor; ABorders: TACLBorders = acAllBorders);
+procedure acDrawComplexFrame(DC: HDC; const R: TRect;
+  AColor1, AColor2: TColor; ABorders: TACLBorders = acAllBorders);
+var
+  LInnerFrame: TRect;
 begin
+  LInnerFrame := R;
+  LInnerFrame.Content(1, ABorders);
   acDrawFrameEx(DC, R, AColor1, ABorders);
-  acDrawFrameEx(DC, acRectContent(R, 1, ABorders), AColor2, ABorders);
+  acDrawFrameEx(DC, LInnerFrame, AColor2, ABorders);
 end;
 
-procedure acDrawComplexFrame(DC: HDC; const R: TRect; AColor1, AColor2: TAlphaColor; ABorders: TACLBorders = acAllBorders);
+procedure acDrawComplexFrame(DC: HDC; const R: TRect;
+  AColor1, AColor2: TAlphaColor; ABorders: TACLBorders = acAllBorders);
+var
+  LInnerFrame: TRect;
 begin
+  LInnerFrame := R;
+  LInnerFrame.Content(1, ABorders);
   acDrawFrameEx(DC, R, AColor1, ABorders);
-  acDrawFrameEx(DC, acRectContent(R, 1, ABorders), AColor2, ABorders);
+  acDrawFrameEx(DC, LInnerFrame, AColor2, ABorders);
 end;
 
 procedure acDrawGradient(DC: HDC; const ARect: TRect; AFrom, ATo: TColor; AVertical: Boolean = True);
@@ -1925,10 +1951,10 @@ var
   AValue: Single;
   I: Integer;
 begin
-  if not acRectIsEmpty(R) then
+  if not R.IsEmpty then
   begin
     AValue := 0;
-    ADelta := 1.0 / acRectWidth(R);
+    ADelta := 1.0 / R.Width;
     for I := R.Left to R.Right do
     begin
       TACLColors.HSLtoRGB(AHue / 255, AValue, 0.5, AColor);
@@ -1945,10 +1971,10 @@ var
   AValue: Single;
   I: Integer;
 begin
-  if not acRectIsEmpty(R) then
+  if not R.IsEmpty then
   begin
     AValue := 0;
-    ADelta := 1.0 / acRectWidth(R);
+    ADelta := 1.0 / R.Width;
     for I := R.Left to R.Right do
     begin
       TACLColors.HSLtoRGB(AValue, 1.0, 0.5, AColor);
@@ -2001,7 +2027,7 @@ begin
   if Empty then
   begin
     GetWindowRect(AWnd, R);
-    OffsetRect(R, -R.Left, -R.Top);
+    R.Offset(-R.Left, -R.Top);
     SetRectRgn(Handle, R.Left, R.Top, R.Right, R.Bottom);
   end;
 end;
@@ -2231,7 +2257,7 @@ begin
     Inc(AScanR);
     for I := 1 to RectsCount - 1 do
     begin
-      acRectUnion(ARect, AScanR^);
+      ARect.Add(AScanR^);
       Inc(AScanR);
     end;
   end
@@ -2505,18 +2531,24 @@ end;
 procedure TACLBitmap.DrawMargins(ACanvas: TCanvas; const ADest, ASource, AMargins: TRect);
 var
   ADestParts: TACLMarginPartBounds;
-  ASourceParts: TACLMarginPartBounds;
+  AFixedParts: TACLMarginParts;
   APart: TACLMarginPart;
+  ASourceParts: TACLMarginPartBounds;
 begin
-  if acMarginIsEmpty(AMargins) then
+  if AMargins.IsZero then
     DrawStretch(ACanvas, ADest, ASource)
   else
   begin
-    acMarginCalculateRects(ASource, AMargins, ASource, ASourceParts, StretchMode);
-    acMarginCalculateRects(ADest, AMargins, ASource, ADestParts, StretchMode);
+    acCalcPartBounds(ASourceParts, AMargins, ASource, ASource, StretchMode);
+    acCalcPartBounds(ADestParts, AMargins, ADest, ASource, StretchMode);
+    if StretchMode = isCenter then
+      AFixedParts := [mzClient]
+    else
+      AFixedParts := [mzLeftTop, mzLeftBottom, mzRightTop, mzRightBottom];
+
     for APart := Low(APart) to High(APart) do
     begin
-      if acMarginIsPartFixed(APart, StretchMode) then
+      if APart in AFixedParts then
         acBitBlt(ACanvas.Handle, Self, ADestParts[APart], ASourceParts[APart].TopLeft)
       else
         DrawStretch(ACanvas, ADestParts[APart], ASourceParts[APart]);
@@ -2557,7 +2589,7 @@ end;
 
 procedure TACLBitmap.SetSizeEx(const R: TRect);
 begin
-  SetSize(Max(0, acRectWidth(R)), Max(0, acRectHeight(R)));
+  SetSize(Max(0, R.Width), Max(0, R.Height));
 end;
 
 procedure TACLBitmap.ApplyColorSchema(const AValue: TACLColorSchema);

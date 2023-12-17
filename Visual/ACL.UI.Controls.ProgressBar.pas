@@ -179,7 +179,7 @@ begin
     if ProgressRange > 0 then
     begin
       R1 := ProgressAreaRect;
-      R1.Right := R1.Left + Trunc(acRectWidth(R1) * (Progress - Min) / ProgressRange);
+      R1.Right := R1.Left + Trunc(R1.Width * (Progress - Min) / ProgressRange);
     end;
 end;
 
@@ -240,7 +240,8 @@ end;
 
 function TACLProgressBar.GetProgressAreaRect: TRect;
 begin
-  Result := acRectContent(ClientRect, Rect(1, 0, 1, 0));
+  Result := ClientRect;
+  Result.Content(Rect(1, 0, 1, 0));
 end;
 
 function TACLProgressBar.GetProgressRange: Single;

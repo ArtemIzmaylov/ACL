@@ -724,7 +724,7 @@ end;
 function TACLStyleDocking.MeasureTabHeight: Integer;
 begin
   MeasureCanvas.Font.Assign(TabFontActive);
-  Result := MeasureCanvas.TextHeight('Wg') + acMarginHeight(GetTabMargins) + dpiApply(TabControlOffset, TargetDPI);
+  Result := MeasureCanvas.TextHeight('Wg') + GetTabMargins.MarginsHeight + dpiApply(TabControlOffset, TargetDPI);
 end;
 
 function TACLStyleDocking.MeasureTabWidth(const ACaption: string): Integer;
@@ -734,7 +734,7 @@ begin
   Result := Max(Result, acTextSize(MeasureCanvas, ACaption).cx);
   MeasureCanvas.Font.Assign(TabFontActive);
   Result := Max(Result, acTextSize(MeasureCanvas, ACaption).cx);
-  Inc(Result, acMarginWidth(GetTabMargins));
+  Inc(Result, GetTabMargins.MarginsWidth);
 end;
 
 { TACLStyleDockSite }
@@ -751,7 +751,7 @@ end;
 function TACLStyleDockSite.MeasureSideBarTabHeight: Integer;
 begin
   MeasureCanvas.Font.Assign(SideBarTabFontActive);
-  Result := MeasureCanvas.TextHeight('Wg') + acMarginHeight(GetTabMargins) + dpiApply(TabControlOffset, TargetDPI);
+  Result := MeasureCanvas.TextHeight('Wg') + GetTabMargins.MarginsHeight + dpiApply(TabControlOffset, TargetDPI);
 end;
 
 function TACLStyleDockSite.MeasureSideBarTabWidth(const ACaption: string): Integer;
@@ -761,7 +761,7 @@ begin
   Result := Max(Result, acTextSize(MeasureCanvas, ACaption).cx);
   MeasureCanvas.Font.Assign(SideBarTabFontActive);
   Result := Max(Result, acTextSize(MeasureCanvas, ACaption).cx);
-  Inc(Result, acMarginWidth(GetTabMargins));
+  Inc(Result, GetTabMargins.MarginsWidth);
 end;
 
 {$ENDREGION}
@@ -798,7 +798,7 @@ function TACLDockZone.CalculateBounds: TRect;
 const
   Padding = 5;
 begin
-  Result := acRect(GetSkinSize);
+  Result := TRect.Create(GetSkinSize);
   Inc(Result.Bottom, 2 * dpiApply(Padding, FCurrentPPI));
   Inc(Result.Right, 2 * dpiApply(Padding, FCurrentPPI));
 end;
@@ -865,7 +865,7 @@ begin
   try
     acFillRect(ALayer.Handle, ALayer.ClientRect, TAlphaColor($FFFAFAFA));
     acDrawFrame(ALayer.Handle, ALayer.ClientRect, TAlphaColor($FFA5A5A5));
-    Skin.Draw(ALayer.Handle, acRectCenter(ALayer.ClientRect, GetSkinSize), Ord(Active and Enabled), Enabled);
+    Skin.Draw(ALayer.Handle, ALayer.ClientRect.CenterTo(GetSkinSize), Ord(Active and Enabled), Enabled);
     acUpdateLayeredWindow(Handle, ALayer.Handle, BoundsRect);
   finally
     ALayer.Free;
@@ -1020,7 +1020,8 @@ end;
 
 procedure TACLDockZoneClient.CalculateSelection(ASource: TACLDockControl; var ABounds: TRect);
 begin
-  ABounds := acRectInflate(Parent.ClientToScreen(GetParentClientRect), -dpiApply(16, FCurrentPPI));
+  ABounds := Parent.ClientToScreen(GetParentClientRect);
+  ABounds.Inflate(-dpiApply(16, FCurrentPPI));
 end;
 
 procedure TACLDockZoneClient.CreateLayout(ASource: TACLDockControl);
@@ -1295,12 +1296,13 @@ begin
         FNonClientExtends := dpiApply(FNonClientExtends, AFloatForm.FCurrentPPI);
       end;
       AExtends := AFloatForm.GetNonClientExtends;
-      acMarginAdd(AExtends,
+      AExtends.MarginsAdd(
         -AIndents.Left, -AIndents.Top, AIndents.Right, AIndents.Bottom);
-      acMarginAdd(AExtends,
+      AExtends.MarginsAdd(
         -FNonClientExtends.Left, -FNonClientExtends.Top,
         -FNonClientExtends.Right, -FNonClientExtends.Bottom);
-      AFloatFormBounds := acRectInflate(FDragSelection.BoundsRect, AExtends);
+      AFloatFormBounds := FDragSelection.BoundsRect;
+      AFloatFormBounds.Inflate(AExtends);
 
       AFloatForm.BoundsRect := AFloatFormBounds;
       FExecutor.Parent := AFloatForm.DockGroup;
@@ -1398,7 +1400,7 @@ begin
   end;
 
   LSelectionBounds := FExecutor.ClientToScreen(FExecutor.ClientRect);
-  LSelectionBounds := acRectInflate(LSelectionBounds, FNonClientExtends);
+  LSelectionBounds.Inflate(FNonClientExtends);
   LSelectionBounds.Offset(AScreenPos.X - FInitialPos.X, AScreenPos.Y - FInitialPos.Y);
   LTargetDpi := acGetTargetDPI(LSelectionBounds.CenterPoint);
   if LTargetDpi <> FExecutor.FCurrentPPI then
@@ -1431,7 +1433,7 @@ begin
   Align := alClient;
   ControlStyle := ControlStyle + [csAcceptsControls] - [csDoubleClicks, csCaptureMouse];
   FStyle := CreateStyle;
-  FCustomSize := acSize(100, 100);
+  FCustomSize := TSize.Create(100, 100);
   FDragCapture := InvalidPoint;
   DoubleBuffered := True;
 end;
@@ -1458,7 +1460,7 @@ end;
 procedure TACLDockControl.ChangeScale(M, D: Integer; isDpiChange: Boolean);
 begin
   inherited;
-  FCustomSize := acSizeScale(FCustomSize, M, D);
+  FCustomSize.Scale(M, D);
 end;
 
 procedure TACLDockControl.ControlsAligning;
@@ -1507,12 +1509,12 @@ end;
 
 function TACLDockControl.GetMinHeight: Integer;
 begin
-  Result := Style.MeasureHeaderHeight + acMarginHeight(GetOuterPadding);
+  Result := Style.MeasureHeaderHeight + GetOuterPadding.MarginsHeight;
 end;
 
 function TACLDockControl.GetOuterPadding: TRect;
 begin
-  Result := acMargins(dpiApply(TACLStyleDocking.OuterPadding, FCurrentPPI));
+  Result := TRect.CreateMargins(dpiApply(TACLStyleDocking.OuterPadding, FCurrentPPI));
 end;
 
 function TACLDockControl.GetSize(Side: TACLBorder): Integer;
@@ -1559,7 +1561,7 @@ begin
   AClientRect := ClientRect;
   if PtInRect(AClientRect, P) then
   begin
-    AClientRect := acRectContent(AClientRect, GetOuterPadding);
+    AClientRect.Content(GetOuterPadding);
     if not PtInRect(AClientRect, P) then
     begin
       Result := True;
@@ -1572,7 +1574,7 @@ begin
       else if (P.Y >= AClientRect.Bottom) and CheckAllowResize(mBottom) then
         ASide := mBottom
       else if Safe.Cast(Parent, TACLDockGroup, AGroup) then
-        Result := AGroup.HitOnSizeBox(acPointOffset(P, Left, Top), AResizeHandler, ASide)
+        Result := AGroup.HitOnSizeBox(P + Point(Left, Top), AResizeHandler, ASide)
       else
         Result := False;
     end;
@@ -1846,7 +1848,7 @@ begin
       acExcludeFromClipRegion(ACanvas.Handle, ATab.Bounds);
     end;
 
-    ARect := acRectContent(ARect, GetOuterPadding, TabAreaBorders);
+    ARect.Content(GetOuterPadding, TabAreaBorders);
     if not Style.TabArea.IsEmpty then
       acFillRect(ACanvas.Handle, ARect, Style.TabArea.Value);
     Style.DrawBorder(ACanvas, ARect, acAllBorders);
@@ -1865,7 +1867,7 @@ end;
 procedure TACLDockGroup.DrawTabText(ACanvas: TCanvas; const ATab: TTab);
 begin
   acTextDraw(ACanvas, ATab.Control.ToString, 
-    acRectContent(ATab.Bounds, Style.GetTabMargins), 
+    ATab.Bounds.Split(Style.GetTabMargins),
     taCenter, taVerticalCenter, True, True);
 end;
 
@@ -1960,7 +1962,7 @@ begin
       if AChildPrev <> nil then
         AChildPrev.FNeighbours[mRight] := AChild;
       AChildSize := MulDiv(AChild.CustomWidth, AZoom, 100);
-      ABounds.Add(AChild, acRectSetWidth(ARect, AChildSize));
+      ABounds.Add(AChild, ARect.Split(srLeft, AChildSize));
       AChildPrev := AChild;
       Inc(ARect.Left, AChildSize);
     end;
@@ -1977,7 +1979,7 @@ begin
       if AChildNext <> nil then
         AChildNext.FNeighbours[mLeft] := AChild;
       AChildSize := MulDiv(AChild.CustomWidth, AZoom, 100);
-      ABounds.Add(AChild, acRectSetRight(ARect, ARect.Right, AChildSize));
+      ABounds.Add(AChild, ARect.Split(srRight, AChildSize));
       AChildNext := AChild;
       Dec(ARect.Right, AChildSize);
     end;
@@ -1997,7 +1999,7 @@ begin
       if AChildNext <> nil then
         AChildNext.FNeighbours[mLeft] := AChild;
       AChildSize := MulDiv(AChild.CustomWidth, ALeftSize, AClientSize);
-      ABounds.Add(AChild, acRectSetWidth(ARect, AChildSize));
+      ABounds.Add(AChild, ARect.Split(srLeft, AChildSize));
       AChildPrev := AChild;
       Inc(ARect.Left, AChildSize);
     end;
@@ -2015,8 +2017,8 @@ begin
   begin
     AOuterPadding := GetOuterPadding;
     FTabsArea := Rect(ARect.Left, ARect.Top, ARect.Right, ARect.Bottom - 2{visual borders});
-    FTabsArea := acRectContent(FTabsArea, AOuterPadding, TabAreaBorders); // from client to borders
-    FTabsArea := acRectContent(FTabsArea, AOuterPadding, TabAreaBorders); // from borders to tabs
+    FTabsArea.Content(AOuterPadding, TabAreaBorders); // from client to borders
+    FTabsArea.Content(AOuterPadding, TabAreaBorders); // from borders to tabs
     FTabsArea.Top := FTabsArea.Bottom - Style.MeasureTabHeight;
     CalculateTabs(FTabsArea);
     ARect.Bottom := FTabsArea.Top;
@@ -2024,7 +2026,8 @@ begin
   else
     FTabsArea := NullRect;
 
-  AInvisibleRect := acRectSetTop(ARect, -MaxShort, ARect.Height);
+  AInvisibleRect := ARect;
+  AInvisibleRect.SetLocation(ARect.Left, -MaxShort);
   for var I := 0 to ControlCount - 1 do
   begin
     if I <> ActiveControlIndex then
@@ -2086,7 +2089,7 @@ begin
       if AChildPrev <> nil then
         AChildPrev.FNeighbours[mBottom] := AChild;
       AChildSize := MulDiv(AChild.CustomHeight, AZoom, 100);
-      ABounds.Add(AChild, acRectSetHeight(ARect, AChildSize));
+      ABounds.Add(AChild, ARect.Split(srTop, AChildSize));
       AChildPrev := AChild;
       Inc(ARect.Top, AChildSize);
     end;
@@ -2103,7 +2106,7 @@ begin
       if AChildNext <> nil then
         AChildNext.FNeighbours[mTop] := AChild;
       AChildSize := MulDiv(AChild.CustomHeight, AZoom, 100);
-      ABounds.Add(AChild, acRectSetBottom(ARect, ARect.Bottom, AChildSize));
+      ABounds.Add(AChild, ARect.Split(srBottom, AChildSize));
       AChildNext := AChild;
       Dec(ARect.Bottom, AChildSize);
     end;
@@ -2123,7 +2126,7 @@ begin
       if AChildNext <> nil then
         AChildNext.FNeighbours[mTop] := AChild;
       AChildSize := MulDiv(AChild.CustomHeight, ALeftSize, AClientSize);
-      ABounds.Add(AChild, acRectSetHeight(ARect, AChildSize));
+      ABounds.Add(AChild, ARect.Split(srTop, AChildSize));
       AChildPrev := AChild;
       Inc(ARect.Top, AChildSize);
     end;
@@ -2179,11 +2182,11 @@ begin
       if (csDesigning in ComponentState) or AChild.Visible then
       begin
         ATab.Control := AChild;
-        ATab.Bounds := acRectSetWidth(ARect, ACalculator[ATabIndex].Size);
+        ATab.Bounds := ARect.Split(srLeft, ACalculator[ATabIndex].Size);
         ARect.Left := ATab.Bounds.Right;
         if ATabIndex + 1 < ACalculator.Count then
           Dec(ATab.Bounds.Right, ATabIndent);
-        ATab.Bounds := acRectContent(ATab.Bounds, GetTabPlaceIndents(I = ActiveControlIndex));
+        ATab.Bounds.Content(GetTabPlaceIndents(I = ActiveControlIndex));
         if I = ActiveControlIndex then
           FTabActiveIndex := ATabIndex;
         FTabs[ATabIndex] := ATab;
@@ -2649,8 +2652,9 @@ begin
 
   if HasBorders and ShowCaption then
   begin
-    FCaptionRect := acRectContent(ClientRect, GetOuterPadding);
-    FCaptionRect := acRectSetHeight(FCaptionRect, Style.MeasureHeaderHeight);
+    FCaptionRect := ClientRect;
+    FCaptionRect.Content(GetOuterPadding);
+    FCaptionRect.Height := Style.MeasureHeaderHeight;
     FCaptionTextRect := FCaptionRect;
     CalculateCaptionButtons;
   end
@@ -2693,13 +2697,14 @@ procedure TACLDockPanel.CalculateCaptionButtons;
 var
   ARect: TRect;
 begin
-  ARect := acRectInflate(FCaptionRect, -dpiApply(3, FCurrentPPI));
-  FCaptionButtons[TCaptionButton.Close] := acRectSetRight(ARect, ARect.Right, ARect.Height);
+  ARect := FCaptionRect;
+  ARect.Inflate(-dpiApply(3, FCurrentPPI));
+  FCaptionButtons[TCaptionButton.Close] := ARect.Split(srRight, ARect.Height);
   Dec(ARect.Right, ARect.Height + dpiApply(acTextIndent, FCurrentPPI));
 
 //  if AllowMaximize then
 //  begin
-//    FCaptionButtons[TCaptionButton.Maximize] := acRectSetRight(ARect, ARect.Right, ARect.Height);
+//    FCaptionButtons[TCaptionButton.Maximize] := ARect.Split(srRight, ARect.Height);
 //    Dec(ARect.Right, ARect.Height + dpiApply(acTextIndent, FCurrentPPI));
 //  end
 //  else
@@ -2707,7 +2712,7 @@ begin
 
   if AllowPin then
   begin
-    FCaptionButtons[TCaptionButton.Pin] := acRectSetRight(ARect, ARect.Right, ARect.Height);
+    FCaptionButtons[TCaptionButton.Pin] := ARect.Split(srRight, ARect.Height);
     Dec(ARect.Right, ARect.Height + dpiApply(acTextIndent, FCurrentPPI));
   end
   else
@@ -2796,7 +2801,7 @@ begin
   if HasBorders then
   begin
     Result := GetOuterPadding;
-    acMarginAdd(Result, 2{visual borders});
+    Result.MarginsAdd(2{visual borders});
     if ShowCaption then
       Result.Top := FCaptionRect.Bottom + 1;
   end
@@ -2933,7 +2938,7 @@ var
 begin
   if HasBorders then
   begin
-    Style.DrawBorder(Canvas, acRectContent(ClientRect, GetOuterPadding), acAllBorders);
+    Style.DrawBorder(Canvas, ClientRect.Split(GetOuterPadding), acAllBorders);
     Style.DrawHeader(Canvas.Handle, FCaptionRect);
     Style.DrawHeaderText(Canvas, FCaptionTextRect, Caption);
     AClipRgn := acSaveClipRegion(Canvas.Handle);
@@ -2942,14 +2947,14 @@ begin
       for var I := Low(FCaptionButtons) to High(FCaptionButtons) do
       begin
         Style.HeaderButton.Draw(Canvas.Handle, FCaptionButtons[I], GetCaptionButtonState(I));
-        Style.HeaderButtonGlyphs.Draw(Canvas.Handle, acRectInflate(FCaptionButtons[I], -4), Ord(I));
+        Style.HeaderButtonGlyphs.Draw(Canvas.Handle, FCaptionButtons[I].InflateTo(-4), Ord(I));
       end;
     finally
       acRestoreClipRegion(Canvas.Handle, AClipRgn);
     end;
   end;
   if (csDesigning in ComponentState) and not Visible then
-    acFillRect(Canvas.Handle, acRectContent(ClientRect, GetOuterPadding), TAlphaColor.FromColor(clBlack, 30));
+    acFillRect(Canvas.Handle, ClientRect.Split(GetOuterPadding), TAlphaColor.FromColor(clBlack, 30));
 end;
 
 procedure TACLDockPanel.SetParent(AParent: TWinControl);
@@ -3056,7 +3061,7 @@ var
 begin
   AWindowInfo.cbSize := SizeOf(AWindowInfo);
   if HandleAllocated and GetWindowInfo(Handle, AWindowInfo) then
-    Result := acMargins(AWindowInfo.rcWindow, AWindowInfo.rcClient)
+    Result := TRect.CreateMargins(AWindowInfo.rcWindow, AWindowInfo.rcClient)
   else
     Result := NullRect;
 end;
@@ -3236,9 +3241,10 @@ begin
       ASize := Style.MeasureSideBarTabWidth(FTabs.List[I].Control.ToString);
       ACalc.Add(ASize, 4, ASize, True);
     end;
+    ARect := Bounds;
     if Side in [mTop, mBottom] then
     begin
-      ARect := acRectInflate(Bounds, -Bounds.Height, 0);
+      ARect.Inflate(-Bounds.Height, 0);
       ACalc.AvailableSize := ARect.Width;
       ACalc.Calculate;
       for var I := 0 to FTabs.Count - 1 do
@@ -3250,7 +3256,7 @@ begin
     end
     else
     begin
-      ARect := acRectInflate(Bounds, 0, -Bounds.Width);
+      ARect.Inflate(0, -Bounds.Width);
       ACalc.AvailableSize := ARect.Height;
       ACalc.Calculate;
       for var I := 0 to FTabs.Count - 1 do
@@ -3581,13 +3587,13 @@ var
 begin
   ASideBarSize := FSite.Style.MeasureTabHeight;
 
-  FBars[mBottom].Bounds := acRectSetBottom(ABounds, ABounds.Bottom,
+  FBars[mBottom].Bounds := ABounds.Split(srBottom,
     IfThen(FBars[mBottom].FTabs.Count > 0, ASideBarSize));
-  FBars[mLeft].Bounds := acRectSetWidth(ABounds,
+  FBars[mLeft].Bounds := ABounds.Split(srLeft,
     IfThen(FBars[mLeft].FTabs.Count > 0, ASideBarSize));
-  FBars[mRight].Bounds := acRectSetRight(ABounds, ABounds.Right,
+  FBars[mRight].Bounds := ABounds.Split(srRight,
     IfThen(FBars[mRight].FTabs.Count > 0, ASideBarSize));
-  FBars[mTop].Bounds := acRectSetHeight(ABounds,
+  FBars[mTop].Bounds := ABounds.Split(srTop,
     IfThen(FBars[mTop].FTabs.Count > 0, ASideBarSize));
 
   ABounds.Bottom := FBars[mBottom].Bounds.Top;

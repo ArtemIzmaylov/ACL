@@ -239,16 +239,22 @@ end;
 
 procedure TACLProgressBox.CalculateControlsPosition;
 begin
-  FBoxRect := acRectCenter(ClientRect, dpiApply(330, FCurrentPPI), dpiApply(140, FCurrentPPI));
+  FBoxRect := ClientRect;
+  FBoxRect.CenterHorz(dpiApply(330, FCurrentPPI));
+  FBoxRect.CenterVert(dpiApply(140, FCurrentPPI));
   if Assigned(FProgress) then
   begin
-    FProgress.SetBounds(BoxRect.Left + dpiApply(10, FCurrentPPI),
-      BoxRect.Top + dpiApply(76, FCurrentPPI), dpiApply(311, FCurrentPPI), dpiApply(18, FCurrentPPI));
+    FProgress.SetBounds(
+      BoxRect.Left + dpiApply(10, FCurrentPPI),
+      BoxRect.Top + dpiApply(76, FCurrentPPI),
+      dpiApply(311, FCurrentPPI), dpiApply(18, FCurrentPPI));
   end;
   if Assigned(FCancelButton) then
   begin
-    FCancelButton.SetBounds(BoxRect.Left + dpiApply(108, FCurrentPPI),
-      BoxRect.Top + dpiApply(104, FCurrentPPI), dpiApply(120, FCurrentPPI), dpiApply(25, FCurrentPPI));
+    FCancelButton.SetBounds(
+      BoxRect.Left + dpiApply(108, FCurrentPPI),
+      BoxRect.Top + dpiApply(104, FCurrentPPI),
+      dpiApply(120, FCurrentPPI), dpiApply(25, FCurrentPPI));
   end;
 end;
 
@@ -262,7 +268,7 @@ begin
   else
   begin
     L2 := R;
-    L1.Bottom := L1.Top + acRectHeight(L1) div 2;
+    L1.Bottom := L1.Top + L1.Height div 2;
     L2.Top := L1.Bottom;
   end;
 end;
@@ -274,7 +280,7 @@ begin
   ACanvas.Font.Assign(Font);
   ACanvas.Font.Color := Style.ColorText.AsColor;
   ACanvas.Brush.Style := bsClear;
-  InflateRect(R, -4, -4);
+  R.Inflate(-4);
   CalculateLineRects(R, ProgressTitle, ProgressMessage, L1, L2);
   acTextDraw(ACanvas, ProgressMessage, L2, taLeftJustify, taVerticalCenter, True);
   ACanvas.Font.Style := [fsBold];
@@ -286,7 +292,7 @@ begin
   Style.Draw(Canvas, BoxRect);
   DrawTextArea(Canvas, GetTextArea);
   acExcludeFromClipRegion(Canvas.Handle, BoxRect);
-  if RectVisible(Canvas.Handle, ClientRect) then
+  if acRectVisible(Canvas.Handle, ClientRect) then
   begin
     acDrawTransparentControlBackground(Self, Canvas.Handle, ClientRect);
     acFillRect(Canvas.Handle, ClientRect, GetActualCoverColor);
@@ -438,7 +444,8 @@ end;
 
 function TACLProgressBox.GetTextArea: TRect;
 begin
-  Result := acRectInflate(BoxRect, -8, 0);
+  Result := BoxRect;
+  Result.Inflate(-8, 0);
   Result := Bounds(Result.Left, Result.Top + 12, Result.Width, 55);
 end;
 

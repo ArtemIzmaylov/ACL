@@ -159,7 +159,7 @@ var
 begin
   AWindowInfo.cbSize := SizeOf(AWindowInfo);
   GetWindowInfo(AHandle, AWindowInfo);
-  Result := acRectOffsetNegative(AWindowInfo.rcClient, AWindowInfo.rcWindow.TopLeft);
+  Result := AWindowInfo.rcClient - AWindowInfo.rcWindow.TopLeft;
 end;
 
 { TACLScrollBoxStyle }
@@ -195,7 +195,7 @@ begin
   inherited Create(AOwner);
   ControlStyle := ControlStyle + [csAcceptsControls];
   FBorders := acAllBorders;
-end; 
+end;
 
 procedure TACLCustomScrollBox.DisableAutoRange;
 begin
@@ -255,7 +255,7 @@ begin
     AParent := AControl.Parent;
     while (AParent <> nil) and (AParent <> Self) do
     begin
-      ARect := acRectOffset(ARect, AParent.BoundsRect.TopLeft);
+      ARect.Offset(AParent.BoundsRect.TopLeft);
       AParent := AParent.Parent;
     end;
 
@@ -316,7 +316,7 @@ end;
 procedure TACLCustomScrollBox.BoundsChanged;
 begin
   if SubClass <> nil then
-    SubClass.Bounds := acRectContent(Bounds(0, 0, Width, Height), GetBordersWidth);
+    SubClass.Bounds := Bounds(0, 0, Width, Height).Split(GetBordersWidth);
   RecalculateNC;
 end;
 
@@ -370,7 +370,7 @@ begin
       AdjustVertAutoRange(AControl, ARangeVert, AAlignMarginVert);
     end;
   end;
-  Result := acSize(ARangeHorz + AAlignMarginHorz, ARangeVert + AAlignMarginVert);
+  Result := TSize.Create(ARangeHorz + AAlignMarginHorz, ARangeVert + AAlignMarginVert);
 end;
 
 procedure TACLCustomScrollBox.CreateParams(var Params: TCreateParams);
@@ -416,7 +416,7 @@ end;
 
 function TACLCustomScrollBox.TranslatePoint(const SX, SY: SmallInt): TPoint;
 begin
-  Result := acPointOffsetNegative(Point(SX, SY), acGetWindowRect(Handle).TopLeft);
+  Result := Point(SX, SY) - acGetWindowRect(Handle).TopLeft;
 end;
 
 procedure TACLCustomScrollBox.RecalculateNC;
@@ -429,7 +429,8 @@ procedure TACLCustomScrollBox.WMNCCalcSize(var Message: TWMNCCalcSize);
 var
   R: TRect;
 begin
-  R := acRectContent(Message.CalcSize_Params.rgrc[0], GetBordersWidth);
+  R := Message.CalcSize_Params.rgrc[0];
+  R.Content(GetBordersWidth);
   Dec(R.Right, ViewInfo.ScrollBarVert.Bounds.Width);
   Dec(R.Bottom, ViewInfo.ScrollBarHorz.Bounds.Height);
   Message.CalcSize_Params.rgrc[0] := R;
@@ -516,7 +517,7 @@ end;
 
 function TACLCustomScrollBox.GetBordersWidth: TRect;
 begin
-  Result := acMarginGetReal(acBorderOffsets, Borders);
+  Result := acBorderOffsets * Borders;
 end;
 
 function TACLCustomScrollBox.GetStyle: TACLScrollBoxStyle;

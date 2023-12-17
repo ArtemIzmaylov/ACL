@@ -391,8 +391,8 @@ begin
   end
   else
   begin
-    FContentSize := acSize(FClientBounds);
-    FormattedText.Bounds := acRect(FContentSize);
+    FContentSize := FClientBounds.Size;
+    FormattedText.Bounds := TRect.Create(FContentSize);
     FormattedText.SetOption(tloEndEllipsis, True);
   end;
 end;
@@ -403,7 +403,7 @@ var
 begin
   AHitTest := TACLTextLayoutHitTest.Create(FormattedText);
   try
-    FormattedText.HitTest(acPointOffsetNegative(AInfo.HitPoint, GetOrigin), AHitTest);
+    FormattedText.HitTest(AInfo.HitPoint - GetOrigin, AHitTest);
     AInfo.HitObject := AHitTest.HitObject;
     AInfo.HitObjectData[flhtHyperlink] := AHitTest.Hyperlink;
     if AHitTest.Hyperlink <> nil then
@@ -430,7 +430,7 @@ end;
 
 function TACLFormattedLabelViewInfo.GetOrigin: TPoint;
 begin
-  Result := acPointOffsetNegative(ClientBounds.TopLeft, Point(ViewportX, ViewportY));
+  Result := ClientBounds.TopLeft - Point(ViewportX, ViewportY);
 end;
 
 function TACLFormattedLabelViewInfo.GetSubClass: TACLFormattedLabelSubClass;
@@ -471,7 +471,7 @@ end;
 
 function TACLFormattedLabel.GetContentOffset: TRect;
 begin
-  Result := acMarginGetReal(dpiApply(acBorderOffsets, FCurrentPPI), Borders);
+  Result := dpiApply(acBorderOffsets, FCurrentPPI) * Borders;
 end;
 
 procedure TACLFormattedLabel.DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect);

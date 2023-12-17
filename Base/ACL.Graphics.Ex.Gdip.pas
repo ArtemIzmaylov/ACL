@@ -5,7 +5,7 @@
 {*            GDI+ Integration               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -447,7 +447,7 @@ procedure GpDrawImage(AGraphics: GpGraphics; AImage: GpImage; AImageAttributes: 
       begin
         R.Left := ADest.Left + ASourceWidth * AColumn;
         R.Right := Min(ADest.Right, R.Left + ASourceWidth);
-        StretchPart(R, acRectSetSize(ASourceRect, R.Right - R.Left, R.Bottom - R.Top));
+        StretchPart(R, TRect.Create(ASourceRect.TopLeft, R.Width, R.Height));
       end;
     end;
   end;
@@ -1256,17 +1256,19 @@ var
 begin
   ABrushRect.X := R.Left - 1;
   ABrushRect.Y := R.Top - 1;
-  ABrushRect.Width := acRectWidth(R) + 2;
-  ABrushRect.Height := acRectHeight(R) + 2;
+  ABrushRect.Width := R.Width + 2;
+  ABrushRect.Height := R.Height + 2;
   if (ABrushRect.Width > 0) and (ABrushRect.Height > 0) then
   begin
-    GdipCheck(GdipCreateLineBrushFromRectI(@ABrushRect, AColor1, AColor2, TLinearGradientMode(AMode), WrapModeTile, ABrush));
+    GdipCheck(GdipCreateLineBrushFromRectI(@ABrushRect, 
+      AColor1, AColor2, TLinearGradientMode(AMode), WrapModeTile, ABrush));
     GdipCheck(GdipFillRectangleI(FGraphics, ABrush, R.Left, R.Top, R.Width, R.Height));
     GdipCheck(GdipDeleteBrush(ABrush));
   end;
 end;
 
-procedure TACLGdiplusRender.Line(X1, Y1, X2, Y2: Single; Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
+procedure TACLGdiplusRender.Line(X1, Y1, X2, Y2: Single; 
+  Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
 begin
   if Color.IsValid and (Width > 0) then
     GdipDrawLine(FGraphics, TACLGdiplusResourcesCache.PenGet(Color, Width, Style), X1, Y1, X2, Y2);

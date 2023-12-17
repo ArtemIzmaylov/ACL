@@ -265,20 +265,20 @@ type
     property HasAlpha: Boolean read GetHasAlpha;
     property Height: Integer read FHeight;
     property Width: Integer read FWidth;
-    //
+    // Frames
     property FrameCount: Integer read FFramesCount write SetFrameCount;
     property FrameInfo[Index: Integer]: TACLSkinImageFrameState read GetFrameInfo;
     property FrameRect[Index: Integer]: TRect read GetFrameRect;
     property FrameSize: TSize read GetFrameSize write SetFrameSize;
     property FrameHeight: Integer read GetFrameHeight;
     property FrameWidth: Integer read GetFrameWidth;
-    //
+    //# Layout
     property AllowColoration: Boolean read FAllowColoration write SetAllowColoration;
     property ContentOffsets: TRect read FContentOffsets write SetContentOffsets;
     property HitTestMask: TACLSkinImageHitTestMode read FHitTestMask write SetHitTestMask;
     property HitTestMaskFrameIndex: Integer read FHitTestMaskFrameIndex write SetHitTestMaskFrameIndex;
     property Layout: TACLSkinImageLayout read FLayout write SetLayout;
-    //
+    //# Margins
     property Margins: TRect read FMargins write SetMargins;
     property SizingMode: TACLSkinImageSizingMode read FSizingMode write SetSizingMode;
     property StretchMode: TACLStretchMode read FStretchMode write SetStretchMode;
@@ -375,7 +375,7 @@ procedure acCalculateTiledAreas(const R: TRect; const AParams: TACLSkinImageTile
     AParts[tpzPart2Fixed].Left := R.Right - (ATextureWidth - AParams.Part2TileWidth - AParams.Part2TileStart);
 
     Dec(ATextureWidth, AParams.Part1TileStart);
-    Dec(ATextureWidth, acRectWidth(AParts[tpzPart2Fixed]));
+    Dec(ATextureWidth, AParts[tpzPart2Fixed].Width);
     Dec(ATextureWidth, AParams.Part1TileWidth + AParams.Part2TileWidth);
 
     AParts[tpzCenter] := R;
@@ -392,7 +392,7 @@ procedure acCalculateTiledAreas(const R: TRect; const AParams: TACLSkinImageTile
         begin
           Inc(AParts[tpzCenter].Left, AParams.Part1TileWidth);
           Dec(AParts[tpzCenter].Right, AParams.Part2TileWidth);
-          AParts[tpzCenter] := acRectCenterHorizontally(AParts[tpzCenter], ATextureWidth);
+          AParts[tpzCenter].CenterHorz(ATextureWidth);
         end;
     end;
     AParts[tpzPart1Tile] := R;
@@ -413,7 +413,7 @@ procedure acCalculateTiledAreas(const R: TRect; const AParams: TACLSkinImageTile
     AParts[tpzPart2Fixed].Top := R.Bottom - (ATextureHeight - AParams.Part2TileWidth - AParams.Part2TileStart);
 
     Dec(ATextureHeight, AParams.Part1TileStart);
-    Dec(ATextureHeight, acRectHeight(AParts[tpzPart2Fixed]));
+    Dec(ATextureHeight, AParts[tpzPart2Fixed].Height);
     Dec(ATextureHeight, AParams.Part1TileWidth + AParams.Part2TileWidth);
 
     AParts[tpzCenter] := R;
@@ -430,7 +430,7 @@ procedure acCalculateTiledAreas(const R: TRect; const AParams: TACLSkinImageTile
         begin
           Inc(AParts[tpzCenter].Top, AParams.Part1TileWidth);
           Dec(AParts[tpzCenter].Bottom, AParams.Part2TileWidth);
-          AParts[tpzCenter] := acRectCenterVertically(AParts[tpzCenter], ATextureHeight);
+          AParts[tpzCenter].CenterVert(ATextureHeight);
         end;
     end;
     AParts[tpzPart1Tile] := R;
@@ -465,7 +465,8 @@ var
 begin
   W := SrcR.Right - SrcR.Left;
   H := SrcR.Bottom - SrcR.Top;
-  R1 := acRectSetHeight(R, H);
+  R1 := R;
+  R1.Height := H;
   XCount := acCalcPatternCount(R.Right - R.Left, W);
   YCount := acCalcPatternCount(R.Bottom - R.Top, H);
 
@@ -864,14 +865,15 @@ end;
 
 procedure TACLSkinImage.Draw(DC: HDC; const R: TRect; AFrameIndex: Integer = 0; AAlpha: Byte = MaxByte);
 
-  procedure DoDrawWithMargins(ARenderer: TACLSkinImageRenderer; const ASource: TRect; AContentState: TACLSkinImageFrameState);
+  procedure DoDrawWithMargins(ARenderer: TACLSkinImageRenderer;
+    const ASource: TRect; AContentState: TACLSkinImageFrameState);
   var
     ADestParts: TACLMarginPartBounds;
     ASourceParts: TACLMarginPartBounds;
     APart: TACLMarginPart;
   begin
-    acMarginCalculateRects(ARenderer.ClientRect, Margins, ASource, ADestParts, StretchMode);
-    acMarginCalculateRects(ASource, Margins, ASource, ASourceParts, StretchMode);
+    acCalcPartBounds(ADestParts, Margins, ARenderer.ClientRect, ASource, StretchMode);
+    acCalcPartBounds(ASourceParts, Margins, ASource, ASource, StretchMode);
     for APart := Low(APart) to High(APart) do
     begin
       if APart = mzClient then
@@ -907,9 +909,11 @@ procedure TACLSkinImage.Draw(DC: HDC; const R: TRect; AFrameIndex: Integer = 0; 
     if AState.IsColor then
     begin
       if (StretchMode = isCenter) and (ActualSizingMode = ismDefault) then
-        acFillRect(DC, acRectCenter(R, ASource.Width, ASource.Height), TAlphaColor(AState))
-      else
-        acFillRect(DC, R, TAlphaColor(AState));
+      begin
+        R.CenterHorz(ASource.Width);
+        R.CenterVert(ASource.Height);
+      end;
+      acFillRect(DC, R, TAlphaColor(AState));
       Exit;
     end;
 
@@ -922,7 +926,7 @@ procedure TACLSkinImage.Draw(DC: HDC; const R: TRect; AFrameIndex: Integer = 0; 
           DoDrawTiledAreas(FRenderer, ASource);
       else {ismDefault}
         if StretchMode = isCenter then
-          FRenderer.Draw(acRectCenter(FRenderer.ClientRect, ASource.Width, ASource.Height), ASource, False)
+          FRenderer.Draw(FRenderer.ClientRect.CenterTo(ASource.Width, ASource.Height), ASource, False)
         else
           FRenderer.Draw(FRenderer.ClientRect, ASource, StretchMode = isTile);
       end;
@@ -932,7 +936,7 @@ procedure TACLSkinImage.Draw(DC: HDC; const R: TRect; AFrameIndex: Integer = 0; 
   end;
 
 begin
-  if not (Empty or acRectIsEmpty(R)) and RectVisible(DC, R) then
+  if not Empty and acRectVisible(DC, R) then
   begin
     CheckUnpacked;
     CheckBitsState(ibsPremultiplied);
@@ -941,7 +945,8 @@ begin
   end;
 end;
 
-procedure TACLSkinImage.Draw(DC: HDC; const R: TRect; AFrameIndex: Integer; AEnabled: Boolean; AAlpha: Byte = MaxByte);
+procedure TACLSkinImage.Draw(DC: HDC; const R: TRect;
+  AFrameIndex: Integer; AEnabled: Boolean; AAlpha: Byte = MaxByte);
 var
   ALayer: TACLBitmapLayer;
 begin
@@ -1007,8 +1012,8 @@ function TACLSkinImage.HitTestCore(const ABounds: TRect; AFrameIndex, X, Y: Inte
 
   procedure ConvertPointRelativeRects(var P: TPoint; const DR, SR: TRect);
   begin
-    P.X := MulDiv(P.X - DR.Left, acRectWidth(SR), acRectWidth(DR)) + SR.Left;
-    P.Y := MulDiv(P.Y - DR.Top, acRectHeight(SR), acRectHeight(DR)) + SR.Top;
+    P.X := MulDiv(P.X - DR.Left, SR.Width, DR.Width) + SR.Left;
+    P.Y := MulDiv(P.Y - DR.Top, SR.Height, DR.Height) + SR.Top;
   end;
 
   procedure ConvertPointForTiledAreasMode(var P: TPoint; const DR, FR: TRect);
@@ -1016,8 +1021,8 @@ function TACLSkinImage.HitTestCore(const ABounds: TRect; AFrameIndex, X, Y: Inte
     APart: TACLSkinImageTiledAreasPart;
     S, D: TACLSkinImageTiledAreasPartBounds;
   begin
-    acCalculateTiledAreas(FR, TiledAreas, acRectWidth(FR), acRectHeight(FR), TiledAreasMode, S);
-    acCalculateTiledAreas(DR, TiledAreas, acRectWidth(FR), acRectHeight(FR), TiledAreasMode, D);
+    acCalculateTiledAreas(FR, TiledAreas, FR.Width, FR.Height, TiledAreasMode, S);
+    acCalculateTiledAreas(DR, TiledAreas, FR.Width, FR.Height, TiledAreasMode, D);
     for APart := Low(TACLSkinImageTiledAreasPart) to High(TACLSkinImageTiledAreasPart) do
       if PtInRect(D[APart], P) then
       begin
@@ -1031,8 +1036,8 @@ function TACLSkinImage.HitTestCore(const ABounds: TRect; AFrameIndex, X, Y: Inte
     APart: TACLMarginPart;
     DZ, SZ: TACLMarginPartBounds;
   begin
-    acMarginCalculateRects(DR, Margins, FR, DZ, StretchMode);
-    acMarginCalculateRects(FR, Margins, FR, SZ, StretchMode);
+    acCalcPartBounds(DZ, Margins, DR, FR, StretchMode);
+    acCalcPartBounds(SZ, Margins, FR, FR, StretchMode);
     for APart := Low(APart) to High(APart) do
       if PtInRect(DZ[APart], P) then
       begin
@@ -1044,7 +1049,7 @@ function TACLSkinImage.HitTestCore(const ABounds: TRect; AFrameIndex, X, Y: Inte
   function ConvertPointToLocalCoords(var P: TPoint; const DR, FR: TRect): Boolean;
   begin
     Result := False;
-    if not acRectIsEmpty(DR) then
+    if not DR.IsEmpty then
     begin
       case ActualSizingMode of
         ismMargins:
@@ -1398,7 +1403,7 @@ begin
         if AState.IsColor or AState.IsTransparent then
           FFramesInfoContent[I] := AState
         else
-          FFramesInfoContent[I] := TACLSkinImageAnalyzer.AnalyzeFrame(FBits, acRectContent(FrameRect[I], Margins), Width);
+          FFramesInfoContent[I] := TACLSkinImageAnalyzer.AnalyzeFrame(FBits, FrameRect[I].Split(Margins), Width);
       end;
     end
     else
@@ -1629,7 +1634,7 @@ begin
   if (SizingMode <> ismMargins) and not TiledAreas.IsEmpty then
     Result := ismTiledAreas
   else
-    if (SizingMode <> ismTiledAreas) and not acMarginIsEmpty(Margins) then
+    if (SizingMode <> ismTiledAreas) and not Margins.IsZero then
       Result := ismMargins
     else
       Result := ismDefault;
@@ -1761,7 +1766,7 @@ var
   AFrameCount: Integer;
   I: Integer;
 begin
-  if not (Empty or acSizeIsEqual(AValue, FrameSize) or acSizeIsEmpty(AValue)) then
+  if not (Empty or AValue.isEmpty) and (AValue <> FrameSize) then
   begin
     BeginUpdate;
     try
@@ -1769,7 +1774,7 @@ begin
       ABitmap := TACLBitmap.CreateEx(AValue.cx, AValue.cy * FrameCount, pf32bit, True);
       try
         ABitmap.AlphaFormat := afPremultiplied;
-        AFrameRect := acRect(AValue);
+        AFrameRect := TRect.Create(AValue);
         AFrameBitmap := TACLBitmapLayer.Create(FrameWidth, FrameHeight);
         try
           for I := 0 to AFrameCount - 1 do
@@ -1777,7 +1782,7 @@ begin
             AFrameBitmap.Reset;
             Draw(AFrameBitmap.Handle, AFrameBitmap.ClientRect, I);
             AFrameBitmap.DrawBlend(ABitmap.Canvas.Handle, AFrameRect, MaxByte, True);
-            OffsetRect(AFrameRect, 0, acRectHeight(AFrameRect));
+            AFrameRect.Offset(0, AFrameRect.Height);
           end;
         finally
           AFrameBitmap.Free;
@@ -2112,7 +2117,7 @@ begin
 
   AColor := PDWORD(Q)^;
   AAlpha := Q^[0].rgbReserved;
-  AWidth := acRectWidth(AFrameRect);
+  AWidth := AFrameRect.Width;
   for Y := AFrameRect.Top to AFrameRect.Bottom - 1 do
   begin
     AnalyzeCore(@Q^[AFrameRect.Left + Y * AImageWidth], AWidth, AAlpha, AColor);

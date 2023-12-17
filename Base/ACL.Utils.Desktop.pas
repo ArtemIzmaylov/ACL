@@ -4,7 +4,7 @@
 {*           Multi-Monitor Support           *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -158,13 +158,13 @@ begin
   Result := R;
   AWorkArea := MonitorGetBounds(Result.CenterPoint);
   if Result.Top < AWorkArea.Top then
-    OffsetRect(Result, 0, AWorkArea.Top - Result.Top);
+    Result.Offset(0, AWorkArea.Top - Result.Top);
   if Result.Left < AWorkArea.Left then
-    OffsetRect(Result, AWorkArea.Left - Result.Left, 0);
+    Result.Offset(AWorkArea.Left - Result.Left, 0);
   if Result.Right > AWorkArea.Right then
-    OffsetRect(Result, AWorkArea.Right - Result.Right, 0);
+    Result.Offset(AWorkArea.Right - Result.Right, 0);
   if Result.Bottom > AWorkArea.Bottom then
-    OffsetRect(Result, 0, AWorkArea.Bottom - Result.Bottom);
+    Result.Offset(0, AWorkArea.Bottom - Result.Bottom);
 end;
 
 function MonitorGetDefault: TACLMonitor;

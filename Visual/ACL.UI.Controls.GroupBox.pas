@@ -253,19 +253,22 @@ begin
 
     AIndent := Trunc(TACLMargins.DefaultValue * FCurrentPPI / acDefaultDPI);
     AMargins := Padding.GetScaledMargins(FCurrentPPI);
-    acMarginAdd(AMargins, GetContentOffset);
-    acMarginAdd(AMargins, AIndent, 0, AIndent, 0);
+    AMargins.MarginsAdd(GetContentOffset);
+    AMargins.MarginsAdd(AIndent, 0, AIndent, 0);
 
     FCaptionContentRect := R;
     Inc(FCaptionContentRect.Left, AMargins.Left);
     Dec(FCaptionContentRect.Right, AMargins.Right);
-    FCaptionContentRect := acRectSetSize(FCaptionContentRect, Min(AWidth, FCaptionContentRect.Width), AHeight);
+    FCaptionContentRect.Height := AHeight;
+    FCaptionContentRect.Width := Min(AWidth, FCaptionContentRect.Width);
 
-    FCaptionArea := acRectInflate(FCaptionContentRect, dpiApply(acTextIndent, FCurrentPPI), 0)
+    FCaptionArea := FCaptionContentRect;
+    FCaptionArea.Inflate(dpiApply(acTextIndent, FCurrentPPI), 0)
   end
   else
   begin
-    FCaptionArea := acRectSetHeight(R, 0);
+    FCaptionArea := R;
+    FCaptionArea.Height := 0;
     FCaptionContentRect := FCaptionArea;
   end;
 end;

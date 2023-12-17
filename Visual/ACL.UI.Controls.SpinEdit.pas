@@ -4,7 +4,7 @@
 {*             Editors Controls              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -304,7 +304,7 @@ var
   ASize: TSize;
 begin
   ASize := StyleButton.Texture.FrameSize;
-  ASize := acSizeScale(ASize, acRectHeight(R), ASize.cy);
+  ASize.Scale(R.Height, ASize.cy);
   FButtonLeft.IsEnabled := Enabled;
   FButtonLeft.Calculate(Bounds(0, 0, ASize.cx, ASize.cy));
   FButtonRight.IsEnabled := Enabled;
@@ -319,7 +319,8 @@ end;
 
 function TACLCustomSpinEdit.CalculateEditorPosition: TRect;
 begin
-  Result := acRectInflate(ClientRect, 0, -1);
+  Result := ClientRect;
+  Result.Inflate(0, -1);
   Result.Left := ButtonLeft.Bounds.Right;
   Result.Right := ButtonRight.Bounds.Left;
 end;

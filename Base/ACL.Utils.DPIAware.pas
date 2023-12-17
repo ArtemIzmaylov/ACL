@@ -137,26 +137,23 @@ end;
 
 function dpiApply(const AValue: TPoint; ATargetDpi: Integer): TPoint;
 begin
+  Result := AValue;
   if ATargetDpi <> acDefaultDpi then
-    Result := acPointScale(AValue, ATargetDpi, acDefaultDpi)
-  else
-    Result := AValue;
+    Result.Scale(ATargetDpi, acDefaultDpi);
 end;
 
 function dpiApply(const AValue: TRect; ATargetDpi: Integer): TRect;
 begin
+  Result := AValue;
   if ATargetDpi <> acDefaultDpi then
-    Result := acRectScale(AValue, ATargetDpi, acDefaultDpi)
-  else
-    Result := AValue;
+    Result.Scale(ATargetDpi, acDefaultDpi);
 end;
 
 function dpiApply(const AValue: TSize; ATargetDpi: Integer): TSize;
 begin
+  Result := AValue;
   if ATargetDpi <> acDefaultDpi then
-    Result := acSizeScale(AValue, ATargetDpi, acDefaultDpi)
-  else
-    Result := AValue;
+    Result.Scale(ATargetDpi, acDefaultDpi);
 end;
 
 function dpiRevert(const AValue: Integer; ASourceDpi: Integer): Integer;

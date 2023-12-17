@@ -1301,7 +1301,7 @@ end;
 
 constructor TACLBitmapLayer.Create(const R: TRect);
 begin
-  Create(acRectWidth(R), acRectHeight(R));
+  Create(R.Width, R.Height);
 end;
 
 constructor TACLBitmapLayer.Create(const S: TSize);
@@ -1414,7 +1414,7 @@ var
   AImage: TACLImage;
   ALayer: TACLBitmapLayer;
 begin
-  if ASmoothStretch and not (Empty or acRectIsEqualSizes(R, ClientRect)) then
+  if ASmoothStretch and not (Empty or R.EqualSizes(ClientRect)) then
   begin
     if (GetClipBox(DC, AClipBox) <> NULLREGION) and IntersectRect(AClipBox, AClipBox, R) then
     begin
@@ -1451,7 +1451,7 @@ procedure TACLBitmapLayer.DrawCopy(DC: HDC; const R: TRect; ASmoothStretch: Bool
 var
   AMode: Integer;
 begin
-  if ASmoothStretch and not acRectIsEqualSizes(R, ClientRect) then
+  if ASmoothStretch and not R.EqualSizes(ClientRect) then
   begin
     AMode := SetStretchBltMode(DC, HALFTONE);
     acStretchBlt(DC, Handle, R, ClientRect);
@@ -1561,7 +1561,7 @@ end;
 
 procedure TACLBitmapLayer.Resize(const R: TRect);
 begin
-  Resize(acRectWidth(R), acRectHeight(R));
+  Resize(R.Width, R.Height);
 end;
 
 procedure TACLBitmapLayer.Resize(ANewWidth, ANewHeight: Integer);
@@ -1643,7 +1643,7 @@ end;
 
 function TACLCacheLayer.CheckNeedUpdate(const R: TRect): Boolean;
 begin
-  if not acRectIsEqualSizes(R, ClientRect) then
+  if not R.EqualSizes(ClientRect) then
   begin
     Resize(R);
     IsDirty := True;

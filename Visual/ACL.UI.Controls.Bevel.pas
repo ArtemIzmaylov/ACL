@@ -4,7 +4,7 @@
 {*               Bevel Control               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -122,7 +122,7 @@ begin
         AClipRgn := acSaveClipRegion(ACanvas.Handle);
         try
           acIntersectClipRegion(ACanvas.Handle, R);
-          R := acRectInflate(R, Rect(5, 5, 5, 5), acAllBorders - Borders);
+          R.Inflate(Rect(5, 5, 5, 5), acAllBorders - Borders);
           ACanvas.Pen.Color := ColorBorder1.AsColor;
           ACanvas.Brush.Style := bsClear;
           ACanvas.RoundRect(R.Left, R.Top, R.Right, R.Bottom, 5, 5);

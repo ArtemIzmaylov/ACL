@@ -349,7 +349,7 @@ end;
 
 procedure TACLShellFolderBrowserDialog.AdjustClientRect(var Rect: TRect);
 begin
-  Rect := acRectInflate(Rect, -dpiApply(ContentOffset, FCurrentPPI));
+  Rect.Inflate(-dpiApply(ContentOffset, FCurrentPPI));
 end;
 
 procedure TACLShellFolderBrowserDialog.CreateParams(var Params: TCreateParams);

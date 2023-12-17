@@ -4,7 +4,7 @@
 {*             Editors Controls              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -296,8 +296,8 @@ end;
 procedure TACLImageComboBox.CalculateContent(const R: TRect);
 begin
   inherited CalculateContent(R);
-  FImageRect := acRectSetWidth(FTextRect, ImageSize.cx);
-  FImageRect := acRectCenterVertically(ImageRect, ImageSize.cy);
+  FImageRect := FTextRect.Split(srLeft, ImageSize.cx);
+  FImageRect.CenterVert(ImageSize.cy);
   FTextRect.Left := ImageRect.Right + IfThen(ImageSize.cx > 0, dpiApply(acTextIndent, FCurrentPPI));
 end;
 

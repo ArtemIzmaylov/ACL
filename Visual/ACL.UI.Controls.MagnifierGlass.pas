@@ -216,7 +216,7 @@ begin
 
     X := Trunc(FBuffer.Width  / (2 * ZoomActual)) * ZoomActual - ZoomActual div 2;
     Y := Trunc(FBuffer.Height / (2 * ZoomActual)) * ZoomActual - ZoomActual div 2;
-    if acPointInRect(FBuffer.ClientRect, Point(X, Y)) then
+    if PtInRect(FBuffer.ClientRect, Point(X, Y)) then
       FColorAtPoint := TACLColors.ToColor(FBuffer.Colors^[X + Y * FBuffer.Width]);
 
     S := dpiApply(6, FCurrentPPI);

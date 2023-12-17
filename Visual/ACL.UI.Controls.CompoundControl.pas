@@ -294,8 +294,8 @@ begin
   begin
     ARect := NullRect;
     AdjustClientRect(ARect);
-    Inc(NewHeight, -acRectHeight(ARect));
-    Inc(NewWidth, -acRectWidth(ARect));
+    Inc(NewHeight, -ARect.Height);
+    Inc(NewWidth, -ARect.Width);
   end;
 end;
 

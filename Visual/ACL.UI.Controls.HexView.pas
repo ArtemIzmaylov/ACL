@@ -496,7 +496,7 @@ end;
 
 function TACLHexView.GetContentOffset: TRect;
 begin
-  Result := acMarginGetReal(acBorderOffsets, Borders);
+  Result := acBorderOffsets * Borders;
 end;
 
 function TACLHexView.GetData: TStream;
@@ -607,7 +607,7 @@ begin
   begin
     FData[AIndex] := CreateData(AIndex);
     FView[AIndex] := TACLTextViewInfo.Create(MeasureCanvas.Handle, Font, FData[AIndex]);
-    FSize := acSizeMax(FSize, FView[AIndex].Size);
+    FSize := Max(FSize, FView[AIndex].Size);
   end;
 end;
 
@@ -725,9 +725,9 @@ begin
 
   AViewBounds := ViewInfo.RowsAreaClipRect;
   ACharBounds := ASelection.CalculateCharBounds(ACharPosition, False);
-  ACharBounds := acRectOffset(ACharBounds, ViewInfo.RowsArea.TopLeft);
-  ViewInfo.Viewport := acPointOffset(ViewInfo.Viewport,
-    acCalculateScrollToDelta(ACharBounds, AViewBounds, TACLScrollToMode.MakeVisible));
+  ACharBounds.Offset(ViewInfo.RowsArea.TopLeft);
+  ViewInfo.Viewport := ViewInfo.Viewport -
+    acCalculateScrollToDelta(ACharBounds, AViewBounds, TACLScrollToMode.MakeVisible);
 end;
 
 procedure TACLHexViewSubClass.SelectAll;
@@ -1061,19 +1061,27 @@ end;
 
 procedure TACLHexViewRowViewInfo.DoCalculate(AChanges: TIntegerSet);
 var
-  ARect: TRect;
+  LRect: TRect;
+  LView: TRect;
 begin
   inherited;
 
   HexView.IndentBetweenCharacters := dpiApply(4, CurrentDpi);
 
-  ARect := Bounds;
+  LRect := Bounds;
   FLabelAreaWidth := acTextSize(SubClass.Font, '00000000').cx;
-  FLabelRect := acRectSetWidth(ARect, FLabelAreaWidth);
-  Inc(ARect.Left, FLabelAreaWidth + IndentBetweenViews);
-  HexView.Calculate(acRectSetWidth(ARect, HexView.MeasureWidth), []);
-  ARect.Left := FHexView.Bounds.Right + IndentBetweenViews;
-  TextView.Calculate(acRectSetWidth(ARect, TextView.MeasureWidth), []);
+  FLabelRect := LRect;
+  FLabelRect.Width := FLabelAreaWidth;
+  LRect.Left := FLabelRect.Right + IndentBetweenViews;
+
+  LView := LRect;
+  LView.Width := HexView.MeasureWidth;
+  HexView.Calculate(LView, []);
+  LRect.Left := FHexView.Bounds.Right + IndentBetweenViews;
+
+  LView := LRect;
+  LView.Width := TextView.MeasureWidth;
+  TextView.Calculate(LView, []);
 
   HexView.ColorOdd := SubClass.Style.ColorContentText1.AsColor;
   HexView.ColorEven := SubClass.Style.ColorContentText2.AsColor;
@@ -1210,7 +1218,7 @@ begin
     if Focused then
       acFillRect(ACanvas.Handle, FCursor, Style.ColorContentFocused.Value)
     else
-      if acRectIsEmpty(FRects[0]) then // no multiple selection
+      if FRects[0].IsEmpty then // no multiple selection
         acFillRect(ACanvas.Handle, FCursor, AColor);
   finally
     acRestoreWindowOrg(ACanvas.Handle, AWindowOrg);
@@ -1245,7 +1253,7 @@ procedure TACLHexViewSelectionDragObject.DragMove(const P: TPoint; var ADeltaX, 
 var
   AHitPoint: TPoint;
 begin
-  if not acPointInRect(FContentArea, P) then
+  if not PtInRect(FContentArea, P) then
   begin
     AHitPoint.X := EnsureRange(P.X, FContentArea.Left, FContentArea.Right - 1);
     AHitPoint.Y := EnsureRange(P.Y, FContentArea.Top, FContentArea.Bottom - 1);
@@ -1263,7 +1271,8 @@ begin
   FSavedSelStart := SubClass.SelStart;
   FSavedSelLength := SubClass.SelLength;
   FContentArea := SubClass.ViewInfo.RowsArea;
-  FScrollableArea := acRectInflate(FContentArea, 0, -SubClass.ViewInfo.RowHeight);
+  FScrollableArea := FContentArea;
+  FScrollableArea.Inflate(0, -SubClass.ViewInfo.RowHeight);
   Result := True;
 end;
 
@@ -1315,7 +1324,7 @@ begin
   FContentSize.cy := FRowHeight * Ceil(SubClass.DataSize / acHexViewBytesPerRow) + FHeaderViewInfo.MeasureHeight;
 
   if FRowHeight > 0 then
-    CheckBufferCapacity(((acRectHeight(Bounds) div FRowHeight) + 2) * acHexViewBytesPerRow);
+    CheckBufferCapacity(((Bounds.Height div FRowHeight) + 2) * acHexViewBytesPerRow);
 
   FHeaderViewInfo.Calculate(Rect(0, 0, ContentSize.cx, FHeaderHeight), []);
   FRowViewInfo.Calculate(Rect(0, 0, ContentSize.cx, FRowHeight), []);
@@ -1332,7 +1341,7 @@ end;
 procedure TACLHexViewViewInfo.CalculateSubCells(const AChanges: TIntegerSet);
 begin
   inherited;
-  FClientBounds := acRectInflate(FClientBounds, -dpiApply(Padding, CurrentDpi));
+  FClientBounds.Inflate(-dpiApply(Padding, CurrentDpi));
 end;
 
 procedure TACLHexViewViewInfo.CheckBufferCapacity(ACapacity: Integer);
@@ -1353,30 +1362,32 @@ end;
 
 procedure TACLHexViewViewInfo.DoCalculateHitTest(const AInfo: TACLHitTestInfo);
 var
-  ADataOffset: Integer;
+  LDataOffset: Integer;
   ARowRect: TRect;
 begin
   inherited;
 
-  if (FRowHeight > 0) and acPointInRect(RowsArea, AInfo.HitPoint) then
+  if (FRowHeight > 0) and PtInRect(RowsArea, AInfo.HitPoint) then
   begin
-    ADataOffset := 0;
-    ARowRect := acRectSetHeight(RowsArea, FRowHeight);
-    while (ARowRect.Top < FClientBounds.Bottom) and (ADataOffset < FBuffer.Used) do
+    LDataOffset := 0;
+    ARowRect := RowsArea;
+    ARowRect.Height := FRowHeight;
+    while (ARowRect.Top < FClientBounds.Bottom) and (LDataOffset < FBuffer.Used) do
     begin
-      if acPointInRect(ARowRect, AInfo.HitPoint) then
+      if PtInRect(ARowRect, AInfo.HitPoint) then
       begin
-        AInfo.HitPoint := acPointOffset(AInfo.HitPoint, -ARowRect.Left, -ARowRect.Top);
+        AInfo.HitPoint := AInfo.HitPoint - ARowRect.TopLeft;
         try
           if FRowViewInfo.CalculateHitTest(AInfo) then
-            AInfo.HitObjectData[acHexViewHitDataOffset] := TObject(ADataOffset + Integer(AInfo.HitObjectData[acHexViewHitDataOffset]));
+            AInfo.HitObjectData[acHexViewHitDataOffset] :=
+              TObject(LDataOffset + Integer(AInfo.HitObjectData[acHexViewHitDataOffset]));
         finally
-          AInfo.HitPoint := acPointOffset(AInfo.HitPoint, ARowRect.Left, ARowRect.Top);
+          AInfo.HitPoint := AInfo.HitPoint + ARowRect.TopLeft;
         end;
         Break;
       end;
-      ARowRect := acRectOffset(ARowRect, 0, FRowHeight);
-      Inc(ADataOffset, acHexViewBytesPerRow);
+      ARowRect.Offset(0, FRowHeight);
+      Inc(LDataOffset, acHexViewBytesPerRow);
     end;
   end;
 end;
@@ -1399,7 +1410,8 @@ begin
   try
     if acIntersectClipRegion(ACanvas.Handle, FClientBounds) then
     begin
-      ARowRect := acRectSetHeight(FClientBounds, FHeaderHeight);
+      ARowRect := FClientBounds;
+      ARowRect.Height := FHeaderHeight;
       Dec(ARowRect.Left, ViewportX);
       FHeaderViewInfo.Draw(ACanvas, ARowRect.TopLeft, @HexHeaderData[0], Length(HexHeaderData));
       acExcludeFromClipRegion(ACanvas.Handle, ARowRect);
@@ -1410,14 +1422,15 @@ begin
       HexSelection.Draw(ACanvas, ARowsArea.TopLeft);
       TextSelection.Draw(ACanvas, ARowsArea.TopLeft);
 
-      ARowRect := acRectSetHeight(ARowsArea, FRowHeight);
+      ARowRect := ARowsArea;
+      ARowRect.Height := FRowHeight;
       while (ARowRect.Top < FClientBounds.Bottom) and (ADataOffset < FBuffer.Used) do
       begin
         AData := @FBuffer.DataArr^[ADataOffset];
         ADataSize := MinMax(FBuffer.Used - ADataOffset, 0, acHexViewBytesPerRow);
         FRowViewInfo.LabelText := IntToHex(FBufferPosition + ADataOffset, 8);
         FRowViewInfo.Draw(ACanvas, ARowRect.TopLeft, AData, ADataSize);
-        ARowRect := acRectOffset(ARowRect, 0, FRowHeight);
+        ARowRect.Offset(0, FRowHeight);
         Inc(ADataOffset, acHexViewBytesPerRow);
       end;
     end;
@@ -1472,7 +1485,7 @@ end;
 
 function TACLHexViewViewInfo.GetVisibleRowCount: Integer;
 begin
-  Result := acRectHeight(RowsArea) div RowHeight;
+  Result := RowsArea.Height div RowHeight;
 end;
 
 procedure TACLHexViewViewInfo.SetBufferPosition(const AValue: Int64);

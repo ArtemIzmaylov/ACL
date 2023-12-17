@@ -1119,7 +1119,8 @@ var
 begin
   inherited;
 
-  R := acRectContent(ClientRect, Rect(Padding.Left, Padding.Top, Padding.Right, Padding.Bottom));
+  R := ClientRect;
+  R.Content(Rect(Padding.Left, Padding.Top, Padding.Right, Padding.Bottom));
   PlaceControls(R);
   ClientHeight := R.Bottom + Padding.Bottom;
   ClientWidth := R.Right + Padding.Right;
@@ -1143,19 +1144,19 @@ var
 begin
   R.Bottom := R.Top + dpiApply(ButtonHeight, FCurrentPPI);
 
-  AButtonRect := acRectSetRight(R, R.Right, dpiApply(ButtonWidth, FCurrentPPI));
+  AButtonRect := R.Split(srRight, dpiApply(ButtonWidth, FCurrentPPI));
   AButtonIndent := dpiApply(6, FCurrentPPI) + dpiApply(ButtonWidth, FCurrentPPI);
 
   if ButtonApply.Visible then
   begin
     ButtonApply.BoundsRect := AButtonRect;
-    OffsetRect(AButtonRect, -AButtonIndent, 0);
+    AButtonRect.Offset(-AButtonIndent, 0);
   end;
 
   if ButtonCancel.Visible then
   begin
     ButtonCancel.BoundsRect := AButtonRect;
-    OffsetRect(AButtonRect, -AButtonIndent, 0);
+    AButtonRect.Offset(-AButtonIndent, 0);
   end;
 
   ButtonOK.BoundsRect := AButtonRect;
@@ -1169,7 +1170,7 @@ begin
   AClientRect := ClientRect;
   if ButtonOk <> nil then
   begin
-    AClientRect := acRectContent(AClientRect, Rect(Padding.Left, Padding.Top, Padding.Right, Padding.Bottom));
+    AClientRect.Content(Rect(Padding.Left, Padding.Top, Padding.Right, Padding.Bottom));
     if FPrevClientRect <> AClientRect then
     begin
       FPrevClientRect := AClientRect;
@@ -1238,14 +1239,14 @@ var
 begin
   if TControlAccess(AControl).AutoSize then
   begin
-    AWidth := acRectWidth(R);
-    AHeight := acRectHeight(R);
+    AWidth := R.Width;
+    AHeight := R.Height;
     TControlAccess(AControl).CanAutoSize(AWidth, AHeight);
   end
   else
     AHeight := AControl.Height;
 
-  AControl.BoundsRect := acRectSetHeight(R, AHeight);
+  AControl.BoundsRect := R.Split(srTop, AHeight);
   R.Top := AControl.BoundsRect.Bottom + dpiApply(AIndent, FCurrentPPI);
 end;
 

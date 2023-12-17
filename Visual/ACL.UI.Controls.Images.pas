@@ -4,7 +4,7 @@
 {*           Image Based Controls            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -311,7 +311,10 @@ end;
 function TACLImageBox.GetPictureRect: TRect;
 begin
   if Picture <> nil then
-    Result := acRectCenter(ClientRect, acFitSize(acSize(ClientRect), Picture.GetSize, FitMode))
+  begin
+    Result := ClientRect;
+    Result.Center(acFitSize(ClientRect.Size, Picture.GetSize, FitMode));
+  end
   else
     Result := NullRect;
 end;
@@ -625,26 +628,32 @@ begin
   ACornerSize := dpiApply(DefaultCornerSize, ATargetDpi);
   ACornerSize := Min(ACornerSize, Min(FBounds.Width, FBounds.Height) div 3);
 
+  FElements[sfeFrame] := Bounds;
   if HandleAlignment = sfhaOutside then
-    FElements[sfeFrame] := acRectInflate(Bounds, -FFrameSize + FLineSize)
-  else
-    FElements[sfeFrame] := Bounds;
+    FElements[sfeFrame].Inflate(-FFrameSize + FLineSize);
 
-  ARect := acRectSetHeight(ABounds, ACornerSize);
-  FElements[sfeCornerLeftTop] := acRectSetWidth(ARect, ACornerSize);
-  FElements[sfeCornerRightTop] := acRectSetRight(ARect, ARect.Right, ACornerSize);
+  ARect := ABounds;
+  ARect.Height := ACornerSize;
+  FElements[sfeCornerLeftTop] := ARect;
+  FElements[sfeCornerLeftTop].Width := ACornerSize;
+  FElements[sfeCornerRightTop] := ARect.Split(srRight, ACornerSize);
 
-  ARect := acRectSetBottom(FBounds, FBounds.Bottom, ACornerSize);
-  FElements[sfeCornerLeftBottom] := acRectSetWidth(ARect, ACornerSize);
-  FElements[sfeCornerRightBottom] := acRectSetRight(ARect, FBounds.Right, ACornerSize);
+  ARect := FBounds.Split(srBottom, ACornerSize);
+  FElements[sfeCornerLeftBottom] := ARect;
+  FElements[sfeCornerLeftBottom].Width := ACornerSize;
+  FElements[sfeCornerRightBottom] := ARect.Split(srRight, FBounds.Right, ACornerSize);
 
-  ARect := acRectCenterVertically(ABounds, MaxMin(ASideSize, 0, FBounds.Height - 3 * (ACornerSize + 1)));
-  FElements[sfeLeft] := acRectSetWidth(ARect, ACornerSize);
-  FElements[sfeRight] := acRectSetRight(ARect, ARect.Right, ACornerSize);
+  ARect := ABounds;
+  ARect.CenterVert(MaxMin(ASideSize, 0, FBounds.Height - 3 * (ACornerSize + 1)));
+  FElements[sfeLeft] := ARect;
+  FElements[sfeLeft].Width := ACornerSize;
+  FElements[sfeRight] := ARect.Split(srRight, ACornerSize);
 
-  ARect := acRectCenterHorizontally(ABounds, MaxMin(ASideSize, 0, FBounds.Width - 3 * (ACornerSize + 1)));
-  FElements[sfeBottom] := acRectSetBottom(ARect, ARect.Bottom, ACornerSize);
-  FElements[sfeTop] := acRectSetHeight(ARect, ACornerSize);
+  ARect := ABounds;
+  ARect.CenterHorz(MaxMin(ASideSize, 0, FBounds.Width - 3 * (ACornerSize + 1)));
+  FElements[sfeBottom] := ARect.Split(srBottom, ACornerSize);
+  FElements[sfeTop] := ARect;
+  FElements[sfeTop].Height := ACornerSize;
 
   for var AElement := Low(TACLSelectionFrameElement) to High(TACLSelectionFrameElement) do
   begin
@@ -657,7 +666,7 @@ function TACLSelectionFrame.CalculateBounds(const AControlBounds: TRect; ATarget
 begin
   Result := AControlBounds;
   if HandleAlignment = sfhaOutside then
-    Result := acRectInflate(Result,
+    Result.Inflate(
       dpiApply(DefaultFrameSize, ATargetDpi) -
       dpiApply(DefaultLineSize, ATargetDpi));
 end;
@@ -667,14 +676,14 @@ var
   AIndex: TACLSelectionFrameElement;
 begin
   Result := sfeNone;
-  if PtInRect(acRectInflate(Bounds, FFrameSize), P) then
+  if PtInRect(Bounds.InflateTo(FFrameSize), P) then
   begin
     for AIndex := High(AIndex) downto sfeLeft do
     begin
       if PtInRect(FElements[AIndex], P) then
         Exit(AIndex);
     end;
-    if PtInRect(acRectInflate(Bounds, -FFrameSize), P) then
+    if PtInRect(Bounds.InflateTo(-FFrameSize), P) then
       Result := sfeClient
     else
       Result := sfeFrame;
@@ -714,10 +723,10 @@ begin
   end
   else
   begin
-    DrawElements(acRectSetBottom(Bounds, Bounds.Bottom, FFrameSize));
-    DrawElements(acRectSetRight(Bounds, Bounds.Right, FFrameSize));
-    DrawElements(acRectSetHeight(Bounds, FFrameSize));
-    DrawElements(acRectSetWidth(Bounds, FFrameSize));
+    DrawElements(Bounds.Split(srBottom, FFrameSize));
+    DrawElements(Bounds.Split(srRight, FFrameSize));
+    DrawElements(Bounds.Split(srTop, FFrameSize));
+    DrawElements(Bounds.Split(srLeft, FFrameSize));
   end;
 end;
 
@@ -735,7 +744,7 @@ procedure TACLSelectionFrame.Draw(DC: HDC; ASelectedElement: TACLSelectionFrameH
       else
         PatBlt(DC, R.Left, R.Top, R.Width, R.Height, PATINVERT);
 
-      acExcludeFromClipRegion(DC, acRectInflate(R, 2 * FLineSize));
+      acExcludeFromClipRegion(DC, R.InflateTo(2 * FLineSize));
     end;
   end;
 
@@ -746,7 +755,7 @@ begin
   AClipRgn := acSaveClipRegion(DC);
   try
     acIntersectClipRegion(DC, Bounds);
-    acExcludeFromClipRegion(DC, acRectInflate(Bounds, -FFrameSize));
+    acExcludeFromClipRegion(DC, Bounds.InflateTo(-FFrameSize));
     for AElement := High(AElement) downto Low(AElement) do
     begin
       if AElement <> sfeFrame then
@@ -754,7 +763,7 @@ begin
     end;
     if not FElements[sfeFrame].IsEmpty then
     begin
-      acExcludeFromClipRegion(DC, acRectInflate(FElements[sfeFrame], -FLineSize));
+      acExcludeFromClipRegion(DC, FElements[sfeFrame].InflateTo(-FLineSize));
       DrawElement(sfeFrame);
     end;
   finally
@@ -788,8 +797,8 @@ begin
 
   if not DisplayImageRect.IsEmpty then
   begin
-    ARect := acRectScale(FImageCrop, DisplayImageRect.Width / ImageSize.cx).Round;
-    ARect := acRectOffset(ARect, FDisplayImageRect.TopLeft);
+    ARect := (FImageCrop * (DisplayImageRect.Width / ImageSize.cx)).Round;
+    ARect.Offset(FDisplayImageRect.TopLeft);
     FSelection.Calculate(ARect, FCurrentPPI);
   end;
 
@@ -820,8 +829,7 @@ begin
       VK_DOWN:
         AOffset.Y := IfThen(ImageCrop.Bottom < ImageSize.cy, 1);
     end;
-    if (AOffset.X <> 0) or (AOffset.Y <> 0) then
-      ImageCrop := acRectOffset(ImageCrop, AOffset)
+    ImageCrop.Offset(AOffset);
   finally
     FIsKeyboardAction := False;
   end;
@@ -916,7 +924,7 @@ begin
           Min(X, FDragCapturePoint.X), Min(Y, FDragCapturePoint.Y),
           Max(X, FDragCapturePoint.X), Max(Y, FDragCapturePoint.Y));
         ARect.Offset(-DisplayImageRect.Left, -DisplayImageRect.Top);
-        ARect := acRectScale(ARect, ImageSize.cx / DisplayImageRect.Width);
+        ARect := ARect * (ImageSize.cx / DisplayImageRect.Width);
       end;
 
   else

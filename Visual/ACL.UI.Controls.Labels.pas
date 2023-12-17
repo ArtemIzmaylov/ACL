@@ -220,7 +220,7 @@ var
 begin
   ASaveIndex := SaveDC(ACanvas.Handle);
   try
-    acExcludeFromClipRegion(ACanvas.Handle, acRectInflate(ATextRect, 4, 0));
+    acExcludeFromClipRegion(ACanvas.Handle, ATextRect.InflateTo(4, 0));
     acDrawComplexFrame(ACanvas.Handle, ALineRect, AColor1, AColor2, [mTop]);
   finally
     RestoreDC(ACanvas.Handle, ASaveIndex);
@@ -331,7 +331,7 @@ begin
     SubControl.BeforeAutoSize(ANewWidth, ANewHeight);
 
     if Style.ShowLine then
-      ASize := acSize(ANewWidth, MeasureSize.cy)
+      ASize := TSize.Create(ANewWidth, MeasureSize.cy)
     else if Style.WordWrap then
       ASize := MeasureSize(ANewWidth)
     else
@@ -355,47 +355,45 @@ end;
 
 procedure TACLLabel.Calculate(const R: TRect);
 var
-  ATextSize: TSize;
+  LTextSize: TSize;
 begin
   FTextRect := R;
   MeasureCanvas.Font := Font;
   if Style.WordWrap then
-    ATextSize := acTextSizeMultiline(MeasureCanvas, Caption, FTextRect.Width)
+    LTextSize := acTextSizeMultiline(MeasureCanvas, Caption, FTextRect.Width)
   else
-    ATextSize := acTextSize(MeasureCanvas, Caption);
+    LTextSize := acTextSize(MeasureCanvas, Caption);
 
   if Style.Effect <> sleNone then
   begin
-    Inc(ATextSize.cx, 2 * Abs(Style.EffectSize));
-    Inc(ATextSize.cy, 2 * Abs(Style.EffectSize));
+    Inc(LTextSize.cx, 2 * Abs(Style.EffectSize));
+    Inc(LTextSize.cy, 2 * Abs(Style.EffectSize));
   end;
 
+  FTextRect := R;
   case AlignmentVert of
     taAlignTop:
-      FTextRect := acRectSetHeight(R, ATextSize.cy);
+      FTextRect.Height := LTextSize.cy;
     taAlignBottom:
-      FTextRect := acRectSetBottom(R, R.Bottom, ATextSize.cy);
+      FTextRect.Top := FTextRect.Bottom - LTextSize.cy;
   else
-    FTextRect := acRectCenterVertically(R, ATextSize.cy);
+    FTextRect.CenterVert(LTextSize.cy);
   end;
 
   case Alignment of
     taLeftJustify:
-      FTextRect.Right := FTextRect.Left + ATextSize.cx;
+      FTextRect.Right := FTextRect.Left + LTextSize.cx;
     taRightJustify:
-      FTextRect.Left := FTextRect.Right - ATextSize.cx;
+      FTextRect.Left := FTextRect.Right - LTextSize.cx;
     taCenter:
-      begin
-        FTextRect.Left := (FTextRect.Left + FTextRect.Right - ATextSize.cx) div 2;
-        FTextRect.Right := FTextRect.Left + ATextSize.cx;
-      end;
+      FTextRect.CenterHorz(LTextSize.cx);
   end;
 
   IntersectRect(FTextRect, FTextRect, ClientRect);
   FLineRect := FTextRect;
   if Odd(FLineRect.Height) then
     Inc(FLineRect.Bottom);
-  FLineRect := acRectCenterVertically(FLineRect, 2);
+  FLineRect.CenterVert(2);
   FLineRect.Left := R.Left;
   FLineRect.Right := R.Right;
 end;
@@ -526,7 +524,7 @@ procedure TACLLabel.DrawTextEffects(ACanvas: TCanvas; var R: TRect);
   begin
     case Style.Effect of
       sleContour:
-        R := acRectInflate(R, -FastAbs(Style.EffectSize));
+        R.Inflate(-FastAbs(Style.EffectSize));
       sleShadow:
         if Style.EffectSize < 0 then
         begin
@@ -542,8 +540,12 @@ procedure TACLLabel.DrawTextEffects(ACanvas: TCanvas; var R: TRect);
   end;
 
   procedure DrawLabelText(dX, dY: Integer);
+  var
+    LRect: TRect;
   begin
-    DrawText(ACanvas, acRectOffset(R, dX, dY), Style.ColorShadow.AsColor);
+    LRect := R;
+    LRect.Offset(dX, dY);
+    DrawText(ACanvas, LRect, Style.ColorShadow.AsColor);
   end;
 
 begin
@@ -725,12 +727,13 @@ end;
 
 procedure TACLValidationLabel.DrawBackground(ACanvas: TCanvas);
 var
-  AGlyphRect: TRect;
+  LGlyphRect: TRect;
 begin
   inherited DrawBackground(ACanvas);
-  AGlyphRect := acRectSetWidth(ClientRect, Style.Icons.FrameWidth);
-  AGlyphRect := acRectCenterVertically(AGlyphRect, Style.Icons.FrameHeight);
-  Style.Icons.Draw(ACanvas.Handle, AGlyphRect, Ord(Icon));
+  LGlyphRect := ClientRect;
+  LGlyphRect.CenterVert(Style.Icons.FrameHeight);
+  LGlyphRect.Width := Style.Icons.FrameWidth;
+  Style.Icons.Draw(ACanvas.Handle, LGlyphRect, Ord(Icon));
 end;
 
 function TACLValidationLabel.GetStyle: TACLStyleValidationLabel;

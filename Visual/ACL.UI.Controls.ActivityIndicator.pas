@@ -102,10 +102,9 @@ begin
   else
     AColor := ColorActivity1.Value;
 
+  ARect := R;
   if Active then
-    ARect := R
-  else
-    ARect := acRectInflate(R, -2);
+    ARect.Inflate(-2);
 
   acFillRect(ACanvas.Handle, ARect, AColor);
 end;
@@ -149,22 +148,23 @@ end;
 
 procedure TACLActivityIndicator.DrawBackground(ACanvas: TCanvas);
 var
-  ADotSize: Integer;
-  AIndentBetweenDots: Integer;
-  ARect: TRect;
+  LDotSize: Integer;
+  LIndentBetweenDots: Integer;
+  LRect: TRect;
 begin
   inherited;
 
-  ADotSize := dpiApply(Style.DotSize, FCurrentPPI);
-  AIndentBetweenDots := dpiApply(Style.IndentBetweenDots, FCurrentPPI);
+  LDotSize := dpiApply(Style.DotSize, FCurrentPPI);
+  LIndentBetweenDots := dpiApply(Style.IndentBetweenDots, FCurrentPPI);
 
   // Draw dots
-  ARect := acRectCenterVertically(ClientRect, ADotSize);
-  ARect.Left := ARect.Right - ADotSize;
+  LRect := ClientRect;
+  LRect.CenterVert(LDotSize);
+  LRect.Left := LRect.Right - LDotSize;
   for var I := Style.DotCount - 1 downto 0 do
   begin
-    Style.DrawDot(Canvas, ARect, I = FTimer.Tag);
-    ARect := acRectOffset(ARect, -ADotSize - AIndentBetweenDots, 0);
+    Style.DrawDot(Canvas, LRect, I = FTimer.Tag);
+    LRect.Offset(-LDotSize - LIndentBetweenDots, 0);
   end;
 end;
 

@@ -18,10 +18,6 @@ interface
 uses
   Winapi.Windows,
   Winapi.Messages,
-  // Vcl
-{$IFNDEF ACL_BASE_NOVCL}
-  Vcl.Controls,
-{$ENDIF}
   // System
   System.Types,
   System.SysUtils,
@@ -42,7 +38,13 @@ type
   TACLFitMode = (afmNormal, afmStretch, afmProportionalStretch, afmFit, afmFill);
   TACLStretchMode = (isStretch, isTile, isCenter);
 
-  TACLMarginPart = (mzLeftTop, mzLeft, mzLeftBottom, mzTop, mzBottom, mzRight, mzRightTop, mzRightBottom, mzClient);
+  TACLMarginPart = (
+    mzLeftTop, mzLeft, mzLeftBottom,
+    mzTop, mzBottom,
+    mzRight, mzRightTop, mzRightBottom,
+    mzClient
+  );
+  TACLMarginParts = set of TACLMarginPart;
   TACLMarginPartBounds = array[TACLMarginPart] of TRect;
 
 const
@@ -75,7 +77,7 @@ type
     procedure Add(AMinSize, AMaxSize: Integer; ACanResize: Boolean); overload;
     procedure Add(ASize, AMinSize, AMaxSize: Integer; ACanResize: Boolean); overload;
     procedure Calculate;
-    //
+    //# Properties
     property AvailableSize: Integer read FAvailableSize write FAvailableSize;
   end;
 
@@ -110,10 +112,10 @@ type
     function IsEmpty: Boolean;
     procedure Reset;
     function ToString: string; override;
-    //
+    //# Properties
     property DefaultValue: TSize read FDefaultValue write FDefaultValue;
     property Value: TSize read FValue write SetValue;
-    //
+    //# Events
     property OnValidate: TACLSizeValidateEvent read FOnValidate write FOnValidate;
   published
     property All: Integer read GetAll write SetAll stored False;
@@ -149,10 +151,10 @@ type
     procedure Assign(Source: TPersistent); override;
     procedure Reset;
     function ToString: string; override;
-    //
+    //# Properties
     property DefaultValue: TRect read FDefaultValue write FDefaultValue;
     property Value: TRect read FValue write SetValue;
-    //
+    //# Events
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
     property OnValidate: TACLRectValidateEvent read FOnValidate write FOnValidate;
   published
@@ -161,6 +163,84 @@ type
     property Top: Integer index 1 read GetSide write SetSide stored IsSideStored;
     property Right: Integer index 2 read GetSide write SetSide stored IsSideStored;
     property Bottom: Integer index 3 read GetSide write SetSide stored IsSideStored;
+  end;
+
+  { TACLPointHelper }
+
+  TACLPointHelper = record helper for TPoint
+  public
+    class operator Multiply(const L: TPoint; Factor: Single): TPoint;
+    procedure Scale(ANumerator, ADenominator: Integer); inline;
+    function ScaleTo(ANumerator, ADenominator: Integer): TPoint; inline;
+  end;
+
+  { TACLRectHelper }
+
+  TACLRectHelper = record helper for TRect
+  public
+    class function Create(const Size: TSize): TRect; overload; static;
+    class function Create(const Origin: TPoint; const Size: TSize): TRect; overload; static;
+
+    //# Operators
+    class operator Add(const L: TRect; const R: TPoint): TRect;
+    class operator Implicit(const Value: TSize): TRect;
+    class operator Multiply(const L: TRect; Borders: TACLBorders): TRect;
+    class operator Multiply(const L: TRect; Factor: Single): TRect;
+    class operator Subtract(const L: TRect; const R: TPoint): TRect;
+
+    //# Margins
+    class function CreateMargins(const Rect, ContentRect: TRect): TRect; overload; static;
+    class function CreateMargins(const Value: Integer): TRect; overload; static;
+    procedure MarginsAdd(const Value: TRect); overload; inline;
+    procedure MarginsAdd(const Value: Integer); overload; inline;
+    procedure MarginsAdd(const L, T, R, B: Integer); overload; inline;
+    function MarginsHeight: Integer; inline;
+    function MarginsWidth: Integer; inline;
+
+    //# Self-Modifiers
+    procedure Add(const R: TRect); // Unline the Union, does not check the R to emptines
+    procedure Center(const ASize: TSize);
+    procedure CenterHorz(AWidth: Integer);
+    procedure CenterVert(AHeight: Integer);
+    procedure Content(const BorderWidth: Integer; Borders: TACLBorders); overload;
+    procedure Content(const Margins: TRect); overload;
+    procedure Content(const Margins: TRect; Borders: TACLBorders); overload;
+    function EqualSizes(const R: TRect): Boolean;
+    procedure Inflate(const Delta: Integer); overload; inline;
+    procedure Inflate(const Margins: TRect); overload; inline;
+    procedure Inflate(const Margins: TRect; Borders: TACLBorders); overload; inline;
+    function IsZero: Boolean; inline;
+    procedure Mirror(const ParentRect: TRect);
+    procedure Rotate; inline;
+    procedure Scale(Numerator, Denominator: Integer);
+
+    //# Mutations
+    function CenterTo(AWidth, AHeight: Integer): TRect; overload; inline;
+    function CenterTo(const ASize: TSize): TRect; overload; inline;
+    function InflateTo(Delta: Integer): TRect; overload; inline;
+    function InflateTo(dX, dY: Integer): TRect; overload; inline;
+    function OffsetTo(dX, dY: Integer): TRect; inline;
+    function ScaleTo(Numerator, Denominator: Integer): TRect; inline;
+    function Split(const Margins: TRect): TRect; overload;
+    function Split(SplitType: TSplitRectType; Origin, Size: Integer): TRect; overload;
+    function Split(SplitType: TSplitRectType; Size: Integer): TRect; overload;
+  end;
+
+  { TACLRectFHelper }
+
+  TACLRectFHelper = record helper for TRectF
+  public
+    class operator Multiply(const L: TRectF; Factor: Single): TRectF;
+  end;
+
+  { TACLSizeHelper }
+
+  TACLSizeHelper = record helper for TSize
+  public
+    class function Create(const Value: Integer): TSize; overload; static;
+    function IsEmpty: Boolean; inline;
+    procedure Scale(ANumerator, ADenominator: Integer); inline;
+    function ScaleTo(ANumerator, ADenominator: Integer): TSize; inline;
   end;
 
   { TACLXFormHelper }
@@ -182,101 +262,27 @@ type
     function Transform(const P: TPointF): TPointF;
   end;
 
+procedure acCalcPartBounds(out AParts: TACLMarginPartBounds; const AMargins: TRect;
+  const ADestRect, ASourceRect: TRect; AStretchMode: TACLStretchMode = isStretch);
 function acCalcPatternCount(ADestSize, APatternSize: Integer): Integer;
-function acHighestCommonFactor(A, B: Integer): Integer;
+function acHalfCoordinate(ASize: Integer): Integer; inline;
 procedure acReduceFraction(var A, B: Integer);
 
-// Margins
-procedure acMarginAdd(var AMargins: TRect; ALeft, ATop, ARight, ABottom: Integer); overload;
-procedure acMarginAdd(var AMargins: TRect; const AAddition: Integer); overload;
-procedure acMarginAdd(var AMargins: TRect; const AAddition: TRect); overload;
-procedure acMarginCalculateRects(const ADestRect, AMargins, ASourceRect: TRect;
-  out AParts: TACLMarginPartBounds; AStretchMode: TACLStretchMode = isStretch);
-function acMarginGetReal(const R: TRect; ABorders: TACLBorders): TRect;
-function acMarginIsEmpty(const AMargins: TRect): Boolean;
-function acMarginIsPartFixed(APart: TACLMarginPart; AStretchMode: TACLStretchMode = isStretch): Boolean;
-function acMarginHeight(const R: TRect): Integer; inline;
-function acMarginWidth(const R: TRect): Integer; inline;
-function acMargins(const ARect, AContentRect: TRect): TRect; overload;
-function acMargins(const AValue: Integer): TRect; overload;
-
-// Points
-function acPointDistance(const P1, P2: TPoint): Double;
-function acPointInRect(const R: TRect; const P: TPoint): Boolean; inline;
-function acPointIsEqual(const P1, P2: TPoint): Boolean; inline;
-function acPointOffset(const P, AOffset: TPoint): TPoint; overload; inline;
-function acPointOffset(const P: TPoint; X, Y: Integer): TPoint; overload;inline;
-function acPointOffsetNegative(const P, AOffset: TPoint): TPoint; inline;
-function acPointScale(const P: TPoint; AScaleFactor: Single): TPoint; overload; inline;
-function acPointScale(const P: TPoint; ANumerator, ADenominator: Integer): TPoint; overload; inline;
-
-// Sizes
-function acSize(Value: Integer): TSize; overload; inline;
-function acSize(X, Y: Integer): TSize; overload; inline;
-function acSize(const R: TRect): TSize; overload; inline;
-function acSizeIsEmpty(const S: TSize): Boolean; inline;
-function acSizeIsEqual(const R1, R2: TRect): Boolean; overload; inline;
-function acSizeIsEqual(const S1, S2: TSize): Boolean; overload; inline;
-function acSizeMax(const S1, S2: TSize): TSize; inline;
-function acSizeMin(const S1, S2: TSize): TSize; inline;
-function acSizeScale(const S: TSize; ANumerator, ADenominator: Integer): TSize;
-
-// Rects
-{$IFNDEF ACL_BASE_NOVCL}
-procedure acRectToMargins(const R: TRect; Margins: TMargins);
-{$ENDIF}
-function acHalfCoordinate(const ASize: Integer): Integer; inline;
-function acRect(const S: TSize): TRect; overload; inline;
-function acRect(const S: TPoint): TRect; overload; inline;
-function acRect(const ALeftTop: TPoint; const ASize: TSize): TRect; overload; inline;
-function acRectAdjust(const R: TRect): TRect; inline;
-function acRectCenter(const R: TRect): TPoint; overload;
-function acRectCenter(const R: TRect; W, H: Integer): TRect; overload; inline;
-function acRectCenter(const R: TRect; const S: Integer): TRect; overload; inline;
-function acRectCenter(const R: TRect; const S: TSize): TRect; overload; inline;
-function acRectCenterHorizontally(const R: TRect; Width: Integer): TRect; inline;
-function acRectCenterVertically(const R: TRect; AHeight: Integer): TRect; inline;
-function acRectContent(const ARect, AMargins: TRect): TRect; overload;
-function acRectContent(const ARect, AMargins: TRect; ABorders: TACLBorders): TRect; overload;
-function acRectContent(const ARect: TRect; ABorderWidth: Integer; ABorders: TACLBorders): TRect; overload;
-function acRectIsEqualSizes(const R1, R2: TRect): Boolean; inline;
-function acRectHeight(const R: TRect): Integer; inline;
-function acRectInflate(const ARect, AMargins: TRect): TRect; overload; inline;
-function acRectInflate(const ARect: TRect; AMargins: TRect; ABorders: TACLBorders): TRect; overload; inline;
-function acRectInflate(const ARect: TRect; d: Integer): TRect; overload; inline;
-function acRectInflate(const ARect: TRect; dx, dy: Integer): TRect; overload; inline;
-function acRectInRect(const ATestRect, ARect: TRect): Boolean; inline;
-function acRectIsEmpty(const R: TRect): Boolean; inline;
-function acRectMirror(const ARect, AParentRect: TRect): TRect; inline;
-function acRectOffset(const ARect: TRect; const P: TPoint): TRect; overload; inline;
-function acRectOffsetNegative(const ARect: TRect; const P: TPoint): TRect; inline;
-function acRectOffset(const ARect: TRect; dx, dy: Integer): TRect; overload; inline;
-function acRectRotate(const R: TRect): TRect; inline;
-function acRectScale(const R: TRect; ANumeratorX, ADenominatorX, ANumeratorY, ADenominatorY: Integer): TRect; overload;
-function acRectScale(const R: TRect; ANumerator, ADenominator: Integer): TRect; overload; inline;
-function acRectScale(const R: TRect; AScaleFactor: Single): TRect; overload;
-function acRectScale(const R: TRectF; AScale: Single): TRectF; overload;
-function acRectSetBottom(const R: TRect; ABottom, AHeight: Integer): TRect; overload;inline;
-function acRectSetHeight(const R: TRect; AHeight: Integer): TRect; inline;
-function acRectSetLeft(const R: TRect; ALeft, AWidth: Integer): TRect; overload; inline;
-function acRectSetLeft(const R: TRect; AWidth: Integer): TRect; overload; inline;
-function acRectSetPos(const R: TRect; const P: TPoint): TRect; inline;
-function acRectSetRight(const R: TRect; ARight, AWidth: Integer): TRect; overload; inline;
-function acRectSetSize(const R: TRect; const ASize: TSize): TRect; overload; inline;
-function acRectSetSize(const P: TPoint; const ASize: TSize): TRect; overload; inline;
-function acRectSetSize(const R: TRect; W, H: Integer): TRect; overload; inline;
-function acRectSetTop(const R: TRect; AHeight: Integer): TRect; overload;inline;
-function acRectSetTop(const R: TRect; ATop, AHeight: Integer): TRect; overload;inline;
-function acRectSetWidth(const R: TRect; AWidth: Integer): TRect; inline;
-function acRectWidth(const R: TRect): Integer; inline;
-procedure acRectUnion(var ATarget: TRect; const R: TRect); inline; overload;
+// Math
+function Max(const S1, S2: TSize): TSize; overload; inline;
+function Min(const S1, S2: TSize): TSize; overload; inline;
 
 // Fit
-procedure acFitSize(var ATargetWidth, ATargetHeight: Integer; SourceWidth, SourceHeight: Integer; AMode: TACLFitMode); overload;
-function acFitSize(const DisplaySize, SourceSize: TSize; AMode: TACLFitMode): TSize; overload; inline;
-function acFitSize(const DisplaySize: TSize; SourceWidth, SourceHeight: Integer; AMode: TACLFitMode): TSize; overload; inline;
-function acFitRect(const R: TRect; ASourceWidth, ASourceHeight: Integer; AMode: TACLFitMode; ACenter: Boolean = True): TRect; overload;
-function acFitRect(const R: TRect; const ASourceSize: TSize; AMode: TACLFitMode; ACenter: Boolean = True): TRect; overload; inline;
+procedure acFitSize(var ATargetWidth, ATargetHeight: Integer;
+  SourceWidth, SourceHeight: Integer; AMode: TACLFitMode); overload;
+function acFitSize(const DisplaySize, SourceSize: TSize;
+  AMode: TACLFitMode): TSize; overload; inline;
+function acFitSize(const DisplaySize: TSize; SourceWidth, SourceHeight: Integer;
+  AMode: TACLFitMode): TSize; overload; inline;
+function acFitRect(const R: TRect; ASourceWidth, ASourceHeight: Integer;
+  AMode: TACLFitMode; ACenter: Boolean = True): TRect; overload;
+function acFitRect(const R: TRect; const ASourceSize: TSize;
+  AMode: TACLFitMode; ACenter: Boolean = True): TRect; overload; inline;
 
 // Map
 function acMapPoint(const ASource, ATarget: HWND; const P: TPoint): TPoint;
@@ -291,17 +297,81 @@ begin
     Result := ADestSize div APatternSize + Ord(ADestSize mod APatternSize <> 0);
 end;
 
-function acHighestCommonFactor(A, B: Integer): Integer;
-var
-  FA, FB: Integer;
-begin
-  if A = 0 then
-    Exit(0);
+procedure acCalcPartBounds(out AParts: TACLMarginPartBounds; const AMargins: TRect;
+  const ADestRect, ASourceRect: TRect; AStretchMode: TACLStretchMode = isStretch);
 
-  FA := Abs(A);
-  FB := Abs(B);
-  acReduceFraction(FA, FB);
-  Result := A div FA;
+  function CalculateMargins: TRect;
+  var
+    ADelta: Integer;
+    R: TRect;
+  begin
+    Result := AMargins;
+    if AStretchMode = isCenter then
+    begin
+      R := ASourceRect;
+      R.Content(AMargins);
+      if (Result.Left <> 0) or (Result.Right <> 0) then
+      begin
+        ADelta := ADestRect.Width - R.Width;
+        Result.Left := MulDiv(Result.Left, ADelta, Result.Left + Result.Right);
+        Result.Right := ADelta - Result.Left;
+      end;
+      if (Result.Top <> 0) or (Result.Bottom <> 0) then
+      begin
+        ADelta := ADestRect.Height - R.Height;
+        Result.Top := MulDiv(Result.Top, ADelta, Result.Top + Result.Bottom);
+        Result.Bottom := ADelta - Result.Top;
+      end;
+    end;
+  end;
+
+var
+  LPart: TACLMarginPart;
+  LTemp: TRect;
+begin
+  LTemp := ADestRect;
+  LTemp.Content(CalculateMargins);
+  for LPart := Low(TACLMarginPart) to High(TACLMarginPart) do
+  begin
+    // Horizontal
+    case LPart of
+      mzClient:
+        AParts[LPart] := LTemp;
+      mzLeftTop, mzLeft, mzLeftBottom:
+        begin
+          AParts[LPart].Left := ADestRect.Left;
+          AParts[LPart].Right := LTemp.Left;
+        end;
+      mzTop, mzBottom:
+        begin
+          AParts[LPart].Left := LTemp.Left;
+          AParts[LPart].Right := LTemp.Right;
+        end;
+      mzRight, mzRightTop, mzRightBottom:
+        begin
+          AParts[LPart].Left := LTemp.Right;
+          AParts[LPart].Right := ADestRect.Right;
+        end;
+    end;
+    // Vertical
+    case LPart of
+      mzLeft, mzRight:
+        begin
+          AParts[LPart].Top := LTemp.Top;
+          AParts[LPart].Bottom := LTemp.Bottom;
+        end;
+      mzLeftTop, mzTop, mzRightTop:
+        begin
+          AParts[LPart].Top := ADestRect.Top;
+          AParts[LPart].Bottom := LTemp.Top;
+        end;
+      mzRightBottom, mzLeftBottom, mzBottom:
+        begin
+          AParts[LPart].Top := LTemp.Bottom;
+          AParts[LPart].Bottom := ADestRect.Bottom;
+        end;
+    end;
+  end;
 end;
 
 procedure acReduceFraction(var A, B: Integer);
@@ -323,254 +393,16 @@ begin
 end;
 
 //==============================================================================
-// Margins
-//==============================================================================
-
-procedure acMarginCalculateRects(const ADestRect, AMargins, ASourceRect: TRect;
-  out AParts: TACLMarginPartBounds; AStretchMode: TACLStretchMode = isStretch);
-
-  function CalculateMargins: TRect;
-  var
-    ADelta: Integer;
-    R: TRect;
-  begin
-    Result := AMargins;
-    if AStretchMode = isCenter then
-    begin
-      R := acRectContent(ASourceRect, AMargins);
-      if (Result.Left <> 0) or (Result.Right <> 0) then
-      begin
-        ADelta := acRectWidth(ADestRect) - acRectWidth(R);
-        Result.Left := MulDiv(Result.Left, ADelta, Result.Left + Result.Right);
-        Result.Right := ADelta - Result.Left;
-      end;
-      if (Result.Top <> 0) or (Result.Bottom <> 0) then
-      begin
-        ADelta := acRectHeight(ADestRect) - acRectHeight(R);
-        Result.Top := MulDiv(Result.Top, ADelta, Result.Top + Result.Bottom);
-        Result.Bottom := ADelta - Result.Top;
-      end;
-    end;
-  end;
-
-var
-  AIndex: TACLMarginPart;
-  R: TRect;
-begin
-  R := acRectContent(ADestRect, CalculateMargins);
-  for AIndex := Low(TACLMarginPart) to High(TACLMarginPart) do
-  begin
-    // Horizontal
-    case AIndex of
-      mzClient:
-        AParts[AIndex] := R;
-      mzLeftTop, mzLeft, mzLeftBottom:
-        begin
-          AParts[AIndex].Left := ADestRect.Left;
-          AParts[AIndex].Right := R.Left;
-        end;
-      mzTop, mzBottom:
-        begin
-          AParts[AIndex].Left := R.Left;
-          AParts[AIndex].Right := R.Right;
-        end;
-      mzRight, mzRightTop, mzRightBottom:
-        begin
-          AParts[AIndex].Left := R.Right;
-          AParts[AIndex].Right := ADestRect.Right;
-        end;
-    end;
-    // Vertical
-    case AIndex of
-      mzLeft, mzRight:
-        begin
-          AParts[AIndex].Top := R.Top;
-          AParts[AIndex].Bottom := R.Bottom;
-        end;
-      mzLeftTop, mzTop, mzRightTop:
-        begin
-          AParts[AIndex].Top := ADestRect.Top;
-          AParts[AIndex].Bottom := R.Top;
-        end;
-      mzRightBottom, mzLeftBottom, mzBottom:
-        begin
-          AParts[AIndex].Top := R.Bottom;
-          AParts[AIndex].Bottom := ADestRect.Bottom;
-        end;
-    end;
-  end;
-end;
-
-procedure acMarginAdd(var AMargins: TRect; ALeft, ATop, ARight, ABottom: Integer);
-begin
-  Inc(AMargins.Bottom, ABottom);
-  Inc(AMargins.Left, ALeft);
-  Inc(AMargins.Right, ARight);
-  Inc(AMargins.Top, ATop);
-end;
-
-procedure acMarginAdd(var AMargins: TRect; const AAddition: Integer);
-begin
-  acMarginAdd(AMargins, AAddition, AAddition, AAddition, AAddition);
-end;
-
-procedure acMarginAdd(var AMargins: TRect; const AAddition: TRect);
-begin
-  acMarginAdd(AMargins, AAddition.Left, AAddition.Top, AAddition.Right, AAddition.Bottom);
-end;
-
-function acMarginGetReal(const R: TRect; ABorders: TACLBorders): TRect;
-begin
-  Result := NullRect;
-  if mTop in ABorders then
-    Result.Top := R.Top;
-  if mBottom in ABorders then
-    Result.Bottom := R.Bottom;
-  if mLeft in ABorders then
-    Result.Left := R.Left;
-  if mRight in ABorders then
-    Result.Right := R.Right;
-end;
-
-function acMargins(const AValue: Integer): TRect;
-begin
-  Result.Left := AValue;
-  Result.Top := AValue;
-  Result.Right := AValue;
-  Result.Bottom := AValue;
-end;
-
-function acMargins(const ARect, AContentRect: TRect): TRect;
-begin
-  Result.Left := AContentRect.Left - ARect.Left;
-  Result.Top := AContentRect.Top - ARect.Top;
-  Result.Right := ARect.Right - AContentRect.Right;
-  Result.Bottom := ARect.Bottom - AContentRect.Bottom;
-end;
-
-function acMarginIsEmpty(const AMargins: TRect): Boolean;
-begin
-  with AMargins do
-    Result := (Left = 0) and (Top = 0) and (Bottom = 0) and (Right = 0);
-end;
-
-function acMarginIsPartFixed(APart: TACLMarginPart; AStretchMode: TACLStretchMode = isStretch): Boolean;
-begin
-  if AStretchMode = isCenter then
-    Result := APart = mzClient
-  else
-    Result := APart in [mzLeftTop, mzLeftBottom, mzRightTop, mzRightBottom];
-end;
-
-function acMarginHeight(const R: TRect): Integer;
-begin
-  Result := R.Top + R.Bottom;
-end;
-
-function acMarginWidth(const R: TRect): Integer;
-begin
-  Result := R.Left + R.Right;
-end;
-
-//==============================================================================
-// Points
-//==============================================================================
-
-function acPointDistance(const P1, P2: TPoint): Double;
-begin
-  try
-    Result := Sqrt(Sqr(P1.X - P2.X) + Sqr(P1.Y - P2.Y));
-  except
-    Result := MaxInt;
-  end;
-end;
-
-function acPointInRect(const R: TRect; const P: TPoint): Boolean;
-begin
-  Result := (P.X >= R.Left) and (P.X < R.Right) and (P.Y >= R.Top) and (P.Y < R.Bottom);
-end;
-
-function acPointIsEqual(const P1, P2: TPoint): Boolean;
-begin
-  Result := (P1.X = P2.X) and (P1.Y = P2.Y);
-end;
-
-function acPointOffset(const P, AOffset: TPoint): TPoint;
-begin
-  Result.X := P.X + AOffset.X;
-  Result.Y := P.Y + AOffset.Y;
-end;
-
-function acPointOffset(const P: TPoint; X, Y: Integer): TPoint;
-begin
-  Result.X := P.X + X;
-  Result.Y := P.Y + Y;
-end;
-
-function acPointOffsetNegative(const P, AOffset: TPoint): TPoint;
-begin
-  Result.X := P.X - AOffset.X;
-  Result.Y := P.Y - AOffset.Y;
-end;
-
-function acPointScale(const P: TPoint; AScaleFactor: Single): TPoint;
-begin
-  Result.X := Round(P.X * AScaleFactor);
-  Result.Y := Round(P.Y * AScaleFactor);
-end;
-
-function acPointScale(const P: TPoint; ANumerator, ADenominator: Integer): TPoint;
-begin
-  Result.X := MulDiv(P.X, ANumerator, ADenominator);
-  Result.Y := MulDiv(P.Y, ANumerator, ADenominator);
-end;
-
-//==============================================================================
 // Sizes
 //==============================================================================
 
-function acSize(Value: Integer): TSize;
-begin
-  Result.cx := Value;
-  Result.cy := Value;
-end;
-
-function acSize(X, Y: Integer): TSize;
-begin
-  Result.cx := X;
-  Result.cy := Y;
-end;
-
-function acSize(const R: TRect): TSize;
-begin
-  Result.cx := R.Right - R.Left;
-  Result.cy := R.Bottom - R.Top;
-end;
-
-function acSizeIsEmpty(const S: TSize): Boolean;
-begin
-  Result := (S.cx = 0) or (S.cy = 0);
-end;
-
-function acSizeIsEqual(const S1, S2: TSize): Boolean;
-begin
-  Result := (S1.cx = S2.cx) and (S1.cy = S2.cy);
-end;
-
-function acSizeIsEqual(const R1, R2: TRect): Boolean;
-begin
-  Result :=
-    ((R1.Right - R1.Left) = (R2.Right - R2.Left)) and
-    ((R1.Bottom - R1.Top) = (R2.Bottom - R2.Top));
-end;
-
-function acSizeMax(const S1, S2: TSize): TSize;
+function Max(const S1, S2: TSize): TSize;
 begin
   Result.cx := Max(S1.cx, S2.cx);
   Result.cy := Max(S1.cy, S2.cy);
 end;
 
-function acSizeMin(const S1, S2: TSize): TSize;
+function Min(const S1, S2: TSize): TSize;
 begin
   Result.cx := Min(S1.cx, S2.cx);
   Result.cy := Min(S1.cy, S2.cy);
@@ -586,305 +418,9 @@ end;
 // Rects
 //==============================================================================
 
-function acHalfCoordinate(const ASize: Integer): Integer; inline;
+function acHalfCoordinate(ASize: Integer): Integer; inline;
 begin
   Result := (ASize - Integer(Odd(ASize))) div 2;
-end;
-
-function acRectIsEqualSizes(const R1, R2: TRect): Boolean;
-begin
-  Result :=
-    ((R1.Right - R1.Left) = (R2.Right - R2.Left)) and
-    ((R1.Bottom - R1.Top) = (R2.Bottom - R2.Top));
-end;
-
-function acRectContent(const ARect, AMargins: TRect): TRect; overload;
-begin
-  Result.Top := ARect.Top + AMargins.Top;
-  Result.Left := ARect.Left + AMargins.Left;
-  Result.Right := ARect.Right - AMargins.Right;
-  Result.Bottom := ARect.Bottom - AMargins.Bottom;
-end;
-
-function acRectContent(const ARect, AMargins: TRect; ABorders: TACLBorders): TRect;
-begin
-  Result.Top := ARect.Top + IfThen(mTop in ABorders, AMargins.Top);
-  Result.Left := ARect.Left + IfThen(mLeft in ABorders, AMargins.Left);
-  Result.Right := ARect.Right - IfThen(mRight in ABorders, AMargins.Right);
-  Result.Bottom := ARect.Bottom - IfThen(mBottom in ABorders, AMargins.Bottom);
-end;
-
-function acRectContent(const ARect: TRect; ABorderWidth: Integer; ABorders: TACLBorders): TRect;
-begin
-  Result.Top := ARect.Top + IfThen(mTop in ABorders, ABorderWidth);
-  Result.Left := ARect.Left + IfThen(mLeft in ABorders, ABorderWidth);
-  Result.Right := ARect.Right - IfThen(mRight in ABorders, ABorderWidth);
-  Result.Bottom := ARect.Bottom - IfThen(mBottom in ABorders, ABorderWidth);
-end;
-
-function acRectSetRight(const R: TRect; ARight, AWidth: Integer): TRect;
-begin
-  Result := R;
-  Result.Right := ARight;
-  Result.Left := Result.Right - AWidth;
-end;
-
-function acRectSetSize(const R: TRect; const ASize: TSize): TRect;
-begin
-  Result := acRectSetSize(R, ASize.cx, ASize.cy);
-end;
-
-function acRectSetSize(const P: TPoint; const ASize: TSize): TRect; overload; inline;
-begin
-  Result := Rect(P.X, P.Y, P.X + ASize.cx, P.Y + ASize.cy);
-end;
-
-function acRectSetSize(const R: TRect; W, H: Integer): TRect;
-begin
-  Result := R;
-  Result.Right := R.Left + W;
-  Result.Bottom := R.Top + H;
-end;
-
-function acRect(const S: TSize): TRect;
-begin
-  Result := Rect(0, 0, S.cx, S.cy);
-end;
-
-function acRect(const S: TPoint): TRect;
-begin
-  Result := Rect(S.X, S.Y, S.X, S.Y);
-end;
-
-function acRect(const ALeftTop: TPoint; const ASize: TSize): TRect;
-begin
-  Result := Rect(ALeftTop.X, ALeftTop.Y, ALeftTop.X + ASize.cx, ALeftTop.Y + ASize.cy);
-end;
-
-function acRectAdjust(const R: TRect): TRect; inline;
-begin
-  Result := Rect(Min(R.Left, R.Right), Min(R.Top, R.Bottom), Max(R.Left, R.Right), Max(R.Top, R.Bottom));
-end;
-
-function acRectCenter(const R: TRect): TPoint; overload;
-begin
-  Result.X := acHalfCoordinate(R.Left + R.Right);
-  Result.Y := acHalfCoordinate(R.Top + R.Bottom);
-end;
-
-function acRectCenter(const R: TRect; const S: Integer): TRect;
-begin
-  Result := acRectCenter(R, S, S);
-end;
-
-function acRectCenter(const R: TRect; const S: TSize): TRect;
-begin
-  Result := acRectCenter(R, S.cx, S.cy);
-end;
-
-function acRectCenter(const R: TRect; W, H: Integer): TRect;
-begin
-  Result := R;
-  Result.Left := acHalfCoordinate(R.Left + R.Right - W);
-  Result.Right := Result.Left + W;
-  Result.Top := acHalfCoordinate(R.Top + R.Bottom - H);
-  Result.Bottom := Result.Top + H;
-end;
-
-function acRectInflate(const ARect: TRect; d: Integer): TRect;
-begin
-  Result := acRectInflate(ARect, d, d);
-end;
-
-function acRectInflate(const ARect, AMargins: TRect): TRect;
-begin
-  Result := ARect;
-  Dec(Result.Top, AMargins.Top);
-  Dec(Result.Left, AMargins.Left);
-  Inc(Result.Right, AMargins.Right);
-  Inc(Result.Bottom, AMargins.Bottom);
-end;
-
-function acRectInflate(const ARect: TRect; AMargins: TRect; ABorders: TACLBorders): TRect;
-begin
-  AMargins.Bottom := IfThen(mBottom in ABorders, AMargins.Bottom);
-  AMargins.Left := IfThen(mLeft in ABorders, AMargins.Left);
-  AMargins.Right := IfThen(mRight in ABorders, AMargins.Right);
-  AMargins.Top := IfThen(mTop in ABorders, AMargins.Top);
-  Result := acRectInflate(ARect, AMargins);
-end;
-
-function acRectInflate(const ARect: TRect; dx, dy: Integer): TRect;
-begin
-  Result := ARect;
-  Dec(Result.Top, dy);
-  Dec(Result.Left, dx);
-  Inc(Result.Right, dx);
-  Inc(Result.Bottom, dy);
-end;
-
-function acRectInRect(const ATestRect, ARect: TRect): Boolean;
-begin
-  Result :=
-    (ATestRect.Left >= ARect.Left) and (ATestRect.Top >= ARect.Top) and
-    (ATestRect.Right <= ARect.Right) and (ATestRect.Bottom <= ARect.Bottom);
-end;
-
-function acRectIsEmpty(const R: TRect): Boolean;
-begin
-  Result := (R.Bottom <= R.Top) or (R.Right <= R.Left);
-end;
-
-function acRectMirror(const ARect, AParentRect: TRect): TRect; inline;
-begin
-  Result := ARect;
-  Result.Left := AParentRect.Left + AParentRect.Right - ARect.Right;
-  Result.Right := Result.Left + ARect.Width;
-end;
-
-function acRectOffset(const ARect: TRect; const P: TPoint): TRect;
-begin
-  Result := acRectOffset(ARect, P.X, P.Y);
-end;
-
-function acRectOffsetNegative(const ARect: TRect; const P: TPoint): TRect;
-begin
-  Result := acRectOffset(ARect, -P.X, -P.Y);
-end;
-
-function acRectOffset(const ARect: TRect; dx, dy: Integer): TRect;
-begin
-  Result := Rect(ARect.Left + dX, ARect.Top + dY, ARect.Right + dX, ARect.Bottom + dY);
-end;
-
-{$IFNDEF ACL_BASE_NOVCL}
-procedure acRectToMargins(const R: TRect; Margins: TMargins);
-begin
-  Margins.Left := R.Left;
-  Margins.Bottom := R.Bottom;
-  Margins.Right := R.Right;
-  Margins.Top := R.Top;
-end;
-{$ENDIF}
-
-procedure acRectUnion(var ATarget: TRect; const R: TRect);
-begin
-  if R.Left < ATarget.Left then
-    ATarget.Left := R.Left;
-  if R.Top < ATarget.Top then
-    ATarget.Top := R.Top;
-  if R.Right > ATarget.Right then
-    ATarget.Right := R.Right;
-  if R.Bottom > ATarget.Bottom then
-    ATarget.Bottom := R.Bottom;
-end;
-
-function acRectWidth(const R: TRect): Integer;
-begin
-  Result := R.Right - R.Left;
-end;
-
-function acRectRotate(const R: TRect): TRect;
-begin
-  Result := Rect(R.Top, R.Left, R.Bottom, R.Right);
-end;
-
-function acRectScale(const R: TRect; AScaleFactor: Single): TRect;
-begin
-  Result.Bottom := Round(R.Bottom * AScaleFactor);
-  Result.Left := Round(R.Left * AScaleFactor);
-  Result.Right := Round(R.Right * AScaleFactor);
-  Result.Top := Round(R.Top * AScaleFactor);
-end;
-
-function acRectScale(const R: TRectF; AScale: Single): TRectF;
-begin
-  Result.Bottom := R.Bottom * AScale;
-  Result.Left := R.Left * AScale;
-  Result.Right := R.Right * AScale;
-  Result.Top := R.Top * AScale;
-end;
-
-function acRectScale(const R: TRect; ANumeratorX, ADenominatorX, ANumeratorY, ADenominatorY: Integer): TRect;
-begin
-  Result.Bottom := MulDiv(R.Bottom, ANumeratorY, ADenominatorY);
-  Result.Left := MulDiv(R.Left, ANumeratorX, ADenominatorX);
-  Result.Right := MulDiv(R.Right, ANumeratorX, ADenominatorX);
-  Result.Top := MulDiv(R.Top, ANumeratorY, ADenominatorY);
-end;
-
-function acRectScale(const R: TRect; ANumerator, ADenominator: Integer): TRect;
-begin
-  Result := acRectScale(R, ANumerator, ADenominator, ANumerator, ADenominator);
-end;
-
-function acRectSetBottom(const R: TRect; ABottom, AHeight: Integer): TRect;
-begin
-  Result := R;
-  Result.Bottom := ABottom;
-  Result.Top := ABottom - AHeight;
-end;
-
-function acRectSetHeight(const R: TRect; AHeight: Integer): TRect;
-begin
-  Result := R;
-  Result.Bottom := R.Top + AHeight;
-end;
-
-function acRectSetLeft(const R: TRect; AWidth: Integer): TRect;
-begin
-  Result := R;
-  Result.Left := Result.Right - AWidth;
-end;
-
-function acRectSetLeft(const R: TRect; ALeft, AWidth: Integer): TRect;
-begin
-  Result := R;
-  Result.Left := ALeft;
-  Result.Right := Result.Left + AWidth;
-end;
-
-function acRectSetWidth(const R: TRect; AWidth: Integer): TRect;
-begin
-  Result := R;
-  Result.Right := Result.Left + AWidth;
-end;
-
-function acRectSetTop(const R: TRect; AHeight: Integer): TRect;
-begin
-  Result := R;
-  Result.Top := R.Bottom - AHeight;
-end;
-
-function acRectSetTop(const R: TRect; ATop, AHeight: Integer): TRect;
-begin
-  Result := R;
-  Result.Top := ATop;
-  Result.Bottom := Result.Top + AHeight;
-end;
-
-function acRectSetPos(const R: TRect; const P: TPoint): TRect;
-begin
-  Result := Rect(P.X, P.Y, P.X + R.Right - R.Left, P.Y + R.Bottom - R.Top);
-end;
-
-function acRectCenterHorizontally(const R: TRect; Width: Integer): TRect;
-begin
-  Result := R;
-  Result.Left := acHalfCoordinate(R.Left + R.Right - Width);
-  Result.Right := Result.Left + Width;
-end;
-
-function acRectCenterVertically(const R: TRect; AHeight: Integer): TRect;
-begin
-  Result := R;
-  Result.Top := acHalfCoordinate(R.Top + R.Bottom - AHeight);
-  Result.Bottom := Result.Top + AHeight;
-end;
-
-function acRectHeight(const R: TRect): Integer;
-begin
-  Result := R.Bottom - R.Top;
 end;
 
 function acMapPoint(const ASource, ATarget: HWND; const P: TPoint): TPoint;
@@ -973,13 +509,14 @@ end;
 
 function acFitRect(const R: TRect; ASourceWidth, ASourceHeight: Integer; AMode: TACLFitMode; ACenter: Boolean = True): TRect;
 var
-  ASize: TSize;
+  LSize: TSize;
 begin
-  ASize := acFitSize(acSize(R), ASourceWidth, ASourceHeight, AMode);
+  LSize := acFitSize(R.Size, ASourceWidth, ASourceHeight, AMode);
+  Result := R;
   if ACenter then
-    Result := acRectCenter(R, ASize)
+    Result.Center(LSize)
   else
-    Result := acRectSetSize(R, ASize);
+    Result.Size := LSize;
 end;
 
 { TACLRange }
@@ -1141,13 +678,13 @@ end;
 
 procedure TACLSize.SetAll(AValue: Integer);
 begin
-  Value := acSize(AValue);
+  Value := TSize.Create(AValue);
 end;
 
 procedure TACLSize.SetHeight(AValue: Integer);
 begin
   if Height <> AValue then
-    Value := acSize(Width, AValue);
+    Value := TSize.Create(Width, AValue);
 end;
 
 procedure TACLSize.SetValue(AValue: TSize);
@@ -1163,7 +700,7 @@ end;
 procedure TACLSize.SetWidth(AValue: Integer);
 begin
   if Width <> AValue then
-    Value := acSize(AValue, Height);
+    Value := TSize.Create(AValue, Height);
 end;
 
 { TACLRect }
@@ -1350,6 +887,363 @@ function TACLXFormHelper.Transform(const P: TPointF): TPointF;
 begin
   Result.X := P.X * eM11 + P.Y * eM21 + eDX;
   Result.Y := P.X * eM12 + P.Y * eM22 + eDY;
+end;
+
+{ TACLRectHelper }
+
+class operator TACLRectHelper.Add(const L: TRect; const R: TPoint): TRect;
+begin
+  Result := L;
+  Result.Offset(R.X, R.Y);
+end;
+
+procedure TACLRectHelper.Add(const R: TRect);
+begin
+  if R.Left < Left then
+    Left := R.Left;
+  if R.Top < Top then
+    Top := R.Top;
+  if R.Right > Right then
+    Right := R.Right;
+  if R.Bottom > Bottom then
+    Bottom := R.Bottom;
+end;
+
+procedure TACLRectHelper.Center(const ASize: TSize);
+begin
+  CenterHorz(ASize.Width);
+  CenterVert(ASize.Height);
+end;
+
+procedure TACLRectHelper.CenterHorz(AWidth: Integer);
+begin
+  Left := acHalfCoordinate(Left + Right - AWidth);
+  Right := Left + AWidth;
+end;
+
+function TACLRectHelper.CenterTo(AWidth, AHeight: Integer): TRect;
+begin
+  Result := Self;
+  Result.CenterHorz(AWidth);
+  Result.CenterVert(AHeight);
+end;
+
+function TACLRectHelper.CenterTo(const ASize: TSize): TRect;
+begin
+  Result := Self;
+  Result.Center(ASize);
+end;
+
+procedure TACLRectHelper.CenterVert(AHeight: Integer);
+begin
+  Top := acHalfCoordinate(Top + Bottom - AHeight);
+  Bottom := Top + AHeight;
+end;
+
+procedure TACLRectHelper.Content(const Margins: TRect; Borders: TACLBorders);
+begin
+  if mTop in Borders then
+    Inc(Top, Margins.Top);
+  if mLeft in Borders then
+    Inc(Left, Margins.Left);
+  if mRight in Borders then
+    Dec(Right, Margins.Right);
+  if mBottom in Borders then
+    Dec(Bottom, Margins.Bottom);
+end;
+
+procedure TACLRectHelper.Content(const BorderWidth: Integer; Borders: TACLBorders);
+begin
+  if mTop in Borders then
+    Inc(Top, BorderWidth);
+  if mLeft in Borders then
+    Inc(Left, BorderWidth);
+  if mRight in Borders then
+    Dec(Right, BorderWidth);
+  if mBottom in Borders then
+    Dec(Bottom, BorderWidth);
+end;
+
+procedure TACLRectHelper.Content(const Margins: TRect);
+begin
+  Inc(Top, Margins.Top);
+  Inc(Left, Margins.Left);
+  Dec(Right, Margins.Right);
+  Dec(Bottom, Margins.Bottom);
+end;
+
+class function TACLRectHelper.Create(const Size: TSize): TRect;
+begin
+  Result.Left := 0;
+  Result.Top := 0;
+  Result.Right := Size.cx;
+  Result.Bottom := Size.cy;
+end;
+
+class function TACLRectHelper.Create(const Origin: TPoint; const Size: TSize): TRect;
+begin
+  Result.Left := Origin.X;
+  Result.Top := Origin.Y;
+  Result.Right := Origin.X + Size.cx;
+  Result.Bottom := Origin.Y + Size.cy;
+end;
+
+class function TACLRectHelper.CreateMargins(const Value: Integer): TRect;
+begin
+  Result := Rect(Value, Value, Value, Value);
+end;
+
+class function TACLRectHelper.CreateMargins(const Rect, ContentRect: TRect): TRect;
+begin
+  Result.Left := ContentRect.Left - Rect.Left;
+  Result.Top := ContentRect.Top - Rect.Top;
+  Result.Right := Rect.Right - ContentRect.Right;
+  Result.Bottom := Rect.Bottom - ContentRect.Bottom;
+end;
+
+function TACLRectHelper.EqualSizes(const R: TRect): Boolean;
+begin
+  Result :=
+    ((Right - Left) = (R.Right - R.Left)) and
+    ((Bottom - Top) = (R.Bottom - R.Top));
+end;
+
+class operator TACLRectHelper.Implicit(const Value: TSize): TRect;
+begin
+  Result.Left := 0;
+  Result.Top := 0;
+  Result.Right := Value.cx;
+  Result.Bottom := Value.cy;
+end;
+
+procedure TACLRectHelper.Inflate(const Margins: TRect; Borders: TACLBorders);
+begin
+  if mTop in Borders then
+    Dec(Top, Margins.Top);
+  if mLeft in Borders then
+    Dec(Left, Margins.Left);
+  if mRight in Borders then
+    Inc(Right, Margins.Right);
+  if mBottom in Borders then
+    Inc(Bottom, Margins.Bottom);
+end;
+
+function TACLRectHelper.InflateTo(Delta: Integer): TRect;
+begin
+  Result := Self;
+  Result.Inflate(Delta, Delta);
+end;
+
+function TACLRectHelper.InflateTo(dX, dY: Integer): TRect;
+begin
+  Result := Self;
+  Result.Inflate(DX, DY);
+end;
+
+function TACLRectHelper.IsZero: Boolean;
+begin
+  Result := (Left = 0) and (Top = 0) and (Right = 0) and (Bottom = 0);
+end;
+
+procedure TACLRectHelper.Inflate(const Delta: Integer);
+begin
+  Inflate(Delta, Delta);
+end;
+
+procedure TACLRectHelper.Inflate(const Margins: TRect);
+begin
+  Dec(Top, Margins.Top);
+  Dec(Left, Margins.Left);
+  Inc(Right, Margins.Right);
+  Inc(Bottom, Margins.Bottom);
+end;
+
+procedure TACLRectHelper.MarginsAdd(const Value: Integer);
+begin
+  Inc(Bottom, Value);
+  Inc(Left, Value);
+  Inc(Right, Value);
+  Inc(Top, Value);
+end;
+
+procedure TACLRectHelper.MarginsAdd(const L, T, R, B: Integer);
+begin
+  Inc(Bottom, B);
+  Inc(Left, L);
+  Inc(Right, R);
+  Inc(Top, T);
+end;
+
+procedure TACLRectHelper.MarginsAdd(const Value: TRect);
+begin
+  Inc(Bottom, Value.Bottom);
+  Inc(Left, Value.Left);
+  Inc(Right, Value.Right);
+  Inc(Top, Value.Top);
+end;
+
+function TACLRectHelper.MarginsHeight: Integer;
+begin
+  Result := Top + Bottom;
+end;
+
+function TACLRectHelper.MarginsWidth: Integer;
+begin
+  Result := Left + Right;
+end;
+
+procedure TACLRectHelper.Mirror(const ParentRect: TRect);
+var
+  LWidth: Integer;
+begin
+  LWidth := Width;
+  Left := ParentRect.Left + ParentRect.Right - Right;
+  Right := Left + LWidth;
+end;
+
+class operator TACLRectHelper.Multiply(const L: TRect; Borders: TACLBorders): TRect;
+begin
+  Result := NullRect;
+  if mLeft in Borders then
+    Result.Left := L.Left;
+  if mRight in Borders then
+    Result.Right := L.Right;
+  if mTop in Borders then
+    Result.Top := L.Top;
+  if mBottom in Borders then
+    Result.Bottom := L.Bottom;
+end;
+
+class operator TACLRectHelper.Multiply(const L: TRect; Factor: Single): TRect;
+begin
+  Result.Bottom := Round(L.Bottom * Factor);
+  Result.Right := Round(L.Right * Factor);
+  Result.Left := Round(L.Left * Factor);
+  Result.Top := Round(L.Top * Factor);
+end;
+
+function TACLRectHelper.OffsetTo(dX, dY: Integer): TRect;
+begin
+  Result := Self;
+  Result.Offset(dX, dY);
+end;
+
+procedure TACLRectHelper.Rotate;
+begin
+  acExchangeIntegers(Left, Top);
+  acExchangeIntegers(Right, Bottom);
+end;
+
+procedure TACLRectHelper.Scale(Numerator, Denominator: Integer);
+begin
+  Top := MulDiv(Top, Numerator, Denominator);
+  Left := MulDiv(Left, Numerator, Denominator);
+  Right := MulDiv(Right, Numerator, Denominator);
+  Bottom := MulDiv(Bottom, Numerator, Denominator);
+end;
+
+function TACLRectHelper.ScaleTo(Numerator, Denominator: Integer): TRect;
+begin
+  Result := Self;
+  Result.Scale(Numerator, Denominator);
+end;
+
+function TACLRectHelper.Split(SplitType: TSplitRectType; Size: Integer): TRect;
+begin
+  Result := Self;
+  case SplitType of
+    srLeft:
+      Result.Right := Left + Size;
+    srRight:
+      Result.Left := Right - Size;
+    srTop:
+      Result.Bottom := Top + Size;
+    srBottom:
+      Result.Top := Bottom - Size;
+  end;
+end;
+
+function TACLRectHelper.Split(const Margins: TRect): TRect;
+begin
+  Result := Self;
+  Result.Content(Margins);
+end;
+
+function TACLRectHelper.Split(SplitType: TSplitRectType; Origin, Size: Integer): TRect;
+begin
+  case SplitType of
+    srLeft:
+      Result := Rect(Origin, Top, Origin + Size, Bottom);
+    srRight:
+      Result := Rect(Origin - Size, Top, Origin, Bottom);
+    srTop:
+      Result := Rect(Left, Origin, Right, Origin + Size);
+    srBottom:
+      Result := Rect(Left, Origin - Size, Right, Origin);
+  else
+    Result := Self;
+  end;
+end;
+
+class operator TACLRectHelper.Subtract(const L: TRect; const R: TPoint): TRect;
+begin
+  Result := L;
+  Result.Offset(-R.X, -R.Y);
+end;
+
+{ TACLRectFHelper }
+
+class operator TACLRectFHelper.Multiply(const L: TRectF; Factor: Single): TRectF;
+begin
+  Result.Bottom := L.Bottom * Factor;
+  Result.Right := L.Right * Factor;
+  Result.Left := L.Left * Factor;
+  Result.Top := L.Top * Factor;
+end;
+
+{ TACLPointHelper }
+
+class operator TACLPointHelper.Multiply(const L: TPoint; Factor: Single): TPoint;
+begin
+  Result.X := Round(L.X * Factor);
+  Result.Y := Round(L.Y * Factor);
+end;
+
+procedure TACLPointHelper.Scale(ANumerator, ADenominator: Integer);
+begin
+  X := MulDiv(X, ANumerator, ADenominator);
+  Y := MulDiv(Y, ANumerator, ADenominator);
+end;
+
+function TACLPointHelper.ScaleTo(ANumerator, ADenominator: Integer): TPoint;
+begin
+  Result := Self;
+  Result.Scale(ANumerator, ADenominator);
+end;
+
+{ TACLSizeHelper }
+
+class function TACLSizeHelper.Create(const Value: Integer): TSize;
+begin
+  Result.cx := Value;
+  Result.cy := Value;
+end;
+
+function TACLSizeHelper.IsEmpty: Boolean;
+begin
+  Result := (cx <= 0) or (cy <= 0);
+end;
+
+procedure TACLSizeHelper.Scale(ANumerator, ADenominator: Integer);
+begin
+  cx := MulDiv(cx, ANumerator, ADenominator);
+  cy := MulDiv(cy, ANumerator, ADenominator);
+end;
+
+function TACLSizeHelper.ScaleTo(ANumerator, ADenominator: Integer): TSize;
+begin
+  Result := Self;
+  Result.Scale(ANumerator, ADenominator);
 end;
 
 end.

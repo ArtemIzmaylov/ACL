@@ -698,7 +698,7 @@ procedure TACLCustomButtonViewInfo.Draw(ACanvas: TCanvas);
 var
   AClipRgn: HRGN;
 begin
-  if RectVisible(ACanvas.Handle, Bounds) then
+  if acRectVisible(ACanvas.Handle, Bounds) then
   begin
     ACanvas.Font := Font;
     AClipRgn := acSaveClipRegion(ACanvas.Handle);
@@ -1194,9 +1194,9 @@ procedure TACLButtonViewInfo.Calculate(R: TRect);
 begin
   inherited;
   FButtonRect := R;
-  R := acRectContent(R, Style.ContentOffsets);
+  R.Content(Style.ContentOffsets);
   FFocusRect := R;
-  R := acRectInflate(R, -1);
+  R.Inflate(-1);
   CalculateArrowRect(R);
   CalculateImageRect(R);
   CalculateTextRect(R);
@@ -1218,19 +1218,19 @@ end;
 
 procedure TACLButtonViewInfo.CalculateImageRect(var R: TRect);
 var
-  AImageSize: TSize;
+  LImageSize: TSize;
 begin
   if HasImage then
   begin
-    AImageSize := ImageSize;
-
+    LImageSize := ImageSize;
+    FImageRect := R;
     if Caption <> '' then
     begin
-      FImageRect := acRectCenterVertically(R, AImageSize.cy);
-      FImageRect := acRectSetWidth(FImageRect, AImageSize.cx);
+      FImageRect.CenterVert(LImageSize.cy);
+      FImageRect.Width := LImageSize.cx;
     end
     else
-      FImageRect := acRectCenter(R, AImageSize);
+      FImageRect.Center(LImageSize);
 
     R.Left := FImageRect.Right + GetIndentBetweenElements;
   end;
@@ -1238,7 +1238,8 @@ end;
 
 procedure TACLButtonViewInfo.CalculateTextRect(var R: TRect);
 begin
-  FTextRect := acRectInflate(R, -dpiApply(acTextIndent - 1, CurrentDpi), 0);
+  FTextRect := R;
+  FTextRect.Inflate(-dpiApply(acTextIndent - 1, CurrentDpi), 0);
 end;
 
 function TACLButtonViewInfo.CanClickOnDialogChar(Char: Word): Boolean;
@@ -1279,7 +1280,7 @@ begin
   if FHasArrow then
     acDrawDropArrow(ACanvas.Handle, ArrowRect, TextColor, dpiApply(acDropArrowSize, CurrentDpi));
 
-  if not acRectIsEmpty(ImageRect) then
+  if not ImageRect.IsEmpty then
   begin
     if Glyph <> nil then
       Glyph.Draw(ACanvas.Handle, ImageRect, IsEnabled)
@@ -1511,7 +1512,7 @@ const
 var
   DR: TRect;
 begin
-  DR := acRectSetLeft(R, IfThen(Kind = sbkDropDownButton, DropDownViewInfo.TextureSize.cx));
+  DR := R.Split(srRight, IfThen(Kind = sbkDropDownButton, DropDownViewInfo.TextureSize.cx));
   R.Right := DR.Left;
 
   DropDownViewInfo.HasArrow := True;
@@ -1744,11 +1745,15 @@ begin
   if ShowCheckMark then
   begin
     ASize := TextureSize;
-    FButtonRect := acRectSetWidth(R, ASize.cx);
+    FButtonRect := R;
+    FButtonRect.Width := ASize.cx;
     if WordWrap then
-      FButtonRect := acRectSetTop(FButtonRect, FButtonRect.Top + acFocusRectIndent, ASize.cy)
+    begin
+      FButtonRect.Top := R.Top + acFocusRectIndent;
+      FButtonRect.Height := ASize.cy;
+    end
     else
-      FButtonRect := acRectCenter(FButtonRect, ASize);
+      FButtonRect.Center(ASize);
 
     R.Left := FButtonRect.Right + GetIndentBetweenElements - acTextIndent;
   end
@@ -1762,7 +1767,8 @@ begin
   begin
     if Odd(R.Height) then
       Inc(R.Bottom);
-    FLineRect := acRectCenterVertically(R, 2);
+    FLineRect := R;
+    FLineRect.CenterVert(2);
   end
   else
     FLineRect := NullRect;
@@ -1770,33 +1776,36 @@ end;
 
 procedure TACLCheckBoxViewInfo.CalculateTextRect(var R: TRect);
 var
-  ATextWidth: Integer;
+  LTextWidth: Integer;
 begin
   CalculateTextSize(R, FTextSize);
 
-  ATextWidth := Min(FTextSize.cx, R.Width);
+  FTextRect := R;
+  LTextWidth := Min(FTextSize.cx, R.Width);
   case Alignment of
     taCenter:
-      FTextRect := acRectCenterHorizontally(R, ATextWidth);
+      FTextRect.CenterHorz(LTextWidth);
     taRightJustify:
-      FTextRect := acRectSetRight(R, R.Right, ATextWidth);
+      FTextRect.Left := FTextRect.Right - LTextWidth;
   else
-    FTextRect := acRectSetWidth(R, ATextWidth);
+    FTextRect.Width := LTextWidth;
   end;
 
-  FTextRect := acRectCenterVertically(FTextRect, FTextSize.cy);
+  FTextRect.CenterVert(FTextSize.cy);
   FTextRect.Offset(0, -1);
 
   if TextRect.IsEmpty or (Caption = '') then
   begin
-    FFocusRect := acRectInflate(ButtonRect, -2);
+    FFocusRect := ButtonRect;
+    FFocusRect.Inflate(-2);
     if FFocusRect.IsEmpty then
       FFocusRect := Bounds;
   end
   else
     if ShowCheckMark then
     begin
-      FFocusRect := acRectInflate(TextRect, acTextIndent, acFocusRectIndent);
+      FFocusRect := TextRect;
+      FFocusRect.Inflate(acTextIndent, acFocusRectIndent);
       FFocusRect := TRect.Intersect(FFocusRect, Bounds);
     end
     else
@@ -1809,11 +1818,11 @@ var
 begin
   MeasureCanvas.Font := Font;
   if ShowCheckMark then
-    R := acRectInflate(R, -acTextIndent, -acFocusRectIndent);
+    R.Inflate(-acTextIndent, -acFocusRectIndent);
 
   ATextRect := R;
   acSysDrawText(MeasureCanvas, ATextRect, Caption, DT_CALCRECT or IfThen(WordWrap, DT_WORDBREAK));
-  ATextSize := acSize(ATextRect);
+  ATextSize := ATextRect.Size;
 
   if WordWrap or (FTextSize.cy = 0) then
     ATextSize.cy := Max(ATextSize.cy, acFontHeight(MeasureCanvas));

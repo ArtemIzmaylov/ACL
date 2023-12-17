@@ -279,7 +279,7 @@ end;
 
 function TACLTrayIcon.IsMouseAtControl: Boolean;
 begin
-  Result := acPointIsEqual(FLastMousePos, MouseCursorPos);
+  Result := FLastMousePos = MouseCursorPos;
 end;
 
 procedure TACLTrayIcon.MouseEnter;

@@ -4,7 +4,7 @@
 {*           Advanced Color Picker           *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -672,8 +672,8 @@ begin
   inherited DoCalculate(AChanges);
 
   if (FContentCache = nil) or (cccnStruct in AChanges) or
-    (FContentCache.Width <> acRectWidth(ContentBounds)) or
-    (FContentCache.Height <> acRectHeight(ContentBounds)) then
+    (FContentCache.Width <> ContentBounds.Width) or
+    (FContentCache.Height <> ContentBounds.Height) then
   begin
     FlushContentCache;
     UpdateEditValue;
@@ -714,12 +714,14 @@ end;
 
 function TACLColorPickerVisualColorModifierCell.GetContentBounds: TRect;
 begin
-  Result := acRectInflate(Bounds, -Painter.BorderSize);
+  Result := Bounds;
+  Result.Inflate(-Painter.BorderSize);
 end;
 
 function TACLColorPickerVisualColorModifierCell.GetContentFrameRect: TRect;
 begin
-  Result := acRectInflate(ContentBounds, Painter.BorderSize);
+  Result := ContentBounds;
+  Result.Inflate(Painter.BorderSize);
 end;
 
 function TACLColorPickerVisualColorModifierCell.GetCursorColor: TColor;
@@ -856,7 +858,7 @@ procedure TACLColorPickerViewInfo.CalculateAutoSize(var AWidth, AHeight: Integer
 
   procedure Include(const ASize: TSize);
   begin
-    if not acSizeIsEmpty(ASize) then
+    if not ASize.IsEmpty then
     begin
       Inc(AWidth, ASize.cx);
       Inc(AWidth, FIndentBetweenElements);
@@ -875,7 +877,7 @@ begin
   Include(MeasureEditsAreaSize);
 
   if FGamut <> nil then
-    Include(acSize(Max(AHeight, FGamut.MeasureSize.cy)));
+    Include(TSize.Create(Max(AHeight, FGamut.MeasureSize.cy)));
 
   // Content Offsets
   Inc(AHeight, 2 * FIndentBetweenElements);
@@ -884,46 +886,54 @@ end;
 
 procedure TACLColorPickerViewInfo.CalculateSubCells(const AChanges: TIntegerSet);
 var
-  ARect: TRect;
+  LRect: TRect;
 begin
   inherited CalculateSubCells(AChanges);
 
-  ARect := acRectInflate(Bounds, -FIndentBetweenElements);
-  CalculateSubCellsEditors(ARect, AChanges);
-  CalculateSubCellsSliders(ARect, AChanges);
+  LRect := Bounds;
+  LRect.Inflate(-FIndentBetweenElements);
+  CalculateSubCellsEditors(LRect, AChanges);
+  CalculateSubCellsSliders(LRect, AChanges);
   if FGamut <> nil then
-    FGamut.Calculate(ARect, AChanges);
+    FGamut.Calculate(LRect, AChanges);
 end;
 
 procedure TACLColorPickerViewInfo.CalculateSubCellsEditors(var R: TRect; const AChanges: TIntegerSet);
 
   function PlaceCell(ACell: TACLColorPickerColorModifierCell; var R: TRect): Boolean;
+  var
+    LCellRect: TRect;
   begin
     Result := ACell <> nil;
     if Result then
     begin
-      ACell.Calculate(acRectSetHeight(R, ACell.MeasureSize.cy), AChanges);
+      LCellRect := R;
+      LCellRect.Height := ACell.MeasureSize.cy;
+      ACell.Calculate(LCellRect, AChanges);
       R.Top := ACell.Bounds.Bottom + FIndentBetweenElements;
     end;
   end;
 
 var
-  AComponent: TACLColorPickerColorComponent;
-  ARect: TRect;
+  LComponent: TACLColorPickerColorComponent;
+  LPreview: TRect;
+  LRect: TRect;
 begin
-  ARect := acRectSetRight(R, R.Right, MeasureEditsAreaSize.cx);
+  LRect := R.Split(srRight, MeasureEditsAreaSize.cx);
   if FPreview <> nil then
   begin
-    FPreview.Calculate(acRectSetHeight(ARect, ARect.Width), AChanges);
-    ARect.Top := FPreview.Bounds.Bottom + FIndentBetweenElements;
+    LPreview := LRect;
+    LPreview.Height := LPreview.Width;
+    FPreview.Calculate(LPreview, AChanges);
+    LRect.Top := FPreview.Bounds.Bottom + FIndentBetweenElements;
   end;
-  for AComponent := Low(AComponent) to High(AComponent) do
+  for LComponent := Low(LComponent) to High(LComponent) do
   begin
-    if PlaceCell(FEdits[AComponent], ARect) and (AComponent in [cpccA, cpccB, cpccL]) then
-      Inc(ARect.Top, FIndentBetweenElements);
+    if PlaceCell(FEdits[LComponent], LRect) and (LComponent in [cpccA, cpccB, cpccL]) then
+      Inc(LRect.Top, FIndentBetweenElements);
   end;
-  PlaceCell(FHexCode, ARect);
-  R.Right := ARect.Left - FIndentBetweenElements;
+  PlaceCell(FHexCode, LRect);
+  R.Right := LRect.Left - FIndentBetweenElements;
 end;
 
 procedure TACLColorPickerViewInfo.CalculateSubCellsSliders(var R: TRect; const AChanges: TIntegerSet);
@@ -932,16 +942,16 @@ procedure TACLColorPickerViewInfo.CalculateSubCellsSliders(var R: TRect; const A
   begin
     if ACell <> nil then
     begin
-      ACell.Calculate(acRectSetRight(R, R.Right, ACell.MeasureSize.cx), AChanges);
+      ACell.Calculate(R.Split(srRight, ACell.MeasureSize.cx), AChanges);
       R.Right := ACell.Bounds.Left - FIndentBetweenElements;
     end;
   end;
 
 begin
-  InflateRect(R, 0, accpSliderArrowWidthHalf);
+  R.Inflate(0, accpSliderArrowWidthHalf);
   Place(R, FSlider2);
   Place(R, FSlider1);
-  InflateRect(R, 0, -accpSliderArrowWidthHalf);
+  R.Inflate(0, -accpSliderArrowWidthHalf);
 end;
 
 function TACLColorPickerViewInfo.MeasureEditsAreaSize: TSize;
@@ -956,7 +966,7 @@ var
   ACell: TACLColorPickerColorModifierCell;
   AComponent: TACLColorPickerColorComponent;
 begin
-  Result := acSize(0, 0);
+  Result := NullSize;
   for AComponent := Low(AComponent) to High(AComponent) do
   begin
     ACell := FEdits[AComponent];
@@ -970,7 +980,7 @@ begin
   if FHexCode <> nil then
     Include(FHexCode.MeasureSize, Result);
   if FPreview <> nil then
-    Include(acSize(Result.cx), Result);
+    Include(TSize.Create(Result.cx), Result);
   if Result.cy > 0 then
     Inc(Result.cy, FIndentBetweenElements);
 end;
@@ -1011,21 +1021,23 @@ end;
 
 procedure TACLColorPickerGamutCell.DragMove(X, Y: Integer);
 begin
-  X := Min(acRectWidth(ContentBounds), Max(0, X - ContentBounds.Left));
-  Y := Min(acRectHeight(ContentBounds), Max(0, Y - ContentBounds.Top));
-  ColorInfo.H := X / acRectWidth(ContentBounds);
-  ColorInfo.S := 1 - Y / acRectHeight(ContentBounds);
+  X := Min(ContentBounds.Width, Max(0, X - ContentBounds.Left));
+  Y := Min(ContentBounds.Height, Max(0, Y - ContentBounds.Top));
+  ColorInfo.H := X / ContentBounds.Width;
+  ColorInfo.S := 1 - Y / ContentBounds.Height;
   CursorPosition := Point(X, Y);
 end;
 
 function TACLColorPickerGamutCell.MeasureSize: TSize;
 begin
-  Result := acSize(dpiApply(200, CurrentDpi));
+  Result := TSize.Create(dpiApply(200, CurrentDpi));
 end;
 
 function TACLColorPickerGamutCell.CalculateCursorPosition: TPoint;
 begin
-  Result := Point(Round(acRectWidth(ContentBounds) * ColorInfo.H), Round(acRectHeight(ContentBounds) * (1 - ColorInfo.S)));
+  Result := Point(
+    Round(ContentBounds.Width * ColorInfo.H),
+    Round(ContentBounds.Height * (1 - ColorInfo.S)));
 end;
 
 procedure TACLColorPickerGamutCell.UpdateContentCache(ACanvas: TCanvas; AWidth, AHeight: Integer);
@@ -1058,23 +1070,32 @@ const
   LineWidth = 5;
   AreaSize = (LineWidth + LineThin) * 2 + LineThin;
 var
-  R: TRect;
+  LLine: TRect;
+  LRect: TRect;
 begin
-  R := System.Classes.Bounds(CursorPosition.X - AreaSize div 2, CursorPosition.Y - AreaSize div 2, AreaSize, AreaSize);
-  R := acRectOffset(R, ContentBounds.TopLeft);
+  LRect := System.Classes.Bounds(
+    CursorPosition.X - AreaSize div 2,
+    CursorPosition.Y - AreaSize div 2, AreaSize, AreaSize);
+  LRect.Offset(ContentBounds.TopLeft);
 
   ACanvas.Brush.Color := GetCursorColor;
-  ACanvas.FillRect(acRectSetWidth(acRectCenterVertically(R, LineThin), LineWidth));
-  ACanvas.FillRect(acRectSetRight(acRectCenterVertically(R, LineThin), R.Right, LineWidth));
-  ACanvas.FillRect(acRectSetHeight(acRectCenterHorizontally(R, LineThin), LineWidth));
-  ACanvas.FillRect(acRectSetBottom(acRectCenterHorizontally(R, LineThin), R.Bottom, LineWidth));
+
+  LLine := LRect;
+  LLine.CenterVert(LineThin);
+  ACanvas.FillRect(LLine.Split(srLeft, LineWidth));
+  ACanvas.FillRect(LLine.Split(srRight, LRect.Right, LineWidth));
+
+  LLine := LRect;
+  LLine.CenterHorz(LineThin);
+  ACanvas.FillRect(LLine.Split(srTop, LineWidth));
+  ACanvas.FillRect(LLine.Split(srBottom, LRect.Bottom, LineWidth));
 end;
 
 { TACLColorPickerSliderCell }
 
 function TACLColorPickerSliderCell.MeasureSize: TSize;
 begin
-  Result := acSize(dpiApply(20, CurrentDpi));
+  Result := TSize.Create(dpiApply(20, CurrentDpi));
 end;
 
 procedure TACLColorPickerSliderCell.DrawArrow(ACanvas: TCanvas);
@@ -1083,13 +1104,13 @@ var
   I: Integer;
 begin
   R1 := ArrowBounds;
-  R2 := acRectSetRight(R1, R1.Right, 1);
+  R2 := ArrowBounds.Split(srRight, 1);
   ACanvas.Brush.Color := Painter.Style.ColorText.AsColor;
   for I := R1.Left to R1.Right - 1 do
   begin
     ACanvas.FillRect(R2);
-    R2 := acRectInflate(R2, 0, -1);
-    R2 := acRectOffset(R2, -1, 0);
+    R2.Inflate(0, -1);
+    R2.Offset(-1, 0);
   end;
 end;
 
@@ -1101,15 +1122,15 @@ end;
 
 function TACLColorPickerSliderCell.GetArrowBounds: TRect;
 begin
-  Result := acRectSetRight(Bounds, Bounds.Right, accpSliderArrowWidth);
-  Result := acRectSetHeight(Result, accpSliderArrowWidth * 2 - 1);
-  Result := acRectOffset(Result, 0, CursorPosition.Y);
+  Result := Bounds.Split(srRight, accpSliderArrowWidth);
+  Result.Height := accpSliderArrowWidth * 2 - 1;
+  Result.Offset(0, CursorPosition.Y);
 end;
 
 function TACLColorPickerSliderCell.GetContentBounds: TRect;
 begin
   Result := inherited GetContentBounds;
-  Result := acRectInflate(Result, 0, -accpSliderArrowWidth + Painter.BorderSize);
+  Result.Inflate(0, -accpSliderArrowWidth + Painter.BorderSize);
   Result.Right := ArrowBounds.Left - acTextIndent - Painter.BorderSize;
 end;
 
@@ -1117,13 +1138,13 @@ end;
 
 function TACLColorPickerAlphaSliderCell.CalculateCursorPosition: TPoint;
 begin
-  Result := Point(0, MulDiv(acRectHeight(ContentBounds), ColorInfo.Alpha, MaxByte));
+  Result := Point(0, MulDiv(ContentBounds.Height, ColorInfo.Alpha, MaxByte));
 end;
 
 procedure TACLColorPickerAlphaSliderCell.DragMove(X, Y: Integer);
 begin
-  Y := Min(acRectHeight(ContentBounds), Max(0, Y - ContentBounds.Top));
-  ColorInfo.Alpha := Round(MaxByte * Y / acRectHeight(ContentBounds));
+  Y := Min(ContentBounds.Height, Max(0, Y - ContentBounds.Top));
+  ColorInfo.Alpha := Round(MaxByte * Y / ContentBounds.Height);
   CursorPosition := Point(0, Y);
 end;
 
@@ -1132,7 +1153,9 @@ begin
   Painter.StyleHatch.Draw(ACanvas, Rect(0, 0, AWidth, AHeight), 2);
   GpPaintCanvas.BeginPaint(ACanvas.Handle);
   try
-    GpPaintCanvas.FillRectangleByGradient(0, TAlphaColor.FromColor(ColorInfo.Color), Rect(0, 0, AWidth, AHeight), gmVertical);
+    GpPaintCanvas.FillRectangleByGradient(0,
+      TAlphaColor.FromColor(ColorInfo.Color),
+      Rect(0, 0, AWidth, AHeight), gmVertical);
   finally
     GpPaintCanvas.EndPaint;
   end;
@@ -1142,14 +1165,14 @@ end;
 
 procedure TACLColorPickerLightnessSliderCell.DragMove(X, Y: Integer);
 begin
-  Y := Min(acRectHeight(ContentBounds), Max(0, Y - ContentBounds.Top));
-  ColorInfo.L := 1 - Y / acRectHeight(ContentBounds);
+  Y := Min(ContentBounds.Height, Max(0, Y - ContentBounds.Top));
+  ColorInfo.L := 1 - Y / ContentBounds.Height;
   CursorPosition := Point(0, Y);
 end;
 
 function TACLColorPickerLightnessSliderCell.CalculateCursorPosition: TPoint;
 begin
-  Result := Point(0, Round((1 - ColorInfo.L) * acRectHeight(ContentBounds)));
+  Result := Point(0, Round((1 - ColorInfo.L) * ContentBounds.Height));
 end;
 
 procedure TACLColorPickerLightnessSliderCell.UpdateContentCache(ACanvas: TCanvas; AWidth, AHeight: Integer);
@@ -1174,14 +1197,14 @@ var
 begin
   R := Bounds;
   Painter.DrawBorder(ACanvas, R);
-  R := acRectInflate(R, -Painter.BorderSize);
+  R.Inflate(-Painter.BorderSize);
   Painter.StyleHatch.Draw(ACanvas, R, 2);
   acFillRect(ACanvas.Handle, R, ColorInfo.AlphaColor);
 end;
 
 function TACLColorPickerPreviewCell.MeasureSize: TSize;
 begin
-  Result := acSize(dpiApply(48, CurrentDpi));
+  Result := TSize.Create(dpiApply(48, CurrentDpi));
 end;
 
 procedure TACLColorPickerPreviewCell.UpdateEditValue;
@@ -1210,7 +1233,7 @@ end;
 procedure TACLColorPickerCustomEditCell.DoCalculate(AChanges: TIntegerSet);
 begin
   if [cccnStruct, cccnLayout] * AChanges <> [] then
-    FEdit.BoundsRect := acRectSetRight(Bounds, Bounds.Right, MeasureEditWidth);
+    FEdit.BoundsRect := Bounds.Split(srRight, MeasureEditWidth);
   inherited DoCalculate(AChanges);
 end;
 
@@ -1439,7 +1462,7 @@ end;
 
 function TACLCustomColorPicker.GetContentOffset: TRect;
 begin
-  Result := acMarginGetReal(dpiApply(acBorderOffsets, FCurrentPPI), Borders);
+  Result := dpiApply(acBorderOffsets, FCurrentPPI) * Borders;
 end;
 
 function TACLCustomColorPicker.GetBackgroundStyle: TACLControlBackgroundStyle;

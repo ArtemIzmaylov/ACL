@@ -5,7 +5,7 @@
 {*           Direct2D Integration            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -1394,7 +1394,7 @@ begin
     FTextureSize := BoxRect.Size;
     D2D1Check(FSwapChain.ResizeBuffers(0, FTextureSize.cx, FTextureSize.cy, DXGI_FORMAT_UNKNOWN, 0));
     CreateTexture;
-    FUpdateRect := acRect(FTextureSize);
+    FUpdateRect := TRect.Create(FTextureSize);
   end;
 
   DoBeginDraw(FUpdateRect);
@@ -1484,7 +1484,7 @@ var
   ATextureDescription: TD3D11Texture2DDesc;
   AFrontBufferTexture: ID3D11Texture2D;
 begin
-  if not acSizeIsEqual(FTextureSize, FFrontBufferContentSize) then
+  if FTextureSize <> FFrontBufferContentSize then
     FFrontBufferContent := nil;
 
   if FFrontBufferContent = nil then
@@ -1506,7 +1506,7 @@ end;
 
 procedure TACLDirect2DHwndBasedRender.CopyToDC(DC: HDC);
 begin
-  CopyToDC(DC, acRect(FTextureSize), acRect(FTextureSize));
+  CopyToDC(DC, TRect.Create(FTextureSize), TRect.Create(FTextureSize));
 end;
 
 procedure TACLDirect2DHwndBasedRender.CopyToDC(DC: HDC; const ATargetRect, ASourceRect: TRect);

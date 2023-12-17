@@ -323,7 +323,7 @@ begin
     if AMonitor.PixelsPerInch <> FCurrentPPI then
     begin
       ScaleForPPI(AMonitor.PixelsPerInch);
-      Rect := acRectOffset(CalcHintRect(Screen.Width div 3, AHint, AData), Rect.TopLeft);
+      Rect := CalcHintRect(Screen.Width div 3, AHint, AData) + Rect.TopLeft;
     end;
 
     Caption := AHint;
@@ -355,7 +355,7 @@ begin
   Canvas.Font := Font;
   Layout.Bounds := Rect(0, 0, MaxWidth, 2);
   SetHintData(AHint, AData);
-  Result := acRect(Layout.MeasureSize);
+  Result := TRect.Create(Layout.MeasureSize);
 
   Inc(Result.Right, 2 * dpiApply(HintTextIndentH, FCurrentPPI));
   Inc(Result.Bottom, 2 * dpiApply(HintTextIndentV, FCurrentPPI));
@@ -379,7 +379,7 @@ begin
   ScaleForPPI(MonitorGet(AScreenRect.TopLeft).PixelsPerInch);
   AHintPos.X := AScreenRect.Left - dpiApply(HintTextIndentH, FCurrentPPI);
   AHintPos.Y := AScreenRect.Top - dpiApply(HintTextIndentV, FCurrentPPI);
-  AHintSize := acSize(CalcHintRect(Screen.Width div 3, AHint, nil));
+  AHintSize := CalcHintRect(Screen.Width div 3, AHint, nil).Size;
 
   case AHorzAlignment of
     hwhaRight:
@@ -401,14 +401,18 @@ begin
 end;
 
 procedure TACLHintWindow.ShowFloatHint(const AHint: UnicodeString; const P: TPoint);
+var
+  LRect: TRect;
 begin
-  ActivateHint(acRectSetPos(CalcHintRect(Screen.Width div 3, AHint, nil), P), AHint);
+  LRect := CalcHintRect(Screen.Width div 3, AHint, nil);
+  LRect.Location := P;
+  ActivateHint(LRect, AHint);
 end;
 
 procedure TACLHintWindow.ShowFloatHint(const AHint: UnicodeString; const AControl: TControl;
   AHorzAlignment: TACLHintWindowHorzAlignment; AVertAligment: TACLHintWindowVertAlignment);
 begin
-  ShowFloatHint(AHint, acRectOffset(AControl.ClientRect, AControl.ClientOrigin), AHorzAlignment, AVertAligment);
+  ShowFloatHint(AHint, AControl.ClientRect + AControl.ClientOrigin, AHorzAlignment, AVertAligment);
 end;
 
 procedure TACLHintWindow.CreateParams(var Params: TCreateParams);
@@ -429,7 +433,7 @@ begin
   Canvas.Font := Font;
   Canvas.Font.Color := Style.ColorText.AsColor;
   Layout.Bounds :=
-    acRectInflate(ClientRect,
+    ClientRect.InflateTo(
       -dpiApply(HintTextIndentH, FCurrentPPI),
       -dpiApply(HintTextIndentV, FCurrentPPI));
   Layout.Draw(Canvas);
@@ -564,6 +568,8 @@ end;
 procedure TACLHintController.PauseTimerHandler(Sender: TObject);
 const
   SWP_TOPMOST = SWP_SHOWWINDOW or SWP_NOSIZE or SWP_NOMOVE or SWP_NOACTIVATE;
+var
+  LHintPos: TPoint;
 begin
   case FPauseMode of
     hpmBeforeHide:
@@ -574,9 +580,16 @@ begin
           FHintWindow := CreateHintWindow;
 
         if HintData.ScreenBounds.IsEmpty or (FHintData.AlignVert = hwvaOver) and not CanShowHintOverOwner then
-          HintWindow.ShowFloatHint(HintData.Text, acPointOffset(HintPoint, 0, GetCursorHeightMargin))
+        begin
+          LHintPos := HintPoint;
+          LHintPos.Offset(0, GetCursorHeightMargin);
+          HintWindow.ShowFloatHint(HintData.Text, LHintPos);
+        end
         else
-          HintWindow.ShowFloatHint(HintData.Text, HintData.ScreenBounds, HintData.AlignHorz, HintData.AlignVert);
+          HintWindow.ShowFloatHint(HintData.Text,
+            HintData.ScreenBounds,
+            HintData.AlignHorz,
+            HintData.AlignVert);
 
         if FDeactivateTimer = nil then
           FDeactivateTimer := TACLTimer.CreateEx(DeactivateTimerHandler, 10, True);

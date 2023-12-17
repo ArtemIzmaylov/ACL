@@ -272,8 +272,9 @@ function TACLTextureEditorDialog.CanStartReSize(X, Y: Integer): Boolean;
 var
   R: TRect;
 begin
-  R := acRectSetLeft(Image.FrameRect[0], 6);
-  R := acRectSetTop(R, 6);
+  R := Image.FrameRect[0];
+  R.Top := R.Bottom - 6;
+  R.Left := R.Right - 6;
   Result := PtInRect(R, Point(X, Y));
 end;
 
@@ -350,15 +351,15 @@ begin
   if FResizing then
     R := FResizingRect
   else
-    R := acRectSetSize(pbDisplay.ClientRect, Image.FrameSize);
+    R := Image.FrameSize;
 
   Image.Draw(pbDisplay.Canvas.Handle, R, seFrame.Value - 1);
-  if not (FResizing or acMarginIsEmpty(Image.Margins)) then
+  if not (FResizing or Image.Margins.IsZero) then
   begin
-    acFillRect(pbDisplay.Canvas.Handle, acRectSetLeft(R, Image.Margins.Left, 1), clRed);
-    acFillRect(pbDisplay.Canvas.Handle, acRectSetTop(R, Image.Margins.Top, 1), clRed);
-    acFillRect(pbDisplay.Canvas.Handle, acRectSetRight(R, R.Right - Image.Margins.Right, 1), clRed);
-    acFillRect(pbDisplay.Canvas.Handle, acRectSetBottom(R, R.Bottom - Image.Margins.Bottom, 1), clRed);
+    acFillRect(pbDisplay.Canvas.Handle, R.Split(srLeft, Image.Margins.Left, 1), clRed);
+    acFillRect(pbDisplay.Canvas.Handle, R.Split(srTop, Image.Margins.Top, 1), clRed);
+    acFillRect(pbDisplay.Canvas.Handle, R.Split(srRight, R.Right - Image.Margins.Right, 1), clRed);
+    acFillRect(pbDisplay.Canvas.Handle, R.Split(srBottom, R.Bottom - Image.Margins.Bottom, 1), clRed);
   end;
 end;
 

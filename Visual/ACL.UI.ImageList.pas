@@ -4,7 +4,7 @@
 {*             ImageList Classes             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -104,7 +104,7 @@ var
 begin
   if (AImageList <> nil) and (AImageIndex >= 0) and RectVisible(ACanvas.Handle, R) then
   begin
-    if (acRectWidth(R) <> AImageList.Width) or (acRectHeight(R) <> AImageList.Height) then
+    if (R.Width <> AImageList.Width) or (R.Height <> AImageList.Height) then
     begin
       ALayer := TACLBitmapLayer.Create(AImageList.Width, AImageList.Height);
       try
@@ -123,9 +123,9 @@ function acGetImageListSize(AImageList: TCustomImageList; ATargetDPI: Integer): 
 begin
   if AImageList <> nil then
   begin
-    Result := acSize(AImageList.Width, AImageList.Height);
+    Result := TSize.Create(AImageList.Width, AImageList.Height);
     if (AImageList is TACLImageList) and TACLImageList(AImageList).Scalable then
-      Result := acSizeScale(Result, ATargetDPI, TACLImageList(AImageList).SourceDPI);
+      Result.Scale(ATargetDPI, TACLImageList(AImageList).SourceDPI);
   end
   else
     Result := NullSize;

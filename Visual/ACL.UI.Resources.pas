@@ -5,7 +5,7 @@
 {*              Styles Support               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -984,7 +984,7 @@ end;
 
 procedure TACLResource.DrawPreview(ACanvas: TCanvas; const R: TRect);
 begin
-  acTextDraw(ACanvas, ToString, acRectInflate(R, -acTextIndent, 0), taLeftJustify, taVerticalCenter, True);
+  acTextDraw(ACanvas, ToString, R.InflateTo(-acTextIndent, 0), taLeftJustify, taVerticalCenter, True);
 end;
 
 procedure TACLResource.InitailizeDefaults(const DefaultID: string);
@@ -1278,9 +1278,13 @@ end;
 { TACLResourceColor }
 
 procedure TACLResourceColor.DrawPreview(ACanvas: TCanvas; const R: TRect);
+var
+  LPreview: TRect;
 begin
-  acDrawColorPreview(ACanvas, acRectSetWidth(R, acRectHeight(R)), Value);
-  inherited DrawPreview(ACanvas, Rect(R.Left + acRectHeight(R), R.Top, R.Right, R.Bottom));
+  LPreview := R;
+  LPreview.Width := LPreview.Height;
+  acDrawColorPreview(ACanvas, LPreview, Value);
+  inherited DrawPreview(ACanvas, Rect(LPreview.Right, R.Top, R.Right, R.Bottom));
 end;
 
 procedure TACLResourceColor.InitailizeDefaults(const DefaultID: string; AIsAlphaSupported: Boolean);
@@ -1526,9 +1530,13 @@ begin
 end;
 
 procedure TACLResourceFont.DrawPreview(ACanvas: TCanvas; const R: TRect);
+var
+  LPreview: TRect;
 begin
-  acDrawColorPreview(ACanvas, acRectSetWidth(R, acRectHeight(R)), Color);
-  inherited DrawPreview(ACanvas, Rect(R.Left + acRectHeight(R), R.Top, R.Right, R.Bottom));
+  LPreview := R;
+  LPreview.Width := LPreview.Height;
+  acDrawColorPreview(ACanvas, LPreview, Color);
+  inherited DrawPreview(ACanvas, Rect(LPreview.Right, R.Top, R.Right, R.Bottom));
 end;
 
 procedure TACLResourceFont.AssignTo(Dest: TPersistent);
@@ -2060,9 +2068,15 @@ begin
 end;
 
 procedure TACLResourceTexture.Draw(DC: HDC; const R: TRect; AFrameIndex: Integer; ABorders: TACLBorders);
+var
+  LClipRect: TRect;
 begin
-  if (ABorders <> acAllBorders) and not acMarginIsEmpty(Margins) then
-    DrawClipped(DC, R, acRectInflate(R, Margins, acAllBorders - ABorders), AFrameIndex)
+  if (ABorders <> acAllBorders) and not Margins.IsZero then
+  begin
+    LClipRect := R;
+    LClipRect.Inflate(Margins, acAllBorders - ABorders);
+    DrawClipped(DC, R, LClipRect, AFrameIndex)
+  end
   else
     Draw(DC, R, AFrameIndex);
 end;

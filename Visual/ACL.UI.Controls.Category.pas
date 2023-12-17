@@ -116,7 +116,7 @@ procedure TACLStyleCategory.DrawHeaderText(ACanvas: TCanvas; const R: TRect; con
 begin
   ACanvas.Brush.Style := bsClear;
   ACanvas.Font.Assign(HeaderTextFont);
-  acTextDraw(ACanvas, AText, acRectInflate(R, -4, 0), HeaderTextAlignment, taVerticalCenter, True, True);
+  acTextDraw(ACanvas, AText, R.InflateTo(-4, 0), HeaderTextAlignment, taVerticalCenter, True, True);
 end;
 
 function TACLStyleCategory.MeasureHeaderHeight: Integer;
@@ -145,7 +145,8 @@ end;
 procedure TACLCategory.BoundsChanged;
 begin
   inherited;
-  FCaptionRect := acRectSetHeight(ClientRect, Style.MeasureHeaderHeight);
+  FCaptionRect := ClientRect;
+  FCaptionRect.Height := Style.MeasureHeaderHeight;
   Realign;
 end;
 

@@ -204,6 +204,13 @@ type
     DefaultValue = 3;
   end;
 
+  { TACLMarginsHelper }
+
+  TACLMarginsHelper = class helper for TMargins
+  public
+    procedure Assign(const S: TRect);
+  end;
+
   { TACLCheckBoxStateHelper }
 
   TACLCheckBoxStateHelper = record helper for TCheckBoxState
@@ -858,9 +865,9 @@ var
 begin
   APlacement.length := SizeOf(TWindowPlacement);
   if GetWindowPlacement(AControl.Handle, APlacement) then
-    APosition := acRectCenter(APlacement.rcNormalPosition)
+    APosition := APlacement.rcNormalPosition.CenterPoint
   else
-    APosition := AControl.ClientToScreen(acRectCenter(AControl.ClientRect));
+    APosition := AControl.ClientToScreen(AControl.ClientRect.CenterPoint);
 
   Result := acGetTargetDPI(APosition);
 end;
@@ -868,14 +875,14 @@ end;
 function ImageListSize(AImages: TCustomImageList): TSize;
 begin
   if AImages <> nil then
-    Result := acSize(AImages.Width, AImages.Height)
+    Result := TSize.Create(AImages.Width, AImages.Height)
   else
     Result := NullSize;
 end;
 
 function GetElementWidthIncludeOffset(const R: TRect; ATargetDpi: Integer): Integer;
 begin
-  Result := acRectWidth(R);
+  Result := R.Width;
   if Result > 0 then
     Inc(Result, dpiApply(acIndentBetweenElements, ATargetDpi));
 end;
@@ -1159,6 +1166,16 @@ begin
     FData[Index] := Value;
     Changed;
   end;
+end;
+
+{ TACLMarginsHelper }
+
+procedure TACLMarginsHelper.Assign(const S: TRect);
+begin
+  Left := S.Left;
+  Bottom := S.Bottom;
+  Right := S.Right;
+  Top := S.Top;
 end;
 
 { TACLControlsHelper }
@@ -1446,7 +1463,7 @@ end;
 procedure TACLGraphicControl.InvalidateRect(const R: TRect);
 begin
   if (Parent <> nil) and Parent.HandleAllocated then
-    Winapi.Windows.InvalidateRect(Parent.Handle, acRectOffset(R, Left, Top), True);
+    Winapi.Windows.InvalidateRect(Parent.Handle, R.OffsetTo(Left, Top), True);
 end;
 
 function TACLGraphicControl.GetCurrentDpi: Integer;
@@ -1586,7 +1603,7 @@ end;
 
 procedure TACLGraphicControl.MarginsChangeHandler(Sender: TObject);
 begin
-  acRectToMargins(Margins.GetScaledMargins(FCurrentPPI), inherited Margins);
+  inherited Margins.Assign(Margins.GetScaledMargins(FCurrentPPI));
 end;
 
 procedure TACLGraphicControl.SetMargins(const Value: TACLMargins);
@@ -1998,8 +2015,8 @@ end;
 procedure TACLCustomControl.AdjustClientRect(var ARect: TRect);
 begin
   inherited AdjustClientRect(ARect);
-  ARect := acRectContent(ARect, GetContentOffset);
-  ARect := acRectContent(ARect, Padding.GetScaledMargins(FCurrentPPI));
+  ARect.Content(GetContentOffset);
+  ARect.Content(Padding.GetScaledMargins(FCurrentPPI));
 end;
 
 procedure TACLCustomControl.AdjustSize;
@@ -2102,7 +2119,7 @@ procedure TACLCustomControl.MarginsChangeHandler(Sender: TObject);
 begin
   DisableAlign;
   try
-    acRectToMargins(Margins.GetScaledMargins(FCurrentPPI), inherited Margins);
+    inherited Margins.Assign(Margins.GetScaledMargins(FCurrentPPI));
   finally
     EnableAlign;
   end;
@@ -2141,7 +2158,7 @@ end;
 
 function TACLContainer.GetContentOffset: TRect;
 begin
-  Result := acMarginGetReal(acBorderOffsets, Borders);
+  Result := acBorderOffsets * Borders;
 end;
 
 function TACLContainer.GetBackgroundStyle: TACLControlBackgroundStyle;
@@ -2354,44 +2371,45 @@ end;
 
 procedure TACLSubControlOptions.AlignControl(var AClientRect: TRect);
 var
-  ABounds: TRect;
+  LBounds: TRect;
 begin
   if Validate then
   begin
-    ABounds := acRectOffset(AClientRect, FOwner.Left, FOwner.Top);
+    LBounds := AClientRect;
+    LBounds.Offset(FOwner.Left, FOwner.Top);
     case Position of
       mLeft:
         begin
-          ABounds := acRectSetWidth(ABounds, Control.ExplicitWidth);
+          LBounds.Width := Control.ExplicitWidth;
           if Align <> acTrue then
-            ABounds := acRectCenterVertically(ABounds, Control.ExplicitHeight);
+            LBounds.CenterVert(Control.ExplicitHeight);
           Inc(AClientRect.Left, GetActualIndentBetweenElements);
           Inc(AClientRect.Left, Control.ExplicitWidth);
         end;
 
       mRight:
         begin
-          ABounds := acRectSetRight(ABounds, ABounds.Right, Control.ExplicitWidth);
+          LBounds := LBounds.Split(srRight, Control.ExplicitWidth);
           if Align <> acTrue then
-            ABounds := acRectCenterVertically(ABounds, Control.ExplicitHeight);
+            LBounds.CenterVert(Control.ExplicitHeight);
           Dec(AClientRect.Right, GetActualIndentBetweenElements);
           Dec(AClientRect.Right, Control.ExplicitWidth);
         end;
 
       mTop:
         begin
-          ABounds := acRectSetHeight(ABounds, Control.ExplicitHeight);
+          LBounds.Height := Control.ExplicitHeight;
           if Align = acFalse then
-            ABounds := acRectSetWidth(ABounds, Control.ExplicitWidth);
+            LBounds.Width := Control.ExplicitWidth;
           Inc(AClientRect.Top, GetActualIndentBetweenElements);
           Inc(AClientRect.Top, Control.ExplicitHeight);
         end;
 
       mBottom:
         begin
-          ABounds := acRectSetBottom(ABounds, ABounds.Bottom, Control.ExplicitHeight);
+          LBounds := LBounds.Split(srBottom, Control.ExplicitHeight);
           if Align = acFalse then
-            ABounds := acRectSetWidth(ABounds, Control.ExplicitWidth);
+            LBounds.Width := Control.ExplicitWidth;
           Dec(AClientRect.Bottom, GetActualIndentBetweenElements);
           Dec(AClientRect.Bottom, Control.ExplicitHeight);
         end;
@@ -2399,7 +2417,7 @@ begin
 
     Control.ControlState := Control.ControlState + [csAligning];
     try
-      Control.BoundsRect := ABounds;
+      Control.BoundsRect := LBounds;
     finally
       Control.ControlState := Control.ControlState - [csAligning];
     end;

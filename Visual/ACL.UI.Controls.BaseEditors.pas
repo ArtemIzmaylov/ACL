@@ -4,7 +4,7 @@
 {*             Editors Controls              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -450,7 +450,7 @@ begin
     acDrawFrame(ACanvas.Handle, R, ColorBorder.AsColor);
     if AFocused then
     begin
-      AFocusRect := acRectSetBottom(R, R.Bottom, Scale(acTextIndent));
+      AFocusRect := R.Split(srBottom, Scale(acTextIndent));
       acFillRect(ACanvas.Handle, AFocusRect, ColorBorderFocused.AsColor);
       acExcludeFromClipRegion(ACanvas.Handle, AFocusRect);
     end;
@@ -545,7 +545,7 @@ begin
   if ViewInfo <> nil then
   begin
     ViewInfo.IsEnabled := Enabled and ((Collection.ButtonEdit = nil) or Collection.ButtonEdit.ButtonsGetEnabled);
-    ViewInfo.Calculate(acRectSetLeft(R, IfThen(Visible, dpiApply(Width, ViewInfo.CurrentDpi))));
+    ViewInfo.Calculate(R.Split(srRight, IfThen(Visible, dpiApply(Width, ViewInfo.CurrentDpi))));
     R.Right := ViewInfo.Bounds.Left;
   end;
 end;
@@ -804,10 +804,10 @@ end;
 procedure TACLCustomEdit.Calculate(R: TRect);
 begin
   if Borders then
-    R := acRectInflate(R, -EditorOuterBorderSize);
+    R.Inflate(-EditorOuterBorderSize);
   CalculateButtons(R);
   if Borders then
-    R := acRectInflate(R, -EditorInnerBorderSize);
+    R.Inflate(-EditorInnerBorderSize);
   CalculateContent(R);
   EditorUpdateBounds;
 end;
@@ -824,7 +824,8 @@ var
   ARect: TRect;
 begin
   AIndent := dpiApply(ButtonsIndent, FCurrentPPI);
-  ARect := acRectInflate(R, -AIndent);
+  ARect := R;
+  ARect.Inflate(-AIndent);
   for AIndex := Buttons.Count - 1 downto 0 do
   begin
     Buttons.Items[AIndex].Calculate(ARect);
@@ -840,7 +841,8 @@ end;
 
 function TACLCustomEdit.CalculateEditorPosition: TRect;
 begin
-  Result := acRectInflate(ClientRect, -EditorBorderSize);
+  Result := ClientRect;
+  Result.Inflate(-EditorBorderSize);
 end;
 
 function TACLCustomEdit.CalculateTextHeight: Integer;
@@ -980,17 +982,17 @@ end;
 
 procedure TACLCustomEdit.EditorUpdateBounds;
 var
-  R: TRect;
+  LTemp: TRect;
 begin
   if HasEditor then
   begin
-    R := CalculateEditorPosition;
-    FEditor.BoundsRect := R;
-    if FEditor.Height > acRectHeight(R) then
+    LTemp := CalculateEditorPosition;
+    FEditor.BoundsRect := LTemp;
+    if FEditor.Height > LTemp.Height then
     begin
-      FEditor.BoundsRect := acRectCenterVertically(R, FEditor.Height);
+      FEditor.BoundsRect := LTemp.CenterTo(LTemp.Width, FEditor.Height);
       if HandleAllocated then
-        SetWindowRgn(FEditor.Handle, CreateRectRgnIndirect(acMapRect(Handle, FEditor.Handle, R)), False);
+        SetWindowRgn(FEditor.Handle, CreateRectRgnIndirect(acMapRect(Handle, FEditor.Handle, LTemp)), False);
     end
     else
       if HandleAllocated then

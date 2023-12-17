@@ -363,7 +363,7 @@ begin
         Exit(dtimInto);
     end;
 
-    if HitTest.HitPoint.Y > acRectCenterVertically(ACell.Bounds, 0).Top then
+    if HitTest.HitPoint.Y > ACell.Bounds.CenterPoint.Y then
       Result := dtimAfter
     else
       Result := dtimBefore;
@@ -377,7 +377,7 @@ end;
 
 function TACLTreeListDropTarget.GetTargetClientRect: TRect;
 begin
-  Result := acRectOffset(ContentViewInfo.ClientBounds, 0, 0);
+  Result := ContentViewInfo.ClientBounds;
 end;
 
 function TACLTreeListDropTarget.ScreenToClient(const P: TPoint): TPoint;
@@ -772,8 +772,8 @@ end;
 
 procedure TACLTreeListColumnDragMoveObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
 var
-  AColumnViewInfo: TACLTreeListColumnViewInfo;
-  ADropTargetBounds: TRect;
+  LColumnViewInfo: TACLTreeListColumnViewInfo;
+  LDropTargetBounds: TRect;
 begin
   DragWindow.SetVisible(True);
   DragWindow.SetBounds(DragWindow.Left + ADeltaX, DragWindow.Top + ADeltaY, DragWindow.Width, DragWindow.Height);
@@ -781,13 +781,14 @@ begin
   CheckAutoScrolling(CalculateAutoScrollingDelta(P));
   if HitTest.HitAtColumn then
   begin
-    AColumnViewInfo := HitTest.ColumnViewInfo;
-    if AColumnViewInfo.Column.DrawIndex > ColumnViewInfo.Column.DrawIndex then
-      ADropTargetBounds := acRectSetRight(AColumnViewInfo.Bounds, AColumnViewInfo.Bounds.Right, 1)
+    LColumnViewInfo := HitTest.ColumnViewInfo;
+    LDropTargetBounds := LColumnViewInfo.Bounds;
+    if LColumnViewInfo.Column.DrawIndex > ColumnViewInfo.Column.DrawIndex then
+      LDropTargetBounds.Left := LDropTargetBounds.Right - 1
     else
-      ADropTargetBounds := acRectSetLeft(AColumnViewInfo.Bounds, AColumnViewInfo.Bounds.Left, 1);
+      LDropTargetBounds.Width := 1;
 
-    UpdateDragTargetZoneWindow(SubClass.ClientToScreen(ADropTargetBounds), True);
+    UpdateDragTargetZoneWindow(SubClass.ClientToScreen(LDropTargetBounds), True);
     Cursor := crDefault;
   end
   else
@@ -879,7 +880,7 @@ procedure TACLTreeListColumnDragResizeObject.DragMoveAutoWidthColumns(
   end;
   
 var
-  AColumnViewInfo: TACLTreeListColumnViewInfo;
+  LColumnViewInfo: TACLTreeListColumnViewInfo;
   ANextSibling: TACLTreeListColumn;
 begin
   ANextSibling := Column.NextSibling;
@@ -889,8 +890,8 @@ begin
   try
     for var I := 0 to ColumnBarViewInfo.ChildCount - 1 do
     begin
-      AColumnViewInfo := ColumnBarViewInfo.Children[I];
-      AColumnViewInfo.Column.Width := dpiRevert(AColumnViewInfo.ActualWidth, CurrentDpi);
+      LColumnViewInfo := ColumnBarViewInfo.Children[I];
+      LColumnViewInfo.Column.Width := dpiRevert(LColumnViewInfo.ActualWidth, CurrentDpi);
     end;
     if ADeltaX > 0 then
       DoResize(Column, ANextSibling, 1)
@@ -1000,7 +1001,7 @@ end;
 
 function TACLTreeListSelectionRectDragObject.GetAbsoluteHitPoint: TPoint;
 begin
-  Result := acPointOffsetNegative(HitTest.HitPoint, ContentViewInfo.ViewItemsOrigin);
+  Result := HitTest.HitPoint - ContentViewInfo.ViewItemsOrigin;
 end;
 
 procedure TACLTreeListSelectionRectDragObject.UpdateStartNodeNearest;

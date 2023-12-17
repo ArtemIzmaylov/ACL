@@ -769,21 +769,24 @@ begin
   AHandle := BeginDeferWindowPos(4);
   try
     AIndent := dpiApply(acIndentBetweenElements, FCurrentPPI);
-    AContentRect := acRectInflate(ClientRect, -AIndent);
+    AContentRect := ClientRect;
+    AContentRect.Inflate(-AIndent);
 
     // Buttons
     R := AContentRect;
     R.Top := R.Bottom - FButtonCancel.Height;
-    DeferWindowPos(AHandle, FButtonCancel.Handle, 0, R.Right - FButtonCancel.Width, R.Top, 0, 0, SWP_NOZORDER or SWP_NOSIZE);
+    DeferWindowPos(AHandle, FButtonCancel.Handle, 0,
+      R.Right - FButtonCancel.Width, R.Top, 0, 0, SWP_NOZORDER or SWP_NOSIZE);
     R.Right := R.Right - FButtonCancel.Width - AIndent;
-    DeferWindowPos(AHandle, FButtonOk.Handle, 0, R.Right - FButtonOk.Width, R.Top, 0, 0, SWP_NOZORDER or SWP_NOSIZE);
+    DeferWindowPos(AHandle, FButtonOk.Handle, 0,
+      R.Right - FButtonOk.Width, R.Top, 0, 0, SWP_NOZORDER or SWP_NOSIZE);
     AContentRect.Bottom := R.Top - 2 * AIndent;
 
     // TimeEdit
     if FTimeEdit.Visible then
     begin
-      R := acRectSetBottom(AContentRect, AContentRect.Bottom, FTimeEdit.Height);
-      R := acRectCenterHorizontally(R, FTimeEdit.Width);
+      R := AContentRect.Split(srBottom, FTimeEdit.Height);
+      R.CenterHorz(FTimeEdit.Width);
       DeferWindowPos(AHandle, FTimeEdit.Handle, 0, R.Left, R.Top, 0, 0, SWP_NOZORDER or SWP_NOSIZE);
       AContentRect.Bottom := R.Top - AIndent;
     end;

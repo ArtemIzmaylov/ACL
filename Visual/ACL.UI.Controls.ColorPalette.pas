@@ -412,18 +412,18 @@ var
   I: Integer;
 begin
   ASize := dpiApply(Options.CellSize, CurrentDpi);
-  ASpace := CalculateCellSpacing(ASize, acRectWidth(ABounds));
+  ASpace := CalculateCellSpacing(ASize, ABounds.Width);
 
-  AItemBounds := acRectSetSize(ABounds, ASize, ASize);
+  AItemBounds := TRect.Create(ABounds.TopLeft, ASize, ASize);
   for I := 0 to Items.Count - 1 do
   begin
     if AItemBounds.Right > ABounds.Right then
     begin
       ABounds.Top := AItemBounds.Bottom + ASpace;
-      AItemBounds := acRectSetSize(ABounds, ASize, ASize);
+      AItemBounds := TRect.Create(ABounds.TopLeft, ASize, ASize);
     end;
     FCells.Add(TACLColorPaletteItemViewInfo.Create(Self, Items[I].Color, AItemBounds));
-    OffsetRect(AItemBounds, ASpace + ASize, 0);
+    AItemBounds.Offset(ASpace + ASize, 0);
   end;
 
   if Items.Count > 0 then
@@ -458,7 +458,7 @@ var
   I, J: Integer;
 begin
   ASize := dpiApply(Options.CellSize, CurrentDpi);
-  ASpace := CalculateCellSpacing(ASize, acRectWidth(ABounds));
+  ASpace := CalculateCellSpacing(ASize, ABounds.Width);
 
   FWidth := ASize * Items.Count + ASpace * (Items.Count - 1);
   FHeight := ASize + ASpace + Options.StyleOfficeTintCount * ASize - (Options.StyleOfficeTintCount - 1) * BorderSize;
@@ -466,17 +466,17 @@ begin
   for I := 0 to Items.Count - 1 do
   begin
     AColor := Items[I].Color;
-    AItemBounds := acRectSetSize(ABounds, ASize, ASize);
+    AItemBounds := TRect.Create(ABounds.TopLeft, ASize, ASize);
     ABounds.Left := AItemBounds.Right + ASpace;
     FCells.Add(TACLColorPaletteItemViewInfo.Create(Self, AColor, AItemBounds));
-    AItemBounds := acRectOffset(AItemBounds, 0, ASize + ASpace);
+    AItemBounds.Offset(0, ASize + ASpace);
     if AColor <> TAlphaColor.None then
       for J := 0 to Options.StyleOfficeTintCount - 1 do
       begin
         FCells.Add(TACLColorPaletteItemViewInfo.Create(Self,
           AdjustColor(AColor, 1 - (J + 1) / (Options.StyleOfficeTintCount + 1)),
           AItemBounds, GetBorders(J)));
-        AItemBounds := acRectOffset(AItemBounds, 0, ASize - BorderSize);
+        AItemBounds.Offset(0, ASize - BorderSize);
       end;
   end;
 end;

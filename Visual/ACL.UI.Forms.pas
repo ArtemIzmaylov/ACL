@@ -763,13 +763,16 @@ begin
         APlacement.rcNormalPosition.Width := dpiApply(APlacement.rcNormalPosition.Width, FCurrentPPI);
       end
       else
-        APlacement.rcNormalPosition := acRectSetSize(APlacement.rcNormalPosition, Width, Height);
+      begin
+        APlacement.rcNormalPosition.Height := Height;
+        APlacement.rcNormalPosition.Width := Width;
+      end;
 
       SetWindowPlacement(Handle, APlacement);
 
       Position := poDesigned;
       DefaultMonitor := dmDesktop;
-      if not acRectInRect(BoundsRect, MonitorGetBounds(BoundsRect.TopLeft)) then
+      if not BoundsRect.Contains(MonitorGetBounds(BoundsRect.TopLeft)) then
         MakeFullyVisible;
     end;
 
@@ -1109,21 +1112,21 @@ begin
     ScaleForPPI(ATargetDpi);
   AdjustSize;
 
-  ARect := acRect(AControlBoundsOnScreen.Size);
-  ARect := acRectSetHeight(ARect, Height);
+  ARect := TRect.Create(AControlBoundsOnScreen.Size);
+  ARect.Height := Height;
   ValidatePopupFormBounds(ARect);
-  ARect := acRectOffset(ARect, CalculateOffset(ARect));
+  ARect.Offset(CalculateOffset(ARect));
 
   AWorkareaRect := MonitorGet(ARect.CenterPoint).WorkareaRect;
   if ARect.Bottom > AWorkareaRect.Bottom then
   begin
-    OffsetRect(ARect, 0, -(ARect.Height + AControlBoundsOnScreen.Height + 4));
+    ARect.Offset(0, -(ARect.Height + AControlBoundsOnScreen.Height + 4));
     ARect.Top := Max(ARect.Top, AWorkareaRect.Top);
   end;
   if ARect.Left < AWorkareaRect.Left then
-    OffsetRect(ARect, AWorkareaRect.Left - ARect.Left, 0);
+    ARect.Offset(AWorkareaRect.Left - ARect.Left, 0);
   if ARect.Right > AWorkareaRect.Right then
-    OffsetRect(ARect, AWorkareaRect.Right - ARect.Right, 0);
+    ARect.Offset(AWorkareaRect.Right - ARect.Right, 0);
 
   ShowPopup(ARect);
 end;
@@ -1199,8 +1202,8 @@ var
   AHeight: Integer;
   AWidth: Integer;
 begin
-  AHeight := Max(Constraints.MinHeight, acRectHeight(R));
-  AWidth := Max(Constraints.MinWidth, acRectWidth(R));
+  AHeight := Max(Constraints.MinHeight, R.Height);
+  AWidth := Max(Constraints.MinWidth, R.Width);
   if AutoSize then
   begin
     AHeight := Max(AHeight, Height);

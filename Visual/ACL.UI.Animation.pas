@@ -4,7 +4,7 @@
 {*             Animation Manager             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2023                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -560,29 +560,29 @@ begin
     samLeftToRight:
       begin
         AOffset := Round(Progress * FFrame1.Width);
-        acAlphaBlend(DC, FFrame1, acRectOffset(R, AOffset, 0));
-        acAlphaBlend(DC, FFrame2, acRectOffset(R, AOffset - R.Width, 0));
+        acAlphaBlend(DC, FFrame1, R.OffsetTo(AOffset, 0));
+        acAlphaBlend(DC, FFrame2, R.OffsetTo(AOffset - R.Width, 0));
       end;
 
     samRightToLeft:
       begin
         AOffset := Round((1 - Progress) * FFrame1.Width);
-        acAlphaBlend(DC, FFrame1, acRectOffset(R, AOffset - R.Width, 0));
-        acAlphaBlend(DC, FFrame2, acRectOffset(R, AOffset, 0));
+        acAlphaBlend(DC, FFrame1, R.OffsetTo(AOffset - R.Width, 0));
+        acAlphaBlend(DC, FFrame2, R.OffsetTo(AOffset, 0));
       end;
 
     samTopToBottom:
       begin
         AOffset := Round(Progress * FFrame1.Height);
-        acAlphaBlend(DC, FFrame1, acRectOffset(R, 0, AOffset));
-        acAlphaBlend(DC, FFrame2, acRectOffset(R, 0, AOffset - R.Height));
+        acAlphaBlend(DC, FFrame1, R.OffsetTo(0, AOffset));
+        acAlphaBlend(DC, FFrame2, R.OffsetTo(0, AOffset - R.Height));
       end;
 
     samBottomToTop:
       begin
         AOffset := Round((1 - Progress) * FFrame1.Height);
-        acAlphaBlend(DC, FFrame1, acRectOffset(R, 0, AOffset - R.Height));
-        acAlphaBlend(DC, FFrame2, acRectOffset(R, 0, AOffset));
+        acAlphaBlend(DC, FFrame1, R.OffsetTo(0, AOffset - R.Height));
+        acAlphaBlend(DC, FFrame2, R.OffsetTo(0, AOffset));
       end;
   end;
 end;
@@ -617,10 +617,10 @@ begin
     ABitmap2 := Frame1;
   end;
 
-  ADeltaX := acRectWidth(R) div 2;
-  ADeltaY := acRectHeight(R) div 2;
-  acAlphaBlend(DC, ABitmap1, acRectInflate(R, -Round(ADeltaX * AProgress), -Round(ADeltaY * AProgress)), Round(MaxByte * (1 - AProgress)));
-  acAlphaBlend(DC, ABitmap2, acRectInflate(R, Round(ADeltaX * (1 - AProgress)), Round(ADeltaY * (1 - AProgress))), Round(MaxByte * AProgress));
+  ADeltaX := R.Width div 2;
+  ADeltaY := R.Height div 2;
+  acAlphaBlend(DC, ABitmap1, R.InflateTo(-Round(ADeltaX * AProgress), -Round(ADeltaY * AProgress)), Round(MaxByte * (1 - AProgress)));
+  acAlphaBlend(DC, ABitmap2, R.InflateTo(Round(ADeltaX * (1 - AProgress)), Round(ADeltaY * (1 - AProgress))), Round(MaxByte * AProgress));
 end;
 
 { TACLBitmapPaperSlideAnimation }
@@ -655,26 +655,26 @@ begin
   case Mode of
     samLeftToRight:
       begin
-        acAlphaBlend(DC, FFrame2, acRectOffset(R, GetFrame2Offset(FFrame2.Width), 0), GetBackgroundAlpha);
-        acAlphaBlend(DC, FFrame1, acRectOffset(R, GetFrame1Offset(FFrame1.Width), 0), GetForegroundAlpha);
+        acAlphaBlend(DC, FFrame2, R.OffsetTo(GetFrame2Offset(FFrame2.Width), 0), GetBackgroundAlpha);
+        acAlphaBlend(DC, FFrame1, R.OffsetTo(GetFrame1Offset(FFrame1.Width), 0), GetForegroundAlpha);
       end;
 
     samRightToLeft:
       begin
-        acAlphaBlend(DC, FFrame2, acRectOffset(R, -GetFrame2Offset(FFrame2.Width), 0), GetBackgroundAlpha);
-        acAlphaBlend(DC, FFrame1, acRectOffset(R, -GetFrame1Offset(FFrame1.Width), 0), GetForegroundAlpha);
+        acAlphaBlend(DC, FFrame2, R.OffsetTo(-GetFrame2Offset(FFrame2.Width), 0), GetBackgroundAlpha);
+        acAlphaBlend(DC, FFrame1, R.OffsetTo(-GetFrame1Offset(FFrame1.Width), 0), GetForegroundAlpha);
       end;
 
     samTopToBottom:
       begin
-        acAlphaBlend(DC, FFrame2, acRectOffset(R, 0, GetFrame2Offset(FFrame2.Height)), GetBackgroundAlpha);
-        acAlphaBlend(DC, FFrame1, acRectOffset(R, 0, GetFrame1Offset(FFrame1.Height)), GetForegroundAlpha);
+        acAlphaBlend(DC, FFrame2, R.OffsetTo(0, GetFrame2Offset(FFrame2.Height)), GetBackgroundAlpha);
+        acAlphaBlend(DC, FFrame1, R.OffsetTo(0, GetFrame1Offset(FFrame1.Height)), GetForegroundAlpha);
       end;
 
     samBottomToTop:
       begin
-        acAlphaBlend(DC, FFrame2, acRectOffset(R, 0, -GetFrame2Offset(FFrame2.Height)), GetBackgroundAlpha);
-        acAlphaBlend(DC, FFrame1, acRectOffset(R, 0, -GetFrame1Offset(FFrame1.Height)), GetForegroundAlpha);
+        acAlphaBlend(DC, FFrame2, R.OffsetTo(0, -GetFrame2Offset(FFrame2.Height)), GetBackgroundAlpha);
+        acAlphaBlend(DC, FFrame1, R.OffsetTo(0, -GetFrame1Offset(FFrame1.Height)), GetForegroundAlpha);
       end;
   end;
 end;

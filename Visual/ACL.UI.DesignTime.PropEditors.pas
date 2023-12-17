@@ -438,7 +438,8 @@ end;
 
 function TAlphaColorPropertyEditor.PropDrawValueRect(const ARect: TRect): TRect;
 begin
-  Result := acRectSetWidth(ARect, acRectHeight(ARect));
+  Result := ARect;
+  Result.Width := ARect.Height;
 end;
 
 procedure TAlphaColorPropertyEditor.SetValue(const Value: string);
@@ -562,7 +563,8 @@ end;
 
 function TACLResourceColorProperty.PropDrawValueRect(const ARect: TRect): TRect;
 begin
-  Result := acRectSetWidth(ARect, acRectHeight(ARect));
+  Result := ARect;
+  Result.Width := ARect.Height;
 end;
 
 function TACLResourceColorProperty.GetResource: TACLResourceColor;
@@ -610,7 +612,8 @@ end;
 
 function TACLResourceFontProperty.PropDrawValueRect(const ARect: TRect): TRect;
 begin
-  Result := acRectSetWidth(ARect, acRectHeight(ARect));
+  Result := ARect;
+  Result.Width := ARect.Height;
 end;
 
 { TACLResourceFontColorIDProperty }
@@ -1023,22 +1026,30 @@ begin
   SetOrdValue(StrToInt(Value));
 end;
 
-procedure TACLImageIndexProperty.ListDrawValue(const Value: string; ACanvas: TCanvas; const ARect: TRect; ASelected: Boolean);
+procedure TACLImageIndexProperty.ListDrawValue(const Value: string;
+  ACanvas: TCanvas; const ARect: TRect; ASelected: Boolean);
 var
-  AImageWidth: Integer;
+  LImageWidth: Integer;
+  LRect: TRect;
 begin
+  // Image
   if Images <> nil then
   begin
     ACanvas.FillRect(ARect);
     if ASelected then
       ACanvas.DrawFocusRect(ARect);
-    Images.Draw(ACanvas, ARect.Left + 2, acRectCenterVertically(ARect, Images.Height).Top, StrToInt(Value));
-    AImageWidth := Images.Width + 2 * 2;
+    LRect := ARect;
+    LRect.CenterVert(Images.Height);
+    Images.Draw(ACanvas, ARect.Left + 2, LRect.Top, StrToInt(Value));
+    LImageWidth := Images.Width + 2 * 2;
   end
   else
-    AImageWidth := 0;
+    LImageWidth := 0;
 
-  ACanvas.TextOut(ARect.Left + AImageWidth + 2, acRectCenterVertically(ARect, ACanvas.TextHeight(Value)).Top, Value);
+  // Text
+  LRect := ARect;
+  LRect.CenterVert(ACanvas.TextHeight(Value));
+  ACanvas.TextOut(ARect.Left + LImageWidth + 2, LRect.Top, Value);
 end;
 
 procedure TACLImageIndexProperty.ListMeasureHeight(const Value: string; ACanvas: TCanvas; var AHeight: Integer);

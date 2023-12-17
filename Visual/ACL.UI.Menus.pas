@@ -1112,7 +1112,7 @@ var
   AImages: TCustomImageList;
   AIntf: IACLGlyph;
 begin
-  if not RectVisible(ACanvas.Handle, ARect) then Exit;
+  if not acRectVisible(ACanvas.Handle, ARect) then Exit;
 
   AClipRegion := acSaveClipRegion(ACanvas.Handle);
   try
@@ -1122,7 +1122,8 @@ begin
     begin
       AGlyph := AIntf.GetGlyph;
       AGlyph.TargetDPI := TargetDPI;
-      AGlyph.Draw(ACanvas.Handle, acRectCenter(ARect, AGlyph.FrameSize), AItem.Enabled);
+      ARect.Center(AGlyph.FrameSize);
+      AGlyph.Draw(ACanvas.Handle, ARect, AItem.Enabled);
     end
     else
 
@@ -1133,7 +1134,8 @@ begin
       try
         AGlyph.ImportFromImage(AItem.Bitmap, acDefaultDPI);
         AGlyph.TargetDPI := TargetDPI;
-        AGlyph.Draw(ACanvas.Handle, acRectCenter(ARect, AGlyph.FrameSize), AItem.Enabled);
+        ARect.Center(AGlyph.FrameSize);
+        AGlyph.Draw(ACanvas.Handle, ARect, AItem.Enabled);
       finally
         AGlyph.Free;
       end;
@@ -1145,7 +1147,7 @@ begin
       AImages := AItem.GetImageList;
       if (AImages <> nil) and (AItem.ImageIndex >= 0) then
       begin
-        ARect := acRectCenter(ARect, acGetImageListSize(AImages, TargetDPI));
+        ARect.Center(acGetImageListSize(AImages, TargetDPI));
         DoDrawImage(ACanvas, ARect, AImages, AItem.ImageIndex, AItem.Enabled, ASelected);
       end;
     end;
@@ -1204,8 +1206,9 @@ procedure TACLStylePopupMenu.DrawCheckMark(
 
   function GetStateRect(const R: TRect; ATexture: TACLResourceTexture): TRect;
   begin
-    Result := acRectSetWidth(R, ItemGutterWidth);
-    Result := acRectCenter(Result, ATexture.FrameSize);
+    Result := R;
+    Result.Width := ItemGutterWidth;
+    Result.Center(ATexture.FrameSize);
   end;
 
 const
@@ -1259,7 +1262,8 @@ end;
 procedure TACLStylePopupMenu.DoSplitRect(const R: TRect;
   AGutterWidth: Integer; out AGutterRect, AContentRect: TRect);
 begin
-  AGutterRect := acRectSetWidth(R, AGutterWidth);
+  AGutterRect := R;
+  AGutterRect.Width := AGutterWidth;
   AContentRect := R;
   AContentRect.Left := AGutterRect.Right;
 end;
@@ -1331,11 +1335,11 @@ procedure TACLStylePopupMenu.DrawItem(
   AShortCut: TShortCut; ASelected, AIsDefault, AEnabled, AHasSubItems: Boolean);
 begin
   Inc(R.Left, ItemGutterWidth);
-  R := acRectInflate(R, -GetTextIdent, 0);
+  R.Inflate(-GetTextIdent, 0);
   AssignFontParams(ACanvas, ASelected, AIsDefault, AEnabled);
   DoDrawText(ACanvas, R, S);
   if AHasSubItems then
-    acDrawArrow(ACanvas.Handle, acRectSetLeft(R, acRectHeight(R)), ACanvas.Font.Color, makRight, TargetDPI)
+    acDrawArrow(ACanvas.Handle, R.Split(srRight, R.Height), ACanvas.Font.Color, makRight, TargetDPI)
   else
     if AShortCut <> scNone then
       acTextDraw(ACanvas, ShortCutToText(AShortCut), R, taRightJustify, taVerticalCenter);
@@ -2632,10 +2636,13 @@ begin
     end;
   end;
 
-  if acRectIsEmpty(AAlignRect) then
+  if AAlignRect.IsEmpty then
     FScrollButtonRestArea := NullRect
   else
-    FScrollButtonRestArea := acRectSetHeight(AAlignRect, Style.ItemHeight);
+  begin
+    FScrollButtonRestArea := AAlignRect;
+    FScrollButtonRestArea.Height := Style.ItemHeight;
+  end;
 end;
 
 function TACLMenuPopupWindow.CalculateMaxSize: TSize;
@@ -2658,8 +2665,8 @@ begin
   if ScrollBar <> nil then
     Inc(Result.cx, ScrollBar.Width);
   ABorders := GetBorderWidths;
-  Inc(Result.cx, acMarginWidth(ABorders));
-  Inc(Result.cy, acMarginHeight(ABorders));
+  Inc(Result.cx, ABorders.MarginsWidth);
+  Inc(Result.cy, ABorders.MarginsHeight);
 end;
 
 procedure TACLMenuPopupWindow.CalculateScrollBar(var R: TRect);
@@ -2675,8 +2682,10 @@ begin
     if AUseScrollButtons then
     begin
       FreeAndNil(FScrollBar);
-      FScrollButtonDown := acRectSetHeight(R, Style.ItemHeight);
-      FScrollButtonUp := acRectSetTop(R, Style.ItemHeight);
+      FScrollButtonDown := R;
+      FScrollButtonDown.Height := Style.ItemHeight;
+      FScrollButtonUp := R;
+      FScrollButtonUp.Top := FScrollButtonUp.Bottom - Style.ItemHeight;
       R.Top := FScrollButtonDown.Bottom;
       R.Bottom := FScrollButtonUp.Top;
     end
@@ -2688,7 +2697,7 @@ begin
         FScrollBar.Parent := Self;
         FScrollBar.OnScroll := DoScroll;
       end;
-      ScrollBar.BoundsRect := acRectSetRight(R, R.Right, FScrollBar.Width);
+      ScrollBar.BoundsRect := R.Split(srRight, FScrollBar.Width);
       ScrollBar.SetScrollParams(0, FItems.Count - 1, VisibleIndex, FItemNumberInDisplayArea);
       Dec(R.Right, ScrollBar.Width);
     end;
@@ -2707,8 +2716,8 @@ begin
   AWorkArea := MonitorGetWorkArea(ClientOrigin);
   if AChild <> nil then
   begin
-    AParentRect := acRectOffset(AChild.ParentControl.BoundsRect, ClientOrigin);
-    AParentRect := acRectOffset(AParentRect, 0, -GetBorderWidths.Top);
+    AParentRect := AChild.ParentControl.BoundsRect + ClientOrigin;
+    AParentRect.Offset(0, -GetBorderWidths.Top);
     Result.Left := AParentRect.Right;
     Result.Top := AParentRect.Top;
     if Result.Left + ASize.Width > AWorkArea.Right then
@@ -2824,7 +2833,7 @@ begin
   ASaveIndex := SaveDC(DC);
   try
     ARect := Bounds(0, 0, Width, Height);
-    acExcludeFromClipRegion(DC, acRectContent(ARect, GetBorderWidths));
+    acExcludeFromClipRegion(DC, ARect.Split(GetBorderWidths));
 
     ACanvas := TCanvas.Create;
     try
@@ -2901,11 +2910,11 @@ procedure TACLMenuPopupWindow.DrawScrollButtons(ACanvas: TCanvas);
 begin
   if FScrollBar <> nil then
     Style.DrawBackground(ACanvas, FScrollBar.BoundsRect, False);
-  if not acRectIsEmpty(FScrollButtonRestArea) then
+  if not FScrollButtonRestArea.IsEmpty then
     Style.DrawBackground(ACanvas, FScrollButtonRestArea, False);
-  if not acRectIsEmpty(FScrollButtonDown) then
+  if not FScrollButtonDown.IsEmpty then
     DrawScrollButton(ACanvas, FScrollButtonDown, True, VisibleIndex > 0);
-  if not acRectIsEmpty(FScrollButtonUp) then
+  if not FScrollButtonUp.IsEmpty then
     DrawScrollButton(ACanvas, FScrollButtonUp, False, VisibleIndex + FItemNumberInDisplayArea < FItems.Count);
 end;
 
@@ -2917,7 +2926,7 @@ end;
 
 procedure TACLMenuPopupWindow.WMNCCalcSize(var Message: TWMNCCalcSize);
 begin
-  Message.CalcSize_Params^.rgrc0 := acRectContent(Message.CalcSize_Params^.rgrc0, GetBorderWidths);
+  Message.CalcSize_Params^.rgrc0.Content(GetBorderWidths);
 end;
 
 procedure TACLMenuPopupWindow.WMNCPaint(var Message: TWMNCPaint);
@@ -3065,8 +3074,10 @@ begin
   else
   begin
     Style.DrawBackground(Canvas, R, Selected);
-    Style.DrawItem(Canvas, R, Caption, MenuItem.ShortCut, Selected, MenuItem.Default, MenuItem.Enabled, HasSubItems);
-    Style.DrawItemImage(Canvas, acRectSetWidth(R, Style.ItemGutterWidth), MenuItem, Selected);
+    Style.DrawItem(Canvas, R, Caption, MenuItem.ShortCut,
+      Selected, MenuItem.Default, MenuItem.Enabled, HasSubItems);
+    R.Width := Style.ItemGutterWidth;
+    Style.DrawItemImage(Canvas, R, MenuItem, Selected);
   end;
 end;
 
@@ -3225,7 +3236,7 @@ end;
 
 function TACLMainMenu.CalculateMaxSize: TSize;
 begin
-  Result := acSize(1, Style.ItemHeight);
+  Result := TSize.Create(1, Style.ItemHeight);
 end;
 
 function TACLMainMenu.CalculatePopupBounds(ASize: TSize; AChild: TACLMenuWindow): TRect;
@@ -3433,25 +3444,26 @@ end;
 
 procedure TACLMainMenuItemControl.Paint;
 var
-  ARect: TRect;
-  AImageWidth: Integer;
+  LImageRect: TRect;
+  LRect: TRect;
 begin
-  ARect := ClientRect;
-  Style.DrawBackground(Canvas, ARect, Selected);
-  ARect.Inflate(-Style.GetTextIdent, 0);
+  LRect := ClientRect;
+  Style.DrawBackground(Canvas, LRect, Selected);
+  LRect.Inflate(-Style.GetTextIdent, 0);
   if Caption <> '' then
   begin
     if HasGlyph then
     begin
-      AImageWidth := dpiApply(TACLStyleMenu.GlyphSize, FCurrentPPI);
-      Style.DrawItemImage(Canvas, acRectSetWidth(ARect, AImageWidth), MenuItem, Selected);
-      ARect.Left := ARect.Left + AImageWidth + dpiApply(acTextIndent, FCurrentPPI);
+      LImageRect := LRect;
+      LImageRect.Width := dpiApply(TACLStyleMenu.GlyphSize, FCurrentPPI);
+      Style.DrawItemImage(Canvas, LImageRect, MenuItem, Selected);
+      LRect.Left := LImageRect.Right + dpiApply(acTextIndent, FCurrentPPI);
     end;
     Style.AssignFontParams(Canvas, Selected, MenuItem.Default, MenuItem.Enabled);
-    acTextDraw(Canvas, Caption, ARect, taLeftJustify, taVerticalCenter, True);
+    acTextDraw(Canvas, Caption, LRect, taLeftJustify, taVerticalCenter, True);
   end
   else
-    Style.DrawItemImage(Canvas, ARect, MenuItem, Selected);
+    Style.DrawItemImage(Canvas, LRect, MenuItem, Selected);
 end;
 
 function TACLMainMenuItemControl.Style: TACLStyleMenu;
