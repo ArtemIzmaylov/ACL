@@ -466,20 +466,10 @@ function StringToColor(AColor: UnicodeString): TColor;
 function acFontHeight(Canvas: TCanvas): Integer; overload;
 function acFontHeight(Font: TFont): Integer; overload;
 
-function acTextSize(ACanvas: TCanvas; const AText: PWideChar; ALength: Integer): TSize; overload;
-function acTextSize(ACanvas: TCanvas; const AText: UnicodeString; AStartIndex: Integer = 1; ALength: Integer = MaxInt): TSize; overload;
-function acTextSize(Font: TFont; const AText: UnicodeString; AStartIndex: Integer = 1; ALength: Integer = MaxInt): TSize; overload;
-function acTextSize(Font: TFont; const AText: PWideChar; ALength: Integer): TSize; overload;
-function acTextSizeMultiline(ACanvas: TCanvas; const AText: UnicodeString; AMaxWidth: Integer = 0): TSize;
-
-function acAlignText(const R: TRect; const ATextSize: TSize; AHorzAlignment: TAlignment;
+function acTextAlign(const R: TRect; const ATextSize: TSize; AHorzAlignment: TAlignment;
   AVertAlignment: TVerticalAlignment; APreventTopLeftExceed: Boolean = False): TPoint;
-function acTextPrepare(ACanvas: TCanvas; const R: TRect; AEndEllipsis: Boolean; AHorzAlignment: TAlignment;
-  AVertAlignment: TVerticalAlignment; var AText: UnicodeString; out ATextSize: TSize; out ATextOffset: TPoint): Integer; overload;
-function acTextPrepare(ACanvas: TCanvas; const R: TRect; AEndEllipsis: Boolean; AHorzAlignment: TAlignment;
-  AVertAlignment: TVerticalAlignment; var AText: UnicodeString; out ATextSize: TSize; out ATextOffset: TPoint;
-  const ATextExtends: TRect; APreventTopLeftExceed: Boolean = False): Integer; overload;
-
+function acTextEllipsize(ACanvas: TCanvas;
+  var AText: UnicodeString; var ATextSize: TSize; AMaxWidth: Integer): Integer;
 procedure acTextDraw(ACanvas: TCanvas; const S: UnicodeString; const R: TRect;
   AHorzAlignment: TAlignment = taLeftJustify; AVertAlignment: TVerticalAlignment = taAlignTop;
   AEndEllipsis: Boolean = False; APreventTopLeftExceed: Boolean = False; AWordWrap: Boolean = False);
@@ -489,6 +479,15 @@ procedure acTextDrawHighlight(ACanvas: TCanvas; const S: UnicodeString; const R:
 procedure acTextDrawVertical(ACanvas: TCanvas; const S: UnicodeString; const R: TRect; AHorzAlignment: TAlignment;
   AVertAlignment: TVerticalAlignment; AEndEllipsis: Boolean = False); overload;
 procedure acTextOut(ACanvas: TCanvas; X, Y: Integer; const S: UnicodeString; AFlags: Integer; ARect: PRect = nil); inline;
+
+function acTextSize(ACanvas: TCanvas; const AText: PWideChar; ALength: Integer): TSize; overload;
+function acTextSize(ACanvas: TCanvas; const AText: UnicodeString;
+  AStartIndex: Integer = 1; ALength: Integer = MaxInt): TSize; overload;
+function acTextSize(Font: TFont; const AText: UnicodeString;
+  AStartIndex: Integer = 1; ALength: Integer = MaxInt): TSize; overload;
+function acTextSize(Font: TFont; const AText: PWideChar; ALength: Integer): TSize; overload;
+function acTextSizeMultiline(ACanvas: TCanvas;
+  const AText: UnicodeString; AMaxWidth: Integer = 0): TSize;
 
 procedure acSysDrawText(ACanvas: TCanvas; var R: TRect; const AText: UnicodeString; AFlags: Cardinal);
 
@@ -922,7 +921,7 @@ end;
 // TextDraw Utilities
 //----------------------------------------------------------------------------------------------------------------------
 
-function acAlignText(const R: TRect; const ATextSize: TSize; AHorzAlignment: TAlignment;
+function acTextAlign(const R: TRect; const ATextSize: TSize; AHorzAlignment: TAlignment;
   AVertAlignment: TVerticalAlignment; APreventTopLeftExceed: Boolean = False): TPoint;
 begin
   case AVertAlignment of
@@ -997,45 +996,48 @@ end;
 
 function acTextSizeMultiline(ACanvas: TCanvas; const AText: UnicodeString; AMaxWidth: Integer = 0): TSize;
 var
-  ATextRect: TRect;
+  LTextRect: TRect;
 begin
-  ATextRect := Rect(0, 0, AMaxWidth, 2);
-  acSysDrawText(ACanvas, ATextRect, AText, DT_CALCRECT or DT_WORDBREAK);
-  Result := ATextRect.Size;
+  LTextRect := Rect(0, 0, AMaxWidth, 2);
+  acSysDrawText(ACanvas, LTextRect, AText, DT_CALCRECT or DT_WORDBREAK);
+  Result := LTextRect.Size;
 end;
 
-procedure acTextDraw(ACanvas: TCanvas; const S: UnicodeString; const R: TRect; AHorzAlignment: TAlignment;
-  AVertAlignment: TVerticalAlignment; AEndEllipsis, APreventTopLeftExceed, AWordWrap: Boolean);
+procedure acTextDraw(ACanvas: TCanvas; const S: UnicodeString; const R: TRect;
+  AHorzAlignment: TAlignment; AVertAlignment: TVerticalAlignment;
+  AEndEllipsis, APreventTopLeftExceed, AWordWrap: Boolean);
 var
-  AMultiLine: Boolean;
-  AText: UnicodeString;
-  ATextFlags: Integer;
-  ATextOffset: TPoint;
-  ATextRect: TRect;
-  ATextSize: TSize;
+  LMultiLine: Boolean;
+  LText: UnicodeString;
+  LTextFlags: Integer;
+  LTextOffset: TPoint;
+  LTextRect: TRect;
+  LTextSize: TSize;
 begin
   if (S <> '') and acRectVisible(ACanvas.Handle, R) then
   begin
-    AMultiLine := acPos(#13, S) > 0;
-    if AWordWrap or AMultiLine then
+    LMultiLine := acPos(#13, S) > 0;
+    if AWordWrap or LMultiLine then
     begin
-      ATextRect := R;
-      ATextFlags := acTextAlignHorz[AHorzAlignment] or acTextAlignVert[AVertAlignment];
+      LTextRect := R;
+      LTextFlags := acTextAlignHorz[AHorzAlignment] or acTextAlignVert[AVertAlignment];
       if AEndEllipsis then
-        ATextFlags := ATextFlags or DT_END_ELLIPSIS;
+        LTextFlags := LTextFlags or DT_END_ELLIPSIS;
       if AWordWrap then
-        ATextFlags := ATextFlags or DT_WORDBREAK
-      else if not AMultiLine then
-        ATextFlags := ATextFlags or DT_SINGLELINE;
-      acSysDrawText(ACanvas, ATextRect, S, ATextFlags);
+        LTextFlags := LTextFlags or DT_WORDBREAK
+      else if not LMultiLine then
+        LTextFlags := LTextFlags or DT_SINGLELINE;
+      acSysDrawText(ACanvas, LTextRect, S, LTextFlags);
     end
     else
       if (AHorzAlignment <> taLeftJustify) or (AVertAlignment <> taAlignTop) or AEndEllipsis then
       begin
-        AText := S;
-        acTextPrepare(ACanvas, R, AEndEllipsis, AHorzAlignment, AVertAlignment,
-          AText, ATextSize, ATextOffset, NullRect, APreventTopLeftExceed);
-        acTextOut(ACanvas, ATextOffset.X, ATextOffset.Y, AText, ETO_CLIPPED, @R);
+        LText := S;
+        LTextSize := acTextSize(ACanvas, LText);
+        if AEndEllipsis then
+          acTextEllipsize(ACanvas, LText, LTextSize, R.Width);
+        LTextOffset := acTextAlign(R, LTextSize, AHorzAlignment, AVertAlignment, APreventTopLeftExceed);
+        acTextOut(ACanvas, LTextOffset.X, LTextOffset.Y, LText, ETO_CLIPPED, @R);
       end
       else
         acTextOut(ACanvas, R.Left, R.Top, S, ETO_CLIPPED, @R);
@@ -1046,52 +1048,52 @@ procedure acTextDrawHighlight(ACanvas: TCanvas; const S: UnicodeString; const R:
   AHorzAlignment: TAlignment; AVertAlignment: TVerticalAlignment; AEndEllipsis: Boolean;
   AHighlightStart, AHighlightFinish: Integer; AHighlightColor, AHighlightTextColor: TColor);
 var
-  AHighlightRect: TRect;
-  AHighlightTextSize: TSize;
-  APrevTextColor: TColor;
-  ASaveRgn: HRGN;
-  AText: UnicodeString;
-  ATextOffset, X: TPoint;
-  ATextPart: UnicodeString;
-  ATextPartSize: TSize;
-  ATextSize: TSize;
-  ATextVisibleCount: Integer;
+  LHighlightRect: TRect;
+  LHighlightTextSize: TSize;
+  LPrevTextColor: TColor;
+  LSaveRgn: HRGN;
+  LText: UnicodeString;
+  LTextOffset: TPoint;
+  LTextPart: UnicodeString;
+  LTextPartSize: TSize;
+  LTextSize: TSize;
 begin
   if AHighlightFinish > AHighlightStart then
   begin
-    AText := S;
-    ATextVisibleCount := acTextPrepare(ACanvas, R, AEndEllipsis, AHorzAlignment, AVertAlignment, AText, ATextSize, ATextOffset);
-    AHighlightFinish := Min(AHighlightFinish, ATextVisibleCount);
-    ATextPart := Copy(AText, 1, AHighlightStart);
-    acTextPrepare(ACanvas, R, False, taLeftJustify, taAlignTop, ATextPart, ATextPartSize, X);
-    ATextPart := Copy(AText, 1, AHighlightFinish);
-    acTextPrepare(ACanvas, R, False, taLeftJustify, taAlignTop, ATextPart, AHighlightTextSize, X);
-    Dec(AHighlightTextSize.cx, ATextPartSize.cx);
+    LText := S;
+    LTextSize := acTextSize(ACanvas, LText);
+    if AEndEllipsis then
+      AHighlightFinish := Min(AHighlightFinish, acTextEllipsize(ACanvas, LText, LTextSize, R.Width));
+    LTextPart := Copy(LText, 1, AHighlightStart);
+    LTextPartSize := acTextSize(ACanvas, LTextPart);
+    LTextPart := Copy(LText, 1, AHighlightFinish);
+    LHighlightTextSize := acTextSize(ACanvas, LTextPart);
+    Dec(LHighlightTextSize.cx, LTextPartSize.cx);
 
-    AHighlightRect := R;
-    AHighlightRect.Left := ATextOffset.X + ATextPartSize.cx;
-    AHighlightRect.Right := AHighlightRect.Left + AHighlightTextSize.cx;
+    LHighlightRect := R;
+    LHighlightRect.Left := LTextOffset.X + LTextPartSize.cx;
+    LHighlightRect.Right := LHighlightRect.Left + LHighlightTextSize.cx;
 
-    ASaveRgn := acSaveClipRegion(ACanvas.Handle);
+    LSaveRgn := acSaveClipRegion(ACanvas.Handle);
     try
-      acExcludeFromClipRegion(ACanvas.Handle, AHighlightRect);
-      acTextOut(ACanvas, ATextOffset.X, ATextOffset.Y, AText, ETO_CLIPPED, @R);
+      acExcludeFromClipRegion(ACanvas.Handle, LHighlightRect);
+      acTextOut(ACanvas, LTextOffset.X, LTextOffset.Y, LText, ETO_CLIPPED, @R);
     finally
-      acRestoreClipRegion(ACanvas.Handle, ASaveRgn);
+      acRestoreClipRegion(ACanvas.Handle, LSaveRgn);
     end;
 
-    ASaveRgn := acSaveClipRegion(ACanvas.Handle);
+    LSaveRgn := acSaveClipRegion(ACanvas.Handle);
     try
-      if acIntersectClipRegion(ACanvas.Handle, AHighlightRect) then
+      if acIntersectClipRegion(ACanvas.Handle, LHighlightRect) then
       begin
-        acFillRect(ACanvas.Handle, AHighlightRect, AHighlightColor);
-        APrevTextColor := ACanvas.Font.Color;
+        acFillRect(ACanvas.Handle, LHighlightRect, AHighlightColor);
+        LPrevTextColor := ACanvas.Font.Color;
         ACanvas.Font.Color := AHighlightTextColor;
-        acTextOut(ACanvas, ATextOffset.X, ATextOffset.Y, AText, ETO_CLIPPED, @R);
-        ACanvas.Font.Color := APrevTextColor;
+        acTextOut(ACanvas, LTextOffset.X, LTextOffset.Y, LText, ETO_CLIPPED, @R);
+        ACanvas.Font.Color := LPrevTextColor;
       end;
     finally
-      acRestoreClipRegion(ACanvas.Handle, ASaveRgn);
+      acRestoreClipRegion(ACanvas.Handle, LSaveRgn);
     end;
   end
   else
@@ -1100,57 +1102,40 @@ end;
 
 procedure acTextDrawVertical(ACanvas: TCanvas; const S: UnicodeString; const R: TRect;
   AHorzAlignment: TAlignment; AVertAlignment: TVerticalAlignment; AEndEllipsis: Boolean = False);
+const
+  MapVert: array[TAlignment] of TVerticalAlignment = (taAlignBottom, taAlignTop, taVerticalCenter);
 var
-  ABitmap: TACLBitmap;
+  LText: string;
+  LTextOffset: TPoint;
+  LTextSize: TSize;
 begin
-  ABitmap := TACLBitmap.CreateEx(R);
+  ACanvas.Font.Orientation := 900;
   try
-    ABitmap.Canvas.Brush.Style := bsClear;
-    acBitBlt(ABitmap.Canvas.Handle, ACanvas.Handle, ABitmap.ClientRect, R.TopLeft);
-    ABitmap.Rotate(br270);
-    ABitmap.Canvas.Lock;
-    try
-      ABitmap.Canvas.Font := ACanvas.Font;
-      acTextDraw(ABitmap.Canvas, S, ABitmap.ClientRect, AHorzAlignment, AVertAlignment, AEndEllipsis);
-    finally
-      ABitmap.Canvas.Unlock;
-    end;
-    ABitmap.Rotate(br90);
-    acBitBlt(ACanvas.Handle, ABitmap, R.TopLeft);
+    LText := S;
+    LTextSize := acTextSize(ACanvas, LText);
+    if AEndEllipsis then
+      acTextEllipsize(ACanvas, LText, LTextSize, R.Height);
+    acExchangeIntegers(LTextSize.cx, LTextSize.cy);
+    LTextOffset := acTextAlign(R, LTextSize, TAlignment(AVertAlignment), MapVert[AHorzAlignment]);
+    acTextOut(ACanvas, LTextOffset.X, LTextOffset.Y + LTextSize.cy, LText, 0);
   finally
-    ABitmap.Free;
+    ACanvas.Font.Orientation := 0;
   end;
 end;
 
-function acTextPrepare(ACanvas: TCanvas; const R: TRect; AEndEllipsis: Boolean; AHorzAlignment: TAlignment;
-  AVertAlignment: TVerticalAlignment; var AText: UnicodeString; out ATextSize: TSize; out ATextOffset: TPoint): Integer;
+function acTextEllipsize(ACanvas: TCanvas;
+  var AText: UnicodeString;
+  var ATextSize: TSize; AMaxWidth: Integer): Integer;
 begin
-  Result := acTextPrepare(ACanvas, R, AEndEllipsis, AHorzAlignment, AVertAlignment, AText, ATextSize, ATextOffset, NullRect);
-end;
-
-function acTextPrepare(ACanvas: TCanvas; const R: TRect; AEndEllipsis: Boolean; AHorzAlignment: TAlignment;
-  AVertAlignment: TVerticalAlignment; var AText: UnicodeString; out ATextSize: TSize; out ATextOffset: TPoint;
-  const ATextExtends: TRect; APreventTopLeftExceed: Boolean = False): Integer;
-var
-  AEllipsisSize: TSize;
-begin
-  ATextSize := acTextSize(ACanvas, AText);
-
-  if AEndEllipsis and (ATextSize.cx > R.Right - R.Left) then
+  if ATextSize.cx > AMaxWidth then
   begin
-    AEllipsisSize := acTextSize(ACanvas, acEndEllipsis);
-    GetTextExtentExPointW(ACanvas.Handle, PWideChar(AText), Length(AText),
-      Max(0, R.Width - AEllipsisSize.cx), @Result, nil, ATextSize);
+    GetTextExtentExPointW(ACanvas.Handle, PChar(AText), Length(AText),
+      Max(0, AMaxWidth - acTextSize(ACanvas, acEndEllipsis).cx), @Result, nil, ATextSize);
     AText := Copy(AText, 1, Result) + acEndEllipsis;
     ATextSize := acTextSize(ACanvas, AText);
   end
   else
     Result := Length(AText);
-
-  Inc(ATextSize.cy, ATextExtends.MarginsHeight);
-  Inc(ATextSize.cx, ATextExtends.MarginsWidth);
-
-  ATextOffset := acAlignText(R, ATextSize, AHorzAlignment, AVertAlignment, APreventTopLeftExceed);
 end;
 
 procedure acTextOut(ACanvas: TCanvas; X, Y: Integer; const S: UnicodeString; AFlags: Integer; ARect: PRect = nil);
@@ -1187,7 +1172,7 @@ begin
 //      else
 //        ALayout.DrawTo(ACanvas, R,
 //          acPointOffsetNegative(
-//            acAlignText(R, ALayout.MeasureSize,
+//            acTextAlign(R, ALayout.MeasureSize,
 //              HorzAlignMap[AFlags and DT_RIGHT <> 0, AFlags and DT_CENTER <> 0],
 //              VertAlignMap[AFlags and DT_BOTTOM <> 0, AFlags and DT_VCENTER <> 0], True),
 //            R.TopLeft));

@@ -384,18 +384,22 @@ end;
 procedure DrawText32(DC: HDC; const R: TRect; AText: UnicodeString; AFont: TACLFont;
   AAlignment: TAlignment; AVertAlignment: TVerticalAlignment; AEndEllipsis: Boolean);
 var
-  ATextExtends: TRect;
-  ATextOffset: TPoint;
-  ATextSize: TSize;
+  LTextExtends: TRect;
+  LTextOffset: TPoint;
+  LTextSize: TSize;
 begin
   if CheckCanDraw(DC, R, AText, AFont) then
   begin
     MeasureCanvas.Font := AFont;
-    ATextExtends := AFont.TextExtends;
-    acTextPrepare(MeasureCanvas, R, AEndEllipsis,
-      AAlignment, AVertAlignment, AText, ATextSize, ATextOffset, ATextExtends);
+    LTextExtends := AFont.TextExtends;
+    LTextSize := acTextSize(MeasureCanvas, AText);
+    if AEndEllipsis then
+      acTextEllipsize(MeasureCanvas, AText, LTextSize, R.Width - LTextExtends.MarginsWidth);
+    Inc(LTextSize.cy, LTextExtends.MarginsHeight);
+    Inc(LTextSize.cx, LTextExtends.MarginsWidth);
+    LTextOffset := acTextAlign(R, LTextSize, AAlignment, AVertAlignment);
     DrawText32Core(DC, PWideChar(AText), Length(AText), nil, AFont,
-      Bounds(ATextOffset.X, ATextOffset.Y, ATextSize.cx, ATextSize.cy), ATextExtends.TopLeft, 0);
+      TRect.Create(LTextOffset, LTextSize), LTextExtends.TopLeft, 0);
   end;
 end;
 
