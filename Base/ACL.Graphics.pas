@@ -43,8 +43,6 @@ type
 
   TACLArrowKind = (makLeft, makRight, makTop, makBottom);
 
-  TACLBitmapRotation = (br0, br90, br180, br270);
-
 const
   acDropArrowSize: TSize = (cx: 7; cy: 3);
   acMeasureTextPattern = 'Qq';
@@ -140,34 +138,21 @@ type
 
   TACLBitmap = class(TBitmap, IACLColorSchema)
   strict private
-    FStretchMode: TACLStretchMode;
-
     function GetClientRect: TRect;
   public
     constructor CreateEx(const S: TSize; APixelFormat: TPixelFormat = pf32bit; AResetContent: Boolean = False); overload;
     constructor CreateEx(const R: TRect; APixelFormat: TPixelFormat = pf32bit; AResetContent: Boolean = False); overload;
     constructor CreateEx(W, H: Integer; APixelFormat: TPixelFormat = pf32bit; AResetContent: Boolean = False); overload;
-    procedure Clear;
     procedure LoadFromResource(Inst: HINST; const AName, AType: UnicodeString);
     procedure LoadFromStream(Stream: TStream); override;
-    procedure SetSizeEx(const R: TRect);
-    // Drawing
-    procedure DrawMargins(ACanvas: TCanvas; const ADest, AMargins: TRect); overload; virtual;
-    procedure DrawMargins(ACanvas: TCanvas; const ADest, ASource, AMargins: TRect); overload; virtual;
-    procedure DrawStretch(ACanvas: TCanvas; const ADest, ASource: TRect); overload; virtual;
-    procedure DrawStretch(ACanvas: TCanvas; const ADest: TRect); overload; virtual;
-    procedure DrawTo(ACanvas: TCanvas; X, Y: Integer); virtual;
+    procedure SetSize(const R: TRect); reintroduce; overload;
     // Effects
     procedure ApplyColorSchema(const AValue: TACLColorSchema);
-    procedure ChangeAlpha(AValue: Byte);
-    procedure MakeDisabled;
     procedure MakeOpaque;
     procedure MakeTransparent(AColor: TColor);
     procedure Reset;
-    procedure Rotate(ARotation: TACLBitmapRotation; AFlipVertically: Boolean = False);
     // Properties
     property ClientRect: TRect read GetClientRect;
-    property StretchMode: TACLStretchMode read FStretchMode write FStretchMode;
   end;
 
   { TACLRegion }
@@ -303,8 +288,10 @@ type
     class function ToQuad(AColor: TColor; AAlpha: Byte = MaxByte): TRGBQuad; overload; static;
 
     class procedure AlphaBlend(var D: TColor; S: TColor; AAlpha: Integer = 255); overload; inline; static;
-    class procedure AlphaBlend(var D: TRGBQuad; const S: TRGBQuad; AAlpha: Integer = 255; AProcessPerChannelAlpha: Boolean = True); overload; inline; static;
-    class procedure ApplyColorSchema(AColors: PRGBQuad; ACount: Integer; const AValue: TACLColorSchema); overload; inline; static;
+    class procedure AlphaBlend(var D: TRGBQuad; const S: TRGBQuad;
+      AAlpha: Integer = 255; AProcessPerChannelAlpha: Boolean = True); overload; inline; static;
+    class procedure ApplyColorSchema(AColors: PRGBQuad;
+      ACount: Integer; const AValue: TACLColorSchema); overload; inline; static;
     class procedure ApplyColorSchema(const AFont: TFont; const AValue: TACLColorSchema); overload;
     class procedure ApplyColorSchema(var AColor: TAlphaColor; const AValue: TACLColorSchema); overload;
     class procedure ApplyColorSchema(var AColor: TColor; const AValue: TACLColorSchema); overload;
@@ -365,9 +352,12 @@ type
   end;
 
 // acAlphaBlend
-procedure acAlphaBlend(Dest, Src: HDC; const DR, SR: TRect; AAlpha: Integer = 255; AUseSourceAlpha: Boolean = True); overload;
-procedure acAlphaBlend(Dest: HDC; ABitmap: TBitmap; const DR: TRect; AAlpha: Integer = 255; AUseSourceAlpha: Boolean = True); overload;
-procedure acAlphaBlend(Dest: HDC; ABitmap: TBitmap; const DR, SR: TRect; AAlpha: Integer = 255; AUseSourceAlpha: Boolean = True); overload;
+procedure acAlphaBlend(Dest, Src: HDC;
+  const DR, SR: TRect; AAlpha: Integer = 255; AUseSourceAlpha: Boolean = True); overload;
+procedure acAlphaBlend(Dest: HDC; ABitmap: TBitmap;
+  const DR: TRect; AAlpha: Integer = 255; AUseSourceAlpha: Boolean = True); overload;
+procedure acAlphaBlend(Dest: HDC; ABitmap: TBitmap;
+  const DR, SR: TRect; AAlpha: Integer = 255; AUseSourceAlpha: Boolean = True); overload;
 procedure acUpdateLayeredWindow(Wnd: THandle; SrcDC: HDC; const R: TRect; AAlpha: Integer = 255); overload;
 
 // DoubleBuffer
@@ -410,7 +400,7 @@ procedure acDrawTransparentControlBackground(AControl: TWinControl; DC: HDC; R: 
 {$ENDIF}
 procedure acFillRect(DC: HDC; const ARect: TRect; AColor: TAlphaColor); overload;
 procedure acFillRect(DC: HDC; const ARect: TRect; AColor: TColor); overload;
-procedure acFitFileName(ACanvas: TCanvas; ATargetWidth: Integer; var S: UnicodeString);
+procedure acFitFileName(ACanvas: TCanvas; ATargetWidth: Integer; var S: UnicodeString); deprecated;
 procedure acResetFont(AFont: TFont);
 procedure acResetRect(DC: HDC; const R: TRect); inline;
 procedure acStretchBlt(DC, SourceDC: HDC; const ADest, ASource: TRect); inline;
@@ -451,7 +441,8 @@ procedure acWorldTransformFlip(DC: HDC; const APivotPoint: TPointF;
 // Bitmaps
 procedure acFillBitmapInfoHeader(out AHeader: TBitmapInfoHeader; AWidth, AHeight: Integer);
 function acGetBitmapBits(ABitmap: TBitmap): TRGBColors; overload;
-procedure acGetBitmapBits(ABitmap: THandle; AWidth, AHeight: Integer; out AColors: TRGBColors; out ABitmapInfo: TBitmapInfo); overload;
+procedure acGetBitmapBits(ABitmap: THandle; AWidth, AHeight: Integer;
+  out AColors: TRGBColors; out ABitmapInfo: TBitmapInfo); overload;
 procedure acSetBitmapBits(ABitmap: TBitmap; var AColors: TRGBColors);
 
 // Colors
@@ -2493,59 +2484,6 @@ begin
   Result := Rect(0, 0, Width, Height);
 end;
 
-procedure TACLBitmap.DrawStretch(ACanvas: TCanvas; const ADest, ASource: TRect);
-begin
-  acStretchDraw(ACanvas.Handle, Self.Canvas.Handle, ADest, ASource, StretchMode);
-end;
-
-procedure TACLBitmap.DrawStretch(ACanvas: TCanvas; const ADest: TRect);
-begin
-  DrawStretch(ACanvas, ADest, ClientRect);
-end;
-
-procedure TACLBitmap.DrawTo(ACanvas: TCanvas; X, Y: Integer);
-begin
-  ACanvas.Draw(X, Y, Self);
-end;
-
-procedure TACLBitmap.DrawMargins(ACanvas: TCanvas; const ADest, AMargins: TRect);
-begin
-  DrawMargins(ACanvas, ADest, ClientRect, AMargins);
-end;
-
-procedure TACLBitmap.DrawMargins(ACanvas: TCanvas; const ADest, ASource, AMargins: TRect);
-var
-  ADestParts: TACLMarginPartBounds;
-  AFixedParts: TACLMarginParts;
-  APart: TACLMarginPart;
-  ASourceParts: TACLMarginPartBounds;
-begin
-  if AMargins.IsZero then
-    DrawStretch(ACanvas, ADest, ASource)
-  else
-  begin
-    acCalcPartBounds(ASourceParts, AMargins, ASource, ASource, StretchMode);
-    acCalcPartBounds(ADestParts, AMargins, ADest, ASource, StretchMode);
-    if StretchMode = isCenter then
-      AFixedParts := [mzClient]
-    else
-      AFixedParts := [mzLeftTop, mzLeftBottom, mzRightTop, mzRightBottom];
-
-    for APart := Low(APart) to High(APart) do
-    begin
-      if APart in AFixedParts then
-        acBitBlt(ACanvas.Handle, Self, ADestParts[APart], ASourceParts[APart].TopLeft)
-      else
-        DrawStretch(ACanvas, ADestParts[APart], ASourceParts[APart]);
-    end;
-  end;
-end;
-
-procedure TACLBitmap.Clear;
-begin
-  SetSize(0, 0);
-end;
-
 procedure TACLBitmap.LoadFromResource(Inst: HINST; const AName, AType: UnicodeString);
 var
   AStream: TStream;
@@ -2572,11 +2510,6 @@ begin
   end;
 end;
 
-procedure TACLBitmap.SetSizeEx(const R: TRect);
-begin
-  SetSize(Max(0, R.Width), Max(0, R.Height));
-end;
-
 procedure TACLBitmap.ApplyColorSchema(const AValue: TACLColorSchema);
 var
   ABits: TRGBColors;
@@ -2592,35 +2525,17 @@ begin
   end;
 end;
 
-procedure TACLBitmap.ChangeAlpha(AValue: Byte);
-var
-  ABits: TRGBColors;
-  I: Integer;
-begin
-  ABits := acGetBitmapBits(Self);
-  try
-    for I := 0 to Length(ABits) - 1 do
-      ABits[I].rgbReserved := AValue;
-  finally
-    acSetBitmapBits(Self, ABits);
-  end;
-end;
-
-procedure TACLBitmap.MakeDisabled;
-var
-  ABits: TRGBColors;
-begin
-  ABits := acGetBitmapBits(Self);
-  try
-    TACLColors.MakeDisabled(@ABits[0], Length(ABits));
-  finally
-    acSetBitmapBits(Self, ABits);
-  end;
-end;
-
 procedure TACLBitmap.MakeOpaque;
+var
+  ABits: TRGBColors;
 begin
-  ChangeAlpha(MaxByte);
+  ABits := acGetBitmapBits(Self);
+  try
+    for var I := 0 to Length(ABits) - 1 do
+      ABits[I].rgbReserved := MaxByte;
+  finally
+    acSetBitmapBits(Self, ABits);
+  end;
 end;
 
 procedure TACLBitmap.MakeTransparent(AColor: TColor);
@@ -2639,59 +2554,14 @@ begin
   end;
 end;
 
-procedure TACLBitmap.Rotate(ARotation: TACLBitmapRotation; AFlipVertically: Boolean = False);
-var
-  ARow, ACol, H, W, ASourceI, ADestI: Integer;
-  ASource, ADest: TRGBColors;
-begin
-  if (ARotation = br0) and not AFlipVertically then
-    Exit;
-
-  H := Height;
-  W := Width;
-  ASource := acGetBitmapBits(Self);
-  SetLength(ADest, Length(ASource));
-  for ARow := 0 to H - 1 do
-  begin
-    for ACol := 0 to W - 1 do
-    begin
-      ASourceI := ARow * W + ACol;
-      case ARotation of
-        br90:
-          if AFlipVertically then
-            ADestI := ACol * H + ARow
-          else
-            ADestI := (W - ACol - 1) * H + ARow;
-
-        br180:
-          if AFlipVertically then
-            ADestI := ARow * W + W - ACol - 1
-          else
-            ADestI := (H - ARow - 1) * W + W - ACol - 1;
-
-        br270:
-          if AFlipVertically then
-            ADestI := (W - ACol - 1) * H + H - ARow - 1
-          else
-            ADestI := H - 1 + ACol * H - ARow;
-
-        else
-          if AFlipVertically then
-            ADestI := (H - 1 - ARow) * W + ACol
-          else
-            ADestI := ASourceI;
-      end;
-      ADest[ADestI] := ASource[ASourceI];
-    end;
-  end;
-  if ARotation in [br90, br270] then
-    SetSize(H, W);
-  acSetBitmapBits(Self, ADest);
-end;
-
 procedure TACLBitmap.Reset;
 begin
   acResetRect(Canvas.Handle, ClientRect);
+end;
+
+procedure TACLBitmap.SetSize(const R: TRect);
+begin
+  SetSize(Max(0, R.Width), Max(0, R.Height));
 end;
 
 { TACLColors }

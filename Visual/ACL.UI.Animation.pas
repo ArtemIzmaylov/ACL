@@ -33,7 +33,6 @@ uses
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Ex,
-  ACL.UI.Forms,
   ACL.Utils.Common;
 
 type
@@ -111,7 +110,7 @@ type
   public
     constructor Create(const ASourceText, ATargetText: string; const AControl: IACLAnimateControl;
       const ATime: Cardinal; ATransitionMode: TACLAnimationTransitionMode = ateLinear); reintroduce;
-    //
+    //# Properties
     property ActualText: string read GetActualText;
     property SourceText: string read FSourceText;
     property TargetText: string read FTargetText;
@@ -176,7 +175,7 @@ type
   public
     constructor Create(AMode: TACLBitmapSlideAnimationMode; AControl: IACLAnimateControl;
       ATime: Cardinal; ATransitionMode: TACLAnimationTransitionMode = ateLinear); reintroduce;
-    //
+    //# Properties
     property Mode: TACLBitmapSlideAnimationMode read FMode;
   end;
 
@@ -192,7 +191,7 @@ type
   public
     constructor Create(AMode: TACLBitmapZoomAnimationMode; AControl: IACLAnimateControl;
       ATime: Cardinal; ATransitionMode: TACLAnimationTransitionMode = ateLinear); reintroduce;
-    //
+    //# Properties
     property Mode: TACLBitmapZoomAnimationMode read FMode;
   end;
 
@@ -480,14 +479,14 @@ end;
 function TACLCustomBitmapAnimation.AllocateFrame1(const R: TRect): TACLBitmap;
 begin
   Result := FFrame1;
-  Result.SetSizeEx(R);
+  Result.SetSize(R);
   Result.Reset;
 end;
 
 function TACLCustomBitmapAnimation.AllocateFrame2(const R: TRect): TACLBitmap;
 begin
   Result := FFrame2;
-  Result.SetSizeEx(R);
+  Result.SetSize(R);
   Result.Reset;
 end;
 

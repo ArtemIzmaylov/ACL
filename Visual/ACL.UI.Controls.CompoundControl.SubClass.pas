@@ -12,7 +12,6 @@
 unit ACL.UI.Controls.CompoundControl.SubClass;
 
 {$I ACL.Config.inc}
-{$R ACL.UI.Controls.CompoundControl.SubClass.res}
 
 interface
 
@@ -1301,32 +1300,48 @@ end;
 procedure TACLCompoundControlDragObject.UpdateDragTargetZoneWindow(
   const ATargetScreenBounds: TRect; AVertical: Boolean);
 
-  function LoadArrowBitmap(const AName: UnicodeString): TACLBitmap;
-  begin
-    Result := TACLBitmap.Create;
-    Result.LoadFromResourceName(HInstance, AName);
-  end;
-
   function PrepareDragWindowBitmap: TACLBitmap;
   var
-    AArrow1, AArrow2: TACLBitmap;
+    LRect: TRect;
+    LSize: TSize;
   begin
-    AArrow1 := LoadArrowBitmap('CCDW_DOWN');
-    try
-      AArrow2 := LoadArrowBitmap('CCDW_UP');
-      try
-        Result := TACLBitmap.CreateEx(Max(AArrow1.Width, AArrow2.Width), AArrow1.Height + AArrow2.Height +
-          IfThen(AVertical, ATargetScreenBounds.Height, ATargetScreenBounds.Width), pf24bit);
-        acFillRect(Result.Canvas.Handle, Result.ClientRect, clFuchsia);
-        Result.Canvas.Draw(0, 0, AArrow1);
-        Result.Canvas.Draw(0, Result.Height - AArrow2.Height, AArrow2);
-        if not AVertical then
-          Result.Rotate(br270);
-      finally
-        AArrow2.Free;
-      end;
-    finally
-      AArrow1.Free;
+    if AVertical then
+    begin
+      LSize := acGetArrowSize(makBottom, 288);
+      Result := TACLBitmap.CreateEx(LSize.cx, 2 * LSize.cy + ATargetScreenBounds.Height, pf24bit);
+      Result.Canvas.Brush.Color := clFuchsia;
+      Result.Canvas.FillRect(Result.ClientRect);
+      // Top
+      LRect := TRect.Create(LSize);
+      LRect.Offset(0, -1);
+      acDrawArrow(Result.Canvas.Handle, LRect, clWhite, makBottom, 288);
+      LRect.Inflate(-1);
+      acDrawArrow(Result.Canvas.Handle, LRect, clBlack, makBottom, 192);
+      // Bottom
+      LRect := TRect.Create(LSize);
+      LRect.Offset(0, Result.Height - LSize.cy);
+      acDrawArrow(Result.Canvas.Handle, LRect, clWhite, makTop, 288);
+      LRect.Inflate(-1);
+      acDrawArrow(Result.Canvas.Handle, LRect, clBlack, makTop, 192);
+    end
+    else
+    begin
+      LSize := acGetArrowSize(makRight, 288);
+      Result := TACLBitmap.CreateEx(2 * LSize.cx + ATargetScreenBounds.Width, LSize.cy, pf24bit);
+      Result.Canvas.Brush.Color := clFuchsia;
+      Result.Canvas.FillRect(Result.ClientRect);
+      // Left
+      LRect := TRect.Create(LSize);
+      LRect.Offset(-1, 0);
+      acDrawArrow(Result.Canvas.Handle, LRect, clWhite, makRight, 288);
+      LRect.Inflate(-1);
+      acDrawArrow(Result.Canvas.Handle, LRect, clBlack, makRight, 192);
+      // Bottom
+      LRect := TRect.Create(LSize);
+      LRect.Offset(Result.Width - LSize.cx, 0);
+      acDrawArrow(Result.Canvas.Handle, LRect, clWhite, makLeft, 288);
+      LRect.Inflate(-1);
+      acDrawArrow(Result.Canvas.Handle, LRect, clBlack, makLeft, 192);
     end;
   end;
 
@@ -2065,7 +2080,8 @@ begin
       FThumbExtends.Bottom := 0;
       FThumbExtends.Top := 0;
 
-      R1 := Bounds.Split(srRight, Style.TextureButtonsHorz.FrameWidth);
+      R2 := Bounds;
+      R1 := R2.Split(srRight, Style.TextureButtonsHorz.FrameWidth);
       Children[0].Calculate(R1, [cccnLayout]);
       R2.Right := R1.Left;
 
