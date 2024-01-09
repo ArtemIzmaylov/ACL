@@ -528,7 +528,7 @@ begin
   if IgnoreCase then
     Result := (DataLength >= L) and (acCompareStrings(Data, PWideChar(S), L, L) = 0)
   else
-    Result := (DataLength >= L) and CompareMem(Data, PWideChar(S), L);
+    Result := (DataLength >= L) and CompareMem(Data, PWideChar(S), L * SizeOf(WideChar));
 end;
 
 function TACLParserToken.ToString: UnicodeString;
