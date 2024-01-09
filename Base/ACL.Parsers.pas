@@ -4,7 +4,7 @@
 {*             Parsers Routines              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -102,6 +102,15 @@ type
     property SkipDelimiters: Boolean read FSkipDelimiters write FSkipDelimiters;
     property SkipQuotes: Boolean read FSkipQuotes write FSkipQuotes;
     property SkipSpaces: Boolean read FSkipSpaces write FSkipSpaces;
+  end;
+
+  { TACLTokenComparer }
+
+  TACLTokenComparer = class(TInterfacedObject, IEqualityComparer<string>)
+  public
+    // IEqualityComparer<string>
+    function Equals(const Left, Right: string): Boolean; reintroduce;
+    function GetHashCode(const Value: string): Integer; reintroduce;
   end;
 
 function acExtractLine(var P: PWideChar; var C: Integer; out AToken: TACLParserToken): Boolean;
@@ -534,6 +543,31 @@ end;
 function TACLParserToken.ToString: UnicodeString;
 begin
   SetString(Result, Data, DataLength);
+end;
+
+{ TACLTokenComparer }
+
+function TACLTokenComparer.Equals(const Left, Right: string): Boolean;
+begin
+  Result := acCompareTokens(Left, Right);
+end;
+
+function TACLTokenComparer.GetHashCode(const Value: string): Integer;
+var
+  LCode: Word;
+  LIndex: Integer;
+begin
+  Result := 0;
+  for var Ch in Value do
+  begin
+    LCode := Word(Ch);
+    if (LCode >= Ord('a')) and (LCode <= Ord('z')) then
+      LCode := LCode xor $20;
+    Result := Result shl 4 + LCode;
+    LIndex := Result and $F0000000;
+    Result := Result xor (LIndex shr 24);
+    Result := Result and (not LIndex);
+  end;
 end;
 
 end.
