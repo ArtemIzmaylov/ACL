@@ -164,7 +164,6 @@ contains
   ACL.Utils.RTTI in 'Base\ACL.Utils.RTTI.pas',
   ACL.Utils.Shell.FileTypeRegistrar in 'Base\ACL.Utils.Shell.FileTypeRegistrar.pas',
   ACL.Utils.Shell in 'Base\ACL.Utils.Shell.pas',
-  ACL.Utils.Shell.UserAccounts in 'Base\ACL.Utils.Shell.UserAccounts.pas',
   ACL.Utils.Stream in 'Base\ACL.Utils.Stream.pas',
   ACL.Utils.Strings in 'Base\ACL.Utils.Strings.pas',
   ACL.Web.Http in 'Base\ACL.Web.Http.pas',

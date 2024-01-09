@@ -206,7 +206,6 @@ function ShellParseLink(const ALink: UnicodeString; out AFileName: UnicodeString
 
 function ShellDriveFree(const ADrive: WideChar): Int64; overload;
 function ShellDriveFree(const ADrive: WideChar; out AFreeSpace, ATotalSpace: Int64): LongBool; overload;
-function ShellDriveTypeFromFileName(const AFileName: UnicodeString): Cardinal;
 function ShellShutdown(AMode: TShellShutdownMode): Boolean;
 
 function ShellLastErrorCode: Integer;
@@ -693,17 +692,6 @@ begin
   finally
     SetErrorMode(AErrorMode);
   end;
-end;
-
-function ShellDriveTypeFromFileName(const AFileName: UnicodeString): Cardinal;
-var
-  ATemp: UnicodeString;
-begin
-  ATemp := Copy(AFileName, 1, acPos(':', AFileName));
-  if ATemp = '' then
-    Result := DRIVE_UNKNOWN
-  else
-    Result := acVolumeGetType(ATemp[1]);
 end;
 
 function ShellShutdown(AMode: TShellShutdownMode): Boolean;
