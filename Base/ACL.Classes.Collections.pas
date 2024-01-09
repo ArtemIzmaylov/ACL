@@ -4,7 +4,7 @@
 {*                Collections                *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -434,6 +434,7 @@ type
     function GetValues: IACLEnumerable<TValue>; virtual;
 
     procedure Remove(const Key: TKey);
+    procedure RemoveByValue(const Value: TValue);
     procedure TrimExcess;
     function TryExtract(const Key: TKey; out Value: TValue): Boolean;
     function TryExtractFirst(out Key: TKey; out Value: TValue): Boolean;
@@ -1558,7 +1559,8 @@ begin
   Create(0, AComparer);
 end;
 
-constructor TACLDictionary<TKey, TValue>.Create(ACapacity: Integer; const AComparer: IEqualityComparer<TKey>);
+constructor TACLDictionary<TKey, TValue>.Create(
+  ACapacity: Integer; const AComparer: IEqualityComparer<TKey>);
 begin
   if ACapacity < 0 then
     raise EArgumentOutOfRangeException.CreateRes(@SArgumentOutOfRange);
@@ -1575,12 +1577,15 @@ begin
   Create(AOwnerships, 0, nil);
 end;
 
-constructor TACLDictionary<TKey, TValue>.Create(AOwnerships: TDictionaryOwnerships; const AComparer: IEqualityComparer<TKey>);
+constructor TACLDictionary<TKey, TValue>.Create(
+  AOwnerships: TDictionaryOwnerships; const AComparer: IEqualityComparer<TKey>);
 begin
   Create(AOwnerships, 0, AComparer);
 end;
 
-constructor TACLDictionary<TKey, TValue>.Create(AOwnerships: TDictionaryOwnerships; ACapacity: Integer; const AComparer: IEqualityComparer<TKey>);
+constructor TACLDictionary<TKey, TValue>.Create(
+  AOwnerships: TDictionaryOwnerships; ACapacity: Integer;
+  const AComparer: IEqualityComparer<TKey>);
 begin
   Create(ACapacity, AComparer);
 
@@ -1622,23 +1627,22 @@ end;
 
 procedure TACLDictionary<TKey, TValue>.Clear(AKeepCapacity: Boolean = False);
 var
-  AItem: PItem;
-  I: Integer;
+  LItem: PItem;
 begin
   FCount := 0;
 
-  for I := 0 to Length(FItems) - 1 do
+  for var I := 0 to Length(FItems) - 1 do
   begin
-    AItem := @FItems[I];
-    if AItem^.HashCode <> EMPTY_HASH then
+    LItem := @FItems[I];
+    if LItem^.HashCode <> EMPTY_HASH then
     begin
-      AItem^.HashCode := EMPTY_HASH;
+      LItem^.HashCode := EMPTY_HASH;
 
-      KeyNotify(AItem^.Key, cnRemoved);
-      AItem^.Key := Default(TKey);
+      KeyNotify(LItem^.Key, cnRemoved);
+      LItem^.Key := Default(TKey);
 
-      ValueNotify(AItem^.Value, cnRemoved);
-      AItem^.Value := Default(TValue);
+      ValueNotify(LItem^.Value, cnRemoved);
+      LItem^.Value := Default(TValue);
     end;
   end;
 
@@ -1657,23 +1661,20 @@ end;
 
 function TACLDictionary<TKey, TValue>.ContainsValue(const Value: TValue): Boolean;
 var
-  AComparer: IEqualityComparer<TValue>;
-  I: Integer;
+  LComparer: IEqualityComparer<TValue>;
 begin
-  AComparer := TEqualityComparer<TValue>.Default;
-  for I := 0 to Length(FItems) - 1 do
+  LComparer := TEqualityComparer<TValue>.Default;
+  for var I := 0 to Length(FItems) - 1 do
   begin
-    if (FItems[I].HashCode <> EMPTY_HASH) and AComparer.Equals(FItems[I].Value, Value) then
+    if (FItems[I].HashCode <> EMPTY_HASH) and LComparer.Equals(FItems[I].Value, Value) then
       Exit(True);
   end;
   Result := False;
 end;
 
 procedure TACLDictionary<TKey, TValue>.Enum(const AProc: TACLPairEnum<TKey, TValue>);
-var
-  I: Integer;
 begin
-  for I := 0 to Length(FItems) - 1 do
+  for var I := 0 to Length(FItems) - 1 do
   begin
     with FItems[I] do
       if HashCode <> EMPTY_HASH then
@@ -1683,11 +1684,38 @@ end;
 
 procedure TACLDictionary<TKey, TValue>.Remove(const Key: TKey);
 var
-  AIndex: Integer;
+  LIndex: Integer;
 begin
-  AIndex := GetBucketIndex(Key, Hash(Key));
-  if AIndex >= 0 then
-    DoRemove(Key, AIndex, cnRemoved);
+  LIndex := GetBucketIndex(Key, Hash(Key));
+  if LIndex >= 0 then
+    DoRemove(Key, LIndex, cnRemoved);
+end;
+
+procedure TACLDictionary<TKey, TValue>.RemoveByValue(const Value: TValue);
+var
+  LComparer: IEqualityComparer<TValue>;
+  LKeys: TACLList<TKey>;
+begin
+  LKeys := nil;
+  try
+    LComparer := TEqualityComparer<TValue>.Default;
+    for var I := 0 to Length(FItems) - 1 do
+    begin
+      if (FItems[I].HashCode <> EMPTY_HASH) and LComparer.Equals(FItems[I].Value, Value) then
+      begin
+        if LKeys = nil then
+          LKeys := TACLList<TKey>.Create;
+        LKeys.Add(FItems[I].Key);
+      end;
+    end;
+    if LKeys <> nil then
+    begin
+      for var I := 0 to LKeys.Count - 1 do
+        Remove(LKeys.List[I]);
+    end;
+  finally
+    LKeys.Free;
+  end;
 end;
 
 procedure TACLDictionary<TKey, TValue>.TrimExcess;
@@ -1697,21 +1725,19 @@ end;
 
 function TACLDictionary<TKey, TValue>.TryExtract(const Key: TKey; out Value: TValue): Boolean;
 var
-  AIndex: Integer;
+  LIndex: Integer;
 begin
-  AIndex := GetBucketIndex(Key, Hash(Key));
-  Result := AIndex >= 0;
+  LIndex := GetBucketIndex(Key, Hash(Key));
+  Result := LIndex >= 0;
   if Result then
-    Value := DoRemove(Key, AIndex, cnExtracted)
+    Value := DoRemove(Key, LIndex, cnExtracted)
   else
     Value := Default(TValue);
 end;
 
 function TACLDictionary<TKey, TValue>.TryExtractFirst(out Key: TKey; out Value: TValue): Boolean;
-var
-  I: Integer;
 begin
-  for I := 0 to Length(FItems) - 1 do
+  for var I := 0 to Length(FItems) - 1 do
   begin
     if FItems[I].HashCode <> EMPTY_HASH then
     begin
@@ -1728,12 +1754,12 @@ end;
 
 function TACLDictionary<TKey, TValue>.TryGetValue(const Key: TKey; out Value: TValue): Boolean;
 var
-  AIndex: Integer;
+  LIndex: Integer;
 begin
-  AIndex := GetBucketIndex(Key, Hash(Key));
-  Result := AIndex >= 0;
+  LIndex := GetBucketIndex(Key, Hash(Key));
+  Result := LIndex >= 0;
   if Result then
-    Value := FItems[AIndex].Value
+    Value := FItems[LIndex].Value
   else
     Value := Default(TValue);
 end;
@@ -1765,7 +1791,8 @@ begin
   ValueNotify(Value, cnAdded);
 end;
 
-function TACLDictionary<TKey, TValue>.DoRemove(const Key: TKey; ABucketIndex: Integer; Notification: TCollectionNotification): TValue;
+function TACLDictionary<TKey, TValue>.DoRemove(const Key: TKey;
+  ABucketIndex: Integer; Notification: TCollectionNotification): TValue;
 var
   AGap: Integer;
   AHashCode: Integer;
