@@ -218,6 +218,13 @@ type
     procedure EndWriteChunk(var AMarkerPosition: Int64);
   end;
 
+  { TACLMemoryStream }
+
+  TACLMemoryStream = class(TMemoryStream)
+  public
+    property Capacity;
+  end;
+
   { TACLMemoryStreamHelper }
 
   TACLMemoryStreamHelper = class helper for TMemoryStream
@@ -228,7 +235,7 @@ type
 
   { TACLAnsiStringStream }
 
-  TACLAnsiStringStream = class(TMemoryStream)
+  TACLAnsiStringStream = class(TACLMemoryStream)
   strict private const
     MemoryDelta = $2000; { Must be a power of 2 }
   strict private
@@ -241,27 +248,9 @@ type
   {$ENDIF}
   public
     constructor Create(const AData: AnsiString);
-    //
+    //# Properties
     property Data: AnsiString read FData;
   end;
-
-{$IFDEF MSWINDOWS}
-
-  { TACLHGlobalReadOnlyStream }
-
-  TACLHGlobalReadOnlyStream = class(TCustomMemoryStream)
-  strict private
-    FData: THandle;
-    FDataOwnership: TStreamOwnership;
-  protected
-    procedure SetSize(const NewSize: Int64); override;
-  public
-    constructor Create(AData: THandle; ADataOwnership: TStreamOwnership = soReference);
-    destructor Destroy; override;
-    function Write(const Buffer; Count: LongInt): LongInt; override;
-  end;
-
-{$ENDIF}
 
 // Equals
 function StreamEquals(const AStream1, AStream2: TStream): Boolean;
@@ -1606,36 +1595,5 @@ begin
     SetLength(FData, ANewCapacity);
   Result := PAnsiChar(FData);
 end;
-
-{$IFDEF MSWINDOWS}
-
-{ TACLHGlobalReadOnlyStream }
-
-constructor TACLHGlobalReadOnlyStream.Create(AData: THandle; ADataOwnership: TStreamOwnership);
-begin
-  FData := AData;
-  FDataOwnership := ADataOwnership;
-  SetPointer(GlobalLock(AData), GlobalSize(AData));
-end;
-
-destructor TACLHGlobalReadOnlyStream.Destroy;
-begin
-  GlobalUnlock(FData);
-  if FDataOwnership = soOwned then
-    GlobalFree(FData);
-  inherited;
-end;
-
-procedure TACLHGlobalReadOnlyStream.SetSize(const NewSize: Int64);
-begin
-  raise EACLCannotModifyReadOnlyStream.Create;
-end;
-
-function TACLHGlobalReadOnlyStream.Write(const Buffer; Count: Integer): Integer;
-begin
-  raise EACLCannotModifyReadOnlyStream.Create;
-end;
-
-{$ENDIF}
 
 end.

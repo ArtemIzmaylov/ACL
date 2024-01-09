@@ -292,13 +292,15 @@ var
 begin
   AConfig.Clear;
   if AGlobal <> 0 then
-  begin
-    AStream := TACLHGlobalReadOnlyStream.Create(AGlobal);
+  try
+    AStream := TPointerStream.Create(GlobalLock(AGlobal), GlobalSize(AGlobal), True);
     try
       AConfig.LoadFromStream(AStream);
     finally
       AStream.Free;
     end;
+  finally
+    GlobalUnlock(AGlobal);
   end;
 end;
 
