@@ -674,6 +674,9 @@ function acCalculateScrollToDelta(
 function acCalculateScrollToDelta(AObjectTopValue, AObjectBottomValue: Integer;
   AAreaTopValue, AAreaBottomValue: Integer; AScrollToMode: TACLScrollToMode): Integer; overload;
 
+procedure acDrawTransparentControlBackground(AControl: TWinControl;
+  DC: HDC; R: TRect; APaintWithChildren: Boolean = True);
+
 function acCanStartDragging(const ADeltaX, ADeltaY, ATargetDpi: Integer): Boolean; overload;
 function acCanStartDragging(const P0, P1: TPoint; ATargetDpi: Integer): Boolean; overload;
 procedure acDesignerSetModified(AInvoker: TPersistent);
@@ -773,6 +776,77 @@ end;
 function acOpacityToAlphaBlendValue(AOpacity: Integer): Byte;
 begin
   Result := 15 + MulDiv(240, AOpacity, 100)
+end;
+
+procedure acDrawTransparentControlBackground(AControl: TWinControl; DC: HDC; R: TRect; APaintWithChildren: Boolean = True);
+
+  procedure DrawControl(DC: HDC; AControl: TWinControl);
+  begin
+    if IsWindowVisible(AControl.Handle) then
+    begin
+      AControl.ControlState := AControl.ControlState + [csPaintCopy];
+      try
+        AControl.Perform(WM_ERASEBKGND, DC, DC);
+        AControl.Perform(WM_PAINT, DC, 0);
+      finally
+        AControl.ControlState := AControl.ControlState - [csPaintCopy];
+      end;
+    end;
+  end;
+
+  procedure PaintControlTo(ADrawControl: TWinControl; AOffsetX, AOffsetY: Integer; R: TRect);
+  var
+    AChildControl: TControl;
+    I: Integer;
+  begin
+    MoveWindowOrg(DC, AOffsetX, AOffsetY);
+    try
+      if not RectVisible(DC, R) then
+        Exit;
+
+      DrawControl(DC, ADrawControl);
+      if APaintWithChildren then
+      begin
+        for I := 0 to ADrawControl.ControlCount - 1 do
+        begin
+          AChildControl := ADrawControl.Controls[I];
+          if (AChildControl = AControl) and AControl.Visible then
+            Break;
+          if (AChildControl is TWinControl) and AChildControl.Visible then
+          begin
+            R := AChildControl.BoundsRect;
+            R.Offset(-R.Left, -R.Top);
+            PaintControlTo(TWinControl(AChildControl),
+              AChildControl.Left, AChildControl.Top, R);
+          end;
+        end;
+      end;
+    finally
+      MoveWindowOrg(DC, -AOffsetX, -AOffsetY);
+    end;
+  end;
+
+var
+  AParentControl: TWinControl;
+  ASaveIndex: Integer;
+begin
+  AParentControl := AControl.Parent;
+  if (AParentControl = nil) and (AControl.ParentWindow <> 0) then
+  begin
+    AParentControl := FindControl(AControl.ParentWindow);
+    APaintWithChildren := False;
+  end;
+  if Assigned(AParentControl) then
+  begin
+    ASaveIndex := SaveDC(DC);
+    try
+      acIntersectClipRegion(DC, R);
+      R.Offset(AControl.Left, AControl.Top);
+      PaintControlTo(AParentControl, -R.Left, -R.Top, R);
+    finally
+      RestoreDC(DC, ASaveIndex);
+    end;
+  end;
 end;
 
 procedure acDesignerSetModified(AInvoker: TPersistent);

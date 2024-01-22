@@ -4,7 +4,7 @@
 {*            Graphics Utilities             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -20,9 +20,6 @@ uses
   Winapi.Windows,
   Winapi.Messages,
   // Vcl
-{$IFNDEF ACL_BASE_NOVCL}
-  Vcl.Controls,
-{$ENDIF}
   Vcl.Graphics,
   // System
   System.Classes,
@@ -395,9 +392,6 @@ procedure acDrawHueColorBar(ACanvas: TCanvas; const R: TRect);
 procedure acDrawHueIntensityBar(ACanvas: TCanvas; const R: TRect; AHue: Byte = 0);
 procedure acDrawSelectionRect(DC: HDC; const R: TRect; AColor: TAlphaColor);
 procedure acDrawShadow(ACanvas: TCanvas; const ARect: TRect; ABKColor: TColor; AShadowSize: Integer = 5);
-{$IFNDEF ACL_BASE_NOVCL}
-procedure acDrawTransparentControlBackground(AControl: TWinControl; DC: HDC; R: TRect; APaintWithChildren: Boolean = True);
-{$ENDIF}
 procedure acFillRect(DC: HDC; const ARect: TRect; AColor: TAlphaColor); overload;
 procedure acFillRect(DC: HDC; const ARect: TRect; AColor: TColor); overload;
 procedure acFitFileName(ACanvas: TCanvas; ATargetWidth: Integer; var S: UnicodeString); deprecated;
@@ -628,79 +622,6 @@ begin
       TACLHexCode.Decode(AColor[5], AColor[6]));
   end;
 end;
-
-{$IFNDEF ACL_BASE_NOVCL}
-procedure acDrawTransparentControlBackground(AControl: TWinControl; DC: HDC; R: TRect; APaintWithChildren: Boolean = True);
-
-  procedure DrawControl(DC: HDC; AControl: TWinControl);
-  begin
-    if IsWindowVisible(AControl.Handle) then
-    begin
-      AControl.ControlState := AControl.ControlState + [csPaintCopy];
-      try
-        AControl.Perform(WM_ERASEBKGND, DC, DC);
-        AControl.Perform(WM_PAINT, DC, 0);
-      finally
-        AControl.ControlState := AControl.ControlState - [csPaintCopy];
-      end;
-    end;
-  end;
-
-  procedure PaintControlTo(ADrawControl: TWinControl; AOffsetX, AOffsetY: Integer; R: TRect);
-  var
-    AChildControl: TControl;
-    I: Integer;
-  begin
-    MoveWindowOrg(DC, AOffsetX, AOffsetY);
-    try
-      if not RectVisible(DC, R) then
-        Exit;
-
-      DrawControl(DC, ADrawControl);
-      if APaintWithChildren then
-      begin
-        for I := 0 to ADrawControl.ControlCount - 1 do
-        begin
-          AChildControl := ADrawControl.Controls[I];
-          if (AChildControl = AControl) and AControl.Visible then
-            Break;
-          if (AChildControl is TWinControl) and AChildControl.Visible then
-          begin
-            R := AChildControl.BoundsRect;
-            R.Offset(-R.Left, -R.Top);
-            PaintControlTo(TWinControl(AChildControl),
-              AChildControl.Left, AChildControl.Top, R);
-          end;
-        end;
-      end;
-    finally
-      MoveWindowOrg(DC, -AOffsetX, -AOffsetY);
-    end;
-  end;
-
-var
-  AParentControl: TWinControl;
-  ASaveIndex: Integer;
-begin
-  AParentControl := AControl.Parent;
-  if (AParentControl = nil) and (AControl.ParentWindow <> 0) then
-  begin
-    AParentControl := FindControl(AControl.ParentWindow);
-    APaintWithChildren := False;
-  end;
-  if Assigned(AParentControl) then
-  begin
-    ASaveIndex := SaveDC(DC);
-    try
-      acIntersectClipRegion(DC, R);
-      R.Offset(AControl.Left, AControl.Top);
-      PaintControlTo(AParentControl, -R.Left, -R.Top, R);
-    finally
-      RestoreDC(DC, ASaveIndex);
-    end;
-  end;
-end;
-{$ENDIF}
 
 procedure acFitFileName(ACanvas: TCanvas; ATargetWidth: Integer; var S: UnicodeString);
 const
