@@ -363,7 +363,7 @@ end;
 
 function acIsLocalUnixPath(const AFileName: UnicodeString): Boolean;
 begin
-  Result := (acPos(sUnixPathDelim, AFileName) > 0) and not acIsUrlFileName(AFileName);
+  Result := acContains(sUnixPathDelim, AFileName) and not acIsUrlFileName(AFileName);
 end;
 
 function acIsUncFileName(const AFileName: UnicodeString): Boolean;

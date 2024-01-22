@@ -4,7 +4,7 @@
 {*             Editors Controls              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -226,7 +226,6 @@ type
     procedure Paint; override;
     procedure Resize; override;
     procedure SetDefaultSize; override;
-    procedure SetFocusOnClick; override;
     procedure SetFocusToInnerEdit; virtual;
     procedure SetTargetDPI(AValue: Integer); override;
     procedure UpdateBordersColor;
@@ -925,12 +924,6 @@ end;
 procedure TACLCustomEdit.SetDefaultSize;
 begin
   SetBounds(Left, Top, 121, 21);
-end;
-
-procedure TACLCustomEdit.SetFocusOnClick;
-begin
-  if not IsChild(Handle, GetFocus) then
-    inherited;
 end;
 
 procedure TACLCustomEdit.SetFocusToInnerEdit;

@@ -4,7 +4,7 @@
 {*             TreeList Control              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -162,7 +162,6 @@ type
   protected
     function CreateSubClass: TACLCompoundControlSubClass; override;
     function GetBackgroundStyle: TACLControlBackgroundStyle; override;
-    procedure SetFocusOnClick; override;
     // IACLFocusableControl2
     procedure SetFocusOnSearchResult;
     //
@@ -363,7 +362,9 @@ end;
 
 function TACLCustomTreeList.Focused: Boolean;
 begin
-  Result := Assigned(SubClass) and (inherited or EditingController.IsEditing and EditingController.EditIntf.InplaceIsFocused);
+  Result := Assigned(SubClass) and (inherited or
+    EditingController.IsEditing and
+    EditingController.EditIntf.InplaceIsFocused);
 end;
 
 function TACLCustomTreeList.ObjectAtPos(const X, Y: Integer): TObject;
@@ -485,12 +486,6 @@ begin
     Result := cbsSemitransparent
   else
     Result := cbsOpaque;
-end;
-
-procedure TACLCustomTreeList.SetFocusOnClick;
-begin
-  if not IsChild(Handle, GetFocus) then
-    inherited SetFocusOnClick;
 end;
 
 procedure TACLCustomTreeList.SetFocusOnSearchResult;

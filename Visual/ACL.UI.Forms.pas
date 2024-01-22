@@ -48,6 +48,7 @@ uses
   ACL.ObjectLinks,
   ACL.Threading,
   ACL.UI.Application,
+  ACL.UI.Controls.BaseControls,
   ACL.UI.Resources,
   ACL.Utils.Common,
   ACL.Utils.Desktop,
@@ -55,10 +56,6 @@ uses
   ACL.Utils.FileSystem,
   ACL.Utils.Registry,
   ACL.Utils.Strings;
-
-const
-  CM_SCALECHANGING = $BF00;
-  CM_SCALECHANGED  = $BF01;
 
 type
 
@@ -299,9 +296,7 @@ uses
   System.Math,
   System.Character,
   // Vcl
-  Vcl.AppEvnts,
-  // ACL.UI
-  ACL.UI.Controls.BaseControls;
+  Vcl.AppEvnts;
 
 const
   // Windows 11

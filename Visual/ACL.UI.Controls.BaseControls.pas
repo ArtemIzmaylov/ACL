@@ -4,7 +4,7 @@
 {*           Base Control Classes            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -46,11 +46,14 @@ uses
   ACL.ObjectLinks,
   ACL.UI.Animation,
   ACL.UI.Application,
-  ACL.UI.Forms,
   ACL.UI.Resources,
   ACL.Utils.Common,
   ACL.Utils.DPIAware,
   ACL.Utils.FileSystem;
+
+const
+  CM_SCALECHANGING = $BF00;
+  CM_SCALECHANGED  = $BF01;
 
 const
   acIndentBetweenElements = 5;
@@ -1814,7 +1817,7 @@ end;
 
 procedure TACLCustomControl.SetFocusOnClick;
 begin
-  SetFocus;
+  if not Focused then SetFocus;
 end;
 
 procedure TACLCustomControl.SetMargins(const Value: TACLMargins);
@@ -2002,7 +2005,8 @@ end;
 
 procedure TACLCustomControl.WMMouseMove(var Message: TWMMouseMove);
 begin
-  MouseTracker.Add(Self);
+  if IsMouseAtControl then
+    MouseTracker.Add(Self);
   inherited;
 end;
 

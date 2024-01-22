@@ -466,7 +466,7 @@ begin
     FText[Index] := AValue;
     FCancelButton.Caption := TextButtonCancel;
     InvalidateTextBox;
-    Update;
+    //Update;
   end;
 end;
 

@@ -4,7 +4,7 @@
 {*               Skinable Menus              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -409,6 +409,7 @@ type
     procedure DoActionIdleTimerProc(Sender: TObject);
     procedure DoMenuDelay(Sender: TObject);
 
+    function GetStyle: TACLStylePopupMenu;
     procedure SetParentMenu(AValue: TACLMenuWindow);
     procedure SetVisibleIndex(AValue: Integer);
 
@@ -505,6 +506,7 @@ type
     property PopupMenu: TACLPopupMenu read FPopupMenu;
     property PopupStack: TObjectStack<TACLMenuWindow> read FPopupStack;
     property RootMenu: TACLMenuWindow read FRootMenu write FRootMenu;
+    property Style: TACLStylePopupMenu read GetStyle;
     property VisibleIndex: Integer read FVisibleIndex write SetVisibleIndex;
   public
     constructor Create(AOwner: TComponent); override;
@@ -525,7 +527,6 @@ type
     FScrollTimer: TACLTimer;
 
     function GetBorderWidths: TRect;
-    function GetStyle: TACLStylePopupMenu;
     procedure WMNCCalcSize(var Message: TWMNCCalcSize); message WM_NCCALCSIZE;
     procedure WMNCPaint(var Message: TWMNCPaint); message WM_NCPAINT;
     procedure WMPrint(var Message: TWMPrint); message WM_PRINT;
@@ -557,7 +558,6 @@ type
     property ScrollButtonDown: TRect read FScrollButtonDown;
     property ScrollButtonUp: TRect read FScrollButtonUp;
     property ScrollTimer: TACLTimer read FScrollTimer;
-    property Style: TACLStylePopupMenu read GetStyle;
   protected
     procedure Popup(X, Y: Integer);
     procedure PopupEx(AMenuItem: TMenuItem; const AControlRect: TRect);
@@ -2018,21 +2018,23 @@ const
     AW_VER_NEGATIVE or AW_HOR_POSITIVE or AW_SLIDE);
   HideShow: array[Boolean] of Integer = (AW_HIDE, 0);
 var
-  AMenuAnimate: LongBool;
-  AMenuPoint: TPoint;
+  LMenuAnimate: LongBool;
+  LMenuPoint: TPoint;
 begin
-  if not RootMenu.FItemKeyed then
+  if not RootMenu.FItemKeyed and Assigned(AnimateWindowProc) then
   begin
-    SystemParametersInfo(SPI_GETMENUANIMATION, 0, @AMenuAnimate, 0);
-    if Assigned(AnimateWindowProc) and (FParentMenu.FAnimatePopups or not Show) and AMenuAnimate then
+    SystemParametersInfo(SPI_GETMENUANIMATION, 0, @LMenuAnimate, 0);
+    if (FParentMenu.FAnimatePopups or not Show) and LMenuAnimate and
+      (IsWin10OrLater or (Style.CornerRadius.Value = 0)) // на старых ОС меню фликает при анимации, если задана маска
+    then
     begin
-      SystemParametersInfo(SPI_GETMENUFADE, 0, @AMenuAnimate, 0);
-      if AMenuAnimate then
+      SystemParametersInfo(SPI_GETMENUFADE, 0, @LMenuAnimate, 0);
+      if LMenuAnimate then
         AnimateWindowProc(Handle, AnimateDuration, AW_BLEND or HideShow[Show])
       else
       begin
-        AMenuPoint := ParentControl.Parent.ClientToScreen(ParentControl.BoundsRect.TopLeft);
-        AnimateWindowProc(Handle, AnimateDuration, UnfoldAnimationStyle[Top < AMenuPoint.Y - 5] or HideShow[Show]);
+        LMenuPoint := ParentControl.Parent.ClientToScreen(ParentControl.BoundsRect.TopLeft);
+        AnimateWindowProc(Handle, AnimateDuration, UnfoldAnimationStyle[Top < LMenuPoint.Y - 5] or HideShow[Show]);
       end;
     end;
   end;
@@ -2415,6 +2417,11 @@ procedure TACLMenuWindow.SelectItem(AItem: TACLMenuItemControl);
 begin
   if AItem <> nil then
     AItem.SetSelected(True);
+end;
+
+function TACLMenuWindow.GetStyle: TACLStylePopupMenu;
+begin
+  Result := PopupMenu.Style;
 end;
 
 procedure TACLMenuWindow.SetParentMenu(AValue: TACLMenuWindow);
@@ -2817,11 +2824,6 @@ end;
 function TACLMenuPopupWindow.GetBorderWidths: TRect;
 begin
   Result := dpiApply(Style.Borders.Value, GetCurrentDpi);
-end;
-
-function TACLMenuPopupWindow.GetStyle: TACLStylePopupMenu;
-begin
-  Result := PopupMenu.Style;
 end;
 
 procedure TACLMenuPopupWindow.NCPaint(DC: HDC);
