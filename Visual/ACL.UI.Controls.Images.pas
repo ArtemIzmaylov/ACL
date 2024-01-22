@@ -4,7 +4,7 @@
 {*           Image Based Controls            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -198,9 +198,12 @@ type
 
   { TACLSubImageSelector }
 
-  TACLSubImageSelectorDragMode = (dmNone, dmMove, dmDrawNew, dmResizeLeft, dmResizeTop, dmResizeRight, dmResizeBottom,
-    dmResizeCornerLeftTop, dmResizeCornerRightTop, dmResizeCornerLeftBottom, dmResizeCornerRightBottom);
-  TACLSubImageSelectorPaintEvent = procedure (Sender: TObject; Canvas: TCanvas; const ImageRect: TRect) of object;
+  TACLSubImageSelectorDragMode = (dmNone, dmMove, dmDrawNew,
+    dmResizeLeft, dmResizeTop, dmResizeRight, dmResizeBottom,
+    dmResizeCornerLeftTop, dmResizeCornerRightTop,
+    dmResizeCornerLeftBottom, dmResizeCornerRightBottom);
+  TACLSubImageSelectorPaintEvent = procedure (
+    Sender: TObject; Canvas: TCanvas; const ImageRect: TRect) of object;
 
   TACLSubImageSelector = class(TACLCustomControl)
   strict private
@@ -813,23 +816,25 @@ end;
 
 procedure TACLSubImageSelector.KeyDown(var Key: Word; Shift: TShiftState);
 var
-  AOffset: TPoint;
+  ARect: TRect;
 begin
   inherited;
   FIsKeyboardAction := True;
   try
-    AOffset := NullPoint;
+    ARect := ImageCrop;
     case Key of
       VK_LEFT:
-        AOffset.X := IfThen(ImageCrop.Left > 0, -1);
+        ARect.Offset(IfThen(ImageCrop.Left > 0, -1), 0);
       VK_UP:
-        AOffset.Y := IfThen(ImageCrop.Top > 0, -1);
+        ARect.Offset(0, IfThen(ImageCrop.Top > 0, -1));
       VK_RIGHT:
-        AOffset.X := IfThen(ImageCrop.Right < ImageSize.cx, 1);
+        ARect.Offset(IfThen(ImageCrop.Right < ImageSize.cx, 1), 0);
       VK_DOWN:
-        AOffset.Y := IfThen(ImageCrop.Bottom < ImageSize.cy, 1);
+        ARect.Offset(0, IfThen(ImageCrop.Bottom < ImageSize.cy, 1));
+    else
+      Exit;
     end;
-    ImageCrop.Offset(AOffset);
+    ImageCrop := ARect;
   finally
     FIsKeyboardAction := False;
   end;
@@ -883,13 +888,20 @@ begin
       end;
 
     dmResizeLeft:
-      ARect := TRectF.Create(Max(FDragCaptureRect.Left + dX, 0), FDragCaptureRect.Top, FDragCaptureRect.Right, FDragCaptureRect.Bottom);
+      ARect := TRectF.Create(Max(FDragCaptureRect.Left + dX, 0),
+        FDragCaptureRect.Top, FDragCaptureRect.Right, FDragCaptureRect.Bottom);
+
     dmResizeTop:
-      ARect := TRectF.Create(FDragCaptureRect.Left, Max(FDragCaptureRect.Top + dY, 0), FDragCaptureRect.Right, FDragCaptureRect.Bottom);
+      ARect := TRectF.Create(FDragCaptureRect.Left, Max(FDragCaptureRect.Top + dY, 0),
+        FDragCaptureRect.Right, FDragCaptureRect.Bottom);
+
     dmResizeRight:
-      ARect := TRectF.Create(FDragCaptureRect.Left, FDragCaptureRect.Top, Min(FDragCaptureRect.Right + dX, ImageSize.cx), FDragCaptureRect.Bottom);
+      ARect := TRectF.Create(FDragCaptureRect.Left, FDragCaptureRect.Top,
+        Min(FDragCaptureRect.Right + dX, ImageSize.cx), FDragCaptureRect.Bottom);
+
     dmResizeBottom:
-      ARect := TRectF.Create(FDragCaptureRect.Left, FDragCaptureRect.Top, FDragCaptureRect.Right, Min(FDragCaptureRect.Bottom + dY, ImageSize.cy));
+      ARect := TRectF.Create(FDragCaptureRect.Left, FDragCaptureRect.Top,
+        FDragCaptureRect.Right, Min(FDragCaptureRect.Bottom + dY, ImageSize.cy));
 
     dmResizeCornerLeftTop:
       ARect := TRectF.Create(
