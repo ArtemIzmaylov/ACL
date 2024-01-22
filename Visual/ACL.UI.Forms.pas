@@ -1,10 +1,10 @@
 ﻿{*********************************************}
 {*                                           *}
 {*     Artem's Visual Components Library     *}
-{*               Form Classes                *}
+{*    Forms and Top Level Window Classes     *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -122,6 +122,7 @@ type
     IACLResourceProvider)
   strict private
     FFormCreated: Boolean;
+    FInMenuLoop: Integer;
     FShowOnTaskBar: Boolean;
     FStayOnTop: Boolean;
     FWndProcHooks: array[TACLWindowHookMode] of TACLWindowHooks;
@@ -163,6 +164,9 @@ type
     procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
     procedure CMRecreateWnd(var Message: TMessage); message CM_RECREATEWND;
     procedure CMShowingChanged(var Message: TCMDialogKey); message CM_SHOWINGCHANGED;
+    procedure WMEnterMenuLoop(var Msg: TWMEnterMenuLoop); message WM_ENTERMENULOOP;
+    procedure WMExitMenuLoop(var Msg: TWMExitMenuLoop); message WM_EXITMENULOOP;
+    procedure WMNCActivate(var Msg: TWMNCActivate); message WM_NCACTIVATE;
     procedure WMShowWindow(var Message: TWMShowWindow); message WM_SHOWWINDOW;
     procedure WMWindowPosChanged(var Message: TWMWindowPosChanged); message WM_WINDOWPOSCHANGED;
     procedure WndProc(var Message: TMessage); override;
@@ -186,42 +190,40 @@ type
     property StayOnTop: Boolean read FStayOnTop write SetStayOnTop default False;
   end;
 
-  { TACLCustomPopupForm }
+  { TACLPopupWindow }
 
-  TACLCustomPopupFormClass = class of TACLCustomPopupForm;
-  TACLCustomPopupForm = class(TACLForm)
+  TACLPopupWindowClass = class of TACLPopupWindow;
+  TACLPopupWindow = class(TACLBasicForm)
   strict private
-    FPopuped: Boolean;
-    FPrevHandle: THandle;
+    FOwnerFormWnd: THandle;
 
     FOnClosePopup: TNotifyEvent;
     FOnPopup: TNotifyEvent;
 
+    procedure ConstraintBounds(var R: TRect);
+    procedure InitPopup;
+    procedure InitScaling;
     procedure ShowPopup(const R: TRect);
+    //# Messages
+    procedure CMCancelMode(var Message: TCMCancelMode); message CM_CANCELMODE;
   protected
-    FUseOwnMessagesLoop: Boolean;
-
     procedure CreateParams(var Params: TCreateParams); override;
-    procedure Deactivate; override;
     procedure WndProc(var Message: TMessage); override;
-
-    procedure DoClosePopup; virtual;
+    //# Events
     procedure DoPopup; virtual;
-    procedure Initialize; virtual;
-    procedure ValidatePopupFormBounds(var R: TRect); virtual;
-
-    procedure CMDialogKey(var Message: TWMKey); override;
-    procedure CMWantSpecialKey(var Message: TCMWantSpecialKey); message CM_WANTSPECIALKEY;
+    procedure DoPopupClosed; virtual;
+    //# Mouse
+    function IsMouseInControl: Boolean;
+    //procedure MouseTracking; virtual;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    procedure ClosePopup;
     procedure Popup(R: TRect); virtual;
-    procedure PopupClose;
-    procedure PopupUnderControl(const AControlBoundsOnScreen: TRect;
-      AAlignment: TAlignment = taLeftJustify; ATargetDpi: Integer = 0); 
-    // Properties
-    property Popuped: Boolean read FPopuped;
-    // Events
+    procedure PopupUnderControl(const AControlBoundsOnScreen: TRect; AAlignment: TAlignment = taLeftJustify);
+    //# Properties
+    property AutoSize;
+    //# Events
     property OnClosePopup: TNotifyEvent read FOnClosePopup write FOnClosePopup;
     property OnPopup: TNotifyEvent read FOnPopup write FOnPopup;
   end;
@@ -331,7 +333,6 @@ type
   TACLFormMouseWheelHelper = class
   strict private
     class var FHook: HHOOK;
-
     class function MouseHook(Code: Integer; wParam: WParam; lParam: LParam): LRESULT; stdcall; static;
   public
     class destructor Destroy;
@@ -976,6 +977,26 @@ begin
     MakeFullyVisible;
 end;
 
+procedure TACLForm.WMEnterMenuLoop(var Msg: TWMEnterMenuLoop);
+begin
+  Inc(FInMenuLoop);
+  inherited;
+end;
+
+procedure TACLForm.WMExitMenuLoop(var Msg: TWMExitMenuLoop);
+begin
+  inherited;
+  Dec(FInMenuLoop);
+end;
+
+procedure TACLForm.WMNCActivate(var Msg: TWMNCActivate);
+begin
+  // Чтобы не было промаргивания при фокусировке контрола внутри попапа.
+  if (FInMenuLoop <> 0) and not Msg.Active then
+    Msg.Active := True;
+  inherited;
+end;
+
 procedure TACLForm.WMShowWindow(var Message: TWMShowWindow);
 begin
   inherited;
@@ -1035,51 +1056,138 @@ begin
   end;
 end;
 
-{ TACLCustomPopupForm }
+{ TACLPopupWindow }
 
-constructor TACLCustomPopupForm.Create(AOwner: TComponent);
+constructor TACLPopupWindow.Create(AOwner: TComponent);
 begin
-  if AOwner is TWinControl then
-    FOwnerHandle := TWinControl(AOwner).Handle;
   CreateNew(AOwner);
-  Initialize;
+  DoubleBuffered := True;
+  Visible := False;
+  BorderStyle := bsNone;
+  DefaultMonitor := dmDesktop;
+  Position := poDesigned;
+  FormStyle := fsStayOnTop;
+  InitScaling;
 end;
 
-destructor TACLCustomPopupForm.Destroy;
+destructor TACLPopupWindow.Destroy;
 begin
   TACLMainThread.Unsubscribe(Self);
   TACLObjectLinks.Release(Self);
-  inherited Destroy;
+  inherited;
 end;
 
-procedure TACLCustomPopupForm.Popup(R: TRect);
+procedure TACLPopupWindow.ClosePopup;
 begin
+  if Visible then
+  try
+//    KillTimer(WindowHandle, MouseTrackerId);
+//    MouseCapture := False;
+    Hide;
+    if FOwnerFormWnd <> 0 then
+      SendMessage(FOwnerFormWnd, WM_EXITMENULOOP, 0, 0);
+  finally
+    DoPopupClosed;
+  end;
+end;
+
+procedure TACLPopupWindow.CMCancelMode(var Message: TCMCancelMode);
+begin
+  if Visible and not ContainsControl(Message.Sender) then
+    ClosePopup;
+end;
+
+procedure TACLPopupWindow.ConstraintBounds(var R: TRect);
+var
+  AHeight: Integer;
+  AWidth: Integer;
+begin
+  AHeight := Max(Constraints.MinHeight, R.Height);
+  AWidth := Max(Constraints.MinWidth, R.Width);
+  if AutoSize then
+  begin
+    AHeight := Max(AHeight, Height);
+    AWidth := Max(AWidth, Width);
+  end;
+  if Constraints.MaxHeight > 0 then
+    AHeight := Min(AHeight, Constraints.MaxHeight);
+  if Constraints.MaxWidth > 0 then
+    AWidth := Min(AWidth, Constraints.MaxWidth);
+  R.Right := R.Left + AWidth;
+  R.Bottom := R.Top + AHeight;
+end;
+
+procedure TACLPopupWindow.CreateParams(var Params: TCreateParams);
+begin
+  inherited;
+  if Owner is TWinControl then
+    Params.WndParent := TWinControl(Owner).Handle;
+  Params.WindowClass.Style := Params.WindowClass.Style or CS_DROPSHADOW or CS_HREDRAW or CS_VREDRAW;
+end;
+
+procedure TACLPopupWindow.DoPopup;
+begin
+  CallNotifyEvent(Self, OnPopup);
+end;
+
+procedure TACLPopupWindow.DoPopupClosed;
+begin
+  CallNotifyEvent(Self, OnClosePopup);
+end;
+
+procedure TACLPopupWindow.InitPopup;
+begin
+  SendCancelMode(Self);
+  InitScaling;
   DoPopup;
   if AutoSize then
     HandleNeeded;
   AdjustSize;
-  ValidatePopupFormBounds(R);
+end;
+
+procedure TACLPopupWindow.InitScaling;
+var
+  LSourceDPI: IACLCurrentDpi;
+begin
+  Scaled := True;
+  if Supports(Owner, IACLCurrentDpi, LSourceDPI) then
+    ScaleForPPI(LSourceDPI.GetCurrentDpi);
+  if Owner is TControl then
+    Font := TWinControlAccess(Owner).Font;
+  Scaled := False; // manual control
+end;
+
+function TACLPopupWindow.IsMouseInControl: Boolean;
+begin
+  Result := PtInRect(Rect(0, 0, Width, Height), CalcCursorPos);
+end;
+
+{procedure TACLPopupWindow.MouseTracking;
+var
+  LCapture: TControl;
+begin
+  if IsMouseInControl then
+    MouseCapture := False
+  else
+  begin
+    LCapture := GetCaptureControl;
+    if LCapture = nil then
+      MouseCapture := True
+    else
+      if (LCapture <> Self) and not ContainsControl(LCapture) then
+        ClosePopup;
+  end;
+end;}
+
+procedure TACLPopupWindow.Popup(R: TRect);
+begin
+  InitPopup;
+  ConstraintBounds(R);
   ShowPopup(MonitorAlignPopupWindow(R));
 end;
 
-procedure TACLCustomPopupForm.PopupClose;
-begin
-  if FPopuped then
-  begin
-    FPopuped := False;
-    Hide;
-    DoClosePopup;
-  end;
-end;
-
-//procedure TACLCustomPopupForm.PopupUnderControl(
-//  AControl: TControl; AAlignment: TAlignment = taLeftJustify);
-//begin
-//  PopupUnderControl( AControl.BoundsRect, Control.ClientToScreen(NullPoint), Alignment, acGetCurrentDpi(Control));
-//end;
-
-procedure TACLCustomPopupForm.PopupUnderControl(const AControlBoundsOnScreen: TRect;
-  AAlignment: TAlignment = taLeftJustify; ATargetDpi: Integer = 0);
+procedure TACLPopupWindow.PopupUnderControl(
+  const AControlBoundsOnScreen: TRect; AAlignment: TAlignment);
 
   function CalculateOffset(const ARect: TRect): TPoint;
   begin
@@ -1100,16 +1208,11 @@ var
   ARect: TRect;
   AWorkareaRect: TRect;
 begin
-  DoPopup;
-  if AutoSize then
-    HandleNeeded;
-  if ATargetDpi >= acMinDpi then
-    ScaleForPPI(ATargetDpi);
-  AdjustSize;
+  InitPopup;
 
   ARect := TRect.Create(AControlBoundsOnScreen.Size);
   ARect.Height := Height;
-  ValidatePopupFormBounds(ARect);
+  ConstraintBounds(ARect);
   ARect.Offset(CalculateOffset(ARect));
 
   AWorkareaRect := MonitorGet(ARect.CenterPoint).WorkareaRect;
@@ -1126,130 +1229,65 @@ begin
   ShowPopup(ARect);
 end;
 
-procedure TACLCustomPopupForm.CreateParams(var Params: TCreateParams);
+procedure TACLPopupWindow.ShowPopup(const R: TRect);
 begin
-  inherited CreateParams(Params);
-  Params.WindowClass.Style := Params.WindowClass.Style or CS_DROPSHADOW or CS_VREDRAW or CS_HREDRAW;
+  BoundsRect := R;
+
+  if Screen.ActiveCustomForm <> nil then
+    FOwnerFormWnd := Screen.ActiveCustomForm.Handle
+  else
+    FOwnerFormWnd := 0;
+
+  if FOwnerFormWnd <> 0 then
+    SendMessage(FOwnerFormWnd, WM_ENTERMENULOOP, 0, 0);
+
+//  SetTimer(Handle, MouseTrackerId, 1, nil);
+  Visible := True;
 end;
 
-procedure TACLCustomPopupForm.Deactivate;
+procedure TACLPopupWindow.WndProc(var Message: TMessage);
 begin
-  inherited Deactivate;
-  PopupClose;
-end;
-
-procedure TACLCustomPopupForm.WndProc(var Message: TMessage);
-begin
-  inherited WndProc(Message);
-  if FPopuped then
+  if Visible then
     case Message.Msg of
       WM_ACTIVATEAPP:
-        with TWMActivateApp(Message) do
-          if not Active then
-          begin
-            SendMessage(FPrevHandle, WM_NCACTIVATE, WPARAM(False), 0);
-            PopupClose;
-          end;
+        ClosePopup;
+      WM_CONTEXTMENU, CM_MOUSEWHEEL:
+        Exit;
+      WM_GETDLGCODE:
+        Message.Result := DLGC_WANTARROWS or DLGC_WANTTAB or DLGC_WANTALLKEYS or DLGC_WANTCHARS;
+
+//      WM_MOUSEACTIVATE:
+//        begin
+//          Message.Result := MA_NOACTIVATE;
+//          Exit;
+//        end;
+//
+//      WM_LBUTTONDBLCLK, WM_MBUTTONDBLCLK, WM_RBUTTONDBLCLK,
+//      WM_LBUTTONDOWN, WM_MBUTTONDOWN, WM_RBUTTONDOWN:
+//        if not IsMouseInControl then
+//          ClosePopup;
+//
+//      WM_TIMER:
+//        if TWMTimer(Message).TimerID = MouseTrackerId then
+//          MouseTracking;
 
       WM_ACTIVATE:
         with TWMActivate(Message) do
           if Active = WA_INACTIVE then
-            TACLMainThread.RunPostponed(PopupClose, Self)
-          else
-          begin
-            FPrevHandle := ActiveWindow;
-            SendMessage(FPrevHandle, WM_NCACTIVATE, WPARAM(True), 0);
-          end;
-    end;
-end;
+            TACLMainThread.RunPostponed(ClosePopup, Self)
+          else // c нашей формой, по идее, это не нужно:
+            SendMessage(ActiveWindow, WM_NCACTIVATE, WPARAM(True), 0);
 
-procedure TACLCustomPopupForm.DoClosePopup;
-begin
-  CallNotifyEvent(Self, OnClosePopup);
-end;
-
-procedure TACLCustomPopupForm.DoPopup;
-begin
-  CallNotifyEvent(Self, OnPopup);
-end;
-
-procedure TACLCustomPopupForm.Initialize;
-var
-  ASourceDPI: IACLCurrentDpi;
-  ATargetDPI: Integer;
-begin
-  Visible := False;
-  BorderStyle := bsNone;
-  DefaultMonitor := dmDesktop;
-  Position := poDesigned;
-  FormStyle := fsStayOnTop;
-
-  if Supports(Owner, IACLCurrentDpi, ASourceDPI) then
-  begin
-    ATargetDPI := ASourceDPI.GetCurrentDpi;
-    if ATargetDPI <> acDefaultDPI then
-      Perform(WM_DPICHANGED, MakeLong(ATargetDPI, ATargetDPI), 0);
-  end;
-end;
-
-procedure TACLCustomPopupForm.ValidatePopupFormBounds(var R: TRect);
-var
-  AHeight: Integer;
-  AWidth: Integer;
-begin
-  AHeight := Max(Constraints.MinHeight, R.Height);
-  AWidth := Max(Constraints.MinWidth, R.Width);
-  if AutoSize then
-  begin
-    AHeight := Max(AHeight, Height);
-    AWidth := Max(AWidth, Width);
-  end;
-  if Constraints.MaxHeight > 0 then
-    AHeight := Min(AHeight, Constraints.MaxHeight);
-  if Constraints.MaxWidth > 0 then
-    AWidth := Min(AWidth, Constraints.MaxWidth);
-  R.Right := R.Left + AWidth;
-  R.Bottom := R.Top + AHeight;
-end;
-
-procedure TACLCustomPopupForm.ShowPopup(const R: TRect);
-var
-  AApp: TApplicationAccess;
-  AMsg: TMsg;
-begin
-  BoundsRect := R;
-  FPopuped := True;
-  Visible := True;
-  BringToFront;
-  if FUseOwnMessagesLoop then
-  begin
-    AApp := TApplicationAccess(Application);
-    repeat
-      if PeekMessage(AMsg, 0, 0, 0, PM_REMOVE) then
-      begin
-        if (AMsg.Message <> WM_QUIT) and not (AApp.IsHintMsg(AMsg) or AApp.IsMDIMsg(AMsg)) then
+      WM_KEYDOWN, CM_DIALOGKEY, CM_WANTSPECIALKEY:
+        if TWMKey(Message).CharCode = VK_ESCAPE then
         begin
-          TranslateMessage(AMsg);
-          DispatchMessage(AMsg);
+          ClosePopup;
+          TWMKey(Message).CharCode := 0;
+          TWMKey(Message).Result := 1;
+          Exit;
         end;
-      end;
-      WaitMessage;
-    until not Visible;
-  end;
-end;
-
-procedure TACLCustomPopupForm.CMDialogKey(var Message: TWMKey);
-begin
+    end;
   inherited;
-  if Message.CharCode = VK_ESCAPE then
-    PopupClose;
-end;
-
-procedure TACLCustomPopupForm.CMWantSpecialKey(var Message: TCMWantSpecialKey);
-begin
-  inherited;
-  if Message.CharCode = VK_ESCAPE then
-    Message.Result := 1;
 end;
 
 { TACLLocalizableForm }

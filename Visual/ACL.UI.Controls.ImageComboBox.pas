@@ -4,7 +4,7 @@
 {*             Editors Controls              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -108,18 +108,19 @@ type
     FImageRect: TRect;
 
     function CanDropDown(X, Y: Integer): Boolean; override;
+    function CreateDropDownWindow: TACLPopupWindow; override;
     function GetCount: Integer; override;
-    function GetDropDownFormClass: TACLCustomPopupFormClass; override;
     procedure CalculateContent(const R: TRect); override;
     procedure DrawEditorContent(ACanvas: TCanvas); override;
     procedure ItemIndexChanged; override;
     procedure Notification(AComponent: TComponent; AOperation: TOperation); override;
-    //
+
+    //# Properties
     property ImageSize: TSize read GetImageSize;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    //
+    //# Properties
     property ImageRect: TRect read FImageRect;
     property SelectedItem: TACLImageComboBoxItem read GetSelectedItem;
   published
@@ -145,17 +146,13 @@ type
     property OnSelect;
   end;
 
-  { TACLImageComboBoxDropDownForm }
+  { TACLImageComboBoxDropDown }
 
-  TACLImageComboBoxDropDownForm = class(TACLBasicComboBoxDropDownForm)
-  strict private
-    function GetOwnerEx: TACLImageComboBox;
+  TACLImageComboBoxDropDown = class(TACLBasicComboBoxDropDown)
   protected
     procedure PopulateListCore(AList: TACLTreeList); override;
   public
     constructor Create(AOwner: TComponent); override;
-    //
-    property Owner: TACLImageComboBox read GetOwnerEx;
   end;
 
   { TACLImageComboBoxUIInsightAdapter }
@@ -301,6 +298,11 @@ begin
   FTextRect.Left := ImageRect.Right + IfThen(ImageSize.cx > 0, dpiApply(acTextIndent, FCurrentPPI));
 end;
 
+function TACLImageComboBox.CreateDropDownWindow: TACLPopupWindow;
+begin
+  Result := TACLImageComboBoxDropDown.Create(Self);
+end;
+
 procedure TACLImageComboBox.ImageListChanged(Sender: TObject);
 begin
   FullRefresh;
@@ -339,11 +341,6 @@ begin
   Result := Items.Count;
 end;
 
-function TACLImageComboBox.GetDropDownFormClass: TACLCustomPopupFormClass;
-begin
-  Result := TACLImageComboBoxDropDownForm;
-end;
-
 function TACLImageComboBox.GetImageSize: TSize;
 begin
   Result := acGetImageListSize(Images, FCurrentPPI);
@@ -367,42 +364,36 @@ begin
   FItems.Assign(AValue);
 end;
 
-{ TACLImageComboBoxDropDownForm }
+{ TACLImageComboBoxDropDown }
 
-constructor TACLImageComboBoxDropDownForm.Create(AOwner: TComponent);
+constructor TACLImageComboBoxDropDown.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  Control.OptionsView.Nodes.Images := Owner.Images;
+  Control.OptionsView.Nodes.Images := TACLImageComboBox(AOwner).Images;
 end;
 
-procedure TACLImageComboBoxDropDownForm.PopulateListCore(AList: TACLTreeList);
+procedure TACLImageComboBoxDropDown.PopulateListCore(AList: TACLTreeList);
 var
-  AItem: TACLImageComboBoxItem;
-  ANode: TACLTreeListNode;
-  I: Integer;
+  LImages: TACLImageComboBoxItems;
+  LItem: TACLImageComboBoxItem;
 begin
-  for I := 0 to Owner.Items.Count - 1 do
+  LImages := TACLImageComboBox(Owner).Items;
+  for var I := 0 to LImages.Count - 1 do
   begin
-    AItem := Owner.Items[I];
-    ANode := AddItem(AList, AItem.Text);
-    ANode.ImageIndex := AItem.ImageIndex;
+    LItem := LImages[I];
+    AddItem(AList, LItem.Text).ImageIndex := LItem.ImageIndex;
   end;
-end;
-
-function TACLImageComboBoxDropDownForm.GetOwnerEx: TACLImageComboBox;
-begin
-  Result := TACLImageComboBox(inherited Owner);
 end;
 
 { TACLImageComboBoxUIInsightAdapter }
 
-class procedure TACLImageComboBoxUIInsightAdapter.GetChildren(AObject: TObject; ABuilder: TACLUIInsightSearchQueueBuilder);
+class procedure TACLImageComboBoxUIInsightAdapter.GetChildren(
+  AObject: TObject; ABuilder: TACLUIInsightSearchQueueBuilder);
 var
-  AImageComboBox: TACLImageComboBox absolute AObject;
-  I: Integer;
+  LImageComboBox: TACLImageComboBox absolute AObject;
 begin
-  for I := 0 to AImageComboBox.Count - 1 do
-    ABuilder.AddCandidate(AImageComboBox, AImageComboBox.Items[I].Text);
+  for var I := 0 to LImageComboBox.Count - 1 do
+    ABuilder.AddCandidate(LImageComboBox, LImageComboBox.Items[I].Text);
 end;
 
 initialization

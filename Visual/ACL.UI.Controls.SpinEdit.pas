@@ -4,7 +4,7 @@
 {*             Editors Controls              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -37,7 +37,8 @@ uses
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.Buttons,
   ACL.UI.Forms,
-  ACL.UI.Resources;
+  ACL.UI.Resources,
+  ACL.Utils.DPIAware;
 
 type
   TACLCustomSpinEdit = class;
@@ -320,9 +321,12 @@ end;
 function TACLCustomSpinEdit.CalculateEditorPosition: TRect;
 begin
   Result := ClientRect;
-  Result.Inflate(0, -1);
   Result.Left := ButtonLeft.Bounds.Right;
   Result.Right := ButtonRight.Bounds.Left;
+  if IsWin11OrLater then
+    Result.Inflate(0, -dpiApply(acTextIndent, FCurrentPPI))
+  else
+    Result.Inflate(0, -1);
 end;
 
 function TACLCustomSpinEdit.CanOpenEditor: Boolean;

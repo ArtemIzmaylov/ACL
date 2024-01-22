@@ -4,7 +4,7 @@
 {*             Editors Controls              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -84,22 +84,21 @@ type
     procedure EnumChecked(AProc: TACLCheckComboBoxItemsEnumProc);
     function FindByTag(const ATag: NativeInt; out AItem: TACLCheckComboBoxItem): Boolean;
     function FindByText(const AText: UnicodeString; out AItem: TACLCheckComboBoxItem): Boolean;
-    //
+    //# Properties
     property Items[Index: Integer]: TACLCheckComboBoxItem read GetItem; default;
     property State: TCheckBoxState read GetState write SetState;
   end;
 
-  { TACLCheckComboBoxDropDownForm }
+  { TACLCheckComboBoxDropDown }
 
-  TACLCheckComboBoxDropDownForm = class(TACLCustomComboBoxDropDownForm)
+  TACLCheckComboBoxDropDown = class(TACLCustomComboBoxDropDown)
   strict private
-    function GetDisplayItemName(AItem: TACLCheckComboBoxItem): UnicodeString;
     function GetOwnerEx: TACLCheckComboBox;
-    procedure GetGroupNameHandler(Sender: TObject; ANode: TACLTreeListNode; var AGroupName: string);
-    procedure ItemCheckHandler(Sender: TObject; AItem: TACLTreeListNode);
-    procedure UpdateStateHandler(Sender: TObject);
+    procedure HandlerGetGroupName(Sender: TObject; ANode: TACLTreeListNode; var AGroupName: string);
+    procedure HandlerItemCheck(Sender: TObject; AItem: TACLTreeListNode);
+    procedure HandlerUpdateState(Sender: TObject);
   protected
-    procedure ClickAtObject(AHitTest: TACLTreeListHitTest); override;
+    procedure DoClick(AHitTest: TACLTreeListHitTest); override;
     procedure PopulateList(AList: TACLTreeList); override;
   public
     constructor Create(AOwner: TComponent); override;
@@ -109,8 +108,10 @@ type
 
   { TACLCheckComboBox }
 
-  TACLCheckComboBoxGetDisplayTextEvent = procedure (Sender: TObject; var AText: string) of object;
-  TACLCheckComboBoxGetItemDisplayTextEvent = procedure (Sender: TObject; AItem: TACLCheckComboBoxItem; var AText: string) of object;
+  TACLCheckComboBoxGetDisplayTextEvent = procedure (
+    Sender: TObject; var AText: string) of object;
+  TACLCheckComboBoxGetItemDisplayTextEvent = procedure (
+    Sender: TObject; AItem: TACLCheckComboBoxItem; var AText: string) of object;
 
   TACLCheckComboBox = class(TACLCustomComboBox)
   strict private
@@ -126,15 +127,15 @@ type
     procedure SetItems(AValue: TACLCheckComboBoxItems);
     procedure SetSeparator(AValue: WideChar);
   protected
+    function CreateDropDownWindow: TACLPopupWindow; override;
     procedure DoGetDisplayText(AItem: TACLCheckComboBoxItem; var AText: string); virtual;
     procedure DoGetGroupName(AItem: TACLCheckComboBoxItem; var AText: string); virtual;
-    function GetDropDownFormClass: TACLCustomPopupFormClass; override;
     procedure SetTextCore(const AText: string); override;
     procedure UpdateText;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    //
+    //# Properties
     property Count: Integer read GetCount;
   published
     property Borders;
@@ -148,9 +149,12 @@ type
     property Text;
 
     property OnChange;
-    property OnGetDisplayItemGroupName: TACLCheckComboBoxGetItemDisplayTextEvent read FOnGetDisplayItemGroupName write FOnGetDisplayItemGroupName;
-    property OnGetDisplayItemName: TACLCheckComboBoxGetItemDisplayTextEvent read FOnGetDisplayItemName write FOnGetDisplayItemName;
-    property OnGetDisplayText: TACLCheckComboBoxGetDisplayTextEvent read FOnGetDisplayText write FOnGetDisplayText;
+    property OnGetDisplayItemGroupName: TACLCheckComboBoxGetItemDisplayTextEvent
+      read FOnGetDisplayItemGroupName write FOnGetDisplayItemGroupName;
+    property OnGetDisplayItemName: TACLCheckComboBoxGetItemDisplayTextEvent
+      read FOnGetDisplayItemName write FOnGetDisplayItemName;
+    property OnGetDisplayText: TACLCheckComboBoxGetDisplayTextEvent
+      read FOnGetDisplayText write FOnGetDisplayText;
   end;
 
   { TACLCheckComboBoxUIInsightAdapter }
@@ -306,9 +310,9 @@ begin
   end;
 end;
 
-{ TACLCheckComboBoxDropDownForm }
+{ TACLCheckComboBoxDropDown }
 
-constructor TACLCheckComboBoxDropDownForm.Create(AOwner: TComponent);
+constructor TACLCheckComboBoxDropDown.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   Control.OptionsView.CheckBoxes := True;
@@ -317,59 +321,56 @@ begin
   Control.Columns.Add;
 
   // must be last
-  Control.OnNodeChecked := ItemCheckHandler;
-  Control.OnUpdateState := UpdateStateHandler;
+  Control.OnNodeChecked := HandlerItemCheck;
+  Control.OnUpdateState := HandlerUpdateState;
 end;
 
-procedure TACLCheckComboBoxDropDownForm.ClickAtObject(AHitTest: TACLTreeListHitTest);
+procedure TACLCheckComboBoxDropDown.DoClick(AHitTest: TACLTreeListHitTest);
 begin
   if AHitTest.HitAtNode and not AHitTest.IsCheckable then
     AHitTest.Node.Checked := not AHitTest.Node.Checked;
 end;
 
-procedure TACLCheckComboBoxDropDownForm.PopulateList(AList: TACLTreeList);
+procedure TACLCheckComboBoxDropDown.PopulateList(AList: TACLTreeList);
 var
-  AItem: TACLCheckComboBoxItem;
-  ATreeListNode: TACLTreeListNode;
-  I: Integer;
+  LItem: TACLCheckComboBoxItem;
+  LNode: TACLTreeListNode;
+  LText: string;
 begin
   if Assigned(Owner.OnGetDisplayItemGroupName) then
   begin
-    AList.OnGetNodeGroup := GetGroupNameHandler;
+    AList.OnGetNodeGroup := HandlerGetGroupName;
     AList.OptionsBehavior.Groups := True;
   end;
-  for I := 0 to Owner.Count - 1 do
+  for var I := 0 to Owner.Count - 1 do
   begin
-    AItem := Owner.Items.Items[I];
-    ATreeListNode := AList.RootNode.AddChild;
-    ATreeListNode.Data := AItem;
-    ATreeListNode.Checked := AItem.Checked;
-    ATreeListNode.Caption := GetDisplayItemName(AItem);
+    LItem := Owner.Items.Items[I];
+    LText := LItem.Text;
+    Owner.DoGetDisplayText(LItem, LText);
+    LNode := AList.RootNode.AddChild;
+    LNode.Data := LItem;
+    LNode.Checked := LItem.Checked;
+    LNode.Caption := LText;
   end;
 end;
 
-function TACLCheckComboBoxDropDownForm.GetDisplayItemName(AItem: TACLCheckComboBoxItem): UnicodeString;
-begin
-  Result := AItem.Text;
-  Owner.DoGetDisplayText(AItem, Result);
-end;
-
-function TACLCheckComboBoxDropDownForm.GetOwnerEx: TACLCheckComboBox;
+function TACLCheckComboBoxDropDown.GetOwnerEx: TACLCheckComboBox;
 begin
   Result := TACLCheckComboBox(inherited Owner);
 end;
 
-procedure TACLCheckComboBoxDropDownForm.GetGroupNameHandler(Sender: TObject; ANode: TACLTreeListNode; var AGroupName: string);
+procedure TACLCheckComboBoxDropDown.HandlerGetGroupName(
+  Sender: TObject; ANode: TACLTreeListNode; var AGroupName: string);
 begin
   Owner.DoGetGroupName(ANode.Data, AGroupName);
 end;
 
-procedure TACLCheckComboBoxDropDownForm.ItemCheckHandler(Sender: TObject; AItem: TACLTreeListNode);
+procedure TACLCheckComboBoxDropDown.HandlerItemCheck(Sender: TObject; AItem: TACLTreeListNode);
 begin
   TACLCheckComboBoxItem(AItem.Data).Checked := AItem.Checked;
 end;
 
-procedure TACLCheckComboBoxDropDownForm.UpdateStateHandler(Sender: TObject);
+procedure TACLCheckComboBoxDropDown.HandlerUpdateState(Sender: TObject);
 begin
   if Control.IsUpdateLocked then
     Owner.Items.BeginUpdate
@@ -392,20 +393,24 @@ begin
   inherited Destroy;
 end;
 
+function TACLCheckComboBox.CreateDropDownWindow: TACLPopupWindow;
+begin
+  Result := TACLCheckComboBoxDropDown.Create(Self);
+end;
+
 procedure TACLCheckComboBox.SetTextCore(const AText: string);
 var
-  AItem: TACLCheckComboBoxItem;
-  AStrings: TStringDynArray;
-  I: Integer;
+  LItem: TACLCheckComboBoxItem;
+  LStrings: TStringDynArray;
 begin
   Items.BeginUpdate;
   try
     Items.State := cbUnchecked;
-    acExplodeString(AText, Separator, AStrings);
-    for I := 0 to Length(AStrings) - 1 do
+    acExplodeString(AText, Separator, LStrings);
+    for var I := 0 to Length(LStrings) - 1 do
     begin
-      if Items.FindByText(AStrings[I], AItem) then
-        AItem.Checked := True;
+      if Items.FindByText(LStrings[I], LItem) then
+        LItem.Checked := True;
     end;
     UpdateText;
   finally
@@ -451,11 +456,6 @@ begin
     OnGetDisplayItemGroupName(Self, AItem, AText);
 end;
 
-function TACLCheckComboBox.GetDropDownFormClass: TACLCustomPopupFormClass;
-begin
-  Result := TACLCheckComboBoxDropDownForm;
-end;
-
 function TACLCheckComboBox.IsSeparatorStored: Boolean;
 begin
   Result := FSeparator <> ';';
@@ -477,13 +477,13 @@ end;
 
 { TACLCheckComboBoxUIInsightAdapter }
 
-class procedure TACLCheckComboBoxUIInsightAdapter.GetChildren(AObject: TObject; ABuilder: TACLUIInsightSearchQueueBuilder);
+class procedure TACLCheckComboBoxUIInsightAdapter.GetChildren(
+  AObject: TObject; ABuilder: TACLUIInsightSearchQueueBuilder);
 var
-  ACheckComboBox: TACLCheckComboBox absolute AObject;
-  I: Integer;
+  LCheckComboBox: TACLCheckComboBox absolute AObject;
 begin
-  for I := 0 to ACheckComboBox.Count - 1 do
-    ABuilder.AddCandidate(ACheckComboBox, ACheckComboBox.Items[I].Text);
+  for var I := 0 to LCheckComboBox.Count - 1 do
+    ABuilder.AddCandidate(LCheckComboBox, LCheckComboBox.Items[I].Text);
 end;
 
 initialization

@@ -4,7 +4,7 @@
 {*             Editors Controls              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -67,7 +67,7 @@ type
     procedure SetStyleSpinButton(const Value: TACLStyleButton);
   protected
     procedure Changed; override;
-    function GetDropDownFormClass: TACLCustomPopupFormClass; override;
+    function CreateDropDownWindow: TACLPopupWindow; override;
     function TextToValue(const AText: string): Variant; override;
     function ValueToText(const AValue: Variant): string; override;
   public
@@ -88,9 +88,9 @@ type
     property OnSelect: TNotifyEvent read FOnSelect write FOnSelect;
   end;
 
-  { TACLDateTimeEditDropDownForm }
+  { TACLDateTimeEditDropDown }
 
-  TACLDateTimeEditDropDownForm = class(TACLCustomPopupForm)
+  TACLDateTimeEditDropDown = class(TACLPopupWindow)
   strict private const
     ButtonWidth = 75;
   strict private
@@ -662,9 +662,9 @@ begin
   CallNotifyEvent(Self, OnSelect);
 end;
 
-function TACLDateTimeEdit.GetDropDownFormClass: TACLCustomPopupFormClass;
+function TACLDateTimeEdit.CreateDropDownWindow: TACLPopupWindow;
 begin
-  Result := TACLDateTimeEditDropDownForm;
+  Result := TACLDateTimeEditDropDown.Create(Self);
 end;
 
 function TACLDateTimeEdit.IsValueStored: Boolean;
@@ -720,9 +720,9 @@ begin
     Result := '';
 end;
 
-{ TACLDateTimeEditDropDownForm }
+{ TACLDateTimeEditDropDown }
 
-constructor TACLDateTimeEditDropDownForm.Create(AOwner: TComponent);
+constructor TACLDateTimeEditDropDown.Create(AOwner: TComponent);
 begin
   inherited;
   FOwner := AOwner as TACLDateTimeEdit;
@@ -756,7 +756,7 @@ begin
   SetBounds(0, 0, Constraints.MinWidth, Constraints.MinHeight);
 end;
 
-procedure TACLDateTimeEditDropDownForm.Resize;
+procedure TACLDateTimeEditDropDown.Resize;
 var
   AHandle: THandle;
   AContentRect: TRect;
@@ -798,25 +798,25 @@ begin
   end;
 end;
 
-procedure TACLDateTimeEditDropDownForm.CreateControl(AControlClass: TACLCustomControlClass; out AControl);
+procedure TACLDateTimeEditDropDown.CreateControl(AControlClass: TACLCustomControlClass; out AControl);
 begin
   TObject(AControl) := AControlClass.Create(Self);
   TACLCustomControlAccess(AControl).Parent := Self;
   TACLCustomControlAccess(AControl).ResourceCollection := FOwner.ResourceCollection;
 end;
 
-procedure TACLDateTimeEditDropDownForm.HandlerApply(Sender: TObject);
+procedure TACLDateTimeEditDropDown.HandlerApply(Sender: TObject);
 begin
   FOwner.Value := DateOf(FCalendar.Value) + TimeOf(FTimeEdit.Time);
-  Close;
+  ClosePopup;
 end;
 
-procedure TACLDateTimeEditDropDownForm.HandlerCancel(Sender: TObject);
+procedure TACLDateTimeEditDropDown.HandlerCancel(Sender: TObject);
 begin
-  Close;
+  ClosePopup;
 end;
 
-procedure TACLDateTimeEditDropDownForm.Paint;
+procedure TACLDateTimeEditDropDown.Paint;
 begin
   Canvas.Brush.Color := FCalendar.Style.ColorBackground.AsColor;
   Canvas.Pen.Color := FOwner.Style.ColorBorder.AsColor;
