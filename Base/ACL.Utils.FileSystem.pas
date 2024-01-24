@@ -24,15 +24,11 @@ uses
 {$ENDIF}
   // System
   System.Classes,
-  System.Generics.Collections,
-  System.SyncObjs,
   System.SysUtils,
   System.Types,
   // ACL
   ACL.Classes,
-  ACL.Classes.ByteBuffer,
   ACL.Classes.StringList,
-  ACL.Parsers,
   ACL.Utils.Common,
   ACL.Utils.Stream;
 
@@ -321,13 +317,10 @@ uses
   Posix.Unistd,
 {$ENDIF}
   // System
-  System.Character,
-  System.Math,
   System.RTLConsts,
   // ACL
   ACL.FastCode,
   ACL.FileFormats.INI,
-  ACL.Math,
   ACL.Utils.Strings;
 
 {$IFDEF MSWINDOWS}

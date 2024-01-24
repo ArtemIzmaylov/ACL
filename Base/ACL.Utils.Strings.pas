@@ -41,15 +41,13 @@ const
   acZero = #0#0;
   acZeroWidthSpace = WideChar($200B);
 
-  UNICODE_BOM = WideChar($FEFF);
-  UNICODE_BOM_EX = AnsiString(#$FF#$FE);
-  UNICODE_NULL = WideChar($0000);
-
 type
   TAnsiStringDynArray = array of AnsiString;
 
-  TAnsiExplodeStringReceiveResultProc = reference to procedure (ACursorStart, ACursorNext: PAnsiChar; var ACanContinue: Boolean);
-  TWideExplodeStringReceiveResultProc = reference to procedure (ACursorStart, ACursorNext: PWideChar; var ACanContinue: Boolean);
+  TAnsiExplodeStringReceiveResultProc = reference to
+    procedure (ACursorStart, ACursorNext: PAnsiChar; var ACanContinue: Boolean);
+  TWideExplodeStringReceiveResultProc = reference to
+    procedure (ACursorStart, ACursorNext: PWideChar; var ACanContinue: Boolean);
 
   { TACLTimeFormat }
 

@@ -267,7 +267,7 @@ type
 
   { TACLListenerList }
 
-  TACLListenerListEnumProc<T: IUnknown> = reference to procedure (const Intf: T);
+  TACLListenerListEnumProc<T> = reference to procedure (const Intf: T);
   TACLListenerListEnumProc = TACLListenerListEnumProc<IUnknown>;
 
   TACLListenerList = class

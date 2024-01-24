@@ -283,7 +283,6 @@ implementation
 
 uses
   System.Math,
-  System.RTLConsts,
   // ACL
   ACL.Math,
   ACL.FastCode,

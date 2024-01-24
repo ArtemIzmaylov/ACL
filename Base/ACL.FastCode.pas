@@ -19,60 +19,16 @@ interface
 type
   TACLMoveMethod = procedure (const Source; var Dest; Count: NativeInt);
 
-type
-  TCPUInstruction = (cpuMMX, cpuSSE, cpuSSE2, ci3DNow, ci3DNowExt);
-  TCPUInstructions = set of TCPUInstruction;
-
 var
   FastMove: TACLMoveMethod = Move;
 
 function FastAbs(const AValue: Integer): Integer; overload; inline;
 function FastAbs(const AValue: Single): Single; overload; inline;
-function FastCopy(const Source; Count: NativeInt): Pointer; inline;
 function FastSign(const AValue: Single): Integer; inline;
 function FastTrunc(const AValue: Double): Integer; overload; inline;
 function FastTrunc(const AValue: Single): Integer; overload; inline;
 procedure FastZeroMem(Destination: Pointer; Length: LongWord);
-
-function GetCPUInstructions: TCPUInstructions;
 implementation
-
-{$IF DEFINED(MSWINDOWS)}
-function GetCPUFeatures: Integer;
-asm
-{$IFDEF CPUX64}
-  PUSH      RBX
-  MOV       EAX,1
-  CPUID
-  POP       RBX
-  MOV       EAX,EDX
-{$ELSE}
-  PUSH      EBX
-  MOV       EAX,1
-  DW        $A20F   // CPUID
-  POP       EBX
-  MOV       EAX,EDX
-{$ENDIF}
-end;
-{$IFEND}
-
-function GetCPUInstructions: TCPUInstructions;
-begin
-  Result := [];
-{$IF DEFINED(MSWINDOWS)}
-  var AFeatures := GetCPUFeatures;
-  if AFeatures and $0800000  <> 0 then
-    Include(Result, cpuMMX);
-  if AFeatures and $2000000  <> 0 then
-    Include(Result, cpuSSE);
-  if AFeatures and $4000000  <> 0 then
-    Include(Result, cpuSSE2);
-  if AFeatures and $80000000 <> 0 then
-    Include(Result, ci3DNow);
-  if AFeatures and $40000000 <> 0 then
-    Include(Result, ci3DNowExt);
-{$IFEND}
-end;
 
 { Fast Routines }
 
@@ -90,12 +46,6 @@ begin
     Result := -AValue
   else
     Result := AValue;
-end;
-
-function FastCopy(const Source; Count: NativeInt): Pointer;
-begin
-  GetMem(Result, Count);
-  FastMove(Source, Result^, Count);
 end;
 
 function FastSign(const AValue: Single): Integer;
@@ -125,6 +75,24 @@ begin
 end;
 
 {$IF NOT DEFINED(CPUX64) AND DEFINED(MSWINDOWS)}
+
+function GetCPUFeatures: Integer;
+asm
+{$IFDEF CPUX64}
+  PUSH      RBX
+  MOV       EAX,1
+  CPUID
+  POP       RBX
+  MOV       EAX,EDX
+{$ELSE}
+  PUSH      EBX
+  MOV       EAX,1
+  DW        $A20F   // CPUID
+  POP       EBX
+  MOV       EAX,EDX
+{$ENDIF}
+end;
+
 const
   TINYSIZE = 36;
 var
@@ -1412,31 +1380,34 @@ end; {MoveJOH_SSE2}
 
 {$IFEND}
 
-{$IF DEFINED(CPUX64) OR NOT DEFINED(MSWINDOWS)}
+{$IF NOT DEFINED(CPUX64) AND DEFINED(MSWINDOWS)}
 
-procedure FastMoveInitialize(out AMethod: TACLMoveMethod);
-begin
-  AMethod := Move;
-end;
-
-{$ELSE}
-
-procedure FastMoveInitialize(out AMethod: TACLMoveMethod);
+procedure FastMoveInitialize;
 var
-  AInstructions: TCPUInstructions;
+  LFeatures: Integer;
 begin
-  AInstructions := GetCpuInstructions;
-  if cpuSSE2 in AInstructions then
-    AMethod := MoveJOH_SSE2_10
-  else if cpuSSE in AInstructions then
-    AMethod := MoveJOH_SSE_10
-  else if cpuMMX in AInstructions then
-    AMethod := MoveJOH_MMX_10
+  LFeatures := GetCPUFeatures;
+//  if LFeatures and $0800000  <> 0 then
+//    Include(Result, cpuMMX);
+//  if LFeatures and $2000000  <> 0 then
+//    Include(Result, cpuSSE);
+//  if LFeatures and $4000000  <> 0 then
+//    Include(Result, cpuSSE2);
+//  if LFeatures and $80000000 <> 0 then
+//    Include(Result, ci3DNow);
+//  if LFeatures and $40000000 <> 0 then
+//    Include(Result, ci3DNowExt);
+  if LFeatures and $4000000 <> 0 then
+    FastMove := MoveJOH_SSE2_10
+  else if LFeatures and $2000000 <> 0 then
+    FastMove := MoveJOH_SSE_10
+  else if LFeatures and $0800000 <> 0 then
+    FastMove := MoveJOH_MMX_10
   else
-    AMethod := MoveJOH_IA32_10;
+    FastMove := MoveJOH_IA32_10;
 end;
-{$IFEND}
 
 initialization
-  FastMoveInitialize(FastMove);
+  FastMoveInitialize;
+{$IFEND}
 end.
