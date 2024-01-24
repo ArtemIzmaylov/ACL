@@ -407,6 +407,10 @@ function acAllocStr(const S: UnicodeString): PWideChar; overload;
 function acAllocStr(const S: UnicodeString; out ALength: Integer): PWideChar; overload;
 function acMakeString(const P: PWideChar; L: Integer): UnicodeString; overload; inline;
 function acMakeString(const P: PAnsiChar; L: Integer): AnsiString; overload; inline;
+function acMakeString(const AScanStart, AScanNext: PAnsiChar): AnsiString; overload;
+function acMakeString(const AScanStart, AScanNext: PWideChar): UnicodeString; overload;
+function acStringLength(const AScanStart, AScanNext: PAnsiChar): Integer; overload;
+function acStringLength(const AScanStart, AScanNext: PWideChar): Integer; overload;
 
 // Explode
 function acExplodeString(AScan: PAnsiChar; AScanCount: Integer;
@@ -914,6 +918,32 @@ begin
     Result := '';
 end;
 
+function acMakeString(const AScanStart, AScanNext: PAnsiChar): AnsiString; overload;
+begin
+  SetString(Result, AScanStart, acStringLength(AScanStart, AScanNext));
+end;
+
+function acMakeString(const AScanStart, AScanNext: PWideChar): UnicodeString;
+begin
+  SetString(Result, AScanStart, acStringLength(AScanStart, AScanNext));
+end;
+
+function acStringLength(const AScanStart, AScanNext: PAnsiChar): Integer;
+begin
+  if NativeUInt(AScanNext) > NativeUInt(AScanStart) then
+    Result := NativeUInt(AScanNext) - NativeUInt(AScanStart)
+  else
+    Result := 0;
+end;
+
+function acStringLength(const AScanStart, AScanNext: PWideChar): Integer;
+begin
+  if NativeUInt(AScanNext) > NativeUInt(AScanStart) then
+    Result := (NativeUInt(AScanNext) - NativeUInt(AScanStart)) div SizeOf(WideChar)
+  else
+    Result := 0;
+end;
+
 //==============================================================================
 // UTF8
 //==============================================================================
@@ -1079,7 +1109,7 @@ begin
     Result := acExplodeString(AScan, AScanCount, ADelimiters,
       procedure (ACursorStart, ACursorNext: PWideChar; var ACanContinue: Boolean)
       begin
-        AArray^ := acExtractString(ACursorStart, ACursorNext);
+        AArray^ := acMakeString(ACursorStart, ACursorNext);
         Dec(AArrayLength);
         Inc(AArray);
         ACanContinue := AArrayLength > 0;
@@ -3106,7 +3136,7 @@ begin
     var
       A: AnsiString;
     begin
-      A := acExtractString(ACursorStart, ACursorFinish);
+      A := acMakeString(ACursorStart, ACursorFinish);
       if AResult <> '' then
         AResult := AResult + '.';
       if System.AnsiStrings.SameText(Copy(A, 1, 4), 'xn--') then
@@ -3258,7 +3288,7 @@ begin
       A: AnsiString;
       U: UnicodeString;
     begin
-      U := acExtractString(ACursorStart, ACursorNext);
+      U := acMakeString(ACursorStart, ACursorNext);
       if AResult <> '' then
         AResult := AResult + '.';
       if Encode(U, A) then

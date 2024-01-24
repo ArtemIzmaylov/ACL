@@ -114,14 +114,9 @@ type
   end;
 
 function acExtractLine(var P: PWideChar; var C: Integer; out AToken: TACLParserToken): Boolean;
-
-function acExtractString(const AScanStart, AScanNext: PAnsiChar): AnsiString; overload;
-function acExtractString(const AScanStart, AScanNext: PWideChar): UnicodeString; overload;
 function acExtractString(const S, ABeginStr, AEndStr: UnicodeString): UnicodeString; overload;
 function acExtractString(const S, ABeginStr, AEndStr: UnicodeString; out APos1, APos2: Integer): UnicodeString; overload;
 function acExtractString(var P: PWideChar; var C: Integer; out AToken: TACLParserToken; const ADelimiter: WideChar): Boolean; overload;
-function acStringLength(const AScanStart, AScanNext: PAnsiChar): Integer; overload; inline;
-function acStringLength(const AScanStart, AScanNext: PWideChar): Integer; overload; inline;
 
 function acUnquot(var AToken: TACLParserToken): Boolean; overload;
 function acUnquot(var S: UnicodeString): Boolean; overload;
@@ -166,16 +161,6 @@ begin
   Result := AToken.DataLength > 0;
 end;
 
-function acExtractString(const AScanStart, AScanNext: PAnsiChar): AnsiString; overload;
-begin
-  SetString(Result, AScanStart, acStringLength(AScanStart, AScanNext));
-end;
-
-function acExtractString(const AScanStart, AScanNext: PWideChar): UnicodeString;
-begin
-  SetString(Result, AScanStart, acStringLength(AScanStart, AScanNext));
-end;
-
 function acExtractString(var P: PWideChar; var C: Integer; out AToken: TACLParserToken; const ADelimiter: WideChar): Boolean;
 begin
   AToken.Reset;
@@ -214,22 +199,6 @@ begin
     APos2 := Length(S) + 1;
 
   Result := Copy(S, APos1 + Length(ABeginStr), APos2 - APos1 - Length(ABeginStr));
-end;
-
-function acStringLength(const AScanStart, AScanNext: PAnsiChar): Integer;
-begin
-  if NativeUInt(AScanNext) > NativeUInt(AScanStart) then
-    Result := NativeUInt(AScanNext) - NativeUInt(AScanStart)
-  else
-    Result := 0;
-end;
-
-function acStringLength(const AScanStart, AScanNext: PWideChar): Integer;
-begin
-  if NativeUInt(AScanNext) > NativeUInt(AScanStart) then
-    Result := (NativeUInt(AScanNext) - NativeUInt(AScanStart)) div SizeOf(WideChar)
-  else
-    Result := 0;
 end;
 
 function acUnquot(var AToken: TACLParserToken): Boolean;

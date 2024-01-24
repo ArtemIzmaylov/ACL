@@ -2366,17 +2366,17 @@ begin
     else if acCompareTokens('S', AScanTag, ATagLength) then
       ABlock := TACLTextLayoutBlockFontStyle.Create(TFontStyle.fsStrikeOut, not AIsClosing)
     else if acCompareTokens('COLOR', AScanTag, ATagLength) then
-      ABlock := TACLTextLayoutBlockFontColor.Create(acExtractString(AScanParam + 1, AScanEnd), not AIsClosing)
+      ABlock := TACLTextLayoutBlockFontColor.Create(acMakeString(AScanParam + 1, AScanEnd), not AIsClosing)
     else if acCompareTokens('BACKCOLOR', AScanTag, ATagLength) then
-      ABlock := TACLTextLayoutBlockFillColor.Create(acExtractString(AScanParam + 1, AScanEnd), not AIsClosing)
+      ABlock := TACLTextLayoutBlockFillColor.Create(acMakeString(AScanParam + 1, AScanEnd), not AIsClosing)
     else if acCompareTokens('BIG', AScanTag, ATagLength) then
       ABlock := TACLTextLayoutBlockFontBig.Create(not AIsClosing)
     else if acCompareTokens('SMALL', AScanTag, ATagLength) then
       ABlock := TACLTextLayoutBlockFontSmall.Create(not AIsClosing)
     else if acCompareTokens('SIZE', AScanTag, ATagLength) then
-      ABlock := TACLTextLayoutBlockFontSize.Create(acExtractString(AScanParam + 1, AScanEnd), not AIsClosing)
+      ABlock := TACLTextLayoutBlockFontSize.Create(acMakeString(AScanParam + 1, AScanEnd), not AIsClosing)
     else if acCompareTokens('URL', AScanTag, ATagLength) then
-      ABlock := TACLTextLayoutBlockHyperlink.Create(acExtractString(AScanParam + 1, AScanEnd), not AIsClosing)
+      ABlock := TACLTextLayoutBlockHyperlink.Create(acMakeString(AScanParam + 1, AScanEnd), not AIsClosing)
     else
       ABlock := nil;
 

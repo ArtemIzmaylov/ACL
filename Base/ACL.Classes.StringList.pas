@@ -176,7 +176,6 @@ uses
   System.Math,
   // ACL
   ACL.FastCode,
-  ACL.Parsers,
   ACL.Threading.Sorting,
   ACL.Utils.FileSystem,
   ACL.Utils.Stream;
@@ -297,7 +296,7 @@ begin
       acExplodeString(PChar(AText), ALength, ADelimiter,
         procedure (ACursorStart, ACursorNext: PWideChar; var ACanContinue: Boolean)
         begin
-          Add(acExtractString(ACursorStart, ACursorNext));
+          Add(acMakeString(ACursorStart, ACursorNext));
         end)
     end;
   finally

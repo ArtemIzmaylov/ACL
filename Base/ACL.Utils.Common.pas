@@ -196,15 +196,7 @@ function WineGetVersion(out AVersion: string): Boolean;
 implementation
 
 uses
-{$IFNDEF ACL_BASE_NOVCL}
-  Vcl.Forms,
-{$ENDIF}
-  // ACL
-  ACL.Math,
-  ACL.Utils.Strings,
-  ACL.Utils.Stream,
-  ACL.Utils.FileSystem,
-  ACL.Threading;
+  ACL.Utils.FileSystem;
 
 {$IFDEF MSWINDOWS}
 type

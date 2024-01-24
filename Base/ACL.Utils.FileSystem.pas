@@ -734,7 +734,7 @@ begin
   while CharInSet(P^, ['A'..'Z', 'a'..'z', '0'..'9']) do
     Inc(P);
   if (P^ = ':') and ((P + 1)^ = (P + 2)^) and CharInSet((P + 1)^, sPathDelims) then
-    Result := acExtractString(C, P)
+    Result := acMakeString(C, P)
   else
     Result := '';
 end;
