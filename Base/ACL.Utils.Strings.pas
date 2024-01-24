@@ -503,9 +503,9 @@ function IfThenW(AValue: Boolean; const ATrue: UnicodeString; const AFalse: Unic
 function IfThenW(const A, B: UnicodeString): UnicodeString; overload; inline;
 function acDupeString(const AText: UnicodeString; ACount: Integer): UnicodeString;
 function acTrim(const S: UnicodeString): UnicodeString;
-function WStrLength(S: PWideChar; AMaxScanCount: Integer): Integer; inline;
-function WStrScan(Str: PWideChar; ACount: Integer; C: WideChar): PWideChar; overload; inline;
-function WStrScan(Str: PWideChar; C: WideChar): PWideChar; overload; inline;
+function acStrLen(S: PWideChar; AMaxScanCount: Integer): Integer; inline;
+function acStrScan(Str: PWideChar; ACount: Integer; C: WideChar): PWideChar; overload; inline;
+function acStrScan(Str: PWideChar; C: WideChar): PWideChar; overload; inline;
 procedure acStrLCopy(ADest: PWideChar; const ASource: UnicodeString; AMax: Integer);
 implementation
 
@@ -792,7 +792,7 @@ end;
 
 function acContains(const AChar: WideChar; const AString: UnicodeString): Boolean; inline;
 begin
-  Result := WStrScan(Pointer(AString), AChar) <> nil;
+  Result := acStrScan(Pointer(AString), AChar) <> nil;
 end;
 
 function acContains(const ASubStr, AString: UnicodeString; AIgnoreCase: Boolean = False): Boolean;
@@ -841,7 +841,7 @@ var
   P, R: PWideChar;
 begin
   P := PWideChar(AString);
-  R := WStrScan(P, Length(AString), ACharToSearch);
+  R := acStrScan(P, Length(AString), ACharToSearch);
   if R <> nil then
     Result := 1 + (NativeUInt(R) - NativeUInt(P)) div SizeOf(WideChar)
   else
@@ -1700,7 +1700,7 @@ begin
   FastMove(PWideChar(ASource)^, ADest^, SizeOf(WideChar) * Min(AMax, Length(ASource)));
 end;
 
-function WStrLength(S: PWideChar; AMaxScanCount: Integer): Integer;
+function acStrLen(S: PWideChar; AMaxScanCount: Integer): Integer;
 begin
   Result := 0;
   if S <> nil then
@@ -1712,7 +1712,7 @@ begin
     end;
 end;
 
-function WStrScan(Str: PWideChar; C: WideChar): PWideChar;
+function acStrScan(Str: PWideChar; C: WideChar): PWideChar;
 begin
   Result := Str;
   if Result <> nil then
@@ -1724,7 +1724,7 @@ begin
     end;
 end;
 
-function WStrScan(Str: PWideChar; ACount: Integer; C: WideChar): PWideChar;
+function acStrScan(Str: PWideChar; ACount: Integer; C: WideChar): PWideChar;
 begin
   Result := Str;
   while (Result <> nil) and (Result^ <> C) do

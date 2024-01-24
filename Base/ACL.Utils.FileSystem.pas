@@ -375,7 +375,7 @@ function acIsUrlFileName(const AFileName: UnicodeString): Boolean;
 var
   P: PWideChar;
 begin
-  P := WStrScan(PWideChar(AFileName), ':');
+  P := acStrScan(PWideChar(AFileName), ':');
   Result := (P <> nil) and ((P + 1)^ = (P + 2)^) and CharInSet((P + 1)^, sPathDelims);
 //  Result := acExtractFileScheme(AFileName) <> '';
 end;
@@ -384,7 +384,7 @@ function acIsUrlFileName(const AFileName: PWideChar; ACount: Integer): Boolean; 
 var
   P: PWideChar;
 begin
-  P := WStrScan(PWideChar(AFileName), ACount, ':');
+  P := acStrScan(PWideChar(AFileName), ACount, ':');
   Result := (P <> nil) and ((P + 1)^ = (P + 2)^) and CharInSet((P + 1)^, sPathDelims);
 end;
 
@@ -883,7 +883,7 @@ begin
   Inc(Str, StrLength - 1);
   while Result > 0 do
   begin
-    if WStrScan(Delimiters, DelimitersLength, Str^) <> nil then
+    if acStrScan(Delimiters, DelimitersLength, Str^) <> nil then
       Exit;
     Dec(Result);
     Dec(Str);

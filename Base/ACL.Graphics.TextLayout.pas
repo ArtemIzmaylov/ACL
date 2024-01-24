@@ -280,7 +280,7 @@ type
 
   TACLTextLayoutRow = class(TACLTextLayoutBlockList)
   strict private
-    FBaseline: Integer; 
+    FBaseline: Integer;
     FBounds: TRect;
     FEndEllipsis: TACLTextLayoutBlockText;
 
@@ -1246,7 +1246,7 @@ end;
 
 { TACLTextLayoutBlock }
 
-function TACLTextLayoutBlock.Bounds: TRect; 
+function TACLTextLayoutBlock.Bounds: TRect;
 begin
   Result := TRect.Create(FPosition);
 end;
@@ -2157,7 +2157,7 @@ function TACLTextLayoutRender.OnText(AText: TACLTextLayoutBlockText): Boolean;
 begin
   if AText.TextLengthVisible > 0 then
   begin
-    ExtTextOut(Canvas.Handle, AText.FPosition.X, AText.FPosition.Y, 
+    ExtTextOut(Canvas.Handle, AText.FPosition.X, AText.FPosition.Y,
       0, nil, AText.Text, AText.TextLengthVisible, AText.FCharacterWidths);
   end;
   Result := True;
@@ -2287,7 +2287,7 @@ class function TACLTextImporter.IsEmail(Ctx: TContext; S: PWideChar; L: Integer)
 var
   ALink: UnicodeString;
 begin
-  if WStrScan(S, L, '@') <> nil then // быстрая проверка
+  if acStrScan(S, L, '@') <> nil then // быстрая проверка
   begin
     ALink := acMakeString(S, L);
     if FEmailValidator.IsMatch(ALink) then
@@ -2338,7 +2338,7 @@ begin
   Result := False;
   if Scan^ = '[' then
   begin
-    AScanEnd := WStrScan(Scan, ']');
+    AScanEnd := acStrScan(Scan, ']');
     if AScanEnd = nil then
       Exit;
 
@@ -2351,7 +2351,7 @@ begin
     end
     else
     begin
-      AScanParam := WStrScan(AScanTag, acStringLength(Scan, AScanEnd), '=');
+      AScanParam := acStrScan(AScanTag, acStringLength(Scan, AScanEnd), '=');
       if AScanParam = nil then
         AScanParam := AScanEnd;
     end;
@@ -2462,7 +2462,7 @@ begin
 
   if (L > 4) and CompareMem(S, Prefix, 4) then
   begin
-    if WStrScan(S + 4, L - 4, '.') <> nil then
+    if acStrScan(S + 4, L - 4, '.') <> nil then
     begin
       Ctx.Blocks.Add(TACLTextLayoutBlockHyperlink.Create('https://' + acMakeString(S, L), True));
       Ctx.Blocks.Add(TACLTextLayoutBlockText.Create(S, L));
