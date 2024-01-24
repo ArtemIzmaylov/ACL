@@ -11,15 +11,13 @@
 
 unit ACL.Parsers;
 
-{$I ACL.Config.INC}
+{$I ACL.Config.inc}
 
 interface
 
 uses
-  System.Generics.Collections,
-  System.Generics.Defaults,
-  System.Math,
-  System.SysUtils;
+  {System.}Generics.Defaults,
+  {System.}SysUtils;
 
 const
   acParserDefaultSpaceChars = ' '#13#10#9#0;
@@ -43,13 +41,13 @@ type
 
   TACLParserToken = record
     Context: Pointer;
-    Data: PWideChar;
+    Data: PChar;
     DataLength: Integer;
     TokenType: Integer;
 
-    function Compare(const S: UnicodeString; IgnoreCase: Boolean = True): Boolean;
-    function StartsWith(const S: UnicodeString; IgnoreCase: Boolean = True): Boolean;
-    function ToString: UnicodeString;
+    function Compare(const S: string; IgnoreCase: Boolean = True): Boolean;
+    function StartsWith(const S: string; IgnoreCase: Boolean = True): Boolean;
+    function ToString: string;
     procedure Reset;
   end;
 
@@ -57,18 +55,18 @@ type
 
   TACLParser = class
   protected
-    FDelimiters: PWideChar;
+    FDelimiters: PChar;
     FDelimitersLength: Integer;
-    FDelimitersBuffer: UnicodeString;
-    FQuotes: PWideChar;
+    FDelimitersBuffer: string;
+    FQuotes: PChar;
     FQuotesLength: Integer;
-    FQuotesBuffer: UnicodeString;
-    FSpaces: PWideChar;
+    FQuotesBuffer: string;
+    FSpaces: PChar;
     FSpacesLength: Integer;
-    FSpacesBuffer: UnicodeString;
+    FSpacesBuffer: string;
 
-    FScan: PWideChar;
-    FScanBuffer: UnicodeString;
+    FScan: PChar;
+    FScanBuffer: string;
     FScanCount: Integer;
 
     FQuotedTextAsSingleToken: Boolean;
@@ -77,24 +75,24 @@ type
     FSkipQuotes: Boolean;
     FSkipSpaces: Boolean;
 
-    function Contains(const W: WideChar; L: PWideChar; C: Integer): LongBool; inline;
-    function FetchToken(var P: PWideChar; var C: Integer; var AToken: TACLParserToken): Boolean; virtual;
-    function MoveToNext(var P: PWideChar; var C: Integer): Boolean; inline;
+    function Contains(const W: Char; L: PChar; C: Integer): LongBool; inline;
+    function FetchToken(var P: PChar; var C: Integer; var AToken: TACLParserToken): Boolean; virtual;
+    function MoveToNext(var P: PChar; var C: Integer): Boolean; inline;
     function ShouldSkipToken(const AToken: TACLParserToken): Boolean; virtual;
   public
     constructor Create; overload;
-    constructor Create(const ADelimiters: UnicodeString); overload;
-    constructor Create(const ADelimiters, AQuotes: UnicodeString); overload;
-    constructor Create(const ADelimiters, AQuotes, ASpaces: UnicodeString); overload;
-    procedure Initialize(const P: PWideChar; C: Integer); overload;
-    procedure Initialize(const S: UnicodeString); overload;
+    constructor Create(const ADelimiters: string); overload;
+    constructor Create(const ADelimiters, AQuotes: string); overload;
+    constructor Create(const ADelimiters, AQuotes, ASpaces: string); overload;
+    procedure Initialize(const P: PChar; C: Integer); overload;
+    procedure Initialize(const S: string); overload;
     // Tokens
     function GetToken(out AToken: TACLParserToken): Boolean; overload;
-    function GetToken(out AToken: TACLParserToken; const ADelimiters: UnicodeString): Boolean; overload;
-    function GetToken(out AToken: TACLParserToken; const ADelimiters, AQuotes, ASpaces: UnicodeString): Boolean; overload;
+    function GetToken(out AToken: TACLParserToken; const ADelimiters: string): Boolean; overload;
+    function GetToken(out AToken: TACLParserToken; const ADelimiters, AQuotes, ASpaces: string): Boolean; overload;
     function MoveToNextSymbol: Boolean; inline;
     // Buffer
-    property Scan: PWideChar read FScan;
+    property Scan: PChar read FScan;
     property ScanCount: Integer read FScanCount;
     // Parser Options
     property QuotedTextAsSingleToken: Boolean read FQuotedTextAsSingleToken write FQuotedTextAsSingleToken;
@@ -107,34 +105,36 @@ type
   { TACLTokenComparer }
 
   TACLTokenComparer = class(TInterfacedObject, IEqualityComparer<string>)
+  public type
+    HashCode = {$IFDEF FPC}UInt32{$ELSE}Integer{$ENDIF};
   public
     // IEqualityComparer<string>
     function Equals(const Left, Right: string): Boolean; reintroduce;
-    function GetHashCode(const Value: string): Integer; reintroduce;
+    function GetHashCode(const Value: string): HashCode; reintroduce;
   end;
 
-function acExtractLine(var P: PWideChar; var C: Integer; out AToken: TACLParserToken): Boolean;
+function acExtractLine(var P: PChar; var C: Integer; out AToken: TACLParserToken): Boolean;
 
 function acExtractString(const AScanStart, AScanNext: PAnsiChar): AnsiString; overload;
 function acExtractString(const AScanStart, AScanNext: PWideChar): UnicodeString; overload;
-function acExtractString(const S, ABeginStr, AEndStr: UnicodeString): UnicodeString; overload;
-function acExtractString(const S, ABeginStr, AEndStr: UnicodeString; out APos1, APos2: Integer): UnicodeString; overload;
-function acExtractString(var P: PWideChar; var C: Integer; out AToken: TACLParserToken; const ADelimiter: WideChar): Boolean; overload;
+function acExtractString(const S, ABeginStr, AEndStr: string): string; overload;
+function acExtractString(const S, ABeginStr, AEndStr: string; out APos1, APos2: Integer): string; overload;
+function acExtractString(var P: PChar; var C: Integer; out AToken: TACLParserToken; ADelimiter: Char): Boolean; overload;
 function acStringLength(const AScanStart, AScanNext: PAnsiChar): Integer; overload; inline;
 function acStringLength(const AScanStart, AScanNext: PWideChar): Integer; overload; inline;
 
 function acUnquot(var AToken: TACLParserToken): Boolean; overload;
-function acUnquot(var S: UnicodeString): Boolean; overload;
+function acUnquot(var S: string): Boolean; overload;
 
-function acCompareTokens(B1, B2: PWideChar; L1, L2: Integer): Boolean; overload;
-function acCompareTokens(const S: UnicodeString; P: PWideChar; L: Integer): Boolean; overload; inline;
-function acCompareTokens(const S1, S2: UnicodeString): Boolean; overload; inline;
+function acCompareTokens(B1, B2: PChar; L1, L2: Integer): Boolean; overload;
+function acCompareTokens(const S: string; P: PChar; L: Integer): Boolean; overload; inline;
+function acCompareTokens(const S1, S2: string): Boolean; overload; inline;
 implementation
 
 uses
   ACL.Utils.Strings;
 
-function acExtractLine(var P: PWideChar; var C: Integer; out AToken: TACLParserToken): Boolean;
+function acExtractLine(var P: PChar; var C: Integer; out AToken: TACLParserToken): Boolean;
 begin
   AToken.Reset;
   AToken.Data := P;
@@ -176,7 +176,7 @@ begin
   SetString(Result, AScanStart, acStringLength(AScanStart, AScanNext));
 end;
 
-function acExtractString(var P: PWideChar; var C: Integer; out AToken: TACLParserToken; const ADelimiter: WideChar): Boolean;
+function acExtractString(var P: PChar; var C: Integer; out AToken: TACLParserToken; ADelimiter: Char): Boolean;
 begin
   AToken.Reset;
   AToken.Data := P;
@@ -195,14 +195,14 @@ begin
   Result := AToken.DataLength > 0;
 end;
 
-function acExtractString(const S, ABeginStr, AEndStr: UnicodeString): UnicodeString;
+function acExtractString(const S, ABeginStr, AEndStr: string): string;
 var
   APos1, APos2: Integer;
 begin
   Result := acExtractString(S, ABeginStr, AEndStr, APos1, APos2);
 end;
 
-function acExtractString(const S, ABeginStr, AEndStr: UnicodeString; out APos1, APos2: Integer): UnicodeString;
+function acExtractString(const S, ABeginStr, AEndStr: string; out APos1, APos2: Integer): string;
 begin
   APos1 := acPos(ABeginStr, S, True);
   if APos1 = 0 then
@@ -237,7 +237,7 @@ begin
   Result := False;
   if (AToken.DataLength >= 2) and acContains(AToken.Data^, acParserDefaultQuotes) then
   begin
-    if PWideChar(NativeUInt(AToken.Data) + SizeOf(WideChar) * NativeUInt(AToken.DataLength - 1))^ = AToken.Data^ then
+    if PChar(NativeUInt(AToken.Data) + SizeOf(Char) * NativeUInt(AToken.DataLength - 1))^ = AToken.Data^ then
     begin
       Dec(AToken.DataLength, 2);
       Inc(AToken.Data);
@@ -246,7 +246,7 @@ begin
   end;
 end;
 
-function acUnquot(var S: UnicodeString): Boolean;
+function acUnquot(var S: string): Boolean;
 var
   I, J: Integer;
 begin
@@ -266,19 +266,19 @@ begin
   end;
 end;
 
-function acCompareTokens(const S: UnicodeString; P: PWideChar; L: Integer): Boolean; overload;
+function acCompareTokens(const S: string; P: PChar; L: Integer): Boolean; overload;
 begin
-  Result := acCompareTokens(PWideChar(S), P, L, Length(S));
+  Result := acCompareTokens(PChar(S), P, L, Length(S));
 end;
 
-function acCompareTokens(const S1, S2: UnicodeString): Boolean;
+function acCompareTokens(const S1, S2: string): Boolean;
 begin
-  Result := acCompareTokens(PWideChar(S1), PWideChar(S2), Length(S1), Length(S2));
+  Result := acCompareTokens(PChar(S1), PChar(S2), Length(S1), Length(S2));
 end;
 
-function acCompareTokens(B1, B2: PWideChar; L1, L2: Integer): Boolean;
+function acCompareTokens(B1, B2: PChar; L1, L2: Integer): Boolean;
 var
-  C1, C2: Word;
+  C1, C2: Word; {$MESSAGE WARN 'Char<>Word'}
 begin
   Result := L1 = L2;
   if Result then
@@ -308,28 +308,28 @@ begin
   Create(acParserDefaultDelimiterChars);
 end;
 
-constructor TACLParser.Create(const ADelimiters: UnicodeString);
+constructor TACLParser.Create(const ADelimiters: string);
 begin
   Create(ADelimiters, acParserDefaultQuotes);
 end;
 
-constructor TACLParser.Create(const ADelimiters, AQuotes: UnicodeString);
+constructor TACLParser.Create(const ADelimiters, AQuotes: string);
 begin
   Create(ADelimiters, AQuotes, acParserDefaultSpaceChars);
 end;
 
-constructor TACLParser.Create(const ADelimiters, AQuotes, ASpaces: UnicodeString);
+constructor TACLParser.Create(const ADelimiters, AQuotes, ASpaces: string);
 begin
   FQuotesBuffer := AQuotes;
-  FQuotes := PWideChar(FQuotesBuffer);
+  FQuotes := PChar(FQuotesBuffer);
   FQuotesLength := Length(FQuotesBuffer);
 
   FSpacesBuffer := ASpaces;
-  FSpaces := PWideChar(FSpacesBuffer);
+  FSpaces := PChar(FSpacesBuffer);
   FSpacesLength := Length(FSpacesBuffer);
 
   FDelimitersBuffer := ADelimiters;
-  FDelimiters := PWideChar(FDelimitersBuffer);
+  FDelimiters := PChar(FDelimitersBuffer);
   FDelimitersLength := Length(FDelimitersBuffer);
 
   FQuotedTextAsSingleToken := False;
@@ -338,14 +338,14 @@ begin
   FSkipSpaces := True;
 end;
 
-procedure TACLParser.Initialize(const S: UnicodeString);
+procedure TACLParser.Initialize(const S: string);
 begin
   FScanBuffer := S;
-  FScan := PWideChar(FScanBuffer);
+  FScan := PChar(FScanBuffer);
   FScanCount := Length(FScanBuffer);
 end;
 
-procedure TACLParser.Initialize(const P: PWideChar; C: Integer);
+procedure TACLParser.Initialize(const P: PChar; C: Integer);
 begin
   FScan := P;
   FScanCount := C;
@@ -360,15 +360,15 @@ begin
   until not (Result and ShouldSkipToken(AToken));
 end;
 
-function TACLParser.GetToken(out AToken: TACLParserToken; const ADelimiters: UnicodeString): Boolean;
+function TACLParser.GetToken(out AToken: TACLParserToken; const ADelimiters: string): Boolean;
 var
-  TB: PWideChar;
+  TB: PChar;
   TL: Integer;
 begin
   TB := FDelimiters;
   TL := FDelimitersLength;
   try
-    FDelimiters := PWideChar(ADelimiters);
+    FDelimiters := PChar(ADelimiters);
     FDelimitersLength := Length(ADelimiters);
     Result := GetToken(AToken);
   finally
@@ -377,9 +377,10 @@ begin
   end;
 end;
 
-function TACLParser.GetToken(out AToken: TACLParserToken; const ADelimiters, AQuotes, ASpaces: UnicodeString): Boolean;
+function TACLParser.GetToken(out AToken: TACLParserToken;
+  const ADelimiters, AQuotes, ASpaces: string): Boolean;
 var
-  TB1, TB2: PWideChar;
+  TB1, TB2: PChar;
   TL1, TL2: Integer;
 begin
   TB1 := FQuotes;
@@ -387,9 +388,9 @@ begin
   TL1 := FQuotesLength;
   TL2 := FSpacesLength;
   try
-    FQuotes := PWideChar(AQuotes);
+    FQuotes := PChar(AQuotes);
     FQuotesLength := Length(AQuotes);
-    FSpaces := PWideChar(ASpaces);
+    FSpaces := PChar(ASpaces);
     FSpacesLength := Length(ASpaces);
     Result := GetToken(AToken, ADelimiters);
   finally
@@ -405,7 +406,7 @@ begin
   Result := MoveToNext(FScan, FScanCount);
 end;
 
-function TACLParser.Contains(const W: WideChar; L: PWideChar; C: Integer): LongBool;
+function TACLParser.Contains(const W: Char; L: PChar; C: Integer): LongBool;
 begin
   Result := False;
   while C > 0 do
@@ -418,9 +419,10 @@ begin
   end;
 end;
 
-function TACLParser.FetchToken(var P: PWideChar; var C: Integer; var AToken: TACLParserToken): Boolean;
+function TACLParser.FetchToken(var P: PChar; var C: Integer; var AToken: TACLParserToken): Boolean;
 
-  procedure ExtractIdent(var AToken: TACLParserToken; ATokenType: Integer; ADelimiters: PWideChar; ADelimitersCount: Integer);
+  procedure ExtractIdent(var AToken: TACLParserToken;
+    ATokenType: Integer; ADelimiters: PChar; ADelimitersCount: Integer);
   begin
     AToken.Data := P;
     AToken.TokenType := ATokenType;
@@ -429,10 +431,11 @@ function TACLParser.FetchToken(var P: PWideChar; var C: Integer; var AToken: TAC
       Dec(C);
       Inc(P);
     end;
-    AToken.DataLength := (NativeUInt(P) - NativeUInt(AToken.Data)) div SizeOf(WideChar);
+    AToken.DataLength := (NativeUInt(P) - NativeUInt(AToken.Data)) div SizeOf(Char);
   end;
 
-  procedure SetToken(var AToken: TACLParserToken; var P: PWideChar; var C: Integer; ATokenType, ATokenLength: Integer); inline;
+  procedure SetToken(var AToken: TACLParserToken;
+    var P: PChar; var C: Integer; ATokenType, ATokenLength: Integer); inline;
   begin
     AToken.Data := P;
     AToken.DataLength := ATokenLength;
@@ -442,9 +445,9 @@ function TACLParser.FetchToken(var P: PWideChar; var C: Integer; var AToken: TAC
   end;
 
 var
-  AQuot: WideChar;
+  AQuot: Char;
   ASavedC: Integer;
-  ASavedP: PWideChar;
+  ASavedP: PChar;
 begin
   if C > 0 then
   begin
@@ -494,7 +497,7 @@ begin
   Result := AToken.DataLength > 0;
 end;
 
-function TACLParser.MoveToNext(var P: PWideChar; var C: Integer): Boolean;
+function TACLParser.MoveToNext(var P: PChar; var C: Integer): Boolean;
 begin
   Result := C > 0;
   if Result then
@@ -514,14 +517,14 @@ end;
 
 { TACLParserToken }
 
-function TACLParserToken.Compare(const S: UnicodeString; IgnoreCase: Boolean = True): Boolean;
+function TACLParserToken.Compare(const S: string; IgnoreCase: Boolean = True): Boolean;
 begin
   if Length(S) <> DataLength then
     Exit(False);
   if IgnoreCase then
-    Result := acCompareStrings(Data, PWideChar(S), DataLength, DataLength) = 0
+    Result := acCompareStrings(Data, PChar(S), DataLength, DataLength) = 0
   else
-    Result := CompareMem(Data, PWideChar(S), DataLength);
+    Result := CompareMem(Data, PChar(S), DataLength);
 end;
 
 procedure TACLParserToken.Reset;
@@ -529,18 +532,18 @@ begin
   FillChar(Self, SizeOf(Self), 0);
 end;
 
-function TACLParserToken.StartsWith(const S: UnicodeString; IgnoreCase: Boolean): Boolean;
+function TACLParserToken.StartsWith(const S: string; IgnoreCase: Boolean): Boolean;
 var
   L: Integer;
 begin
   L := Length(S);
   if IgnoreCase then
-    Result := (DataLength >= L) and (acCompareStrings(Data, PWideChar(S), L, L) = 0)
+    Result := (DataLength >= L) and (acCompareStrings(Data, PChar(S), L, L) = 0)
   else
-    Result := (DataLength >= L) and CompareMem(Data, PWideChar(S), L * SizeOf(WideChar));
+    Result := (DataLength >= L) and CompareMem(Data, PChar(S), L * SizeOf(Char));
 end;
 
-function TACLParserToken.ToString: UnicodeString;
+function TACLParserToken.ToString: string;
 begin
   SetString(Result, Data, DataLength);
 end;
@@ -552,15 +555,16 @@ begin
   Result := acCompareTokens(Left, Right);
 end;
 
-function TACLTokenComparer.GetHashCode(const Value: string): Integer;
+function TACLTokenComparer.GetHashCode(const Value: string): HashCode;
 var
+  LChar: Char;
   LCode: Word;
   LIndex: Integer;
 begin
   Result := 0;
-  for var Ch in Value do
+  for LChar in Value do
   begin
-    LCode := Word(Ch);
+    LCode := Word(LChar);
     if (LCode >= Ord('a')) and (LCode <= Ord('z')) then
       LCode := LCode xor $20;
     Result := Result shl 4 + LCode;

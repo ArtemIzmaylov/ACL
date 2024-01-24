@@ -4,7 +4,7 @@
 {*               Math Routines               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -12,11 +12,12 @@
 unit ACL.Math;
 
 {$I ACL.Config.inc}
+{%FPC: OK}
 
 interface
 
 uses
-  System.Math;
+  {System.}Math;
 
 type
   TACLMath = class
@@ -46,9 +47,7 @@ function MakeInt64(const A, B: Integer): UInt64;
 function MulDiv64(const AValue, ANumerator, ADenominator: Int64): Int64;
 implementation
 
-//==============================================================================
-// MaxMin
-//==============================================================================
+{ MinMax / MaxMin }
 
 function MaxMin(const AValue, AMinValue, AMaxValue: Double): Double; overload;
 begin
@@ -90,12 +89,10 @@ begin
   Result := Min(Max(AValue, AMinValue), AMaxValue);
 end;
 
-//==============================================================================
-// Swapping
-//==============================================================================
+{ Swapping }
 
 function Swap16(const AValue: Word): Word;
-{$IFDEF CPUX64}
+{$IFDEF ACL_PUREPASCAL}
 var
   B: array [0..1] of Byte absolute AValue;
 begin
@@ -109,7 +106,7 @@ end;
 {$ENDIF}
 
 function Swap32(const AValue: Integer): Integer;
-{$IFDEF CPUX64}
+{$IFDEF ACL_PUREPASCAL}
 var
   B: array [0..3] of Byte absolute AValue;
 begin

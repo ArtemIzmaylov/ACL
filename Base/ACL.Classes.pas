@@ -4,27 +4,30 @@
 {*              Common Classes               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.Classes;
 
-{$I ACL.Config.INC}
+{$I ACL.Config.inc}
+{%FPC: OK}
 
 interface
 
 uses
+{$IFDEF MSWINDOWS}
   Winapi.Messages,
-  Winapi.Windows,
+  Winapi.Windows, // inlining
+{$ENDIF}
   // System
-  System.Types,
-  System.TypInfo,
-  System.Classes,
-  System.SysUtils,
-  System.Contnrs,
-  System.Generics.Collections,
+  {System.}Math,
+  {System.}TypInfo,
+  {System.}Classes,
+  {System.}SysUtils,
+  {System.}Contnrs,
+  {System.}Generics.Collections,
   // ACL
   ACL.ObjectLinks,
   ACL.Threading,
@@ -49,9 +52,10 @@ type
     FRefCount: Integer;
   protected
     // IUnknown
-    function QueryInterface(const IID: TGUID; out Obj): HRESULT; virtual; stdcall;
-    function _AddRef: Integer; stdcall;
-    function _Release: Integer; stdcall;
+    function _AddRef: Integer; {$IFDEF MSWINDOWS}stdcall{$ELSE}cdecl{$ENDIF};
+    function _Release: Integer; {$IFDEF MSWINDOWS}stdcall{$ELSE}cdecl{$ENDIF};
+    function QueryInterface({$IFDEF FPC}constref{$ELSE}const{$ENDIF}
+      IID: TGUID; out Obj): HRESULT; virtual; {$IFDEF MSWINDOWS}stdcall{$ELSE}cdecl{$ENDIF};
   public
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
@@ -64,9 +68,10 @@ type
   TACLUnknownObject = class(TObject, IUnknown)
   protected
     // IUnknown
-    function _AddRef: Integer; stdcall;
-    function _Release: Integer; stdcall;
-    function QueryInterface(const IID: TGUID; out Obj): HRESULT; virtual; stdcall;
+    function _AddRef: Integer; {$IFDEF MSWINDOWS}stdcall{$ELSE}cdecl{$ENDIF};
+    function _Release: Integer; {$IFDEF MSWINDOWS}stdcall{$ELSE}cdecl{$ENDIF};
+    function QueryInterface({$IFDEF FPC}constref{$ELSE}const{$ENDIF}
+      IID: TGUID; out Obj): HRESULT; virtual; {$IFDEF MSWINDOWS}stdcall{$ELSE}cdecl{$ENDIF};
   end;
 
   { TACLUnknownPersistent }
@@ -76,9 +81,10 @@ type
     FIsDestroying: Boolean;
   protected
     // IUnknown
-    function _AddRef: Integer; stdcall;
-    function _Release: Integer; stdcall;
-    function QueryInterface(const IID: TGUID; out Obj): HRESULT; virtual; stdcall;
+    function _AddRef: Integer; {$IFDEF MSWINDOWS}stdcall{$ELSE}cdecl{$ENDIF};
+    function _Release: Integer; {$IFDEF MSWINDOWS}stdcall{$ELSE}cdecl{$ENDIF};
+    function QueryInterface({$IFDEF FPC}constref{$ELSE}const{$ENDIF}
+      IID: TGUID; out Obj): HRESULT; virtual; {$IFDEF MSWINDOWS}stdcall{$ELSE}cdecl{$ENDIF};
     //
     property IsDestroying: Boolean read FIsDestroying;
   public
@@ -92,9 +98,10 @@ type
     FIsDestroying: Boolean;
   protected
     // IUnknown
-    function _AddRef: Integer; stdcall;
-    function _Release: Integer; stdcall;
-    function QueryInterface(const IID: TGUID; out Obj): HRESULT; stdcall;
+    function _AddRef: Integer; {$IFDEF MSWINDOWS}stdcall{$ELSE}cdecl{$ENDIF};
+    function _Release: Integer; {$IFDEF MSWINDOWS}stdcall{$ELSE}cdecl{$ENDIF};
+    function QueryInterface({$IFDEF FPC}constref{$ELSE}const{$ENDIF}
+      IID: TGUID; out Obj): HRESULT; {$IFDEF MSWINDOWS}stdcall{$ELSE}cdecl{$ENDIF};
     //
     property IsDestroying: Boolean read FIsDestroying;
   public
@@ -111,9 +118,10 @@ type
     FUpdateCount: Integer;
 
     // IUnknown
-    function _AddRef: Integer; stdcall;
-    function _Release: Integer; stdcall;
-    function QueryInterface(const IID: TGUID; out Obj): HRESULT; stdcall;
+    function _AddRef: Integer; {$IFDEF MSWINDOWS}stdcall{$ELSE}cdecl{$ENDIF};
+    function _Release: Integer; {$IFDEF MSWINDOWS}stdcall{$ELSE}cdecl{$ENDIF};
+    function QueryInterface({$IFDEF FPC}constref{$ELSE}const{$ENDIF}
+      IID: TGUID; out Obj): HRESULT; {$IFDEF MSWINDOWS}stdcall{$ELSE}cdecl{$ENDIF};
   protected
     procedure Update(Item: TCollectionItem); override; final;
     procedure UpdateCore(Item: TCollectionItem); virtual;
@@ -240,26 +248,27 @@ type
 
 // Notify Helpers
 procedure CallNotifyEvent(ASender: TObject; AEvent: TNotifyEvent); inline;
-procedure CallProgressEvent(AEvent: TACLProgressEvent; const APosition, ATotal: Int64; ASender: TObject = nil); inline;
+procedure CallProgressEvent(AEvent: TACLProgressEvent;
+  const APosition, ATotal: Int64; ASender: TObject = nil); inline;
 
-function acComponentFieldSet(var AField; AOwner, ANewValue: TComponent): Boolean;
-function acFindComponent(AComponent: TComponent; const AName: TComponentName; ARecursive: Boolean = True): TComponent;
-function acFindOwnerThatSupportTheInterface(APersistent: TPersistent; const IID: TGUID; out AIntf): TPersistent;
+function acComponentFieldSet(
+  var AField; AOwner, ANewValue: TComponent): Boolean;
+function acFindComponent(AComponent: TComponent;
+  const AName: TComponentName; ARecursive: Boolean = True): TComponent;
+function acFindOwnerThatSupportTheInterface(
+  APersistent: TPersistent; const IID: TGUID; out AIntf): TPersistent;
+function acIsValidIdent(const S: string;
+  AAllowUnicodeIdents: Boolean = True; AAllowDots: Boolean = False): Boolean;
+
+{$IFDEF DELPHI}
 function acIsDelphiObject(AData: Pointer): Boolean;
-function acIsValidIdent(const S: UnicodeString; AAllowUnicodeIdents: Boolean = True; AAllowDots: Boolean = False): Boolean;
+{$ENDIF}
 
 function CreateUniqueName(AComponent: TComponent; const APrefixName, ASuffixName: string): string;
 implementation
 
 uses
-  System.Math,
-  System.SysConst,
-  // ACL
-  ACL.FastCode,
-  ACL.Math,
-  ACL.Threading.Sorting,
-  ACL.Utils.FileSystem,
-  ACL.Utils.Stream;
+  ACL.Math;
 
 type
   TPersistentAccess = class(TPersistent);
@@ -318,6 +327,7 @@ begin
   until Result = nil;
 end;
 
+{$IFDEF DELPHI}
 function acIsDelphiObject(AData: Pointer): Boolean;
 var
   P: Pointer;
@@ -337,8 +347,9 @@ begin
 
   Result := P = SelfPtr;
 end;
+{$ENDIF}
 
-function acIsValidIdent(const S: UnicodeString; AAllowUnicodeIdents: Boolean = True; AAllowDots: Boolean = False): Boolean;
+function acIsValidIdent(const S: string; AAllowUnicodeIdents, AAllowDots: Boolean): Boolean;
 var
   I: Integer;
 begin
@@ -449,7 +460,7 @@ begin
   TACLInterfacedObject(Result).FRefCount := 1;
 end;
 
-function TACLInterfacedObject.QueryInterface(const IID: TGUID; out Obj): HResult;
+function TACLInterfacedObject.QueryInterface;
 begin
   if GetInterface(IID, Obj) then
     Result := 0
@@ -471,17 +482,17 @@ end;
 
 { TACLUnknownObject }
 
-function TACLUnknownObject._AddRef: Integer; stdcall;
+function TACLUnknownObject._AddRef: Integer;
 begin
   Result := -1;
 end;
 
-function TACLUnknownObject._Release: Integer; stdcall;
+function TACLUnknownObject._Release: Integer;
 begin
   Result := -1;
 end;
 
-function TACLUnknownObject.QueryInterface(const IID: TGUID; out Obj): HRESULT; stdcall;
+function TACLUnknownObject.QueryInterface;
 begin
   if GetInterface(IID, Obj) then
     Result := S_OK
@@ -497,17 +508,17 @@ begin
   inherited BeforeDestruction;
 end;
 
-function TACLUnknownPersistent._AddRef: Integer; stdcall;
+function TACLUnknownPersistent._AddRef;
 begin
   Result := -1;
 end;
 
-function TACLUnknownPersistent._Release: Integer; stdcall;
+function TACLUnknownPersistent._Release;
 begin
   Result := -1;
 end;
 
-function TACLUnknownPersistent.QueryInterface(const IID: TGUID; out Obj): HRESULT; stdcall;
+function TACLUnknownPersistent.QueryInterface;
 begin
   if GetInterface(IID, Obj) then
     Result := S_OK
@@ -517,17 +528,17 @@ end;
 
 { TACLCollectionItem }
 
-function TACLCollectionItem._AddRef: Integer;
+function TACLCollectionItem._AddRef;
 begin
   Result := -1;
 end;
 
-function TACLCollectionItem._Release: Integer;
+function TACLCollectionItem._Release;
 begin
   Result := -1;
 end;
 
-function TACLCollectionItem.QueryInterface(const IID: TGUID; out Obj): HRESULT;
+function TACLCollectionItem.QueryInterface;
 begin
   if GetInterface(IID, Obj) then
     Result := S_OK
@@ -577,17 +588,17 @@ begin
   // do nothing
 end;
 
-function TACLCollection._AddRef: Integer;
+function TACLCollection._AddRef;
 begin
   Result := -1;
 end;
 
-function TACLCollection._Release: Integer;
+function TACLCollection._Release;
 begin
   Result := -1;
 end;
 
-function TACLCollection.QueryInterface(const IID: TGUID; out Obj): HRESULT;
+function TACLCollection.QueryInterface;
 begin
   if GetInterface(IID, Obj) then
     Result := S_OK
@@ -722,7 +733,9 @@ end;
 procedure TACLComponent.BeforeDestruction;
 begin
   inherited BeforeDestruction;
+{$IFNDEF FPC}
   RemoveFreeNotifications;
+{$ENDIF}
   TACLObjectLinks.Release(Self);
 end;
 

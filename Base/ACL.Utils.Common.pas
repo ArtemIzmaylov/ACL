@@ -4,7 +4,7 @@
 {*             System Utilities              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -14,22 +14,35 @@ unit ACL.Utils.Common;
 {$I ACL.Config.inc}
 {$WARN SYMBOL_PLATFORM OFF}
 
+{$IFDEF FPC}
+  {$MESSAGE WARN 'ACL.Utils.Common'}
+{$ENDIF}
+{%FPC: FIXME:
+   1) TProcessHelper
+   2) HMODULE's sections
+   3) WINDOW's section
+   4) GetExactTickCount
+}
+
 interface
 
 uses
-{$IFDEF MSWINDOWS}
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
   Winapi.Windows,
   Winapi.Messages,
   Winapi.PsAPI,
 {$ENDIF}
   // System
   System.AnsiStrings,
-  System.Classes,
-  System.SysUtils,
-  System.Types,
-  System.TypInfo,
   System.UITypes,
-  System.Math;
+  {System.}Classes,
+  {System.}SysUtils,
+  {System.}Types,
+  {System.}TypInfo,
+  {System.}Math;
 
 const
   SIZE_ONE_KILOBYTE = 1024;
@@ -51,6 +64,22 @@ const
   E_HANDLE = HRESULT($80070006);
 {$ENDIF}
 
+{$IFDEF FPC}
+type
+  TProc = reference to procedure;
+  TProc<T> = reference to procedure (Arg1: T);
+  TProc<T1,T2> = reference to procedure (Arg1: T1; Arg2: T2);
+  TProc<T1,T2,T3> = reference to procedure (Arg1: T1; Arg2: T2; Arg3: T3);
+  TProc<T1,T2,T3,T4> = reference to procedure (Arg1: T1; Arg2: T2; Arg3: T3; Arg4: T4);
+
+  TFunc<TResult> = reference to function: TResult;
+  TFunc<T,TResult> = reference to function (Arg1: T): TResult;
+  TFunc<T1,T2,TResult> = reference to function (Arg1: T1; Arg2: T2): TResult;
+  TFunc<T1,T2,T3,TResult> = reference to function (Arg1: T1; Arg2: T2; Arg3: T3): TResult;
+  TFunc<T1,T2,T3,T4,TResult> = reference to function (Arg1: T1; Arg2: T2; Arg3: T3; Arg4: T4): TResult;
+
+  TPredicate<T> = reference to function (Arg1: T): Boolean;
+{$ENDIF}
 
 type
 {$SCOPEDENUMS ON}
@@ -75,10 +104,10 @@ type
 
   IStringReceiver = interface
   ['{F07E42B3-2680-425D-9119-253D300AE4CF}']
-    procedure Add(const S: UnicodeString);
+    procedure Add(const S: string);
   end;
 
-  TACLStringEnumProc = reference to procedure (const S: UnicodeString);
+  TACLStringEnumProc = reference to procedure (const S: string);
 
   TACLBooleanHelper = record helper for TACLBoolean
   public
@@ -145,20 +174,22 @@ var
   InvariantFormatSettings: TFormatSettings;
 
 // HMODULE
-function acGetProcessFileName(const AWindowHandle: THandle; out AFileName: UnicodeString): Boolean;
-function acGetProcAddress(ALibHandle: HMODULE; AProcName: PWideChar; var AResult: Boolean): Pointer;
-function acLoadLibrary(const AFileName: UnicodeString; AFlags: Cardinal = 0): HMODULE;
-function acModuleFileName(AModule: HMODULE): UnicodeString; inline;
-function acModuleHandle(const AFileName: UnicodeString): HMODULE;
+{$IFDEF MSWINDOWS}
+function acGetProcessFileName(const AWindowHandle: THandle; out AFileName: string): Boolean;
+function acGetProcAddress(ALibHandle: HMODULE; AProcName: PChar; var AResult: Boolean): Pointer;
+function acLoadLibrary(const AFileName: string; AFlags: Cardinal = 0): HMODULE;
+function acModuleFileName(AModule: HMODULE): string; inline;
+function acModuleHandle(const AFileName: string): HMODULE;
+{$ENDIF}
 
 // Window Handles
 {$IFDEF MSWINDOWS}
 function acGetWindowRect(AHandle: HWND): TRect;
-function acFindWindow(const AClassName: UnicodeString): HWND;
-function acGetClassName(Handle: HWND): UnicodeString;
-function acGetWindowText(AHandle: HWND): UnicodeString;
+function acFindWindow(const AClassName: string): HWND;
+function acGetClassName(Handle: HWND): string;
+function acGetWindowText(AHandle: HWND): string;
 procedure acSwitchToWindow(AHandle: HWND);
-procedure acSetWindowText(AHandle: HWND; const AText: UnicodeString);
+procedure acSetWindowText(AHandle: HWND; const AText: string);
 {$ENDIF}
 
 // System
@@ -179,9 +210,9 @@ function acGetInterfaceEx(const Instance: TObject; const IID: TGUID; out Intf): 
 procedure acExchangeInt64(var AValue1, AValue2: Int64); inline;
 procedure acExchangeIntegers(var AValue1, AValue2); inline;
 procedure acExchangePointers(var AValue1, AValue2); inline;
-procedure acExchangeStrings(var AValue1, AValue2: UnicodeString); inline;
+procedure acExchangeStrings(var AValue1, AValue2: string); inline;
 function acBoolToHRESULT(AValue: Boolean): HRESULT; inline;
-function acGenerateGUID: UnicodeString;
+function acGenerateGUID: string;
 function acObjectUID(AObject: TObject): string;
 {$IFDEF MSWINDOWS}
 function acSetThreadErrorMode(Mode: DWORD): DWORD;
@@ -195,18 +226,10 @@ function WineGetVersion(out AVersion: string): Boolean;
 {$ENDIF}
 implementation
 
-uses
-{$IFNDEF ACL_BASE_NOVCL}
-  Vcl.Forms,
-{$ENDIF}
-  // ACL
-  ACL.Math,
-  ACL.Utils.Strings,
-  ACL.Utils.Stream,
-  ACL.Utils.FileSystem,
-  ACL.Threading;
-
 {$IFDEF MSWINDOWS}
+uses
+  ACL.Utils.FileSystem;
+
 type
   TGetThreadErrorMode = function: DWORD; stdcall;
   TSetThreadErrorMode = function (NewMode: DWORD; out OldMode: DWORD): LongBool; stdcall;
@@ -258,8 +281,8 @@ end;
 // HMODULE
 //==============================================================================
 
-function acGetProcessFileName(const AWindowHandle: THandle; out AFileName: UnicodeString): Boolean;
 {$IFDEF MSWINDOWS}
+function acGetProcessFileName(const AWindowHandle: THandle; out AFileName: string): Boolean;
 var
   AProcess: THandle;
   AProcessID: Cardinal;
@@ -278,54 +301,45 @@ begin
     end;
   end;
 end;
-{$ELSE}
-begin
-  Result := False;
-end;
-{$ENDIF}
 
-function acGetProcAddress(ALibHandle: HMODULE; AProcName: PWideChar; var AResult: Boolean): Pointer;
+function acGetProcAddress(ALibHandle: HMODULE; AProcName: PChar; var AResult: Boolean): Pointer;
 begin
   Result := GetProcAddress(ALibHandle, AProcName);
   AResult := AResult and (Result <> nil);
 end;
 
-function acLoadLibrary(const AFileName: UnicodeString; AFlags: Cardinal = 0): HMODULE;
+function acLoadLibrary(const AFileName: string; AFlags: Cardinal = 0): HMODULE;
 var
-  APrevCurPath: UnicodeString;
+  AErrorMode: Cardinal;
+  APrevCurPath: string;
 begin
-{$IFDEF MSWINDOWS}
-  var AErrorMode := acSetThreadErrorMode(SEM_FailCriticalErrors);
+  AErrorMode := acSetThreadErrorMode(SEM_FailCriticalErrors);
   try
-{$ENDIF}
     APrevCurPath := acGetCurrentDir;
     try
       acSetCurrentDir(acExtractFilePath(AFileName));
-    {$IFDEF MSWINDOWS}
       if AFlags <> 0 then
         Result := LoadLibraryEx(PWideChar(AFileName), 0, AFlags)
       else
-    {$ENDIF}
         Result := LoadLibrary(PWideChar(AFileName));
     finally
       acSetCurrentDir(APrevCurPath);
     end;
-{$IFDEF MSWINDOWS}
   finally
     acSetThreadErrorMode(AErrorMode);
   end;
-{$ENDIF}
 end;
 
-function acModuleHandle(const AFileName: UnicodeString): HMODULE;
+function acModuleHandle(const AFileName: string): HMODULE;
 begin
   Result := GetModuleHandle(PWideChar(AFileName));
 end;
 
-function acModuleFileName(AModule: HMODULE): UnicodeString;
+function acModuleFileName(AModule: HMODULE): string;
 begin
   Result := GetModuleName(AModule);
 end;
+{$ENDIF}
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Internal Tools
@@ -430,9 +444,9 @@ begin
   Pointer(AValue2) := ATempValue;
 end;
 
-procedure acExchangeStrings(var AValue1, AValue2: UnicodeString);
+procedure acExchangeStrings(var AValue1, AValue2: string);
 var
-  ATempValue: UnicodeString;
+  ATempValue: string;
 begin
   ATempValue := AValue1;
   AValue1 := AValue2;
@@ -447,7 +461,7 @@ begin
     Result := E_FAIL;
 end;
 
-function acGenerateGUID: UnicodeString;
+function acGenerateGUID: string;
 var
   G: TGUID;
 begin

@@ -2,7 +2,39 @@
 {$Q-} { Overflow checking }
 {$Z1} { Minumum enum size = 1}
 
-{$IF NOT DEFINED(ACL_RTTI_ALL)}
+{$IFDEF FPC}
+  {$mode delphi}
+  {$modeswitch functionreferences}
+  {$modeswitch anonymousfunctions}
+  {$asmmode INTEL}
+  {$codepage UTF8}
+
+  {$H+}
+  {$WARN 5024 off : Parameter "$1" not used}
+  {$WARN 6058 off : Call to subroutine "$1" marked as inline is not inlined}
+
+  {$IFNDEF LINUX}
+    ACL was not ready for other platforms using FPC/LCL
+  {$ENDIF}
+{$ENDIF}
+
+{$IF DEFINED(CPUX64) OR DEFINED(CPU64)}
+  {$DEFINE CPUX64}
+{$IFEND}
+
+{$IF DEFINED(CPUX64) OR DEFINED(FPC)}
+  {$DEFINE ACL_PUREPASCAL}
+{$IFEND}
+
+{$IF NOT DEFINED(FPC)}
+  {$WARN DUPLICATE_CTOR_DTOR OFF} // We does not support for C++Builder
+{$IFEND}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// RTTI
+// ---------------------------------------------------------------------------------------------------------------------
+
+{$IF NOT DEFINED(ACL_RTTI_ALL) AND NOT DEFINED(FPC)}
   {$WEAKLINKRTTI ON}
   {$IF DEFINED(ACL_RTTI_OFF)}
     {$RTTI EXPLICIT METHODS([]) FIELDS([]) PROPERTIES([])}
@@ -11,11 +43,6 @@
   {$IFEND}
 {$IFEND}
 
-{$IF DEFINED(CPUX64) || DEFINED(CPU64)}
-  {$DEFINE CPUX64}
-{$IFEND}
-
-{$WARN DUPLICATE_CTOR_DTOR OFF} // We does not support for C++Builder
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Options
@@ -47,7 +74,7 @@
   {$DEFINE DELPHI120}
 {$ENDIF}
 
-{$IFNDEF DELPHI110ALEXANDRIA}
+{$IF NOT DEFINED(FPC) AND NOT DEFINED(DELPHI110ALEXANDRIA)}
   You need Delphi 11.0 Alexandria for this library,
   Previous Delphi versions has too many bugs with dpi scaling.
-{$ENDIF}
+{$IFEND}

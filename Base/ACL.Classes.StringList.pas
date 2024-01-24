@@ -4,7 +4,7 @@
 {*             StringList Class              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,8 +16,9 @@ unit ACL.Classes.StringList;
 interface
 
 uses
-  System.Classes,
-  System.SysUtils,
+  {System.}Classes,
+  {System.}Math,
+  {System.}SysUtils,
   // ACL
   ACL.Classes,
   ACL.Utils.Common,
@@ -33,10 +34,8 @@ type
   TACLStringListItem = packed record
     FInterface: IUnknown;
     FObject: TObject;
-    FString: UnicodeString;
-
+    FString: string;
     procedure Exchange(var Item: TACLStringListItem); inline;
-    procedure MoveFrom(const Item: TACLStringListItem); inline;
   end;
 
   PACLStringListItemList = ^TACLStringListItemList;
@@ -51,40 +50,40 @@ type
     FCapacity: Integer;
     FCount: Integer;
     FData: Pointer;
-    FDelimiter: WideChar;
+    FDelimiter: Char;
     FIgnoryCase: Boolean;
     FList: PACLStringListItemList;
 
     function GetCount: Integer;
     function GetInterface(AIndex: Integer): IUnknown;
-    function GetName(AIndex: Integer): UnicodeString;
+    function GetName(AIndex: Integer): string;
     function GetObject(AIndex: Integer): TObject;
-    function GetString(AIndex: Integer): UnicodeString;
-    function GetText: UnicodeString;
-    function GetValue(AIndex: Integer): UnicodeString;
-    function GetValueFromName(const S: UnicodeString): UnicodeString;
+    function GetString(AIndex: Integer): string;
+    function GetText: string;
+    function GetValue(AIndex: Integer): string;
+    function GetValueFromName(const S: string): string;
     procedure SetCapacity(Value: Integer);
     procedure SetInterface(AIndex: Integer; const AValue: IUnknown);
-    procedure SetName(Index: Integer; const Value: UnicodeString);
+    procedure SetName(Index: Integer; const Value: string);
     procedure SetObject(AIndex: Integer; const AValue: TObject);
-    procedure SetValue(Index: Integer; const Value: UnicodeString);
-    procedure SetValueFromName(const AName, AValue: UnicodeString);
+    procedure SetValue(Index: Integer; const Value: string);
+    procedure SetValueFromName(const AName, AValue: string);
     //
     procedure Grow;
-    procedure ParseBuffer(ABuffer: PWideChar; ACount: Integer);
+    procedure ParseBuffer(ABuffer: PChar; ACount: Integer);
   protected
     procedure AssignTo(Dest: TPersistent); override;
     procedure Changed; virtual;
-    procedure SetString(AIndex: Integer; const AValue: UnicodeString); virtual;
-    procedure SetText(const S: UnicodeString); virtual;
+    procedure SetString(AIndex: Integer; const AValue: string); virtual;
+    procedure SetText(const S: string); virtual;
     // IStringReceiver
     procedure IStringReceiver.Add = DoAdd;
-    procedure DoAdd(const S: UnicodeString);
+    procedure DoAdd(const S: string);
     //
     property List: PACLStringListItemList read FList;
   public
     constructor Create; overload;
-    constructor Create(const AText: UnicodeString; ASplitText: Boolean = False); overload;
+    constructor Create(const AText: string; ASplitText: Boolean = False); overload;
     destructor Destroy; override;
     procedure EnsureCapacity(ACount: Integer);
     function Clone: TACLStringList;
@@ -92,34 +91,35 @@ type
     procedure Exchange(Index1, Index2: Integer);
     procedure TrimLines;
 
-    function GetDelimitedText(const ADelimiter: UnicodeString; AAddTrailingDelimiter: Boolean = True): UnicodeString;
-    procedure SetDelimitedText(const AText: UnicodeString; ADelimiter: WideChar);
+    function GetDelimitedText(const ADelimiter: string; AAddTrailingDelimiter: Boolean = True): string;
+    procedure SetDelimitedText(const AText: string; ADelimiter: Char);
 
     // Lock / Unlock
     procedure BeginUpdate; virtual;
     procedure EndUpdate; virtual;
 
     // I/O
-    function LoadFromFile(const AFileName: UnicodeString; AEncoding: TEncoding = nil): Boolean;
+    function LoadFromFile(const AFileName: string; AEncoding: TEncoding = nil): Boolean;
     procedure LoadFromStream(AStream: TStream; AEncoding: TEncoding = nil); virtual;
-    procedure LoadFromResource(AInstance: HINST; const AName: UnicodeString; AType: PChar);
-    function SaveToFile(const AFileName: UnicodeString; AEncoding: TEncoding = nil): Boolean;
+    procedure LoadFromResource(AInstance: HModule; const AName: string; AType: PChar);
+    function SaveToFile(const AFileName: string; AEncoding: TEncoding = nil): Boolean;
     procedure SaveToStream(AStream: TStream; AEncoding: TEncoding = nil); virtual;
 
     // Inserting
-    function Add(const S: UnicodeString; const AObject: NativeInt): Integer; overload;
-    function Add(const S: UnicodeString; const AObject: TObject = nil; AInterface: IUnknown = nil): Integer; overload;
-    procedure AddEx(const S: UnicodeString);
+    function Add(const S: string; AObject: NativeInt): Integer; overload;
+    function Add(const S: string; AObject: TObject = nil; AInterface: IUnknown = nil): Integer; overload;
+    procedure AddEx(const S: string);
     procedure Append(const ASource: TACLStringList); overload;
-    procedure Append(const ASource: UnicodeString); overload;
+    procedure Append(const ASource: string); overload;
     procedure Assign(Source: TPersistent); override;
-    procedure Insert(Index: Integer; const S: UnicodeString; const AObject: TObject = nil; AInterface: IUnknown = nil); virtual;
+    procedure Insert(Index: Integer; const S: string;
+      AObject: TObject = nil; AInterface: IUnknown = nil); virtual;
 
     // Search
-    function Contains(const S: UnicodeString): Boolean;
-    function IndexOf(const S: UnicodeString): Integer; virtual;
-    function IndexOfName(const AName: UnicodeString): Integer;
-    function IndexOfObject(const AObject: TObject): Integer;
+    function Contains(const S: string): Boolean;
+    function IndexOf(const S: string): Integer; virtual;
+    function IndexOfName(const AName: string): Integer;
+    function IndexOfObject(AObject: TObject): Integer;
 
     // Removing
     procedure Clear; virtual;
@@ -129,7 +129,7 @@ type
     function Pack: Integer;
     function Remove(const AObject: NativeUInt): Integer; overload;
     function Remove(const AObject: TObject): Integer; overload;
-    function Remove(const S: UnicodeString): Integer; overload;
+    function Remove(const S: string): Integer; overload;
     function RemoveDuplicates: Integer;
 
     // Sorting
@@ -137,47 +137,46 @@ type
     procedure Sort(ACompareProc: TACLStringListCompareProc; UseThreading: Boolean); overload;
     procedure SortLogical;
     //
-    function First: UnicodeString; inline;
-    function Last: UnicodeString; inline;
+    function First: string; inline;
+    function Last: string; inline;
 
     // Properties
     property Capacity: Integer read FCapacity write SetCapacity;
     property Count: Integer read GetCount;
     property Data: Pointer read FData write FData;
-    property Delimiter: WideChar read FDelimiter write FDelimiter;
+    property Delimiter: Char read FDelimiter write FDelimiter;
     property IgnoryCase: Boolean read FIgnoryCase write FIgnoryCase;
-    property Text: UnicodeString read GetText write SetText;
+    property Text: string read GetText write SetText;
 
     // Row data
     property Interfaces[AIndex: Integer]: IUnknown read GetInterface write SetInterface;
-    property Names[Index: Integer]: UnicodeString read GetName write SetName;
+    property Names[Index: Integer]: string read GetName write SetName;
     property Objects[Index: Integer]: TObject read GetObject write SetObject;
-    property Strings[Index: Integer]: UnicodeString read GetString write SetString; default;
-    property ValueFromIndex[Index: Integer]: UnicodeString read GetValue write SetValue;
-    property ValueFromName[const Name: UnicodeString]: UnicodeString read GetValueFromName write SetValueFromName;
+    property Strings[Index: Integer]: string read GetString write SetString; default;
+    property ValueFromIndex[Index: Integer]: string read GetValue write SetValue;
+    property ValueFromName[const Name: string]: string read GetValueFromName write SetValueFromName;
   end;
 
   { TACLSortedStrings }
 
   TACLSortedStrings = class(TACLStringList)
   protected
-    procedure SetString(AIndex: Integer; const AValue: UnicodeString); override;
+    procedure SetString(AIndex: Integer; const AValue: string); override;
   public
     procedure AfterConstruction; override;
-    function Find(const P: PWideChar; ALength: Integer; out AIndex: Integer): Boolean; overload;
-    function Find(const S: UnicodeString; out AIndex: Integer): Boolean; overload;
-    function IndexOf(const AItem: UnicodeString): Integer; override;
-    procedure Insert(Index: Integer; const S: UnicodeString; const AObject: TObject = nil; AInterface: IUnknown = nil); override;
+    function Find(const P: PChar; ALength: Integer; out AIndex: Integer): Boolean; overload;
+    function Find(const S: string; out AIndex: Integer): Boolean; overload;
+    function IndexOf(const AItem: string): Integer; override;
+    procedure Insert(Index: Integer; const S: string;
+      AObject: TObject = nil; AInterface: IUnknown = nil); override;
   end;
 
 implementation
 
 uses
-  System.Math,
-  // ACL
   ACL.FastCode,
   ACL.Parsers,
-  ACL.Threading.Sorting,
+//  ACL.Threading.Sorting,
   ACL.Utils.FileSystem,
   ACL.Utils.Stream;
 
@@ -200,13 +199,6 @@ begin
   Pointer(Item.FInterface) := ASwap;
 end;
 
-procedure TACLStringListItem.MoveFrom(const Item: TACLStringListItem);
-begin
-  Pointer(FInterface) := Pointer(Item.FInterface);
-  Pointer(FObject) := Pointer(Item.FObject);
-  Pointer(FString) := Pointer(Item.FString);
-end;
-
 { TACLStringList }
 
 constructor TACLStringList.Create;
@@ -216,7 +208,7 @@ begin
   FDelimiter := '=';
 end;
 
-constructor TACLStringList.Create(const AText: UnicodeString; ASplitText: Boolean);
+constructor TACLStringList.Create(const AText: string; ASplitText: Boolean);
 begin
   Create;
   if ASplitText then
@@ -245,16 +237,17 @@ begin
   Result.Assign(Self);
 end;
 
-function TACLStringList.Contains(const S: UnicodeString): Boolean;
+function TACLStringList.Contains(const S: string): Boolean;
 begin
   Result := IndexOf(S) >= 0;
 end;
 
-function TACLStringList.GetDelimitedText(const ADelimiter: UnicodeString; AAddTrailingDelimiter: Boolean = True): UnicodeString;
+function TACLStringList.GetDelimitedText(
+  const ADelimiter: string; AAddTrailingDelimiter: Boolean = True): string;
 var
   I, D, L, ASize: Integer;
-  P: PWideChar;
-  S: UnicodeString;
+  P: PChar;
+  S: string;
 begin
   ASize := 0;
   D := Length(ADelimiter);
@@ -271,18 +264,18 @@ begin
     L := Length(S);
     if L <> 0 then
     begin
-      FastMove(Pointer(S)^, P^, L * SizeOf(WideChar));
+      FastMove(Pointer(S)^, P^, L * SizeOf(Char));
       Inc(P, L);
     end;
     if (D <> 0) and (AAddTrailingDelimiter or (I + 1 < Count)) then
     begin
-      FastMove(Pointer(ADelimiter)^, P^, D * SizeOf(WideChar));
+      FastMove(Pointer(ADelimiter)^, P^, D * SizeOf(Char));
       Inc(P, D);
     end;
   end;
 end;
 
-procedure TACLStringList.SetDelimitedText(const AText: UnicodeString; ADelimiter: WideChar);
+procedure TACLStringList.SetDelimitedText(const AText: string; ADelimiter: Char);
 var
   ALength: Integer;
 begin
@@ -295,7 +288,7 @@ begin
       if Ord(AText[ALength]) = Ord(ADelimiter) then
         Dec(ALength);
       acExplodeString(PChar(AText), ALength, ADelimiter,
-        procedure (ACursorStart, ACursorNext: PWideChar; var ACanContinue: Boolean)
+        procedure (ACursorStart, ACursorNext: PChar; var ACanContinue: Boolean)
         begin
           Add(acExtractString(ACursorStart, ACursorNext));
         end)
@@ -329,7 +322,7 @@ begin
   // do nothing
 end;
 
-function TACLStringList.LoadFromFile(const AFileName: UnicodeString; AEncoding: TEncoding = nil): Boolean;
+function TACLStringList.LoadFromFile(const AFileName: string; AEncoding: TEncoding = nil): Boolean;
 var
   AFileStream: TStream;
 begin
@@ -352,7 +345,7 @@ begin
     Clear;
 end;
 
-procedure TACLStringList.LoadFromResource(AInstance: HINST; const AName: UnicodeString; AType: PChar);
+procedure TACLStringList.LoadFromResource(AInstance: HModule; const AName: string; AType: PChar);
 var
   AStream: TResourceStream;
 begin
@@ -364,7 +357,7 @@ begin
   end;
 end;
 
-function TACLStringList.SaveToFile(const AFileName: UnicodeString; AEncoding: TEncoding = nil): Boolean;
+function TACLStringList.SaveToFile(const AFileName: string; AEncoding: TEncoding = nil): Boolean;
 var
   AStream: TStream;
 begin
@@ -384,28 +377,30 @@ begin
   AStream.WriteString(GetText, AEncoding);
 end;
 
-function TACLStringList.Add(const S: UnicodeString; const AObject: TObject; AInterface: IUnknown): Integer;
+function TACLStringList.Add(const S: string; AObject: TObject; AInterface: IUnknown): Integer;
 begin
   Result := Count;
   Insert(Count, S, AObject, AInterface);
 end;
 
-function TACLStringList.Add(const S: UnicodeString; const AObject: NativeInt): Integer;
+function TACLStringList.Add(const S: string; AObject: NativeInt): Integer;
 begin
   Result := Add(S, TObject(AObject));
 end;
 
-procedure TACLStringList.AddEx(const S: UnicodeString);
+procedure TACLStringList.AddEx(const S: string);
 begin
   Add(S);
 end;
 
 procedure TACLStringList.Append(const ASource: TACLStringList);
+var
+  I: Integer;
 begin
   BeginUpdate;
   try
     EnsureCapacity(ASource.Count);
-    for var I := 0 to ASource.Count - 1 do
+    for I := 0 to ASource.Count - 1 do
     begin
       with ASource.List[I] do
         Add(FString, FObject, FInterface);
@@ -415,11 +410,11 @@ begin
   end;
 end;
 
-procedure TACLStringList.Append(const ASource: UnicodeString);
+procedure TACLStringList.Append(const ASource: string);
 begin
   BeginUpdate;
   try
-    ParseBuffer(PWideChar(ASource), Length(ASource))
+    ParseBuffer(PChar(ASource), Length(ASource))
   finally
     EndUpdate;
   end;
@@ -439,8 +434,8 @@ begin
   end;
 end;
 
-procedure TACLStringList.Insert(Index: Integer; const S: UnicodeString;
-  const AObject: TObject = nil; AInterface: IUnknown = nil);
+procedure TACLStringList.Insert(Index: Integer; const S: string;
+  AObject: TObject = nil; AInterface: IUnknown = nil);
 begin
   if (Index >= 0) and (Index <= Count) then
   begin
@@ -466,7 +461,7 @@ begin
   end;
 end;
 
-function TACLStringList.IndexOf(const S: UnicodeString): Integer;
+function TACLStringList.IndexOf(const S: string): Integer;
 var
   I: Integer;
 begin
@@ -478,9 +473,9 @@ begin
   Result := -1;
 end;
 
-function TACLStringList.IndexOfName(const AName: UnicodeString): Integer;
+function TACLStringList.IndexOfName(const AName: string): Integer;
 var
-  T, S: UnicodeString;
+  T, S: string;
   I, L: Integer;
 begin
   T := AName + Delimiter;
@@ -488,13 +483,13 @@ begin
   for I := Count - 1 downto 0 do
   begin
     S := List[I].FString;
-    if (Length(S) >= L) and (acCompareStrings(PWideChar(T), PWideChar(S), L, L, IgnoryCase) = 0) then
+    if (Length(S) >= L) and (acCompareStrings(PChar(T), PChar(S), L, L, IgnoryCase) = 0) then
       Exit(I);
   end;
   Result := -1;
 end;
 
-function TACLStringList.IndexOfObject(const AObject: TObject): Integer;
+function TACLStringList.IndexOfObject(AObject: TObject): Integer;
 var
   I: Integer;
 begin
@@ -549,7 +544,7 @@ begin
   end;
 end;
 
-function TACLStringList.Remove(const S: UnicodeString): Integer;
+function TACLStringList.Remove(const S: string): Integer;
 begin
   Result := IndexOf(S);
   if Result >= 0 then
@@ -623,7 +618,8 @@ begin
   begin
     BeginUpdate;
     try
-      TACLMultithreadedStringListSorter.Sort(Self, ACompareProc, UseThreading);
+      {$MESSAGE WARN 'Commented'}
+      //TACLMultithreadedStringListSorter.Sort(Self, ACompareProc, UseThreading);
       Changed;
     finally
       EndUpdate;
@@ -653,12 +649,12 @@ begin
   end;
 end;
 
-function TACLStringList.First: UnicodeString;
+function TACLStringList.First: string;
 begin
   Result := Strings[0];
 end;
 
-function TACLStringList.Last: UnicodeString;
+function TACLStringList.Last: string;
 begin
   Result := Strings[Count - 1];
 end;
@@ -693,7 +689,7 @@ begin
   // do nothing
 end;
 
-procedure TACLStringList.SetString(AIndex: Integer; const AValue: UnicodeString);
+procedure TACLStringList.SetString(AIndex: Integer; const AValue: string);
 begin
   if IsValid(AIndex) then
   begin
@@ -702,18 +698,18 @@ begin
   end;
 end;
 
-procedure TACLStringList.SetText(const S: UnicodeString);
+procedure TACLStringList.SetText(const S: string);
 begin
   BeginUpdate;
   try
     Clear;
-    ParseBuffer(PWideChar(S), Length(S));
+    ParseBuffer(PChar(S), Length(S));
   finally
     EndUpdate;
   end;
 end;
 
-procedure TACLStringList.DoAdd(const S: UnicodeString);
+procedure TACLStringList.DoAdd(const S: string);
 begin
   Add(S);
 end;
@@ -731,7 +727,7 @@ begin
     Result := nil;
 end;
 
-function TACLStringList.GetName(AIndex: Integer): UnicodeString;
+function TACLStringList.GetName(AIndex: Integer): string;
 begin
   Result := GetString(AIndex);
   Result := Copy(Result, 1, acPos(Delimiter, Result) - 1);
@@ -745,7 +741,7 @@ begin
     Result := nil;
 end;
 
-function TACLStringList.GetString(AIndex: Integer): UnicodeString;
+function TACLStringList.GetString(AIndex: Integer): string;
 begin
   if IsValid(AIndex) then
     Result := FList^[AIndex].FString
@@ -753,13 +749,13 @@ begin
     Result := '';
 end;
 
-function TACLStringList.GetValue(AIndex: Integer): UnicodeString;
+function TACLStringList.GetValue(AIndex: Integer): string;
 begin
   Result := GetString(AIndex);
   Result := Copy(Result, acPos(Delimiter, Result) + 1, MAXINT);
 end;
 
-function TACLStringList.GetValueFromName(const S: UnicodeString): UnicodeString;
+function TACLStringList.GetValueFromName(const S: string): string;
 var
   AIndex: Integer;
 begin
@@ -770,7 +766,7 @@ begin
     Result := ValueFromIndex[AIndex];
 end;
 
-function TACLStringList.GetText: UnicodeString;
+function TACLStringList.GetText: string;
 begin
   Result := GetDelimitedText(sLineBreak);
 end;
@@ -794,7 +790,7 @@ begin
   end;
 end;
 
-procedure TACLStringList.SetName(Index: Integer; const Value: UnicodeString);
+procedure TACLStringList.SetName(Index: Integer; const Value: string);
 begin
   Strings[Index] := Value + Delimiter + ValueFromIndex[Index];
 end;
@@ -808,12 +804,12 @@ begin
   end;
 end;
 
-procedure TACLStringList.SetValue(Index: Integer; const Value: UnicodeString);
+procedure TACLStringList.SetValue(Index: Integer; const Value: string);
 begin
   Strings[Index] := Names[Index] + Delimiter + Value;
 end;
 
-procedure TACLStringList.SetValueFromName(const AName, AValue: UnicodeString);
+procedure TACLStringList.SetValueFromName(const AName, AValue: string);
 var
   AIndex: Integer;
 begin
@@ -838,21 +834,22 @@ begin
   SetCapacity(Capacity + ADelta);
 end;
 
-procedure TACLStringList.ParseBuffer(ABuffer: PWideChar; ACount: Integer);
+procedure TACLStringList.ParseBuffer(ABuffer: PChar; ACount: Integer);
 var
-  P, AFinish, AStart: PWideChar;
+  P, AFinish, AStart: PChar;
 begin
   P := ABuffer;
   AStart := P;
   AFinish := ABuffer + ACount;
-  while (NativeUInt(P) + SizeOf(WideChar) <= NativeUInt(AFinish)) do
+  while (NativeUInt(P) + SizeOf(Char) <= NativeUInt(AFinish)) do
   begin
-    if (P^ <> #10) and (P^ <> #13) and (P^ <> acLineSeparator) then
+    {$MESSAGE WARN 'acLineSeparator'}
+    if (P^ <> #10) and (P^ <> #13) {and (P^ <> acLineSeparator)} then
       Inc(P)
     else
     begin
       Add(acMakeString(AStart, P - AStart));
-      if P^ = acLineSeparator then Inc(P);
+//      if P^ = acLineSeparator then Inc(P);
       if P^ = #13 then Inc(P);
       if P^ = #10 then Inc(P);
       AStart := P;
@@ -870,15 +867,15 @@ begin
   IgnoryCase := False;
 end;
 
-function TACLSortedStrings.Find(const S: UnicodeString; out AIndex: Integer): Boolean;
+function TACLSortedStrings.Find(const S: string; out AIndex: Integer): Boolean;
 begin
-  Result := Find(PWideChar(S), Length(S), AIndex);
+  Result := Find(PChar(S), Length(S), AIndex);
 end;
 
-function TACLSortedStrings.Find(const P: PWideChar; ALength: Integer; out AIndex: Integer): Boolean;
+function TACLSortedStrings.Find(const P: PChar; ALength: Integer; out AIndex: Integer): Boolean;
 var
   L, H, I, C: Integer;
-  S: UnicodeString;
+  S: String;
 begin
   Result := False;
   L := 0;
@@ -887,7 +884,7 @@ begin
   begin
     I := (L + H) shr 1;
     S := List^[I].FString;
-    C := acCompareStrings(PWideChar(S), P, Length(S), ALength, IgnoryCase);
+    C := acCompareStrings(PChar(S), P, Length(S), ALength, IgnoryCase);
     if C < 0 then
       L := I + 1
     else
@@ -904,20 +901,20 @@ begin
   AIndex := L;
 end;
 
-function TACLSortedStrings.IndexOf(const AItem: UnicodeString): Integer;
+function TACLSortedStrings.IndexOf(const AItem: string): Integer;
 begin
   if not Find(AItem, Result) then
     Result := -1;
 end;
 
-procedure TACLSortedStrings.Insert(Index: Integer; const S: UnicodeString;
-  const AObject: TObject = nil; AInterface: IUnknown = nil);
+procedure TACLSortedStrings.Insert(Index: Integer; const S: string;
+  AObject: TObject = nil; AInterface: IUnknown = nil);
 begin
   if not Find(S, Index) then
     inherited Insert(Index, S, AObject, AInterface);
 end;
 
-procedure TACLSortedStrings.SetString(AIndex: Integer; const AValue: UnicodeString);
+procedure TACLSortedStrings.SetString(AIndex: Integer; const AValue: string);
 begin
   inherited SetString(AIndex, AValue);
   Sort;

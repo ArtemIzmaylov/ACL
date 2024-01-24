@@ -10,7 +10,6 @@
 {*********************************************}
 
 unit ACL.Classes.Collections;
-
 {$I ACL.Config.inc}
 
 interface
@@ -20,13 +19,13 @@ uses
   Winapi.Windows, // inlining
 {$ENDIF}
   // System
-  System.Classes,
-  System.Contnrs,
-  System.Generics.Collections,
-  System.Generics.Defaults,
-  System.Math,
-  System.SysUtils,
-  System.Types,
+  {System.}Classes,
+  {System.}Contnrs,
+  {System.}Generics.Collections,
+  {System.}Generics.Defaults,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
   // ACL
   ACL.Classes,
   ACL.FastCode,
@@ -38,6 +37,8 @@ const
   sErrorValueWasNotFoundInMap = 'This value was not found in map';
 
 type
+  HashCode = {$IFDEF FPC}UInt32{$ELSE}Integer{$ENDIF};
+
   // Стандартные IEnumerable<T> зачем-то наследуются от IEnumerable,
   // заставляя нас реализовывать ненужные оверлоады.
 
@@ -289,7 +290,8 @@ type
     procedure Clear;
     function Contains(const IID: TGUID): Boolean;
     procedure Enum(AProc: TACLListenerListEnumProc<IUnknown>); overload;
-    procedure Enum<T: IUnknown>(AProc: TACLListenerListEnumProc<T>); overload;
+    {$MESSAGE WARN 'Commented'}
+    //procedure Enum<T: IUnknown>(AProc: TACLListenerListEnumProc<T>); overload;
     procedure Remove(const AListener: IUnknown);
     //
     property Count: Integer read GetCount;
@@ -596,9 +598,9 @@ type
   TACLStringSet = class(TACLHashSet<string>)
   public
     constructor Create(const IgnoreCase: Boolean; InitialCapacity: Integer = 0); reintroduce;
-    function Contains(const Item: PWideChar; const ItemLength: Integer): Boolean; reintroduce; overload;
-    function Exclude(const Item: PWideChar; const ItemLength: Integer): Boolean; reintroduce; overload;
-    function Include(const Item: PWideChar; const ItemLength: Integer): Boolean; reintroduce; overload;
+    function Contains(const Item: PChar; ItemLength: Integer): Boolean; reintroduce; overload;
+    function Exclude(const Item: PChar; ItemLength: Integer): Boolean; reintroduce; overload;
+    function Include(const Item: PChar; ItemLength: Integer): Boolean; reintroduce; overload;
   end;
 
 //  { TACLStringSet }
@@ -640,7 +642,7 @@ type
     function Compare(const Left, Right: string): Integer;
     // IEqualityComparer<string>
     function Equals(const Left, Right: string): Boolean; reintroduce;
-    function GetHashCode(const Value: string): Integer; reintroduce;
+    function GetHashCode(const Value: string): HashCode; reintroduce;
   end;
 
   { TACLStringsMap }
@@ -655,10 +657,10 @@ type
     TItem = class
     public
       Next: TItem;
-      Value: UnicodeString;
+      Value: string;
       ValueHash: Cardinal;
 
-      constructor Create(Hash: Cardinal; P: PWideChar; L: Cardinal; B: PUnicodeString);
+      constructor Create(Hash: Cardinal; P: PChar; L: Cardinal; B: PString);
     end;
     TItemArray = array of TItem;
   {$ENDREGION}
@@ -667,12 +669,12 @@ type
     FTableSize: Cardinal;
 
     procedure Clear;
-    function Share(P: PWideChar; L: Integer; B: PUnicodeString): UnicodeString; overload;
+    function Share(P: PChar; L: Integer; B: PString): string; overload;
   public
     constructor Create;
     destructor Destroy; override;
-    function Share(const P: PWideChar; const L: Integer): UnicodeString; overload; inline;
-    function Share(const U: UnicodeString): UnicodeString; overload; inline;
+    function Share(const P: PChar; const L: Integer): string; overload; inline;
+    function Share(const U: string): string; overload; inline;
   end;
 
   { TACLOrderedDictionary }
@@ -773,6 +775,8 @@ type
   { TACLFastObjectList }
 
   TACLFastObjectList = class
+  public type
+    TPointerList = array of Pointer;
   strict private type
   {$REGION 'Internal'}
     TMtChunk = class
@@ -796,15 +800,40 @@ type
     property List: TPointerList read FItems;
   end;
 
+{$IFDEF FPC}
+resourcestring
+  SGenericItemNotFound = 'Item not found';
+  SGenericDuplicateItem = 'Duplicates not allowed';
+
+function GrowCollection(OldCapacity, NewCount: Integer): Integer;
+{$ENDIF}
 implementation
 
 uses
-  System.RTLConsts,
-  System.SysConst,
-  System.TypInfo,
+  {System.}RTLConsts,
+  {System.}SysConst,
+  {System.}TypInfo,
   // ACL
-  ACL.Utils.Common,
-  ACL.Hashes;
+  ACL.Hashes,
+  ACL.Utils.Common;
+
+{$IFDEF FPC}
+function GrowCollection(OldCapacity, NewCount: Integer): Integer;
+begin
+  Result := OldCapacity;
+  repeat
+    if Result > 64 then
+      Result := (Result * 3) div 2
+    else
+      if Result > 8 then
+        Result := Result + 16
+      else
+        Result := Result + 4;
+    if Result < 0 then
+      OutOfMemoryError;
+  until Result >= NewCount;
+end;
+{$ENDIF}
 
 { TACLEnumerable<T> }
 
@@ -812,11 +841,12 @@ function TACLEnumerable<T>.ToArray: TArray<T>;
 var
   ACapacity: Integer;
   AIndex: Integer;
+  AValue: T;
 begin
   Result := nil;
   AIndex := 0;
   ACapacity := 0;
-  for var AValue in Self do
+  for AValue in Self do
   begin
     if AIndex >= ACapacity then
     begin
@@ -908,7 +938,8 @@ function TACLLinkedList<T>.Add(const AValue: T): TACLLinkedListItem<T>;
 begin
   Result := TACLLinkedListItem<T>.Create;
   Result.Value := AValue;
-  Result := Add(Result);
+  {$MESSAGE WARN 'Commented'}
+  //Result := Add(Result);
 end;
 
 procedure TACLLinkedList<T>.Clear;
@@ -1193,8 +1224,17 @@ begin
 end;
 
 function TACLList<T>.BinarySearch(const Value: T; out Index: Integer): Boolean;
+{$IFDEF FPC}
+var
+  LIndex: SizeInt;
+{$ENDIF}
 begin
+{$IFDEF FPC}
+  Result := TArrayHelper<T>.BinarySearch(FItems, Value, LIndex, FComparer, 0, Count);
+  Index := Integer(LIndex);
+{$ELSE}
   Result := TArray.BinarySearch<T>(FItems, Value, Index, FComparer, 0, Count);
+{$ENDIF}
 end;
 
 function TACLList<T>.Contains(const Value: T): Boolean;
@@ -1310,7 +1350,11 @@ end;
 
 procedure TACLList<T>.Sort(AComparer: IComparer<T>);
 begin
+{$IFDEF FPC}
+  TArrayHelper<T>.Sort(FItems, AComparer, 0, Count);
+{$ELSE}
   TArray.Sort<T>(FItems, AComparer, 0, Count);
+{$ENDIF}
 end;
 
 procedure TACLList<T>.Sort(AProc: TACLListCompareProc<T>);
@@ -1322,7 +1366,7 @@ function TACLList<T>.ToArray: TArray<T>;
 var
   I: Integer;
 begin
-  SetLength(Result, Count);
+  SetLength(Result{%H-}, Count);
   for I := 0 to Count - 1 do
     Result[I] := List[I];
 end;
@@ -1339,7 +1383,7 @@ begin
 
   if FNotifications then
   begin
-    SetLength(AOldItems, ACount);
+    SetLength(AOldItems{%H-}, ACount);
     FItemsManager.Move(FItems, AOldItems, AIndex, 0, ACount);
   end;
 
@@ -1627,11 +1671,12 @@ end;
 
 procedure TACLDictionary<TKey, TValue>.Clear(AKeepCapacity: Boolean = False);
 var
+  I: Integer;
   LItem: PItem;
 begin
   FCount := 0;
 
-  for var I := 0 to Length(FItems) - 1 do
+  for I := 0 to Length(FItems) - 1 do
   begin
     LItem := @FItems[I];
     if LItem^.HashCode <> EMPTY_HASH then
@@ -1661,10 +1706,11 @@ end;
 
 function TACLDictionary<TKey, TValue>.ContainsValue(const Value: TValue): Boolean;
 var
+  I: Integer;
   LComparer: IEqualityComparer<TValue>;
 begin
   LComparer := TEqualityComparer<TValue>.Default;
-  for var I := 0 to Length(FItems) - 1 do
+  for I := 0 to Length(FItems) - 1 do
   begin
     if (FItems[I].HashCode <> EMPTY_HASH) and LComparer.Equals(FItems[I].Value, Value) then
       Exit(True);
@@ -1673,8 +1719,10 @@ begin
 end;
 
 procedure TACLDictionary<TKey, TValue>.Enum(const AProc: TACLPairEnum<TKey, TValue>);
+var
+  I: Integer;
 begin
-  for var I := 0 to Length(FItems) - 1 do
+  for I := 0 to Length(FItems) - 1 do
   begin
     with FItems[I] do
       if HashCode <> EMPTY_HASH then
@@ -1695,11 +1743,12 @@ procedure TACLDictionary<TKey, TValue>.RemoveByValue(const Value: TValue);
 var
   LComparer: IEqualityComparer<TValue>;
   LKeys: TACLList<TKey>;
+  I: Integer;
 begin
   LKeys := nil;
   try
     LComparer := TEqualityComparer<TValue>.Default;
-    for var I := 0 to Length(FItems) - 1 do
+    for I := 0 to Length(FItems) - 1 do
     begin
       if (FItems[I].HashCode <> EMPTY_HASH) and LComparer.Equals(FItems[I].Value, Value) then
       begin
@@ -1710,7 +1759,7 @@ begin
     end;
     if LKeys <> nil then
     begin
-      for var I := 0 to LKeys.Count - 1 do
+      for I := 0 to LKeys.Count - 1 do
         Remove(LKeys.List[I]);
     end;
   finally
@@ -1736,8 +1785,10 @@ begin
 end;
 
 function TACLDictionary<TKey, TValue>.TryExtractFirst(out Key: TKey; out Value: TValue): Boolean;
+var
+  I: Integer;
 begin
-  for var I := 0 to Length(FItems) - 1 do
+  for I := 0 to Length(FItems) - 1 do
   begin
     if FItems[I].HashCode <> EMPTY_HASH then
     begin
@@ -1938,7 +1989,7 @@ begin
     OutOfMemoryError;
 
   AOldItems := FItems;
-  SetLength(ANewItems, ACapacity);
+  SetLength(ANewItems{%H-}, ACapacity);
   for I := 0 to Length(ANewItems) - 1 do
     ANewItems[I].HashCode := EMPTY_HASH;
   FItems := ANewItems;
@@ -2281,9 +2332,10 @@ end;
 
 procedure TACLListenerList.Enum(AProc: TACLListenerListEnumProc<IUnknown>);
 begin
-  Enum<IUnknown>(AProc);
+  //Enum<IUnknown>(AProc);
 end;
-
+{$MESSAGE WARN 'TODO'}
+{
 procedure TACLListenerList.Enum<T>(AProc: TACLListenerListEnumProc<T>);
 var
   AEnumerable: IUnknown;
@@ -2319,7 +2371,7 @@ begin
   finally
     Lock.Leave;
   end;
-end;
+end;}
 
 function TACLListenerList.GetCount: Integer;
 begin
@@ -2639,7 +2691,7 @@ var
   AValue: T;
 begin
   AIndex := 0;
-  SetLength(Result, Count);
+  SetLength(Result{%H-}, Count);
   for AValue in Self do
   begin
     Result[AIndex] := AValue;
@@ -2751,7 +2803,7 @@ begin
     OutOfMemoryError;
 
   AOldItems := FItems;
-  SetLength(ANewItems, ACapacity);
+  SetLength(ANewItems{%H-}, ACapacity);
   for I := 0 to Length(ANewItems) - 1 do
     ANewItems[I].HashCode := EMPTY_HASH;
   FItems := ANewItems;
@@ -3026,17 +3078,17 @@ begin
     inherited Create(TStringComparer.Ordinal, InitialCapacity);
 end;
 
-function TACLStringSet.Contains(const Item: PWideChar; const ItemLength: Integer): Boolean;
+function TACLStringSet.Contains(const Item: PChar; ItemLength: Integer): Boolean;
 begin
   Result := Contains(acMakeString(Item, ItemLength));
 end;
 
-function TACLStringSet.Exclude(const Item: PWideChar; const ItemLength: Integer): Boolean;
+function TACLStringSet.Exclude(const Item: PChar; ItemLength: Integer): Boolean;
 begin
   Result := Exclude(acMakeString(Item, ItemLength));
 end;
 
-function TACLStringSet.Include(const Item: PWideChar; const ItemLength: Integer): Boolean;
+function TACLStringSet.Include(const Item: PChar; ItemLength: Integer): Boolean;
 begin
   Result := Include(acMakeString(Item, ItemLength));
 end;
@@ -3069,7 +3121,7 @@ begin
       Result := CompareMem(PChar(Left), PChar(Right), L1 * SizeOf(Char));
 end;
 
-function TACLStringComparer.GetHashCode(const Value: string): Integer;
+function TACLStringComparer.GetHashCode(const Value: string): HashCode;
 begin
   if FIgnoreCase then
     Result := TACLHashBobJenkins.Calculate(acUpperCase(Value), nil)
@@ -3112,23 +3164,23 @@ begin
   end;
 end;
 
-function TACLStringSharedTable.Share(const P: PWideChar; const L: Integer): UnicodeString;
+function TACLStringSharedTable.Share(const P: PChar; const L: Integer): string;
 begin
   Result := Share(P, L, nil);
 end;
 
-function TACLStringSharedTable.Share(const U: UnicodeString): UnicodeString;
+function TACLStringSharedTable.Share(const U: string): string;
 begin
-  Result := Share(PWideChar(U), Length(U), @U);
+  Result := Share(PChar(U), Length(U), @U);
 end;
 
-function TACLStringSharedTable.Share(P: PWideChar; L: Integer; B: PUnicodeString): UnicodeString;
+function TACLStringSharedTable.Share(P: PChar; L: Integer; B: PString): string;
 var
   AIndex: Integer;
   AItem: TItem;
   AHash: Cardinal;
 begin
-  AHash := Cardinal(TACLHashBobJenkins.Calculate(PByte(P), L * SizeOf(WideChar)));
+  AHash := Cardinal(TACLHashBobJenkins.Calculate(PByte(P), L * SizeOf(Char)));
   AIndex := AHash mod FTableSize;
   AItem := FTable[AIndex];
   if AItem = nil then
@@ -3140,7 +3192,7 @@ begin
     repeat
       if (AItem.ValueHash = AHash) and (Length(AItem.Value) = L) then
       begin
-        if CompareMem(PWideChar(AItem.Value), P, L * SizeOf(WideChar)) then
+        if CompareMem(PWideChar(AItem.Value), P, L * SizeOf(Char)) then
           Break;
       end;
 
@@ -3158,7 +3210,8 @@ end;
 
 { TACLStringSharedTable.TItem }
 
-constructor TACLStringSharedTable.TItem.Create(Hash: Cardinal; P: PWideChar; L: Cardinal; B: PUnicodeString);
+constructor TACLStringSharedTable.TItem.Create(
+  Hash: Cardinal; P: PChar; L: Cardinal; B: PString);
 begin
   ValueHash := Hash;
   if B <> nil then
@@ -3411,8 +3464,10 @@ begin
 end;
 
 procedure TACLFastObjectList.Clear(AKeepCapacity: Boolean = False);
+var
+  I: Integer;
 begin
-  for var I := 0 to Count - 1 do
+  for I := 0 to Count - 1 do
     FreeAndNil(FItems[I]);
   Flush(AKeepCapacity);
 end;
@@ -3423,15 +3478,16 @@ var
   AChunks: array of TMtChunk;
   ACountPerChunk: Integer;
   AIndex: Integer;
+  I: Integer;
 begin
   if Count = 0 then Exit;
 
   AIndex := 0;
   AChunkCount := EnsureRange(Min(CpuCount, 4), 1, Count);
-  SetLength(AChunks, AChunkCount);
+  SetLength(AChunks{%H-}, AChunkCount);
   ACountPerChunk := Count div AChunkCount;
   try
-    for var I := 0 to AChunkCount - 1 do
+    for I := 0 to AChunkCount - 1 do
     begin
       AChunks[I] := TMtChunk.Create;
       AChunks[I].Items := @List[AIndex];
@@ -3442,7 +3498,7 @@ begin
     TACLMultithreadedOperation.Run(@AChunks[0], AChunkCount, @RemoveCore);
     Flush(AKeepCapacity);
   finally
-    for var I := 0 to AChunkCount - 1 do
+    for I := 0 to AChunkCount - 1 do
       FreeAndNil(AChunks[I]);
   end;
 end;

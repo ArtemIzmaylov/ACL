@@ -43,7 +43,7 @@ type
   TACLBlendMode = (bmNormal, bmMultiply, bmScreen, bmOverlay, bmAddition,
     bmSubstract, bmDifference, bmDivide, bmLighten, bmDarken, bmGrayscale);
 
-{$REGION 'Layers'}
+{$REGION ' Layers '}
 
   { TACLBitmapLayer }
 
@@ -72,7 +72,7 @@ type
     procedure Assign(ALayer: TACLBitmapLayer);
     procedure AssignParams(DC: HDC);
     function Clone(out AData: PRGBQuadArray): Boolean;
-    function CoordToFlatIndex(X, Y: Integer): Integer;
+    function CoordToFlatIndex(X, Y: Integer): Integer; inline;
     //
     procedure ApplyTint(const AColor: TColor); overload;
     procedure ApplyTint(const AColor: TRGBQuad); overload;

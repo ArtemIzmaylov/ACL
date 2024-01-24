@@ -4,7 +4,7 @@
 {*           Mathematics Routines            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -12,10 +12,11 @@
 unit ACL.Math.Complex;
 
 {$I ACL.Config.inc}
+{%FPC: OK}
 
-// Warning:
-// Don't mix usage of TFastFourierTransform and TFastFourierTransformUniversal functions for same data,
-// because TFastFourierTransformUniversal doesn't reorder data
+// [!] Warning:
+// Don't mix usage of TFastFourierTransform and TFastFourierTransformUniversal
+// functions for same data (TFastFourierTransformUniversal doesn't reorder data)
 
 interface
 
@@ -101,7 +102,7 @@ const
 implementation
 
 uses
-  System.SysUtils,
+  SysUtils,
   // ACL
   ACL.FastCode,
   ACL.Utils.Common;

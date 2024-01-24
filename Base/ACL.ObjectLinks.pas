@@ -4,7 +4,7 @@
 {*               Object Links                *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -20,10 +20,10 @@ uses
   Winapi.Windows, // inlining
 {$ENDIF}
   // System
-  System.Classes,
-  System.Generics.Collections,
-  System.SysUtils,
-  System.Types,
+  {System.}Classes,
+  {System.}Generics.Collections,
+  {System.}SysUtils,
+  {System.}Types,
   // ACL
   ACL.Threading;
 
@@ -49,7 +49,7 @@ type
   TACLObjectLinks = class sealed
   strict private
     class var FFreeNotifier: TComponent;
-    class var FLinks: TDictionary<TObject, TObject>;
+    class var FLinks: TObjectDictionary<TObject, TObject>;
     class var FLock: TACLCriticalSection;
 
     class function SafeCreateLink(AObject: TObject): TObject;
@@ -382,7 +382,11 @@ end;
 procedure TACLObjectLink.RemoveBridge(const ALink: TACLObjectLink);
 begin
   if FBridges <> nil then
+  {$IFDEF DELPHI}
     FBridges.RemoveItem(ALink, TDirection.FromEnd);
+  {$ELSE}
+    FBridges.Remove(ALink);
+  {$ENDIF}
 end;
 
 procedure TACLObjectLink.RemoveExtension(const AIntf: IInterface);
