@@ -464,8 +464,8 @@ function acStringReplace(const S, OldPattern, NewPattern: string;
   AIgnoreCase: Boolean = False; AWholeWords: Boolean = False): string;
 
 // Integer <-> PWideChar;
-function acPWideCharToIntDef(AChars: PWideChar; ACount: Integer; const ADefaultValue: Int64): Int64; inline;
-function acTryPWideCharToInt(AChars: PWideChar; ACount: Integer; out AValue: Int64): Boolean;
+function acPCharToIntDef(AChars: PWideChar; ACount: Integer; const ADefaultValue: Int64): Int64; inline;
+function acTryPCharToInt(AChars: PWideChar; ACount: Integer; out AValue: Int64): Boolean;
 
 // Linebreaks
 function acDecodeLineBreaks(const S: UnicodeString): UnicodeString;
@@ -1174,7 +1174,7 @@ begin
     Result := acExplodeString(S, ADelimiter,
       procedure (ACursorStart, ACursorNext: PWideChar; var ACanContinue: Boolean)
       begin
-        AArray^ := acPWideCharToIntDef(ACursorStart, acStringLength(ACursorStart, ACursorNext), 0);
+        AArray^ := acPCharToIntDef(ACursorStart, acStringLength(ACursorStart, ACursorNext), 0);
         Dec(AArrayLength);
         Inc(AArray);
         ACanContinue := AArrayLength > 0;
@@ -1355,7 +1355,7 @@ begin
         Inc(SL1);
       while (SL2 < P2Len) and (P2 + SL2)^.IsDigit do
         Inc(SL2);
-      Result := Sign(acPWideCharToIntDef(P1, SL1, 0) - acPWideCharToIntDef(P2, SL2, 0));
+      Result := Sign(acPCharToIntDef(P1, SL1, 0) - acPCharToIntDef(P2, SL2, 0));
       Dec(P1Len, SL1);
       Dec(P2Len, SL2);
       Inc(P1, SL1);
@@ -1572,7 +1572,7 @@ end;
 // Integer <-> PWideChar
 // ---------------------------------------------------------------------------------------------------------------------
 
-function acTryPWideCharToInt(AChars: PWideChar; ACount: Integer; out AValue: Int64): Boolean;
+function acTryPCharToInt(AChars: PWideChar; ACount: Integer; out AValue: Int64): Boolean;
 var
   ADigit: Integer;
   ANegative: Boolean;
@@ -1611,9 +1611,9 @@ begin
   Result := True;
 end;
 
-function acPWideCharToIntDef(AChars: PWideChar; ACount: Integer; const ADefaultValue: Int64): Int64; inline;
+function acPCharToIntDef(AChars: PWideChar; ACount: Integer; const ADefaultValue: Int64): Int64; inline;
 begin
-  if not acTryPWideCharToInt(AChars, ACount, Result) then
+  if not acTryPCharToInt(AChars, ACount, Result) then
     Result := ADefaultValue;
 end;
 
@@ -1998,7 +1998,7 @@ begin
     ACurr2 := ACurr;
     while ACurr2^.IsDigit do
       Inc(ACurr2);
-    if acTryPWideCharToInt(ACurr, acStringLength(ACurr, ACurr2), AMillis) then
+    if acTryPCharToInt(ACurr, acStringLength(ACurr, ACurr2), AMillis) then
     begin
       if AMillis > 0 then
         ATimeInSeconds := ATimeInSeconds + 1 / AMillis;

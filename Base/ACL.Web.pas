@@ -216,7 +216,7 @@ begin
 
     // Day
     Check(AParser.GetToken(AToken));
-    D := acPWideCharToIntDef(AToken.Data, AToken.DataLength, 0);
+    D := acPCharToIntDef(AToken.Data, AToken.DataLength, 0);
     // Month
     Check(AParser.GetToken(AToken));
     for M := 1 to 12 do
@@ -228,19 +228,19 @@ begin
     end;
     // Year
     Check(AParser.GetToken(AToken));
-    Y := acPWideCharToIntDef(AToken.Data, AToken.DataLength, 0);
+    Y := acPCharToIntDef(AToken.Data, AToken.DataLength, 0);
 
     // Hour
     Check(AParser.GetToken(AToken));
-    H := acPWideCharToIntDef(AToken.Data, AToken.DataLength, 0);
+    H := acPCharToIntDef(AToken.Data, AToken.DataLength, 0);
     Check(AParser.GetToken(AToken) and AToken.Compare(':'));
     // Minutes
     Check(AParser.GetToken(AToken));
-    N := acPWideCharToIntDef(AToken.Data, AToken.DataLength, 0);
+    N := acPCharToIntDef(AToken.Data, AToken.DataLength, 0);
     Check(AParser.GetToken(AToken) and AToken.Compare(':'));
     // Seconds
     Check(AParser.GetToken(AToken));
-    S := acPWideCharToIntDef(AToken.Data, AToken.DataLength, 0);
+    S := acPCharToIntDef(AToken.Data, AToken.DataLength, 0);
 
     // TimeZone
     T := 0;
@@ -254,7 +254,7 @@ begin
         begin
           T := Signs[AToken.Compare('+')];
           Check(AParser.GetToken(AToken));
-          T := T * acPWideCharToIntDef(AToken.Data, AToken.DataLength, 0);
+          T := T * acPCharToIntDef(AToken.Data, AToken.DataLength, 0);
         end;
     end;
   finally
