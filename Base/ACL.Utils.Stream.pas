@@ -271,14 +271,6 @@ function StreamLoadFromFile(AStream: TStream; const AFileName: UnicodeString): B
 function StreamResourceExists(AInstance: HINST; const AResourceName: UnicodeString; AResourceType: PWideChar): Boolean;
 function StreamSaveToFile(const AStream: IACLStreamContainer; const AFileName: UnicodeString): Boolean; overload;
 function StreamSaveToFile(const AStream: TStream; const AFileName: UnicodeString): Boolean; overload;
-
-// Load/Save String
-function acLoadString(AStream: TStream; ADefaultEncoding: TEncoding; out AEncoding: TEncoding): UnicodeString; overload;
-function acLoadString(AStream: TStream; AEncoding: TEncoding = nil): UnicodeString; overload;
-function acLoadString(const AFileName: UnicodeString; AEncoding: TEncoding = nil): UnicodeString; overload;
-function acSaveString(AStream: TStream; const AString: UnicodeString; AEncoding: TEncoding = nil; AWriteBOM: Boolean = True): Boolean; overload;
-function acSaveString(const AFileName, AString: UnicodeString; AEncoding: TEncoding = nil; AWriteBOM: Boolean = True): Boolean; overload;
-function acSaveString(const AFileName: UnicodeString; const AString: AnsiString): Boolean; overload;
 implementation
 
 uses
@@ -493,96 +485,6 @@ begin
     StreamCopy(AFileStream, AStream, 0, AStream.Size);
   finally
     AFileStream.Free;
-  end;
-end;
-
-// ---------------------------------------------------------------------------------------------------------------------
-// Load/Save String
-// ---------------------------------------------------------------------------------------------------------------------
-
-function acSaveString(const AFileName: UnicodeString; const AString: AnsiString): Boolean;
-var
-  AStream: TStream;
-begin
-  Result := StreamCreateWriter(AFileName, AStream);
-  if Result then
-  try
-    AStream.WriteStringA(AString);
-  finally
-    AStream.Free;
-  end;
-end;
-
-function acLoadString(AStream: TStream; ADefaultEncoding: TEncoding; out AEncoding: TEncoding): UnicodeString;
-var
-  ABytes: TBytes;
-  ASize: Cardinal;
-begin
-  AEncoding := acDetectEncoding(AStream, ADefaultEncoding);
-  ASize := AStream.Size - AStream.Position;
-  if ASize <= 0 then
-    Result := ''
-  else
-    if AEncoding = TEncoding.Unicode then
-    begin
-      ASize := ASize div SizeOf(WideChar);
-      SetLength(Result, ASize);
-      AStream.ReadBuffer(Result[1], ASize * SizeOf(WideChar));
-    end
-    else
-    begin
-      SetLength(ABytes, ASize);
-      AStream.ReadBuffer(ABytes[0], ASize);
-      try
-        Result := AEncoding.GetString(ABytes);
-      except
-        Result := TACLEncodings.Default.GetString(ABytes);
-      end;
-    end;
-end;
-
-function acLoadString(AStream: TStream; AEncoding: TEncoding = nil): UnicodeString;
-var
-  X: TEncoding;
-begin
-  Result := acLoadString(AStream, AEncoding, X);
-end;
-
-function acLoadString(const AFileName: UnicodeString; AEncoding: TEncoding = nil): UnicodeString;
-var
-  AStream: TStream;
-begin
-  AStream := StreamCreateReader(AFileName);
-  if AStream <> nil then
-  try
-    Result := acLoadString(AStream, AEncoding);
-  finally
-    AStream.Free;
-  end
-  else
-    Result := '';
-end;
-
-function acSaveString(AStream: TStream; const AString: UnicodeString;
-  AEncoding: TEncoding = nil; AWriteBOM: Boolean = True): Boolean;
-begin
-  Result := True;
-  if AWriteBOM then
-    AStream.WriteBOM(AEncoding);
-  AStream.WriteString(AString, AEncoding);
-end;
-
-function acSaveString(const AFileName, AString: UnicodeString;
-  AEncoding: TEncoding = nil; AWriteBOM: Boolean = True): Boolean;
-var
-  AStream: TStream;
-begin
-  Result := StreamCreateWriter(AFileName, AStream);
-  if Result then
-  try
-    Result := acSaveString(AStream, AString, AEncoding, AWriteBOM);
-  finally
-    AStream.Free;
   end;
 end;
 

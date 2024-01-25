@@ -451,6 +451,18 @@ function acDetectEncoding(ABuffer: TBytes;
 function acDetectEncoding(AStream: TStream;
   ADefaultEncoding: TEncoding = nil): TEncoding; overload;
 
+// Load/Save String
+function acLoadString(AStream: TStream;
+  ADefaultEncoding: TEncoding; out AEncoding: TEncoding): UnicodeString; overload;
+function acLoadString(AStream: TStream;
+  AEncoding: TEncoding = nil): UnicodeString; overload;
+function acLoadString(const AFileName: UnicodeString;
+  AEncoding: TEncoding = nil): UnicodeString; overload;
+procedure acSaveString(AStream: TStream; const AString: UnicodeString;
+  AEncoding: TEncoding = nil; AWriteBOM: Boolean = True); overload;
+procedure acSaveString(const AFileName, AString: UnicodeString;
+  AEncoding: TEncoding = nil; AWriteBOM: Boolean = True); overload;
+
 // Replacing
 function acRemoveChar(const S: UnicodeString; const ACharToRemove: WideChar): UnicodeString;
 function acRemoveSurrogates(const S: UnicodeString; const AReplaceBy: WideChar = #0): UnicodeString;
@@ -1567,7 +1579,82 @@ begin
 end;
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Integer <-> PWideChar
+// Load/Save String
+// ---------------------------------------------------------------------------------------------------------------------
+
+function acLoadString(AStream: TStream; ADefaultEncoding: TEncoding; out AEncoding: TEncoding): UnicodeString;
+var
+  ABytes: TBytes;
+  ASize: Cardinal;
+begin
+  AEncoding := acDetectEncoding(AStream, ADefaultEncoding);
+  ASize := AStream.Size - AStream.Position;
+  if ASize <= 0 then
+    Result := ''
+  else
+    if AEncoding = TEncoding.Unicode then
+    begin
+      ASize := ASize div SizeOf(WideChar);
+      SetLength(Result, ASize);
+      AStream.ReadBuffer(Result[1], ASize * SizeOf(WideChar));
+    end
+    else
+    begin
+      SetLength(ABytes, ASize);
+      AStream.ReadBuffer(ABytes[0], ASize);
+      try
+        Result := AEncoding.GetString(ABytes);
+      except
+        Result := TACLEncodings.Default.GetString(ABytes);
+      end;
+    end;
+end;
+
+function acLoadString(AStream: TStream; AEncoding: TEncoding = nil): UnicodeString;
+var
+  X: TEncoding;
+begin
+  Result := acLoadString(AStream, AEncoding, X);
+end;
+
+function acLoadString(const AFileName: UnicodeString; AEncoding: TEncoding = nil): UnicodeString;
+var
+  AStream: TStream;
+begin
+  AStream := StreamCreateReader(AFileName);
+  if AStream <> nil then
+  try
+    Result := acLoadString(AStream, AEncoding);
+  finally
+    AStream.Free;
+  end
+  else
+    Result := '';
+end;
+
+procedure acSaveString(AStream: TStream; const AString: UnicodeString;
+  AEncoding: TEncoding = nil; AWriteBOM: Boolean = True);
+begin
+  if AWriteBOM then
+    AStream.WriteBOM(AEncoding);
+  AStream.WriteString(AString, AEncoding);
+end;
+
+procedure acSaveString(const AFileName, AString: UnicodeString;
+  AEncoding: TEncoding = nil; AWriteBOM: Boolean = True);
+var
+  LStream: TStream;
+begin
+  LStream := StreamCreateWriter(AFileName);
+  try
+    acSaveString(LStream, AString, AEncoding, AWriteBOM);
+  finally
+    LStream.Free;
+  end;
+end;
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Integer <-> PChar
 // ---------------------------------------------------------------------------------------------------------------------
 
 function acTryPCharToInt(AChars: PWideChar; ACount: Integer; out AValue: Int64): Boolean;
