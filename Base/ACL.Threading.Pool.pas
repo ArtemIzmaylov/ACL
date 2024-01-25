@@ -92,6 +92,7 @@ type
     procedure Initialize;
     function IsActive: Boolean;
     procedure Run(AWaitFor: Boolean);
+    procedure WaitFor;
     //# Properties
     property OnAsyncFinished: TNotifyEvent read FOnAsyncFinished write FOnAsyncFinished;
   end;
@@ -318,8 +319,12 @@ end;
 procedure TACLTaskGroup.Run(AWaitFor: Boolean);
 begin
   AsyncFinished;
-  if AWaitFor then
-    FEvent.WaitFor;
+  if AWaitFor then WaitFor;
+end;
+
+procedure TACLTaskGroup.WaitFor;
+begin
+  FEvent.WaitFor;
 end;
 
 { TACLTaskQueue }

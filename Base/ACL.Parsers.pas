@@ -490,7 +490,7 @@ begin
   if IgnoreCase then
     Result := acCompareStrings(Data, PWideChar(S), DataLength, DataLength) = 0
   else
-    Result := CompareMem(Data, PWideChar(S), DataLength);
+    Result := CompareMem(Data, PWideChar(S), DataLength * SizeOf(WideChar));
 end;
 
 procedure TACLParserToken.Reset;
