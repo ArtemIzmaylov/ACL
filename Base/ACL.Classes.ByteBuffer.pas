@@ -1,7 +1,7 @@
 ﻿{*********************************************}
 {*                                           *}
 {*        Artem's Components Library         *}
-{*              Common Classes               *}
+{*     Byte Buffers and Data Containers      *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
 {*                 2006-2024                 *}
@@ -11,8 +11,7 @@
 
 unit ACL.Classes.ByteBuffer;
 
-{$I ACL.Config.inc}
-{$MESSAGE WARN 'Commented'}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
@@ -21,8 +20,8 @@ uses
   {System.}SysUtils,
   // ACL
   ACL.Math,
-  ACL.Utils.Common,
-  ACL.Threading;
+  ACL.Threading,
+  ACL.Utils.Common;
 
 type
 
@@ -126,8 +125,7 @@ type
     constructor Create; overload;
     constructor Create(AStream: TStream); overload;
     constructor Create(AStream: TStream; ASize: Integer); overload;
-      {$MESSAGE WARN 'Commented'}
-//    constructor Create(const AFileName: string); overload;
+    constructor Create(const AFileName: string); overload;
     destructor Destroy; override;
     // IACLDataContainer
     function GetDataPtr: PByte;
@@ -171,9 +169,8 @@ uses
   {System.}Math,
   {System.}RTLConsts,
   // ACL
-  ACL.FastCode{,
-  ACL.Utils.FileSystem,
-  ACL.Utils.Stream};
+  ACL.FastCode,
+  ACL.Utils.FileSystem;
 
 function acCompare(const AContainer1, AContainer2: IACLDataContainer): Boolean;
 begin
@@ -471,17 +468,17 @@ begin
   AStream.ReadBuffer(FData.Memory^, ASize);
 end;
 
-//constructor TACLDataContainer.Create(const AFileName: string);
-//var
-//  AStream: TStream;
-//begin
-//  AStream := TACLFileStream.Create(AFileName, fmOpenRead or fmShareDenyNone);
-//  try
-//    Create(AStream);
-//  finally
-//    AStream.Free;
-//  end;
-//end;
+constructor TACLDataContainer.Create(const AFileName: string);
+var
+  LStream: TStream;
+begin
+  LStream := TACLFileStream.Create(AFileName, fmOpenRead or fmShareDenyNone);
+  try
+    Create(LStream);
+  finally
+    LStream.Free;
+  end;
+end;
 
 destructor TACLDataContainer.Destroy;
 begin

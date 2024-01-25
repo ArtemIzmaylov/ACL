@@ -11,8 +11,7 @@
 
 unit ACL.Math.Complex;
 
-{$I ACL.Config.inc}
-{%FPC: OK}
+{$I ACL.Config.inc} // FPC:OK
 
 // [!] Warning:
 // Don't mix usage of TFastFourierTransform and TFastFourierTransformUniversal

@@ -11,9 +11,8 @@
 
 unit ACL.FastCode;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 {$DEBUGINFO OFF}
-{%FPC: OK}
 
 interface
 

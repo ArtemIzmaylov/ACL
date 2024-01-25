@@ -13,6 +13,13 @@ unit ACL.Utils.Strings;
 
 {$I ACL.Config.inc}
 
+(*
+   FPC-NotImplemented:
+   + acStringToAnsiString
+   + acStringFromAnsiString
+   + TACLEncodings
+*)
+
 interface
 
 uses
@@ -33,6 +40,7 @@ uses
   {System.}Generics.Collections,
   {System.}Types,
   // ACL
+  ACL.Threading,
   ACL.Utils.Common;
 
 const
@@ -44,11 +52,6 @@ const
   acLineSeparator = WideChar($2028);
   acZero = #0#0;
   acZeroWidthSpace = WideChar($200B);
-
-  {$MESSAGE WARN 'refactor'}
-  UNICODE_BOM = WideChar($FEFF);
-  UNICODE_BOM_EX = AnsiString(#$FF#$FE);
-  UNICODE_NULL = WideChar($0000);
 
 type
   TAnsiStringDynArray = array of AnsiString;
@@ -100,6 +103,7 @@ type
 
   TACLSearchString = class
   strict private
+    FLock: TACLCriticalSection;
     FEmpty: Boolean;
     FIgnoreCase: Boolean;
     FMask: TStringDynArray;
@@ -114,6 +118,7 @@ type
   public
     constructor Create; overload;
     constructor Create(const AMask: string; AIgnoreCase: Boolean = True); overload;
+    destructor Destroy; override;
     function Compare(const S: string): Boolean;
 
     procedure BeginComparing;
@@ -335,7 +340,7 @@ type
   TACLTranslit = class
   strict private const
     ColChar = 33;
-    RArrayL = 'абвгдеёжзийклмнопрстуфхцчшщьыъэюя';
+    RArrayL = UnicodeString('абвгдеёжзийклмнопрстуфхцчшщьыъэюя');
     Translit: array[1..ColChar] of UnicodeString = (
       'a', 'b', 'v', 'g', 'd', 'e', 'yo', 'zh', 'z', 'i', 'i''', 'k', 'l', 'm', 'n', 'o', 'p', 'r', 's', 't', 'u',
       'f', 'h', 'ts', 'ch', 'sh', 'sch', #39, 'y', #39, 'e', 'yu', 'ya'
@@ -351,8 +356,9 @@ type
   strict private
     class var FCodePages: TObject;
     class var FMap: TObject;
-
+  {$IFDEF MSWINDOWS}
     class function CodePageEnumProc(lpCodePageString: PWideChar): Cardinal; stdcall; static;
+  {$ENDIF}
   public
     class constructor Create;
     class destructor Destroy;
@@ -403,15 +409,15 @@ function acUtf8IsWellformed(Source: PAnsiChar; SourceBytes: Integer): Boolean;
 function acUtf8ToUnicode(Dest: PWideChar; MaxDestChars: Integer; Source: PAnsiChar; SourceBytes: Integer): Integer;
 
 // Search
-function acContains(const AChar: WideChar;
-  const AString: UnicodeString): Boolean; inline; overload;
-function acContains(const ASubStr, AString: UnicodeString;
-  AIgnoreCase: Boolean = False): Boolean; inline; overload;
+function acContains(const AChar: AnsiChar; const AString: AnsiString): Boolean; inline; overload;
+function acContains(const AChar: WideChar; const AString: UnicodeString): Boolean; inline; overload;
+function acContains(const ASubStr, AString: string; AIgnoreCase: Boolean = False): Boolean; inline; overload;
 function acFindStringInMemoryA(const S: AnsiString;
   AMem: PByte; AMemSize, AMemOffset: Integer; out AOffset: Integer): Boolean;
 function acFindStringInMemoryW(const S: UnicodeString;
   AMem: PByte; AMemSize, AMemOffset: Integer; out AOffset: Integer): Boolean;
-function acPos(const ACharToSearch: Char; const AString: string): Integer; overload;
+function acPos(const ACharToSearch: AnsiChar; const AString: AnsiString): Integer; overload;
+function acPos(const ACharToSearch: WideChar; const AString: UnicodeString): Integer; overload;
 function acPos(const ASubStr, AString: string;
   AIgnoreCase: Boolean = False; AOffset: Integer = 1): Integer; overload; inline;
 function acPos(const ASubStr, AString: string;
@@ -422,20 +428,23 @@ function acAllocStr(const S: string): PChar; overload;
 function acAllocStr(const S: string; out ALength: Integer): PChar; overload;
 function acMakeString(const P: PAnsiChar; L: Integer): AnsiString; overload; inline;
 function acMakeString(const P: PWideChar; L: Integer): UnicodeString; overload; inline;
+function acMakeString(const AScanStart, AScanNext: PAnsiChar): AnsiString; overload;
+function acMakeString(const AScanStart, AScanNext: PWideChar): UnicodeString; overload;
+function acStringLength(const AScanStart, AScanNext: PAnsiChar): Integer; overload; inline;
+function acStringLength(const AScanStart, AScanNext: PWideChar): Integer; overload; inline;
 
 // Explode
 function acExplodeString(AScan: PAnsiChar; AScanCount: Integer;
-  ADelimiter: AnsiChar; AReceiveProc: TAnsiExplodeStringReceiveResultProc): Integer; overload;
+  const ADelimiters: AnsiString; AReceiveProc: TAnsiExplodeStringReceiveResultProc): Integer; overload;
 function acExplodeString(AScan: PWideChar; AScanCount: Integer;
   const ADelimiters: UnicodeString; AReceiveProc: TWideExplodeStringReceiveResultProc): Integer; overload;
 function acExplodeString(const S: UnicodeString;
   const ADelimiters: UnicodeString; AReceiveProc: TWideExplodeStringReceiveResultProc): Integer; overload;
-function acExplodeString(const S: UnicodeString;
-  const ADelimiters: UnicodeString; out AParts: TStringDynArray): Integer; overload;
-function acExplodeStringAsIntegerArray(const S: UnicodeString;
-  ADelimiter: WideChar; AArray: PInteger; AArrayLength: Integer): Integer;
-function acGetCharacterCount(const S, ACharacters: UnicodeString): Integer; overload;
-function acGetCharacterCount(P: PWideChar; ALength: Integer; const ACharacters: UnicodeString): Integer; overload;
+function acExplodeString(const S, ADelimiters: string; out AParts: TStringDynArray): Integer; overload;
+function acExplodeStringAsIntegerArray(const S: string;
+  ADelimiter: Char; AArray: PInteger; AArrayLength: Integer): Integer;
+function acGetCharacterCount(const S, ACharacters: string): Integer; overload;
+function acGetCharacterCount(P: PChar; ALength: Integer; const ACharacters: string): Integer; overload;
 
 // Case
 function acAllWordsWithCaptialLetter(const S: AnsiString; IgnoreSourceCase: Boolean = False): AnsiString; overload;
@@ -476,10 +485,10 @@ function acReplaceChars(const S, ACharsToReplace: string; AReplaceBy: Char = '_'
 function acStringReplace(const S, OldPattern, NewPattern: string;
   AIgnoreCase: Boolean = False; AWholeWords: Boolean = False): string;
 
-// Integer <-> PWideChar;
-{$MESSAGE WARN 'TODO - PWideChar -> PChar'}
-function acPWideCharToIntDef(AChars: PWideChar; ACount: Integer; const ADefaultValue: Int64): Int64; inline;
-function acTryPWideCharToInt(AChars: PWideChar; ACount: Integer; out AValue: Int64): Boolean;
+// Integer <-> PChar (supports for the FullWidth Numbers too)
+function acIsDigit(AChar: Char): Boolean; inline;
+function acPCharToIntDef(AChars: PChar; ACount: Integer; ADefaultValue: Int64 = 0): Int64; inline;
+function acTryPCharToInt(AChars: PChar; ACount: Integer; out AValue: Int64): Boolean;
 
 // Linebreaks
 function acDecodeLineBreaks(const S: UnicodeString): UnicodeString;
@@ -516,15 +525,13 @@ function acFormatTrackNo(ATrack: Integer): UnicodeString;
 function IfThenW(AValue: Boolean; const ATrue: UnicodeString; const AFalse: UnicodeString = ''): UnicodeString; overload; inline;
 function IfThenW(const A, B: UnicodeString): UnicodeString; overload; inline;
 function acDupeString(const AText: UnicodeString; ACount: Integer): UnicodeString;
-function acTrim(const S: UnicodeString): UnicodeString;
+function acTrim(const S: string): string;
 procedure acStrLCopy(ADest: PWideChar; const ASource: UnicodeString; AMax: Integer);
-
-{$MESSAGE WARN 'TODO - WStrScan -> acStrScan'}
-function WStrLength(S: PWideChar; AMaxScanCount: Integer): Integer; inline;
-function WStrScan(Str: PAnsiChar; ACount: Integer; C: AnsiChar): PAnsiChar; overload; inline;
-function WStrScan(Str: PAnsiChar; C: AnsiChar): PAnsiChar; overload; inline;
-function WStrScan(Str: PWideChar; ACount: Integer; C: WideChar): PWideChar; overload; inline;
-function WStrScan(Str: PWideChar; C: WideChar): PWideChar; overload; inline;
+function acStrLen(S: PWideChar; AMaxScanCount: Integer): Integer; inline;
+function acStrScan(Str: PAnsiChar; ACount: Integer; C: AnsiChar): PAnsiChar; overload; inline;
+function acStrScan(Str: PAnsiChar; C: AnsiChar): PAnsiChar; overload; inline;
+function acStrScan(Str: PWideChar; ACount: Integer; C: WideChar): PWideChar; overload; inline;
+function acStrScan(Str: PWideChar; C: WideChar): PWideChar; overload; inline;
 implementation
 
 uses
@@ -737,15 +744,21 @@ begin
 end;
 
 function acStringToAnsiString(const S: UnicodeString; CodePage: Integer): AnsiString; overload;
-var
-  ALen: Integer;
-  ATemp: PWideChar;
+{$IFDEF FPC}
 begin
-  {$MESSAGE WARN 'Commented'}
-  //ATemp := PWideChar(S);
-  //ALen := LocaleCharsFromUnicode(CodePage, 0, ATemp, Length(S), nil, 0, nil, nil);
-  //SetLength(Result, ALen);
-  //LocaleCharsFromUnicode(CodePage, 0, ATemp, Length(S), PAnsiChar(Result), ALen, nil, nil);
+  Result := AnsiString(S);
+  {$MESSAGE WARN 'NOT-IMPLEMENTED'}
+//  raise ENotImplemented.Create('acStringToAnsiString');
+{$ELSE}
+var
+  LLen: Integer;
+  LTmp: PWideChar;
+begin
+  LTmp := PWideChar(S);
+  LLen := LocaleCharsFromUnicode(CodePage, 0, LTmp, Length(S), nil, 0, nil, nil);
+  SetLength(Result, LLen);
+  LocaleCharsFromUnicode(CodePage, 0, LTmp, Length(S), PAnsiChar(Result), LLen, nil, nil);
+{$ENDIF}
 end;
 
 function acStringToBytes(W: PWideChar; ACount: Integer): RawByteString;
@@ -773,18 +786,27 @@ end;
 
 function acStringFromAnsiString(const S: AnsiChar): WideChar;
 begin
-  {$MESSAGE WARN 'Commented'}
-  //UnicodeFromLocaleChars(DefaultCodePage, 0, @S, 1, @Result, 1);
+{$IFDEF FPC}
+  Result := S; {$MESSAGE WARN 'NOT-IMPLEMENTED'}
+{$ELSE}
+  UnicodeFromLocaleChars(DefaultCodePage, 0, @S, 1, @Result, 1);
+{$ENDIF}
 end;
 
 function acStringFromAnsiString(const S: PAnsiChar; Length, CodePage: Integer): UnicodeString;
-var
-  ATargetLength: Integer;
+{$IFDEF FPC}
 begin
-  {$MESSAGE WARN 'Commented'}
-  //ATargetLength := UnicodeFromLocaleChars(CodePage, 0, S, Length, nil, 0);
-  //SetLength(Result, ATargetLength);
-  //UnicodeFromLocaleChars(CodePage, 0, S, Length, PWideChar(Result), ATargetLength);
+  Result := UnicodeString(acMakeString(S, Length));
+  {$MESSAGE WARN 'NOT-IMPLEMENTED'}
+//  raise ENotImplemented.Create('acStringToAnsiString');
+{$ELSE}
+var
+  LLen: Integer;
+begin
+  LLen := UnicodeFromLocaleChars(CodePage, 0, S, Length, nil, 0);
+  SetLength(Result, LLen);
+  UnicodeFromLocaleChars(CodePage, 0, S, Length, PWideChar(Result), LLen);
+{$ENDIF}
 end;
 
 function acStringFromAnsiString(const S: AnsiString; CodePage: Integer): UnicodeString;
@@ -801,7 +823,7 @@ function acStringFromBytes(B: PByte; Count: Integer): UnicodeString;
 var
   W: PWord;
 begin
-  SetLength(Result, Count);
+  SetLength(Result{%H-}, Count);
   if Count > 0 then
   begin
     W := @Result[1];
@@ -836,17 +858,23 @@ end;
 // Search
 //==============================================================================
 
-function acContains(const AChar: WideChar; const AString: UnicodeString): Boolean; inline;
+function acContains(const AChar: AnsiChar; const AString: AnsiString): Boolean;
 begin
-  Result := WStrScan(Pointer(AString), AChar) <> nil;
+  Result := acStrScan(Pointer(AString), AChar) <> nil;
 end;
 
-function acContains(const ASubStr, AString: UnicodeString; AIgnoreCase: Boolean = False): Boolean;
+function acContains(const AChar: WideChar; const AString: UnicodeString): Boolean;
+begin
+  Result := acStrScan(Pointer(AString), AChar) <> nil;
+end;
+
+function acContains(const ASubStr, AString: string; AIgnoreCase: Boolean = False): Boolean;
 begin
   Result := acPos(ASubStr, AString, AIgnoreCase) > 0;
 end;
 
-function FindDataInMemory(const AData, AMem: PByte; ADataSize, AMemSize, AMemOffset: Integer; out AOffset: Integer): Boolean;
+function FindDataInMemory(const AData, AMem: PByte;
+  ADataSize, AMemSize, AMemOffset: Integer; out AOffset: Integer): Boolean;
 var
   P: PByte;
   C: Integer;
@@ -872,24 +900,38 @@ begin
   end;
 end;
 
-function acFindStringInMemoryA(const S: AnsiString; AMem: PByte; AMemSize, AMemOffset: Integer; out AOffset: Integer): Boolean;
+function acFindStringInMemoryA(const S: AnsiString;
+  AMem: PByte; AMemSize, AMemOffset: Integer; out AOffset: Integer): Boolean;
 begin
   Result := FindDataInMemory(PByte(@S[1]), AMem, Length(S), AMemSize, AMemOffset, AOffset);
 end;
 
-function acFindStringInMemoryW(const S: UnicodeString; AMem: PByte; AMemSize, AMemOffset: Integer; out AOffset: Integer): Boolean;
+function acFindStringInMemoryW(const S: UnicodeString;
+  AMem: PByte; AMemSize, AMemOffset: Integer; out AOffset: Integer): Boolean;
 begin
   Result := FindDataInMemory(PByte(@S[1]), AMem, Length(S) * SizeOf(WideChar), AMemSize, AMemOffset, AOffset);
 end;
 
-function acPos(const ACharToSearch: Char; const AString: String): Integer;
+function acPos(const ACharToSearch: AnsiChar; const AString: AnsiString): Integer;
 var
-  P, R: PChar;
+  P, R: PAnsiChar;
 begin
-  P := PChar(AString);
-  R := WStrScan(P, Length(AString), ACharToSearch);
+  P := PAnsiChar(AString);
+  R := acStrScan(P, Length(AString), ACharToSearch);
   if R <> nil then
-    Result := 1 + (NativeUInt(R) - NativeUInt(P)) div SizeOf(Char)
+    Result := 1 + (NativeUInt(R) - NativeUInt(P))
+  else
+    Result := 0
+end;
+
+function acPos(const ACharToSearch: WideChar; const AString: UnicodeString): Integer;
+var
+  P, R: PWideChar;
+begin
+  P := PWideChar(AString);
+  R := acStrScan(P, Length(AString), ACharToSearch);
+  if R <> nil then
+    Result := 1 + (NativeUInt(R) - NativeUInt(P)) div SizeOf(WideChar)
   else
     Result := 0
 end;
@@ -962,6 +1004,32 @@ begin
     SetString(Result, P, L)
   else
     Result := '';
+end;
+
+function acMakeString(const AScanStart, AScanNext: PAnsiChar): AnsiString; overload;
+begin
+  SetString(Result, AScanStart, acStringLength(AScanStart, AScanNext));
+end;
+
+function acMakeString(const AScanStart, AScanNext: PWideChar): UnicodeString;
+begin
+  SetString(Result, AScanStart, acStringLength(AScanStart, AScanNext));
+end;
+
+function acStringLength(const AScanStart, AScanNext: PAnsiChar): Integer;
+begin
+  if NativeUInt(AScanNext) > NativeUInt(AScanStart) then
+    Result := NativeUInt(AScanNext) - NativeUInt(AScanStart)
+  else
+    Result := 0;
+end;
+
+function acStringLength(const AScanStart, AScanNext: PWideChar): Integer;
+begin
+  if NativeUInt(AScanNext) > NativeUInt(AScanStart) then
+    Result := (NativeUInt(AScanNext) - NativeUInt(AScanStart)) div SizeOf(WideChar)
+  else
+    Result := 0;
 end;
 
 //==============================================================================
@@ -1085,19 +1153,34 @@ end;
 // ---------------------------------------------------------------------------------------------------------------------
 
 function acExplodeString(AScan: PAnsiChar; AScanCount: Integer;
-  ADelimiter: AnsiChar; AReceiveProc: TAnsiExplodeStringReceiveResultProc): Integer;
+  const ADelimiters: AnsiString; AReceiveProc: TAnsiExplodeStringReceiveResultProc): Integer;
 var
   ACanContinue: Boolean;
   ACursor: PAnsiChar;
+  ADelimiterCode: AnsiChar;
+  AIsDelimiter: Boolean;
+  AIsFastWay: Boolean;
 begin
   Result := 0;
   if AScanCount > 0 then
   begin
     ACursor := AScan;
     ACanContinue := True;
+
+    AIsFastWay := Length(ADelimiters) = 1;
+    if AIsFastWay then
+      ADelimiterCode := ADelimiters[1]
+    else
+      ADelimiterCode := #0;
+
     while (AScanCount >= 0) and ACanContinue do
     begin
-      if (AScanCount = 0) or (AScan^ = ADelimiter) then
+      if AIsFastWay then
+        AIsDelimiter := AScan^ = ADelimiterCode
+      else
+        AIsDelimiter := acContains(AScan^, ADelimiters);
+
+      if (AScanCount = 0) or AIsDelimiter then
       begin
         AReceiveProc(ACursor, AScan, ACanContinue);
         ACursor := AScan;
@@ -1110,14 +1193,14 @@ begin
   end;
 end;
 
-function acExplodeString(const S, ADelimiters: UnicodeString; out AParts: TStringDynArray): Integer;
+function acExplodeString(const S, ADelimiters: string; out AParts: TStringDynArray): Integer;
 var
   AArray: PString;
   AArrayLength: Integer;
-  AScan: PWideChar;
+  AScan: PChar;
   AScanCount: Integer;
 begin
-  AScan := PWideChar(S);
+  AScan := PChar(S);
   AScanCount := Length(S);
 
   Result := acGetCharacterCount(AScan, AScanCount, ADelimiters) + 1;
@@ -1127,9 +1210,9 @@ begin
     AArray := @AParts[0];
     AArrayLength := Result;
     Result := acExplodeString(AScan, AScanCount, ADelimiters,
-      procedure (ACursorStart, ACursorNext: PWideChar; var ACanContinue: Boolean)
+      procedure (ACursorStart, ACursorNext: PChar; var ACanContinue: Boolean)
       begin
-        AArray^ := acExtractString(ACursorStart, ACursorNext);
+        AArray^ := acMakeString(ACursorStart, ACursorNext);
         Dec(AArrayLength);
         Inc(AArray);
         ACanContinue := AArrayLength > 0;
@@ -1185,28 +1268,28 @@ begin
   end;
 end;
 
-function acExplodeStringAsIntegerArray(const S: UnicodeString;
-  ADelimiter: WideChar; AArray: PInteger; AArrayLength: Integer): Integer;
+function acExplodeStringAsIntegerArray(const S: string;
+  ADelimiter: Char; AArray: PInteger; AArrayLength: Integer): Integer;
 begin
   if (AArray = nil) or (AArrayLength <= 0) then
     Result := 0
   else
-    Result := acExplodeString(S, ADelimiter,
-      procedure (ACursorStart, ACursorNext: PWideChar; var ACanContinue: Boolean)
+    Result := acExplodeString(PChar(S), Length(S), ADelimiter,
+      procedure (ACursorStart, ACursorNext: PChar; var ACanContinue: Boolean)
       begin
-        AArray^ := acPWideCharToIntDef(ACursorStart, acStringLength(ACursorStart, ACursorNext), 0);
+        AArray^ := acPCharToIntDef(ACursorStart, acStringLength(ACursorStart, ACursorNext));
         Dec(AArrayLength);
         Inc(AArray);
         ACanContinue := AArrayLength > 0;
       end);
 end;
 
-function acGetCharacterCount(const S, ACharacters: UnicodeString): Integer;
+function acGetCharacterCount(const S, ACharacters: string): Integer;
 begin
-  Result := acGetCharacterCount(PWideChar(S), Length(S), ACharacters);
+  Result := acGetCharacterCount(PChar(S), Length(S), ACharacters);
 end;
 
-function acGetCharacterCount(P: PWideChar; ALength: Integer; const ACharacters: UnicodeString): Integer;
+function acGetCharacterCount(P: PChar; ALength: Integer; const ACharacters: string): Integer;
 begin
   Result := 0;
   while ALength > 0 do
@@ -1379,23 +1462,23 @@ var
   AIsDigit2: Boolean;
   SL1, SL2: Integer;
 begin
-(*  Result := 0;
+  Result := 0;
   while P1Len > 0 do
   begin
     if P2Len = 0 then
       Exit(1);
 
-    AIsDigit1 := P1^.IsDigit;
-    AIsDigit2 := P2^.IsDigit;
+    AIsDigit1 := acIsDigit(P1^);
+    AIsDigit2 := acIsDigit(P2^);
     if AIsDigit1 and AIsDigit2 then
     begin
       SL1 := 0;
       SL2 := 0;
-      while (SL1 < P1Len) and (P1 + SL1)^.IsDigit do
+      while (SL1 < P1Len) and acIsDigit((P1 + SL1)^) do
         Inc(SL1);
-      while (SL2 < P2Len) and (P2 + SL2)^.IsDigit do
+      while (SL2 < P2Len) and acIsDigit((P2 + SL2)^) do
         Inc(SL2);
-      Result := Sign(acPWideCharToIntDef(P1, SL1, 0) - acPWideCharToIntDef(P2, SL2, 0));
+      Result := Sign(acPCharToIntDef(P1, SL1, 0) - acPCharToIntDef(P2, SL2, 0));
       Dec(P1Len, SL1);
       Dec(P2Len, SL2);
       Inc(P1, SL1);
@@ -1414,9 +1497,9 @@ begin
       begin
         SL1 := 0;
         SL2 := 0;
-        while (SL1 < P1Len) and not (P1 + SL1)^.IsDigit do
+        while (SL1 < P1Len) and not acIsDigit((P1 + SL1)^) do
           Inc(SL1);
-        while (SL2 < P2Len) and not (P2 + SL2)^.IsDigit do
+        while (SL2 < P2Len) and not acIsDigit((P2 + SL2)^) do
           Inc(SL2);
         Result := acCompareStrings(P1, P2, SL1, SL2, AIgnoreCase);
         Dec(P1Len, SL1);
@@ -1429,8 +1512,7 @@ begin
       Exit;
   end;
   if P2Len > 0 then
-    Result := -1;*)
-  {$MESSAGE WARN 'COMMENTED'}
+    Result := -1;
 end;
 
 function acSameText(const S1, S2: string): Boolean;
@@ -1462,7 +1544,7 @@ function acDetectEncoding(ABuffer: PByte; ABufferSize: Integer; ADefaultEncoding
 var
   ABytes: TBytes;
 begin
-  SetLength(ABytes, Min(ABufferSize, MaxPreambleLength));
+  SetLength(ABytes{%H-}, Min(ABufferSize, MaxPreambleLength));
   FastMove(ABuffer^, ABytes, Length(ABytes));
   acDetectEncoding(ABytes, Result, ADefaultEncoding);
 end;
@@ -1482,7 +1564,7 @@ var
 begin
   ASavedPosition := AStream.Position;
   try
-    SetLength(ABytes, MaxPreambleLength);
+    SetLength(ABytes{%H-}, MaxPreambleLength);
     SetLength(ABytes, Max(0, AStream.Read(ABytes, Length(ABytes))));
     Inc(ASavedPosition, acDetectEncoding(ABytes, Result, ADefaultEncoding))
   finally
@@ -1615,10 +1697,19 @@ begin
 end;
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Integer <-> PWideChar
+// Integer <> PChar
 // ---------------------------------------------------------------------------------------------------------------------
 
-function acTryPWideCharToInt(AChars: PWideChar; ACount: Integer; out AValue: Int64): Boolean;
+function acIsDigit(AChar: Char): Boolean;
+begin
+  Result :=
+  {$IFDEF UNICODE}
+    (Ord(AChar) >= $FF10) and (Ord(AChar) <= $FF19) or
+  {$ENDIF}
+    (Ord(AChar) >= Ord('0')) and (Ord(AChar) <= Ord('9'));
+end;
+
+function acTryPCharToInt(AChars: PChar; ACount: Integer; out AValue: Int64): Boolean;
 var
   ADigit: Integer;
   ANegative: Boolean;
@@ -1640,9 +1731,11 @@ begin
   while ACount > 0 do
   begin
     AWord := Ord(AChars^);
+  {$IFDEF UNICODE}
     if AWord >= $FF10 then // fullwidth numbers
       ADigit := AWord - $FF10
     else
+  {$ENDIF}
       ADigit := AWord - Ord('0');
 
     if (ADigit < 0) or (ADigit > 9) then
@@ -1657,9 +1750,9 @@ begin
   Result := True;
 end;
 
-function acPWideCharToIntDef(AChars: PWideChar; ACount: Integer; const ADefaultValue: Int64): Int64; inline;
+function acPCharToIntDef(AChars: PChar; ACount: Integer; ADefaultValue: Int64): Int64;
 begin
-  if not acTryPWideCharToInt(AChars, ACount, Result) then
+  if not acTryPCharToInt(AChars, ACount, Result) then
     Result := ADefaultValue;
 end;
 
@@ -1723,7 +1816,7 @@ begin
   end;
 end;
 
-function acTrim(const S: UnicodeString): UnicodeString;
+function acTrim(const S: string): string;
 var
   I, E, L: Integer;
 begin
@@ -1746,7 +1839,7 @@ begin
   FastMove(PWideChar(ASource)^, ADest^, SizeOf(WideChar) * Min(AMax, Length(ASource)));
 end;
 
-function WStrLength(S: PWideChar; AMaxScanCount: Integer): Integer;
+function acStrLen(S: PWideChar; AMaxScanCount: Integer): Integer;
 begin
   Result := 0;
   if S <> nil then
@@ -1758,7 +1851,7 @@ begin
     end;
 end;
 
-function WStrScan(Str: PAnsiChar; C: AnsiChar): PAnsiChar;
+function acStrScan(Str: PAnsiChar; C: AnsiChar): PAnsiChar;
 begin
   Result := Str;
   if Result <> nil then
@@ -1770,7 +1863,7 @@ begin
     end;
 end;
 
-function WStrScan(Str: PAnsiChar; ACount: Integer; C: AnsiChar): PAnsiChar; overload; inline;
+function acStrScan(Str: PAnsiChar; ACount: Integer; C: AnsiChar): PAnsiChar; overload; inline;
 begin
   Result := Str;
   while (Result <> nil) and (Result^ <> C) do
@@ -1782,7 +1875,7 @@ begin
   end;
 end;
 
-function WStrScan(Str: PWideChar; C: WideChar): PWideChar;
+function acStrScan(Str: PWideChar; C: WideChar): PWideChar;
 begin
   Result := Str;
   if Result <> nil then
@@ -1794,7 +1887,7 @@ begin
     end;
 end;
 
-function WStrScan(Str: PWideChar; ACount: Integer; C: WideChar): PWideChar;
+function acStrScan(Str: PWideChar; ACount: Integer; C: WideChar): PWideChar;
 begin
   Result := Str;
   while (Result <> nil) and (Result^ <> C) do
@@ -1832,7 +1925,7 @@ begin
   begin
     FCodePages := TACLStringList.Create;
   {$IFDEF FPC}
-    {$MESSAGE WARN 'EnumSystemCodePagesW'}
+    {$MESSAGE WARN 'NOT-IMPLEMENTED EnumSystemCodePagesW'}
   {$ELSE}
     EnumSystemCodePagesW(@CodePageEnumProc, CP_INSTALLED);
   {$ENDIF}
@@ -1849,12 +1942,14 @@ var
 begin
   if (CodePage = 0) or (CodePage = CP_ACP) then
     Exit(TEncoding.Default);
-
+{$IFDEF FPC}
+  {$MESSAGE WARN 'NOT-IMPLEMENTED'}
+  raise ENotImplemented.Create('TACLEncodings');
+{$ELSE}
   AMap := TACLDictionary<Integer, TEncoding>(FMap);
   if not AMap.TryGetValue(CodePage, Result) then
   begin
- {$MESSAGE WARN 'Commented'}
-    //TMonitor.Enter(FMap);
+    TMonitor.Enter(FMap);
     try
       if not AMap.TryGetValue(CodePage, Result) then
       begin
@@ -1862,9 +1957,10 @@ begin
         AMap.Add(CodePage, Result)
       end;
     finally
-      //TMonitor.Exit(FMap);
+      TMonitor.Exit(FMap);
     end;
   end;
+{$ENDIF}
 end;
 
 class function TACLEncodings.Get(const Name: string): TEncoding;
@@ -1896,17 +1992,18 @@ begin
   Result := acLowerCase(Result);
 end;
 
+{$IFDEF MSWINDOWS}
 class function TACLEncodings.CodePageEnumProc(lpCodePageString: PWideChar): Cardinal; stdcall;
-//var
-  //ACodePage: Integer;
-  //ACodePageInfo: TCPInfoEx;
+var
+  ACodePage: Integer;
+  ACodePageInfo: TCPInfoEx;
 begin
-  {$MESSAGE WARN 'Commented'}
-  //ACodePage := StrToIntDef(lpCodePageString, -1);
-  //if (ACodePage > 0) and GetCPInfoEx(ACodePage, 0, ACodePageInfo) then
-  //  TACLStringList(FCodePages).Add(ACodePageInfo.CodePageName, ACodePage);
-  //Result := 1;
+  ACodePage := StrToIntDef(lpCodePageString, -1);
+  if (ACodePage > 0) and GetCPInfoEx(ACodePage, 0, ACodePageInfo) then
+    TACLStringList(FCodePages).Add(ACodePageInfo.CodePageName, ACodePage);
+  Result := 1;
 end;
+{$ENDIF}
 
 { TACLTimeFormat }
 
@@ -2028,18 +2125,19 @@ begin
 end;
 
 class function TACLTimeFormat.Parse(var Scan: PChar; out ATimeInSeconds: Single): Boolean;
+const
+  Digits = ['0'..'9'];
 var
   ACurr, ACurr2: PChar;
   AMillis: Int64;
 begin
-{$MESSAGE WARN 'Commented'}
-{  if not Scan^.IsDigit then
+  if not CharInSet(Scan^, Digits) then
     Exit(False);
 
   // [h]h or [m]m
   ACurr := Scan + 1;
   ATimeInSeconds := Ord(Scan^) - Ord('0');
-  if ACurr^.IsDigit then
+  if CharInSet(ACurr^, Digits) then
   begin
     ATimeInSeconds := ATimeInSeconds * 10 + Ord(ACurr^) - Ord('0');
     Inc(ACurr);
@@ -2048,7 +2146,7 @@ begin
     Exit(False);
 
   // mm or ss
-  if (ACurr + 1)^.IsDigit and (ACurr + 2)^.IsDigit then
+  if CharInSet((ACurr + 1)^, Digits) and CharInSet((ACurr + 2)^, Digits) then
   begin
     ATimeInSeconds := ATimeInSeconds * 60 +
       (Ord((ACurr + 1)^) - Ord('0')) * 10 +
@@ -2061,7 +2159,7 @@ begin
   // ss
   if ACurr^ = ':' then
   begin
-    if (ACurr + 1)^.IsDigit and (ACurr + 2)^.IsDigit then
+    if CharInSet((ACurr + 1)^, Digits) and CharInSet((ACurr + 2)^, Digits) then
     begin
       ATimeInSeconds := ATimeInSeconds * 60 +
         (Ord((ACurr + 1)^) - Ord('0')) * 10 +
@@ -2077,9 +2175,9 @@ begin
   begin
     Inc(ACurr);
     ACurr2 := ACurr;
-    while ACurr2^.IsDigit do
+    while CharInSet(ACurr2^, Digits) do
       Inc(ACurr2);
-    if acTryPWideCharToInt(ACurr, acStringLength(ACurr, ACurr2), AMillis) then
+    if acTryPCharToInt(ACurr, acStringLength(ACurr, ACurr2), AMillis) then
     begin
       if AMillis > 0 then
         ATimeInSeconds := ATimeInSeconds + 1 / AMillis;
@@ -2091,7 +2189,7 @@ begin
 
   Result := (ACurr^ <= ' ') or CharInSet(ACurr^, BracketsOut);
   if Result then
-    Scan := ACurr; }
+    Scan := ACurr;
 end;
 
 class function TACLTimeFormat.Parse(const S: string; out ATimeInSeconds: Single): Boolean;
@@ -2109,6 +2207,7 @@ end;
 constructor TACLSearchString.Create;
 begin
   inherited Create;
+  FLock := TACLCriticalSection.Create;
   FEmpty := True;
   FIgnoreCase := True;
   FSeparator := ' ';
@@ -2119,6 +2218,12 @@ begin
   Create;
   IgnoreCase := AIgnoreCase;
   Value := AMask;
+end;
+
+destructor TACLSearchString.Destroy;
+begin
+  FreeAndNil(FLock);
+  inherited Destroy;
 end;
 
 function TACLSearchString.Compare(const S: string): Boolean;
@@ -2132,8 +2237,7 @@ procedure TACLSearchString.BeginComparing;
 var
   I: Integer;
 begin
-  {$MESSAGE WARN 'Commented'}
-  //TMonitor.Enter(Self);
+  FLock.Enter;
   for I := 0 to Length(FMaskResult) - 1 do
     FMaskResult[I] := False;
 end;
@@ -2173,8 +2277,7 @@ begin
   Result := True;
   for I := 0 to Length(FMaskResult) - 1 do
     Result := Result and FMaskResult[I];
-  {$MESSAGE WARN 'Commented'}
-  //  TMonitor.Exit(Self);
+  FLock.Leave;
 end;
 
 function TACLSearchString.GetValueIsNumeric: Boolean;
@@ -2203,7 +2306,7 @@ end;
 
 procedure TACLSearchString.SetValue(AValue: string);
 begin
-  {$MESSAGE WARN 'Commented'}  //TMonitor.Enter(Self);
+  FLock.Enter;
   try
     FValue := AValue;
     FEmpty := AValue = '';
@@ -2225,7 +2328,7 @@ begin
       SetLength(FMaskResult, Length(FMask));
     end;
   finally
-    //TMonitor.Exit(Self);
+    FLock.Leave;
   end;
 end;
 
@@ -2326,7 +2429,7 @@ type
   var
     S, T: Integer;
   begin
-    SetLength(Result, ASourceLength + 1, ATargetLength + 1);
+    SetLength(Result{%H-}, ASourceLength + 1, ATargetLength + 1);
     for S := 0 to ASourceLength do
       Result[S, 0] := 0;
     for T := 0 to ATargetLength do
@@ -2451,7 +2554,6 @@ end;
 
 function TACLStringBuilder.Append(const AValue: AnsiChar): TACLStringBuilder;
 begin
-  {$MESSAGE WARN 'Unicode'}
   if FDataLength = Capacity then
     GrowCapacity(FDataLength + 1);
   FData[FDataLength] := Char(AValue);
@@ -2461,12 +2563,15 @@ end;
 
 function TACLStringBuilder.Append(const AValue: WideChar): TACLStringBuilder;
 begin
-  {$MESSAGE WARN 'Unicode'}
+{$IFDEF UNICODE}
   if FDataLength = Capacity then
     GrowCapacity(FDataLength + 1);
   FData[FDataLength] := AValue;
   Inc(FDataLength);
   Result := Self;
+{$ELSE}
+  Result := Append(_A(AValue));
+{$ENDIF}
 end;
 
 function TACLStringBuilder.Append(const AValue: string; AStartIndex, ACount: Integer): TACLStringBuilder;
@@ -3241,7 +3346,7 @@ begin
     var
       A: AnsiString;
     begin
-      A := acExtractString(ACursorStart, ACursorFinish);
+      A := acMakeString(ACursorStart, ACursorFinish);
       if AResult <> '' then
         AResult := AResult + '.';
       if System.AnsiStrings.SameText(Copy(A, 1, 4), 'xn--') then
@@ -3393,7 +3498,7 @@ begin
       A: AnsiString;
       U: UnicodeString;
     begin
-      U := acExtractString(ACursorStart, ACursorNext);
+      U := acMakeString(ACursorStart, ACursorNext);
       if AResult <> '' then
         AResult := AResult + '.';
       if Encode(U, A) then
@@ -3511,8 +3616,6 @@ var
   P: integer;
   C: WideChar;
 begin
-  {$MESSAGE WARN 'Commented'}
-{
   Result := '';
   LenS := Length(S);
   for I := 1 to LenS do
@@ -3529,7 +3632,7 @@ begin
     end
     else
       Result := Result + S[I];
-  end;}
+  end;
 end;
 
 end.

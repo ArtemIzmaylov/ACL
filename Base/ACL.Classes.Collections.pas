@@ -10,7 +10,8 @@
 {*********************************************}
 
 unit ACL.Classes.Collections;
-{$I ACL.Config.inc}
+
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
@@ -30,6 +31,7 @@ uses
   ACL.Classes,
   ACL.FastCode,
   ACL.Threading,
+  ACL.Utils.Common,
   ACL.Utils.Strings;
 
 const
@@ -37,7 +39,6 @@ const
   sErrorValueWasNotFoundInMap = 'This value was not found in map';
 
 type
-  HashCode = {$IFDEF FPC}UInt32{$ELSE}Integer{$ENDIF};
 
   // Стандартные IEnumerable<T> зачем-то наследуются от IEnumerable,
   // заставляя нас реализовывать ненужные оверлоады.
@@ -108,10 +109,11 @@ type
     FFirst: TACLLinkedListItem<T>;
     FLast: TACLLinkedListItem<T>;
     FOwnValues: Boolean;
+    procedure AddCore(const AItem: TACLLinkedListItem<T>);
   public
     constructor Create(AOwnValues: Boolean = False);
-    function Add(const AItem: TACLLinkedListItem<T>): TACLLinkedListItem<T>; overload;
-    function Add(const AValue: T): TACLLinkedListItem<T>; overload;
+    function Add(const AItem: TACLLinkedListItem<T>): TACLLinkedListItem<T>; overload; inline;
+    function Add(const AValue: T): TACLLinkedListItem<T>; overload; inline;
     procedure Clear;
     procedure Delete(AItem: TACLLinkedListItem<T>);
     function Extract(AItem: TACLLinkedListItem<T>): TACLLinkedListItem<T>;
@@ -268,7 +270,7 @@ type
 
   { TACLListenerList }
 
-  TACLListenerListEnumProc<T: IUnknown> = reference to procedure (const Intf: T);
+  TACLListenerListEnumProc<T> = reference to procedure (const Intf: T);
   TACLListenerListEnumProc = TACLListenerListEnumProc<IUnknown>;
 
   TACLListenerList = class
@@ -280,23 +282,22 @@ type
     FOnChange: TNotifyEvent;
 
     procedure Changed;
-    procedure ChangeHandler(Sender: TObject; const Item: IUnknown; Action: TCollectionNotification);
+    procedure ChangeHandler(Sender: TObject;
+      const Item: IUnknown; Action: TCollectionNotification);
     function GetCount: Integer;
   public
     constructor Create(AInitialCapacity: Integer = 0);
     destructor Destroy; override;
-    //
     procedure Add(const AListener: IUnknown);
     procedure Clear;
     function Contains(const IID: TGUID): Boolean;
     procedure Enum(AProc: TACLListenerListEnumProc<IUnknown>); overload;
-    {$MESSAGE WARN 'Commented'}
-    //procedure Enum<T: IUnknown>(AProc: TACLListenerListEnumProc<T>); overload;
+    procedure Enum<T: IUnknown>(AProc: TACLListenerListEnumProc<T>); overload;
     procedure Remove(const AListener: IUnknown);
-    //
+    //# Properties
     property Count: Integer read GetCount;
     property Lock: TACLCriticalSection read FLock;
-    //
+    //# Events
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
   end;
 
@@ -634,6 +635,8 @@ type
   TACLStringComparer = class(TInterfacedObject,
     IComparer<string>,
     IEqualityComparer<string>)
+  public type
+    HashCode = {$IFDEF FPC}UInt32{$ELSE}Integer{$ENDIF};
   strict private
     FIgnoreCase: Boolean;
   public
@@ -814,8 +817,7 @@ uses
   {System.}SysConst,
   {System.}TypInfo,
   // ACL
-  ACL.Hashes,
-  ACL.Utils.Common;
+  ACL.Hashes;
 
 {$IFDEF FPC}
 function GrowCollection(OldCapacity, NewCount: Integer): Integer;
@@ -925,21 +927,25 @@ end;
 function TACLLinkedList<T>.Add(const AItem: TACLLinkedListItem<T>): TACLLinkedListItem<T>;
 begin
   Result := AItem;
-  if Last <> nil then
-    InsertAfter(Result, Last)
-  else
-  begin
-    FLast := Result;
-    FFirst := Result;
-  end;
+  AddCore(Result);
 end;
 
 function TACLLinkedList<T>.Add(const AValue: T): TACLLinkedListItem<T>;
 begin
   Result := TACLLinkedListItem<T>.Create;
   Result.Value := AValue;
-  {$MESSAGE WARN 'Commented'}
-  //Result := Add(Result);
+  AddCore(Result);
+end;
+
+procedure TACLLinkedList<T>.AddCore(const AItem: TACLLinkedListItem<T>);
+begin
+  if Last <> nil then
+    InsertAfter(AItem, Last)
+  else
+  begin
+    FLast := AItem;
+    FFirst := AItem;
+  end;
 end;
 
 procedure TACLLinkedList<T>.Clear;
@@ -2332,10 +2338,9 @@ end;
 
 procedure TACLListenerList.Enum(AProc: TACLListenerListEnumProc<IUnknown>);
 begin
-  //Enum<IUnknown>(AProc);
+  Enum<IUnknown>(AProc);
 end;
-{$MESSAGE WARN 'TODO'}
-{
+
 procedure TACLListenerList.Enum<T>(AProc: TACLListenerListEnumProc<T>);
 var
   AEnumerable: IUnknown;
@@ -2371,7 +2376,7 @@ begin
   finally
     Lock.Leave;
   end;
-end;}
+end;
 
 function TACLListenerList.GetCount: Integer;
 begin
@@ -3124,9 +3129,9 @@ end;
 function TACLStringComparer.GetHashCode(const Value: string): HashCode;
 begin
   if FIgnoreCase then
-    Result := TACLHashBobJenkins.Calculate(acUpperCase(Value), nil)
+    Result := TACLHashBobJenkins.Calculate(acUpperCase(Value){$IFDEF UNICODE}, nil{$ENDIF})
   else
-    Result := TACLHashBobJenkins.Calculate(Value, nil);
+    Result := TACLHashBobJenkins.Calculate(Value{$IFDEF UNICODE}, nil{$ENDIF});
 end;
 
 { TACLStringSharedTable }
@@ -3192,7 +3197,7 @@ begin
     repeat
       if (AItem.ValueHash = AHash) and (Length(AItem.Value) = L) then
       begin
-        if CompareMem(PWideChar(AItem.Value), P, L * SizeOf(Char)) then
+        if CompareMem(PChar(AItem.Value), P, L * SizeOf(Char)) then
           Break;
       end;
 

@@ -29,7 +29,6 @@ uses
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
-  ACL.Parsers,
   ACL.Utils.Common,
   ACL.Utils.Stream;
 
@@ -265,15 +264,21 @@ function acWindowsPathToUnix(const Path: string): string;
 
 // FindFile
 function acFindFile(const AFileName: string; AFullFileName: PString; ASize: PInt64): Boolean;
-function acFindFileFirst(const APath: string; AObjects: TACLFindFileObjects; out AInfo: TACLFindFileInfo): Boolean; overload;
-function acFindFileFirst(const APath: string; const AExts: string; AObjects: TACLFindFileObjects; out AInfo: TACLFindFileInfo): Boolean; overload;
-function acFindFileFirstMasked(const APath, AExts, AMask: string; AObjects: TACLFindFileObjects; out AInfo: TACLFindFileInfo): Boolean; overload;
+function acFindFileFirst(const APath: string;
+  AObjects: TACLFindFileObjects; out AInfo: TACLFindFileInfo): Boolean; overload;
+function acFindFileFirst(const APath: string; const AExts: string;
+  AObjects: TACLFindFileObjects; out AInfo: TACLFindFileInfo): Boolean; overload;
+function acFindFileFirstMasked(const APath, AExts, AMask: string;
+  AObjects: TACLFindFileObjects; out AInfo: TACLFindFileInfo): Boolean; overload;
 function acFindFileNext(var AInfo: TACLFindFileInfo): Boolean; overload;
 procedure acFindFileClose(var AInfo: TACLFindFileInfo);
-procedure acEnumFiles(const APath: string; AObjects: TACLFindFileObjects; AProc: TACLEnumFileProc; ARecursive: Boolean = True); overload;
-procedure acEnumFiles(const APath, AExts, AMask: string; AObjects: TACLFindFileObjects; AProc: TACLEnumFileProc; ARecursive: Boolean = True); overload;
+procedure acEnumFiles(const APath: string;
+  AObjects: TACLFindFileObjects; AProc: TACLEnumFileProc; ARecursive: Boolean = True); overload;
+procedure acEnumFiles(const APath, AExts, AMask: string;
+  AObjects: TACLFindFileObjects; AProc: TACLEnumFileProc; ARecursive: Boolean = True); overload;
 procedure acEnumFiles(const APath, AExts: string; AList: IStringReceiver); overload;
-procedure acEnumFiles(const APath, AExts: string; AObjects: TACLFindFileObjects; AProc: TACLEnumFileProc; ARecursive: Boolean = True); overload;
+procedure acEnumFiles(const APath, AExts: string;
+  AObjects: TACLFindFileObjects; AProc: TACLEnumFileProc; ARecursive: Boolean = True); overload;
 
 // File Attributes
 function acDirectoryExists(const APath: string): Boolean;
@@ -317,10 +322,10 @@ implementation
 uses
   {System.}RTLConsts,
   // ACL
-  ACL.FastCode,
 {$IFDEF MSWINDOWS}
   ACL.FileFormats.INI,
 {$ENDIF}
+  ACL.FastCode,
   ACL.Utils.Strings;
 
 {$IFDEF MSWINDOWS}
@@ -330,12 +335,12 @@ function GetFileAttributesExW(AFileName: PChar;
 
 procedure acClearFilePath(out W: TFilePath);
 begin
-  FastZeroMem(@W[0], SizeOf(WideChar) * Length(W));
+  FastZeroMem(@W[0], SizeOf(Char) * Length(W));
 end;
 
 procedure acClearFileLongPath(out W: TFileLongPath);
 begin
-  FastZeroMem(@W[0], SizeOf(WideChar) * Length(W));
+  FastZeroMem(@W[0], SizeOf(Char) * Length(W));
 end;
 
 function MakeInt64(ALow, AHigh: Cardinal): Int64; inline;
@@ -368,7 +373,7 @@ function acIsUrlFileName(const AFileName: string): Boolean;
 var
   P: PChar;
 begin
-  P := StrScan(PChar(AFileName), ':');
+  P := acStrScan(PChar(AFileName), ':');
   Result := (P <> nil) and ((P + 1)^ = (P + 2)^) and CharInSet((P + 1)^, sPathDelims);
 //  Result := acExtractFileScheme(AFileName) <> '';
 end;
@@ -377,7 +382,7 @@ function acIsUrlFileName(const AFileName: PChar; ACount: Integer): Boolean; over
 var
   P: PChar;
 begin
-  P := WStrScan(PChar(AFileName), ACount, ':');
+  P := acStrScan(PChar(AFileName), ACount, ':');
   Result := (P <> nil) and ((P + 1)^ = (P + 2)^) and CharInSet((P + 1)^, sPathDelims);
 end;
 
@@ -729,14 +734,16 @@ begin
   while CharInSet(P^, ['A'..'Z', 'a'..'z', '0'..'9']) do
     Inc(P);
   if (P^ = ':') and ((P + 1)^ = (P + 2)^) and CharInSet((P + 1)^, sPathDelims) then
-    Result := acExtractString(C, P)
+    Result := acMakeString(C, P)
   else
     Result := '';
 end;
 
 function acIsRelativeFileName(const AFileName: string): Boolean;
 begin
+{$IFDEF FPC}
   {$MESSAGE WARN 'LINUX-PATH'}
+{$ENDIF}
   Result := (Length(AFileName) >= 2) and (AFileName[2] <> DriveDelim) and not
     (acIsUncFileName(AFileName) or acIsUrlFileName(AFileName));
 end;
@@ -746,7 +753,9 @@ var
   ACommonPath: string;
   ALevel: Integer;
 begin
+{$IFDEF FPC}
   {$MESSAGE WARN 'LINUX-PATH'}
+{$ENDIF}
   ARootPath := acIncludeTrailingPathDelimiter(ARootPath);
   ACommonPath := ARootPath;
   if acGetMinimalCommonPath(ACommonPath, acExtractFilePath(AFileName)) then
@@ -880,7 +889,7 @@ begin
   Inc(Str, StrLength - 1);
   while Result > 0 do
   begin
-    if WStrScan(Delimiters, DelimitersLength, Str^) <> nil then
+    if acStrScan(Delimiters, DelimitersLength, Str^) <> nil then
       Exit;
     Dec(Result);
     Dec(Str);
@@ -963,7 +972,8 @@ begin
   //#AI: to avoid to display "Disk is not inserted to the drive" dialog box for removable devices
   AErrorMode := SetErrorMode(SEM_FailCriticalErrors);
   try
-    Result := CreateFileW(PWideChar(acPrepareFileName(AFileName)), AAccess, AShareMode, nil, AAction, FILE_ATTRIBUTE_NORMAL or ARights, 0);
+    Result := CreateFileW(PWideChar(acPrepareFileName(AFileName)),
+      AAccess, AShareMode, nil, AAction, FILE_ATTRIBUTE_NORMAL or ARights, 0);
   finally
     SetErrorMode(AErrorMode);
   end;

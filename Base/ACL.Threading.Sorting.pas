@@ -22,7 +22,6 @@ uses
   System.Generics.Defaults,
   System.SysUtils,
   // ACL
-  ACL.Classes,
   ACL.Classes.Collections,
   ACL.Classes.StringList,
   ACL.Threading,

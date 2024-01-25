@@ -31,7 +31,6 @@ uses
   ACL.Classes.Collections,
   ACL.Classes.StringList,
   ACL.Hashes,
-  ACL.Parsers,
   ACL.Utils.Common,
   ACL.Utils.FileSystem,
   ACL.Utils.Stream,

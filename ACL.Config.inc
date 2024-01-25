@@ -6,12 +6,12 @@
   {$mode delphi}
   {$modeswitch functionreferences}
   {$modeswitch anonymousfunctions}
-  {$asmmode INTEL}
   {$codepage UTF8}
 
   {$H+}
-  {$WARN 5024 off : Parameter "$1" not used}
-  {$WARN 6058 off : Call to subroutine "$1" marked as inline is not inlined}
+  {$WARN 5024 off} // Parameter "$1" not used
+  {$WARN 5026 off}
+  {$WARN 6058 off} // Call to subroutine "$1" marked as inline is not inlined
 
   {$IFNDEF LINUX}
     ACL was not ready for other platforms using FPC/LCL

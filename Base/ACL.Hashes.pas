@@ -11,14 +11,12 @@
 
 unit ACL.Hashes;
 
-{$I ACL.Config.inc}
-{$Q-}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
   {System.}Classes,
-  {System.}Math,
   {System.}Generics.Defaults,
   {System.}SysUtils,
   System.AnsiStrings,
@@ -44,7 +42,7 @@ type
     class function Calculate(const AText: AnsiString): Variant; overload; inline;
     class function Calculate(const AText: UnicodeString): Variant; overload; inline;
     class function Calculate(const AText: UnicodeString; AEncoding: TEncoding): Variant; overload; inline;
-    class function CalculateFromFile(const AFileName: UnicodeString; AProgressEvent: TACLProgressEvent = nil): Variant; inline;
+    class function CalculateFromFile(const AFileName: string; AProgressEvent: TACLProgressEvent = nil): Variant; inline;
 
     class function Finalize(var AState: Pointer): Variant; virtual; abstract;
     class procedure Initialize(out AState: Pointer); virtual; abstract;
@@ -55,7 +53,7 @@ type
     class procedure Update(var AState: Pointer; const AText: AnsiString); overload;
     class procedure Update(var AState: Pointer; const AText: UnicodeString); overload;
     class procedure Update(var AState: Pointer; const AText: UnicodeString; AEncoding: TEncoding); overload;
-    class procedure UpdateFromFile(var AState: Pointer; const AFileName: UnicodeString; AProgressEvent: TACLProgressEvent = nil);
+    class procedure UpdateFromFile(var AState: Pointer; const AFileName: string; AProgressEvent: TACLProgressEvent = nil);
   end;
 
   { TACLHash32Bit }
@@ -225,14 +223,18 @@ type
 {$ENDIF}
 
 // Elf
-function ElfHash(S: PWideChar; ACount: Integer; AIgnoryCase: Boolean): Integer; overload;
-function ElfHash(const S: UnicodeString; AIgnoryCase: Boolean = True): Integer; overload; inline;
+function ElfHash(S: PChar; ACount: Integer; AIgnoryCase: Boolean): Integer; overload;
+function ElfHash(const S: string; AIgnoryCase: Boolean = True): Integer; overload; inline;
 
-function acFileNameHash(const S: UnicodeString): Cardinal; inline;
+function acFileNameHash(const S: string): Cardinal; inline;
 implementation
 
 {$R-} { Range-Checking }
 {$Q-} { Overflow checking }
+
+{$IFDEF FPC}
+  {$WARN 4056 off : Conversion between ordinals and pointers is not portable}
+{$ENDIF}
 
 uses
 {$IFDEF MSWINDOWS}
@@ -244,7 +246,6 @@ uses
   ACL.Utils.FileSystem;
 
 {$IFDEF MSWINDOWS}
-
 {$REGION 'CryptoAPI Implemenation'}
 type
   HCRYPTHASH = ULONG_PTR;
@@ -310,7 +311,7 @@ function CryptDestroyKey(hKey: HCRYPTKEY): BOOL; stdcall; external advapi32;
 {$ENDREGION}
 {$ENDIF}
 
-function acFileNameHash(const S: UnicodeString): Cardinal;
+function acFileNameHash(const S: string): Cardinal;
 {$IFDEF MSWINDOWS}
 var
   LCount: Integer;
@@ -320,9 +321,9 @@ begin
   // тоже самое, но просто с меньшим числом вызовов
 {$IFDEF MSWINDOWS}
   LCount := LCMapString(LOCALE_INVARIANT, LCMAP_LOWERCASE, PChar(S), Length(S), @LPath[0], Length(LPath));
-  Result := THashBobJenkins.GetHashValue(LPath[0], LCount, 0);
+  Result := THashBobJenkins.GetHashValue(LPath[0], LCount * SizeOf(Char), 0);
 {$ELSE}
-  Result := TACLHashBobJenkins.Calculate(acLowerCase(S), nil);
+  Result := TACLHashBobJenkins.Calculate(acLowerCase(S));
 {$ENDIF}
 end;
 
@@ -330,12 +331,10 @@ end;
 // ELF Hash
 //==============================================================================
 
-function ElfHash(S: PWideChar; ACount: Integer; AIgnoryCase: Boolean): Integer;
-const
-  ElfHashUpCaseBufferSize = 64;
+function ElfHash(S: PChar; ACount: Integer; AIgnoryCase: Boolean): Integer;
 var
 {$IFDEF MSWINDOWS}
-  ABuffer: array[0..ElfHashUpCaseBufferSize - 1] of WideChar;
+  ABuffer: array[0..63] of WideChar;
 {$ENDIF}
   AIndex: Integer;
 begin
@@ -363,9 +362,13 @@ begin
   end;
 end;
 
-function ElfHash(const S: UnicodeString; AIgnoryCase: Boolean = True): Integer;
+function ElfHash(const S: string; AIgnoryCase: Boolean = True): Integer;
 begin
-  Result := ElfHash(PWideChar(S), Length(S), AIgnoryCase);
+{$IFNDEF MSWINDOWS}
+  if AIgnoryCase then
+    Exit(ElfHash(acUpperCase(S), False));
+{$ENDIF}
+  Result := ElfHash(PChar(S), Length(S), AIgnoryCase);
 end;
 
 { TACLHash }
@@ -425,7 +428,8 @@ begin
   Result := Calculate(AStream.Memory, AStream.Size);
 end;
 
-class function TACLHash.CalculateFromFile(const AFileName: UnicodeString; AProgressEvent: TACLProgressEvent): Variant;
+class function TACLHash.CalculateFromFile(
+  const AFileName: string; AProgressEvent: TACLProgressEvent): Variant;
 var
   AState: Pointer;
 begin
@@ -489,7 +493,8 @@ begin
     until APosition = ASize;
 end;
 
-class procedure TACLHash.UpdateFromFile(var AState: Pointer; const AFileName: UnicodeString; AProgressEvent: TACLProgressEvent);
+class procedure TACLHash.UpdateFromFile(var AState: Pointer;
+  const AFileName: string; AProgressEvent: TACLProgressEvent);
 var
   AStream: TACLFileStream;
 begin

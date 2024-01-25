@@ -215,7 +215,7 @@ var
   ARequiredSize: Integer;
   AText: UnicodeString;
 begin
-  AText := AFileList.GetDelimitedText(UNICODE_NULL);
+  AText := AFileList.GetDelimitedText(#0);
   ARequiredSize := SizeOf(TDropFiles) + (Length(AText) + 1) * SizeOf(WideChar);
   Result := GlobalAlloc(GMEM_MOVEABLE or GMEM_ZEROINIT, ARequiredSize);
   if Result <> 0 then

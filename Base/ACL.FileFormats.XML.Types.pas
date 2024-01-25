@@ -700,7 +700,7 @@ begin
           LS := L - 1;
           if IsHTMLCode(PS, LS) then
           begin
-            B.Append(GetReplacement(acExtractString(P + 1, PS)));
+            B.Append(GetReplacement(acMakeString(P + 1, PS)));
             P := PS + 1;
             L := LS - 1;
             Continue;

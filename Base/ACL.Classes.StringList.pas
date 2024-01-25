@@ -36,6 +36,7 @@ type
     FObject: TObject;
     FString: string;
     procedure Exchange(var Item: TACLStringListItem); inline;
+    procedure MoveFrom(const Item: TACLStringListItem); inline;
   end;
 
   PACLStringListItemList = ^TACLStringListItemList;
@@ -176,7 +177,7 @@ implementation
 uses
   ACL.FastCode,
   ACL.Parsers,
-//  ACL.Threading.Sorting,
+  ACL.Threading.Sorting,
   ACL.Utils.FileSystem,
   ACL.Utils.Stream;
 
@@ -197,6 +198,13 @@ begin
   ASwap := Pointer(FInterface);
   Pointer(FInterface) := Pointer(Item.FInterface);
   Pointer(Item.FInterface) := ASwap;
+end;
+
+procedure TACLStringListItem.MoveFrom(const Item: TACLStringListItem);
+begin
+  Pointer(FInterface) := Pointer(Item.FInterface);
+  Pointer(FObject) := Pointer(Item.FObject);
+  Pointer(FString) := Pointer(Item.FString);
 end;
 
 { TACLStringList }
@@ -290,7 +298,7 @@ begin
       acExplodeString(PChar(AText), ALength, ADelimiter,
         procedure (ACursorStart, ACursorNext: PChar; var ACanContinue: Boolean)
         begin
-          Add(acExtractString(ACursorStart, ACursorNext));
+          Add(acMakeString(ACursorStart, ACursorNext));
         end)
     end;
   finally
@@ -618,8 +626,7 @@ begin
   begin
     BeginUpdate;
     try
-      {$MESSAGE WARN 'Commented'}
-      //TACLMultithreadedStringListSorter.Sort(Self, ACompareProc, UseThreading);
+      TACLMultithreadedStringListSorter.Sort(Self, ACompareProc, UseThreading);
       Changed;
     finally
       EndUpdate;
@@ -841,15 +848,16 @@ begin
   P := ABuffer;
   AStart := P;
   AFinish := ABuffer + ACount;
-  while (NativeUInt(P) + SizeOf(Char) <= NativeUInt(AFinish)) do
+  while NativeUInt(P) + SizeOf(Char) <= NativeUInt(AFinish) do
   begin
-    {$MESSAGE WARN 'acLineSeparator'}
-    if (P^ <> #10) and (P^ <> #13) {and (P^ <> acLineSeparator)} then
+    if (P^ <> #10) and (P^ <> #13){$IFDEF UNICODE}and (P^ <> acLineSeparator){$ENDIF} then
       Inc(P)
     else
     begin
       Add(acMakeString(AStart, P - AStart));
-//      if P^ = acLineSeparator then Inc(P);
+    {$IFDEF UNICODE}
+      if P^ = acLineSeparator then Inc(P);
+    {$ENDIF}
       if P^ = #13 then Inc(P);
       if P^ = #10 then Inc(P);
       AStart := P;

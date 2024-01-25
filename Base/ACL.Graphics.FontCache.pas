@@ -201,7 +201,6 @@ uses
   System.Math,
   // ACL
   ACL.FastCode,
-  ACL.Parsers,
   ACL.Hashes,
   ACL.Utils.Strings;
 

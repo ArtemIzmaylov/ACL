@@ -11,8 +11,7 @@
 
 unit ACL.Math;
 
-{$I ACL.Config.inc}
-{%FPC: OK}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 

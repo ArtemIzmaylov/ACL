@@ -11,7 +11,7 @@
 
 unit ACL.Parsers;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
@@ -21,7 +21,8 @@ uses
 
 const
   acParserDefaultSpaceChars = ' '#13#10#9#0;
-  acParserDefaultIdentDelimiters = '%=:+-\/*;,|(){}<>[].@#$^&?!"«»'#39#$201C#$201D + acParserDefaultSpaceChars;
+  acParserDefaultIdentDelimiters = '%=:+-\/*;,|(){}<>[].@#$^&?!"«»'#39 +
+    acParserDefaultSpaceChars{$IFDEF UNICODE} + #$201C#$201D{$ENDIF};
   acParserDefaultDelimiterChars = acParserDefaultIdentDelimiters + '_';
   acParserDefaultQuotes = '"'#39;
 
@@ -114,14 +115,9 @@ type
   end;
 
 function acExtractLine(var P: PChar; var C: Integer; out AToken: TACLParserToken): Boolean;
-
-function acExtractString(const AScanStart, AScanNext: PAnsiChar): AnsiString; overload;
-function acExtractString(const AScanStart, AScanNext: PWideChar): UnicodeString; overload;
 function acExtractString(const S, ABeginStr, AEndStr: string): string; overload;
 function acExtractString(const S, ABeginStr, AEndStr: string; out APos1, APos2: Integer): string; overload;
 function acExtractString(var P: PChar; var C: Integer; out AToken: TACLParserToken; ADelimiter: Char): Boolean; overload;
-function acStringLength(const AScanStart, AScanNext: PAnsiChar): Integer; overload; inline;
-function acStringLength(const AScanStart, AScanNext: PWideChar): Integer; overload; inline;
 
 function acUnquot(var AToken: TACLParserToken): Boolean; overload;
 function acUnquot(var S: string): Boolean; overload;
@@ -133,6 +129,10 @@ implementation
 
 uses
   ACL.Utils.Strings;
+
+{$IFDEF FPC}
+  {$WARN 4055 off : Conversion between ordinals and pointers is not portable}
+{$ENDIF}
 
 function acExtractLine(var P: PChar; var C: Integer; out AToken: TACLParserToken): Boolean;
 begin
@@ -164,16 +164,6 @@ begin
     Dec(C);
   end;
   Result := AToken.DataLength > 0;
-end;
-
-function acExtractString(const AScanStart, AScanNext: PAnsiChar): AnsiString; overload;
-begin
-  SetString(Result, AScanStart, acStringLength(AScanStart, AScanNext));
-end;
-
-function acExtractString(const AScanStart, AScanNext: PWideChar): UnicodeString;
-begin
-  SetString(Result, AScanStart, acStringLength(AScanStart, AScanNext));
 end;
 
 function acExtractString(var P: PChar; var C: Integer; out AToken: TACLParserToken; ADelimiter: Char): Boolean;
@@ -214,22 +204,6 @@ begin
     APos2 := Length(S) + 1;
 
   Result := Copy(S, APos1 + Length(ABeginStr), APos2 - APos1 - Length(ABeginStr));
-end;
-
-function acStringLength(const AScanStart, AScanNext: PAnsiChar): Integer;
-begin
-  if NativeUInt(AScanNext) > NativeUInt(AScanStart) then
-    Result := NativeUInt(AScanNext) - NativeUInt(AScanStart)
-  else
-    Result := 0;
-end;
-
-function acStringLength(const AScanStart, AScanNext: PWideChar): Integer;
-begin
-  if NativeUInt(AScanNext) > NativeUInt(AScanStart) then
-    Result := (NativeUInt(AScanNext) - NativeUInt(AScanStart)) div SizeOf(WideChar)
-  else
-    Result := 0;
 end;
 
 function acUnquot(var AToken: TACLParserToken): Boolean;
@@ -278,7 +252,7 @@ end;
 
 function acCompareTokens(B1, B2: PChar; L1, L2: Integer): Boolean;
 var
-  C1, C2: Word; {$MESSAGE WARN 'Char<>Word'}
+  C1, C2: Word;
 begin
   Result := L1 = L2;
   if Result then
@@ -524,7 +498,7 @@ begin
   if IgnoreCase then
     Result := acCompareStrings(Data, PChar(S), DataLength, DataLength) = 0
   else
-    Result := CompareMem(Data, PChar(S), DataLength);
+    Result := CompareMem(Data, PChar(S), DataLength * SizeOf(Char));
 end;
 
 procedure TACLParserToken.Reset;
