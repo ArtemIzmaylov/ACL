@@ -4,26 +4,24 @@
 {*             Macros Processor              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.Expressions.FormatString;
 
-{$I ACL.Config.INC}
+{$I ACL.Config.inc} //FPC:OK
 
 interface
 
 uses
-  System.Math,
-  System.SysUtils,
-  System.Classes,
-  System.Variants,
-  System.Generics.Collections,
+  {System.}Math,
+  {System.}Classes,
+  {System.}SysUtils,
+  {System.}Variants,
   // ACL
-  ACL.Classes,
-  ACL.Classes.StringList,
+  ACL.Classes.Collections,
   ACL.Expressions,
   ACL.Parsers,
   ACL.Utils.Common,
@@ -33,7 +31,7 @@ type
   TACLFormatStringMacroProc = function (AContext: TObject): string of object;
   TACLFormatStringMacroEvalFunction = class;
 
-  TACLFormatStringEnumMacrosProc = reference to procedure (const S: UnicodeString; AFunc: TACLExpressionFunctionInfo);
+  TACLFormatStringEnumMacrosProc = reference to procedure (const S: string; AFunc: TACLExpressionFunctionInfo);
 
   { TACLFormatString }
 
@@ -92,10 +90,10 @@ type
 
     function CreateCompiler: TACLExpressionCompiler; override;
     function CreateExpression(const AExpression: string; ARoot: TACLExpressionElement): TACLExpression; override;
-    function CreateMacroEvalFunction(const AName: UnicodeString;
+    function CreateMacroEvalFunction(const AName: string;
       AProc: TACLFormatStringMacroProc; ACategory: Byte): TACLFormatStringMacroEvalFunction; virtual;
     class function TryProcessAsNumber(const AValue: Variant; out ANumber: Integer): Boolean;
-    procedure RegisterMacro(const AName: UnicodeString; AProc: TACLFormatStringMacroProc; ACategory: Byte = 0);
+    procedure RegisterMacro(const AName: string; AProc: TACLFormatStringMacroProc; ACategory: Byte = 0);
     procedure RegisterMacros; virtual;
   public
     constructor Create; override;
@@ -113,12 +111,12 @@ type
     procedure PopulateOutputBuffer;
   protected
     function CompileCore: TACLExpressionElement; override;
-    function FetchToken(var P: PWideChar; var C: Integer; var AToken: TACLParserToken): Boolean; override;
+    function FetchToken(var P: PChar; var C: Integer; var AToken: TACLParserToken): Boolean; override;
     function ProcessToken: Boolean; override;
   public
     constructor Create(
       const AFactory: TACLCustomExpressionFactory;
-      const ADelimiters, AQuotes, ASpaces: UnicodeString); override;
+      const ADelimiters, AQuotes, ASpaces: string); override;
     property Factory: TACLFormatStringFactory read GetFactory;
   end;
 
@@ -153,7 +151,7 @@ type
     FMacroProc: TACLFormatStringMacroProc;
     function EvalProc(AContext: TObject; AParams: TACLExpressionElements): Variant; virtual;
   public
-    constructor Create(const AName: UnicodeString; AMacroProc: TACLFormatStringMacroProc; ACategory: Byte);
+    constructor Create(const AName: string; AMacroProc: TACLFormatStringMacroProc; ACategory: Byte);
   end;
 
   { TACLFormatStringReverseMacro }
@@ -193,6 +191,7 @@ function TACLFormatString.Compare(AContext1, AContext2: TObject): Integer;
 var
   AElement: TACLExpressionElement;
   AReversed: Boolean;
+  I: Integer;
 begin
   Result := 0;
   if FRoot = nil then
@@ -200,7 +199,7 @@ begin
   if FRoot is TACLFormatStringConcatenateFunction then
   begin
     AReversed := False;
-    for var I := 0 to TACLFormatStringConcatenateFunction(FRoot).Params.Count - 1 do
+    for I := 0 to TACLFormatStringConcatenateFunction(FRoot).Params.Count - 1 do
     begin
       AElement := TACLFormatStringConcatenateFunction(FRoot).Params[I];
       if AElement is TACLFormatStringReverseMacro then
@@ -304,7 +303,7 @@ end;
 
 procedure TACLFormatStringFactory.EnumMacros(AProc: TACLFormatStringEnumMacrosProc);
 
-  function FuncToString(AFunc: TACLExpressionFunctionInfo): UnicodeString;
+  function FuncToString(AFunc: TACLExpressionFunctionInfo): string;
   begin
     if AFunc.ParamCount = 0 then
       Result := MacroDelimiter + AFunc.ToString + IfThenW(MacroDelimiterOnBothSides, MacroDelimiter)
@@ -313,31 +312,32 @@ procedure TACLFormatStringFactory.EnumMacros(AProc: TACLFormatStringEnumMacrosPr
   end;
 
 var
-  AFunc: TACLExpressionFunctionInfo;
+  LFunc: TACLExpressionFunctionInfo;
+  LTemp: TACLList<TACLExpressionFunctionInfo>;
   I: Integer;
-  L: TList;
 begin
-  L := TList.Create;
+  LTemp := TACLList<TACLExpressionFunctionInfo>.Create;
   try
+    LTemp.Capacity := FRegisteredFunctions.Count;
     for I := 0 to FRegisteredFunctions.Count - 1 do
     begin
-      AFunc := FRegisteredFunctions.Items[I];
-      if AFunc.Category <> CategoryHidden then
-        L.Add(AFunc);
+      LFunc := FRegisteredFunctions.Items[I];
+      if LFunc.Category <> CategoryHidden then
+        LTemp.Add(LFunc);
     end;
 
-    L.SortList(
-      function (Item1, Item2: Pointer): Integer
+    LTemp.Sort(
+      function (const Item1, Item2: TACLExpressionFunctionInfo): Integer
       begin
-        Result := TACLExpressionFunctionInfo(Item1).Category - TACLExpressionFunctionInfo(Item2).Category;
+        Result := Item1.Category - Item2.Category;
         if Result = 0 then
-          Result := acCompareStrings(TACLExpressionFunctionInfo(Item1).Name, TACLExpressionFunctionInfo(Item2).Name, False);
+          Result := acCompareStrings(Item1.Name, Item2.Name, False);
       end);
 
-    for I := 0 to L.Count - 1 do
-      AProc(FuncToString(L[I]), L[I]);
+    for I := 0 to LTemp.Count - 1 do
+      AProc(FuncToString(LTemp[I]), LTemp[I]);
   finally
-    L.Free;
+    LTemp.Free;
   end;
 end;
 
@@ -348,19 +348,20 @@ begin
     acParserDefaultQuotes, acParserDefaultSpaceChars);
 end;
 
-function TACLFormatStringFactory.CreateExpression(const AExpression: string; ARoot: TACLExpressionElement): TACLExpression;
+function TACLFormatStringFactory.CreateExpression(
+  const AExpression: string; ARoot: TACLExpressionElement): TACLExpression;
 begin
   Result := TACLFormatString.Create(Self, ARoot, AExpression);
 end;
 
-function TACLFormatStringFactory.CreateMacroEvalFunction(const AName: UnicodeString;
+function TACLFormatStringFactory.CreateMacroEvalFunction(const AName: string;
   AProc: TACLFormatStringMacroProc; ACategory: Byte): TACLFormatStringMacroEvalFunction;
 begin
   Result := TACLFormatStringMacroEvalFunction.Create(AName, AProc, ACategory);
 end;
 
 procedure TACLFormatStringFactory.RegisterMacro(
-  const AName: UnicodeString; AProc: TACLFormatStringMacroProc; ACategory: Byte = 0);
+  const AName: string; AProc: TACLFormatStringMacroProc; ACategory: Byte = 0);
 begin
   FRegisteredFunctions.Add(CreateMacroEvalFunction(AName, AProc, ACategory));
 end;
@@ -441,7 +442,7 @@ var
 begin
   Result := AParams[0].Evaluate(AContext);
   if TryProcessAsNumber(Result, AValue) then
-    Result := WideChar(AValue);
+    Result := Char(AValue);
 end;
 
 class function TACLFormatStringFactory.FunctionDec(AContext: TObject; AParams: TACLExpressionElements): Variant;
@@ -527,7 +528,8 @@ end;
 
 class function TACLFormatStringFactory.FunctionRemove(AContext: TObject; AParams: TACLExpressionElements): Variant;
 var
-  ASource: UnicodeString;
+  ASource: string;
+  I: Integer;
 begin
   if AParams.Count = 0 then
     Exit(acEmptyStr);
@@ -535,7 +537,7 @@ begin
     Exit(AParams[0].Evaluate(AContext));
 
   ASource := AParams[0].Evaluate(AContext);
-  for var I := 1 to AParams.Count - 1 do
+  for I := 1 to AParams.Count - 1 do
     ASource := acStringReplace(ASource, AParams[I].Evaluate(AContext), '');
   Result := ASource;
 end;
@@ -549,7 +551,7 @@ class function TACLFormatStringFactory.FunctionReplaceEx(AContext: TObject; APar
 var
   AIndex: Integer;
   ACount: Integer;
-  ASource: UnicodeString;
+  ASource: string;
 begin
   ACount := AParams.Count;
   if ACount = 0 then
@@ -672,11 +674,11 @@ begin
       Result := nil;
 end;
 
-function TACLFormatStringCompiler.FetchToken(var P: PWideChar; var C: Integer; var AToken: TACLParserToken): Boolean;
+function TACLFormatStringCompiler.FetchToken(var P: PChar; var C: Integer; var AToken: TACLParserToken): Boolean;
 var
   AEvalFunction: TACLExpressionFunctionInfo;
   D: Integer;
-  K: PWideChar;
+  K: PChar;
   T: TACLParserToken;
 begin
   Result := (C > 0) and inherited FetchToken(P, C, AToken);
@@ -795,7 +797,7 @@ begin
         try
           while I <= J do
           begin
-            ABuffer.Append(UnicodeString(AParams[I].Evaluate(nil)));
+            ABuffer.Append(string(AParams[I].Evaluate(nil)));
             TObject(AParams.FList[I]).Free;
             AParams.FList.Delete(I);
             Dec(J);
@@ -813,6 +815,7 @@ end;
 function TACLFormatStringConcatenateFunction.Evaluate(AContext: TObject): Variant;
 var
   ABuffer: TACLStringBuilder;
+  I: Integer;
 begin
   if FParams.Count = 0 then
     Exit('');
@@ -821,8 +824,8 @@ begin
 
   ABuffer := TACLStringBuilder.Get(256);
   try
-    for var I := 0 to FParams.Count - 1 do
-      ABuffer.Append(UnicodeString(FParams[I].Evaluate(AContext)));
+    for I := 0 to FParams.Count - 1 do
+      ABuffer.Append(string(FParams[I].Evaluate(AContext)));
     Result := ABuffer.ToString;
   finally
     ABuffer.Release;
@@ -855,7 +858,7 @@ end;
 { TACLFormatStringMacroEvalFunction }
 
 constructor TACLFormatStringMacroEvalFunction.Create(
-  const AName: UnicodeString; AMacroProc: TACLFormatStringMacroProc; ACategory: Byte);
+  const AName: string; AMacroProc: TACLFormatStringMacroProc; ACategory: Byte);
 begin
   inherited Create(AName, 0, False, EvalProc, ACategory);
   FMacroProc := AMacroProc;

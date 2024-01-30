@@ -11,14 +11,7 @@
 
 unit ACL.Utils.Strings;
 
-{$I ACL.Config.inc}
-
-(*
-   FPC-NotImplemented:
-   + acStringToAnsiString
-   + acStringFromAnsiString
-   + TACLEncodings
-*)
+{$I ACL.Config.inc} //FPC:OK
 
 interface
 
@@ -26,19 +19,20 @@ uses
 {$IFDEF MSWINDOWS}
   Winapi.Windows,
 {$ENDIF}
+  // VCL
 {$IFNDEF ACL_BASE_NOVCL}
   {Vcl.}Graphics,
 {$ENDIF}
   // System
-{$IFNDEF ACL_BASE_NOVCL}
-  System.UITypes,
-{$ENDIF}
   {System.}Character,
   {System.}Classes,
   {System.}Math,
   {System.}SysUtils,
   {System.}Generics.Collections,
   {System.}Types,
+{$IFNDEF ACL_BASE_NOVCL}
+  System.UITypes,
+{$ENDIF}
   // ACL
   ACL.Threading,
   ACL.Utils.Common;
@@ -239,23 +233,24 @@ type
   strict private const
     Map: array[0..15] of Char = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f');
   strict private
-    class var FByteToHexMap: array[Byte] of UnicodeString;
+    class var FByteToHexMap: array[Byte] of string;
   public
     class constructor Create;
 
     class function Decode(const AChar1, AChar2: Char): Byte; overload;
     class function Decode(const AChar1, AChar2: Char; out AValue: Byte): Boolean; overload; inline;
     class function Decode(const AChar1: Char; out AValue: Byte): Boolean; overload; inline;
-    class function Decode(const ACode: UnicodeString; AStream: TStream): Boolean; overload;
-    class function DecodeString(const ACode: UnicodeString): UnicodeString; overload;
+    class function Decode(const ACode: string; AStream: TStream): Boolean; overload;
+    class function DecodeString(const ACode: string): UnicodeString; overload;
 
-    class function Encode(ABuffer: PByte; ACount: Integer): UnicodeString; overload;
-    class function Encode(AByte: Byte): UnicodeString; overload; static;
-    class function Encode(AChar: WideChar): UnicodeString; overload; static;
+    class function Encode(ABuffer: PByte; ACount: Integer): string; overload;
+    class function Encode(AByte: Byte): string; overload; static;
+    class function Encode(AChar: WideChar): string; overload; static;
     class function Encode(AChar: WideChar; ABuffer: PWideChar): PWideChar; overload; static;
-    class function Encode(AStream: TStream): UnicodeString; overload;
-    class function EncodeFile(const AFileName: UnicodeString): UnicodeString; overload;
-    class function EncodeString(const AValue: UnicodeString): UnicodeString; overload;
+    class function Encode(AStream: TStream): string; overload;
+    class function EncodeFile(const AFileName: string): string; overload;
+    class function EncodeString(const AValue: AnsiString): string; overload;
+    class function EncodeString(const AValue: UnicodeString): string; overload;
   end;
 
   { TACLMimecode }
@@ -298,8 +293,8 @@ type
     class function DecodeBytes(const ACode: UnicodeString): TBytes; overload;
     class function Encode(ASrc: PByte; ASrcSize: Integer; AStream: TStream): Integer; overload;
     class function Encode(P: PByteArray; ASize: Integer): TMemoryStream; overload;
-    class function EncodeBytes(const ABytes: PAnsiChar; ACount: Integer): UnicodeString; overload;
-    class function EncodeBytes(const ABytes: TBytes): UnicodeString; overload;
+    class function EncodeBytes(const ABytes: PAnsiChar; ACount: Integer): string; overload;
+    class function EncodeBytes(const ABytes: TBytes): string; overload;
     class function EncodeString(const S: AnsiString; AStream: TStream): Integer; overload;
     class function EncodeString(const S: UnicodeString; AStream: TStream): Integer; overload;
   end;
@@ -356,6 +351,7 @@ type
   strict private
     class var FCodePages: TObject;
     class var FMap: TObject;
+    class var FMapLock: TACLCriticalSection;
   {$IFDEF MSWINDOWS}
     class function CodePageEnumProc(lpCodePageString: PWideChar): Cardinal; stdcall; static;
   {$ENDIF}
@@ -382,8 +378,10 @@ var
 // Special macros:
 // Delphi: just maps to acStringToAnsiString / acStringFromAnsiString
 // FPC: asumes that AnsiString is UTF8-encoded
-function _A(const S: UnicodeString): AnsiString; inline;
-function _U(const S: AnsiString): UnicodeString; inline;
+function _A(const S: string): AnsiString; overload; inline;
+function _S(const S: AnsiString): string; overload; inline;
+function _S(const S: UnicodeString): string; overload; inline;
+function _U(const S: string): UnicodeString; overload; inline;
 
 // Helpers
 function StrToIntDef(const S: AnsiString; ADefault: Integer): Integer; overload;
@@ -447,9 +445,7 @@ function acGetCharacterCount(const S, ACharacters: string): Integer; overload;
 function acGetCharacterCount(P: PChar; ALength: Integer; const ACharacters: string): Integer; overload;
 
 // Case
-function acAllWordsWithCaptialLetter(const S: AnsiString; IgnoreSourceCase: Boolean = False): AnsiString; overload;
 function acAllWordsWithCaptialLetter(const S: UnicodeString; IgnoreSourceCase: Boolean = False): UnicodeString; overload;
-function acFirstWordWithCaptialLetter(const S: AnsiString): AnsiString; overload;
 function acFirstWordWithCaptialLetter(const S: UnicodeString): UnicodeString; overload;
 function acLowerCase(const S: string): string; overload; inline;
 function acLowerCase(const S: AnsiChar): AnsiChar; overload; inline;
@@ -477,6 +473,24 @@ function acDetectEncoding(ABuffer: TBytes;
 function acDetectEncoding(AStream: TStream;
   ADefaultEncoding: TEncoding = nil): TEncoding; overload;
 
+// Load/Save String
+function acLoadString(AStream: TStream;
+  ADefaultEncoding: TEncoding; out AEncoding: TEncoding): UnicodeString; overload;
+function acLoadString(AStream: TStream;
+  AEncoding: TEncoding = nil): UnicodeString; overload;
+function acLoadString(const AFileName: string;
+  AEncoding: TEncoding = nil): UnicodeString; overload;
+procedure acSaveString(const AStream: TStream; const AString: UnicodeString;
+  AEncoding: TEncoding = nil; AWriteBOM: Boolean = True); overload;
+procedure acSaveString(const AFileName: string; const AString: UnicodeString;
+  AEncoding: TEncoding = nil; AWriteBOM: Boolean = True); overload;
+{$IF DEFINED(FPC) AND NOT DEFINED(UNICODE)}
+procedure acSaveString(const AStream: TStream; const AString: string;
+  AEncoding: TEncoding = nil; AWriteBOM: Boolean = True); overload;
+procedure acSaveString(const AFileName: string; const AString: string;
+  AEncoding: TEncoding = nil; AWriteBOM: Boolean = True); overload;
+{$IFEND}
+
 // Replacing
 function acRemoveChar(const S: string; ACharToRemove: Char): string;
 function acRemoveSurrogates(const S: UnicodeString; AReplaceBy: WideChar = #0): UnicodeString;
@@ -491,40 +505,40 @@ function acPCharToIntDef(AChars: PChar; ACount: Integer; ADefaultValue: Int64 = 
 function acTryPCharToInt(AChars: PChar; ACount: Integer; out AValue: Int64): Boolean;
 
 // Linebreaks
-function acDecodeLineBreaks(const S: UnicodeString): UnicodeString;
-function acEncodeLineBreaks(const S: UnicodeString): UnicodeString;
-function acRemoveLineBreaks(const S: UnicodeString): UnicodeString;
-function acReplaceLineBreaks(const S, ReplaceBy: UnicodeString): UnicodeString;
+function acDecodeLineBreaks(const S: string): string;
+function acEncodeLineBreaks(const S: string): string;
+function acRemoveLineBreaks(const S: string): string;
+function acReplaceLineBreaks(const S, ReplaceBy: string): string;
 
 // Conversion
 {$IFNDEF ACL_BASE_NOVCL}
 function acFontStyleDecode(const Style: TFontStyles): Byte;
 function acFontStyleEncode(Style: Integer): TFontStyles;
-function acFontToString(AFont: TFont): UnicodeString; overload;
-function acFontToString(const AName: UnicodeString; AColor: TColor;
-  AHeight: Integer; AStyle: TFontStyles): UnicodeString; overload;
-procedure acStringToFont(const S: UnicodeString; const Font: TFont);
-procedure acStringToFontData(const S: UnicodeString; out AFontData: TACLFontData);
+function acFontToString(AFont: TFont): string; overload;
+function acFontToString(const AName: string; AColor: TColor;
+  AHeight: Integer; AStyle: TFontStyles): string; overload;
+procedure acStringToFont(const S: string; const Font: TFont);
+procedure acStringToFontData(const S: string; out AFontData: TACLFontData);
 {$ENDIF}
-function acPointToString(const P: TPoint): UnicodeString;
-function acRectToString(const R: TRect): UnicodeString;
-function acSizeToString(const S: TSize): UnicodeString;
-function acStringToPoint(const S: UnicodeString): TPoint;
-function acStringToRect(const S: UnicodeString): TRect;
-function acStringToSize(const S: UnicodeString): TSize;
+function acPointToString(const P: TPoint): string;
+function acRectToString(const R: TRect): string;
+function acSizeToString(const S: TSize): string;
+function acStringToPoint(const S: string): TPoint;
+function acStringToRect(const S: string): TRect;
+function acStringToSize(const S: string): TSize;
 
 // Formatting
-function acFormatFloat(const AFormat: UnicodeString;
-  const AValue: Double; AShowPlusSign: Boolean): UnicodeString; overload;
-function acFormatFloat(const AFormat: UnicodeString;
-  const AValue: Double; const ADecimalSeparator: Char = '.'): UnicodeString; overload;
-function acFormatSize(const AValue: Int64; AAllowGigaBytes: Boolean = True): UnicodeString;
-function acFormatTrackNo(ATrack: Integer): UnicodeString;
+function acFormatFloat(const AFormat: string;
+  const AValue: Double; AShowPlusSign: Boolean): string; overload;
+function acFormatFloat(const AFormat: string;
+  const AValue: Double; const ADecimalSeparator: Char = '.'): string; overload;
+function acFormatSize(const AValue: Int64; AAllowGigaBytes: Boolean = True): string;
+function acFormatTrackNo(ATrack: Integer): string;
 
 // Utils
-function IfThenW(AValue: Boolean; const ATrue: UnicodeString; const AFalse: UnicodeString = ''): UnicodeString; overload; inline;
-function IfThenW(const A, B: UnicodeString): UnicodeString; overload; inline;
-function acDupeString(const AText: UnicodeString; ACount: Integer): UnicodeString;
+function IfThenW(ACondition: Boolean; const ATrue: string; const AFalse: string = ''): string; overload; inline;
+function IfThenW(const A, B: string): string; overload; inline;
+function acDupeString(const AText: string; ACount: Integer): string;
 function acTrim(const S: string): string;
 procedure acStrLCopy(ADest: PWideChar; const ASource: UnicodeString; AMax: Integer);
 function acStrLen(S: PWideChar; AMaxScanCount: Integer): Integer; inline;
@@ -546,6 +560,10 @@ uses
   ACL.Utils.FileSystem,
   ACL.Utils.Stream;
 
+{$ifdef fpc}
+  {$WARN 4055 off : Conversion between ordinals and pointers is not portable}
+{$endif}
+
 const
   MaxPreambleLength = 3;
 
@@ -553,18 +571,40 @@ const
 // Special Macros
 // -----------------------------------------------------------------------------
 
-function _A(const S: UnicodeString): AnsiString;
+function _A(const S: string): AnsiString;
 begin
-{$IFDEF FPC}
-  Result := acEncodeUTF8(S);
-{$ELSE}
+{$IFDEF UNICODE}
   Result := acStringToAnsiString(S);
+{$ELSE}
+  Result := S;
 {$ENDIF}
 end;
 
-function _U(const S: AnsiString): UnicodeString;
+function _S(const S: AnsiString): string;
 begin
-{$IFDEF FPC}
+{$IFDEF UNICODE}
+  Result := acStringFromAnsiString(S);
+{$ELSE}
+  Result := S;
+{$ENDIF}
+end;
+
+function _S(const S: UnicodeString): string;
+begin
+{$IF DEFINED(UNICODE)}
+  Result := S;
+{$ELSEIF DEFINED(FPC)}
+  Result := acEncodeUTF8(S);
+{$ELSE}
+  Result := acStringToAnsiString(S);
+{$IFEND}
+end;
+
+function _U(const S: string): UnicodeString;
+begin
+{$IF DEFINED(UNICODE)}
+  Result := S;
+{$ELSEIF DEFINED(FPC)}
   Result := acDecodeUTF8(S);
 {$ELSE}
   Result := acStringFromAnsiString(S);
@@ -584,35 +624,35 @@ end;
 // Conversion
 // -----------------------------------------------------------------------------
 
-function acStringToPoint(const S: UnicodeString): TPoint;
+function acStringToPoint(const S: string): TPoint;
 begin
   Result := NullPoint;
   acExplodeStringAsIntegerArray(S, ',', @Result.X, 2);
 end;
 
-function acStringToSize(const S: UnicodeString): TSize;
+function acStringToSize(const S: string): TSize;
 begin
   Result := NullSize;
   acExplodeStringAsIntegerArray(S, ',', @Result.cx, 2);
 end;
 
-function acStringToRect(const S: UnicodeString): TRect;
+function acStringToRect(const S: string): TRect;
 begin
   Result := NullRect;
   acExplodeStringAsIntegerArray(S, ',', @Result.Left, 4);
 end;
 
-function acPointToString(const P: TPoint): UnicodeString;
+function acPointToString(const P: TPoint): string;
 begin
   Result := Format('%d,%d', [P.X, P.Y]);
 end;
 
-function acSizeToString(const S: TSize): UnicodeString;
+function acSizeToString(const S: TSize): string;
 begin
   Result := Format('%d,%d', [S.cx, S.cy]);
 end;
 
-function acRectToString(const R: TRect): UnicodeString;
+function acRectToString(const R: TRect): string;
 begin
   Result := Format('%d,%d,%d,%d', [R.Left, R.Top, R.Right, R.Bottom]);
 end;
@@ -644,18 +684,18 @@ begin
     Result := Result or 8;
 end;
 
-function acFontToString(const AName: UnicodeString;
-  AColor: TColor; AHeight: Integer; AStyle: TFontStyles): UnicodeString; overload;
+function acFontToString(const AName: string;
+  AColor: TColor; AHeight: Integer; AStyle: TFontStyles): string; overload;
 begin
   Result := Format('%s,%d,%d,%d', [AName, AColor, AHeight, acFontStyleDecode(AStyle)]);
 end;
 
-function acFontToString(AFont: TFont): UnicodeString; overload;
+function acFontToString(AFont: TFont): string; overload;
 begin
   Result := acFontToString(AFont.Name, AFont.Color, AFont.Height, AFont.Style);
 end;
 
-procedure acStringToFont(const S: UnicodeString; const Font: TFont);
+procedure acStringToFont(const S: string; const Font: TFont);
 var
   AFontData: TACLFontData;
 begin
@@ -666,13 +706,13 @@ begin
   Font.Style := acFontStyleEncode(StrToIntDef(AFontData[3], 0));
 end;
 
-procedure acStringToFontData(const S: UnicodeString; out AFontData: TACLFontData);
+procedure acStringToFontData(const S: string; out AFontData: TACLFontData);
 var
   ALen: Integer;
   APos: Integer;
-  AStart, AScan: PWideChar;
+  AStart, AScan: PChar;
 begin
-  AScan := PWideChar(S);
+  AScan := PChar(S);
   ALen := Length(S);
   AStart := AScan;
   APos := 0;
@@ -680,7 +720,7 @@ begin
   begin
     if (AScan^ = ',') or (ALen = 0) then
     begin
-      SetString(AFontData[APos], AStart, (NativeUInt(AScan) - NativeUInt(AStart)) div SizeOf(WideChar));
+      AFontData[APos] := acMakeString(AStart, AScan);
       AStart := AScan;
       Inc(AStart);
       Inc(APos);
@@ -695,7 +735,7 @@ end;
 // Formatting
 // ---------------------------------------------------------------------------------------------------------------------
 
-function acFormatSize(const AValue: Int64; AAllowGigaBytes: Boolean = True): UnicodeString;
+function acFormatSize(const AValue: Int64; AAllowGigaBytes: Boolean = True): string;
 begin
   if AValue < 0 then
     Exit('-' + acFormatSize(-AValue, AAllowGigaBytes));
@@ -710,7 +750,7 @@ begin
     Result := FormatFloat('0.00', AValue / SIZE_ONE_GIGABYTE) + ' ' + acLangSizeSuffixGB;
 end;
 
-function acFormatTrackNo(ATrack: Integer): UnicodeString;
+function acFormatTrackNo(ATrack: Integer): string;
 begin
   if (ATrack >= 0) and (ATrack < 10) then
     Result := '0' + IntToStr(ATrack)
@@ -718,7 +758,7 @@ begin
     Result := IntToStr(ATrack);
 end;
 
-function acFormatFloat(const AFormat: UnicodeString; const AValue: Double; const ADecimalSeparator: Char = '.'): UnicodeString;
+function acFormatFloat(const AFormat: string; const AValue: Double; const ADecimalSeparator: Char = '.'): string;
 var
   AFormatSettings: TFormatSettings;
 begin
@@ -727,7 +767,7 @@ begin
   Result := FormatFloat(AFormat, AValue, AFormatSettings);
 end;
 
-function acFormatFloat(const AFormat: UnicodeString; const AValue: Double; AShowPlusSign: Boolean): UnicodeString;
+function acFormatFloat(const AFormat: string; const AValue: Double; AShowPlusSign: Boolean): string;
 const
   SignsMap: array[Boolean] of string = ('', '+');
 begin
@@ -746,9 +786,7 @@ end;
 function acStringToAnsiString(const S: UnicodeString; CodePage: Integer): AnsiString; overload;
 {$IFDEF FPC}
 begin
-  Result := AnsiString(S);
-  {$MESSAGE WARN 'NOT-IMPLEMENTED'}
-//  raise ENotImplemented.Create('acStringToAnsiString');
+  Result := TACLEncodings.Get(CodePage).GetAnsiString(TEncoding.Unicode.GetBytes(S));
 {$ELSE}
 var
   LLen: Integer;
@@ -765,7 +803,7 @@ function acStringToBytes(W: PWideChar; ACount: Integer): RawByteString;
 var
   B: PByte;
 begin
-  SetLength(Result, ACount);
+  SetLength(Result{%H-}, ACount);
   if ACount > 0 then
   begin
     B := @Result[1];
@@ -787,7 +825,7 @@ end;
 function acStringFromAnsiString(const S: AnsiChar): WideChar;
 begin
 {$IFDEF FPC}
-  Result := S; {$MESSAGE WARN 'NOT-IMPLEMENTED'}
+  Result := PWideChar(acStringFromAnsiString(AnsiString(S)))^;
 {$ELSE}
   UnicodeFromLocaleChars(DefaultCodePage, 0, @S, 1, @Result, 1);
 {$ENDIF}
@@ -796,9 +834,7 @@ end;
 function acStringFromAnsiString(const S: PAnsiChar; Length, CodePage: Integer): UnicodeString;
 {$IFDEF FPC}
 begin
-  Result := UnicodeString(acMakeString(S, Length));
-  {$MESSAGE WARN 'NOT-IMPLEMENTED'}
-//  raise ENotImplemented.Create('acStringToAnsiString');
+  Result := acStringFromAnsiString(acMakeString(S, Length), CodePage);
 {$ELSE}
 var
   LLen: Integer;
@@ -811,7 +847,11 @@ end;
 
 function acStringFromAnsiString(const S: AnsiString; CodePage: Integer): UnicodeString;
 begin
+{$IFDEF FPC}
+  Result := TEncoding.Unicode.GetString(TACLEncodings.Get(CodePage).GetAnsiBytes(S));
+{$ELSE}
   Result := acStringFromAnsiString(PAnsiChar(S), Length(S), CodePage);
+{$ENDIF}
 end;
 
 function acStringFromBytes(const Bytes: TBytes): UnicodeString;
@@ -1124,7 +1164,7 @@ begin
   L := Length(Source);
   if L > 0 then
   begin
-    SetLength(Result, L);
+    SetLength(Result{%H-}, L);
     L := acUtf8ToUnicode(PWideChar(Result), L, PAnsiChar(Source), L);
     if L > 0 then
       SetLength(Result, L);
@@ -1305,9 +1345,34 @@ end;
 // Charcase
 //==============================================================================
 
-function acFirstWordWithCaptialLetter(const S: AnsiString): AnsiString; overload;
+//  Test('swoosh fever (extended version)', 'Swoosh Fever (Extended Version)');
+//  Test('there''s nothing to do', 'There''s Nothing To Do');
+//  Test('21th', '21th');
+//  Test('dear monsters, be patient', 'Dear Monsters, Be Patient');
+function acAllWordsWithCaptialLetter(const S: UnicodeString; IgnoreSourceCase: Boolean = False): UnicodeString;
+var
+  AChar1: WideChar;
+  ADelims: UnicodeString;
+  AEndOfWordFound: Boolean;
+  APos, ALen: Cardinal;
 begin
-  Result := _A(acFirstWordWithCaptialLetter(_U(S)));
+  APos := 1;
+  ALen := Length(S);
+  if IgnoreSourceCase then
+    Result := S
+  else
+    Result := S.ToLower;
+
+  ADelims := acParserDefaultDelimiterChars;
+  AEndOfWordFound := True;
+  while APos <= ALen do
+  begin
+    AChar1 := Result[APos];
+    if AEndOfWordFound then
+      Result[APos] := acUpperCase(AChar1);
+    AEndOfWordFound := (AChar1 <> #39) and acContains(AChar1, ADelims);
+    Inc(APos);
+  end;
 end;
 
 function acFirstWordWithCaptialLetter(const S: UnicodeString): UnicodeString;
@@ -1315,7 +1380,7 @@ var
   APos, ALen: Cardinal;
   Ch1, Ch2: WideChar;
 begin
-  Result := acLowerCase(S);
+  Result := S.ToLower;
   ALen := Length(Result);
   APos := 0;
   if ALen > 0 then
@@ -1329,39 +1394,6 @@ begin
       Break;
     end;
   until (APos + 1 > ALen);
-end;
-
-function acAllWordsWithCaptialLetter(const S: AnsiString; IgnoreSourceCase: Boolean = False): AnsiString;
-begin
-  Result := _A(acAllWordsWithCaptialLetter(_U(S), IgnoreSourceCase));
-end;
-
-//  Test('swoosh fever (extended version)', 'Swoosh Fever (Extended Version)');
-//  Test('there''s nothing to do', 'There''s Nothing To Do');
-//  Test('21th', '21th');
-//  Test('dear monsters, be patient', 'Dear Monsters, Be Patient');
-function acAllWordsWithCaptialLetter(const S: UnicodeString; IgnoreSourceCase: Boolean = False): UnicodeString;
-var
-  AChar1: WideChar;
-  AEndOfWordFound: Boolean;
-  APos, ALen: Cardinal;
-begin
-  APos := 1;
-  ALen := Length(S);
-  if IgnoreSourceCase then
-    Result := S
-  else
-    Result := acLowerCase(S);
-
-  AEndOfWordFound := True;
-  while APos <= ALen do
-  begin
-    AChar1 := Result[APos];
-    if AEndOfWordFound then
-      Result[APos] := acUpperCase(AChar1);
-    AEndOfWordFound := (AChar1 <> #39) and acContains(AChar1, acParserDefaultDelimiterChars);
-    Inc(APos);
-  end;
 end;
 
 function acLowerCase(const S: string): string;
@@ -1573,6 +1605,107 @@ begin
 end;
 
 // ---------------------------------------------------------------------------------------------------------------------
+// Load/Save String
+// ---------------------------------------------------------------------------------------------------------------------
+
+function acLoadString(AStream: TStream; AEncoding: TEncoding = nil): UnicodeString;
+var
+  X: TEncoding;
+begin
+  Result := acLoadString(AStream, AEncoding, X);
+end;
+
+function acLoadString(AStream: TStream; ADefaultEncoding: TEncoding; out AEncoding: TEncoding): UnicodeString;
+var
+  ABytes: TBytes;
+  ASize: Cardinal;
+begin
+  AEncoding := acDetectEncoding(AStream, ADefaultEncoding);
+  ASize := AStream.Available;
+  if ASize <= 0 then
+    Result := ''
+  else
+    if AEncoding = TEncoding.Unicode then
+    begin
+      ASize := ASize div SizeOf(WideChar);
+      SetLength(Result{%H-}, ASize);
+      AStream.ReadBuffer(Result[1], ASize * SizeOf(WideChar));
+    end
+    else
+    begin
+      SetLength(ABytes{%H-}, ASize);
+      AStream.ReadBuffer(ABytes[0], ASize);
+      try
+        Result := AEncoding.GetString(ABytes);
+      except
+        Result := TACLEncodings.Default.GetString(ABytes);
+      end;
+    end;
+end;
+
+function acLoadString(const AFileName: string; AEncoding: TEncoding = nil): UnicodeString;
+var
+  AStream: TStream;
+begin
+  AStream := StreamCreateReader(AFileName);
+  if AStream <> nil then
+  try
+    Result := acLoadString(AStream, AEncoding);
+  finally
+    AStream.Free;
+  end
+  else
+    Result := '';
+end;
+
+procedure acSaveString(const AStream: TStream; const AString: UnicodeString;
+  AEncoding: TEncoding = nil; AWriteBOM: Boolean = True);
+begin
+  if AWriteBOM then
+    AStream.WriteBOM(AEncoding);
+  AStream.WriteString(AString, AEncoding);
+end;
+
+procedure acSaveString(const AFileName: string; const AString: UnicodeString;
+  AEncoding: TEncoding = nil; AWriteBOM: Boolean = True);
+var
+  LStream: TStream;
+begin
+  LStream := StreamCreateWriter(AFileName);
+  try
+    acSaveString(LStream, AString, AEncoding, AWriteBOM);
+  finally
+    LStream.Free;
+  end;
+end;
+
+{$IF DEFINED(FPC) AND NOT DEFINED(UNICODE)}
+procedure acSaveString(const AStream: TStream; const AString: string;
+  AEncoding: TEncoding = nil; AWriteBOM: Boolean = True);
+begin
+  if AWriteBOM then
+    AStream.WriteBOM(AEncoding);
+  if AEncoding = TEncoding.UTF8 then
+    AStream.WriteStringA(AString)
+  else
+    AStream.WriteString(_U(AString), AEncoding);
+end;
+
+procedure acSaveString(const AFileName: string; const AString: string;
+  AEncoding: TEncoding = nil; AWriteBOM: Boolean = True);
+var
+  LStream: TStream;
+begin
+  LStream := StreamCreateWriter(AFileName);
+  try
+    acSaveString(LStream, AString, AEncoding, AWriteBOM);
+  finally
+    LStream.Free;
+  end;
+end;
+{$IFEND}
+
+// ---------------------------------------------------------------------------------------------------------------------
 // Replacing
 // ---------------------------------------------------------------------------------------------------------------------
 
@@ -1658,7 +1791,7 @@ begin
           Inc(AScan);
         end;
       end;
-      Result := ABuffer.ToString;
+      Result := _U(ABuffer.ToString);
     finally
       ABuffer.Release;
     end;
@@ -1756,37 +1889,37 @@ begin
     Result := ADefaultValue;
 end;
 
-function acDecodeLineBreaks(const S: UnicodeString): UnicodeString;
+function acDecodeLineBreaks(const S: string): string;
 begin
   Result := acStringReplace(S, acLineBreakMacro, acCRLF);
 end;
 
-function acEncodeLineBreaks(const S: UnicodeString): UnicodeString;
+function acEncodeLineBreaks(const S: string): string;
 begin
   Result := acReplaceLineBreaks(S, acLineBreakMacro);
 end;
 
-function acRemoveLineBreaks(const S: UnicodeString): UnicodeString;
+function acRemoveLineBreaks(const S: string): string;
 begin
   Result := acReplaceLineBreaks(S, '');
 end;
 
-function acReplaceLineBreaks(const S, ReplaceBy: UnicodeString): UnicodeString;
+function acReplaceLineBreaks(const S, ReplaceBy: string): string;
 begin
   Result := acStringReplace(S, acCRLF, ReplaceBy);
   Result := acStringReplace(Result, #13, ReplaceBy);
   Result := acStringReplace(Result, #10, ReplaceBy);
 end;
 
-function IfThenW(AValue: Boolean; const ATrue: UnicodeString; const AFalse: UnicodeString = ''): UnicodeString;
+function IfThenW(ACondition: Boolean; const ATrue, AFalse: string): string;
 begin
-  if AValue then
+  if ACondition then
     Result := ATrue
   else
     Result := AFalse;
 end;
 
-function IfThenW(const A, B: UnicodeString): UnicodeString;
+function IfThenW(const A, B: string): string;
 begin
   if A = '' then
     Result := B
@@ -1794,7 +1927,7 @@ begin
     Result := A;
 end;
 
-function acDupeString(const AText: UnicodeString; ACount: Integer): UnicodeString;
+function acDupeString(const AText: string; ACount: Integer): string;
 var
   ABuffer: TACLStringBuilder;
   ACapacity: Integer;
@@ -1904,11 +2037,13 @@ end;
 class constructor TACLEncodings.Create;
 begin
   FMap := TACLDictionary<Integer, TEncoding>.Create([doOwnsValues]);
+  FMapLock := TACLCriticalSection.Create;
 end;
 
 class destructor TACLEncodings.Destroy;
 begin
   FreeAndNil(FCodePages);
+  FreeAndNil(FMapLock);
   FreeAndNil(FMap);
 end;
 
@@ -1925,7 +2060,15 @@ begin
   begin
     FCodePages := TACLStringList.Create;
   {$IFDEF FPC}
-    {$MESSAGE WARN 'NOT-IMPLEMENTED EnumSystemCodePagesW'}
+    TACLStringList(FCodePages).Add('windows-1250', 1250);
+    TACLStringList(FCodePages).Add('windows-1251', 1251);
+    TACLStringList(FCodePages).Add('windows-1252', 1252);
+    TACLStringList(FCodePages).Add('windows-1253', 1253);
+    TACLStringList(FCodePages).Add('windows-1254', 1254);
+    TACLStringList(FCodePages).Add('windows-1255', 1255);
+    TACLStringList(FCodePages).Add('windows-1256', 1256);
+    TACLStringList(FCodePages).Add('windows-1257', 1257);
+    TACLStringList(FCodePages).Add('windows-1258', 1258);
   {$ELSE}
     EnumSystemCodePagesW(@CodePageEnumProc, CP_INSTALLED);
   {$ENDIF}
@@ -1942,14 +2085,10 @@ var
 begin
   if (CodePage = 0) or (CodePage = CP_ACP) then
     Exit(TEncoding.Default);
-{$IFDEF FPC}
-  {$MESSAGE WARN 'NOT-IMPLEMENTED'}
-  raise ENotImplemented.Create('TACLEncodings');
-{$ELSE}
   AMap := TACLDictionary<Integer, TEncoding>(FMap);
   if not AMap.TryGetValue(CodePage, Result) then
   begin
-    TMonitor.Enter(FMap);
+    FMapLock.Enter;
     try
       if not AMap.TryGetValue(CodePage, Result) then
       begin
@@ -1957,28 +2096,28 @@ begin
         AMap.Add(CodePage, Result)
       end;
     finally
-      TMonitor.Exit(FMap);
+      FMapLock.Leave;
     end;
   end;
-{$ENDIF}
 end;
 
 class function TACLEncodings.Get(const Name: string): TEncoding;
-var
-  AEncoding: TEncoding;
 begin
   if acSameText(Name, 'utf-8') then
     Exit(TEncoding.UTF8);
-
+{$IFDEF FPC}
+  Result := Get(CodePageNameToCodePage(Name));
+{$ELSE}
   // По-хорошему, надо бы тут использовать GetCodePageFromEncodingName, но она спрятана в SysUtils.
   // Пока используем такой вот костыльный подход.
   // TODO: сделать свой аналог GetCodePageFromEncodingName
-  AEncoding := TEncoding.GetEncoding(Name);
+  with TEncoding.GetEncoding(Name) do
   try
-    Result := Get(AEncoding.CodePage);
+    Result := Get(CodePage);
   finally
-    AEncoding.Free;
+    Free;
   end;
+{$ENDIF}
 end;
 
 class function TACLEncodings.WebName(const Encoding: TEncoding): string;
@@ -1986,7 +2125,7 @@ var
   AStartPos: Integer;
   AEncodingName: string;
 begin
-  AEncodingName := Encoding.EncodingName;
+  AEncodingName := _S(Encoding.EncodingName);
   AStartPos := acPos('(', AEncodingName) + 1;
   Result := Copy(AEncodingName, AStartPos, acPos(')', AEncodingName) - AStartPos);
   Result := acLowerCase(Result);
@@ -1995,12 +2134,12 @@ end;
 {$IFDEF MSWINDOWS}
 class function TACLEncodings.CodePageEnumProc(lpCodePageString: PWideChar): Cardinal; stdcall;
 var
-  ACodePage: Integer;
-  ACodePageInfo: TCPInfoEx;
+  LCodePage: Integer;
+  LCodePageInfo: TCPInfoEx;
 begin
-  ACodePage := StrToIntDef(lpCodePageString, -1);
-  if (ACodePage > 0) and GetCPInfoEx(ACodePage, 0, ACodePageInfo) then
-    TACLStringList(FCodePages).Add(ACodePageInfo.CodePageName, ACodePage);
+  LCodePage := StrToIntDef(lpCodePageString, -1);
+  if (LCodePage > 0) and GetCPInfoEx(LCodePage, 0, LCodePageInfo) then
+    TACLStringList(FCodePages).Add(LCodePageInfo.CodePageName, LCodePage);
   Result := 1;
 end;
 {$ENDIF}
@@ -2091,7 +2230,8 @@ begin
   end;
 end;
 
-class function TACLTimeFormat.FormatEx(ATimeInSeconds: Single; const AFormatString: string): string;
+class function TACLTimeFormat.FormatEx(
+  ATimeInSeconds: Single; const AFormatString: string): string;
 
   function GetPartValue(var AParts: TStringDynArray;
     AIndex: Integer; const ADefaultValue: string = ''): string;
@@ -2102,9 +2242,9 @@ class function TACLTimeFormat.FormatEx(ATimeInSeconds: Single; const AFormatStri
       Result := ADefaultValue;
   end;
 
-  function GetTimeParts(const S: UnicodeString): TACLFormatTimeParts;
+  function GetTimeParts(const S: string): TACLFormatTimeParts;
   const
-    Map: array[TACLFormatTimePart] of WideChar = ('Z', 'S', 'M', 'H', 'D');
+    Map: array[TACLFormatTimePart] of Char = ('Z', 'S', 'M', 'H', 'D');
   var
     APart: TACLFormatTimePart;
   begin
@@ -2180,7 +2320,7 @@ begin
     if acTryPCharToInt(ACurr, acStringLength(ACurr, ACurr2), AMillis) then
     begin
       if AMillis > 0 then
-        ATimeInSeconds := ATimeInSeconds + 1 / AMillis;
+        ATimeInSeconds := ATimeInSeconds + AMillis / 1000;
       ACurr := ACurr2;
     end
     else
@@ -2259,7 +2399,11 @@ begin
     if not FMaskResult[I] then
     begin
       AMask := FMask[I];
+    {$IFDEF UNICODE}
       if acFindStringInMemoryW(AMask, AScan, ASize, 0, ACur) then
+    {$ELSE}
+      if acFindStringInMemoryA(AMask, AScan, ASize, 0, ACur) then
+    {$ENDIF}
       begin
         FastZeroMem(AScan + ACur, Length(AMask) * SizeOf(Char));
         FMaskResult[I] := True;
@@ -2563,14 +2707,16 @@ end;
 
 function TACLStringBuilder.Append(const AValue: WideChar): TACLStringBuilder;
 begin
-{$IFDEF UNICODE}
+{$IF DEFINED(UNICODE)}
   if FDataLength = Capacity then
     GrowCapacity(FDataLength + 1);
   FData[FDataLength] := AValue;
   Inc(FDataLength);
   Result := Self;
+{$ELSEIF DEFINED(FPC)}
+  Result := Append(_S(AValue));
 {$ELSE}
-  Result := Append(_A(AValue));
+  Result := Append(AnsiChar(AValue));
 {$ENDIF}
 end;
 
@@ -2875,7 +3021,7 @@ begin
     AValue := X1 shl 4 or X2;
 end;
 
-class function TACLHexcode.Decode(const ACode: UnicodeString; AStream: TStream): Boolean;
+class function TACLHexcode.Decode(const ACode: string; AStream: TStream): Boolean;
 var
   B: Byte;
   L: Integer;
@@ -2926,7 +3072,7 @@ begin
   end;
 end;
 
-class function TACLHexcode.DecodeString(const ACode: UnicodeString): UnicodeString;
+class function TACLHexcode.DecodeString(const ACode: string): UnicodeString;
 var
   AStream: TBytesStream;
 begin
@@ -2940,9 +3086,9 @@ begin
   end;
 end;
 
-class function TACLHexcode.Encode(ABuffer: PByte; ACount: Integer): UnicodeString;
+class function TACLHexcode.Encode(ABuffer: PByte; ACount: Integer): string;
 var
-  AScan: PWideChar;
+  AScan: PChar;
 begin
   System.SetString(Result, nil, 2 * ACount);
   AScan := @Result[1];
@@ -2957,7 +3103,7 @@ begin
   end;
 end;
 
-class function TACLHexcode.Encode(AStream: TStream): UnicodeString;
+class function TACLHexcode.Encode(AStream: TStream): string;
 var
   B: PByte;
   L: Integer;
@@ -2978,12 +3124,12 @@ begin
   end;
 end;
 
-class function TACLHexcode.Encode(AByte: Byte): UnicodeString;
+class function TACLHexcode.Encode(AByte: Byte): string;
 begin
   Result := FByteToHexMap[AByte];
 end;
 
-class function TACLHexcode.Encode(AChar: WideChar): UnicodeString;
+class function TACLHexcode.Encode(AChar: WideChar): string;
 begin
   Result := FByteToHexMap[Ord(AChar) shr 8] + FByteToHexMap[Ord(AChar) and $FF];
 end;
@@ -2999,15 +3145,7 @@ begin
   Result := ABuffer;
 end;
 
-class function TACLHexcode.EncodeString(const AValue: UnicodeString): UnicodeString;
-var
-  ABytes: TBytes;
-begin
-  ABytes := TEncoding.UTF8.GetBytes(AValue);
-  Result := Encode(@ABytes[0], Length(ABytes));
-end;
-
-class function TACLHexcode.EncodeFile(const AFileName: UnicodeString): UnicodeString;
+class function TACLHexcode.EncodeFile(const AFileName: string): string;
 var
   AStream: TStream;
 begin
@@ -3017,6 +3155,19 @@ begin
   finally
     AStream.Free;
   end;
+end;
+
+class function TACLHexcode.EncodeString(const AValue: AnsiString): string;
+begin
+  Result := Encode(PByte(PAnsiChar(AValue)), Length(AValue));
+end;
+
+class function TACLHexcode.EncodeString(const AValue: UnicodeString): string;
+var
+  ABytes: TBytes;
+begin
+  ABytes := TEncoding.UTF8.GetBytes(AValue);
+  Result := Encode(@ABytes[0], Length(ABytes));
 end;
 
 { TACLMimecode }
@@ -3105,7 +3256,7 @@ begin
   AStream := TMemoryStream.Create;
   try
     Decode(ACode, AStream);
-    SetLength(Result, AStream.Size);
+    SetLength(Result{%H-}, AStream.Size);
     AStream.Position := 0;
     AStream.ReadBuffer(Result[0], Length(Result));
   finally
@@ -3117,7 +3268,7 @@ class function TACLMimecode.Encode(ASrc: PByte; ASrcSize: Integer; AStream: TStr
 
   procedure OutputBytes(AStream: TStream; var ABank: Integer; ASize: Integer);
   var
-    ABuffer: array[0..3] of Byte;
+    {%H-}ABuffer: array[0..3] of Byte;
     I: Integer;
   begin
     for I := ASize to 3 do
@@ -3184,25 +3335,25 @@ begin
   Result.Position := 0;
 end;
 
-class function TACLMimecode.EncodeBytes(const ABytes: PAnsiChar; ACount: Integer): UnicodeString;
+class function TACLMimecode.EncodeBytes(const ABytes: PAnsiChar; ACount: Integer): string;
 var
   AStream: TMemoryStream;
 begin
   AStream := Encode(PByteArray(ABytes), ACount);
   try
-    Result := acLoadString(AStream);
+    Result := _S(acLoadString(AStream));
   finally
     AStream.Free;
   end;
 end;
 
-class function TACLMimecode.EncodeBytes(const ABytes: TBytes): UnicodeString;
+class function TACLMimecode.EncodeBytes(const ABytes: TBytes): string;
 var
   AStream: TMemoryStream;
 begin
   AStream := Encode(@ABytes[0], Length(ABytes));
   try
-    Result := acLoadString(AStream);
+    Result := _S(acLoadString(AStream));
   finally
     AStream.Free;
   end;
@@ -3224,9 +3375,10 @@ class function TACLPunycode.Decode(const S: AnsiString): UnicodeString;
 var
   AOutputLength: Cardinal;
 begin
+  AOutputLength := 0;
   if (Decode(PByte(S), Length(S), AOutputLength) = apcOK) and (Cardinal(Length(S)) <> AOutputLength) then
   begin
-    SetLength(Result, AOutputLength);
+    SetLength(Result{%H-}, AOutputLength);
     Decode(PByte(S), Length(S), AOutputLength, PWordArray(Result));
   end
   else
@@ -3367,6 +3519,7 @@ class function TACLPunycode.Encode(const S: UnicodeString; out A: AnsiString): B
 var
   AOutputLength: Cardinal;
 begin
+  AOutputLength := 0;
   Result := (Encode(PWordArray(S), Length(S), AOutputLength) = apcOK) and (Cardinal(Length(S) + 1) <> AOutputLength);
   if Result then
   begin
@@ -3561,13 +3714,16 @@ var
   var
     J: Integer;
   begin
-    Result := -1;
     for J := 1 to ColChar do
+    begin
+    {$IFDEF FPC}
+      if Translit[J].Equals(AStr, True) then
+    {$ELSE}
       if acSameText(AStr, Translit[J]) then
-      begin
-        Result := J;
-        Break;
-      end;
+    {$ENDIF}
+        Exit(J);
+    end;
+    Result := -1;
   end;
 
 begin

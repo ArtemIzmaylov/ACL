@@ -11,7 +11,7 @@
 
 unit ACL.Utils.Stream;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} //FPC:OK
 
 interface
 
@@ -277,14 +277,6 @@ function StreamLoadFromFile(AStream: TStream; const AFileName: string): Boolean;
 function StreamResourceExists(AInstance: HModule; const AResourceName: string; AResourceType: PChar): Boolean;
 function StreamSaveToFile(const AStream: IACLStreamContainer; const AFileName: string): Boolean; overload;
 function StreamSaveToFile(const AStream: TStream; const AFileName: string): Boolean; overload;
-
-// Load/Save String
-function acLoadString(AStream: TStream; ADefaultEncoding: TEncoding; out AEncoding: TEncoding): UnicodeString; overload;
-function acLoadString(AStream: TStream; AEncoding: TEncoding = nil): UnicodeString; overload;
-function acLoadString(const AFileName: string; AEncoding: TEncoding = nil): UnicodeString; overload;
-function acSaveString(AStream: TStream; const AString: UnicodeString; AEncoding: TEncoding = nil; AWriteBOM: Boolean = True): Boolean; overload;
-function acSaveString(const AFileName: string; const AString: UnicodeString; AEncoding: TEncoding = nil; AWriteBOM: Boolean = True): Boolean; overload;
-function acSaveString(const AFileName: string; const AString: AnsiString): Boolean; overload;
 implementation
 
 uses
@@ -502,96 +494,6 @@ begin
   end;
 end;
 
-// ---------------------------------------------------------------------------------------------------------------------
-// Load/Save String
-// ---------------------------------------------------------------------------------------------------------------------
-
-function acSaveString(const AFileName: string; const AString: AnsiString): Boolean;
-var
-  AStream: TStream;
-begin
-  Result := StreamCreateWriter(AFileName, AStream);
-  if Result then
-  try
-    AStream.WriteStringA(AString);
-  finally
-    AStream.Free;
-  end;
-end;
-
-function acLoadString(AStream: TStream; ADefaultEncoding: TEncoding; out AEncoding: TEncoding): UnicodeString;
-var
-  ABytes: TBytes;
-  ASize: Cardinal;
-begin
-  AEncoding := acDetectEncoding(AStream, ADefaultEncoding);
-  ASize := AStream.Size - AStream.Position;
-  if ASize <= 0 then
-    Result := ''
-  else
-    if AEncoding = TEncoding.Unicode then
-    begin
-      ASize := ASize div SizeOf(WideChar);
-      SetLength(Result, ASize);
-      AStream.ReadBuffer(Result[1], ASize * SizeOf(WideChar));
-    end
-    else
-    begin
-      SetLength(ABytes{%H-}, ASize);
-      AStream.ReadBuffer(ABytes[0], ASize);
-      try
-        Result := AEncoding.GetString(ABytes);
-      except
-        Result := TACLEncodings.Default.GetString(ABytes);
-      end;
-    end;
-end;
-
-function acLoadString(AStream: TStream; AEncoding: TEncoding = nil): UnicodeString;
-var
-  X: TEncoding;
-begin
-  Result := acLoadString(AStream, AEncoding, X);
-end;
-
-function acLoadString(const AFileName: string; AEncoding: TEncoding = nil): UnicodeString;
-var
-  AStream: TStream;
-begin
-  AStream := StreamCreateReader(AFileName);
-  if AStream <> nil then
-  try
-    Result := acLoadString(AStream, AEncoding);
-  finally
-    AStream.Free;
-  end
-  else
-    Result := '';
-end;
-
-function acSaveString(AStream: TStream; const AString: UnicodeString;
-  AEncoding: TEncoding = nil; AWriteBOM: Boolean = True): Boolean;
-begin
-  Result := True;
-  if AWriteBOM then
-    AStream.WriteBOM(AEncoding);
-  AStream.WriteString(AString, AEncoding);
-end;
-
-function acSaveString(const AFileName: string; const AString: UnicodeString;
-  AEncoding: TEncoding = nil; AWriteBOM: Boolean = True): Boolean;
-var
-  AStream: TStream;
-begin
-  Result := StreamCreateWriter(AFileName, AStream);
-  if Result then
-  try
-    Result := acSaveString(AStream, AString, AEncoding, AWriteBOM);
-  finally
-    AStream.Free;
-  end;
-end;
-
 { EACLCannotModifyReadOnlyStream }
 
 constructor EACLCannotModifyReadOnlyStream.Create;
@@ -610,7 +512,7 @@ constructor TACLStreamContainer.Create(const AStream: TStream; ASize: Integer);
 begin
   Create;
   if ASize < 0 then
-    ASize := AStream.Size - AStream.Position;
+    ASize := AStream.Available;
   FData.Size := ASize;
   AStream.ReadBuffer(FData.Memory^, ASize);
 end;

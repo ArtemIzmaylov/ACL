@@ -4,21 +4,21 @@
 {*       High-level Parsers Routines         *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2021-2023                 *}
+{*                 2021-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.Parsers.Ripper;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  System.Math,
-  System.SysUtils,
-  System.Types,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
   // ACL
   ACL.Classes.Collections,
   ACL.Expressions,
@@ -221,7 +221,7 @@ var
   I0: Integer;
   L1, L2: Integer;
   P1, P2, PE: Integer;
-  US: UnicodeString;
+  US: string;
 begin
   L1 := Length(FStartTags);
   L2 := Length(FFinishTags);
@@ -262,12 +262,13 @@ begin
   until (P1 < 0) or not (ratMultipleTargets in FOptions);
 end;
 
-function TACLRipperRuleAimingByTags.Find(const AStrToFind, AStr: string; AStartPos, AEndPos: Integer; AFromEnd: Boolean): Integer;
+function TACLRipperRuleAimingByTags.Find(const AStrToFind, AStr: string;
+  AStartPos, AEndPos: Integer; AFromEnd: Boolean): Integer;
 var
   AIterationCount: Integer;
-  AStrScan: PWideChar;
+  AStrScan: PChar;
   AStrToFindLength: Integer;
-  AStrToFindScan: PWideChar;
+  AStrToFindScan: PChar;
 begin
   if AStartPos <= 0 then
     Exit(0);
@@ -282,12 +283,12 @@ begin
 
   if AFromEnd then
   begin
-    AStrToFindScan := PWideChar(AStrToFind);
+    AStrToFindScan := PChar(AStrToFind);
     AStartPos := AEndPos - AStrToFindLength;
-    AStrScan := PWideChar(AStr) + AStartPos;
+    AStrScan := PChar(AStr) + AStartPos;
     while AIterationCount >= 0 do
     begin
-      if CompareMem(AStrToFindScan, AStrScan, AStrToFindLength * SizeOf(WideChar)) then
+      if CompareMem(AStrToFindScan, AStrScan, AStrToFindLength * SizeOf(Char)) then
         Exit(AStartPos);
       Dec(AIterationCount);
       Dec(AStartPos);
@@ -296,11 +297,11 @@ begin
   end
   else
   begin
-    AStrToFindScan := PWideChar(AStrToFind);
-    AStrScan := PWideChar(AStr) + (AStartPos - 1);
+    AStrToFindScan := PChar(AStrToFind);
+    AStrScan := PChar(AStr) + (AStartPos - 1);
     while AIterationCount >= 0 do
     begin
-      if CompareMem(AStrToFindScan, AStrScan, AStrToFindLength * SizeOf(WideChar)) then
+      if CompareMem(AStrToFindScan, AStrScan, AStrToFindLength * SizeOf(Char)) then
         Exit(AStartPos);
       Dec(AIterationCount);
       Inc(AStartPos);
@@ -345,12 +346,12 @@ var
   AByte1, AByte2: Byte;
   ACount: Integer;
   AData: string;
-  AScan: PWideChar;
+  AScan: PChar;
 begin
   AData := TACLXMLConvert.DecodeName(ASource);
   ABuffer := TACLStringBuilder.Get(Length(AData));
   try
-    AScan := PWideChar(AData);
+    AScan := PChar(AData);
     ACount := Length(AData);
     repeat
       case AScan^ of

@@ -4,14 +4,14 @@
 {*              Date Utilities               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.Utils.Date;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC: OK
 
 interface
 
@@ -77,25 +77,16 @@ uses
   Winapi.Windows,
 {$ENDIF}
   // System
-  System.Math,
-  System.DateUtils,
-  System.SysUtils;
+  {System.}Math,
+  {System.}DateUtils,
+  {System.}SysUtils;
 
 {$IFNDEF MSWINDOWS}
 const
   CAL_GREGORIAN = 1;              { Gregorian (localized) calendar }
-  CAL_GREGORIAN_US = 2;           { Gregorian (U.S.) calendar }
-  CAL_JAPAN = 3;                  { Japanese Emperor Era calendar }
-  CAL_TAIWAN = 4;                 { Republic of China Era calendar }
-  CAL_KOREA = 5;                  { Korean Tangun Era calendar }
-  CAL_HIJRI = 6;                  { Hijri (Arabic Lunar) calendar }
-  CAL_THAI = 7;                   { Thai calendar }
-  CAL_HEBREW = 8;                 { Hebrew calendar }
-  CAL_GREGORIAN_ME_FRENCH = 9;    { Gregorian Middle East French calendar }
   CAL_GREGORIAN_ARABIC = 10;      { Gregorian Arabic calendar }
-  CAL_GREGORIAN_XLIT_ENGLISH = 11;{ Gregorian Transliterated English calendar }
-  CAL_GREGORIAN_XLIT_FRENCH = 12; { Gregorian Transliterated French calendar }
-  CAL_UMALQURA = 23;              { UmAlQura Hijri (Arabic Lunar) calendar }
+  CAL_GREGORIAN_US = 2;           { Gregorian (U.S.) calendar }
+  CAL_HIJRI = 6;                  { Hijri (Arabic Lunar) calendar }
 {$ENDIF}
 
 //function TzSpecificLocalTimeToSystemTime(lpTimeZoneInformation: PTimeZoneInformation;
@@ -124,7 +115,11 @@ function LocalDateTimeToUTC(const AValue: TDateTime): TDateTime;
 //  Result := SystemTimeToDateTime(AUniversalTime);
 //end;
 begin
+{$IFDEF FPC}
+  Result := LocalTimeToUniversal(AValue);
+{$ELSE}
   Result := TTimeZone.Local.ToUniversalTime(AValue);
+{$ENDIF}
 end;
 
 function UTCToLocalDateTime(const AValue: TDateTime): TDateTime;
@@ -139,7 +134,11 @@ function UTCToLocalDateTime(const AValue: TDateTime): TDateTime;
 //  Result := SystemTimeToDateTime(ALocalTime);
 //end;
 begin
+{$IFDEF FPC}
+  Result := UniversalTimeToLocal(AValue);
+{$ELSE}
   Result := TTimeZone.Local.ToLocalTime(AValue);
+{$ENDIF}
 end;
 
 { TWeekDaysHelper }
@@ -231,7 +230,7 @@ end;
 
 class function TACLDateUtils.GetDayOfMonth(const AValue: TDateTime): Byte;
 begin
-  Result := System.DateUtils.DayOfTheMonth(AValue);
+  Result := {System.}DateUtils.DayOfTheMonth(AValue);
 end;
 
 class function TACLDateUtils.GetDayOfWeek(const AValue: TDateTime): Byte;
@@ -296,7 +295,7 @@ const
   OffsetDistance: array[TWeekDay] of Integer = (0, 6, 5, 4, 3, 2, 1);
 begin
   Result := AddDays(AValue, OffsetDistance[FFirstDayInWeek]);
-  Result := System.DateUtils.StartOfTheWeek(Result); // always starts from Monday
+  Result := {System.}DateUtils.StartOfTheWeek(Result); // always starts from Monday
   Result := AddDays(Result, -OffsetDistance[FFirstDayInWeek]);
 end;
 
@@ -319,9 +318,12 @@ begin
 end;
 
 class function TACLDateUtils.InRange(const AValue, AMinDate, AMaxDate: TDateTime): Boolean;
+var
+  LValue: UInt64;
 begin
   try
-    Result := System.Math.InRange(DateTimeToSeconds(AValue), DateTimeToSeconds(AMinDate), DateTimeToSeconds(AMaxDate));
+    LValue := DateTimeToSeconds(AValue);
+    Result := (LValue >= DateTimeToSeconds(AMinDate)) and (LValue <= DateTimeToSeconds(AMaxDate));
   except
     Result := (AValue >= AMinDate) and (AValue <= AMaxDate);
   end;
@@ -352,7 +354,8 @@ var
   ADays: UInt64;
   TS: TTimeStamp;
 begin
-  DivMod(AValue, MSecsPerDay, ADays, ATime);
+  ADays := AValue div MSecsPerDay;
+  ATime := AValue mod MSecsPerDay;
   TS.Time := ATime;
   TS.Date := DateDelta;
   Result := TimeStampToDateTime(TS) + ADays;

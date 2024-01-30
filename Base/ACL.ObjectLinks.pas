@@ -11,7 +11,7 @@
 
 unit ACL.ObjectLinks;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} //FPC:OK
 
 interface
 
@@ -174,7 +174,8 @@ begin
   end;
 end;
 
-class procedure TACLObjectLinks.RegisterRemoveListener(AObject: TObject; ARemoveListener: IACLObjectRemoveNotify);
+class procedure TACLObjectLinks.RegisterRemoveListener(
+  AObject: TObject; ARemoveListener: IACLObjectRemoveNotify);
 begin
   FLock.Enter;
   try
@@ -224,7 +225,8 @@ begin
   end;
 end;
 
-class procedure TACLObjectLinks.UnregisterRemoveListener(ARemoveListener: IACLObjectRemoveNotify; AObject: TObject = nil);
+class procedure TACLObjectLinks.UnregisterRemoveListener(
+  ARemoveListener: IACLObjectRemoveNotify; AObject: TObject = nil);
 var
   ALink: TObject;
 begin
@@ -297,7 +299,6 @@ destructor TACLObjectLink.Destroy;
 var
   I: Integer;
 begin
-
   if FWeakReferences <> nil then
   try
     for I := 0 to FWeakReferences.Count - 1 do

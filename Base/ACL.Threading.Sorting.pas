@@ -4,23 +4,26 @@
 {*         Multi Threading Routines          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.Threading.Sorting;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} //FPC:OK
 
 interface
 
 uses
+{$IFNDEF FPC}
   Winapi.Windows,
+{$ENDIF}
   // System
-  System.Classes,
-  System.Generics.Defaults,
-  System.SysUtils,
+  {System.}Classes,
+  {System.}Generics.Defaults,
+  {System.}SyncObjs,
+  {System.}SysUtils,
   // ACL
   ACL.Classes.Collections,
   ACL.Classes.StringList,
@@ -109,6 +112,10 @@ implementation
 
 uses
   ACL.FastCode;
+
+{$IFDEF FPC}
+  {$WARN 4055 off : Conversion between ordinals and pointers is not portable}
+{$ENDIF}
 
 type
   TACLStringListAccess = class(TACLStringList);
@@ -268,7 +275,8 @@ begin
   end;
 end;
 
-class procedure TACLMultithreadedListSorter.Sort(List: TList; CompareProc: TACLListCompareProc; Multithreadeding: Boolean = True);
+class procedure TACLMultithreadedListSorter.Sort(List: TList;
+  CompareProc: TACLListCompareProc; Multithreadeding: Boolean = True);
 begin
   Sort(@List.List[0], List.Count, CompareProc, Multithreadeding);
 end;

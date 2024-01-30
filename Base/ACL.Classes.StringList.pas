@@ -11,7 +11,7 @@
 
 unit ACL.Classes.StringList;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} //FPC:OK
 
 interface
 
@@ -176,7 +176,6 @@ implementation
 
 uses
   ACL.FastCode,
-  ACL.Parsers,
   ACL.Threading.Sorting,
   ACL.Utils.FileSystem,
   ACL.Utils.Stream;
@@ -296,7 +295,7 @@ begin
       if Ord(AText[ALength]) = Ord(ADelimiter) then
         Dec(ALength);
       acExplodeString(PChar(AText), ALength, ADelimiter,
-        procedure (ACursorStart, ACursorNext: PChar; var ACanContinue: Boolean)
+        procedure (ACursorStart, ACursorNext: PChar; var {%H-}ACanContinue: Boolean)
         begin
           Add(acMakeString(ACursorStart, ACursorNext));
         end)
@@ -344,13 +343,8 @@ begin
 end;
 
 procedure TACLStringList.LoadFromStream(AStream: TStream; AEncoding: TEncoding = nil);
-var
-  ATempEncoding: TEncoding;
 begin
-  if AStream.Size > 0 then
-    Text := acLoadString(AStream, AEncoding, ATempEncoding)
-  else
-    Clear;
+  Text := _S(acLoadString(AStream, AEncoding));
 end;
 
 procedure TACLStringList.LoadFromResource(AInstance: HModule; const AName: string; AType: PChar);
@@ -382,7 +376,7 @@ end;
 procedure TACLStringList.SaveToStream(AStream: TStream; AEncoding: TEncoding = nil);
 begin
   AStream.WriteBOM(AEncoding);
-  AStream.WriteString(GetText, AEncoding);
+  AStream.WriteString(_U(Text), AEncoding);
 end;
 
 function TACLStringList.Add(const S: string; AObject: TObject; AInterface: IUnknown): Integer;
@@ -842,6 +836,7 @@ begin
 end;
 
 procedure TACLStringList.ParseBuffer(ABuffer: PChar; ACount: Integer);
+{$ifdef fpc}{$push}{$WARN 4055 off}{$endif}
 var
   P, AFinish, AStart: PChar;
 begin
@@ -865,6 +860,7 @@ begin
   end;
   if NativeUInt(P - AStart) > 0 then
     Add(acMakeString(AStart, P - AStart));
+{$ifdef fpc}{$pop}{$endif}
 end;
 
 { TACLSortedStrings }

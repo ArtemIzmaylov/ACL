@@ -4,7 +4,7 @@
 {*          Multilanguage UI Engine          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,18 +16,24 @@ unit ACL.MUI;
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+  LMessages,
+{$ELSE}
+  {Winapi.}Windows,
+  {Winapi.}Messages,
+{$ENDIF}
   // System
-  System.Classes,
-  System.Generics.Collections,
+  {System.}Classes,
+  {System.}TypInfo,
+  {System.}SysUtils,
   // VCL
 {$IFNDEF ACL_BASE_NOVCL}
-  Vcl.Forms,
-  Vcl.Graphics,
+  {Vcl.}Forms,
+  {Vcl.}Graphics,
 {$ENDIF}
   // ACL
-  ACL.Classes,
   ACL.Classes.Collections,
   ACL.Classes.StringList,
   ACL.FileFormats.INI;
@@ -52,9 +58,9 @@ const
 const
   WM_ACL_LANG = WM_USER + 101;
 
-  LANG_EN_US = LANG_ENGLISH   or (SUBLANG_ENGLISH_US shl 10); // 1033
-  LANG_RU_RU = LANG_RUSSIAN   or (SUBLANG_DEFAULT    shl 10); // 1049
-  LANG_UK_UA = LANG_UKRAINIAN or (SUBLANG_DEFAULT    shl 10); // 1058
+  LANG_EN_US = 1033;//LANG_ENGLISH   or (SUBLANG_ENGLISH_US shl 10); // 1033
+  LANG_RU_RU = 1049;//LANG_RUSSIAN   or (SUBLANG_DEFAULT    shl 10); // 1049
+  LANG_UK_UA = 1058;//LANG_UKRAINIAN or (SUBLANG_DEFAULT    shl 10); // 1058
 
 type
 
@@ -62,14 +68,14 @@ type
 
   IACLLocalizableComponent = interface
   ['{41434C4D-5549-436F-6D70-6F6E656E7400}']
-    procedure Localize(const ASection: UnicodeString);
+    procedure Localize(const ASection: string);
   end;
 
   { IACLLocalizableComponentRoot }
 
   IACLLocalizableComponentRoot = interface
   ['{9250A6D0-932D-4996-811F-4F8B0CC72DFE}']
-    function GetLangSection: UnicodeString;
+    function GetLangSection: string;
   end;
 
   { IACLLocalizationListener }
@@ -96,9 +102,9 @@ type
   { TACLLocalizationInfo }
 
   TACLLocalizationInfo = packed record
-    Author: UnicodeString;
+    Author: string;
     LangID: Integer;
-    Name: UnicodeString;
+    Name: string;
     VersionID: Integer;
   end;
 
@@ -110,75 +116,71 @@ type
     FListeners: TACLListenerList;
 
     function GetLangID: Integer;
-    function GetShortFileName: UnicodeString;
+    function GetShortFileName: string;
     procedure SetLangID(const Value: Integer);
   protected
     procedure LangChanged;
   public
-    constructor Create(const AFileName: UnicodeString; AutoSave: Boolean = True); override;
+    constructor Create(const AFileName: string; AutoSave: Boolean = True); override;
     destructor Destroy; override;
-    procedure ExpandLinks(AInst: HINST; const AName: UnicodeString; AType: PWideChar); overload;
+    procedure ExpandLinks(AInst: HMODULE; const AName: string; AType: PChar); overload;
     procedure ExpandLinks(ALinks: TACLIniFile); overload;
-    procedure LoadFromFile(const AFileName: UnicodeString); override;
+    procedure LoadFromFile(const AFileName: string); override;
     procedure LoadFromStream(AStream: TStream); override;
     //
-    function ReadStringEx(const ASection, AKey: UnicodeString; out AValue: UnicodeString): Boolean; override;
+    function ReadStringEx(const ASection, AKey: string; out AValue: string): Boolean; override;
     // Listeners
     class procedure ListenerAdd(const AListener: IACLLocalizationListener);
     class procedure ListenerRemove(const AListener: IACLLocalizationListener);
     // Properties
     property LangID: Integer read GetLangID write SetLangID;
-    property ShortFileName: UnicodeString read GetShortFileName;
+    property ShortFileName: string read GetShortFileName;
   end;
 
 var
-  LangFilePath: UnicodeString = '';
+  LangFilePath: string = '';
 
-function GetCodePageByLCID(LCID: Cardinal): UINT;
 function LangFile: TACLLocalization;
 
-procedure LangApplyTo(const AParentSection: UnicodeString; AComponent: TComponent);
-procedure LangApplyToItems(const ASection: UnicodeString; AItems: TStrings);
+procedure LangApplyTo(const AParentSection: string; AComponent: TComponent);
+procedure LangApplyToItems(const ASection: string; AItems: TStrings);
 
-function LangExpandMacros(const AText: UnicodeString; const ADefaultSection: UnicodeString = ''): UnicodeString;
-function LangExtractPart(const AValue: UnicodeString; APartIndex: Integer): UnicodeString;
-function LangGetComponentPath(const AComponent: TComponent): UnicodeString;
+function LangExpandMacros(const AText: string; const ADefaultSection: string = ''): string;
+function LangExtractPart(const AValue: string; APartIndex: Integer): string;
+function LangGetComponentPath(const AComponent: TComponent): string;
 procedure LangGetFiles(AList: TACLStringList);
 
-function LangGet(const ASection, AItemName: UnicodeString; const ADefaultValue: UnicodeString = ''): UnicodeString;
-function LangGetMsg(ID: Integer): UnicodeString;
-function LangGetMsgPart(ID, APart: Integer): UnicodeString;
+function LangGet(const ASection, AItemName: string; const ADefaultValue: string = ''): string;
+function LangGetMsg(ID: Integer): string;
+function LangGetMsgPart(ID, APart: Integer): string;
 
 {$IFNDEF ACL_BASE_NOVCL}
-function LangGetInfo(const ALangFile: TACLIniFile; var AData: TACLLocalizationInfo; AIcon: TIcon): Boolean; overload;
-function LangGetInfo(const ALangFile: UnicodeString; var AData: TACLLocalizationInfo): Boolean; overload;
-function LangGetInfo(const ALangFile: UnicodeString; var AData: TACLLocalizationInfo; AIcon: TIcon): Boolean; overload;
+function LangGetInfo(const ALangFile: TACLIniFile;
+  out AData: TACLLocalizationInfo; AIcon: TIcon): Boolean; overload;
+function LangGetInfo(const ALangFile: string;
+  out AData: TACLLocalizationInfo): Boolean; overload;
+function LangGetInfo(const ALangFile: string;
+  out AData: TACLLocalizationInfo; AIcon: TIcon): Boolean; overload;
 {$ENDIF}
 
 procedure LangSetFileClass(AClass: TACLLocalizationClass);
 implementation
 
 uses
-  System.TypInfo,
-  System.SysUtils,
-  // VCL
 {$IFNDEF ACL_BASE_NOVCL}
-  Vcl.Controls,
-  Vcl.Menus,
-  Vcl.ActnList,
+  {Vcl.}ActnList,
+  {Vcl.}Controls,
+  {Vcl.}Menus,
 {$ENDIF}
   // ACL
   ACL.Utils.FileSystem,
   ACL.Utils.Strings;
 
-const
-  LOCALE_RETURN_NUMBER = $20000000;   { return number instead of string }
-
 var
   FLangFile: TACLLocalization;
   FLangFileClass: TACLLocalizationCLass = TACLLocalization;
 
-function LangGetComponentPath(const AComponent: TComponent): UnicodeString;
+function LangGetComponentPath(const AComponent: TComponent): string;
 var
   S: IACLLocalizableComponentRoot;
 begin
@@ -195,11 +197,6 @@ begin
       Result := '';
 end;
 
-function GetCodePageByLCID(LCID: Cardinal): UINT;
-begin
-  GetLocaleInfo(LCID, LOCALE_IDEFAULTANSICODEPAGE or LOCALE_RETURN_NUMBER, @Result, SizeOf(Result) div SizeOf(Char));
-end;
-
 function LangFile: TACLLocalization;
 begin
   if FLangFile = nil then
@@ -213,7 +210,7 @@ begin
   FreeAndNil(FLangFile);
 end;
 
-procedure LangApplyTo(const AParentSection: UnicodeString; AComponent: TComponent);
+procedure LangApplyTo(const AParentSection: string; AComponent: TComponent);
 {$IFNDEF ACL_BASE_NOVCL}
   function IsActionAssigned(AObject: TObject): Boolean;
   var
@@ -229,7 +226,7 @@ procedure LangApplyTo(const AParentSection: UnicodeString; AComponent: TComponen
   end;
 {$ENDIF}
 
-  procedure SetStringValue(APropInfo: PPropInfo; const S: UnicodeString);
+  procedure SetStringValue(APropInfo: PPropInfo; const S: string);
   begin
     if APropInfo <> nil then
       SetStrProp(AComponent, APropInfo, S);
@@ -238,7 +235,7 @@ procedure LangApplyTo(const AParentSection: UnicodeString; AComponent: TComponen
 var
   AIntf: IACLLocalizableComponent;
   I: Integer;
-  S: UnicodeString;
+  S: string;
 begin
   if not LangFile.IsEmpty then
   begin
@@ -266,7 +263,7 @@ begin
   end;
 end;
 
-procedure LangApplyToItems(const ASection: UnicodeString; AItems: TStrings);
+procedure LangApplyToItems(const ASection: string; AItems: TStrings);
 var
   I: Integer;
 begin
@@ -279,11 +276,11 @@ begin
   end;
 end;
 
-function LangExpandMacros(const AText: UnicodeString; const ADefaultSection: UnicodeString = ''): UnicodeString;
+function LangExpandMacros(const AText: string; const ADefaultSection: string = ''): string;
 var
   K, I, J, L: Integer;
   S: TACLStringBuilder;
-  V: UnicodeString;
+  V: string;
 begin
   if Pos(sLangMacroBegin, AText) = 0 then
     Exit(AText);
@@ -318,7 +315,7 @@ begin
   end;
 end;
 
-function LangExtractPart(const AValue: UnicodeString; APartIndex: Integer): UnicodeString;
+function LangExtractPart(const AValue: string; APartIndex: Integer): string;
 var
   APos: Integer;
 begin
@@ -343,23 +340,24 @@ begin
   AList.SortLogical;
 end;
 
-function LangGet(const ASection, AItemName: UnicodeString; const ADefaultValue: UnicodeString = ''): UnicodeString;
+function LangGet(const ASection, AItemName: string; const ADefaultValue: string = ''): string;
 begin
   Result := LangFile.ReadString(ASection, AItemName, ADefaultValue);
 end;
 
-function LangGetMsg(ID: Integer): UnicodeString;
+function LangGetMsg(ID: Integer): string;
 begin
   Result := Langfile.ReadString(sLangMsg, IntToStr(ID));
 end;
 
-function LangGetMsgPart(ID, APart: Integer): UnicodeString;
+function LangGetMsgPart(ID, APart: Integer): string;
 begin
   Result := LangExtractPart(LangGetMsg(ID), APart);
 end;
 
 {$IFNDEF ACL_BASE_NOVCL}
-function LangGetInfo(const ALangFile: TACLIniFile; var AData: TACLLocalizationInfo; AIcon: TIcon): Boolean; overload;
+function LangGetInfo(const ALangFile: TACLIniFile;
+  out AData: TACLLocalizationInfo; AIcon: TIcon): Boolean;
 begin
   AData.Author := ALangFile.ReadString(sLangMainSection, sLangAuthor);
   AData.LangID := ALangFile.ReadInteger(sLangMainSection, sLangID);
@@ -367,18 +365,23 @@ begin
   AData.VersionID := ALangFile.ReadInteger(sLangMainSection, sLangVersionId, 0);
   if AIcon <> nil then
   begin
-    if not ALangFile.ReadObject(sLangMainSection, sLangIcon, AIcon.LoadFromStream) then
+    if not ALangFile.ReadObject(sLangMainSection, sLangIcon,
+      procedure (AStream: TStream)
+      begin
+        AIcon.LoadFromStream(AStream);
+      end)
+    then
       AIcon.Handle := 0;
   end;
   Result := True;
 end;
 
-function LangGetInfo(const ALangFile: UnicodeString; var AData: TACLLocalizationInfo): Boolean; overload;
+function LangGetInfo(const ALangFile: string; out AData: TACLLocalizationInfo): Boolean;
 begin
   Result := LangGetInfo(ALangFile, AData, nil);
 end;
 
-function LangGetInfo(const ALangFile: UnicodeString; var AData: TACLLocalizationInfo; AIcon: TIcon): Boolean;
+function LangGetInfo(const ALangFile: string; out AData: TACLLocalizationInfo; AIcon: TIcon): Boolean;
 var
   AInfo: TACLIniFile;
 begin
@@ -393,7 +396,7 @@ end;
 
 { TACLLocalization }
 
-constructor TACLLocalization.Create(const AFileName: UnicodeString; AutoSave: Boolean = True);
+constructor TACLLocalization.Create(const AFileName: string; AutoSave: Boolean = True);
 begin
   inherited Create(AFileName, False);
   FListeners := TACLListenerList.Create;
@@ -405,7 +408,7 @@ begin
   inherited Destroy;
 end;
 
-procedure TACLLocalization.ExpandLinks(AInst: HINST; const AName: UnicodeString; AType: PWideChar);
+procedure TACLLocalization.ExpandLinks(AInst: HMODULE; const AName: string; AType: PChar);
 var
   ALinks: TACLIniFile;
 begin
@@ -420,10 +423,10 @@ end;
 
 procedure TACLLocalization.ExpandLinks(ALinks: TACLIniFile);
 var
-  AItemName: UnicodeString;
+  AItemName: string;
   AItems: TACLStringList;
-  ASectionName: UnicodeString;
-  AValue: UnicodeString;
+  ASectionName: string;
+  AValue: string;
   I, J, P: Integer;
 begin
   AItems := TACLStringList.Create;
@@ -454,7 +457,7 @@ begin
   end;
 end;
 
-procedure TACLLocalization.LoadFromFile(const AFileName: UnicodeString);
+procedure TACLLocalization.LoadFromFile(const AFileName: string);
 begin
   inherited LoadFromFile(LangFilePath + AFileName);
 end;
@@ -466,7 +469,7 @@ begin
   LangChanged;
 end;
 
-function TACLLocalization.ReadStringEx(const ASection, AKey: UnicodeString; out AValue: UnicodeString): Boolean;
+function TACLLocalization.ReadStringEx(const ASection, AKey: string; out AValue: string): Boolean;
 begin
   Result := inherited ReadStringEx(ASection, AKey, AValue);
   if Result then
@@ -524,7 +527,7 @@ begin
   Result := ReadInteger(sLangMainSection, sLangID);
 end;
 
-function TACLLocalization.GetShortFileName: UnicodeString;
+function TACLLocalization.GetShortFileName: string;
 begin
   Result := acExtractFileName(FileName);
 end;

@@ -2365,7 +2365,7 @@ begin
             AProc(AIntf);
         end
         else
-          AProc(FEnumerable);
+          AProc(T(FEnumerable));
 
         if FEnumerable <> nil then
           Inc(AIndex);

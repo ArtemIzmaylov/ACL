@@ -21,8 +21,8 @@ uses
 
 const
   acParserDefaultSpaceChars = ' '#13#10#9#0;
-  acParserDefaultIdentDelimiters = '%=:+-\/*;,|(){}<>[].@#$^&?!"«»'#39 +
-    acParserDefaultSpaceChars{$IFDEF UNICODE} + #$201C#$201D{$ENDIF};
+  acParserDefaultIdentDelimiters = '%=:+-\/*;,|(){}<>[].@#$^&?!"'#39 +
+    acParserDefaultSpaceChars{$IFDEF UNICODE} + '«»'#$201C#$201D{$ENDIF};
   acParserDefaultDelimiterChars = acParserDefaultIdentDelimiters + '_';
   acParserDefaultQuotes = '"'#39;
 

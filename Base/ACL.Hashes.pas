@@ -241,7 +241,9 @@ uses
   Winapi.Windows,
 {$ENDIF}
   // ACL
+{$IFDEF MSWINDOWS}
   ACL.FastCode,
+{$ENDIF}
   ACL.Utils.Common,
   ACL.Utils.FileSystem;
 

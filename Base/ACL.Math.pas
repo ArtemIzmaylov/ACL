@@ -40,6 +40,7 @@ function Swap16(const AValue: Word): Word;
 function Swap32(const AValue: Integer): Integer;
 function Swap64(const AValue: Int64): Int64;
 
+// 64-bit int utils
 function HiInteger(const A: UInt64): Integer;
 function LoInteger(const A: UInt64): Integer;
 function MakeInt64(const A, B: Integer): UInt64;

@@ -11,8 +11,12 @@
 
 unit ACL.Utils.FileSystem;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc}//FPC:Partial
 {$WARN SYMBOL_PLATFORM OFF}
+
+//TODO: FPC
+//  1) TACLFileDateTimeHelper
+//  2) TACLFindFileInfo - date-time
 
 interface
 
@@ -78,7 +82,7 @@ type
     function IsInternal: Boolean; inline;
   public
     destructor Destroy; override;
-    //
+    //# Properties
     property FileName: string read FFileName;
     property FileObject: TACLFindFileObject read FFileObject;
     property FileSize: Int64 read GetFileSize;
@@ -113,14 +117,14 @@ type
   protected
     function CanScanDirectory(const Dir: string): Boolean;
     procedure ScanDirectory(const Dir: string);
-    //
+    //# Properties
     property Dest: IStringReceiver read FDest;
   public
     constructor Create(const AReceiver: IStringReceiver); virtual;
     destructor Destroy; override;
     procedure Start(ARecurse: Boolean = True);
     procedure Stop;
-    // Properties
+    //# Properties
     property Active: Boolean read FActive;
     property Exts: string read FExts write FExts;
     property OnDir: TACLSearchDirFilter read FOnDir write FOnDir;
@@ -155,7 +159,7 @@ type
     function CreatePathList: TACLStringList; virtual;
     procedure Delete(Index: Integer);
     function ToString: string; override;
-    //
+    //# Properties
     property Count: Integer read GetCount;
     property Paths[Index: Integer]: string read GetPath write SetPath; default;
     property Recursive[Index: Integer]: Boolean read GetRecursive write SetRecursive;
@@ -669,25 +673,21 @@ begin
 end;
 
 function acExtractFileDrive(const FileName: string): string;
-var
-  J: Integer;
 begin
+{$IFDEF MSWINDOWS}
   if acBeginsWith(FileName, sLongFileNamePrefix) then
-    Result := acExtractFileDrive(Copy(FileName, Length(sLongFileNamePrefix) + 1, MaxInt))
-  else
-    if (Length(FileName) >= 2) and (FileName[2] = DriveDelim) then
-      Result := Copy(FileName, 1, 2)
-    else
-      if acIsUncFileName(FileName) then
-      begin
-        J := acPos(PathDelim, FileName, False, Length(sUncPrefix) + 1);
-        if J > 0 then
-          Result := Copy(FileName, 1, J - 1)
-        else
-          Result := FileName;
-      end
-      else
-        Result := '';
+    Exit(acExtractFileDrive(Copy(FileName, Length(sLongFileNamePrefix) + 1, MaxInt)));
+  if (Length(FileName) >= 2) and (FileName[2] = DriveDelim) then
+    Exit(Copy(FileName, 1, 2));
+  if acIsUncFileName(FileName) then
+  begin
+    var J := acPos(PathDelim, FileName, False, Length(sUncPrefix) + 1);
+    if J > 0 then
+      Exit(Copy(FileName, 1, J - 1));
+    Exit(FileName);
+  end;
+{$ENDIF}
+  Result := '';
 end;
 
 function acExtractFileExt(const FileName: string; ADoubleExt: Boolean = False): string;
@@ -741,11 +741,12 @@ end;
 
 function acIsRelativeFileName(const AFileName: string): Boolean;
 begin
-{$IFDEF FPC}
-  {$MESSAGE WARN 'LINUX-PATH'}
+{$IFDEF MSWINDOWS}
+  Result := (Length(AFileName) >= 2) and (AFileName[2] <> DriveDelim);
+{$ELSE}
+  Result := (AFileName <> '') and (AFileName[1] <> sUnixPathDelim);
 {$ENDIF}
-  Result := (Length(AFileName) >= 2) and (AFileName[2] <> DriveDelim) and not
-    (acIsUncFileName(AFileName) or acIsUrlFileName(AFileName));
+  Result := Result and not (acIsUncFileName(AFileName) or acIsUrlFileName(AFileName));
 end;
 
 function acRelativeFileName(const AFileName: string; ARootPath: string): string;
@@ -753,17 +754,16 @@ var
   ACommonPath: string;
   ALevel: Integer;
 begin
-{$IFDEF FPC}
-  {$MESSAGE WARN 'LINUX-PATH'}
-{$ENDIF}
   ARootPath := acIncludeTrailingPathDelimiter(ARootPath);
   ACommonPath := ARootPath;
   if acGetMinimalCommonPath(ACommonPath, acExtractFilePath(AFileName)) then
   begin
     ALevel := acGetCharacterCount(Copy(ARootPath, Length(ACommonPath) + 1, MaxInt), PathDelim);
+  {$IFDEF MSWINDOWS}
     if (ALevel > 2) and acSameText(acIncludeTrailingPathDelimiter(acExtractFileDrive(AFileName)), ACommonPath) then
       Result := Copy(AFileName, 3, MaxInt)
     else
+  {$ENDIF}
       Result := acDupeString('..' + PathDelim, ALevel) + Copy(AFileName, Length(ACommonPath) + 1, MaxInt);
   end
   else
@@ -1651,7 +1651,7 @@ end;
 constructor TACLFileStream.Create(const AHandle: THandle);
 begin
   inherited Create(AHandle);
-  if Handle = INVALID_HANDLE_VALUE then
+  if Handle = THandle(INVALID_HANDLE_VALUE) then
     raise EFOpenError.CreateResFmt(@SFOpenErrorEx, [FileName,
       SysErrorMessage({$IFDEF FPC}GetLastOSError{$ELSE}GetLastError{$ENDIF})]);
 end;

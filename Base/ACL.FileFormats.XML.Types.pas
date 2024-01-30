@@ -4,15 +4,17 @@
 {*    General Types for XML Reader/Writer    *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.FileFormats.XML.Types;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} //FPC:Partial
 {$SCOPEDENUMS ON}
+
+// FPC-TODO: TACLXMLCharType-surrogates
 
 // Ported from .NET platform:
 // https://github.com/microsoft/referencesource/tree/master/System.Xml/System/Xml/Core
@@ -21,12 +23,8 @@ interface
 
 uses
   // System
-  System.Character,
-  System.Math,
-  System.Generics.Defaults,
-  System.Generics.Collections,
-  System.SysUtils,
-  System.Types,
+  {System.}Generics.Defaults,
+  {System.}SysUtils,
   // ACL
   ACL.Classes.Collections,
   ACL.Parsers,
@@ -201,7 +199,7 @@ type
     class function EncodeName(const S: string): string; static;
     class function EncodeString(const S: string;
       ARemoveBreakLines, ASkipServiceCharacters: Boolean): string; static;
-    class function IsHTMLCode(var P: PWideChar; var L: Integer): Boolean; static;
+    class function IsHTMLCode(var P: PChar; var L: Integer): Boolean; static;
     class function IsInvalidXmlChar(const C: Word): Boolean; inline;
   end;
 
@@ -278,27 +276,25 @@ end;
 
 class function EACLXMLException.BuildCharExceptionArgs(AInvChar, ANextChar: Char): TArray<string>;
 var
-  AAStringList: TArray<string>;
-  ACombinedChar: Integer;
+  LCombinedChar: Integer;
 begin
-  SetLength(AAStringList, 2);
+  SetLength(Result{%H-}, 2);
   //# for surrogate characters include both high and low char in the message so that a full character is displayed
   if TACLXMLCharType.IsHighSurrogate(AInvChar) and (ANextChar <> #0) then
   begin
-    ACombinedChar := TACLXMLCharType.CombineSurrogateChar(ANextChar, AInvChar);
-    AAStringList[0] := AInvChar + ANextChar;
-    AAStringList[1] := Format('0x%2x', [Ord(ACombinedChar)]);
+    LCombinedChar := TACLXMLCharType.CombineSurrogateChar(ANextChar, AInvChar);
+    Result[0] := AInvChar + ANextChar;
+    Result[1] := Format('0x%2x', [Ord(LCombinedChar)]);
   end
   else
   begin
     //# don't include 0 character in the string - in means eof-of-string in native code, where this may bubble up to
     if Integer(AInvChar) = 0 then
-      AAStringList[0] := '.'
+      Result[0] := '.'
     else
-      AAStringList[0] := AInvChar;
-    AAStringList[1] := Format('0x%2x', [Ord(AInvChar)]);
+      Result[0] := AInvChar;
+    Result[1] := Format('0x%2x', [Ord(AInvChar)]);
   end;
-  Result := AAStringList;
 end;
 
 class function EACLXMLException.BuildCharExceptionArgs(const AData: TCharArray; ALength, AInvCharIndex: Integer): TArray<string>;
@@ -396,10 +392,6 @@ const
     #$212A#$212B#$212E#$212E#$2180#$2182#$3005#$3005#$3007#$3007#$3021#$302F#$3031#$3035#$3041#$3094 +
     #$3099#$309A#$309D#$309E#$30A1#$30FA#$30FC#$30FE#$3105#$312C#$4E00#$9FA5#$AC00#$D7A3;
   CharDataRanges = #$0009#$000A#$000D#$000D#$0020#$D7FF#$E000#$FFFD;
-
-  PublicIDRanges =
-    #$000A#$000A#$000D#$000D#$0020#$0021#$0023#$0025#$0027#$003B#$003D#$003D#$003F#$005A#$005F#$005F +
-    #$0061#$007A;
 
   TextRanges = //# TextChar = CharData - { 0xA | 0xD | < | & | 0x9 | ] | 0xDC00 - 0xDFFF }
     #$0020#$0025#$0027#$003B#$003D#$005C#$005E#$D7FF#$E000#$FFFD;
@@ -664,7 +656,7 @@ end;
 
 class function TACLXMLConvert.DecodeName(const S: string): string;
 
-  function GetReplacement(const S: UnicodeString): UnicodeString;
+  function GetReplacement(const S: string): string;
   begin
     if not FMap.TryGetKey(S, Result) then
     begin
@@ -678,10 +670,10 @@ class function TACLXMLConvert.DecodeName(const S: string): string;
 var
   B: TACLStringBuilder;
   L, LS: Integer;
-  P, PS: PWideChar;
-  V: UnicodeString;
+  P, PS: PChar;
+  V: string;
 begin
-  P := PWideChar(S);
+  P := PChar(S);
   L := Length(S);
   B := TACLStringBuilder.Get(L);
   try
@@ -722,7 +714,7 @@ begin
   Result := EncodeString(S, False, True);
 end;
 
-class function TACLXMLConvert.IsHTMLCode(var P: PWideChar; var L: Integer): Boolean;
+class function TACLXMLConvert.IsHTMLCode(var P: PChar; var L: Integer): Boolean;
 begin
   while (L > 0) and CharInSet(P^, ['0'..'9', '#', 'A'..'Z', 'a'..'z']) do
   begin
@@ -732,7 +724,8 @@ begin
   Result := P^ = ';';
 end;
 
-class function TACLXMLConvert.EncodeString(const S: string; ARemoveBreakLines, ASkipServiceCharacters: Boolean): string;
+class function TACLXMLConvert.EncodeString(
+  const S: string; ARemoveBreakLines, ASkipServiceCharacters: Boolean): string;
 
   function EncodeChar(const AChar: Char): string; inline;
   begin

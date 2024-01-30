@@ -4,20 +4,21 @@
 {*                  Crypto                   *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.Crypto;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} //FPC:OK
 
 interface
 
 uses
-  System.Classes,
-  System.SysUtils;
+  {System.}Classes,
+  {System.}Math,
+  {System.}SysUtils;
 
 type
   { TRC4 }
@@ -29,7 +30,7 @@ type
 
   TRC4 = class
   public
-    class function CryptString(const AString, APassword: string): string;
+    class function CryptString(const AStr: UnicodeString; const APassword: string): UnicodeString;
 
     class procedure Crypt(var AKey: TRC4Key; AData: PByte; ADataSize: Integer); overload; inline;
     class procedure Crypt(var AKey: TRC4Key; AInData, AOutData: PByte; ADataSize: Integer); overload;
@@ -51,31 +52,30 @@ type
 
     procedure DoXOR(P: PByte; C: Integer);
   public
-    constructor Create(const AKey: TBytes; const AStream: TStream; AStreamOwnership: TStreamOwnership);
+    constructor Create(const AKey: TBytes;
+      AStream: TStream; AStreamOwnership: TStreamOwnership);
     destructor Destroy; override;
     function Read(var Buffer; Count: Longint): Longint; override;
     function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; override;
     function Write(const Buffer; Count: Longint): Longint; override;
   end;
 
-function acDecryptString(const S, Key: string): string;
-function acEncryptString(const S, Key: string): string;
+function acDecryptString(const S: string; const Key: string): UnicodeString;
+function acEncryptString(const S: UnicodeString; const Key: string): string;
 
 procedure acCryptStringXOR(var S: UnicodeString; const AKey: UnicodeString);
 implementation
 
 uses
-  System.Math,
-  // ACL
   ACL.FastCode,
   ACL.Utils.Strings;
 
-function acDecryptString(const S, Key: string): string;
+function acDecryptString(const S: string; const Key: string): UnicodeString;
 begin
   Result := TRC4.CryptString(TEncoding.Unicode.GetString(TACLMimecode.DecodeBytes(S)), Key);
 end;
 
-function acEncryptString(const S, Key: string): string;
+function acEncryptString(const S: UnicodeString; const Key: string): string;
 begin
   Result := TACLMimecode.EncodeBytes(TEncoding.Unicode.GetBytes(TRC4.CryptString(S, Key)));
 end;
@@ -122,18 +122,18 @@ begin
   AKey.Y := J;
 end;
 
-class function TRC4.CryptString(const AString, APassword: string): string;
+class function TRC4.CryptString(const AStr: UnicodeString; const APassword: string): UnicodeString;
 var
-  AKey: TRC4Key;
+  LKey: TRC4Key;
 begin
-  if AString <> '' then
+  if AStr <> '' then
   begin
-    Initialize(AKey, APassword);
-    SetLength(Result, Length(AString));
-    Crypt(AKey, @AString[1], @Result[1], Length(Result) * SizeOf(Char));
+    Initialize(LKey, APassword);
+    SetLength(Result{%H-}, Length(AStr));
+    Crypt(LKey, @AStr[1], @Result[1], Length(Result) * SizeOf(WideChar));
   end
   else
-    Result := AString;
+    Result := acEmptyStrU;
 end;
 
 class procedure TRC4.Initialize(out AKey: TRC4Key; APassword: PByteArray; APasswordLength: Integer);
@@ -161,7 +161,11 @@ end;
 
 class procedure TRC4.Initialize(out AKey: TRC4Key; const APassword: string);
 begin
+{$IFDEF UNICODE}
   Initialize(AKey, TEncoding.UTF8.GetBytes(APassword));
+{$ELSE}
+  Initialize(AKey, PByteArray(PAnsiChar(APassword)), Length(APassword));
+{$ENDIF}
 end;
 
 class procedure TRC4.Initialize(out AKey: TRC4Key; const APassword: TBytes);
@@ -171,7 +175,8 @@ end;
 
 { TXORStream }
 
-constructor TXORStream.Create(const AKey: TBytes; const AStream: TStream; AStreamOwnership: TStreamOwnership);
+constructor TXORStream.Create(const AKey: TBytes;
+  AStream: TStream; AStreamOwnership: TStreamOwnership);
 begin
   FStream := AStream;
   FStreamOwnership := AStreamOwnership;

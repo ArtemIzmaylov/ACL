@@ -4,22 +4,21 @@
 {*        Math Expressions Processor         *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.Expressions.Math;
 
-{$I ACL.Config.INC}
+{$I ACL.Config.inc} //FPC:OK
 
 interface
 
 uses
-  System.Classes,
-  System.Generics.Collections,
-  System.SysUtils,
-  System.Variants,
+  {System.}Classes,
+  {System.}SysUtils,
+  {System.}Variants,
   // ACL
   ACL.Expressions,
   ACL.Parsers,
@@ -30,6 +29,8 @@ type
   { TACLMathExpressionFactory }
 
   TACLMathExpressionFactory = class(TACLCustomExpressionFactory)
+  strict private type
+    Float = Extended;
   strict private
     class var FInstance: TACLMathExpressionFactory;
   strict private
@@ -79,14 +80,14 @@ type
 
   TACLMathExpressionCompiler = class(TACLExpressionCompiler)
   protected
-    function FetchNumericToken(var P: PWideChar; var C: Integer; var AToken: TACLParserToken): Boolean;
-    function FetchToken(var P: PWideChar; var C: Integer; var AToken: TACLParserToken): Boolean; override;
+    function FetchNumericToken(var P: PChar; var C: Integer; var AToken: TACLParserToken): Boolean;
+    function FetchToken(var P: PChar; var C: Integer; var AToken: TACLParserToken): Boolean; override;
   end;
 
 implementation
 
 uses
-  System.Math;
+  {System.}Math;
 
 { TACLMathExpressionFactory }
 
@@ -196,12 +197,12 @@ end;
 
 class function TACLMathExpressionFactory.FunctionMax(AContext: TObject; AParams: TACLExpressionElements): Variant;
 begin
-  Result := Max(AParams[0].Evaluate(AContext), AParams[1].Evaluate(AContext));
+  Result := Max(Float(AParams[0].Evaluate(AContext)), Float(AParams[1].Evaluate(AContext)));
 end;
 
 class function TACLMathExpressionFactory.FunctionMin(AContext: TObject; AParams: TACLExpressionElements): Variant;
 begin
-  Result := Min(AParams[0].Evaluate(AContext), AParams[1].Evaluate(AContext));
+  Result := Min(Float(AParams[0].Evaluate(AContext)), Float(AParams[1].Evaluate(AContext)));
 end;
 
 class function TACLMathExpressionFactory.FunctionPower(AContext: TObject; AParams: TACLExpressionElements): Variant;
@@ -330,7 +331,7 @@ end;
 { TACLMathExpressionCompiler }
 
 function TACLMathExpressionCompiler.FetchNumericToken(
-  var P: PWideChar; var C: Integer; var AToken: TACLParserToken): Boolean;
+  var P: PChar; var C: Integer; var AToken: TACLParserToken): Boolean;
 const
   NumericStateMachine: array[0..3, -1..14] of SmallInt = (
     {    0  1  2  3  4  5  6  7  8  9   +   -   .   E  #0}
@@ -391,7 +392,7 @@ begin
 end;
 
 function TACLMathExpressionCompiler.FetchToken(
-  var P: PWideChar; var C: Integer; var AToken: TACLParserToken): Boolean;
+  var P: PChar; var C: Integer; var AToken: TACLParserToken): Boolean;
 var
   AEvalFunction: TACLExpressionFunctionInfo;
   ALength: Integer;

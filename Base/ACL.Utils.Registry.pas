@@ -11,7 +11,11 @@
 
 unit ACL.Utils.Registry;
 
-{$I ACL.Config.INC}
+{$I ACL.Config.inc} // FPC:OK
+
+{$IFNDEF MSWINDOWS}
+  {$MESSAGE FATAL 'Windows platform is required'}
+{$ENDIF}
 
 interface
 

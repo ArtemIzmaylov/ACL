@@ -4,24 +4,23 @@
 {*               Recent List                 *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.RecentList;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} //FPC:OK
 
 interface
 
 uses
   // System
-  System.Classes,
-  System.Math,
-  System.SysUtils,
+  {System.}Classes,
+  {System.}SysUtils,
   // Vcl
-  Vcl.Menus,
+  {Vcl.}Menus,
   // ACL
   ACL.Classes.StringList,
   ACL.FileFormats.INI,
@@ -41,19 +40,20 @@ type
     FItems: TACLStringList;
 
     procedure Changed;
-    function IsValid(const S: UnicodeString): Boolean; virtual;
+    function IsValid(const S: string): Boolean; virtual;
   public
     constructor Create(AMaxCount: Integer = 10); virtual;
     destructor Destroy; override;
-    procedure Add(const S: UnicodeString); virtual;
-    procedure BuildMenu(AParentItem: TMenuItem; ATag: Integer; AEvent: TNotifyEvent; const AFormatLine: UnicodeString = '%s');
-    procedure ConfigLoad(AConfig: TACLIniFile; const ASection: UnicodeString); virtual;
-    procedure ConfigSave(AConfig: TACLIniFile; const ASection: UnicodeString); virtual;
+    procedure Add(const S: string); virtual;
+    procedure BuildMenu(AParentItem: TMenuItem; ATag: Integer;
+      AEvent: TNotifyEvent; const AFormatLine: string = '%s');
+    procedure ConfigLoad(AConfig: TACLIniFile; const ASection: string); virtual;
+    procedure ConfigSave(AConfig: TACLIniFile; const ASection: string); virtual;
     procedure Validate;
-    //
+    //# Properties
     property Items: TACLStringList read FItems;
     property LastAdded: string read GetLastAdded;
-    //
+    //# Events
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
   end;
 
@@ -75,9 +75,6 @@ type
 
 implementation
 
-uses
-  ACL.UI.Menus;
-
 { TACLRecentList }
 
 constructor TACLRecentList.Create(AMaxCount: Integer = 10);
@@ -93,7 +90,7 @@ begin
   inherited Destroy;
 end;
 
-procedure TACLRecentList.Add(const S: UnicodeString);
+procedure TACLRecentList.Add(const S: string);
 begin
   Items.Remove(S);
   Items.Insert(0, S);
@@ -103,22 +100,30 @@ begin
 end;
 
 procedure TACLRecentList.BuildMenu(AParentItem: TMenuItem;
-  ATag: Integer; AEvent: TNotifyEvent; const AFormatLine: UnicodeString = '%s');
+  ATag: Integer; AEvent: TNotifyEvent; const AFormatLine: string = '%s');
 var
   I: Integer;
+  LItem: TMenuItem;
 begin
   Validate;
   for I := 0 to Items.Count - 1 do
-    AParentItem.AddItem(Format(AFormatLine, [Items[I]]), Items[I], ATag, AEvent);
+  begin
+    LItem := TMenuItem.Create(AParentItem);
+    LItem.Caption := Format(AFormatLine, [Items[I]]);
+    LItem.Hint := Items[I];
+    LItem.Tag := ATag;
+    LItem.OnClick := AEvent;
+    AParentItem.Add(LItem);
+  end;
 end;
 
-procedure TACLRecentList.ConfigLoad(AConfig: TACLIniFile; const ASection: UnicodeString);
+procedure TACLRecentList.ConfigLoad(AConfig: TACLIniFile; const ASection: string);
 begin
   Items.Text := AConfig.SectionData[ASection];
   Changed;
 end;
 
-procedure TACLRecentList.ConfigSave(AConfig: TACLIniFile; const ASection: UnicodeString);
+procedure TACLRecentList.ConfigSave(AConfig: TACLIniFile; const ASection: string);
 begin
   AConfig.SectionData[ASection] := Items.Text;
 end;
@@ -155,7 +160,7 @@ begin
     Result := '';
 end;
 
-function TACLRecentList.IsValid(const S: UnicodeString): Boolean;
+function TACLRecentList.IsValid(const S: string): Boolean;
 begin
   Result := True;
 end;
