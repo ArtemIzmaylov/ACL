@@ -103,7 +103,7 @@ begin
     AColor := ColorActivity1.Value;
 
   ARect := R;
-  if Active then
+  if not Active then
     ARect.Inflate(-2);
 
   acFillRect(ACanvas.Handle, ARect, AColor);

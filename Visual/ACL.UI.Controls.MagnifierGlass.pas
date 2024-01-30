@@ -217,7 +217,7 @@ begin
     X := Trunc(FBuffer.Width  / (2 * ZoomActual)) * ZoomActual - ZoomActual div 2;
     Y := Trunc(FBuffer.Height / (2 * ZoomActual)) * ZoomActual - ZoomActual div 2;
     if PtInRect(FBuffer.ClientRect, Point(X, Y)) then
-      FColorAtPoint := TACLColors.ToColor(FBuffer.Colors^[X + Y * FBuffer.Width]);
+      FColorAtPoint := FBuffer.Colors^[X + Y * FBuffer.Width].ToColor;
 
     S := dpiApply(6, FCurrentPPI);
     FBuffer.Canvas.Pen.Color := GetForegroundColor(ColorAtPoint);

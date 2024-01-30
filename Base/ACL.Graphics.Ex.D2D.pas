@@ -107,10 +107,13 @@ type
     procedure SaveClipRegion; override;
 
     // Images
-    function CreateImage(Colors: PRGBQuad; Width, Height: Integer; AlphaFormat: TAlphaFormat = afDefined): TACL2DRenderImage; override;
+    function CreateImage(Colors: PACLPixel32; Width, Height: Integer;
+      AlphaFormat: TAlphaFormat = afDefined): TACL2DRenderImage; override;
     function CreateImageAttributes: TACL2DRenderImageAttributes; override;
-    procedure DrawImage(Image: TACL2DRenderImage; const TargetRect, SourceRect: TRect; Attributes: TACL2DRenderImageAttributes); override;
-    procedure DrawImage(Image: TACL2DRenderImage; const TargetRect, SourceRect: TRect; Alpha: Byte); override;
+    procedure DrawImage(Image: TACL2DRenderImage;
+      const TargetRect, SourceRect: TRect; Attributes: TACL2DRenderImageAttributes); override;
+    procedure DrawImage(Image: TACL2DRenderImage;
+      const TargetRect, SourceRect: TRect; Alpha: Byte); override;
 
     // Ellipse
     procedure DrawEllipse(X1, Y1, X2, Y2: Single; Color: TAlphaColor;
@@ -268,7 +271,7 @@ type
   public
     Handle: ID2D1Bitmap;
     constructor Create(AOwner: TACLDirect2DAbstractRender;
-      AColors: PRGBQuad; AWidth, AHeight: Integer; AAlphaFormat: TAlphaFormat);
+      AColors: PACLPixel32; AWidth, AHeight: Integer; AAlphaFormat: TAlphaFormat);
     destructor Destroy; override;
     procedure Release; override;
   end;
@@ -309,7 +312,8 @@ end;
 
 {$REGION 'Utilities'}
 
-function D2D1Bitmap(ATarget: ID2D1RenderTarget; ABits: PRGBQuad; AWidth, AHeight: Integer; AAlphaFormat: TAlphaFormat): ID2D1Bitmap; overload;
+function D2D1Bitmap(ATarget: ID2D1RenderTarget; ABits: PACLPixel32;
+  AWidth, AHeight: Integer; AAlphaFormat: TAlphaFormat): ID2D1Bitmap; overload;
 const
   AlphaModeMap: array[TAlphaFormat] of D2D1_ALPHA_MODE = (
     D2D1_ALPHA_MODE_IGNORE,
@@ -318,15 +322,15 @@ const
   );
 var
   ABitmapProperties: TD2D1BitmapProperties;
-  ATempBits: PRGBQuad;
+  ATempBits: PACLPixel32;
   ATempBitsCount: Integer;
 begin
   if AAlphaFormat = afDefined then
   begin
     ATempBitsCount := AWidth * AHeight;
-    ATempBits := AllocMem(SizeOf(TRGBQuad) * ATempBitsCount);
+    ATempBits := AllocMem(SizeOf(TACLPixel32) * ATempBitsCount);
     try
-      FastMove(ABits^, ATempBits^, SizeOf(TRGBQuad) * ATempBitsCount);
+      FastMove(ABits^, ATempBits^, SizeOf(TACLPixel32) * ATempBitsCount);
       TACLColors.Premultiply(ATempBits, ATempBitsCount);
       Result := D2D1Bitmap(ATarget, ATempBits, AWidth, AHeight, afPremultiplied);
     finally
@@ -346,7 +350,7 @@ function D2D1Bitmap(ATarget: ID2D1RenderTarget; ABitmap: TBitmap; AAlphaFormat: 
 var
   ABitmapHandle: HBITMAP;
   ABitmapInfo: TBitmapInfo;
-  ABuffer: PRGBQuad;
+  ABuffer: PACLPixel32;
 begin
   ABuffer := AllocMem(ABitmap.Width * ABitmap.Height * 4);
   try
@@ -722,7 +726,7 @@ end;
 { TACLDirect2DRenderImage }
 
 constructor TACLDirect2DRenderImage.Create(AOwner: TACLDirect2DAbstractRender;
-  AColors: PRGBQuad; AWidth, AHeight: Integer; AAlphaFormat: TAlphaFormat);
+  AColors: PACLPixel32; AWidth, AHeight: Integer; AAlphaFormat: TAlphaFormat);
 begin
   inherited Create(AOwner);
   AOwner.FResources.Add(Self);
@@ -895,7 +899,7 @@ begin
   FSavedClipRects.Push(FClipCounter);
 end;
 
-function TACLDirect2DAbstractRender.CreateImage(Colors: PRGBQuad;
+function TACLDirect2DAbstractRender.CreateImage(Colors: PACLPixel32;
   Width, Height: Integer; AlphaFormat: TAlphaFormat): TACL2DRenderImage;
 begin
   Result := TACLDirect2DRenderImage.Create(Self, Colors, Width, Height, AlphaFormat);

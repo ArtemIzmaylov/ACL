@@ -147,7 +147,7 @@ type
     procedure SaveClipRegion; override;
 
     // Images
-    function CreateImage(Colors: PRGBQuad; Width, Height: Integer;
+    function CreateImage(Colors: PACLPixel32; Width, Height: Integer;
       AlphaFormat: TAlphaFormat = afDefined): TACL2DRenderImage; override;
     function CreateImage(Image: TACLImage): TACL2DRenderImage; override;
     function CreateImageAttributes: TACL2DRenderImageAttributes; override;
@@ -1005,7 +1005,8 @@ begin
 end;
 {$ENDREGION}
 
-function TACLGdiplusRender.CreateImage(Colors: PRGBQuad; Width, Height: Integer; AlphaFormat: TAlphaFormat): TACL2DRenderImage;
+function TACLGdiplusRender.CreateImage(Colors: PACLPixel32;
+  Width, Height: Integer; AlphaFormat: TAlphaFormat): TACL2DRenderImage;
 const
   FormatMap: array[TAlphaFormat] of Integer = (PixelFormat32bppRGB, PixelFormat32bppARGB, PixelFormat32bppPARGB);
 var

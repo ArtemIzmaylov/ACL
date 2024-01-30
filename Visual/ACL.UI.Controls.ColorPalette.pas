@@ -513,11 +513,11 @@ end;
 
 function TACLColorPaletteViewInfo.AdjustColor(AColor: TAlphaColor; ALightness: Single): TAlphaColor;
 var
-  AColorQuad: TRGBQuad;
+  AColorQuad: TACLPixel32;
   H, S, L: Single;
 begin
-  AColorQuad := AColor.ToQuad;
-  TACLColors.RGBtoHSL(AColorQuad.rgbRed, AColorQuad.rgbGreen, AColorQuad.rgbBlue, H, S, L);
+  AColorQuad := AColor.ToPixel;
+  TACLColors.RGBtoHSL(AColorQuad.R, AColorQuad.G, AColorQuad.B, H, S, L);
 
   if L >= 0.8 then
     ALightness := ALightness * 0.2 + 0.8
@@ -526,7 +526,7 @@ begin
   else
     ALightness := ALightness * 0.49;
 
-  TACLColors.HSLtoRGB(H, S, ALightness, AColorQuad.rgbRed, AColorQuad.rgbGreen, AColorQuad.rgbBlue);
+  TACLColors.HSLtoRGB(H, S, ALightness, AColorQuad.R, AColorQuad.G, AColorQuad.B);
   Result := TAlphaColor.FromColor(AColorQuad);
 end;
 

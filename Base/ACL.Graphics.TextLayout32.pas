@@ -257,12 +257,12 @@ begin
   end;
 end;
 
-procedure Text32RecoverAlpha(ALayer: TACLBitmapLayer; const ATextColor: TRGBQuad);
+procedure Text32RecoverAlpha(ALayer: TACLBitmapLayer; const ATextColor: TACLPixel32);
 const
   K = 700; // [1..5000]
 var
   AAlpha: Integer;
-  Q: PRGBQuad;
+  P: PACLPixel32;
 begin
   if not FGammaTableInitialized then
   begin
@@ -271,25 +271,22 @@ begin
     FGammaTableInitialized := True;
   end;
 
-  Q := PRGBQuad(ALayer.Colors);
+  P := PACLPixel32(ALayer.Colors);
   for var I := 1 to ALayer.ColorCount do
   begin
-    if PDWORD(Q)^ and $00FFFFFF <> 0 then
+    if PDWORD(P)^ and TACLPixel32.EssenceMask <> 0 then
     begin
-      AAlpha := 128 +
-        FGammaTable[Q^.rgbRed] * 77 +
-        FGammaTable[Q^.rgbGreen] * 151 +
-        FGammaTable[Q^.rgbBlue] * 28;
-      AAlpha := AAlpha * ATextColor.rgbReserved shr 16;
-      Q^.rgbBlue := TACLColors.PremultiplyTable[ATextColor.rgbBlue, AAlpha];
-      Q^.rgbGreen := TACLColors.PremultiplyTable[ATextColor.rgbGreen, AAlpha];
-      Q^.rgbRed := TACLColors.PremultiplyTable[ATextColor.rgbRed, AAlpha];
-      Q^.rgbReserved := AAlpha;
+      AAlpha := 128 + FGammaTable[P^.R] * 77 + FGammaTable[P^.G] * 151 + FGammaTable[P^.B] * 28;
+      AAlpha := AAlpha * ATextColor.A shr 16;
+      P^.B := TACLColors.PremultiplyTable[ATextColor.B, AAlpha];
+      P^.G := TACLColors.PremultiplyTable[ATextColor.G, AAlpha];
+      P^.R := TACLColors.PremultiplyTable[ATextColor.R, AAlpha];
+      P^.A := AAlpha;
     end
     else
-      Q^.rgbReserved := 0;
+      P^.A := 0;
 
-    Inc(Q);
+    Inc(P);
   end;
 end;
 
@@ -365,7 +362,7 @@ begin
       end;
     end;
     Text32ApplyBlur(FTextBuffer, AFont.Shadow);
-    Text32RecoverAlpha(FTextBuffer, TACLColors.ToQuad(AFont.Shadow.Color));
+    Text32RecoverAlpha(FTextBuffer, TACLPixel32.Create(AFont.Shadow.Color));
     acAlphaBlend(DC, FTextBuffer.Handle, R, FTextBuffer.ClientRect);
   end;
 
@@ -376,7 +373,7 @@ begin
   begin
     FTextBuffer.Reset;
     Text32Output(FTextBuffer.Handle, ATextOffset);
-    Text32RecoverAlpha(FTextBuffer, TACLColors.ToQuad(ATextColor));
+    Text32RecoverAlpha(FTextBuffer, TACLPixel32.Create(ATextColor));
     acAlphaBlend(DC, FTextBuffer.Handle, R, FTextBuffer.ClientRect);
   end;
 end;
@@ -798,7 +795,7 @@ procedure TACLTextLayoutShadowRender32.BeforeDestruction;
 begin
   inherited;
   Text32ApplyBlur(FBuffer, Shadow);
-  Text32RecoverAlpha(FBuffer, TACLColors.ToQuad(Shadow.Color));
+  Text32RecoverAlpha(FBuffer, TACLPixel32.Create(Shadow.Color));
   FBuffer.DrawBlend(FTargetCanvas.Handle, FBufferOrigin);
 end;
 
