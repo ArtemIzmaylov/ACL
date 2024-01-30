@@ -101,14 +101,14 @@ type
     State: TACLSkinImageBitsState;
 
     constructor Create; overload;
-    constructor Create(ABits: PRGBQuadArray; ACount: Integer;
+    constructor Create(ABits: PACLPixel32Array; ACount: Integer;
       AHasAlpha: TACLBoolean; AState: TACLSkinImageBitsState); overload;
     constructor Create(AStream: TStream); overload;
     destructor Destroy; override;
     function Clone: TACLSkinImageBitsStorage;
     function Equals(Obj: TObject): Boolean; override;
     function GetHashCode: Integer; override;
-    procedure Restore(ABits: PRGBQuadArray; ACount: Integer;
+    procedure Restore(ABits: PACLPixel32Array; ACount: Integer;
       out AHasAlpha: TACLBoolean; out AState: TACLSkinImageBitsState);
     procedure SaveToStream(AStream: TStream);
   end;
@@ -136,7 +136,7 @@ type
   strict private
     FAllowColoration: Boolean;
     FBitCount: Integer;
-    FBits: PRGBQuadArray;
+    FBits: PACLPixel32Array;
     FBitsState: TACLSkinImageBitsState;
     FContentOffsets: TRect;
     FDormantData: TACLSkinImageBitsStorage;
@@ -213,7 +213,7 @@ type
     procedure WriteChunks(AStream: TStream; var AChunkCount: Integer); virtual;
 
     property BitCount: Integer read FBitCount;
-    property Bits: PRGBQuadArray read FBits;
+    property Bits: PACLPixel32Array read FBits;
     property BitsState: TACLSkinImageBitsState read FBitsState;
     property Handle: HBITMAP read FHandle;
   public
@@ -243,7 +243,7 @@ type
     function HitTest(const ABounds: TRect; X, Y: Integer): Boolean;
     function HitTestCore(const ABounds: TRect; AFrameIndex, X, Y: Integer): Boolean;
     // Pixels
-    function GetPixel(X, Y: Integer; out APixel: TRGBQuad): Boolean;
+    function GetPixel(X, Y: Integer; out APixel: TACLPixel32): Boolean;
     // Listeners
     procedure ListenerAdd(AEvent: TNotifyEvent);
     procedure ListenerRemove(AEvent: TNotifyEvent);
@@ -322,12 +322,16 @@ type
   strict private const
     INVALID_VALUE = $010203;
   strict private
-    class procedure AnalyzeCore(Q: PRGBQuad; Count: Integer; var AAlpha: DWORD; var AColor: DWORD); inline;
-    class function AnalyzeResultToState(var AAlpha: DWORD; var AColor: DWORD): TACLSkinImageFrameState; inline;
+    class procedure AnalyzeCore(Q: PACLPixel32;
+      Count: Integer; var AAlpha: DWORD; var AColor: DWORD); inline;
+    class function AnalyzeResultToState(
+      var AAlpha: DWORD; var AColor: DWORD): TACLSkinImageFrameState; inline;
   public
-    class function Analyze(Q: PRGBQuad; ACount: Integer): TACLSkinImageFrameState;
-    class function AnalyzeFrame(Q: PRGBQuadArray; const AFrameRect: TRect; AImageWidth: Integer): TACLSkinImageFrameState;
-    class procedure RecoveryAlpha(Q: PRGBQuad; ACount: Integer; var AHasSemiTransparentPixels: Boolean);
+    class function Analyze(Q: PACLPixel32; ACount: Integer): TACLSkinImageFrameState;
+    class function AnalyzeFrame(Q: PACLPixel32Array;
+      const AFrameRect: TRect; AImageWidth: Integer): TACLSkinImageFrameState;
+    class procedure RecoveryAlpha(Q: PACLPixel32;
+      ACount: Integer; var AHasSemiTransparentPixels: Boolean);
   end;
 
   { TACLSkinImageRenderer }
@@ -518,15 +522,15 @@ begin
     FreeAndNil(FRenderer);
 end;
 
-function acBitsAlloc(ACount: Integer): PRGBQuadArray; inline;
+function acBitsAlloc(ACount: Integer): PACLPixel32Array; inline;
 begin
-  Result := AllocMem(ACount * SizeOf(TRGBQuad));
+  Result := AllocMem(ACount * SizeOf(TACLPixel32));
 end;
 
-procedure acBitsCopy(ASrc, ADst: PRGBQuadArray; ACount: Integer);
+procedure acBitsCopy(ASrc, ADst: PACLPixel32Array; ACount: Integer);
 begin
   if (ASrc <> nil) and (ADst <> nil) and (ACount > 0) then
-    FastMove(ASrc^, ADst^, ACount * SizeOf(TRGBQuad));
+    FastMove(ASrc^, ADst^, ACount * SizeOf(TACLPixel32));
 end;
 
 function ZCompressCheck(code: Integer): Integer; overload;
@@ -602,7 +606,7 @@ begin
   // do nothing
 end;
 
-constructor TACLSkinImageBitsStorage.Create(ABits: PRGBQuadArray;
+constructor TACLSkinImageBitsStorage.Create(ABits: PACLPixel32Array;
   ACount: Integer; AHasAlpha: TACLBoolean; AState: TACLSkinImageBitsState);
 const
   Delta = 256;
@@ -612,7 +616,7 @@ var
   ZStream: TZStreamRec;
 begin
   // Our own ZCompress implementation, because standard version works with Integer, not Cardinal.
-  AInSize := ACount * SizeOf(TRGBQuad);
+  AInSize := ACount * SizeOf(TACLPixel32);
   AOutSize := 12{ZLib Header} + AInSize div 2 + IfThen(AInSize < 100, AInSize div 3);
 
   GetMem(Data, AOutSize);
@@ -686,7 +690,7 @@ begin
   Result := Integer(AHashValue);
 end;
 
-procedure TACLSkinImageBitsStorage.Restore(ABits: PRGBQuadArray;
+procedure TACLSkinImageBitsStorage.Restore(ABits: PACLPixel32Array;
   ACount: Integer; out AHasAlpha: TACLBoolean; out AState: TACLSkinImageBitsState);
 var
   ASize: Cardinal;
@@ -858,7 +862,7 @@ begin
   if AllowColoration and AValue.IsAssigned then
   begin
     CheckUnpacked;
-    TACLColors.ApplyColorSchema(PRGBQuad(Bits), BitCount, AValue);
+    TACLColors.ApplyColorSchema(PACLPixel32(Bits), BitCount, AValue);
     Changed;
   end;
 end;
@@ -1064,7 +1068,7 @@ function TACLSkinImage.HitTestCore(const ABounds: TRect; AFrameIndex, X, Y: Inte
   end;
 
 var
-  APixel: TRGBQuad;
+  APixel: TACLPixel32;
   APoint: TPoint;
 begin
   if not Empty then
@@ -1074,14 +1078,14 @@ begin
     if ConvertPointToLocalCoords(APoint, ABounds, FrameRect[AFrameIndex]) then
     begin
       if GetPixel(APoint.X, APoint.Y, APixel) then
-        Result := APixel.rgbReserved >= HitTestThreshold;
+        Result := APixel.A >= HitTestThreshold;
     end;
   end
   else
     Result := True;
 end;
 
-function TACLSkinImage.GetPixel(X, Y: Integer; out APixel: TRGBQuad): Boolean;
+function TACLSkinImage.GetPixel(X, Y: Integer; out APixel: TACLPixel32): Boolean;
 var
   AOffset: Integer;
 begin
@@ -1119,7 +1123,7 @@ begin
   GetDIBits(MeasureCanvas.Handle, ABitmap.Handle, 0, Height, Bits, AInfo, DIB_RGB_COLORS);
 
   if (ABitmap.PixelFormat > pfDevice) and (ABitmap.PixelFormat < pf32bit) then
-    TACLColors.MakeTransparent(PRGBQuad(Bits), BitCount, TACLColors.MaskPixel);
+    TACLColors.MakeTransparent(PACLPixel32(Bits), BitCount, TACLColors.MaskPixel);
   if ABitmap.AlphaFormat = afPremultiplied then
     FBitsState := ibsPremultiplied;
 
@@ -1345,9 +1349,9 @@ begin
     begin
       case ARequiredState of
         ibsPremultiplied:
-          TACLColors.Premultiply(PRGBQuad(Bits), BitCount);
+          TACLColors.Premultiply(PACLPixel32(Bits), BitCount);
         ibsUnpremultiplied:
-          TACLColors.Unpremultiply(PRGBQuad(Bits), BitCount);
+          TACLColors.Unpremultiply(PACLPixel32(Bits), BitCount);
       end;
     end;
     FBitsState := ARequiredState;
@@ -1363,7 +1367,7 @@ begin
     FDormantData := TACLSkinImageBitsStorage.Create(Bits, BitCount, FHasAlpha, FBitsState);
   {$IFDEF ACL_DEBUG_SKINIMAGE_STAT}
     Inc(FSkinImageMemoryCompressed, FDormantData.DataSize);
-    Inc(FSkinImageMemoryUsageInDormant, BitCount * SizeOf(TRGBQuad));
+    Inc(FSkinImageMemoryUsageInDormant, BitCount * SizeOf(TACLPixel32));
     Inc(FSkinImageDormantCount);
   {$ENDIF}
     ReleaseHandle;
@@ -1438,7 +1442,7 @@ begin
 {$IFDEF ACL_DEBUG_SKINIMAGE_STAT}
   if FDormantData <> nil then
   begin
-    Dec(FSkinImageMemoryUsageInDormant, BitCount * SizeOf(TRGBQuad));
+    Dec(FSkinImageMemoryUsageInDormant, BitCount * SizeOf(TACLPixel32));
     Dec(FSkinImageMemoryCompressed, FDormantData.DataSize);
     Dec(FSkinImageDormantCount);
   end;
@@ -1467,7 +1471,7 @@ begin
         DoSetSize(ASkinImage.Width, ASkinImage.Height);
         FDormantData := ASkinImage.FDormantData.Clone;
       {$IFDEF ACL_DEBUG_SKINIMAGE_STAT}
-        Inc(FSkinImageMemoryUsageInDormant, BitCount * SizeOf(TRGBQuad));
+        Inc(FSkinImageMemoryUsageInDormant, BitCount * SizeOf(TACLPixel32));
         Inc(FSkinImageMemoryCompressed, FDormantData.DataSize);
         Inc(FSkinImageDormantCount);
       {$ENDIF}
@@ -1507,7 +1511,7 @@ begin
   if BitCount > 0 then
   begin
   {$IFDEF ACL_DEBUG_SKINIMAGE_STAT}
-    Inc(FSkinImageMemoryUsage, BitCount * SizeOf(TRGBQuad));
+    Inc(FSkinImageMemoryUsage, BitCount * SizeOf(TACLPixel32));
   {$ENDIF}
     acFillBitmapInfoHeader(AInfo.bmiHeader, Width, Height);
     FHandle := CreateDIBSection(0, AInfo, DIB_RGB_COLORS, Pointer(FBits), 0, 0);
@@ -1711,10 +1715,10 @@ begin
   if FHasAlpha = TACLBoolean.Default then
   begin
     CheckUnpacked;
-    AState := TACLSkinImageAnalyzer.Analyze(PRGBQuad(Bits), BitCount);
+    AState := TACLSkinImageAnalyzer.Analyze(PACLPixel32(Bits), BitCount);
     if AState.IsTransparent then // null-alpha
     begin
-      TACLSkinImageAnalyzer.RecoveryAlpha(PRGBQuad(Bits), BitCount, AHasSemiTransparentPixels);
+      TACLSkinImageAnalyzer.RecoveryAlpha(PACLPixel32(Bits), BitCount, AHasSemiTransparentPixels);
       if AHasSemiTransparentPixels then
         FHasAlpha := TACLBoolean.True
       else
@@ -1883,7 +1887,7 @@ begin
 
   DoCreateBits(AWidth, AHeight);
   if BitCount > 0 then
-    AStream.ReadBuffer(Bits^, BitCount * SizeOf(TRGBQuad));
+    AStream.ReadBuffer(Bits^, BitCount * SizeOf(TACLPixel32));
 
   FHasAlpha := TACLBoolean.From(AFlags and FLAGS_BITS_HASALPHA = FLAGS_BITS_HASALPHA);
   FBitsState := TACLSkinImageBitsState(AFlags and FLAGS_BITS_PREPARED = FLAGS_BITS_PREPARED);
@@ -2090,7 +2094,7 @@ end;
 
 { TACLSkinImageAnalyzer }
 
-class function TACLSkinImageAnalyzer.Analyze(Q: PRGBQuad; ACount: Integer): TACLSkinImageFrameState;
+class function TACLSkinImageAnalyzer.Analyze(Q: PACLPixel32; ACount: Integer): TACLSkinImageFrameState;
 var
   AAlpha: DWORD;
   AColor: DWORD;
@@ -2099,13 +2103,13 @@ begin
     Exit(TACLSkinImageFrameState.TRANSPARENT);
 
   AColor := PDWORD(Q)^;
-  AAlpha := Q^.rgbReserved;
+  AAlpha := Q^.A;
   AnalyzeCore(Q, ACount, AAlpha, AColor);
   Result := AnalyzeResultToState(AAlpha, AColor);
 end;
 
-class function TACLSkinImageAnalyzer.AnalyzeFrame(
-  Q: PRGBQuadArray; const AFrameRect: TRect; AImageWidth: Integer): TACLSkinImageFrameState;
+class function TACLSkinImageAnalyzer.AnalyzeFrame(Q: PACLPixel32Array;
+  const AFrameRect: TRect; AImageWidth: Integer): TACLSkinImageFrameState;
 var
   AAlpha: DWORD;
   AColor: DWORD;
@@ -2116,7 +2120,7 @@ begin
     Exit(TACLSkinImageFrameState.TRANSPARENT);
 
   AColor := PDWORD(Q)^;
-  AAlpha := Q^[0].rgbReserved;
+  AAlpha := Q^[0].A;
   AWidth := AFrameRect.Width;
   for Y := AFrameRect.Top to AFrameRect.Bottom - 1 do
   begin
@@ -2127,7 +2131,8 @@ begin
   Result := AnalyzeResultToState(AAlpha, AColor);
 end;
 
-class procedure TACLSkinImageAnalyzer.RecoveryAlpha(Q: PRGBQuad; ACount: Integer; var AHasSemiTransparentPixels: Boolean);
+class procedure TACLSkinImageAnalyzer.RecoveryAlpha(
+  Q: PACLPixel32; ACount: Integer; var AHasSemiTransparentPixels: Boolean);
 begin
   while ACount > 0 do
   begin
@@ -2137,18 +2142,19 @@ begin
       TACLColors.Flush(Q^);
     end
     else
-      Q^.rgbReserved := $FF;
+      Q^.A := $FF;
 
     Dec(ACount);
     Inc(Q);
   end;
 end;
 
-class procedure TACLSkinImageAnalyzer.AnalyzeCore(Q: PRGBQuad; Count: Integer; var AAlpha: DWORD; var AColor: DWORD);
+class procedure TACLSkinImageAnalyzer.AnalyzeCore(
+  Q: PACLPixel32; Count: Integer; var AAlpha: DWORD; var AColor: DWORD);
 begin
   while Count > 0 do
   begin
-    if AAlpha <> Q^.rgbReserved then
+    if AAlpha <> Q^.A then
     begin
       AAlpha := INVALID_VALUE;
       Break;
@@ -2168,7 +2174,7 @@ begin
     Exit(TACLSkinImageFrameState.TRANSPARENT);
   if AColor <> INVALID_VALUE then
   begin
-    TACLColors.Unpremultiply(TRGBQuad(AColor));
+    TACLColors.Unpremultiply(TACLPixel32(AColor));
     Exit(AColor);
   end;
   if AAlpha < MaxByte then

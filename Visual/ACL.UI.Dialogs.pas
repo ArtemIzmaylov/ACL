@@ -683,12 +683,12 @@ begin
   if S <> '' then
   begin
     Result := S + #0;  // double null terminators
-    P := WStrScan(PWideChar(Result), '|');
+    P := acStrScan(PWideChar(Result), '|');
     while P <> nil do
     begin
       P^ := #0;
       Inc(P);
-      P := WStrScan(P, '|');
+      P := acStrScan(P, '|');
     end;
   end;
 end;
@@ -730,7 +730,7 @@ procedure TACLFileDialogOldStyleWrapper.GetFileNames(AFileList: TACLStringList);
 
   function ExtractFileName(P: PWideChar; var S: UnicodeString): PWideChar;
   begin
-    Result := WStrScan(P, #0);
+    Result := acStrScan(P, #0);
     if Result = nil then
     begin
       S := P;

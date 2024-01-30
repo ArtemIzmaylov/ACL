@@ -694,13 +694,13 @@ begin
   CheckBitsState(ibsUnpremultiplied);
   case AMode of
     cmTint:
-      TACLColors.Tint(PRGBQuad(Bits), BitCount, AColor.ToQuad);
+      TACLColors.Tint(PACLPixel32(Bits), BitCount, AColor.ToPixel);
     cmColor:
-      TACLColors.ChangeColor(PRGBQuad(Bits), BitCount, AColor.ToQuad);
+      TACLColors.ChangeColor(PACLPixel32(Bits), BitCount, AColor.ToPixel);
     cmHue:
       begin
         TACLColors.RGBtoHSLi(AColor.ToColor, H, S, L);
-        TACLColors.ChangeHue(PRGBQuad(Bits), BitCount, H, MulDiv(100, S, MaxByte));
+        TACLColors.ChangeHue(PACLPixel32(Bits), BitCount, H, MulDiv(100, S, MaxByte));
       end;
   end;
 end;

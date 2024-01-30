@@ -34,10 +34,7 @@ uses
   ACL.Utils.FileSystem;
 
 type
-  TRGBQuadArray = array [0..0] of TRGBQuad;
-  PRGBQuadArray = ^TRGBQuadArray;
   TRGBColors = array of TRGBQuad;
-
   TACLArrowKind = (makLeft, makRight, makTop, makBottom);
 
 const
@@ -86,6 +83,26 @@ type
   PAlphaColorArray = ^TAlphaColorArray;
   TAlphaColorArray = array[0..0] of TAlphaColor;
 
+  { TACLPixel32 }
+
+  PACLPixel32 = ^TACLPixel32;
+  TACLPixel32 = packed record
+  public const
+    EssenceMask = $00FFFFFF;
+  public
+    B, G, R, A: Byte; // TRGBQuad's order
+    class function Create(A, R, G, B: Byte): TACLPixel32; overload; static; inline;
+    class function Create(AColor: TAlphaColor): TACLPixel32; overload; static;
+    class function Create(AColor: TColor; AAlpha: Byte = MaxByte): TACLPixel32; overload; static;
+    class operator Implicit(const Value: TRGBQuad): TACLPixel32; overload;
+    class operator Implicit(const Value: TACLPixel32): TRGBQuad; overload;
+    function ToColor: TColor;
+  end;
+
+  PACLPixel32Array = ^TACLPixel32Array;
+  TACLPixel32Array = array [0..0] of TACLPixel32;
+  TACLPixel32DynArray = array of TACLPixel32;
+
   { TAlphaColorHelper }
 
   TAlphaColorHelper = record helper for TAlphaColor
@@ -105,12 +122,12 @@ type
     class function ApplyColorSchema(AColor: TAlphaColor; const ASchema: TACLColorSchema): TAlphaColor; static;
     class function FromARGB(const A, R, G, B: Byte): TAlphaColor; static;
     class function FromColor(const AColor: TColor; AAlpha: Byte = MaxByte): TAlphaColor; overload; static;
-    class function FromColor(const AColor: TRGBQuad): TAlphaColor; overload; static;
+    class function FromColor(const AColor: TACLPixel32): TAlphaColor; overload; static;
     class function FromString(AColor: UnicodeString): TAlphaColor; static;
     function IsDefault: Boolean; inline;
     function IsValid: Boolean; inline;
     function ToColor: TColor;
-    function ToQuad: TRGBQuad;
+    function ToPixel: TACLPixel32;
     function ToString: string;
 
     property A: Byte index 3 read GetAlpha write SetComponent;
@@ -125,6 +142,64 @@ type
   public
     function Clone: TFont;
     procedure SetSize(ASize: Integer; ATargetDpi: Integer);
+  end;
+
+  { TACLDib }
+
+  TACLDib = class
+  strict private
+    FBitmap: HBITMAP;
+    FCanvas: TCanvas;
+    FColorCount: Integer;
+    FColors: PACLPixel32Array;
+    FHandle: HDC;
+    FHeight: Integer;
+    FOldBmp: HBITMAP;
+    FWidth: Integer;
+
+    function GetCanvas: TCanvas;
+    function GetClientRect: TRect; inline;
+    function GetEmpty: Boolean; inline;
+  protected
+    procedure CreateHandles(W, H: Integer); virtual;
+    procedure FreeHandles; virtual;
+  public
+    constructor Create(const R: TRect); overload;
+    constructor Create(const S: TSize); overload;
+    constructor Create(const W, H: Integer); overload; virtual;
+    destructor Destroy; override;
+    procedure Assign(ALayer: TACLDib);
+    procedure AssignParams(DC: HDC);
+    function Clone(out AData: PACLPixel32Array): Boolean;
+    function CoordToFlatIndex(X, Y: Integer): Integer; inline;
+    //# Processing
+    procedure ApplyTint(const AColor: TColor); overload;
+    procedure ApplyTint(const AColor: TACLPixel32); overload;
+    procedure Flip(AHorizontally, AVertically: Boolean);
+    procedure MakeDisabled(AIgnoreMask: Boolean = False);
+    procedure MakeMirror(ASize: Integer);
+    procedure MakeOpaque;
+    procedure MakeTransparent(AColor: TColor);
+    procedure Premultiply(R: TRect); overload;
+    procedure Premultiply; overload;
+    procedure Reset(const R: TRect); overload;
+    procedure Reset; overload;
+    procedure Resize(ANewWidth, ANewHeight: Integer); overload;
+    procedure Resize(const R: TRect); overload;
+    //# Draw
+    procedure DrawBlend(DC: HDC; const P: TPoint; AAlpha: Byte = MaxByte); overload;
+    procedure DrawCopy(DC: HDC; const P: TPoint); overload;
+    procedure DrawCopy(DC: HDC; const R: TRect; ASmoothStretch: Boolean = False); overload;
+    //# Properties
+    property Bitmap: HBITMAP read FBitmap;
+    property Canvas: TCanvas read GetCanvas;
+    property ClientRect: TRect read GetClientRect;
+    property ColorCount: Integer read FColorCount;
+    property Colors: PACLPixel32Array read FColors;
+    property Empty: Boolean read GetEmpty;
+    property Handle: HDC read FHandle;
+    property Height: Integer read FHeight;
+    property Width: Integer read FWidth;
   end;
 
   { TACLColorList }
@@ -269,52 +344,48 @@ type
 
   TACLColors = class
   public const
-    MaskPixel: TRGBQuad = (rgbBlue: 255; rgbGreen: 0; rgbRed: 255; rgbReserved: 0); // clFuchsia
-    NullPixel: TRGBQuad = (rgbBlue: 0; rgbGreen: 0; rgbRed: 0; rgbReserved: 0);
+    MaskPixel: TACLPixel32 = (B: 255; G: 0; R: 255; A: 0); // clFuchsia
+    NullPixel: TACLPixel32 = (B: 0; G: 0; R: 0; A: 0);
   public class var
     PremultiplyTable: TACLPixelMap;
     UnpremultiplyTable: TACLPixelMap;
   public
     class constructor Create;
-    class function CompareRGB(const Q1, Q2: TRGBQuad): Boolean; inline; static;
+    class function CompareRGB(const Q1, Q2: TACLPixel32): Boolean; inline; static;
     class function IsDark(Color: TColor): Boolean;
-    class function IsMask(const Q: TRGBQuad): Boolean; inline; static;
-    class function ToColor(const Q: TRGBQuad): TColor; static;
-    class function ToQuad(A, R, G, B: Byte): TRGBQuad; overload; static; inline;
-    class function ToQuad(AColor: TAlphaColor): TRGBQuad; overload; static;
-    class function ToQuad(AColor: TColor; AAlpha: Byte = MaxByte): TRGBQuad; overload; static;
+    class function IsMask(const P: TACLPixel32): Boolean; inline; static;
 
     class procedure AlphaBlend(var D: TColor; S: TColor; AAlpha: Integer = 255); overload; inline; static;
-    class procedure AlphaBlend(var D: TRGBQuad; const S: TRGBQuad;
+    class procedure AlphaBlend(var D: TACLPixel32; const S: TACLPixel32;
       AAlpha: Integer = 255; AProcessPerChannelAlpha: Boolean = True); overload; inline; static;
-    class procedure ApplyColorSchema(AColors: PRGBQuad;
+    class procedure ApplyColorSchema(AColors: PACLPixel32;
       ACount: Integer; const AValue: TACLColorSchema); overload; inline; static;
     class procedure ApplyColorSchema(const AFont: TFont; const AValue: TACLColorSchema); overload;
     class procedure ApplyColorSchema(var AColor: TAlphaColor; const AValue: TACLColorSchema); overload;
     class procedure ApplyColorSchema(var AColor: TColor; const AValue: TACLColorSchema); overload;
-    class procedure ApplyColorSchema(var AColor: TRGBQuad; const AValue: TACLColorSchema); overload;
-    class function ArePremultiplied(AColors: PRGBQuad; ACount: Integer): Boolean;
-    class procedure Flip(AColors: PRGBQuadArray; AWidth, AHeight: Integer; AHorizontally, AVertically: Boolean);
-    class procedure Flush(var Q: TRGBQuad); inline; static;
-    class procedure Grayscale(Q: PRGBQuad; Count: Integer; IgnoreMask: Boolean = False); overload; static;
-    class procedure Grayscale(var Q: TRGBQuad; IgnoreMask: Boolean = False); overload; inline; static;
+    class procedure ApplyColorSchema(var AColor: TACLPixel32; const AValue: TACLColorSchema); overload;
+    class function ArePremultiplied(AColors: PACLPixel32; ACount: Integer): Boolean;
+    class procedure Flip(AColors: PACLPixel32Array; AWidth, AHeight: Integer; AHorizontally, AVertically: Boolean);
+    class procedure Flush(var P: TACLPixel32); inline; static;
+    class procedure Grayscale(P: PACLPixel32; Count: Integer; IgnoreMask: Boolean = False); overload; static;
+    class procedure Grayscale(var P: TACLPixel32; IgnoreMask: Boolean = False); overload; inline; static;
     class function Hue(Color: TColor): Single; overload; static;
     class function Invert(Color: TColor): TColor; static;
     class function Lightness(Color: TColor): Single; overload; static;
-    class procedure MakeDisabled(Q: PRGBQuad; Count: Integer; IgnoreMask: Boolean = False); overload; static;
-    class procedure MakeDisabled(var Q: TRGBQuad; IgnoreMask: Boolean = False); overload; inline; static;
-    class procedure MakeTransparent(Q: PRGBQuad; ACount: Integer; const AColor: TRGBQuad); overload;
-    class procedure Premultiply(Q: PRGBQuad; ACount: Integer); overload; static;
-    class procedure Premultiply(var Q: TRGBQuad); overload; inline; static;
-    class procedure Unpremultiply(Q: PRGBQuad; ACount: Integer); overload; static;
-    class procedure Unpremultiply(var Q: TRGBQuad); overload; inline; static;
+    class procedure MakeDisabled(P: PACLPixel32; Count: Integer; IgnoreMask: Boolean = False); overload; static;
+    class procedure MakeDisabled(var P: TACLPixel32; IgnoreMask: Boolean = False); overload; inline; static;
+    class procedure MakeTransparent(P: PACLPixel32; ACount: Integer; const AColor: TACLPixel32); overload;
+    class procedure Premultiply(P: PACLPixel32; ACount: Integer); overload; static;
+    class procedure Premultiply(var P: TACLPixel32); overload; inline; static;
+    class procedure Unpremultiply(P: PACLPixel32; ACount: Integer); overload; static;
+    class procedure Unpremultiply(var P: TACLPixel32); overload; inline; static;
 
     // Coloration
     // Pixels must be unpremultiplied
-    class procedure ChangeColor(Q: PRGBQuad; ACount: Integer; const AColor: TRGBQuad); static;
-    class procedure ChangeHue(Q: PRGBQuad; ACount: Integer; AHue: Byte; AIntensity: Byte = 100); overload; static;
-    class procedure ChangeHue(var Q: TRGBQuad; AHue: Byte; AIntensity: Byte = 100); overload; inline; static;
-    class procedure Tint(Q: PRGBQuad; ACount: Integer; const ATintColor: TRGBQuad); overload; static;
+    class procedure ChangeColor(P: PACLPixel32; ACount: Integer; const AColor: TACLPixel32); static;
+    class procedure ChangeHue(P: PACLPixel32; ACount: Integer; AHue: Byte; AIntensity: Byte = 100); overload; static;
+    class procedure ChangeHue(var P: TACLPixel32; AHue: Byte; AIntensity: Byte = 100); overload; inline; static;
+    class procedure Tint(P: PACLPixel32; ACount: Integer; const ATintColor: TACLPixel32); overload; static;
 
     // RGB <-> HSL
     class function HSLtoRGB(H, S, L: Single): TColor; overload;
@@ -418,7 +489,7 @@ function acRegionCombine(ATarget, ASource: HRGN; AOperation: Integer): Integer; 
 function acRegionCombine(ATarget: HRGN; const ASource: TRect; AOperation: Integer): Integer; overload;
 procedure acRegionFree(var ARegion: HRGN); inline;
 function acRegionFromBitmap(ABitmap: TBitmap): HRGN; overload;
-function acRegionFromBitmap(AColors: PRGBQuad; AWidth, AHeight: Integer; ATransparentColor: TColor): HRGN; overload;
+function acRegionFromBitmap(AColors: PACLPixel32; AWidth, AHeight: Integer; ATransparentColor: TColor): HRGN; overload;
 
 // WindowOrg
 function acMoveWindowOrg(DC: HDC; const P: TPoint): TPoint; overload; inline;
@@ -756,7 +827,7 @@ begin
     IfThen(ABitmap.PixelFormat = pf1bit, clWhite, clFuchsia));
 end;
 
-function acRegionFromBitmap(AColors: PRGBQuad; AWidth, AHeight: Integer; ATransparentColor: TColor): HRGN;
+function acRegionFromBitmap(AColors: PACLPixel32; AWidth, AHeight: Integer; ATransparentColor: TColor): HRGN;
 
   procedure FlushRegion(X, Y: Integer; var ACount: Integer; var ACombined: HRGN);
   var
@@ -778,13 +849,13 @@ function acRegionFromBitmap(AColors: PRGBQuad; AWidth, AHeight: Integer; ATransp
 
 var
   ACount: Integer;
-  ATransparent: TRGBQuad;
+  ATransparent: TACLPixel32;
   X, Y: Integer;
 begin
   Result := 0;
-  ATransparent.rgbBlue := GetBValue(ATransparentColor);
-  ATransparent.rgbGreen := GetGValue(ATransparentColor);
-  ATransparent.rgbRed := GetRValue(ATransparentColor);
+  ATransparent.B := GetBValue(ATransparentColor);
+  ATransparent.G := GetGValue(ATransparentColor);
+  ATransparent.R := GetRValue(ATransparentColor);
   for Y := 0 to AHeight - 1 do
   begin
     ACount := 0;
@@ -1612,7 +1683,7 @@ end;
 procedure acTileBlt(DC, SourceDC: HDC; const ADest, ASource: TRect);
 var
   ABrush: HBRUSH;
-  ABrushBitmap: TACLBitmapLayer;
+  ABrushBitmap: TACLDib;
   AClipRgn: HRGN;
   AOrigin: TPoint;
   R: TRect;
@@ -1630,7 +1701,7 @@ begin
 
     if XCount * YCount > 10 then
     begin
-      ABrushBitmap := TACLBitmapLayer.Create(W, H);
+      ABrushBitmap := TACLDib.Create(W, H);
       try
         acBitBlt(ABrushBitmap.Handle, SourceDC, ABrushBitmap.ClientRect, ASource.TopLeft);
 
@@ -1879,6 +1950,160 @@ begin
       AValue := AValue + ADelta;
     end;
   end;
+end;
+
+{ TACLPixel32 }
+
+class function TACLPixel32.Create(A, R, G, B: Byte): TACLPixel32;
+begin
+  Result.B := B;
+  Result.G := G;
+  Result.R := R;
+  Result.A := A;
+end;
+
+class function TACLPixel32.Create(AColor: TAlphaColor): TACLPixel32;
+begin
+  Result.B := AColor.B;
+  Result.G := AColor.G;
+  Result.R := AColor.R;
+  Result.A := AColor.A;
+end;
+
+class function TACLPixel32.Create(AColor: TColor; AAlpha: Byte = MaxByte): TACLPixel32;
+begin
+  AColor := ColorToRGB(AColor);
+  Result.R := GetRValue(AColor);
+  Result.G := GetGValue(AColor);
+  Result.B := GetBValue(AColor);
+  Result.A := AAlpha;
+end;
+
+class operator TACLPixel32.Implicit(const Value: TACLPixel32): TRGBQuad;
+begin
+  DWORD(Result) := DWORD(Value);
+end;
+
+function TACLPixel32.ToColor: TColor;
+begin
+  Result := RGB(R, G, B);
+end;
+
+class operator TACLPixel32.Implicit(const Value: TRGBQuad): TACLPixel32;
+begin
+  DWORD(Result) := DWORD(Value);
+end;
+
+{ TAlphaColorHelper }
+
+class function TAlphaColorHelper.ApplyColorSchema(
+  AColor: TAlphaColor; const ASchema: TACLColorSchema): TAlphaColor;
+begin
+  Result := AColor;
+  TACLColors.ApplyColorSchema(Result, ASchema);
+end;
+
+class function TAlphaColorHelper.FromARGB(const A, R, G, B: Byte): TAlphaColor;
+begin
+  Result := (A shl 24) or (R shl 16) or (G shl 8) or B;
+end;
+
+class function TAlphaColorHelper.FromColor(const AColor: TColor; AAlpha: Byte): TAlphaColor;
+begin
+  if AColor = clDefault then
+    Exit(TAlphaColor.Default);
+  if AColor = clNone then
+    Exit(TAlphaColor.None);
+  Result := FromColor(TACLPixel32.Create(AColor, AAlpha));
+end;
+
+class function TAlphaColorHelper.FromColor(const AColor: TACLPixel32): TAlphaColor;
+begin
+  Result := FromARGB(AColor.A, AColor.R, AColor.G, AColor.B);
+end;
+
+class function TAlphaColorHelper.FromString(AColor: UnicodeString): TAlphaColor;
+var
+  P: TACLPixel32;
+begin
+  if AColor = '' then
+    Exit(Default);
+  if Length(AColor) < 6 then
+    AColor := AColor + DupeString('0', 6 - Length(AColor));
+  if Length(AColor) = 6 then
+    AColor := 'FF' + AColor
+  else
+    if Length(AColor) < 8 then
+      AColor := DupeString('0', 8 - Length(AColor)) + AColor;
+
+  P.A := StrToIntDef('$' + Copy(AColor, 1, 2), 0);
+  P.R := StrToIntDef('$' + Copy(AColor, 3, 2), 0);
+  P.G := StrToIntDef('$' + Copy(AColor, 5, 2), 0);
+  P.B := StrToIntDef('$' + Copy(AColor, 7, 2), 0);
+  Result := TAlphaColor.FromColor(P);
+end;
+
+function TAlphaColorHelper.IsDefault: Boolean;
+begin
+  Result := Self = TAlphaColor.Default;
+end;
+
+function TAlphaColorHelper.IsValid: Boolean;
+begin
+  Result := (Self <> TAlphaColor.None) and (Self <> TAlphaColor.Default);
+end;
+
+function TAlphaColorHelper.ToColor: TColor;
+begin
+  if Self = TAlphaColor.Default then
+    Result := clDefault
+  else
+    if Self = TAlphaColor.None then
+      Result := clNone
+    else
+      Result := (GetRValue(Self) shl 16) or (GetGValue(Self) shl 8) or (GetBValue(Self));
+end;
+
+function TAlphaColorHelper.ToPixel: TACLPixel32;
+begin
+  Result.B := Byte(Self shr BlueShift);
+  Result.G := Byte(Self shr GreenShift);
+  Result.R := Byte(Self shr RedShift);
+  Result.A := Self shr AlphaShift;
+end;
+
+function TAlphaColorHelper.ToString: string;
+begin
+  if Self = TAlphaColor.None then
+    Result := 'None'
+  else
+    if Self = TAlphaColor.Default then
+      Result := 'Default'
+    else
+      with ToPixel do
+        Result :=
+          IntToHex(A, 2) +
+          IntToHex(R, 2) +
+          IntToHex(G, 2) +
+          IntToHex(B, 2);
+end;
+
+function TAlphaColorHelper.GetAlpha(const Index: Integer): Byte;
+begin
+  if IsDefault then
+    Result := MaxByte
+  else
+    Result := GetComponent(Index);
+end;
+
+function TAlphaColorHelper.GetComponent(const Index: Integer): Byte;
+begin
+  Result := PARGB(@Self)^[Index];
+end;
+
+procedure TAlphaColorHelper.SetComponent(const Index: Integer; const Value: Byte);
+begin
+  PARGB(@Self)^[Index] := Value;
 end;
 
 { TACLRegion }
@@ -2212,119 +2437,6 @@ begin
   end;
 end;
 
-{ TAlphaColorHelper }
-
-class function TAlphaColorHelper.ApplyColorSchema(AColor: TAlphaColor; const ASchema: TACLColorSchema): TAlphaColor;
-begin
-  Result := AColor;
-  TACLColors.ApplyColorSchema(Result, ASchema);
-end;
-
-class function TAlphaColorHelper.FromARGB(const A, R, G, B: Byte): TAlphaColor;
-begin
-  Result := (A shl 24) or (R shl 16) or (G shl 8) or B;
-end;
-
-class function TAlphaColorHelper.FromColor(const AColor: TColor; AAlpha: Byte): TAlphaColor;
-begin
-  if AColor = clDefault then
-    Result := TAlphaColor.Default
-  else
-    if AColor <> clNone then
-      Result := FromColor(TACLColors.ToQuad(AColor, AAlpha))
-    else
-      Result := TAlphaColor.None;
-end;
-
-class function TAlphaColorHelper.FromColor(const AColor: TRGBQuad): TAlphaColor;
-begin
-  Result := FromARGB(AColor.rgbReserved, AColor.rgbRed, AColor.rgbGreen, AColor.rgbBlue);
-end;
-
-class function TAlphaColorHelper.FromString(AColor: UnicodeString): TAlphaColor;
-var
-  Q: TRGBQuad;
-begin
-  if AColor = '' then
-    Exit(Default);
-  if Length(AColor) < 6 then
-    AColor := AColor + DupeString('0', 6 - Length(AColor));
-  if Length(AColor) = 6 then
-    AColor := 'FF' + AColor
-  else
-    if Length(AColor) < 8 then
-      AColor := DupeString('0', 8 - Length(AColor)) + AColor;
-
-  Q.rgbReserved := StrToIntDef('$' + Copy(AColor, 1, 2), 0);
-  Q.rgbRed := StrToIntDef('$' + Copy(AColor, 3, 2), 0);
-  Q.rgbGreen := StrToIntDef('$' + Copy(AColor, 5, 2), 0);
-  Q.rgbBlue := StrToIntDef('$' + Copy(AColor, 7, 2), 0);
-  Result := TAlphaColor.FromColor(Q);
-end;
-
-function TAlphaColorHelper.IsDefault: Boolean;
-begin
-  Result := Self = TAlphaColor.Default;
-end;
-
-function TAlphaColorHelper.IsValid: Boolean;
-begin
-  Result := (Self <> TAlphaColor.None) and (Self <> TAlphaColor.Default);
-end;
-
-function TAlphaColorHelper.ToColor: TColor;
-begin
-  if Self = TAlphaColor.Default then
-    Result := clDefault
-  else
-    if Self = TAlphaColor.None then
-      Result := clNone
-    else
-      Result := (GetRValue(Self) shl 16) or (GetGValue(Self) shl 8) or (GetBValue(Self));
-end;
-
-function TAlphaColorHelper.ToQuad: TRGBQuad;
-begin
-  Result.rgbBlue := Byte(Self shr BlueShift);
-  Result.rgbGreen := Byte(Self shr GreenShift);
-  Result.rgbRed := Byte(Self shr RedShift);
-  Result.rgbReserved := Self shr AlphaShift;
-end;
-
-function TAlphaColorHelper.ToString: string;
-begin
-  if Self = TAlphaColor.None then
-    Result := 'None'
-  else
-    if Self = TAlphaColor.Default then
-      Result := 'Default'
-    else
-      with ToQuad do
-        Result :=
-          IntToHex(rgbReserved, 2) +
-          IntToHex(rgbRed, 2) +
-          IntToHex(rgbGreen, 2) +
-          IntToHex(rgbBlue, 2);
-end;
-
-function TAlphaColorHelper.GetAlpha(const Index: Integer): Byte;
-begin
-  if IsDefault then
-    Result := MaxByte
-  else
-    Result := GetComponent(Index);
-end;
-
-function TAlphaColorHelper.GetComponent(const Index: Integer): Byte;
-begin
-  Result := PARGB(@Self)^[Index];
-end;
-
-procedure TAlphaColorHelper.SetComponent(const Index: Integer; const Value: Byte);
-begin
-  PARGB(@Self)^[Index] := Value;
-end;
-
 { TACLColorSchema }
 
 constructor TACLColorSchema.Create(AHue, AHueIntensity: Byte);
@@ -2377,6 +2489,287 @@ end;
 procedure TFontHelper.SetSize(ASize, ATargetDpi: Integer);
 begin
   Size := MulDiv(ASize, ATargetDpi, PixelsPerInch);
+end;
+
+{ TACLDib }
+
+constructor TACLDib.Create(const R: TRect);
+begin
+  Create(R.Width, R.Height);
+end;
+
+constructor TACLDib.Create(const S: TSize);
+begin
+  Create(S.cx, S.cy);
+end;
+
+constructor TACLDib.Create(const W, H: Integer);
+begin
+  CreateHandles(W, H);
+end;
+
+destructor TACLDib.Destroy;
+begin
+  FreeHandles;
+  inherited Destroy;
+end;
+
+procedure TACLDib.Assign(ALayer: TACLDib);
+begin
+  if ALayer <> Self then
+  begin
+    Resize(ALayer.Width, ALayer.Height);
+    FastMove(ALayer.Colors^, Colors^, ColorCount * SizeOf(TACLPixel32));
+  end;
+end;
+
+procedure TACLDib.AssignParams(DC: HDC);
+begin
+  SelectObject(Handle, GetCurrentObject(DC, OBJ_BRUSH));
+  SelectObject(Handle, GetCurrentObject(DC, OBJ_FONT));
+  SetTextColor(Handle, GetTextColor(DC));
+end;
+
+function TACLDib.Clone(out AData: PACLPixel32Array): Boolean;
+var
+  ASize: Integer;
+begin
+  ASize := ColorCount * SizeOf(TACLPixel32);
+  Result := ASize > 0;
+  if Result then
+  begin
+    AData := AllocMem(ASize);
+    FastMove(FColors^, AData^, ASize);
+  end;
+end;
+
+function TACLDib.CoordToFlatIndex(X, Y: Integer): Integer;
+begin
+  if (X >= 0) and (X < Width) and (Y >= 0) and (Y < Height) then
+    Result := X + Y * Width
+  else
+    Result := -1;
+end;
+
+procedure TACLDib.ApplyTint(const AColor: TColor);
+begin
+  ApplyTint(TAlphaColor.FromColor(AColor).ToPixel);
+end;
+
+procedure TACLDib.ApplyTint(const AColor: TACLPixel32);
+var
+  P: PACLPixel32;
+  I: Integer;
+begin
+  P := @FColors^[0];
+  for I := 0 to ColorCount - 1 do
+  begin
+    if P^.A > 0 then
+    begin
+      TACLColors.Unpremultiply(P^);
+      P^.B := AColor.B;
+      P^.G := AColor.G;
+      P^.R := AColor.R;
+      TACLColors.Premultiply(P^);
+    end;
+    Inc(P);
+  end;
+end;
+
+procedure TACLDib.DrawBlend(DC: HDC; const P: TPoint; AAlpha: Byte = 255);
+begin
+  acAlphaBlend(DC, Handle, Bounds(P.X, P.Y, Width, Height), ClientRect, AAlpha);
+end;
+
+procedure TACLDib.DrawCopy(DC: HDC; const P: TPoint);
+begin
+  acBitBlt(DC, Handle, Bounds(P.X, P.Y, Width, Height), NullPoint);
+end;
+
+procedure TACLDib.DrawCopy(DC: HDC; const R: TRect; ASmoothStretch: Boolean = False);
+var
+  AMode: Integer;
+begin
+  if ASmoothStretch and not R.EqualSizes(ClientRect) then
+  begin
+    AMode := SetStretchBltMode(DC, HALFTONE);
+    acStretchBlt(DC, Handle, R, ClientRect);
+    SetStretchBltMode(DC, AMode);
+  end
+  else
+    acStretchBlt(DC, Handle, R, ClientRect);
+end;
+
+procedure TACLDib.Flip(AHorizontally, AVertically: Boolean);
+begin
+  TACLColors.Flip(Colors, Width, Height, AHorizontally, AVertically);
+end;
+
+procedure TACLDib.MakeDisabled(AIgnoreMask: Boolean = False);
+begin
+  TACLColors.MakeDisabled(@FColors^[0], ColorCount, AIgnoreMask);
+end;
+
+procedure TACLDib.MakeMirror(ASize: Integer);
+var
+  AAlpha: Single;
+  AAlphaDelta: Single;
+  AIndex: Integer;
+  I, J, O1, O2, R: Integer;
+begin
+  if (ASize > 0) and (ASize < Height div 2) then
+  begin
+    AAlpha := 60;
+    AAlphaDelta := AAlpha / ASize;
+    O2 := Width;
+    O1 := O2 * (Height - ASize);
+
+    AIndex := O1;
+    for J := 0 to ASize - 1 do
+    begin
+      R := Round(AAlpha);
+      for I := 0 to O2 - 1 do
+      begin
+        TACLColors.AlphaBlend(Colors^[AIndex], Colors^[O1 + I], R, False);
+        Inc(AIndex);
+      end;
+      AAlpha := AAlpha - AAlphaDelta;
+      Dec(O1, O2);
+    end;
+  end;
+end;
+
+procedure TACLDib.MakeOpaque;
+var
+  I: Integer;
+  P: PACLPixel32;
+begin
+  P := @FColors^[0];
+  for I := 0 to ColorCount - 1 do
+  begin
+    P^.A := $FF;
+    Inc(P);
+  end;
+end;
+
+procedure TACLDib.MakeTransparent(AColor: TColor);
+var
+  I: Integer;
+  P: PACLPixel32;
+  R: TACLPixel32;
+begin
+  P := @FColors^[0];
+  R := TACLPixel32.Create(AColor);
+  for I := 0 to ColorCount - 1 do
+  begin
+    if TACLColors.CompareRGB(P^, R) then
+      TACLColors.Flush(P^)
+    else
+      P^.A := $FF;
+    Inc(P);
+  end;
+end;
+
+procedure TACLDib.Premultiply(R: TRect);
+var
+  Y: Integer;
+begin
+  IntersectRect(R, R, ClientRect);
+  for Y := R.Top to R.Bottom - 1 do
+    TACLColors.Premultiply(@FColors^[Y * Width + R.Left], R.Right - R.Left - 1);
+end;
+
+procedure TACLDib.Premultiply;
+begin
+  TACLColors.Premultiply(@FColors^[0], ColorCount);
+end;
+
+procedure TACLDib.Reset;
+var
+  APrevPoint: TPoint;
+begin
+  SetWindowOrgEx(Handle, 0, 0, @APrevPoint);
+  acResetRect(Handle, ClientRect);
+  SetWindowOrgEx(Handle, APrevPoint.X, APrevPoint.Y, nil);
+end;
+
+procedure TACLDib.Reset(const R: TRect);
+begin
+  acResetRect(Handle, R);
+end;
+
+procedure TACLDib.Resize(const R: TRect);
+begin
+  Resize(R.Width, R.Height);
+end;
+
+procedure TACLDib.Resize(ANewWidth, ANewHeight: Integer);
+begin
+  if (ANewWidth <> Width) or (ANewHeight <> Height) then
+  begin
+    FreeHandles;
+    CreateHandles(ANewWidth, ANewHeight);
+  end;
+end;
+
+procedure TACLDib.CreateHandles(W, H: Integer);
+var
+  AInfo: TBitmapInfo;
+begin
+  if (W <= 0) or (H <= 0) then
+    Exit;
+
+  FWidth := W;
+  FHeight := H;
+  FColorCount := W * H;
+  FHandle := CreateCompatibleDC(0);
+  acFillBitmapInfoHeader(AInfo.bmiHeader, Width, Height);
+  FBitmap := CreateDIBSection(0, AInfo, DIB_RGB_COLORS, Pointer(FColors), 0, 0);
+  FOldBmp := SelectObject(Handle, Bitmap);
+  if FColors = nil then
+  begin
+    FreeHandles;
+    raise EInvalidGraphicOperation.CreateFmt('Unable to create bitmap layer (%dx%d)', [W, H]);
+  end;
+end;
+
+procedure TACLDib.FreeHandles;
+begin
+  FreeAndNil(FCanvas);
+  if Handle <> 0 then
+  begin
+    SelectObject(Handle, FOldBmp);
+    DeleteObject(Bitmap);
+    DeleteDC(Handle);
+    FColorCount := 0;
+    FColors := nil;
+    FHeight := 0;
+    FBitmap := 0;
+    FHandle := 0;
+    FWidth := 0;
+  end;
+end;
+
+function TACLDib.GetCanvas: TCanvas;
+begin
+  if FCanvas = nil then
+  begin
+    FCanvas := TCanvas.Create;
+    FCanvas.Lock;
+    FCanvas.Handle := Handle;
+    FCanvas.Brush.Style := bsClear;
+  end;
+  Result := FCanvas;
+end;
+
+function TACLDib.GetClientRect: TRect;
+begin
+  Result := Rect(0, 0, Width, Height);
+end;
+
+function TACLDib.GetEmpty: Boolean;
+begin
+  Result := FColorCount = 0;
 end;
 
 { TACLBitmap }
@@ -2468,7 +2861,7 @@ begin
     PixelFormat := pf32bit;
     ABits := acGetBitmapBits(Self);
     try
-      TACLColors.MakeTransparent(@ABits[0], Length(ABits), TACLColors.ToQuad(AColor));
+      TACLColors.MakeTransparent(@ABits[0], Length(ABits), TACLPixel32.Create(AColor));
     finally
       acSetBitmapBits(Self, ABits);
     end;
@@ -2502,9 +2895,9 @@ begin
     end;
 end;
 
-class function TACLColors.CompareRGB(const Q1, Q2: TRGBQuad): Boolean;
+class function TACLColors.CompareRGB(const Q1, Q2: TACLPixel32): Boolean;
 begin
-  Result := (Q1.rgbBlue = Q2.rgbBlue) and (Q1.rgbGreen = Q2.rgbGreen) and (Q1.rgbRed = Q2.rgbRed);
+  Result := (Q1.B = Q2.B) and (Q1.G = Q2.G) and (Q1.R = Q2.R);
 end;
 
 class function TACLColors.IsDark(Color: TColor): Boolean;
@@ -2512,67 +2905,38 @@ begin
   Result := Lightness(Color) < 0.45;
 end;
 
-class function TACLColors.IsMask(const Q: TRGBQuad): Boolean;
+class function TACLColors.IsMask(const P: TACLPixel32): Boolean;
 begin
-  Result := (Q.rgbGreen = MaskPixel.rgbGreen) and (Q.rgbBlue = MaskPixel.rgbBlue) and (Q.rgbRed = MaskPixel.rgbRed);
-end;
-
-class function TACLColors.ToQuad(A, R, G, B: Byte): TRGBQuad;
-begin
-  Result.rgbBlue := B;
-  Result.rgbGreen := G;
-  Result.rgbRed := R;
-  Result.rgbReserved := A;
-end;
-
-class function TACLColors.ToQuad(AColor: TAlphaColor): TRGBQuad;
-begin
-  Result.rgbBlue := AColor.B;
-  Result.rgbGreen := AColor.G;
-  Result.rgbRed := AColor.R;
-  Result.rgbReserved := AColor.A;
-end;
-
-class function TACLColors.ToQuad(AColor: TColor; AAlpha: Byte = MaxByte): TRGBQuad;
-begin
-  AColor := ColorToRGB(AColor);
-  Result.rgbRed := GetRValue(AColor);
-  Result.rgbGreen := GetGValue(AColor);
-  Result.rgbBlue := GetBValue(AColor);
-  Result.rgbReserved := AAlpha;
-end;
-
-class function TACLColors.ToColor(const Q: TRGBQuad): TColor;
-begin
-  Result := RGB(Q.rgbRed, Q.rgbGreen, Q.rgbBlue);
+  Result := (P.G = MaskPixel.G) and (P.B = MaskPixel.B) and (P.R = MaskPixel.R);
 end;
 
 class procedure TACLColors.AlphaBlend(var D: TColor; S: TColor; AAlpha: Integer = 255);
 var
-  DQ, SQ: TRGBQuad;
+  DQ, SQ: TACLPixel32;
 begin
-  DQ := ToQuad(D);
-  SQ := ToQuad(S);
+  DQ := TACLPixel32.Create(D);
+  SQ := TACLPixel32.Create(S);
   AlphaBlend(DQ, SQ, AAlpha);
-  D := ToColor(DQ);
+  D := DQ.ToColor;
 end;
 
-class procedure TACLColors.AlphaBlend(var D: TRGBQuad; const S: TRGBQuad; AAlpha: Integer = 255; AProcessPerChannelAlpha: Boolean = True);
+class procedure TACLColors.AlphaBlend(var D: TACLPixel32; const S: TACLPixel32;
+  AAlpha: Integer = 255; AProcessPerChannelAlpha: Boolean = True);
 var
   A: Integer;
 begin
   if AProcessPerChannelAlpha then
-    A := PremultiplyTable[S.rgbReserved, AAlpha]
+    A := PremultiplyTable[S.A, AAlpha]
   else
     A := AAlpha;
 
   if (A <> MaxByte) or (AAlpha <> MaxByte) then
   begin
     A := MaxByte - A;
-    D.rgbRed      := PremultiplyTable[D.rgbRed, A]      + PremultiplyTable[S.rgbRed, AAlpha];
-    D.rgbBlue     := PremultiplyTable[D.rgbBlue, A]     + PremultiplyTable[S.rgbBlue, AAlpha];
-    D.rgbGreen    := PremultiplyTable[D.rgbGreen, A]    + PremultiplyTable[S.rgbGreen, AAlpha];
-    D.rgbReserved := PremultiplyTable[D.rgbReserved, A] + PremultiplyTable[S.rgbReserved, AAlpha];
+    D.R := PremultiplyTable[D.R, A] + PremultiplyTable[S.R, AAlpha];
+    D.B := PremultiplyTable[D.B, A] + PremultiplyTable[S.B, AAlpha];
+    D.G := PremultiplyTable[D.G, A] + PremultiplyTable[S.G, AAlpha];
+    D.A := PremultiplyTable[D.A, A] + PremultiplyTable[S.A, AAlpha];
   end
   else
     TAlphaColor(D) := TAlphaColor(S);
@@ -2580,17 +2944,18 @@ end;
 
 class procedure TACLColors.ApplyColorSchema(var AColor: TColor; const AValue: TACLColorSchema);
 var
-  Q: TRGBQuad;
+  P: TACLPixel32;
 begin
   if AValue.IsAssigned then
   begin
-    Q := ToQuad(AColor);
-    ApplyColorSchema(Q, AValue);
-    AColor := ToColor(Q);
+    P := TACLPixel32.Create(AColor);
+    ApplyColorSchema(P, AValue);
+    AColor := P.ToColor;
   end;
 end;
 
-class procedure TACLColors.ApplyColorSchema(AColors: PRGBQuad; ACount: Integer; const AValue: TACLColorSchema);
+class procedure TACLColors.ApplyColorSchema(
+  AColors: PACLPixel32; ACount: Integer; const AValue: TACLColorSchema);
 begin
   if AValue.IsAssigned then
     ChangeHue(AColors, ACount, AValue.Hue, AValue.HueIntensity);
@@ -2610,32 +2975,32 @@ end;
 
 class procedure TACLColors.ApplyColorSchema(var AColor: TAlphaColor; const AValue: TACLColorSchema);
 var
-  Q: TRGBQuad;
+  P: TACLPixel32;
 begin
   if AColor.IsValid and AValue.IsAssigned then
   begin
-    Q := ToQuad(AColor);
-    ApplyColorSchema(Q, AValue);
-    AColor := TAlphaColor.FromColor(Q);
+    P := TACLPixel32.Create(AColor);
+    ApplyColorSchema(P, AValue);
+    AColor := TAlphaColor.FromColor(P);
   end;
 end;
 
-class procedure TACLColors.ApplyColorSchema(var AColor: TRGBQuad; const AValue: TACLColorSchema);
+class procedure TACLColors.ApplyColorSchema(var AColor: TACLPixel32; const AValue: TACLColorSchema);
 begin
   if AValue.IsAssigned then
     ChangeHue(AColor, AValue.Hue, AValue.HueIntensity);
 end;
 
 //#AI: https://github.com/chromium/chromium/blob/master/ui/base/clipboard/clipboard_win.cc#L652
-class function TACLColors.ArePremultiplied(AColors: PRGBQuad; ACount: Integer): Boolean;
+class function TACLColors.ArePremultiplied(AColors: PACLPixel32; ACount: Integer): Boolean;
 begin
   while ACount > 0 do
   begin
     with AColors^ do
     begin
-      if rgbRed   > rgbReserved then Exit(False);
-      if rgbGreen > rgbReserved then Exit(False);
-      if rgbBlue  > rgbReserved then Exit(False);
+      if R > A then Exit(False);
+      if G > A then Exit(False);
+      if B > A then Exit(False);
     end;
     Inc(AColors);
     Dec(ACount);
@@ -2643,58 +3008,58 @@ begin
   Result := True;
 end;
 
-class procedure TACLColors.ChangeColor(Q: PRGBQuad; ACount: Integer; const AColor: TRGBQuad);
+class procedure TACLColors.ChangeColor(P: PACLPixel32; ACount: Integer; const AColor: TACLPixel32);
 var
   Cmax, Cmin: Integer;
   H, S, L: Byte;
 begin
-  RGBtoHSLi(AColor.rgbRed, AColor.rgbGreen, AColor.rgbBlue, H, S, L);
+  RGBtoHSLi(AColor.R, AColor.G, AColor.B, H, S, L);
   while ACount > 0 do
   begin
-    if not IsMask(Q^) then
+    if not IsMask(P^) then
     begin
-      Cmax := Max(Q^.rgbRed, Max(Q^.rgbGreen, Q^.rgbBlue));
-      Cmin := Min(Q^.rgbRed, Min(Q^.rgbGreen, Q^.rgbBlue));
-      HSLtoRGBi(H, S, MulDiv(MaxByte, Cmax + Cmin, 2 * MaxByte), Q^.rgbRed, Q^.rgbGreen, Q^.rgbBlue);
+      Cmax := Max(P^.R, Max(P^.G, P^.B));
+      Cmin := Min(P^.R, Min(P^.G, P^.B));
+      HSLtoRGBi(H, S, MulDiv(MaxByte, Cmax + Cmin, 2 * MaxByte), P^.R, P^.G, P^.B);
     end;
     Dec(ACount);
-    Inc(Q);
+    Inc(P);
   end;
 end;
 
-class procedure TACLColors.ChangeHue(var Q: TRGBQuad; AHue: Byte; AIntensity: Byte = 100);
+class procedure TACLColors.ChangeHue(var P: TACLPixel32; AHue: Byte; AIntensity: Byte = 100);
 var
   H, S, L: Byte;
 begin
-  if not IsMask(Q) then
+  if not IsMask(P) then
   begin
-    TACLColors.RGBtoHSLi(Q.rgbRed, Q.rgbGreen, Q.rgbBlue, H, S, L);
-    TACLColors.HSLtoRGBi(AHue, MulDiv(S, AIntensity, 100), L, Q.rgbRed, Q.rgbGreen, Q.rgbBlue);
+    TACLColors.RGBtoHSLi(P.R, P.G, P.B, H, S, L);
+    TACLColors.HSLtoRGBi(AHue, MulDiv(S, AIntensity, 100), L, P.R, P.G, P.B);
   end;
 end;
 
-class procedure TACLColors.ChangeHue(Q: PRGBQuad; ACount: Integer; AHue: Byte; AIntensity: Byte = 100);
+class procedure TACLColors.ChangeHue(P: PACLPixel32; ACount: Integer; AHue: Byte; AIntensity: Byte = 100);
 begin
   while ACount > 0 do
   begin
-    ChangeHue(Q^, AHue, AIntensity);
+    ChangeHue(P^, AHue, AIntensity);
     Dec(ACount);
-    Inc(Q);
+    Inc(P);
   end;
 end;
 
-class procedure TACLColors.Flip(AColors: PRGBQuadArray; AWidth, AHeight: Integer; AHorizontally, AVertically: Boolean);
+class procedure TACLColors.Flip(AColors: PACLPixel32Array; AWidth, AHeight: Integer; AHorizontally, AVertically: Boolean);
 var
   I: Integer;
-  Q1, Q2, Q3: PRGBQuad;
-  Q4: TRGBQuad;
+  Q1, Q2, Q3: PACLPixel32;
+  Q4: TACLPixel32;
   RS: Integer;
 begin
   if AVertically then
   begin
     Q1 := @AColors^[0];
     Q2 := @AColors^[(AHeight - 1) * AWidth];
-    RS := AWidth * SizeOf(TRGBQuad);
+    RS := AWidth * SizeOf(TACLPixel32);
     Q3 := AllocMem(RS);
     try
       while NativeUInt(Q1) < NativeUInt(Q2) do
@@ -2726,28 +3091,28 @@ begin
     end;
 end;
 
-class procedure TACLColors.Flush(var Q: TRGBQuad);
+class procedure TACLColors.Flush(var P: TACLPixel32);
 begin
-  PCardinal(@Q)^ := 0;
+  PCardinal(@P)^ := 0;
 end;
 
-class procedure TACLColors.Grayscale(Q: PRGBQuad; Count: Integer; IgnoreMask: Boolean = False);
+class procedure TACLColors.Grayscale(P: PACLPixel32; Count: Integer; IgnoreMask: Boolean = False);
 begin
   while Count > 0 do
   begin
-    Grayscale(Q^, IgnoreMask);
+    Grayscale(P^, IgnoreMask);
     Dec(Count);
-    Inc(Q);
+    Inc(P);
   end;
 end;
 
-class procedure TACLColors.Grayscale(var Q: TRGBQuad; IgnoreMask: Boolean = False);
+class procedure TACLColors.Grayscale(var P: TACLPixel32; IgnoreMask: Boolean = False);
 begin
-  if IgnoreMask or not IsMask(Q) then
+  if IgnoreMask or not IsMask(P) then
   begin
-    Q.rgbBlue := PremultiplyTable[Q.rgbBlue, 77] + PremultiplyTable[Q.rgbGreen, 150] + PremultiplyTable[Q.rgbRed, 28];
-    Q.rgbGreen := Q.rgbBlue;
-    Q.rgbRed := Q.rgbBlue;
+    P.B := PremultiplyTable[P.B, 77] + PremultiplyTable[P.G, 150] + PremultiplyTable[P.R, 28];
+    P.G := P.B;
+    P.R := P.B;
   end;
 end;
 
@@ -2763,116 +3128,116 @@ begin
   TACLColors.RGBtoHSL(Color, H, S, Result);
 end;
 
-class procedure TACLColors.MakeDisabled(Q: PRGBQuad; Count: Integer; IgnoreMask: Boolean = False);
+class procedure TACLColors.MakeDisabled(P: PACLPixel32; Count: Integer; IgnoreMask: Boolean = False);
 begin
   while Count > 0 do
   begin
-    MakeDisabled(Q^, IgnoreMask);
+    MakeDisabled(P^, IgnoreMask);
     Dec(Count);
-    Inc(Q);
+    Inc(P);
   end;
 end;
 
-class procedure TACLColors.MakeDisabled(var Q: TRGBQuad; IgnoreMask: Boolean = False);
+class procedure TACLColors.MakeDisabled(var P: TACLPixel32; IgnoreMask: Boolean = False);
 var
   APixel: Byte;
 begin
-  if (Q.rgbReserved > 0) and (IgnoreMask or not IsMask(Q)) then
+  if (P.A > 0) and (IgnoreMask or not IsMask(P)) then
   begin
-    Unpremultiply(Q);
-    Q.rgbReserved := PremultiplyTable[Q.rgbReserved, 128];
-    APixel := PremultiplyTable[Q.rgbBlue, 77] + PremultiplyTable[Q.rgbGreen, 150] + PremultiplyTable[Q.rgbRed, 28];
-    APixel := PremultiplyTable[APixel, Q.rgbReserved];
-    Q.rgbBlue := APixel;
-    Q.rgbGreen := APixel;
-    Q.rgbRed := APixel;
+    Unpremultiply(P);
+    P.A := PremultiplyTable[P.A, 128];
+    APixel := PremultiplyTable[P.B, 77] + PremultiplyTable[P.G, 150] + PremultiplyTable[P.R, 28];
+    APixel := PremultiplyTable[APixel, P.A];
+    P.B := APixel;
+    P.G := APixel;
+    P.R := APixel;
   end;
 end;
 
-class procedure TACLColors.MakeTransparent(Q: PRGBQuad; ACount: Integer; const AColor: TRGBQuad);
+class procedure TACLColors.MakeTransparent(P: PACLPixel32; ACount: Integer; const AColor: TACLPixel32);
 begin
   while ACount > 0 do
   begin
-    if CompareRGB(Q^, AColor) then
-      PDWORD(Q)^ := 0
+    if CompareRGB(P^, AColor) then
+      PDWORD(P)^ := 0
     else
-      Q^.rgbReserved := MaxByte;
+      P^.A := MaxByte;
     Dec(ACount);
-    Inc(Q);
+    Inc(P);
   end;
 end;
 
-class procedure TACLColors.Tint(Q: PRGBQuad; ACount: Integer; const ATintColor: TRGBQuad);
+class procedure TACLColors.Tint(P: PACLPixel32; ACount: Integer; const ATintColor: TACLPixel32);
 var
   AAlpha: Byte;
 begin
-  if ATintColor.rgbReserved = 0 then
+  if ATintColor.A = 0 then
     Exit;
-  if ATintColor.rgbReserved = MaxByte then
+  if ATintColor.A = MaxByte then
   begin
     while ACount > 0 do
     begin
-      Q.rgbBlue := ATintColor.rgbBlue;
-      Q.rgbGreen := ATintColor.rgbGreen;
-      Q.rgbRed := ATintColor.rgbRed;
+      P.B := ATintColor.B;
+      P.G := ATintColor.G;
+      P.R := ATintColor.R;
       Dec(ACount);
-      Inc(Q);
+      Inc(P);
     end;
   end
   else
   begin
-    AAlpha := MaxByte - ATintColor.rgbReserved;
+    AAlpha := MaxByte - ATintColor.A;
     while ACount > 0 do
     begin
-      Q.rgbBlue  := PremultiplyTable[Q.rgbBlue,  AAlpha] + PremultiplyTable[ATintColor.rgbBlue,  ATintColor.rgbReserved];
-      Q.rgbGreen := PremultiplyTable[Q.rgbGreen, AAlpha] + PremultiplyTable[ATintColor.rgbGreen, ATintColor.rgbReserved];
-      Q.rgbRed   := PremultiplyTable[Q.rgbRed,   AAlpha] + PremultiplyTable[ATintColor.rgbRed,   ATintColor.rgbReserved];
+      P.B := PremultiplyTable[P.B, AAlpha] + PremultiplyTable[ATintColor.B, ATintColor.A];
+      P.G := PremultiplyTable[P.G, AAlpha] + PremultiplyTable[ATintColor.G, ATintColor.A];
+      P.R := PremultiplyTable[P.R, AAlpha] + PremultiplyTable[ATintColor.R, ATintColor.A];
       Dec(ACount);
-      Inc(Q);
+      Inc(P);
     end;
   end;
 end;
 
-class procedure TACLColors.Premultiply(var Q: TRGBQuad);
+class procedure TACLColors.Premultiply(var P: TACLPixel32);
 begin
-  if Q.rgbReserved = 0 then
-    DWORD(Q) := 0
+  if P.A = 0 then
+    DWORD(P) := 0
   else
-    if Q.rgbReserved < 255 then
+    if P.A < 255 then
     begin
-      Q.rgbRed   := PremultiplyTable[Q.rgbRed,   Q.rgbReserved];
-      Q.rgbBlue  := PremultiplyTable[Q.rgbBlue,  Q.rgbReserved];
-      Q.rgbGreen := PremultiplyTable[Q.rgbGreen, Q.rgbReserved];
+      P.R := PremultiplyTable[P.R, P.A];
+      P.B := PremultiplyTable[P.B, P.A];
+      P.G := PremultiplyTable[P.G, P.A];
     end;
 end;
 
-class procedure TACLColors.Premultiply(Q: PRGBQuad; ACount: Integer);
+class procedure TACLColors.Premultiply(P: PACLPixel32; ACount: Integer);
 begin
   while ACount > 0 do
   begin
-    Premultiply(Q^);
+    Premultiply(P^);
     Dec(ACount);
-    Inc(Q);
+    Inc(P);
   end;
 end;
 
-class procedure TACLColors.Unpremultiply(var Q: TRGBQuad);
+class procedure TACLColors.Unpremultiply(var P: TACLPixel32);
 begin
-  if (Q.rgbReserved > 0) and (Q.rgbReserved < MaxByte) then
+  if (P.A > 0) and (P.A < MaxByte) then
   begin
-    Q.rgbGreen := UnpremultiplyTable[Q.rgbGreen, Q.rgbReserved];
-    Q.rgbBlue  := UnpremultiplyTable[Q.rgbBlue,  Q.rgbReserved];
-    Q.rgbRed   := UnpremultiplyTable[Q.rgbRed,   Q.rgbReserved];
+    P.G := UnpremultiplyTable[P.G, P.A];
+    P.B := UnpremultiplyTable[P.B, P.A];
+    P.R := UnpremultiplyTable[P.R, P.A];
   end;
 end;
 
-class procedure TACLColors.Unpremultiply(Q: PRGBQuad; ACount: Integer);
+class procedure TACLColors.Unpremultiply(P: PACLPixel32; ACount: Integer);
 begin
   while ACount > 0 do
   begin
-    Unpremultiply(Q^);
+    Unpremultiply(P^);
     Dec(ACount);
-    Inc(Q);
+    Inc(P);
   end;
 end;
 

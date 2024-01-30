@@ -47,62 +47,12 @@ type
 
   { TACLBitmapLayer }
 
-  TACLBitmapLayer = class
-  strict private
-    FBitmap: HBITMAP;
-    FCanvas: TCanvas;
-    FColorCount: Integer;
-    FColors: PRGBQuadArray;
-    FHandle: HDC;
-    FHeight: Integer;
-    FOldBmp: HBITMAP;
-    FWidth: Integer;
-
-    function GetCanvas: TCanvas;
-    function GetClientRect: TRect; inline;
-    function GetEmpty: Boolean; inline;
-  protected
-    procedure CreateHandles(W, H: Integer); virtual;
-    procedure FreeHandles; virtual;
+  TACLBitmapLayer = class(TACLDib)
   public
-    constructor Create(const R: TRect); overload;
-    constructor Create(const S: TSize); overload;
-    constructor Create(const W, H: Integer); overload; virtual;
-    destructor Destroy; override;
-    procedure Assign(ALayer: TACLBitmapLayer);
-    procedure AssignParams(DC: HDC);
-    function Clone(out AData: PRGBQuadArray): Boolean;
-    function CoordToFlatIndex(X, Y: Integer): Integer; inline;
-    //
-    procedure ApplyTint(const AColor: TColor); overload;
-    procedure ApplyTint(const AColor: TRGBQuad); overload;
-    procedure Flip(AHorizontally, AVertically: Boolean);
-    procedure MakeDisabled(AIgnoreMask: Boolean = False);
-    procedure MakeMirror(ASize: Integer);
-    procedure MakeOpaque;
-    procedure MakeTransparent(AColor: TColor);
-    procedure Premultiply(R: TRect); overload;
-    procedure Premultiply; overload;
-    procedure Reset(const R: TRect); overload;
-    procedure Reset; overload;
-    procedure Resize(ANewWidth, ANewHeight: Integer); overload;
-    procedure Resize(const R: TRect); overload;
-    //
-    procedure DrawBlend(DC: HDC; const P: TPoint; AAlpha: Byte = MaxByte); overload;
-    procedure DrawBlend(DC: HDC; const P: TPoint; AMode: TACLBlendMode; AAlpha: Byte = MaxByte); overload;
-    procedure DrawBlend(DC: HDC; const R: TRect; AAlpha: Byte = MaxByte; ASmoothStretch: Boolean = False); overload;
-    procedure DrawCopy(DC: HDC; const P: TPoint); overload;
-    procedure DrawCopy(DC: HDC; const R: TRect; ASmoothStretch: Boolean = False); overload;
-    //
-    property Bitmap: HBITMAP read FBitmap;
-    property Canvas: TCanvas read GetCanvas;
-    property ClientRect: TRect read GetClientRect;
-    property ColorCount: Integer read FColorCount;
-    property Colors: PRGBQuadArray read FColors;
-    property Empty: Boolean read GetEmpty;
-    property Handle: HDC read FHandle;
-    property Height: Integer read FHeight;
-    property Width: Integer read FWidth;
+    procedure DrawBlend(DC: HDC; const P: TPoint;
+      AMode: TACLBlendMode; AAlpha: Byte = MaxByte); overload;
+    procedure DrawBlend(DC: HDC; const R: TRect;
+      AAlpha: Byte = MaxByte; ASmoothStretch: Boolean = False); overload;
   end;
 
   { TACLCacheLayer }
@@ -129,7 +79,7 @@ type
     FOpaqueRange: TPoint;
 
     procedure ApplyMaskCore(AClipArea: PRect = nil); overload;
-    procedure ApplyMaskCore(AMask: PByte; AColors: PRGBQuad; ACount: Integer); overload; inline;
+    procedure ApplyMaskCore(AMask: PByte; AColors: PACLPixel32; ACount: Integer); overload; inline;
   protected
     procedure FreeHandles; override;
   public
@@ -142,13 +92,13 @@ type
 
 {$ENDREGION}
 
-{$REGION 'Blur'}
+{$REGION ' Blur '}
 
   { IACLBlurFilterCore }
 
   IACLBlurFilterCore = interface
   ['{89DD6E84-C6CB-4367-90EC-3943D5593372}']
-    procedure Apply(LayerDC: HDC; Colors: PRGBQuad; Width, Height: Integer);
+    procedure Apply(LayerDC: HDC; Colors: PACLPixel32; Width, Height: Integer);
     function GetSize: Integer;
   end;
 
@@ -175,7 +125,7 @@ type
   {$ENDIF}
     constructor Create;
     procedure Apply(ALayer: TACLBitmapLayer); overload;
-    procedure Apply(ALayerDC: HDC; AColors: PRGBQuad; AWidth, AHeight: Integer); overload;
+    procedure Apply(ALayerDC: HDC; AColors: PACLPixel32; AWidth, AHeight: Integer); overload;
     //
     property Radius: Integer read FRadius write SetRadius;
     property Size: Integer read FSize;
@@ -183,7 +133,7 @@ type
 
 {$ENDREGION}
 
-{$REGION 'Abstract 2D Render'}
+{$REGION ' Abstract 2D Render '}
 
   TACL2DRender = class;
   TACL2DRenderStrokeStyle = (ssSolid, ssDash, ssDot, ssDashDot, ssDashDotDot);
@@ -283,7 +233,7 @@ type
 
     // Images
     function CreateImage(Bitmap: TBitmap): TACL2DRenderImage; overload; virtual;
-    function CreateImage(Colors: PRGBQuad; Width, Height: Integer;
+    function CreateImage(Colors: PACLPixel32; Width, Height: Integer;
       AlphaFormat: TAlphaFormat = afDefined): TACL2DRenderImage; overload; virtual; abstract;
     function CreateImage(Image: TACLBitmapLayer): TACL2DRenderImage; overload; virtual;
     function CreateImage(Image: TACLImage): TACL2DRenderImage; overload; virtual;
@@ -367,8 +317,8 @@ type
     TChunk = class
     protected
       Count: Integer;
-      Source: PRGBQuad;
-      Target: PRGBQuad;
+      Source: PACLPixel32;
+      Target: PACLPixel32;
     end;
 
     TChunks = class(TACLObjectList<TChunk>);
@@ -435,10 +385,10 @@ type
 
     TChunk = class
     strict private
-      FBuffer: PRGBQuad;
+      FBuffer: PACLPixel32;
       FFilter: TACLSoftwareImplGaussianBlur;
     protected
-      Colors: PRGBQuad;
+      Colors: PACLPixel32;
       Index1: Integer;
       Index2: Integer;
       LineWidth: Integer;
@@ -448,7 +398,7 @@ type
       constructor Create(AFilter: TACLSoftwareImplGaussianBlur; AMaxLineSize: Integer);
       destructor Destroy; override;
       procedure ApplyTo; overload;
-      procedure ApplyTo(AColors: PRGBQuad; ACount, AStep: Integer); overload;
+      procedure ApplyTo(AColors: PACLPixel32; ACount, AStep: Integer); overload;
     end;
 
     TChunks = class(TACLObjectList<TChunk>);
@@ -468,7 +418,7 @@ type
     constructor Create(ARadius: Integer);
     class function CreateBlurFilterCore(ARadius: Integer): IACLBlurFilterCore; static;
     // IACLBlurFilterCore
-    procedure Apply(DC: HDC; AColors: PRGBQuad; AWidth, AHeight: Integer);
+    procedure Apply(DC: HDC; AColors: PACLPixel32; AWidth, AHeight: Integer);
     function GetSize: Integer;
   end;
 
@@ -491,7 +441,7 @@ type
     class function CreateBlurFilterCore(ARadius: Integer): IACLBlurFilterCore; static;
     class procedure Register;
     // IACLBlurFilterCore
-    procedure Apply(DC: HDC; AColors: PRGBQuad; AWidth, AHeight: Integer);
+    procedure Apply(DC: HDC; AColors: PACLPixel32; AWidth, AHeight: Integer);
     function GetSize: Integer;
   end;
 
@@ -621,8 +571,8 @@ var
   AChunk: TChunk;
   AChunkCount: Integer;
   AChunkSize: Integer;
-  ASourceScan: PRGBQuad;
-  ATargetScan: PRGBQuad;
+  ASourceScan: PACLPixel32;
+  ATargetScan: PACLPixel32;
   I: Integer;
 begin
   if (ATarget.Width <> ASource.Width) or (ATarget.Height <> ASource.Height) then
@@ -668,35 +618,35 @@ end;
 class procedure TACLSoftwareImplBlendMode.ProcessByMatrix(Chunk: TChunk);
 var
   AAlpha: Byte;
-  ASource: TRGBQuad;
-  ATarget: TRGBQuad;
+  ASource: TACLPixel32;
+  ATarget: TACLPixel32;
 begin
   while Chunk.Count > 0 do
   begin
     PAlphaColor(@ASource)^ := PAlphaColor(Chunk.Source)^;
-    if ASource.rgbReserved > 0 then
+    if ASource.A > 0 then
     begin
       PAlphaColor(@ATarget)^ := PAlphaColor(Chunk.Target)^;
 
-      if ATarget.rgbReserved = MaxByte then
+      if ATarget.A = MaxByte then
       begin
         TACLColors.Unpremultiply(ASource);
-        ASource.rgbBlue  := FWorkMatrix[ASource.rgbBlue, ATarget.rgbBlue];
-        ASource.rgbGreen := FWorkMatrix[ASource.rgbGreen, ATarget.rgbGreen];
-        ASource.rgbRed   := FWorkMatrix[ASource.rgbRed, ATarget.rgbRed];
+        ASource.B := FWorkMatrix[ASource.B, ATarget.B];
+        ASource.G := FWorkMatrix[ASource.G, ATarget.G];
+        ASource.R := FWorkMatrix[ASource.R, ATarget.R];
         TACLColors.Premultiply(ASource);
       end
       else
-        if ATarget.rgbReserved > 0 then
+        if ATarget.A > 0 then
         begin
           TACLColors.Unpremultiply(ASource);
-          AAlpha := MaxByte - ATarget.rgbReserved;
-          ASource.rgbRed := TACLColors.PremultiplyTable[ASource.rgbRed, AAlpha] +
-            TACLColors.PremultiplyTable[FWorkMatrix[ASource.rgbRed, ATarget.rgbRed], ATarget.rgbReserved];
-          ASource.rgbBlue := TACLColors.PremultiplyTable[ASource.rgbBlue, AAlpha] +
-            TACLColors.PremultiplyTable[FWorkMatrix[ASource.rgbBlue, ATarget.rgbBlue], ATarget.rgbReserved];
-          ASource.rgbGreen := TACLColors.PremultiplyTable[ASource.rgbGreen, AAlpha] +
-            TACLColors.PremultiplyTable[FWorkMatrix[ASource.rgbGreen, ATarget.rgbGreen], ATarget.rgbReserved];
+          AAlpha := MaxByte - ATarget.A;
+          ASource.R := TACLColors.PremultiplyTable[ASource.R, AAlpha] +
+            TACLColors.PremultiplyTable[FWorkMatrix[ASource.R, ATarget.R], ATarget.A];
+          ASource.B := TACLColors.PremultiplyTable[ASource.B, AAlpha] +
+            TACLColors.PremultiplyTable[FWorkMatrix[ASource.B, ATarget.B], ATarget.A];
+          ASource.G := TACLColors.PremultiplyTable[ASource.G, AAlpha] +
+            TACLColors.PremultiplyTable[FWorkMatrix[ASource.G, ATarget.G], ATarget.A];
           TACLColors.Premultiply(ASource);
         end;
 
@@ -710,13 +660,13 @@ end;
 
 class procedure TACLSoftwareImplBlendMode.ProcessGrayScale(Chunk: TChunk);
 var
-  ASource: TRGBQuad;
+  ASource: TACLPixel32;
 begin
   while Chunk.Count > 0 do
   begin
     ASource := Chunk.Target^;
     TACLColors.Grayscale(ASource);
-    TACLColors.AlphaBlend(Chunk.Target^, ASource, TACLColors.PremultiplyTable[FWorkOpacity, Chunk.Source^.rgbReserved]);
+    TACLColors.AlphaBlend(Chunk.Target^, ASource, TACLColors.PremultiplyTable[FWorkOpacity, Chunk.Source^.A]);
     Inc(Chunk.Source);
     Inc(Chunk.Target);
     Dec(Chunk.Count);
@@ -833,7 +783,7 @@ begin
   Result := FSize;
 end;
 
-procedure TACLSoftwareImplGaussianBlur.Apply(DC: HDC; AColors: PRGBQuad; AWidth, AHeight: Integer);
+procedure TACLSoftwareImplGaussianBlur.Apply(DC: HDC; AColors: PACLPixel32; AWidth, AHeight: Integer);
 
   function CreateChunks(ACount: Integer): TChunks;
   var
@@ -904,7 +854,7 @@ constructor TACLSoftwareImplGaussianBlur.TChunk.Create(AFilter: TACLSoftwareImpl
 begin
   inherited Create;
   FFilter := AFilter;
-  FBuffer := AllocMem((AMaxLineSize + 2 * FFilter.Size + 1) * SizeOf(TRGBQuad))
+  FBuffer := AllocMem((AMaxLineSize + 2 * FFilter.Size + 1) * SizeOf(TACLPixel32))
 end;
 
 destructor TACLSoftwareImplGaussianBlur.TChunk.Destroy;
@@ -915,7 +865,7 @@ end;
 
 procedure TACLSoftwareImplGaussianBlur.TChunk.ApplyTo;
 var
-  AScan: PRGBQuad;
+  AScan: PACLPixel32;
   I: Integer;
 begin
   AScan := Colors;
@@ -927,12 +877,12 @@ begin
   end;
 end;
 
-procedure TACLSoftwareImplGaussianBlur.TChunk.ApplyTo(AColors: PRGBQuad; ACount, AStep: Integer);
+procedure TACLSoftwareImplGaussianBlur.TChunk.ApplyTo(AColors: PACLPixel32; ACount, AStep: Integer);
 var
-  D: TRGBQuad;
+  D: TACLPixel32;
   I, N: Integer;
   R, G, B: Integer;
-  S, P: PRGBQuad;
+  S, P: PACLPixel32;
 begin
   // Preparing the temporary buffer
   P := AColors;
@@ -946,7 +896,7 @@ begin
 
   if AStep = 1 then
   begin
-    FastMove(P^, S^, ACount * SizeOf(TRGBQuad));
+    FastMove(P^, S^, ACount * SizeOf(TACLPixel32));
     Inc(P, ACount);
     Inc(S, ACount);
   end
@@ -976,14 +926,14 @@ begin
     Inc(S, I);
     for N := -FFilter.Size to FFilter.Size do
     begin
-      Inc(R, FFilter.FWeights[N, S^.rgbRed]);
-      Inc(G, FFilter.FWeights[N, S^.rgbGreen]);
-      Inc(B, FFilter.FWeights[N, S^.rgbBlue]);
+      Inc(R, FFilter.FWeights[N, S^.R]);
+      Inc(G, FFilter.FWeights[N, S^.G]);
+      Inc(B, FFilter.FWeights[N, S^.B]);
       Inc(S);
     end;
-    AColors^.rgbBlue := B div FFilter.WeightResolution;
-    AColors^.rgbGreen := G div FFilter.WeightResolution;
-    AColors^.rgbRed := R div FFilter.WeightResolution;
+    AColors^.B := B div FFilter.WeightResolution;
+    AColors^.G := G div FFilter.WeightResolution;
+    AColors^.R := R div FFilter.WeightResolution;
     Inc(AColors, AStep);
   end;
 end;
@@ -1039,9 +989,9 @@ begin
   Result := FRadius;
 end;
 
-procedure TACLSoftwareImplStackBlur.Apply(DC: HDC; AColors: PRGBQuad; AWidth, AHeight: Integer);
+procedure TACLSoftwareImplStackBlur.Apply(DC: HDC; AColors: PACLPixel32; AWidth, AHeight: Integer);
 var
-  AColor: PRGBQuad;
+  AColor: PACLPixel32;
   AInputSumA: Integer;
   AInputSumB: Integer;
   AInputSumG: Integer;
@@ -1053,7 +1003,7 @@ var
   AOutputSumR: Integer;
   ARadiusBias: Integer;
   AStackCursor: Integer;
-  AStackScan: PRGBQuad;
+  AStackScan: PACLPixel32;
   ASumA: Integer;
   ASumB: Integer;
   ASumG: Integer;
@@ -1099,23 +1049,23 @@ begin
       begin
         PAlphaColor(AStackScan)^ := PAlphaColorArray(AColors)[Yi + MinMax(I, 0, Wm)];
         ARadiusBias := FRadiusBias[I];
-        Inc(ASumR, AStackScan.rgbRed * ARadiusBias);
-        Inc(ASumG, AStackScan.rgbGreen * ARadiusBias);
-        Inc(ASumB, AStackScan.rgbBlue * ARadiusBias);
-        Inc(ASumA, AStackScan.rgbReserved * ARadiusBias);
+        Inc(ASumR, AStackScan.R * ARadiusBias);
+        Inc(ASumG, AStackScan.G * ARadiusBias);
+        Inc(ASumB, AStackScan.B * ARadiusBias);
+        Inc(ASumA, AStackScan.A * ARadiusBias);
         if I > 0 then
         begin
-          Inc(AInputSumR, AStackScan.rgbRed);
-          Inc(AInputSumG, AStackScan.rgbGreen);
-          Inc(AInputSumB, AStackScan.rgbBlue);
-          Inc(AInputSumA, AStackScan.rgbReserved);
+          Inc(AInputSumR, AStackScan.R);
+          Inc(AInputSumG, AStackScan.G);
+          Inc(AInputSumB, AStackScan.B);
+          Inc(AInputSumA, AStackScan.A);
         end
         else
         begin
-          Inc(AOutputSumR, AStackScan.rgbRed);
-          Inc(AOutputSumG, AStackScan.rgbGreen);
-          Inc(AOutputSumB, AStackScan.rgbBlue);
-          Inc(AOutputSumA, AStackScan.rgbReserved);
+          Inc(AOutputSumR, AStackScan.R);
+          Inc(AOutputSumG, AStackScan.G);
+          Inc(AOutputSumB, AStackScan.B);
+          Inc(AOutputSumA, AStackScan.A);
         end;
         Inc(AStackScan);
       end;
@@ -1135,20 +1085,20 @@ begin
 
         AStackScan := @FStack[FStackOffsets[AStackCursor + FStackOffset]];
 
-        Dec(AOutputSumR, AStackScan.rgbRed);
-        Dec(AOutputSumG, AStackScan.rgbGreen);
-        Dec(AOutputSumB, AStackScan.rgbBlue);
-        Dec(AOutputSumA, AStackScan.rgbReserved);
+        Dec(AOutputSumR, AStackScan.R);
+        Dec(AOutputSumG, AStackScan.G);
+        Dec(AOutputSumB, AStackScan.B);
+        Dec(AOutputSumA, AStackScan.A);
 
         if Y = 0 then
           AMinValues[X] := Min(X + FRadius + 1, Wm);
 
         PAlphaColor(AStackScan)^ := PAlphaColorArray(AColors)[Yw + AMinValues[X]];
 
-        Inc(AInputSumR, AStackScan.rgbRed);
-        Inc(AInputSumG, AStackScan.rgbGreen);
-        Inc(AInputSumB, AStackScan.rgbBlue);
-        Inc(AInputSumA, AStackScan.rgbReserved);
+        Inc(AInputSumR, AStackScan.R);
+        Inc(AInputSumG, AStackScan.G);
+        Inc(AInputSumB, AStackScan.B);
+        Inc(AInputSumA, AStackScan.A);
 
         Inc(ASumR, AInputSumR);
         Inc(ASumG, AInputSumG);
@@ -1158,15 +1108,15 @@ begin
         AStackCursor := FStackOffsets[AStackCursor + 1];
         AStackScan := @FStack[AStackCursor];
 
-        Inc(AOutputSumR, AStackScan.rgbRed);
-        Inc(AOutputSumG, AStackScan.rgbGreen);
-        Inc(AOutputSumB, AStackScan.rgbBlue);
-        Inc(AOutputSumA, AStackScan.rgbReserved);
+        Inc(AOutputSumR, AStackScan.R);
+        Inc(AOutputSumG, AStackScan.G);
+        Inc(AOutputSumB, AStackScan.B);
+        Inc(AOutputSumA, AStackScan.A);
 
-        Dec(AInputSumR, AStackScan.rgbRed);
-        Dec(AInputSumG, AStackScan.rgbGreen);
-        Dec(AInputSumB, AStackScan.rgbBlue);
-        Dec(AInputSumA, AStackScan.rgbReserved);
+        Dec(AInputSumR, AStackScan.R);
+        Dec(AInputSumG, AStackScan.G);
+        Dec(AInputSumB, AStackScan.B);
+        Dec(AInputSumA, AStackScan.A);
 
         Inc(Yi);
       end;
@@ -1196,10 +1146,10 @@ begin
       begin
         Yi := Max(0, Yp) + X;
 
-        AStackScan.rgbRed := R[Yi];
-        AStackScan.rgbGreen := G[Yi];
-        AStackScan.rgbBlue := B[Yi];
-        AStackScan.rgbReserved := A[Yi];
+        AStackScan.R := R[Yi];
+        AStackScan.G := G[Yi];
+        AStackScan.B := B[Yi];
+        AStackScan.A := A[Yi];
 
         ARadiusBias := FRadiusBias[I];
 
@@ -1210,17 +1160,17 @@ begin
 
         if I > 0 then
         begin
-          Inc(AInputSumR, AStackScan.rgbRed);
-          Inc(AInputSumG, AStackScan.rgbGreen);
-          Inc(AInputSumB, AStackScan.rgbBlue);
-          Inc(AInputSumA, AStackScan.rgbReserved);
+          Inc(AInputSumR, AStackScan.R);
+          Inc(AInputSumG, AStackScan.G);
+          Inc(AInputSumB, AStackScan.B);
+          Inc(AInputSumA, AStackScan.A);
         end
         else
         begin
-          Inc(AOutputSumR, AStackScan.rgbRed);
-          Inc(AOutputSumG, AStackScan.rgbGreen);
-          Inc(AOutputSumB, AStackScan.rgbBlue);
-          Inc(AOutputSumA, AStackScan.rgbReserved);
+          Inc(AOutputSumR, AStackScan.R);
+          Inc(AOutputSumG, AStackScan.G);
+          Inc(AOutputSumB, AStackScan.B);
+          Inc(AOutputSumA, AStackScan.A);
         end;
 
         if I < Hm then
@@ -1232,10 +1182,10 @@ begin
       AStackCursor := FRadius;
       for Y := 0 to AHeight - 1 do
       begin
-        AColor^.rgbBlue := FDivValues[ASumB];
-        AColor^.rgbGreen := FDivValues[ASumG];
-        AColor^.rgbRed := FDivValues[ASumR];
-        AColor^.rgbReserved := FDivValues[ASumA];
+        AColor^.B := FDivValues[ASumB];
+        AColor^.G := FDivValues[ASumG];
+        AColor^.R := FDivValues[ASumR];
+        AColor^.A := FDivValues[ASumA];
 
         Dec(ASumR, AOutputSumR);
         Dec(ASumG, AOutputSumG);
@@ -1244,24 +1194,24 @@ begin
 
         AStackScan := @FStack[FStackOffsets[AStackCursor + FStackOffset]];
 
-        Dec(AOutputSumR, AStackScan.rgbRed);
-        Dec(AOutputSumG, AStackScan.rgbGreen);
-        Dec(AOutputSumB, AStackScan.rgbBlue);
-        Dec(AOutputSumA, AStackScan.rgbReserved);
+        Dec(AOutputSumR, AStackScan.R);
+        Dec(AOutputSumG, AStackScan.G);
+        Dec(AOutputSumB, AStackScan.B);
+        Dec(AOutputSumA, AStackScan.A);
 
         if X = 0 then
           AMinValues[Y] := Min(Y + FRadius + 1, Hm) * AWidth;
 
         K := X + AMinValues[Y];
-        AStackScan.rgbRed := R[K];
-        AStackScan.rgbGreen := G[K];
-        AStackScan.rgbBlue := B[K];
-        AStackScan.rgbReserved := A[K];
+        AStackScan.R := R[K];
+        AStackScan.G := G[K];
+        AStackScan.B := B[K];
+        AStackScan.A := A[K];
 
-        Inc(AInputSumR, AStackScan.rgbRed);
-        Inc(AInputSumG, AStackScan.rgbGreen);
-        Inc(AInputSumB, AStackScan.rgbBlue);
-        Inc(AInputSumA, AStackScan.rgbReserved);
+        Inc(AInputSumR, AStackScan.R);
+        Inc(AInputSumG, AStackScan.G);
+        Inc(AInputSumB, AStackScan.B);
+        Inc(AInputSumA, AStackScan.A);
 
         Inc(ASumR, AInputSumR);
         Inc(ASumG, AInputSumG);
@@ -1271,15 +1221,15 @@ begin
         AStackCursor := FStackOffsets[AStackCursor + 1];
         AStackScan := @FStack[AStackCursor];
 
-        Inc(AOutputSumR, AStackScan.rgbRed);
-        Inc(AOutputSumG, AStackScan.rgbGreen);
-        Inc(AOutputSumB, AStackScan.rgbBlue);
-        Inc(AOutputSumA, AStackScan.rgbReserved);
+        Inc(AOutputSumR, AStackScan.R);
+        Inc(AOutputSumG, AStackScan.G);
+        Inc(AOutputSumB, AStackScan.B);
+        Inc(AOutputSumA, AStackScan.A);
 
-        Dec(AInputSumR, AStackScan.rgbRed);
-        Dec(AInputSumG, AStackScan.rgbGreen);
-        Dec(AInputSumB, AStackScan.rgbBlue);
-        Dec(AInputSumA, AStackScan.rgbReserved);
+        Dec(AInputSumR, AStackScan.R);
+        Dec(AInputSumG, AStackScan.G);
+        Dec(AInputSumB, AStackScan.B);
+        Dec(AInputSumA, AStackScan.A);
 
         Inc(AColor, AWidth);
       end;
@@ -1296,96 +1246,6 @@ end;
 {$ENDREGION}
 
 {$REGION 'Layers'}
-
-{ TACLBitmapLayer }
-
-constructor TACLBitmapLayer.Create(const R: TRect);
-begin
-  Create(R.Width, R.Height);
-end;
-
-constructor TACLBitmapLayer.Create(const S: TSize);
-begin
-  Create(S.cx, S.cy);
-end;
-
-constructor TACLBitmapLayer.Create(const W, H: Integer);
-begin
-  CreateHandles(W, H);
-end;
-
-destructor TACLBitmapLayer.Destroy;
-begin
-  FreeHandles;
-  inherited Destroy;
-end;
-
-procedure TACLBitmapLayer.Assign(ALayer: TACLBitmapLayer);
-begin
-  if ALayer <> Self then
-  begin
-    Resize(ALayer.Width, ALayer.Height);
-    FastMove(ALayer.Colors^, Colors^, ColorCount * SizeOf(TRGBQuad));
-  end;
-end;
-
-procedure TACLBitmapLayer.AssignParams(DC: HDC);
-begin
-  SelectObject(Handle, GetCurrentObject(DC, OBJ_BRUSH));
-  SelectObject(Handle, GetCurrentObject(DC, OBJ_FONT));
-  SetTextColor(Handle, GetTextColor(DC));
-end;
-
-function TACLBitmapLayer.Clone(out AData: PRGBQuadArray): Boolean;
-var
-  ASize: Integer;
-begin
-  ASize := ColorCount * SizeOf(TRGBQuad);
-  Result := ASize > 0;
-  if Result then
-  begin
-    AData := AllocMem(ASize);
-    FastMove(FColors^, AData^, ASize);
-  end;
-end;
-
-function TACLBitmapLayer.CoordToFlatIndex(X, Y: Integer): Integer;
-begin
-  if (X >= 0) and (X < Width) and (Y >= 0) and (Y < Height) then
-    Result := X + Y * Width
-  else
-    Result := -1;
-end;
-
-procedure TACLBitmapLayer.ApplyTint(const AColor: TColor);
-begin
-  ApplyTint(TAlphaColor.FromColor(AColor).ToQuad);
-end;
-
-procedure TACLBitmapLayer.ApplyTint(const AColor: TRGBQuad);
-var
-  Q: PRGBQuad;
-  I: Integer;
-begin
-  Q := @FColors^[0];
-  for I := 0 to ColorCount - 1 do
-  begin
-    if Q^.rgbReserved > 0 then
-    begin
-      TACLColors.Unpremultiply(Q^);
-      Q^.rgbBlue := AColor.rgbBlue;
-      Q^.rgbGreen := AColor.rgbGreen;
-      Q^.rgbRed := AColor.rgbRed;
-      TACLColors.Premultiply(Q^);
-    end;
-    Inc(Q);
-  end;
-end;
-
-procedure TACLBitmapLayer.DrawBlend(DC: HDC; const P: TPoint; AAlpha: Byte = 255);
-begin
-  DrawBlend(DC, Bounds(P.X, P.Y, Width, Height), AAlpha);
-end;
 
 procedure TACLBitmapLayer.DrawBlend(DC: HDC; const P: TPoint; AMode: TACLBlendMode; AAlpha: Byte = MaxByte);
 var
@@ -1412,7 +1272,7 @@ procedure TACLBitmapLayer.DrawBlend(DC: HDC; const R: TRect; AAlpha: Byte = 255;
 var
   AClipBox: TRect;
   AImage: TACLImage;
-  ALayer: TACLBitmapLayer;
+  ALayer: TACLDib;
 begin
   if ASmoothStretch and not (Empty or R.EqualSizes(ClientRect)) then
   begin
@@ -1424,7 +1284,7 @@ begin
         AImage.PixelOffsetMode := ipomHalf;
 
         // Layer is used for better performance
-        ALayer := TACLBitmapLayer.Create(AClipBox);
+        ALayer := TACLDib.Create(AClipBox);
         try
           SetWindowOrgEx(ALayer.Handle, AClipBox.Left, AClipBox.Top, nil);
           AImage.Draw(ALayer.Handle, R);
@@ -1440,197 +1300,6 @@ begin
   end
   else
     acAlphaBlend(DC, Handle, R, ClientRect, AAlpha);
-end;
-
-procedure TACLBitmapLayer.DrawCopy(DC: HDC; const P: TPoint);
-begin
-  acBitBlt(DC, Handle, Bounds(P.X, P.Y, Width, Height), NullPoint);
-end;
-
-procedure TACLBitmapLayer.DrawCopy(DC: HDC; const R: TRect; ASmoothStretch: Boolean = False);
-var
-  AMode: Integer;
-begin
-  if ASmoothStretch and not R.EqualSizes(ClientRect) then
-  begin
-    AMode := SetStretchBltMode(DC, HALFTONE);
-    acStretchBlt(DC, Handle, R, ClientRect);
-    SetStretchBltMode(DC, AMode);
-  end
-  else
-    acStretchBlt(DC, Handle, R, ClientRect);
-end;
-
-procedure TACLBitmapLayer.Flip(AHorizontally, AVertically: Boolean);
-begin
-  TACLColors.Flip(Colors, Width, Height, AHorizontally, AVertically);
-end;
-
-procedure TACLBitmapLayer.MakeDisabled(AIgnoreMask: Boolean = False);
-begin
-  TACLColors.MakeDisabled(@FColors^[0], ColorCount, AIgnoreMask);
-end;
-
-procedure TACLBitmapLayer.MakeMirror(ASize: Integer);
-var
-  AAlpha: Single;
-  AAlphaDelta: Single;
-  AIndex: Integer;
-  I, J, O1, O2, R: Integer;
-begin
-  if (ASize > 0) and (ASize < Height div 2) then
-  begin
-    AAlpha := 60;
-    AAlphaDelta := AAlpha / ASize;
-    O2 := Width;
-    O1 := O2 * (Height - ASize);
-
-    AIndex := O1;
-    for J := 0 to ASize - 1 do
-    begin
-      R := Round(AAlpha);
-      for I := 0 to O2 - 1 do
-      begin
-        TACLColors.AlphaBlend(Colors^[AIndex], Colors^[O1 + I], R, False);
-        Inc(AIndex);
-      end;
-      AAlpha := AAlpha - AAlphaDelta;
-      Dec(O1, O2);
-    end;
-  end;
-end;
-
-procedure TACLBitmapLayer.MakeOpaque;
-var
-  I: Integer;
-  Q: PRGBQuad;
-begin
-  Q := @FColors^[0];
-  for I := 0 to ColorCount - 1 do
-  begin
-    Q^.rgbReserved := $FF;
-    Inc(Q);
-  end;
-end;
-
-procedure TACLBitmapLayer.MakeTransparent(AColor: TColor);
-var
-  I: Integer;
-  Q: PRGBQuad;
-  R: TRGBQuad;
-begin
-  Q := @FColors^[0];
-  R := TACLColors.ToQuad(AColor);
-  for I := 0 to ColorCount - 1 do
-  begin
-    if TACLColors.CompareRGB(Q^, R) then
-      TACLColors.Flush(Q^)
-    else
-      Q^.rgbReserved := $FF;
-    Inc(Q);
-  end;
-end;
-
-procedure TACLBitmapLayer.Premultiply(R: TRect);
-var
-  Y: Integer;
-begin
-  IntersectRect(R, R, ClientRect);
-  for Y := R.Top to R.Bottom - 1 do
-    TACLColors.Premultiply(@FColors^[Y * Width + R.Left], R.Right - R.Left - 1);
-end;
-
-procedure TACLBitmapLayer.Premultiply;
-begin
-  TACLColors.Premultiply(@FColors^[0], ColorCount);
-end;
-
-procedure TACLBitmapLayer.Reset;
-var
-  APrevPoint: TPoint;
-begin
-  SetWindowOrgEx(Handle, 0, 0, @APrevPoint);
-  acResetRect(Handle, ClientRect);
-  SetWindowOrgEx(Handle, APrevPoint.X, APrevPoint.Y, nil);
-end;
-
-procedure TACLBitmapLayer.Reset(const R: TRect);
-begin
-  acResetRect(Handle, R);
-end;
-
-procedure TACLBitmapLayer.Resize(const R: TRect);
-begin
-  Resize(R.Width, R.Height);
-end;
-
-procedure TACLBitmapLayer.Resize(ANewWidth, ANewHeight: Integer);
-begin
-  if (ANewWidth <> Width) or (ANewHeight <> Height) then
-  begin
-    FreeHandles;
-    CreateHandles(ANewWidth, ANewHeight);
-  end;
-end;
-
-procedure TACLBitmapLayer.CreateHandles(W, H: Integer);
-var
-  AInfo: TBitmapInfo;
-begin
-  if (W <= 0) or (H <= 0) then
-    Exit;
-
-  FWidth := W;
-  FHeight := H;
-  FColorCount := W * H;
-  FHandle := CreateCompatibleDC(0);
-  acFillBitmapInfoHeader(AInfo.bmiHeader, Width, Height);
-  FBitmap := CreateDIBSection(0, AInfo, DIB_RGB_COLORS, Pointer(FColors), 0, 0);
-  FOldBmp := SelectObject(Handle, Bitmap);
-  if FColors = nil then
-  begin
-    FreeHandles;
-    raise EInvalidGraphicOperation.CreateFmt('Unable to create bitmap layer (%dx%d)', [W, H]);
-  end;
-end;
-
-procedure TACLBitmapLayer.FreeHandles;
-begin
-  FreeAndNil(FCanvas);
-  if Handle <> 0 then
-  begin
-    SelectObject(Handle, FOldBmp);
-    DeleteObject(Bitmap);
-    DeleteDC(Handle);
-    FColorCount := 0;
-    FColors := nil;
-    FHeight := 0;
-    FBitmap := 0;
-    FHandle := 0;
-    FWidth := 0;
-  end;
-end;
-
-function TACLBitmapLayer.GetCanvas: TCanvas;
-begin
-  if FCanvas = nil then
-  begin
-    FCanvas := TCanvas.Create;
-    FCanvas.Lock;
-    FCanvas.Handle := Handle;
-    FCanvas.Brush.Style := bsClear;
-  end;
-  Result := FCanvas;
-end;
-
-function TACLBitmapLayer.GetClientRect: TRect;
-begin
-  Result := Rect(0, 0, Width, Height);
-end;
-
-function TACLBitmapLayer.GetEmpty: Boolean;
-begin
-  Result := FColorCount = 0;
 end;
 
 { TACLCacheLayer }
@@ -1674,7 +1343,7 @@ end;
 
 procedure TACLMaskLayer.LoadMask;
 var
-  AColor: PRGBQuad;
+  AColor: PACLPixel32;
   AColorIndex: Integer;
   AMask: PByte;
   AOpaqueCounter: Integer;
@@ -1689,7 +1358,7 @@ begin
   AOpaqueCounter := 0;
   for AColorIndex := 0 to ColorCount - 1 do
   begin
-    AMask^ := AColor^.rgbReserved;
+    AMask^ := AColor^.A;
 
     if AMask^ = MaxByte then
       Inc(AOpaqueCounter)
@@ -1798,7 +1467,7 @@ begin
     ApplyMaskCore(AMask + ARange2.X, @Colors^[ARange2.X], ARange2.Y - ARange2.X);
 end;
 
-procedure TACLMaskLayer.ApplyMaskCore(AMask: PByte; AColors: PRGBQuad; ACount: Integer);
+procedure TACLMaskLayer.ApplyMaskCore(AMask: PByte; AColors: PACLPixel32; ACount: Integer);
 var
   AAlpha: Byte;
 begin
@@ -1812,12 +1481,12 @@ begin
       begin
         // less quality, but 2x faster
         //    TACLColors.Unpremultiply(C^);
-        //    C^.rgbReserved := TACLColors.PremultiplyTable[C^.rgbReserved, S^];
+        //    C^.A := TACLColors.PremultiplyTable[C^.A, S^];
         //    TACLColors.Premultiply(C^);
-        AColors^.rgbBlue := TACLColors.PremultiplyTable[AColors^.rgbBlue, AAlpha];
-        AColors^.rgbGreen := TACLColors.PremultiplyTable[AColors^.rgbGreen, AAlpha];
-        AColors^.rgbReserved := TACLColors.PremultiplyTable[AColors^.rgbReserved, AAlpha];
-        AColors^.rgbRed := TACLColors.PremultiplyTable[AColors^.rgbRed, AAlpha];
+        AColors^.B := TACLColors.PremultiplyTable[AColors^.B, AAlpha];
+        AColors^.G := TACLColors.PremultiplyTable[AColors^.G, AAlpha];
+        AColors^.A := TACLColors.PremultiplyTable[AColors^.A, AAlpha];
+        AColors^.R := TACLColors.PremultiplyTable[AColors^.R, AAlpha];
       end;
 
     Inc(AMask);
@@ -1854,10 +1523,10 @@ end;
 
 procedure TACLBlurFilter.Apply(ALayer: TACLBitmapLayer);
 begin
-  Apply(ALayer.Handle, PRGBQuad(ALayer.Colors), ALayer.Width, ALayer.Height);
+  Apply(ALayer.Handle, PACLPixel32(ALayer.Colors), ALayer.Width, ALayer.Height);
 end;
 
-procedure TACLBlurFilter.Apply(ALayerDC: HDC; AColors: PRGBQuad; AWidth, AHeight: Integer);
+procedure TACLBlurFilter.Apply(ALayerDC: HDC; AColors: PACLPixel32; AWidth, AHeight: Integer);
 begin
   if FSize > 0 then
     FCore.Apply(ALayerDC, AColors, AWidth, AHeight);
@@ -1990,7 +1659,7 @@ begin
   if Image.Empty then
     Result := nil
   else
-    Result := CreateImage(PRGBQuad(Image.Colors), Image.Width, Image.Height, afPremultiplied);
+    Result := CreateImage(PACLPixel32(Image.Colors), Image.Width, Image.Height, afPremultiplied);
 end;
 
 procedure TACL2DRender.DrawImage(Image: TACLBitmapLayer; const TargetRect: TRect; Cache: PACL2DRenderImage);
