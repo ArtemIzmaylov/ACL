@@ -2086,7 +2086,7 @@ begin
     if acTryPCharToInt(ACurr, acStringLength(ACurr, ACurr2), AMillis) then
     begin
       if AMillis > 0 then
-        ATimeInSeconds := ATimeInSeconds + 1 / AMillis;
+        ATimeInSeconds := ATimeInSeconds + AMillis / 1000;
       ACurr := ACurr2;
     end
     else
