@@ -1203,8 +1203,9 @@ var
   AList: TACLIniFileSection;
   I, J: Integer;
 begin
-  if AEncoding = nil then
-    AEncoding := TEncoding.Unicode;
+  if AEncoding = TEncoding.Unicode then
+    AEncoding := nil; // TACLStreamHelper will operate in more optimal way
+
   AStream.WriteBOM(AEncoding);
   for I := 0 to FSections.Count - 1 do
   begin
