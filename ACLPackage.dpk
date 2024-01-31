@@ -126,6 +126,7 @@ contains
   ACL.FileFormats.XML.Types in 'Base\ACL.FileFormats.XML.Types.pas',
   ACL.FileFormats.XML.Writer in 'Base\ACL.FileFormats.XML.Writer.pas',
   ACL.Geometry in 'Base\ACL.Geometry.pas',
+  ACL.Geometry.Utils in 'Base\ACL.Geometry.Utils.pas',
   ACL.Graphics.Ex.D2D in 'Base\ACL.Graphics.Ex.D2D.pas',
   ACL.Graphics.Ex.D2D.Types in 'Base\ACL.Graphics.Ex.D2D.Types.pas',
   ACL.Graphics.Ex.Gdip in 'Base\ACL.Graphics.Ex.Gdip.pas',
