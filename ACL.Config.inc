@@ -7,14 +7,16 @@
   {$modeswitch functionreferences}
   {$modeswitch anonymousfunctions}
   {$codepage UTF8}
+  {$inline off}
 
   {$H+}
   {$WARN 5024 off} // Parameter "$1" not used
   {$WARN 5026 off}
   {$WARN 6058 off} // Call to subroutine "$1" marked as inline is not inlined
+  {$WARN 3124 off} // Inlining disabled
 
   {$IFNDEF LINUX}
-    ACL was not ready for other platforms using FPC/LCL
+    {$MESSAGE FATAL 'ACL was not ready for other platforms using FPC/LCL'}
   {$ENDIF}
 {$ENDIF}
 
@@ -75,6 +77,5 @@
 {$ENDIF}
 
 {$IF NOT DEFINED(FPC) AND NOT DEFINED(DELPHI110ALEXANDRIA)}
-  You need Delphi 11.0 Alexandria for this library,
-  Previous Delphi versions has too many bugs with dpi scaling.
+  {$MESSAGE FATAL 'You need Delphi 11.0 Alexandria for this library, previous Delphi versions has too many bugs with dpi scaling'}
 {$IFEND}

@@ -13,6 +13,8 @@ unit ACL.Threading;
 
 {$I ACL.Config.inc} // FPC:OK
 
+{$DEFINE ACL_THREADING_USE_MESSAGES}
+
 interface
 
 uses
@@ -21,8 +23,8 @@ uses
   LCLType,
 {$ELSE}
   Winapi.Windows,
-  Winapi.Messages,
 {$ENDIF}
+  {Winapi.}Messages,
   // System
   {System.}Classes,
   {System.}Generics.Defaults,
@@ -159,8 +161,8 @@ type
     end;
   {$ENDREGION}
   strict private
-  {$IFDEF MSWINDOWS}
-    class var FHandle: HWND;
+  {$IFDEF ACL_THREADING_USE_MESSAGES}
+    class var FMessage: Cardinal;
   {$ENDIF}
     class var FQueue: TThreadList<PSynchronizeRecord>;
 
@@ -169,8 +171,8 @@ type
     class procedure Execute; overload;
     class procedure Execute(ARecord: PSynchronizeRecord); overload;
     class procedure Run(ARecord: PSynchronizeRecord; AWaitFor: Boolean); overload;
-  {$IFDEF MSWINDOWS}
-    class procedure WndProc(var Message: TMessage);
+  {$IFDEF ACL_THREADING_USE_MESSAGES}
+    class procedure WndProc(var AMessage: TMessage; var AHandled: Boolean);
   {$ENDIF}
   public
     class constructor Create;
@@ -203,10 +205,7 @@ procedure RunInThread(Func: TThreadStartRoutine; Context: Pointer);
 implementation
 
 uses
-{$IFDEF FPC}
-  {$MESSAGE WARN 'TODO - ACL.Utils.Messaging'}
-{$ENDIF}
-{$IFDEF MSWINDOWS}
+{$IFDEF ACL_THREADING_USE_MESSAGES}
   ACL.Utils.Messaging,
 {$ENDIF}
   Math;
@@ -612,7 +611,8 @@ begin
   FreeAndNil(FLock);
 end;
 
-class procedure TACLMultithreadedOperation.Run(AChunks: PPointer; AChunkCount: Integer; AFilterProc: TFilterProc);
+class procedure TACLMultithreadedOperation.Run(
+  AChunks: PPointer; AChunkCount: Integer; AFilterProc: TFilterProc);
 begin
   if AChunkCount > 0 then
   begin
@@ -663,16 +663,17 @@ end;
 
 class constructor TACLMainThread.Create;
 begin
-{$IFDEF MSWINDOWS}
-  FHandle := WndCreate(WndProc, ClassName, True);
+{$IFDEF ACL_THREADING_USE_MESSAGES}
+  FMessage := TACLMessaging.RegisterMessage(ClassName);
+  TACLMessaging.HandlerAdd(WndProc);
 {$ENDIF}
   FQueue := TThreadList<PSynchronizeRecord>.Create;
 end;
 
 class destructor TACLMainThread.Destroy;
 begin
-{$IFDEF MSWINDOWS}
-  WndFree(FHandle);
+{$IFDEF ACL_THREADING_USE_MESSAGES}
+  TACLMessaging.HandlerRemove(WndProc);
 {$ELSE}
   TACLThread.RemoveQueuedEvents(Execute);
 {$ENDIF}
@@ -819,8 +820,8 @@ begin
     if IsMainThread then
       Execute(ARecord)
     else
-    {$IFDEF MSWINDOWS}
-      SendMessage(FHandle, WM_USER, 0, LPARAM(ARecord));
+    {$IFDEF ACL_THREADING_USE_MESSAGES}
+      TACLMessaging.SendMessage(FMessage, 0, LPARAM(ARecord));
     {$ELSE}
       TACLThread.Synchronize(nil,
         procedure
@@ -832,25 +833,25 @@ begin
   else
   begin
     FQueue.Add(ARecord);
-  {$IFDEF MSWINDOWS}
-    PostMessage(FHandle, WM_USER, 0, 0);
+  {$IFDEF ACL_THREADING_USE_MESSAGES}
+    TACLMessaging.PostMessage(FMessage, 0, 0);
   {$ELSE}
     TACLThread.Queue(nil, Execute);
   {$ENDIF}
   end;
 end;
 
-{$IFDEF MSWINDOWS}
-class procedure TACLMainThread.WndProc(var Message: TMessage);
+{$IFDEF ACL_THREADING_USE_MESSAGES}
+class procedure TACLMainThread.WndProc(var AMessage: TMessage; var AHandled: Boolean);
 begin
-  if Message.Msg = WM_USER then
+  if AMessage.Msg = FMessage then
   begin
-    if Message.LParam <> 0 then
-      Execute(PSynchronizeRecord(Message.LParam))
+    AHandled := True;
+    if AMessage.LParam <> 0 then
+      Execute(PSynchronizeRecord(AMessage.LParam))
     else
       Execute;
   end;
-  WndDefaultProc(FHandle, Message);
 end;
 {$ENDIF}
 
