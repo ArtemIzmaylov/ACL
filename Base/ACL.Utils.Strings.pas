@@ -184,7 +184,8 @@ type
     function Append(const AValue: Shortint): TACLStringBuilder; overload; inline;
     function Append(const AValue: Single): TACLStringBuilder; overload; inline;
     function Append(const AValue: Smallint): TACLStringBuilder; overload; inline;
-    function Append(const AValue: TCharArray; AStartIndex: Integer; ACount: Integer): TACLStringBuilder; overload; inline;
+    function Append(const AValue: TArray<AnsiChar>; AStartIndex, ACount: Integer): TACLStringBuilder; overload; inline;
+    function Append(const AValue: TArray<WideChar>; AStartIndex, ACount: Integer): TACLStringBuilder; overload; inline;
     function Append(const AValue: TObject): TACLStringBuilder; overload; inline;
     function Append(const AValue: UInt64): TACLStringBuilder; overload; inline;
     function Append(const AValue: string): TACLStringBuilder; overload; inline;
@@ -2123,11 +2124,11 @@ end;
 class function TACLEncodings.WebName(const Encoding: TEncoding): string;
 var
   AStartPos: Integer;
-  AEncodingName: string;
 begin
-  AEncodingName := _S(Encoding.EncodingName);
-  AStartPos := acPos('(', AEncodingName) + 1;
-  Result := Copy(AEncodingName, AStartPos, acPos(')', AEncodingName) - AStartPos);
+  Result := _S(Encoding.EncodingName);
+  AStartPos := acPos('(', Result) + 1;
+  if AStartPos > 1 then
+    Result := Copy(Result, AStartPos, acPos(')', Result) - AStartPos);
   Result := acLowerCase(Result);
 end;
 
@@ -2902,11 +2903,6 @@ begin
   Result := Append(AValue).AppendLine;
 end;
 
-function TACLStringBuilder.Append(const AValue: TCharArray; AStartIndex, ACount: Integer): TACLStringBuilder;
-begin
-  Result := Append(@AValue[AStartIndex], ACount);
-end;
-
 function TACLStringBuilder.Append(const AValue: Shortint): TACLStringBuilder;
 begin
   Result := Append(IntToStr(AValue));
@@ -2920,6 +2916,24 @@ end;
 function TACLStringBuilder.Append(const AValue: Smallint): TACLStringBuilder;
 begin
   Result := Append(IntToStr(AValue));
+end;
+
+function TACLStringBuilder.Append(const AValue: TArray<AnsiChar>; AStartIndex, ACount: Integer): TACLStringBuilder;
+begin
+{$IFDEF UNICODE}
+  Result := Append(acStringFromAnsiString(PAnsiChar(@AValue[AStartIndex]), ACount, DefaultCodePage));
+{$ELSE}
+  Result := Append(@AValue[AStartIndex], ACount);
+{$ENDIF}
+end;
+
+function TACLStringBuilder.Append(const AValue: TArray<WideChar>; AStartIndex, ACount: Integer): TACLStringBuilder;
+begin
+{$IFDEF UNICODE}
+  Result := Append(@AValue[AStartIndex], ACount);
+{$ELSE}
+  Result := Append(_S(acMakeString(PWideChar(@AValue[AStartIndex]), ACount)));
+{$ENDIF}
 end;
 
 { TACLAppVersion }

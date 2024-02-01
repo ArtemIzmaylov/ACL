@@ -4,7 +4,7 @@
 {*         SQLite Database Wrappers          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,18 +16,26 @@ unit ACL.SQLite3;
 interface
 
 uses
+{$IFNDEF FPC}
   Winapi.Windows,
+{$ENDIF}
   // System
-  System.Classes,
-  System.Generics.Collections,
-  System.Generics.Defaults,
-  System.Sqlite,
-  System.SysUtils,
-  System.Variants,
+  {System.}Classes,
+  {System.}Generics.Collections,
+  {System.}Generics.Defaults,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Variants,
+{$IFDEF FPC}
+  {System.}Sqlite3,
+{$ELSE}
+  {System.}Sqlite,
+{$ENDIF}
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
   ACL.Classes.StringList,
+  ACL.FastCode,
   ACL.Utils.Common,
   ACL.Utils.FileSystem,
   ACL.Utils.Strings,
@@ -50,7 +58,7 @@ type
   TACLSQLiteBase = class;
   TACLSQLiteColumnType = (sctUnknown, sctFloat, sctText, sctBlob, sctNull);
 
-  TSQLFunction = TxFunc;
+  TSQLFunction = {$IFDEF FPC}xFunc{$ELSE}TxFunc{$ENDIF};
 
   { EACLSQLiteError }
 
@@ -59,7 +67,7 @@ type
     FErrorCode: Integer;
   public
     constructor Create(AHandle: HSQLDB; AError: Integer; const AAdditionalInfo: string = '');
-    //
+    //# Properties
     property ErrorCode: Integer read FErrorCode;
   end;
 
@@ -68,11 +76,11 @@ type
   TACLSQLiteColumn = class
   protected
     FDataType: TACLSQLiteColumnType;
-    FName: UnicodeString;
+    FName: string;
     FNameHash: Integer;
   public
     property DataType: TACLSQLiteColumnType read FDataType;
-    property Name: UnicodeString read FName;
+    property Name: string read FName;
     property NameHash: Integer read FNameHash;
   end;
 
@@ -92,19 +100,19 @@ type
   public
     constructor Create(ADatabase: TACLSQLiteBase; AQuery: HSQLQUERY); virtual;
     destructor Destroy; override;
-    function GetFieldIndex(const Name: UnicodeString): Integer;
+    function GetFieldIndex(const Name: string): Integer;
     function NextRecord: Boolean;
-    // I/O
+    //# I/O
     function ReadBlob(AIndex: Integer; AData: TMemoryStream): Integer; overload;
-    function ReadBlob(const AName: UnicodeString; AData: TMemoryStream): Integer; overload; inline;
+    function ReadBlob(const AName: string; AData: TMemoryStream): Integer; overload; inline;
     function ReadDouble(AIndex: Integer): Double; overload;
-    function ReadDouble(const AName: UnicodeString): Double; overload; inline;
+    function ReadDouble(const AName: string): Double; overload; inline;
     function ReadInt(AIndex: Integer): Int64; overload;
-    function ReadInt(const AName: UnicodeString): Int64; overload; inline;
-    function ReadStr(AIndex: Integer; out ALength: Integer): PWideChar; overload;
-    function ReadStr(AIndex: Integer; ASharedStrings: TACLStringSharedTable = nil): UnicodeString; overload; inline;
-    function ReadStr(const AName: UnicodeString; ASharedStrings: TACLStringSharedTable = nil): UnicodeString; overload; inline;
-    // Properties
+    function ReadInt(const AName: string): Int64; overload; inline;
+    function ReadStr(AIndex: Integer; out ALength: Integer): PChar; overload;
+    function ReadStr(AIndex: Integer; ASharedStrings: TACLStringSharedTable = nil): string; overload; inline;
+    function ReadStr(const AName: string; ASharedStrings: TACLStringSharedTable = nil): string; overload; inline;
+    //# Properties
     property Column[Index: Integer]: TACLSQLiteColumn read GetColumn; default;
     property ColumnCount: Integer read GetColumnCount;
     property Database: TACLSQLiteBase read FDatabase;
@@ -114,7 +122,7 @@ type
 
   TACLSQLiteBase = class(TACLUnknownObject)
   strict private
-    FFileName: UnicodeString;
+    FFileName: string;
     FHandle: HSQLDB;
     FLock: TACLCriticalSection;
     FUpdateCount: Integer;
@@ -123,19 +131,19 @@ type
     procedure SetVersion(AValue: Integer);
   protected
     procedure CheckError(AErrorCode: Integer; const AAdditionalInfo: string = '');
-    procedure CreateFunction(const AName: PWideChar; AArgCount: Integer; AFunc: TSQLFunction);
+    procedure CreateFunction(const AName: PChar; AArgCount: Integer; AFunc: TSQLFunction);
     procedure DestroySubClasses; virtual;
     function GetTableClass: TACLSQLiteTableClass; virtual;
     procedure InitializeFunctions; virtual;
     procedure InitializeTables; virtual;
-    procedure PrepareQuery(const S: UnicodeString; out AHandle: HSQLQUERY); virtual;
-    // Lock / Unlock
+    procedure PrepareQuery(const S: string; out AHandle: HSQLQUERY); virtual;
+    //# Lock / Unlock
     procedure Lock;
     procedure Unlock;
-    //
+    //# Properties
     property Handle: HSQLDB read FHandle;
   public
-    constructor Create(const AFileName: UnicodeString); virtual;
+    constructor Create(const AFileName: string); virtual;
     destructor Destroy; override;
     procedure BeginUpdate;
     procedure EndUpdate;
@@ -145,20 +153,20 @@ type
     procedure Transaction(Proc: TProc);
 
     // Statements
-    procedure Exec(const AFormatLine: UnicodeString; const AArguments: array of const); overload;
-    procedure Exec(const AQuery: UnicodeString); overload;
-    function Exec(const AQuery: UnicodeString; out AHandle: HSQLQUERY): Boolean; overload;
-    function Exec(const AQuery: UnicodeString; out ATable: TACLSQLiteTable): Boolean; overload;
-    function ExecInt(const AQuery: UnicodeString): Int64;
+    procedure Exec(const AFormatLine: string; const AArguments: array of const); overload;
+    procedure Exec(const AQuery: string); overload;
+    function Exec(const AQuery: string; out AHandle: HSQLQUERY): Boolean; overload;
+    function Exec(const AQuery: string; out ATable: TACLSQLiteTable): Boolean; overload;
+    function ExecInt(const AQuery: string): Int64;
     // Use "?" symbol in Query for set BlobData position
-    procedure ExecInsertBlob(const AQuery: UnicodeString; const AData: TMemoryStream); overload;
-    procedure ExecInsertBlob(const AQuery: UnicodeString; const AData: PByte; const ASize: Int64); overload;
+    procedure ExecInsertBlob(const AQuery: string; const AData: TMemoryStream); overload;
+    procedure ExecInsertBlob(const AQuery: string; const AData: PByte; const ASize: Int64); overload;
 
     // Utilities
-    function FetchColumns(const ATableName: UnicodeString): TACLStringList;
+    function FetchColumns(const ATableName: string): TACLStringList;
 
     // Properties
-    property FileName: UnicodeString read FFileName;
+    property FileName: string read FFileName;
     property Version: Integer read GetVersion write SetVersion;
   end;
 
@@ -182,13 +190,13 @@ type
     function Raw(const S: string): TACLSQLQueryBuilder; inline;
 
     // Abbreviations
-    function N(const AName: UnicodeString): TACLSQLQueryBuilder; overload; inline;
+    function N(const AName: string): TACLSQLQueryBuilder; overload; inline;
     function V(const AValue: Single): TACLSQLQueryBuilder; overload; inline;
     function V(const AValue: Double): TACLSQLQueryBuilder; overload; inline;
     function V(const AValue: Int64): TACLSQLQueryBuilder; overload; inline;
     function V(const AValue: Integer): TACLSQLQueryBuilder; overload; inline;
     function V(const AValue: TDateTime): TACLSQLQueryBuilder; overload; inline;
-    function V(const AValue: UnicodeString): TACLSQLQueryBuilder; overload; inline;
+    function V(const AValue: string): TACLSQLQueryBuilder; overload; inline;
     function V(const AValue: Variant): TACLSQLQueryBuilder; overload; inline;
     function VBlob: TACLSQLQueryBuilder; overload; inline;
 
@@ -251,28 +259,26 @@ type
     function TypeText: TACLSQLQueryBuilder; inline;
   end;
 
-function PrepareData(const AData: Int64): UnicodeString; inline; overload;
-function PrepareData(const AData: UnicodeString): UnicodeString; inline; overload;
-function PrepareData(const AData: Variant): UnicodeString; inline; overload;
-function SQLiteEncodeDateTime(const DateTime: TDateTime): UnicodeString;
-function SQLiteFormatDouble(const AValue: Double): UnicodeString;
+function PrepareData(const AData: Int64): string; inline; overload;
+function PrepareData(const AData: string): string; inline; overload;
+function PrepareData(const AData: Variant): string; inline; overload;
+function SQLiteEncodeDateTime(const DateTime: TDateTime): string;
+function SQLiteFormatDouble(const AValue: Double): string;
 
 // Values
 function SQLiteVarToDouble(AValue: Pointer): Double; inline;
 function SQLiteVarToInt32(AValue: Pointer): Integer; inline;
 function SQLiteVarToInt64(AValue: Pointer): Int64; inline;
-function SQLiteVarToText(AValue: Pointer): UnicodeString; inline;
+function SQLiteVarToText(AValue: Pointer): string; inline;
 
 // Result
 procedure SQLiteResultSet(AContext: HSQLCONTEXT; const AValue: Double); overload;
 procedure SQLiteResultSet(AContext: HSQLCONTEXT; const AValue: Integer); overload;
-procedure SQLiteResultSet(AContext: HSQLCONTEXT; const AValue: UnicodeString); overload;
+procedure SQLiteResultSet(AContext: HSQLCONTEXT; const AValue: string); overload;
 procedure SQLiteResultSetNull(AContext: HSQLCONTEXT);
 implementation
 
 uses
-  System.Math,
-  // ACL
   ACL.Hashes,
   ACL.Math;
   
@@ -292,8 +298,10 @@ type
     // Callback methods
     class procedure FreeText(P: Pointer); cdecl; static;
     // Collation
-    class function LogicalCompare(UserData: Pointer; P1Size: Integer; P1: PWideChar; P2Size: Integer; P2: PWideChar): Integer; cdecl; static;
-    class function NoCaseCompare(UserData: Pointer; P1Size: Integer; P1: PWideChar; P2Size: Integer; P2: PWideChar): Integer; cdecl; static;
+    class function LogicalCompare(UserData: Pointer;
+      P1Size: Integer; P1: PChar; P2Size: Integer; P2: PChar): Integer; cdecl; static;
+    class function NoCaseCompare(UserData: Pointer;
+      P1Size: Integer; P1: PChar; P2Size: Integer; P2: PChar): Integer; cdecl; static;
     // Additional Methods
     class procedure Base64(Context: HSQLCONTEXT; Count: Integer; Vars: PPointerArray); cdecl; static;
     class procedure KeyContains(Context: HSQLCONTEXT; Count: Integer; Vars: PPointerArray); cdecl; static;
@@ -309,22 +317,22 @@ type
 // Formatting
 //=============================================================================
 
-function PrepareData(const AData: Int64): UnicodeString; inline; overload;
+function PrepareData(const AData: Int64): string; inline; overload;
 begin
   Result := IntToStr(AData);
 end;
 
-function PrepareData(const AData: UnicodeString): UnicodeString; inline; overload;
+function PrepareData(const AData: string): string; inline; overload;
 begin
   //# Surrogates does not supported by SQLite
-  Result := acRemoveSurrogates(AData, ' ');
+  Result := _S(acRemoveSurrogates(_U(AData), ' '));
   Result := #39 + acStringReplace(Result, #39, #39#39) + #39;
 end;
 
-function PrepareData(const AData: Variant): UnicodeString;
+function PrepareData(const AData: Variant): string;
 begin
   if VarIsStr(AData) then
-    Result := PrepareData(UnicodeString(AData))
+    Result := PrepareData(string(AData))
   else if VarType(AData) in [varSingle, varDouble, varCurrency, varDate] then
     Result := SQLiteFormatDouble(AData)
   else if VarIsNull(AData) then
@@ -333,12 +341,12 @@ begin
     Result := IntToStr(AData);
 end;
 
-function SQLiteFormatDouble(const AValue: Double): UnicodeString;
+function SQLiteFormatDouble(const AValue: Double): string;
 begin
   Result := FloatToStr(AValue, InvariantFormatSettings);
 end;
 
-function SQLiteEncodeDateTime(const DateTime: TDateTime): UnicodeString;
+function SQLiteEncodeDateTime(const DateTime: TDateTime): string;
 begin
   Result := SQLiteFormatDouble(DateTime);
 end;
@@ -362,9 +370,13 @@ begin
   Result := sqlite3_value_int64(AValue);
 end;
 
-function SQLiteVarToText(AValue: Pointer): UnicodeString;
+function SQLiteVarToText(AValue: Pointer): string;
 begin
+{$IFDEF UNICODE}
   SetString(Result, sqlite3_value_text16(AValue), sqlite3_value_bytes16(AValue) div SizeOf(WideChar));
+{$ELSE}
+  SetString(Result, sqlite3_value_text(AValue), sqlite3_value_bytes(AValue));
+{$ENDIF}
 end;
 
 procedure SQLiteResultSet(AContext: HSQLCONTEXT; const AValue: Double); overload;
@@ -377,13 +389,17 @@ begin
   sqlite3_result_int(AContext, AValue);
 end;
 
-procedure SQLiteResultSet(AContext: HSQLCONTEXT; const AValue: UnicodeString); overload;
+procedure SQLiteResultSet(AContext: HSQLCONTEXT; const AValue: string); overload;
 var
-  AData: PWideChar;
-  ALength: Integer;
+  LData: PChar;
+  LDataLen: Integer;
 begin
-  AData := acAllocStr(AValue, ALength);
-  sqlite3_result_text16(AContext, AData, ALength * SizeOf(WideChar), TSQLLiteHelper.FreeText);
+  LData := acAllocStr(AValue, LDataLen);
+{$IFDEF UNICODE}
+  sqlite3_result_text16(AContext, LData, LDataLen, TSQLLiteHelper.FreeText);
+{$ELSE}
+  sqlite3_result_text(AContext, LData, LDataLen, TSQLLiteHelper.FreeText);
+{$ENDIF}
 end;
 
 procedure SQLiteResultSetNull(AContext: HSQLCONTEXT);
@@ -420,7 +436,7 @@ begin
   inherited Destroy;
 end;
 
-function TACLSQLiteTable.GetFieldIndex(const Name: UnicodeString): Integer;
+function TACLSQLiteTable.GetFieldIndex(const Name: string): Integer;
 var
   AColumn: TACLSQLiteColumn;
   AHash, I: Integer;
@@ -463,7 +479,7 @@ begin
   end;
 end;
 
-function TACLSQLiteTable.ReadBlob(const AName: UnicodeString; AData: TMemoryStream): Integer;
+function TACLSQLiteTable.ReadBlob(const AName: string; AData: TMemoryStream): Integer;
 begin
   Result := ReadBlob(GetFieldIndex(AName), AData);
 end;
@@ -473,7 +489,7 @@ begin
   Result := sqlite3_column_double(FQuery, AIndex);
 end;
 
-function TACLSQLiteTable.ReadDouble(const AName: UnicodeString): Double;
+function TACLSQLiteTable.ReadDouble(const AName: string): Double;
 begin
   Result := ReadDouble(GetFieldIndex(AName));
 end;
@@ -483,15 +499,15 @@ begin
   Result := sqlite3_column_int64(FQuery, AIndex);
 end;
 
-function TACLSQLiteTable.ReadInt(const AName: UnicodeString): Int64;
+function TACLSQLiteTable.ReadInt(const AName: string): Int64;
 begin
   Result := ReadInt(GetFieldIndex(AName));
 end;
 
-function TACLSQLiteTable.ReadStr(AIndex: Integer; ASharedStrings: TACLStringSharedTable): UnicodeString;
+function TACLSQLiteTable.ReadStr(AIndex: Integer; ASharedStrings: TACLStringSharedTable): string;
 var
   L: Integer;
-  P: PWideChar;
+  P: PChar;
 begin
   P := ReadStr(AIndex, L);
   if ASharedStrings <> nil then
@@ -500,13 +516,18 @@ begin
     Result := acMakeString(P, L);
 end;
 
-function TACLSQLiteTable.ReadStr(AIndex: Integer; out ALength: Integer): PWideChar;
+function TACLSQLiteTable.ReadStr(AIndex: Integer; out ALength: Integer): PChar;
 begin
+{$IFDEF UNICODE}
   ALength := sqlite3_column_bytes16(FQuery, AIndex) div SizeOf(WideChar);
   Result := sqlite3_column_text16(FQuery, AIndex);
+{$ELSE}
+  ALength := sqlite3_column_bytes(FQuery, AIndex);
+  Result := sqlite3_column_text(FQuery, AIndex);
+{$ENDIF}
 end;
 
-function TACLSQLiteTable.ReadStr(const AName: UnicodeString; ASharedStrings: TACLStringSharedTable): UnicodeString;
+function TACLSQLiteTable.ReadStr(const AName: string; ASharedStrings: TACLStringSharedTable): string;
 begin
   Result := ReadStr(GetFieldIndex(AName), ASharedStrings);
 end;
@@ -548,16 +569,23 @@ end;
 
 { TACLSQLiteBase }
 
-constructor TACLSQLiteBase.Create(const AFileName: UnicodeString);
+constructor TACLSQLiteBase.Create(const AFileName: string);
 begin
   inherited Create;
   FFileName := AFileName;
   FLock := TACLCriticalSection.Create(Self);
 
+{$IFDEF UNICODE}
   CheckError(sqlite3_open16(PWideChar(AFileName), FHandle));
-  CheckError(sqlite3_create_collation16(Handle, 'NOCASE', SQLITE_UTF16, nil, @TSQLLiteHelper.NoCaseCompare));
+  CheckError(sqlite3_create_collation16(Handle, 'NOCASE',  SQLITE_UTF16, nil, @TSQLLiteHelper.NoCaseCompare));
   CheckError(sqlite3_create_collation16(Handle, 'UNICODE', SQLITE_UTF16, nil, @TSQLLiteHelper.NoCaseCompare));
   CheckError(sqlite3_create_collation16(Handle, 'LOGICAL', SQLITE_UTF16, nil, @TSQLLiteHelper.LogicalCompare));
+{$ELSE}
+  CheckError(sqlite3_open(PChar(AFileName), FHandle));
+  CheckError(sqlite3_create_collation(Handle, 'NOCASE',  SQLITE_UTF8, nil, @TSQLLiteHelper.NoCaseCompare));
+  CheckError(sqlite3_create_collation(Handle, 'UNICODE', SQLITE_UTF8, nil, @TSQLLiteHelper.NoCaseCompare));
+  CheckError(sqlite3_create_collation(Handle, 'LOGICAL', SQLITE_UTF8, nil, @TSQLLiteHelper.LogicalCompare));
+{$ENDIF}
   CheckError(sqlite3_busy_timeout(Handle, 10000));
 
   InitializeFunctions;
@@ -593,7 +621,7 @@ begin
   end;
 end;
 
-function TACLSQLiteBase.FetchColumns(const ATableName: UnicodeString): TACLStringList;
+function TACLSQLiteBase.FetchColumns(const ATableName: string): TACLStringList;
 var
   ATable: TACLSQLiteTable;
 begin
@@ -630,12 +658,12 @@ begin
   Unlock;
 end;
 
-procedure TACLSQLiteBase.Exec(const AFormatLine: UnicodeString; const AArguments: array of const);
+procedure TACLSQLiteBase.Exec(const AFormatLine: string; const AArguments: array of const);
 begin
   Exec(Format(AFormatLine, AArguments));
 end;
 
-function TACLSQLiteBase.Exec(const AQuery: UnicodeString; out AHandle: HSQLQUERY): Boolean;
+function TACLSQLiteBase.Exec(const AQuery: string; out AHandle: HSQLQUERY): Boolean;
 begin
   Lock;
   try
@@ -648,7 +676,7 @@ begin
   end;
 end;
 
-function TACLSQLiteBase.Exec(const AQuery: UnicodeString; out ATable: TACLSQLiteTable): Boolean;
+function TACLSQLiteBase.Exec(const AQuery: string; out ATable: TACLSQLiteTable): Boolean;
 var
   AQueryHandle: HSQLQUERY;
 begin
@@ -657,7 +685,7 @@ begin
     ATable := GetTableClass.Create(Self, AQueryHandle);
 end;
 
-procedure TACLSQLiteBase.Exec(const AQuery: UnicodeString);
+procedure TACLSQLiteBase.Exec(const AQuery: string);
 var
   AQueryHandle: HSQLQUERY;
 begin
@@ -671,7 +699,7 @@ begin
   end;
 end;
 
-function TACLSQLiteBase.ExecInt(const AQuery: UnicodeString): Int64;
+function TACLSQLiteBase.ExecInt(const AQuery: string): Int64;
 var
   ATable: TACLSQLiteTable;
 begin
@@ -689,7 +717,7 @@ begin
   end;
 end;
 
-procedure TACLSQLiteBase.ExecInsertBlob(const AQuery: UnicodeString; const AData: TMemoryStream);
+procedure TACLSQLiteBase.ExecInsertBlob(const AQuery: string; const AData: TMemoryStream);
 begin
   if AData <> nil then
     ExecInsertBlob(AQuery, AData.Memory, AData.Size)
@@ -697,7 +725,7 @@ begin
     ExecInsertBlob(AQuery, nil, 0);
 end;
 
-procedure TACLSQLiteBase.ExecInsertBlob(const AQuery: UnicodeString; const AData: PByte; const ASize: Int64);
+procedure TACLSQLiteBase.ExecInsertBlob(const AQuery: string; const AData: PByte; const ASize: Int64);
 var
   AQueryHandle: HSQLQUERY;
 begin
@@ -738,9 +766,13 @@ begin
     raise EACLSQLiteError.Create(Handle, AErrorCode, AAdditionalInfo);
 end;
 
-procedure TACLSQLiteBase.CreateFunction(const AName: PWideChar; AArgCount: Integer; AFunc: TSQLFunction);
+procedure TACLSQLiteBase.CreateFunction(const AName: PChar; AArgCount: Integer; AFunc: TSQLFunction);
 begin
+{$IFDEF UNICODE}
   CheckError(sqlite3_create_function16(Handle, AName, AArgCount, SQLITE_UTF16, nil, AFunc, nil, nil));
+{$ELSE}
+  CheckError(sqlite3_create_function(Handle, AName, AArgCount, SQLITE_UTF8, nil, AFunc, nil, nil));
+{$ENDIF}
 end;
 
 procedure TACLSQLiteBase.DestroySubClasses;
@@ -776,11 +808,15 @@ begin
   // do nothing
 end;
 
-procedure TACLSQLiteBase.PrepareQuery(const S: UnicodeString; out AHandle: HSQLQUERY);
+procedure TACLSQLiteBase.PrepareQuery(const S: string; out AHandle: HSQLQUERY);
 var
-  ANext: PWideChar;
+  LNext: PChar;
 begin
-  CheckError(sqlite3_prepare16_v2(Handle, PWideChar(S), Length(S) * SizeOf(WideChar), AHandle, ANext), S);
+{$IFDEF UNICODE}
+  CheckError(sqlite3_prepare16_v2(Handle, PWideChar(S), Length(S) * SizeOf(WideChar), AHandle, LNext), S);
+{$ELSE}
+  CheckError(sqlite3_prepare_v2(Handle, PChar(S), Length(S), @AHandle, @LNext), S);
+{$ENDIF}
 end;
 
 procedure TACLSQLiteBase.Lock;
@@ -805,14 +841,16 @@ begin
   FreeMem(P);
 end;
 
-class function TSQLLiteHelper.LogicalCompare(UserData: Pointer; P1Size: Integer; P1: PWideChar; P2Size: Integer; P2: PWideChar): Integer;
+class function TSQLLiteHelper.LogicalCompare(UserData: Pointer;
+  P1Size: Integer; P1: PChar; P2Size: Integer; P2: PChar): Integer;
 begin
-  Result := acLogicalCompare(P1, P2, P1Size div SizeOf(WideChar), P2Size div SizeOf(WideChar));
+  Result := acLogicalCompare(P1, P2, P1Size div SizeOf(Char), P2Size div SizeOf(Char));
 end;
 
-class function TSQLLiteHelper.NoCaseCompare(UserData: Pointer; P1Size: Integer; P1: PWideChar; P2Size: Integer; P2: PWideChar): Integer;
+class function TSQLLiteHelper.NoCaseCompare(UserData: Pointer;
+  P1Size: Integer; P1: PChar; P2Size: Integer; P2: PChar): Integer;
 begin
-  Result := acCompareStrings(P1, P2, P1Size div SizeOf(WideChar), P2Size div SizeOf(WideChar));
+  Result := acCompareStrings(P1, P2, P1Size div SizeOf(Char), P2Size div SizeOf(Char));
 end;
 
 class procedure TSQLLiteHelper.Base64(Context: HSQLCONTEXT; Count: Integer; Vars: PPointerArray);
@@ -821,7 +859,7 @@ var
 begin
   AStream := TStringStream.Create;
   try
-    TACLMimecode.EncodeString(acEncodeUTF8(SQLiteVarToText(Vars^[0])), AStream);
+    TACLMimecode.EncodeString({$IFDEF UNICODE}acEncodeUTF8{$ENDIF}(SQLiteVarToText(Vars^[0])), AStream);
     SQLiteResultSet(Context, AStream.DataString);
   finally
     AStream.Free;
@@ -850,40 +888,46 @@ end;
 
 class procedure TSQLLiteHelper.KeyContainsOneFromRange(Context: HSQLCONTEXT; Count: Integer; Vars: PPointerArray); cdecl;
 var
-  AKeyLength: Integer;
-  AKeys, AScan: PWideChar;
-  AKeysLength: Integer;
-  AValue1, AValue2: Integer;
+  LKeyLength: Integer;
+  LKeys, LScan: PChar;
+  LKeysLength: Integer;
+  LValue1, LValue2: Integer;
 begin
-  AKeysLength := sqlite3_value_bytes16(Vars^[0]) div SizeOf(WideChar);
-  AKeys := sqlite3_value_text16(Vars^[0]);
-  AValue1 := SQLiteVarToInt32(Vars^[1]);
-  AValue2 := SQLiteVarToInt32(Vars^[2]);
+{$IFDEF UNICODE}
+  LKeysLength := sqlite3_value_bytes16(Vars^[0]) div SizeOf(WideChar);
+  LKeys := sqlite3_value_text16(Vars^[0]);
+{$ELSE}
+  LKeysLength := sqlite3_value_bytes(Vars^[0]);
+  LKeys := sqlite3_value_text(Vars^[0]);
+{$ENDIF}
+  LValue1 := SQLiteVarToInt32(Vars^[1]);
+  LValue2 := SQLiteVarToInt32(Vars^[2]);
   repeat
-    AScan := acStrScan(AKeys, AKeysLength, sKeyDelim);
-    if AScan <> nil then
+    LScan := acStrScan(LKeys, LKeysLength, sKeyDelim);
+    if LScan <> nil then
     begin
-      AKeyLength := (NativeUInt(AScan) - NativeUInt(AKeys)) div SizeOf(WideChar);
-      Inc(AScan); // Skip Separator
+      LKeyLength := acStringLength(LKeys, LScan);
+      Inc(LScan); // Skip Separator
     end
     else
-      AKeyLength := AKeysLength;
+      LKeyLength := LKeysLength;
 
-    if InRange(acPCharToIntDef(AKeys, AKeyLength, 0), AValue1, AValue2) then
+    if InRange(acPCharToIntDef(LKeys, LKeyLength, 0), LValue1, LValue2) then
     begin
       SQLiteResultSet(Context, 1);
       Exit;
     end;
 
-    AKeys := AScan;
-    Dec(AKeysLength, AKeyLength + 1);
-  until AKeysLength <= 0;
+    LKeys := LScan;
+    Dec(LKeysLength, LKeyLength + 1);
+  until LKeysLength <= 0;
   SQLiteResultSet(Context, 0);
 end;
 
 class procedure TSQLLiteHelper.KeyExclude(Context: HSQLCONTEXT; Count: Integer; Vars: PPointerArray); cdecl;
 var
-  AData: UnicodeString;
+  AData: string;
+  ADataLen: Integer;
   APosition: Integer;
 begin
   if Count = 2 then
@@ -892,7 +936,12 @@ begin
     AData := SQLiteVarToText(Vars^[0]);
     if APosition >= 0 then
     begin
-      Delete(AData, APosition + 1, sqlite3_value_bytes16(Vars^[1]) div SizeOf(WideChar) + 1);
+    {$IFDEF UNICODE}
+      ADataLen := sqlite3_value_bytes16(Vars^[1]) div SizeOf(WideChar) + 1;
+    {$ELSE}
+      ADataLen := sqlite3_value_bytes(Vars^[1]);
+    {$ENDIF}
+      Delete(AData, APosition + 1, ADataLen);
       AData := acStringReplace(AData, sKeyDelim + sKeyDelim, sKeyDelim);
       APosition := Length(AData);
       if (APosition > 0) and (AData[APosition] = sKeyDelim) then
@@ -906,7 +955,7 @@ end;
 
 class procedure TSQLLiteHelper.KeyInclude(Context: HSQLCONTEXT; Count: Integer; Vars: PPointerArray); cdecl;
 var
-  AData: UnicodeString;
+  AData: string;
   APosition: Integer;
 begin
   if Count = 2 then
@@ -927,46 +976,70 @@ end;
 class procedure TSQLLiteHelper.Upper(Context: HSQLCONTEXT; Count: Integer; Vars: PPointerArray);
 var
   L: Integer;
-  W: PWideChar;
+  W: PChar;
 begin
+{$IFDEF UNICODE}
   W := sqlite3_value_text16(Vars^[0]);
   L := sqlite3_value_bytes16(Vars^[0]) div SizeOf(WideChar);
   LCMapString(LOCALE_USER_DEFAULT, LCMAP_UPPERCASE or LCMAP_LINGUISTIC_CASING, W, L, W, L);
   sqlite3_result_text16(Context, W, L * SizeOf(WideChar), nil);
+{$ELSE}
+  L := sqlite3_value_bytes(Vars^[0]);
+  W := sqlite3_value_text(Vars^[0]);
+  W := AnsiStrUpper(W);
+  sqlite3_result_text(Context, W, L, nil);
+{$ENDIF}
 end;
 
 class procedure TSQLLiteHelper.Lower(Context: HSQLCONTEXT; Count: Integer; Vars: PPointerArray);
 var
   L: Integer;
-  W: PWideChar;
+  W: PChar;
 begin
+ {$IFDEF UNICODE}
   W := sqlite3_value_text16(Vars^[0]);
   L := sqlite3_value_bytes16(Vars^[0]) div SizeOf(WideChar);
   LCMapString(LOCALE_USER_DEFAULT, LCMAP_LOWERCASE or LCMAP_LINGUISTIC_CASING, W, L, W, L);
   sqlite3_result_text16(Context, W, L * SizeOf(WideChar), nil);
+{$ELSE}
+  L := sqlite3_value_bytes(Vars^[0]);
+  W := sqlite3_value_text(Vars^[0]);
+  W := AnsiStrLower(W);
+  sqlite3_result_text(Context, W, L, nil);
+{$ENDIF}
 end;
 
 class function TSQLLiteHelper.KeyFind(AVar1, AVar2: Pointer): Integer;
 var
   I: Integer;
-  L: WideChar;
+  L: Char;
   L1, L2: Integer;
-  T1, T2: PWideChar;
+  T1, T2: PChar;
 begin
   Result := -1;
+{$IFDEF UNICODE}
   L1 := sqlite3_value_bytes16(AVar1) div SizeOf(WideChar);
   L2 := sqlite3_value_bytes16(AVar2) div SizeOf(WideChar);
+{$ELSE}
+  L1 := sqlite3_value_bytes(AVar1);
+  L2 := sqlite3_value_bytes(AVar2);
+{$ENDIF}
   if (L1 = L2) and (L2 = 0) then
     Result := 0
   else
     if (L1 >= L2) and (L2 > 0) then
     begin
       L := sKeyDelim;
+    {$IFDEF UNICODE}
       T1 := sqlite3_value_text16(AVar1);
       T2 := sqlite3_value_text16(AVar2);
+    {$ELSE}
+      T1 := sqlite3_value_text(AVar1);
+      T2 := sqlite3_value_text(AVar2);
+    {$ENDIF}
       for I := 0 to L1 - L2 do
       begin
-        if (L = sKeyDelim) and ((I + L2 = L1) or (PWideChar(T1 + L2)^ = sKeyDelim)) and CompareMem(T1, T2, L2 * SizeOf(WideChar)) then
+        if (L = sKeyDelim) and ((I + L2 = L1) or (PChar(T1 + L2)^ = sKeyDelim)) and CompareMem(T1, T2, L2 * SizeOf(Char)) then
         begin
           Result := I;
           Break;
@@ -1028,7 +1101,7 @@ begin
   Result := Raw('REPLACE ');
 end;
 
-function TACLSQLQueryBuilder.N(const AName: UnicodeString): TACLSQLQueryBuilder;
+function TACLSQLQueryBuilder.N(const AName: string): TACLSQLQueryBuilder;
 begin
   Result := ValCore(AName); // todo, blob markers
 end;
@@ -1038,7 +1111,7 @@ begin
   Result := ValCore(SQLiteFormatDouble(AValue));
 end;
 
-function TACLSQLQueryBuilder.V(const AValue: UnicodeString): TACLSQLQueryBuilder;
+function TACLSQLQueryBuilder.V(const AValue: string): TACLSQLQueryBuilder;
 begin
   Result := ValCore(PrepareData(AValue));
 end;
