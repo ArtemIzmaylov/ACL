@@ -27,7 +27,7 @@ uses
   Vcl.Controls,
   Vcl.Graphics,
   // ACL
-  ACL.Classes.Timer,
+  ACL.Timers,
   ACL.Geometry,
   ACL.Graphics.TextLayout,
   ACL.UI.Menus,

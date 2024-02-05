@@ -27,7 +27,7 @@ uses
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
-  ACL.Classes.Timer,
+  ACL.Timers,
   ACL.Graphics.SkinImage,
   ACL.Graphics.SkinImageSet,
   ACL.UI.Controls.BaseControls,

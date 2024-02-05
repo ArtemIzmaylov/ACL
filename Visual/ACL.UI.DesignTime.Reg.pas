@@ -48,7 +48,7 @@ uses
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
-  ACL.Classes.Timer,
+  ACL.Timers,
   ACL.Geometry,
   ACL.Graphics.Ex.Gdip,
   ACL.UI.Application,
