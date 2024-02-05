@@ -31,7 +31,6 @@ uses
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
-  ACL.Classes.Timer,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.BaseEditors,

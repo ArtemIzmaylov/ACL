@@ -33,7 +33,7 @@ uses
   ACL.Classes,
   ACL.Classes.Collections,
   ACL.Classes.StringList,
-  ACL.Classes.Timer,
+  ACL.Timers,
   ACL.Geometry,
   ACL.Graphics,
   ACL.Math,

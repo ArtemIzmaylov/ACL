@@ -164,12 +164,6 @@ procedure acSetWindowText(AHandle: HWND; const AText: UnicodeString);
 // System
 procedure MinimizeMemoryUsage;
 
-{$IFDEF MSWINDOWS}
-function GetExactTickCount: Int64;
-function TickCountToTime(const ATicks: Int64): Cardinal;
-function TimeToTickCount(const ATime: Cardinal): Int64;
-{$ENDIF}
-
 // Interfaces
 procedure acGetInterface(const Instance: IInterface; const IID: TGUID; out Intf); overload;
 procedure acGetInterface(const Instance: TObject; const IID: TGUID; out Intf); overload;
@@ -205,7 +199,6 @@ type
   TWineGetVersion = function: PAnsiChar; stdcall;
 
 var
-  FPerformanceCounterFrequency: Int64 = 0;
   FGetThreadErrorMode: TGetThreadErrorMode = nil;
   FSetThreadErrorMode: TSetThreadErrorMode = nil;
   FWineGetBuildId: TWineGetVersion = nil;
@@ -322,30 +315,6 @@ end;
 // ---------------------------------------------------------------------------------------------------------------------
 // Internal Tools
 // ---------------------------------------------------------------------------------------------------------------------
-
-{$IFDEF MSWINDOWS}
-function GetExactTickCount: Int64;
-begin
-  //# https://docs.microsoft.com/ru-ru/windows/win32/api/profileapi/nf-profileapi-queryperformancecounter?redirectedfrom=MSDN
-  //# On systems that run Windows XP or later, the function will always succeed and will thus never return zero.
-  if not QueryPerformanceCounter(Result) then
-    Result := GetTickCount;
-end;
-
-function TickCountToTime(const ATicks: Int64): Cardinal;
-begin
-  if FPerformanceCounterFrequency = 0 then
-    QueryPerformanceFrequency(FPerformanceCounterFrequency);
-  Result := (ATicks * 1000) div FPerformanceCounterFrequency;
-end;
-
-function TimeToTickCount(const ATime: Cardinal): Int64;
-begin
-  if FPerformanceCounterFrequency = 0 then
-    QueryPerformanceFrequency(FPerformanceCounterFrequency);
-  Result := (Int64(ATime) * FPerformanceCounterFrequency) div 1000;
-end;
-{$ENDIF}
 
 procedure FreeMemAndNil(var P: Pointer);
 begin

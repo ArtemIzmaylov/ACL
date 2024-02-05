@@ -30,7 +30,7 @@ uses
   // ACL
   ACL.Math,
   ACL.Classes,
-  ACL.Classes.Timer,
+  ACL.Timers,
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Ex,

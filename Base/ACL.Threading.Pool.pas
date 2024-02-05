@@ -27,7 +27,7 @@ uses
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
-  ACL.Classes.Timer,
+  ACL.Timers,
   ACL.Threading,
   ACL.Utils.Strings;
 

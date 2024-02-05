@@ -112,7 +112,6 @@ contains
   ACL.Classes.Collections in 'Base\ACL.Classes.Collections.pas',
   ACL.Classes in 'Base\ACL.Classes.pas',
   ACL.Classes.StringList in 'Base\ACL.Classes.StringList.pas',
-  ACL.Classes.Timer in 'Base\ACL.Classes.Timer.pas',
   ACL.Crypto in 'Base\ACL.Crypto.pas',
   ACL.DataBroadcaster in 'Base\ACL.DataBroadcaster.pas',
   ACL.Expressions.FormatString in 'Base\ACL.Expressions.FormatString.pas',
@@ -167,7 +166,8 @@ contains
   ACL.Utils.Stream in 'Base\ACL.Utils.Stream.pas',
   ACL.Utils.Strings in 'Base\ACL.Utils.Strings.pas',
   ACL.Web.Http in 'Base\ACL.Web.Http.pas',
-  ACL.Web in 'Base\ACL.Web.pas';
+  ACL.Web in 'Base\ACL.Web.pas',
+  ACL.Timers in 'Base\ACL.Timers.pas';
 
 end.
 

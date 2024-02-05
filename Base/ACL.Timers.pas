@@ -9,7 +9,7 @@
 {*                                           *}
 {*********************************************}
 
-unit ACL.Classes.Timer;
+unit ACL.Timers;
 
 {$I ACL.Config.inc}
 
@@ -80,6 +80,10 @@ type
     procedure Remove(const AObject: T);
   end;
 
+function GetExactTickCount: Int64;
+function TickCountToTime(const ATicks: Int64): Cardinal;
+function TimeToTickCount(const ATime: Cardinal): Int64;
+
 implementation
 
 uses
@@ -135,9 +139,32 @@ type
   end;
 
 var
+  FPerformanceCounterFrequency: Int64 = 0;
   FTimerManager: TACLTimerManager;
 
 function NtQueryTimerResolution(out MaximumResolution, MinimumResolution, ActualResolution: ULONG): NTSTATUS; stdcall; external 'ntdll.dll';
+
+function GetExactTickCount: Int64;
+begin
+  //# https://docs.microsoft.com/ru-ru/windows/win32/api/profileapi/nf-profileapi-queryperformancecounter?redirectedfrom=MSDN
+  //# On systems that run Windows XP or later, the function will always succeed and will thus never return zero.
+  if not QueryPerformanceCounter(Result) then
+    Result := GetTickCount;
+end;
+
+function TickCountToTime(const ATicks: Int64): Cardinal;
+begin
+  if FPerformanceCounterFrequency = 0 then
+    QueryPerformanceFrequency(FPerformanceCounterFrequency);
+  Result := (ATicks * 1000) div FPerformanceCounterFrequency;
+end;
+
+function TimeToTickCount(const ATime: Cardinal): Int64;
+begin
+  if FPerformanceCounterFrequency = 0 then
+    QueryPerformanceFrequency(FPerformanceCounterFrequency);
+  Result := (Int64(ATime) * FPerformanceCounterFrequency) div 1000;
+end;
 
 { TACLTimer }
 
