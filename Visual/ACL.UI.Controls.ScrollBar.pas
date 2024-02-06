@@ -122,10 +122,7 @@ type
     function GetDisplayBounds: TRect;
     procedure SetState(AState: TACLButtonState);
   protected
-    procedure FadingPrepare(out AAnimate: TACLBitmapFadingAnimation);
-    procedure FadingRun(AAnimate: TACLBitmapFadingAnimation);
-    procedure InternalDraw(ABitmap: TACLBitmap); overload;
-    procedure InternalDraw(ACanvas: TCanvas; const R: TRect); overload;
+    procedure InternalDraw(ACanvas: TCanvas; const R: TRect);
     // IACLAnimateControl
     procedure IACLAnimateControl.Animate = Invalidate;
   public
@@ -422,30 +419,13 @@ end;
 
 procedure TACLScrollBarViewInfoItem.Draw(ACanvas: TCanvas);
 begin
-  if not AnimationManager.Draw(Self, ACanvas.Handle, DisplayBounds) then
+  if not AnimationManager.Draw(Self, ACanvas, DisplayBounds) then
     InternalDraw(ACanvas, DisplayBounds);
-end;
-
-procedure TACLScrollBarViewInfoItem.FadingPrepare(out AAnimate: TACLBitmapFadingAnimation);
-begin
-  AAnimate := TACLBitmapFadingAnimation.Create(Self, acUIFadingTime);
-  InternalDraw(AAnimate.AllocateFrame1(DisplayBounds));
-end;
-
-procedure TACLScrollBarViewInfoItem.FadingRun(AAnimate: TACLBitmapFadingAnimation);
-begin
-  InternalDraw(AAnimate.AllocateFrame2(DisplayBounds));
-  AAnimate.Run;
 end;
 
 procedure TACLScrollBarViewInfoItem.Invalidate;
 begin
   Owner.Owner.InvalidateRect(Bounds);
-end;
-
-procedure TACLScrollBarViewInfoItem.InternalDraw(ABitmap: TACLBitmap);
-begin
-  InternalDraw(ABitmap.Canvas, ABitmap.ClientRect);
 end;
 
 procedure TACLScrollBarViewInfoItem.InternalDraw(ACanvas: TCanvas; const R: TRect);
@@ -487,9 +467,11 @@ begin
   begin
     if (State = absHover) and (AState = absNormal) and Owner.Owner.AllowFading then
     begin
-      FadingPrepare(AAnimator);
+      AAnimator := TACLBitmapFadingAnimation.Create(Self, acUIFadingTime);
+      AAnimator.AllocateFrame1(DisplayBounds, InternalDraw);
       FState := AState;
-      FadingRun(AAnimator);
+      AAnimator.AllocateFrame2(DisplayBounds, InternalDraw);
+      AAnimator.Run;
     end;
     FState := AState;
     Invalidate;

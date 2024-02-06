@@ -38,7 +38,6 @@ uses
   ACL.Graphics.SkinImageSet,
   ACL.Math,
   ACL.UI.Controls.BaseControls,
-  ACL.UI.Forms,
   ACL.UI.Resources,
   ACL.Utils.Common,
   ACL.Utils.DPIAware,

@@ -2894,7 +2894,7 @@ begin
       LBitmap.Canvas.Pen.Color := clWhite;
       LBitmap.Canvas.Brush.Color := clWhite;
       LBitmap.Canvas.RoundRect(LBitmap.ClientRect, LRadius, LRadius);
-      LRegion := acRegionFromBitmap(@LBitmap.Colors[0], LBitmap.Width, LBitmap.Height, clFuchsia);
+      LRegion := acRegionFromBitmap(LBitmap);
     finally
       LBitmap.Free;
     end;

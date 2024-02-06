@@ -262,7 +262,7 @@ type
 
   TACLCompoundControlDragWindow = class(TACLForm)
   strict private
-    FBitmap: TBitmap;
+    FBitmap: TACLDib;
     FControl: TWinControl;
   protected
     procedure CreateParams(var Params: TCreateParams); override;
@@ -271,7 +271,7 @@ type
   public
     constructor Create(AOwner: TWinControl); reintroduce;
     destructor Destroy; override;
-    procedure SetBitmap(ABitmap: TBitmap; AMaskByBitmap: Boolean);
+    procedure SetBitmap(ABitmap: TACLDib; AMaskByBitmap: Boolean);
     procedure SetVisible(AValue: Boolean);
   end;
 
@@ -1171,7 +1171,7 @@ constructor TACLCompoundControlDragWindow.Create(AOwner: TWinControl);
 begin
   CreateNew(AOwner);
   FControl := AOwner;
-  FBitmap := TBitmap.Create;
+  FBitmap := TACLDib.Create(0, 0);
   AlphaBlend := True;
   AlphaBlendValue := 200;
   BorderStyle := bsNone;
@@ -1194,10 +1194,10 @@ end;
 
 procedure TACLCompoundControlDragWindow.Paint;
 begin
-  Canvas.Draw(0, 0, FBitmap);
+  FBitmap.DrawCopy(Canvas.Handle, NullPoint);
 end;
 
-procedure TACLCompoundControlDragWindow.SetBitmap(ABitmap: TBitmap; AMaskByBitmap: Boolean);
+procedure TACLCompoundControlDragWindow.SetBitmap(ABitmap: TACLDib; AMaskByBitmap: Boolean);
 begin
   FBitmap.Assign(ABitmap);
   SetBounds(Left, Top, FBitmap.Width, FBitmap.Height);
@@ -1259,12 +1259,12 @@ end;
 
 procedure TACLCompoundControlDragObject.InitializeDragWindow(ASourceViewInfo: TACLCompoundControlCustomViewInfo);
 var
-  ABitmap: TACLBitmap;
+  ABitmap: TACLDib;
 begin
   if DragWindow = nil then
     FDragWindow := TACLCompoundControlDragWindow.Create(SubClass.Container.GetControl);
 
-  ABitmap := TACLBitmap.CreateEx(ASourceViewInfo.Bounds, pf24bit);
+  ABitmap := TACLDib.Create(ASourceViewInfo.Bounds);
   try
     SubClass.StyleHint.Draw(ABitmap.Canvas, ABitmap.ClientRect);
     ASourceViewInfo.DrawTo(ABitmap.Canvas, 0, 0);
@@ -1300,7 +1300,7 @@ end;
 procedure TACLCompoundControlDragObject.UpdateDragTargetZoneWindow(
   const ATargetScreenBounds: TRect; AVertical: Boolean);
 
-  function PrepareDragWindowBitmap: TACLBitmap;
+  function PrepareDragWindowBitmap: TACLDib;
   var
     LRect: TRect;
     LSize: TSize;
@@ -1308,7 +1308,7 @@ procedure TACLCompoundControlDragObject.UpdateDragTargetZoneWindow(
     if AVertical then
     begin
       LSize := acGetArrowSize(makBottom, 288);
-      Result := TACLBitmap.CreateEx(LSize.cx, 2 * LSize.cy + ATargetScreenBounds.Height, pf24bit);
+      Result := TACLDib.Create(LSize.cx, 2 * LSize.cy + ATargetScreenBounds.Height);
       Result.Canvas.Brush.Color := clFuchsia;
       Result.Canvas.FillRect(Result.ClientRect);
       // Top
@@ -1327,7 +1327,7 @@ procedure TACLCompoundControlDragObject.UpdateDragTargetZoneWindow(
     else
     begin
       LSize := acGetArrowSize(makRight, 288);
-      Result := TACLBitmap.CreateEx(2 * LSize.cx + ATargetScreenBounds.Width, LSize.cy, pf24bit);
+      Result := TACLDib.Create(2 * LSize.cx + ATargetScreenBounds.Width, LSize.cy);
       Result.Canvas.Brush.Color := clFuchsia;
       Result.Canvas.FillRect(Result.ClientRect);
       // Left
@@ -1346,7 +1346,7 @@ procedure TACLCompoundControlDragObject.UpdateDragTargetZoneWindow(
   end;
 
 var
-  ABitmap: TACLBitmap;
+  ABitmap: TACLDib;
   AIsTargetAssigned: Boolean;
 begin
   if (DragTargetScreenBounds <> ATargetScreenBounds) or (DragTargetZoneWindow = nil) then
@@ -2253,7 +2253,7 @@ end;
 
 procedure TACLCompoundControlScrollBarPartViewInfo.DoDraw(ACanvas: TCanvas);
 begin
-  if not AnimationManager.Draw(Self, ACanvas.Handle, Bounds) then
+  if not AnimationManager.Draw(Self, ACanvas, Bounds) then
     Style.DrawPart(ACanvas.Handle, Bounds, Part, ActualState, Kind);
 end;
 

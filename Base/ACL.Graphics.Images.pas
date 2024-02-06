@@ -132,6 +132,7 @@ type
     procedure Scale(AScaleFactor: Single); overload;
 
     procedure LoadFromBitmap(ABitmap: HBITMAP; APalette: HPALETTE = 0); overload;
+    procedure LoadFromBitmap(ABitmap: TACLDib; AAlphaFormat: TAlphaFormat = afPremultiplied); overload;
     procedure LoadFromBitmap(ABitmap: TBitmap; AAlphaFormat: TAlphaFormat = afPremultiplied); overload;
     procedure LoadFromBits(ABits: PRGBQuad; AWidth, AHeight: Integer; AAlphaFormat: TAlphaFormat = afPremultiplied);
     procedure LoadFromFile(const AFileName: UnicodeString);
@@ -310,7 +311,6 @@ type
     class function GetSize(AStream: TStream; out ASize: TSize): Boolean; override;
   end;
 
-function acGraphicToBitmap(AGraphic: TGraphic): TACLBitmap;
 implementation
 
 uses
@@ -321,29 +321,6 @@ uses
   ACL.Math,
   ACL.Utils.FileSystem,
   ACL.Utils.Stream;
-
-function acGraphicToBitmap(AGraphic: TGraphic): TACLBitmap;
-begin
-  if AGraphic.SupportsPartialTransparency then
-  begin
-    Result := TACLBitmap.CreateEx(AGraphic.Width, AGraphic.Height, pf32bit, True);
-    Result.Canvas.Draw(0, 0, AGraphic);
-  end
-  else
-    if AGraphic.Transparent then
-    begin
-      Result := TACLBitmap.CreateEx(AGraphic.Width, AGraphic.Height);
-      Result.Canvas.Brush.Color := clFuchsia;
-      Result.Canvas.FillRect(Result.ClientRect);
-      Result.Canvas.Draw(0, 0, AGraphic);
-      Result.MakeTransparent(clFuchsia);
-    end
-    else
-    begin
-      Result := TACLBitmap.CreateEx(AGraphic.Width, AGraphic.Height, pf24bit);
-      Result.Canvas.Draw(0, 0, AGraphic);
-    end;
-end;
 
 { EACLImageUnsupportedFormat }
 
@@ -744,6 +721,11 @@ begin
     LoadFromBits(@acGetBitmapBits(ABitmap)[0], ABitmap.Width, ABitmap.Height, AAlphaFormat);
 end;
 
+procedure TACLImage.LoadFromBitmap(ABitmap: TACLDib; AAlphaFormat: TAlphaFormat);
+begin
+  LoadFromBits(@ABitmap.Colors[0], ABitmap.Width, ABitmap.Height, AAlphaFormat);
+end;
+
 procedure TACLImage.LoadFromBits(ABits: PRGBQuad; AWidth, AHeight: Integer; AAlphaFormat: TAlphaFormat);
 const
   PixelFormatMap: array[TAlphaFormat] of Integer = (
@@ -783,13 +765,14 @@ end;
 
 procedure TACLImage.LoadFromGraphic(AGraphic: TGraphic);
 var
-  ABitmap: TACLBitmap;
+  LDib: TACLDib;
 begin
-  ABitmap := acGraphicToBitmap(AGraphic);
+  LDib := TACLDib.Create;
   try
-    LoadFromBitmap(ABitmap);
+    LDib.Assign(AGraphic);
+    LoadFromBitmap(LDib);
   finally
-    ABitmap.Free;
+    LDib.Free;
   end;
 end;
 
