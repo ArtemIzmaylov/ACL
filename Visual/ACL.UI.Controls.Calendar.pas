@@ -312,7 +312,7 @@ type
     procedure DoActivateView(AView: TACLCalendarCustomViewViewInfo; const AInitialDate: TDate);
     procedure DoCalculate(AChanges: TIntegerSet); override;
     procedure DoDraw(ACanvas: TCanvas); override;
-    procedure PrepareAnimationFrame(AFrame: TACLBitmap; const P: TPoint);
+    procedure PrepareAnimationFrame(AFrame: TACLDib; const P: TPoint);
   public
     constructor Create(ASubClass: TACLCompoundControlSubClass); override;
     destructor Destroy; override;
@@ -1106,7 +1106,7 @@ begin
     begin
       ASaveIndex := SaveDC(ACanvas.Handle);
       try
-        AAnimation.Draw(ACanvas.Handle, ActiveView.CellsArea);
+        AAnimation.Draw(ACanvas, ActiveView.CellsArea);
         acExcludeFromClipRegion(ACanvas.Handle, ActiveView.CellsArea);
         ActiveView.Draw(ACanvas);
       finally
@@ -1114,13 +1114,13 @@ begin
       end;
     end
     else
-      AAnimation.Draw(ACanvas.Handle, Bounds);
+      AAnimation.Draw(ACanvas, Bounds);
   end
   else
     ActiveView.Draw(ACanvas);
 end;
 
-procedure TACLCalendarViewInfo.PrepareAnimationFrame(AFrame: TACLBitmap; const P: TPoint);
+procedure TACLCalendarViewInfo.PrepareAnimationFrame(AFrame: TACLDib; const P: TPoint);
 begin
   DrawTo(AFrame.Canvas, Bounds.Left - P.X, Bounds.Top - P.Y);
   AFrame.MakeOpaque;

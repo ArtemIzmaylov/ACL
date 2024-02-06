@@ -18,7 +18,6 @@ interface
 uses
   Winapi.GDIPAPI,
   Winapi.Windows,
-  Winapi.Messages,
   // Vcl
   Vcl.Graphics,
   // System
@@ -30,8 +29,7 @@ uses
   // ACL
   ACL.Classes.Collections,
   ACL.Geometry,
-  ACL.Utils.Common,
-  ACL.Utils.FileSystem;
+  ACL.Utils.Common;
 
 type
   TRGBColors = array of TRGBQuad;
@@ -187,6 +185,7 @@ type
     procedure Resize(ANewWidth, ANewHeight: Integer); overload;
     procedure Resize(const R: TRect); overload;
     //# Draw
+    procedure DrawBlend(ACanvas: TCanvas; const R: TRect; AAlpha: Byte = MaxByte); overload;
     procedure DrawBlend(DC: HDC; const P: TPoint; AAlpha: Byte = MaxByte); overload;
     procedure DrawCopy(DC: HDC; const P: TPoint); overload;
     procedure DrawCopy(DC: HDC; const R: TRect; ASmoothStretch: Boolean = False); overload;
@@ -1047,6 +1046,7 @@ begin
     LTextSize := acTextSize(ACanvas, LText);
     if AEndEllipsis then
       AHighlightFinish := Min(AHighlightFinish, acTextEllipsize(ACanvas, LText, LTextSize, R.Width));
+    LTextOffset := acTextAlign(R, LTextSize, AHorzAlignment, AVertAlignment, True);
     LTextPart := Copy(LText, 1, AHighlightStart);
     LTextPartSize := acTextSize(ACanvas, LTextPart);
     LTextPart := Copy(LText, 1, AHighlightFinish);
@@ -2519,7 +2519,8 @@ begin
   if ALayer <> Self then
   begin
     Resize(ALayer.Width, ALayer.Height);
-    FastMove(ALayer.Colors^, Colors^, ColorCount * SizeOf(TACLPixel32));
+    acBitBlt(Handle, ALayer.Handle, ClientRect, NullPoint);
+//    FastMove(ALayer.Colors^, Colors^, ColorCount * SizeOf(TACLPixel32));
   end;
 end;
 
@@ -2574,6 +2575,11 @@ begin
     end;
     Inc(P);
   end;
+end;
+
+procedure TACLDib.DrawBlend(ACanvas: TCanvas; const R: TRect; AAlpha: Byte);
+begin
+  acAlphaBlend(ACanvas.Handle, Handle, R, ClientRect, AAlpha);
 end;
 
 procedure TACLDib.DrawBlend(DC: HDC; const P: TPoint; AAlpha: Byte = 255);

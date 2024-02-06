@@ -142,9 +142,6 @@ type
     procedure DrawFocusRect(ACanvas: TCanvas); virtual;
     // Fading
     function FadingCanStarts: Boolean; virtual;
-    procedure FadingPrepareBegin(out AAnimator: TACLBitmapFadingAnimation);
-    procedure FadingPrepareEnd(AAnimator: TACLBitmapFadingAnimation);
-    procedure FadingPrepareFrame(ATarget: TACLBitmap);
     // IACLAnimateControl
     procedure IACLAnimateControl.Animate = Invalidate;
     // Events
@@ -704,7 +701,7 @@ begin
     AClipRgn := acSaveClipRegion(ACanvas.Handle);
     try
       acIntersectClipRegion(ACanvas.Handle, Bounds);
-      if not AnimationManager.Draw(Self, ACanvas.Handle, ButtonRect) then
+      if not AnimationManager.Draw(Self, ACanvas, ButtonRect) then
         DrawBackground(ACanvas, ButtonRect);
       if IsFocused then
         DrawFocusRect(ACanvas);
@@ -795,7 +792,7 @@ end;
 
 procedure TACLCustomButtonViewInfo.RefreshState;
 var
-  AAnimator: TACLBitmapFadingAnimation;
+  AAnimator: TACLCustomBitmapAnimation;
   ANewState: TACLButtonState;
 begin
   ANewState := CalculateState;
@@ -803,9 +800,11 @@ begin
   begin
     if FadingCanStarts and (FState = absHover) and (ANewState in [absActive, absNormal]) then
     begin
-      FadingPrepareBegin(AAnimator);
+      AAnimator := TACLBitmapFadingAnimation.Create(Self, acUIFadingTime);
+      AAnimator.AllocateFrame1(ButtonRect, DrawBackground);
       FState := ANewState;
-      FadingPrepareEnd(AAnimator);
+      AAnimator.AllocateFrame2(ButtonRect, DrawBackground);
+      AAnimator.Run;
     end;
     FState := ANewState;
     StateChanged;
@@ -885,23 +884,6 @@ end;
 function TACLCustomButtonViewInfo.FadingCanStarts: Boolean;
 begin
   Result := [bsfEnabled, bsfPressed] * FFlags = [bsfEnabled];
-end;
-
-procedure TACLCustomButtonViewInfo.FadingPrepareBegin(out AAnimator: TACLBitmapFadingAnimation);
-begin
-  AAnimator := TACLBitmapFadingAnimation.Create(Self, acUIFadingTime);
-  FadingPrepareFrame(AAnimator.AllocateFrame1(ButtonRect));
-end;
-
-procedure TACLCustomButtonViewInfo.FadingPrepareEnd(AAnimator: TACLBitmapFadingAnimation);
-begin
-  FadingPrepareFrame(AAnimator.AllocateFrame2(ButtonRect));
-  AAnimator.Run;
-end;
-
-procedure TACLCustomButtonViewInfo.FadingPrepareFrame(ATarget: TACLBitmap);
-begin
-  DrawBackground(ATarget.Canvas, ATarget.ClientRect);
 end;
 
 procedure TACLCustomButtonViewInfo.DoClick;

@@ -4,7 +4,7 @@
 {*             Animation Manager             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -45,6 +45,8 @@ type
     procedure Animate;
   end;
 
+  TACLAnimationDrawProc = procedure (ACanvas: TCanvas; const R: TRect) of object;
+
   TACLAnimationTransitionMode = (ateLinear, ateAccelerateDecelerate, ateTanh);
   TACLAnimationTransitionModeProc = function (AProgress: Single): Single;
 
@@ -76,21 +78,21 @@ type
     function IsCompatible(AAnimation: TACLAnimation): Boolean; virtual;
     // Events
     procedure DoAnimate; virtual;
-
+    //# Properties
     property CurrentTime: Int64 read FCurrentTime write FCurrentTime;
     property FinishTime: Int64 read FFinishTime write FFinishTime;
     property StartTime: Int64 read FStartTime write FStartTime;
     property TimerInterval: Cardinal read FTimerInterval write FTimerInterval;
     property TransitionModeProc: TACLAnimationTransitionModeProc read FTransitionModeProc;
   public
-    constructor Create(const AControl: IACLAnimateControl; const ATime: Cardinal;
+    constructor Create(const AControl: IACLAnimateControl; ATime: Cardinal;
       ATransitionMode: TACLAnimationTransitionMode = ateLinear); virtual;
     destructor Destroy; override;
-    procedure Draw(DC: HDC; const R: TRect); virtual;
+    procedure Draw(ACanvas: TCanvas; const R: TRect); virtual;
     procedure Run;
     procedure RunImmediate;
     procedure Terminate;
-
+    //# Properties
     property Control: IACLAnimateControl read FControl;
     property Finished: Boolean read FFinished write SetFinished;
     property FreeOnTerminate: Boolean read FFreeOnTerminate write FFreeOnTerminate;
@@ -108,8 +110,9 @@ type
   private
     function GetActualText: string;
   public
-    constructor Create(const ASourceText, ATargetText: string; const AControl: IACLAnimateControl;
-      const ATime: Cardinal; ATransitionMode: TACLAnimationTransitionMode = ateLinear); reintroduce;
+    constructor Create(const ASourceText, ATargetText: string;
+      const AControl: IACLAnimateControl; ATime: Cardinal;
+      ATransitionMode: TACLAnimationTransitionMode = ateLinear); reintroduce;
     //# Properties
     property ActualText: string read GetActualText;
     property SourceText: string read FSourceText;
@@ -124,8 +127,10 @@ type
     procedure TimerObject(const AObject: TACLAnimation); override;
   public
     constructor Create; reintroduce;
-    function Find(AControl: IACLAnimateControl; out AAnimation: TACLAnimation; ATag: NativeInt = 0): Boolean;
-    function Draw(AControl: IACLAnimateControl; DC: HDC; const R: TRect; ATag: NativeInt = 0): Boolean;
+    function Find(AControl: IACLAnimateControl;
+      out AAnimation: TACLAnimation; ATag: NativeInt = 0): Boolean;
+    function Draw(AControl: IACLAnimateControl;
+      ACanvas: TCanvas; const R: TRect; ATag: NativeInt = 0): Boolean;
     procedure RemoveOwner(AOwnerObject: TObject);
   end;
 
@@ -133,32 +138,33 @@ type
 
   TACLCustomBitmapAnimation = class(TACLAnimation)
   strict private
+    FFrame1: TACLDib;
+    FFrame2: TACLDib;
     function CanAnimate(const R: TRect): Boolean;
   protected
-    FFrame1: TACLBitmap;
-    FFrame2: TACLBitmap;
-
-    procedure DrawContent(DC: HDC; const R: TRect); virtual; abstract;
+    procedure DrawContent(ACanvas: TCanvas; const R: TRect); virtual; abstract;
   public
-    constructor Create(const AControl: IACLAnimateControl; const ATime: Cardinal;
+    constructor Create(const AControl: IACLAnimateControl; ATime: Cardinal;
       ATransitionMode: TACLAnimationTransitionMode = ateLinear); override;
     destructor Destroy; override;
-    function AllocateFrame1(const R: TRect): TACLBitmap;
-    function AllocateFrame2(const R: TRect): TACLBitmap;
-    procedure Draw(DC: HDC; const R: TRect); override;
-
-    property Frame1: TACLBitmap read FFrame1;
-    property Frame2: TACLBitmap read FFrame2;
+    function AllocateFrame1(const R: TRect): TACLDib; overload;
+    function AllocateFrame2(const R: TRect): TACLDib; overload;
+    procedure AllocateFrame1(const R: TRect; AProc: TACLAnimationDrawProc); overload;
+    procedure AllocateFrame2(const R: TRect; AProc: TACLAnimationDrawProc); overload;
+    procedure Draw(ACanvas: TCanvas; const R: TRect); override;
+    //# Properties
+    property Frame1: TACLDib read FFrame1;
+    property Frame2: TACLDib read FFrame2;
   end;
 
   { TACLBitmapFadingAnimation }
 
   TACLBitmapFadingAnimation = class(TACLCustomBitmapAnimation)
   strict private
-    FLayer1: TACLBitmapLayer;
-    FLayer2: TACLBitmapLayer;
+    FLayer1: TACLDib;
+    FLayer2: TACLDib;
   protected
-    procedure DrawContent(DC: HDC; const R: TRect); override;
+    procedure DrawContent(ACanvas: TCanvas; const R: TRect); override;
   public
     destructor Destroy; override;
   end;
@@ -171,7 +177,7 @@ type
   strict private
     FMode: TACLBitmapSlideAnimationMode;
   protected
-    procedure DrawContent(DC: HDC; const R: TRect); override;
+    procedure DrawContent(ACanvas: TCanvas; const R: TRect); override;
   public
     constructor Create(AMode: TACLBitmapSlideAnimationMode; AControl: IACLAnimateControl;
       ATime: Cardinal; ATransitionMode: TACLAnimationTransitionMode = ateLinear); reintroduce;
@@ -187,7 +193,7 @@ type
   strict private
     FMode: TACLBitmapZoomAnimationMode;
   protected
-    procedure DrawContent(DC: HDC; const R: TRect); override;
+    procedure DrawContent(ACanvas: TCanvas; const R: TRect); override;
   public
     constructor Create(AMode: TACLBitmapZoomAnimationMode; AControl: IACLAnimateControl;
       ATime: Cardinal; ATransitionMode: TACLAnimationTransitionMode = ateLinear); reintroduce;
@@ -210,12 +216,12 @@ type
     function GetForegroundAlpha: Byte;
     function GetProgress: Single;
   protected
-    procedure DrawContent(DC: HDC; const R: TRect); override;
+    procedure DrawContent(ACanvas: TCanvas; const R: TRect); override;
   public
     constructor Create(AMode: TACLBitmapSlideAnimationMode; AControl: IACLAnimateControl; ATime: Cardinal;
       ABackwardDirection: Boolean; ABackgroundOpacity, AForegroundOpacity, ABackgroundOffsetInPercents: Single;
       ATransitionMode: TACLAnimationTransitionMode = ateLinear); reintroduce;
-    //
+    //# Properties
     property BackgroundOffsetInPercents: Single read FBackgroundOffsetInPercents;
     property BackgroundOpacity: Single read FBackgroundOpacity;
     property BackwardDirection: Boolean read FBackwardDirection;
@@ -246,7 +252,7 @@ end;
 { TACLAnimation }
 
 constructor TACLAnimation.Create(const AControl: IACLAnimateControl;
-  const ATime: Cardinal; ATransitionMode: TACLAnimationTransitionMode = ateLinear);
+  ATime: Cardinal; ATransitionMode: TACLAnimationTransitionMode = ateLinear);
 begin
   inherited Create;
   FTime := ATime;
@@ -269,7 +275,7 @@ begin
   inherited Destroy;
 end;
 
-procedure TACLAnimation.Draw(DC: HDC; const R: TRect);
+procedure TACLAnimation.Draw(ACanvas: TCanvas; const R: TRect);
 begin
   // do nothing
 end;
@@ -373,7 +379,7 @@ end;
 { TACLAnimationText }
 
 constructor TACLAnimationText.Create(const ASourceText, ATargetText: string;
-  const AControl: IACLAnimateControl; const ATime: Cardinal; ATransitionMode: TACLAnimationTransitionMode);
+  const AControl: IACLAnimateControl; ATime: Cardinal; ATransitionMode: TACLAnimationTransitionMode);
 var
   ASourceTextLength: Integer;
   ATargetTextLength: Integer;
@@ -391,7 +397,7 @@ var
   I, L: Integer;
 begin
   L := Length(FSourceText);
-  SetLength(Result, L);
+  SetLength(Result{%H-}, L);
   for I := 1 to L do
     Result[I] := Char(Trunc(Ord(FSourceText[I]) * Progress + Ord(FTargetText[I]) * (1 - Progress)));
 end;
@@ -404,7 +410,8 @@ begin
   Interval := 1;
 end;
 
-function TACLAnimationManager.Find(AControl: IACLAnimateControl; out AAnimation: TACLAnimation; ATag: NativeInt = 0): Boolean;
+function TACLAnimationManager.Find(AControl: IACLAnimateControl;
+  out AAnimation: TACLAnimation; ATag: NativeInt = 0): Boolean;
 var
   I: Integer;
 begin
@@ -417,13 +424,14 @@ begin
   Result := False;
 end;
 
-function TACLAnimationManager.Draw(AControl: IACLAnimateControl; DC: HDC; const R: TRect; ATag: NativeInt = 0): Boolean;
+function TACLAnimationManager.Draw(AControl: IACLAnimateControl;
+  ACanvas: TCanvas; const R: TRect; ATag: NativeInt = 0): Boolean;
 var
   AAnimation: TACLAnimation;
 begin
   Result := Find(AControl, AAnimation, ATag);
   if Result then
-    AAnimation.Draw(DC, R)
+    AAnimation.Draw(ACanvas, R)
 end;
 
 procedure TACLAnimationManager.RemoveOwner(AOwnerObject: TObject);
@@ -462,11 +470,11 @@ end;
 { TACLCustomBitmapAnimation }
 
 constructor TACLCustomBitmapAnimation.Create(const AControl: IACLAnimateControl;
-  const ATime: Cardinal; ATransitionMode: TACLAnimationTransitionMode);
+  ATime: Cardinal; ATransitionMode: TACLAnimationTransitionMode);
 begin
   inherited Create(AControl, ATime, ATransitionMode);
-  FFrame1 := TACLBitmap.CreateEx(0, 0, pf32bit);
-  FFrame2 := TACLBitmap.CreateEx(0, 0, pf32bit);
+  FFrame1 := TACLDib.Create(0, 0);
+  FFrame2 := TACLDib.Create(0, 0);
 end;
 
 destructor TACLCustomBitmapAnimation.Destroy;
@@ -476,32 +484,44 @@ begin
   inherited Destroy;
 end;
 
-function TACLCustomBitmapAnimation.AllocateFrame1(const R: TRect): TACLBitmap;
+function TACLCustomBitmapAnimation.AllocateFrame1(const R: TRect): TACLDib;
 begin
   Result := FFrame1;
-  Result.SetSize(R);
+  Result.Resize(R);
   Result.Reset;
 end;
 
-function TACLCustomBitmapAnimation.AllocateFrame2(const R: TRect): TACLBitmap;
+procedure TACLCustomBitmapAnimation.AllocateFrame1(const R: TRect; AProc: TACLAnimationDrawProc);
+begin
+  with AllocateFrame1(R) do
+    AProc(Canvas, ClientRect);
+end;
+
+function TACLCustomBitmapAnimation.AllocateFrame2(const R: TRect): TACLDib;
 begin
   Result := FFrame2;
-  Result.SetSize(R);
+  Result.Resize(R);
   Result.Reset;
 end;
 
-procedure TACLCustomBitmapAnimation.Draw(DC: HDC; const R: TRect);
+procedure TACLCustomBitmapAnimation.AllocateFrame2(const R: TRect; AProc: TACLAnimationDrawProc);
+begin
+  with AllocateFrame1(R) do
+    AProc(Canvas, ClientRect);
+end;
+
+procedure TACLCustomBitmapAnimation.Draw(ACanvas: TCanvas; const R: TRect);
 var
-  ASaveIndex: Integer;
+  LSaveRgn: HRGN;
 begin
   if CanAnimate(R) then
   begin
-    ASaveIndex := SaveDC(DC);
+    LSaveRgn := acSaveClipRegion(ACanvas.Handle);
     try
-      if acIntersectClipRegion(DC, R) then
-        DrawContent(DC, R);
+      if acIntersectClipRegion(ACanvas.Handle, R) then
+        DrawContent(ACanvas, R);
     finally
-      RestoreDC(DC, ASaveIndex);
+      acRestoreClipRegion(ACanvas.Handle, LSaveRgn);
     end;
   end
   else
@@ -524,22 +544,22 @@ begin
   inherited;
 end;
 
-procedure TACLBitmapFadingAnimation.DrawContent(DC: HDC; const R: TRect);
+procedure TACLBitmapFadingAnimation.DrawContent(ACanvas: TCanvas; const R: TRect);
 var
   AAlpha: Byte;
   I: Integer;
 begin
   if FLayer1 = nil then
-    FLayer1 := TACLBitmapLayer.Create(R);
+    FLayer1 := TACLDib.Create(R);
   if FLayer2 = nil then
-    FLayer2 := TACLBitmapLayer.Create(R);
+    FLayer2 := TACLDib.Create(R);
 
   AAlpha := Trunc(MaxByte * Progress);
-  acBitBlt(FLayer1.Handle, FFrame1, NullPoint);
-  acBitBlt(FLayer2.Handle, FFrame2, NullPoint);
+  FLayer1.Assign(Frame1);
+  FLayer2.Assign(Frame2);
   for I := 0 to FLayer1.ColorCount - 1 do
     TACLColors.AlphaBlend(FLayer1.Colors^[I], FLayer2.Colors^[I], AAlpha, False);
-  FLayer1.DrawBlend(DC, R.TopLeft);
+  FLayer1.DrawBlend(ACanvas, R);
 end;
 
 { TACLBitmapSlideAnimation }
@@ -551,37 +571,37 @@ begin
   FMode := AMode;
 end;
 
-procedure TACLBitmapSlideAnimation.DrawContent(DC: HDC; const R: TRect);
+procedure TACLBitmapSlideAnimation.DrawContent(ACanvas: TCanvas; const R: TRect);
 var
-  AOffset: Integer;
+  LOffset: Integer;
 begin
   case Mode of
     samLeftToRight:
       begin
-        AOffset := Round(Progress * FFrame1.Width);
-        acAlphaBlend(DC, FFrame1, R.OffsetTo(AOffset, 0));
-        acAlphaBlend(DC, FFrame2, R.OffsetTo(AOffset - R.Width, 0));
+        LOffset := Round(Progress * Frame1.Width);
+        Frame1.DrawBlend(ACanvas, R.OffsetTo(LOffset, 0));
+        Frame2.DrawBlend(ACanvas, R.OffsetTo(LOffset - R.Width, 0));
       end;
 
     samRightToLeft:
       begin
-        AOffset := Round((1 - Progress) * FFrame1.Width);
-        acAlphaBlend(DC, FFrame1, R.OffsetTo(AOffset - R.Width, 0));
-        acAlphaBlend(DC, FFrame2, R.OffsetTo(AOffset, 0));
+        LOffset := Round((1 - Progress) * Frame1.Width);
+        Frame1.DrawBlend(ACanvas, R.OffsetTo(LOffset - R.Width, 0));
+        Frame2.DrawBlend(ACanvas, R.OffsetTo(LOffset, 0));
       end;
 
     samTopToBottom:
       begin
-        AOffset := Round(Progress * FFrame1.Height);
-        acAlphaBlend(DC, FFrame1, R.OffsetTo(0, AOffset));
-        acAlphaBlend(DC, FFrame2, R.OffsetTo(0, AOffset - R.Height));
+        LOffset := Round(Progress * Frame1.Height);
+        Frame1.DrawBlend(ACanvas, R.OffsetTo(0, LOffset));
+        Frame2.DrawBlend(ACanvas, R.OffsetTo(0, LOffset - R.Height));
       end;
 
     samBottomToTop:
       begin
-        AOffset := Round((1 - Progress) * FFrame1.Height);
-        acAlphaBlend(DC, FFrame1, R.OffsetTo(0, AOffset - R.Height));
-        acAlphaBlend(DC, FFrame2, R.OffsetTo(0, AOffset));
+        LOffset := Round((1 - Progress) * Frame1.Height);
+        Frame1.DrawBlend(ACanvas, R.OffsetTo(0, LOffset - R.Height));
+        Frame2.DrawBlend(ACanvas, R.OffsetTo(0, LOffset));
       end;
   end;
 end;
@@ -595,10 +615,10 @@ begin
   FMode := AMode;
 end;
 
-procedure TACLBitmapZoomAnimation.DrawContent(DC: HDC; const R: TRect);
+procedure TACLBitmapZoomAnimation.DrawContent(ACanvas: TCanvas; const R: TRect);
 var
-  ABitmap1: TACLBitmap;
-  ABitmap2: TACLBitmap;
+  ABitmap1: TACLDib;
+  ABitmap2: TACLDib;
   ADeltaX: Integer;
   ADeltaY: Integer;
   AProgress: Single;
@@ -618,8 +638,12 @@ begin
 
   ADeltaX := R.Width div 2;
   ADeltaY := R.Height div 2;
-  acAlphaBlend(DC, ABitmap1, R.InflateTo(-Round(ADeltaX * AProgress), -Round(ADeltaY * AProgress)), Round(MaxByte * (1 - AProgress)));
-  acAlphaBlend(DC, ABitmap2, R.InflateTo(Round(ADeltaX * (1 - AProgress)), Round(ADeltaY * (1 - AProgress))), Round(MaxByte * AProgress));
+  ABitmap1.DrawBlend(ACanvas,
+    R.InflateTo(-Round(ADeltaX * AProgress), -Round(ADeltaY * AProgress)),
+    Round(MaxByte * (1 - AProgress)));
+  ABitmap2.DrawBlend(ACanvas,
+    R.InflateTo(Round(ADeltaX * (1 - AProgress)), Round(ADeltaY * (1 - AProgress))),
+    Round(MaxByte * AProgress));
 end;
 
 { TACLBitmapPaperSlideAnimation }
@@ -638,7 +662,7 @@ begin
   FForegroundOpacityAssigned := not SameValue(ForegroundOpacity, 1);
 end;
 
-procedure TACLBitmapPaperSlideAnimation.DrawContent(DC: HDC; const R: TRect);
+procedure TACLBitmapPaperSlideAnimation.DrawContent(ACanvas: TCanvas; const R: TRect);
 
   function GetFrame1Offset(const ASize: Integer): Integer;
   begin
@@ -654,26 +678,26 @@ begin
   case Mode of
     samLeftToRight:
       begin
-        acAlphaBlend(DC, FFrame2, R.OffsetTo(GetFrame2Offset(FFrame2.Width), 0), GetBackgroundAlpha);
-        acAlphaBlend(DC, FFrame1, R.OffsetTo(GetFrame1Offset(FFrame1.Width), 0), GetForegroundAlpha);
+        Frame2.DrawBlend(ACanvas, R.OffsetTo(GetFrame2Offset(Frame2.Width), 0), GetBackgroundAlpha);
+        Frame1.DrawBlend(ACanvas, R.OffsetTo(GetFrame1Offset(Frame1.Width), 0), GetForegroundAlpha);
       end;
 
     samRightToLeft:
       begin
-        acAlphaBlend(DC, FFrame2, R.OffsetTo(-GetFrame2Offset(FFrame2.Width), 0), GetBackgroundAlpha);
-        acAlphaBlend(DC, FFrame1, R.OffsetTo(-GetFrame1Offset(FFrame1.Width), 0), GetForegroundAlpha);
+        Frame2.DrawBlend(ACanvas, R.OffsetTo(-GetFrame2Offset(Frame2.Width), 0), GetBackgroundAlpha);
+        Frame1.DrawBlend(ACanvas, R.OffsetTo(-GetFrame1Offset(Frame1.Width), 0), GetForegroundAlpha);
       end;
 
     samTopToBottom:
       begin
-        acAlphaBlend(DC, FFrame2, R.OffsetTo(0, GetFrame2Offset(FFrame2.Height)), GetBackgroundAlpha);
-        acAlphaBlend(DC, FFrame1, R.OffsetTo(0, GetFrame1Offset(FFrame1.Height)), GetForegroundAlpha);
+        Frame2.DrawBlend(ACanvas, R.OffsetTo(0, GetFrame2Offset(Frame2.Height)), GetBackgroundAlpha);
+        Frame1.DrawBlend(ACanvas, R.OffsetTo(0, GetFrame1Offset(Frame1.Height)), GetForegroundAlpha);
       end;
 
     samBottomToTop:
       begin
-        acAlphaBlend(DC, FFrame2, R.OffsetTo(0, -GetFrame2Offset(FFrame2.Height)), GetBackgroundAlpha);
-        acAlphaBlend(DC, FFrame1, R.OffsetTo(0, -GetFrame1Offset(FFrame1.Height)), GetForegroundAlpha);
+        Frame2.DrawBlend(ACanvas, R.OffsetTo(0, -GetFrame2Offset(Frame2.Height)), GetBackgroundAlpha);
+        Frame1.DrawBlend(ACanvas, R.OffsetTo(0, -GetFrame1Offset(Frame1.Height)), GetForegroundAlpha);
       end;
   end;
 end;

@@ -2253,7 +2253,7 @@ end;
 
 procedure TACLCompoundControlScrollBarPartViewInfo.DoDraw(ACanvas: TCanvas);
 begin
-  if not AnimationManager.Draw(Self, ACanvas.Handle, Bounds) then
+  if not AnimationManager.Draw(Self, ACanvas, Bounds) then
     Style.DrawPart(ACanvas.Handle, Bounds, Part, ActualState, Kind);
 end;
 
