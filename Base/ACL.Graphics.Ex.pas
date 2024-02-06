@@ -232,13 +232,12 @@ type
       Width: Single = 1; Style: TACL2DRenderStrokeStyle = ssSolid); overload; virtual; abstract;
 
     // Images
-    function CreateImage(Bitmap: TBitmap): TACL2DRenderImage; overload; virtual;
     function CreateImage(Colors: PACLPixel32; Width, Height: Integer;
       AlphaFormat: TAlphaFormat = afDefined): TACL2DRenderImage; overload; virtual; abstract;
-    function CreateImage(Image: TACLBitmapLayer): TACL2DRenderImage; overload; virtual;
+    function CreateImage(Image: TACLDib): TACL2DRenderImage; overload; virtual;
     function CreateImage(Image: TACLImage): TACL2DRenderImage; overload; virtual;
     function CreateImageAttributes: TACL2DRenderImageAttributes; virtual; abstract;
-    procedure DrawImage(Image: TACLBitmapLayer; const TargetRect: TRect; Cache: PACL2DRenderImage = nil); overload;
+    procedure DrawImage(Image: TACLDib; const TargetRect: TRect; Cache: PACL2DRenderImage = nil); overload;
     procedure DrawImage(Image: TACL2DRenderImage; const TargetRect: TRect; Alpha: Byte = MaxByte); overload;
     procedure DrawImage(Image: TACL2DRenderImage;
       const TargetRect, SourceRect: TRect; Alpha: Byte = MaxByte); overload; virtual; abstract;
@@ -1639,22 +1638,7 @@ begin
     Result := nil;
 end;
 
-function TACL2DRender.CreateImage(Bitmap: TBitmap): TACL2DRenderImage;
-var
-  AColors: TRGBColors;
-begin
-  Result := nil;
-  if not Bitmap.Empty then
-    with TACLBitmapBits.Create(Bitmap.Handle) do
-    try
-      if ReadColors(AColors) then
-        Result := CreateImage(@AColors[0], Bitmap.Width, Bitmap.Height, Bitmap.AlphaFormat);
-    finally
-      Free;
-    end;
-end;
-
-function TACL2DRender.CreateImage(Image: TACLBitmapLayer): TACL2DRenderImage;
+function TACL2DRender.CreateImage(Image: TACLDib): TACL2DRenderImage;
 begin
   if Image.Empty then
     Result := nil
@@ -1662,7 +1646,7 @@ begin
     Result := CreateImage(PACLPixel32(Image.Colors), Image.Width, Image.Height, afPremultiplied);
 end;
 
-procedure TACL2DRender.DrawImage(Image: TACLBitmapLayer; const TargetRect: TRect; Cache: PACL2DRenderImage);
+procedure TACL2DRender.DrawImage(Image: TACLDib; const TargetRect: TRect; Cache: PACL2DRenderImage);
 var
   AImage: TACL2DRenderImage;
 begin
