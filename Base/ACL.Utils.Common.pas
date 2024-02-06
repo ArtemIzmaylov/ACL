@@ -743,6 +743,7 @@ begin
         Exit(PWord(@Value)^);
       otULong, otSLong:
         Exit(PInteger(@Value)^);
+    else;
     end;
   raise EInvalidArgument.Create('Unexpected ordinal type');
 end;

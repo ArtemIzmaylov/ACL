@@ -5,7 +5,7 @@
 {*           Direct2D Integration            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -13,6 +13,10 @@
 unit ACL.Graphics.Ex.D2D;
 
 {$I ACL.Config.inc}
+
+{$IFNDEF MSWINDOWS}
+  {$MESSAGE FATAL 'Windows platform is required'}
+{$ENDIF}
 
 interface
 

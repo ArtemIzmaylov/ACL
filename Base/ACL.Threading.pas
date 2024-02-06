@@ -321,6 +321,7 @@ begin
   if not QueueUserWorkItem(Func, Context, WT_EXECUTELONGFUNCTION) then
     RaiseLastOSError;
 {$ELSE}
+  {$MESSAGE WARN 'OptimizeMe - emulate system thread-pool'}
   TThread.CreateAnonymousThread(
     procedure
     begin

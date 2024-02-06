@@ -298,9 +298,9 @@ procedure DrawText32Core(DC: HDC; const AText: PWideChar; ALength: Integer;
   begin
     if ATextViewInfo <> nil then
     begin
-      ATextViewInfo.DrawCore(DC, Offset.X, Offset.Y, ALength);
+      ATextViewInfo.DrawCore(DC, Offset.X, Offset.Y);
       if ATextDuplicateIndent > 0 then
-        ATextViewInfo.DrawCore(DC, Offset.X + ATextDuplicateIndent, Offset.Y, ALength);
+        ATextViewInfo.DrawCore(DC, Offset.X + ATextDuplicateIndent, Offset.Y);
     end
     else
     begin
