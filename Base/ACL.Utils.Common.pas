@@ -36,13 +36,13 @@ uses
   Winapi.PsAPI,
 {$ENDIF}
   // System
-  System.AnsiStrings,
-  System.UITypes,
   {System.}Classes,
   {System.}SysUtils,
   {System.}Types,
   {System.}TypInfo,
-  {System.}Math;
+  {System.}Math,
+  System.AnsiStrings,
+  System.UITypes;
 
 const
   SIZE_ONE_KILOBYTE = 1024;
@@ -82,6 +82,8 @@ type
 {$ENDIF}
 
 type
+  TObjHashCode = {$IFDEF FPC}PtrInt{$ELSE}Integer{$ENDIF};
+
 {$SCOPEDENUMS ON}
   TACLBoolean = (Default, False, True);
 {$SCOPEDENUMS OFF}

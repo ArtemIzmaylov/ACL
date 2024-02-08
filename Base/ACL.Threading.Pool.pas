@@ -4,26 +4,29 @@
 {*           Thread Pool Routines            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.Threading.Pool;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
+{$IFDEF MSWINDOWS}
+  {Winapi.}Windows,
+{$ENDIF}
   // System
-  System.Classes,
-  System.Generics.Collections,
-  System.Generics.Defaults,
-  System.SyncObjs,
-  System.SysUtils,
-  System.Types,
+  {System.}Classes,
+  {System.}Generics.Collections,
+  {System.}Generics.Defaults,
+  {System.}Math,
+  {System.}SyncObjs,
+  {System.}SysUtils,
+  {System.}Types,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -184,15 +187,12 @@ type
 function TaskDispatcher: TACLTaskDispatcher;
 implementation
 
-uses
-  System.Math;
-
 type
 
   { TACLTaskComparer }
 
   TACLTaskComparer = class(TComparer<TACLTask>)
-  protected
+  public
     function Compare(const Left, Right: TACLTask): Integer; override;
   end;
 
@@ -200,7 +200,11 @@ type
 
   TACLTaskEvent = class(TInterfacedObject, IACLTaskEvent)
   strict private
+  {$IFDEF FPC}
+    FEvent: TEvent;
+  {$ELSE}
     FHandle: THandle;
+  {$ENDIF}
   public
     constructor Create;
     destructor Destroy; override;
@@ -297,8 +301,10 @@ begin
 end;
 
 procedure TACLTaskGroup.Cancel;
+var
+  I: Integer;
 begin
-  for var I := FTasks.Count - 1 downto 0 do
+  for I := FTasks.Count - 1 downto 0 do
     TaskDispatcher.Cancel(FTasks.List[I], False);
   FEvent.WaitFor;
 end;
@@ -443,23 +449,40 @@ end;
 
 constructor TACLTaskEvent.Create;
 begin
+{$IFDEF FPC}
+  FEvent := TEvent.Create(nil, True, False, ClassName);
+{$ELSE}
   FHandle := CreateEvent(nil, True, False, nil);
+{$ENDIF}
 end;
 
 destructor TACLTaskEvent.Destroy;
 begin
+{$IFDEF FPC}
+  FreeAndNil(FEvent);
+{$ELSE}
   CloseHandle(FHandle);
+{$ENDIF}
   inherited Destroy;
 end;
 
 function TACLTaskEvent.Signal: Boolean;
 begin
+{$IFDEF FPC}
+  FEvent.SetEvent;
+  Result := True;
+{$ELSE}
   Result := SetEvent(FHandle);
+{$ENDIF}
 end;
 
 function TACLTaskEvent.WaitFor(ATimeOut: Cardinal): TWaitResult;
 begin
+{$IFDEF FPC}
+  Result := FEvent.WaitFor(ATimeOut);
+{$ELSE}
   Result := WaitForSyncObject(FHandle, ATimeOut);
+{$ENDIF}
 end;
 
 { TACLTaskDispatcher }
@@ -708,14 +731,17 @@ begin
 end;
 
 procedure TACLTaskDispatcher.AsyncRun(ATask: TACLTask);
+{$IFDEF MSWINDOWS}
 const
   PriorityMap: array[TACLTaskPriority] of Integer = (
-    THREAD_PRIORITY_IDLE, THREAD_PRIORITY_NORMAL, THREAD_PRIORITY_HIGHEST
-  );
+    THREAD_PRIORITY_IDLE, THREAD_PRIORITY_NORMAL, THREAD_PRIORITY_HIGHEST);
+{$ENDIF}
 begin
   try
     ATask.FThreadID := GetCurrentThreadId;
+  {$IFDEF MSWINDOWS}
     SetThreadPriority(GetCurrentThread, PriorityMap[ATask.GetPriority]);
+  {$ENDIF}
     try
       try
         ATask.Execute;
@@ -744,13 +770,14 @@ end;
 procedure TACLTaskDispatcher.CancelAll(AWaitFor: Boolean);
 var
   ATaskHandle: THandle;
+  I: Integer;
 begin
   // Mark all as canceled
   FLock.Enter;
   try
-    for var I := FTasks.Count - 1 downto 0 do
+    for I := FTasks.Count - 1 downto 0 do
       Cancel(FTasks[I].Handle, False);
-    for var I := FActiveTasks.Count - 1 downto 0 do
+    for I := FActiveTasks.Count - 1 downto 0 do
       Cancel(FActiveTasks[I].Handle, False);
   finally
     FLock.Leave;
@@ -841,7 +868,6 @@ procedure TACLTaskDispatcher.SetUseCpuUsageMonitor(AValue: Boolean);
 begin
   if not IsMainThread then
     raise EInvalidArgument.Create('');
-
   TACLTimer(FCpuUsageMonitor).Enabled := AValue;
 end;
 

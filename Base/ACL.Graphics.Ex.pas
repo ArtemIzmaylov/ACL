@@ -4,37 +4,47 @@
 {*         Extended Graphic Library          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.Graphics.Ex;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:Partial
+
+{$MESSAGE WARN 'TODO - Commented'}
+(*
+  CreateImage(Image: TACLImage): TACL2DRenderImage
+*)
 
 interface
 
 uses
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
   Winapi.GDIPAPI,
   Winapi.Messages,
   Winapi.Windows,
+{$ENDIF}
   // System
-  System.Classes,
-  System.Math,
-  System.SysUtils,
-  System.Types,
+  {System.}Classes,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
   System.UITypes,
   // VCL
-  Vcl.Graphics,
+  {Vcl.}Graphics,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
+  ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.Images,
+  //ACL.Graphics.Images,
   ACL.Graphics.SkinImage,
-  ACL.Utils.Common,
-  ACL.Utils.FileSystem;
+  ACL.Utils.Common;
 
 type
   // Refer to following articles for more information:
@@ -49,7 +59,7 @@ type
 
   TACLBitmapLayer = class(TACLDib)
   public
-    procedure DrawBlend(DC: HDC; const P: TPoint;
+    procedure DrawBlend(ACanvas: TCanvas; const P: TPoint;
       AMode: TACLBlendMode; AAlpha: Byte = MaxByte); overload;
     procedure DrawBlend(DC: HDC; const R: TRect;
       AAlpha: Byte = MaxByte; ASmoothStretch: Boolean = False); overload;
@@ -64,7 +74,7 @@ type
     procedure AfterConstruction; override;
     function CheckNeedUpdate(const R: TRect): Boolean;
     procedure Drop;
-    //
+    //# Properties
     property IsDirty: Boolean read FIsDirty write FIsDirty;
   end;
 
@@ -126,7 +136,7 @@ type
     constructor Create;
     procedure Apply(ALayer: TACLBitmapLayer); overload;
     procedure Apply(ALayerDC: HDC; AColors: PACLPixel32; AWidth, AHeight: Integer); overload;
-    //
+    //# Properties
     property Radius: Integer read FRadius write SetRadius;
     property Size: Integer read FSize;
   end;
@@ -235,7 +245,8 @@ type
     function CreateImage(Colors: PACLPixel32; Width, Height: Integer;
       AlphaFormat: TAlphaFormat = afDefined): TACL2DRenderImage; overload; virtual; abstract;
     function CreateImage(Image: TACLDib): TACL2DRenderImage; overload; virtual;
-    function CreateImage(Image: TACLImage): TACL2DRenderImage; overload; virtual;
+    {$MESSAGE WARN 'Commented'}
+//    function CreateImage(Image: TACLImage): TACL2DRenderImage; overload; virtual;
     function CreateImageAttributes: TACL2DRenderImageAttributes; virtual; abstract;
     procedure DrawImage(Image: TACLDib; const TargetRect: TRect; Cache: PACL2DRenderImage = nil); overload;
     procedure DrawImage(Image: TACL2DRenderImage; const TargetRect: TRect; Alpha: Byte = MaxByte); overload;
@@ -295,15 +306,13 @@ var
 implementation
 
 uses
-  // ACL
   ACL.FastCode,
-  ACL.Geometry,
-  ACL.Graphics.Ex.Gdip,
+  //ACL.Graphics.Ex.Gdip,
   ACL.Math,
   ACL.Threading;
 
-type
-  TACLImageAccess = class(TACLImage);
+//type
+//  TACLImageAccess = class(TACLImage);
 
 {$REGION 'Software-based filters implementation'}
 type
@@ -513,7 +522,7 @@ end;
 
 class procedure TACLSoftwareImplBlendMode.DoNormal(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
 begin
-  AForegroundLayer.DrawBlend(ABackgroundLayer.Handle, NullPoint, AAlpha);
+  AForegroundLayer.DrawBlend(ABackgroundLayer.Canvas, NullPoint, AAlpha);
 end;
 
 class procedure TACLSoftwareImplBlendMode.DoOverlay(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
@@ -1246,60 +1255,68 @@ end;
 
 {$REGION 'Layers'}
 
-procedure TACLBitmapLayer.DrawBlend(DC: HDC; const P: TPoint; AMode: TACLBlendMode; AAlpha: Byte = MaxByte);
+procedure TACLBitmapLayer.DrawBlend(ACanvas: TCanvas;
+  const P: TPoint; AMode: TACLBlendMode; AAlpha: Byte = MaxByte);
 var
   ALayer: TACLBitmapLayer;
 begin
   if Empty then
     Exit;
   if AMode = bmNormal then
-    DrawBlend(DC, P, AAlpha)
+    DrawBlend(ACanvas, P, AAlpha)
   else
   begin
     ALayer := TACLBitmapLayer.Create(Width, Height);
     try
-      acBitBlt(ALayer.Handle, DC, ALayer.ClientRect, P);
+      acBitBlt(ALayer.Handle, ACanvas.Handle, ALayer.ClientRect, P);
       FBlendFunctions[AMode](ALayer, Self, AAlpha);
-      ALayer.DrawCopy(DC, P);
+      ALayer.DrawCopy(ACanvas.Handle, P);
     finally
       ALayer.Free;
     end;
   end;
 end;
 
-procedure TACLBitmapLayer.DrawBlend(DC: HDC; const R: TRect; AAlpha: Byte = 255; ASmoothStretch: Boolean = False);
-var
-  AClipBox: TRect;
-  AImage: TACLImage;
-  ALayer: TACLDib;
+procedure TACLBitmapLayer.DrawBlend(DC: HDC;
+  const R: TRect; AAlpha: Byte = 255; ASmoothStretch: Boolean = False);
+{$IFDEF FPC}
 begin
-  if ASmoothStretch and not (Empty or R.EqualSizes(ClientRect)) then
-  begin
-    if (GetClipBox(DC, AClipBox) <> NULLREGION) and IntersectRect(AClipBox, AClipBox, R) then
-    begin
-      AImage := TACLImage.Create(PRGBQuad(Colors), Width, Height);
-      try
-        AImage.StretchQuality := sqLowQuality;
-        AImage.PixelOffsetMode := ipomHalf;
-
-        // Layer is used for better performance
-        ALayer := TACLDib.Create(AClipBox);
-        try
-          SetWindowOrgEx(ALayer.Handle, AClipBox.Left, AClipBox.Top, nil);
-          AImage.Draw(ALayer.Handle, R);
-          SetWindowOrgEx(ALayer.Handle, 0, 0, nil);
-          ALayer.DrawBlend(DC, AClipBox.TopLeft);
-        finally
-          ALayer.Free;
-        end;
-      finally
-        AImage.Free;
-      end;
-    end;
-  end
-  else
-    acAlphaBlend(DC, Handle, R, ClientRect, AAlpha);
+  acAlphaBlend(DC, Handle, R, ClientRect, AAlpha);
 end;
+{$ELSE}
+//var
+//  AClipBox: TRect;
+//  AImage: TACLImage;
+//  ALayer: TACLDib;
+begin
+//  if ASmoothStretch and not (Empty or R.EqualSizes(ClientRect)) then
+//  begin
+//    if (GetClipBox(DC, AClipBox) <> NULLREGION) and IntersectRect(AClipBox, AClipBox, R) then
+//    begin
+//      AImage := TACLImage.Create(PRGBQuad(Colors), Width, Height);
+//      try
+//        AImage.StretchQuality := sqLowQuality;
+//        AImage.PixelOffsetMode := ipomHalf;
+//
+//        // Layer is used for better performance
+//        ALayer := TACLDib.Create(AClipBox);
+//        try
+//          SetWindowOrgEx(ALayer.Handle, AClipBox.Left, AClipBox.Top, nil);
+//          AImage.Draw(ALayer.Handle, R);
+//          SetWindowOrgEx(ALayer.Handle, 0, 0, nil);
+//          ALayer.DrawBlend(DC, AClipBox.TopLeft);
+//        finally
+//          ALayer.Free;
+//        end;
+//      finally
+//        AImage.Free;
+//      end;
+//    end;
+//  end
+//  else
+//    acAlphaBlend(DC, Handle, R, ClientRect, AAlpha);
+end;
+{$ENDIF}
 
 { TACLCacheLayer }
 
@@ -1393,7 +1410,7 @@ begin
     end
     else
     begin
-      AImage.Draw(Handle, ClientRect, AMaskFrameIndex);
+      AImage.Draw(Canvas, ClientRect, AMaskFrameIndex);
       LoadMask;
     end;
   end;
@@ -1608,7 +1625,7 @@ procedure TACL2DRender.BeginPaint(DC: HDC; const BoxRect: TRect);
 begin
   BeginPaint(DC, BoxRect, BoxRect)
 end;
-
+(*
 function TACL2DRender.CreateImage(Image: TACLImage): TACL2DRenderImage;
 var
   AData: TBitmapData;
@@ -1636,7 +1653,7 @@ begin
   end
   else
     Result := nil;
-end;
+end;  *)
 
 function TACL2DRender.CreateImage(Image: TACLDib): TACL2DRenderImage;
 begin

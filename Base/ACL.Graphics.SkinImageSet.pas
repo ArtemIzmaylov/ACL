@@ -4,34 +4,38 @@
 {*       Sharable SkinImageSet  Class        *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.Graphics.SkinImageSet;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
   Winapi.Windows,
-  Winapi.GDIPAPI,
+{$ENDIF}
   // System
+  {System.}Classes,
+  {System.}Generics.Collections,
+  {System.}Generics.Defaults,
+  {System.}Math,
+  {System.}Types,
+  {System.}SysUtils,
   System.UITypes,
-  System.Types,
-  System.Classes,
-  System.Generics.Collections,
   // VCL
-  Vcl.Graphics,
+  {Vcl.}Graphics,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
-  ACL.Classes.StringList,
-  ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.Ex.Gdip,
   ACL.Graphics.SkinImage,
   ACL.Utils.DPIAware,
   ACL.Utils.Common,
@@ -87,7 +91,8 @@ type
     procedure SetItem(Index: Integer; AValue: TACLSkinImageSetItem); inline;
     //
     procedure ImageChangeHandler(Sender: TObject);
-    procedure ItemsChangeHandler(Sender: TObject; const Item: TACLSkinImageSetItem; Action: TCollectionNotification);
+    procedure ItemsChangeHandler(Sender: TObject;
+      const Item: TACLSkinImageSetItem; Action: TCollectionNotification);
     procedure ReleaseItems;
     procedure ReleaseTintedItems;
   protected
@@ -110,9 +115,10 @@ type
     function Equals(Obj: TObject): Boolean; override;
     function Find(DPI: Integer): TACLSkinImageSetItem;
     function Get(DPI: Integer): TACLSkinImageSetItem; overload;
-    function Get(DPI: Integer; const AColor: TAlphaColor; AMode: TACLSkinImageColorationMode): TACLSkinImageSetItem; overload;
+    function Get(DPI: Integer; const AColor: TAlphaColor;
+      AMode: TACLSkinImageColorationMode): TACLSkinImageSetItem; overload;
     function Get(DPI: Integer; const AColorScheme: TACLColorSchema): TACLSkinImageSetItem; overload;
-    function GetHashCode: Integer; override;
+    function GetHashCode: TObjHashCode; override;
     function IsEmpty: Boolean;
     procedure MakeUnique;
 
@@ -121,7 +127,7 @@ type
     procedure ImportFromImageFile(const AFileName: string; DPI: Integer = acDefaultDPI);
     procedure ImportFromImageStream(const AStream: TStream; DPI: Integer = acDefaultDPI);
     procedure LoadFromFile(const AFileName: string);
-    procedure LoadFromResource(Inst: HINST; const AName: UnicodeString; AType: PChar);
+    procedure LoadFromResource(Inst: HINST; const AName: string; AType: PChar);
     procedure LoadFromStream(const AStream: TStream);
     procedure SaveToFile(const AFileName: string);
     procedure SaveToStream(const AStream: TStream);
@@ -136,11 +142,6 @@ var
   acSkinImageSetDormantUnusedImages: Boolean = True;
 
 implementation
-
-uses
-  System.SysUtils,
-  System.Math,
-  System.Generics.Defaults;
 
 const
   sErrorCannotDeleteLastImage = 'You cannot delete the last image';
@@ -419,7 +420,7 @@ begin
   Result := nil;
 end;
 
-function TACLSkinImageSet.GetHashCode: Integer;
+function TACLSkinImageSet.GetHashCode: TObjHashCode;
 begin
   Result := Count;
 end;
@@ -532,7 +533,7 @@ begin
   end;
 end;
 
-procedure TACLSkinImageSet.LoadFromResource(Inst: HINST; const AName: UnicodeString; AType: PChar);
+procedure TACLSkinImageSet.LoadFromResource(Inst: HINST; const AName: string; AType: PChar);
 var
   AStream: TStream;
 begin
@@ -555,7 +556,7 @@ begin
     repeat
       Items[Count - 1].LoadFromStream(AStream);
 
-      ASyncWordSize := AStream.Read(ASyncWord, SizeOf(ASyncWord));
+      ASyncWordSize := AStream.Read(ASyncWord{%H-}, SizeOf(ASyncWord));
       if (ASyncWordSize <> SizeOf(ASyncWord)) or (ASyncWord <> SYNC_WORD) then
       begin
         AStream.Seek(-ASyncWordSize, soCurrent);

@@ -822,7 +822,7 @@ begin
       Execute(ARecord)
     else
     {$IFDEF ACL_THREADING_USE_MESSAGES}
-      TACLMessaging.SendMessage(FMessage, 0, LPARAM(ARecord));
+      TACLMessaging.SendMessage(FMessage, 0, {%H-}LPARAM(ARecord));
     {$ELSE}
       TACLThread.Synchronize(nil,
         procedure
@@ -849,7 +849,7 @@ begin
   begin
     AHandled := True;
     if AMessage.LParam <> 0 then
-      Execute(PSynchronizeRecord(AMessage.LParam))
+      Execute({%H-}PSynchronizeRecord(AMessage.LParam))
     else
       Execute;
   end;

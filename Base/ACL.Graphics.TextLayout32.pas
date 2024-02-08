@@ -760,7 +760,7 @@ end;
 procedure TACLTextLayoutRender32.FillBackground(ABlock: TACLTextLayoutBlock);
 begin
   if FDrawBackground and HasBackground then
-    acFillRect(Canvas.Handle, ABlock.Bounds, TAlphaColor.FromColor(Canvas.Brush.Color));
+    acFillRect(Canvas, ABlock.Bounds, TAlphaColor.FromColor(Canvas.Brush.Color));
 end;
 
 { TACLTextLayoutShadowRender32 }
@@ -796,7 +796,7 @@ begin
   inherited;
   Text32ApplyBlur(FBuffer, Shadow);
   Text32RecoverAlpha(FBuffer, TACLPixel32.Create(Shadow.Color));
-  FBuffer.DrawBlend(FTargetCanvas.Handle, FBufferOrigin);
+  FBuffer.DrawBlend(FTargetCanvas, FBufferOrigin);
 end;
 
 function TACLTextLayoutShadowRender32.OnSpace(ABlock: TACLTextLayoutBlockSpace): Boolean;
