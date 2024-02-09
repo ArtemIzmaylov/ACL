@@ -4,7 +4,7 @@
 {*     Formatted Text based on BB Codes      *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,27 +16,33 @@ unit ACL.Graphics.TextLayout;
 interface
 
 uses
-  Winapi.Windows,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
+  {Winapi.}Windows,
+{$ENDIF}
   // System
-  System.Character,
-  System.Classes,
-  System.Contnrs,
-  System.Generics.Collections,
-  System.Generics.Defaults,
-  System.Math,
+  {System.}Character,
+  {System.}Classes,
+  {System.}Contnrs,
+  {System.}Generics.Collections,
+  {System.}Generics.Defaults,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
+  {System.}Variants,
   System.RegularExpressions,
-  System.SysUtils,
-  System.Types,
   System.UITypes,
-  System.Variants,
   // VCL
-  Vcl.Graphics,
+  {Vcl.}Graphics,
   // ACL
   ACL.Classes.Collections,
   ACL.Classes.StringList,
   ACL.Parsers,
   ACL.FastCode,
   ACL.Geometry,
+  ACL.Geometry.Utils,
   ACL.Graphics,
   ACL.Math,
   ACL.Utils.Common,
@@ -141,7 +147,7 @@ type
   TACLTextLayoutBlock = class abstract
   protected
     FPosition: TPoint;
-    FPositionInText: PWideChar;
+    FPositionInText: PChar;
     FLength: Word;
   public
     function Bounds: TRect; virtual;
@@ -153,7 +159,7 @@ type
 
   TACLTextLayoutBlockList = class(TACLObjectList<TACLTextLayoutBlock>)
   protected
-    procedure AddInit(ABlock: TACLTextLayoutBlock; var AScan: PWideChar; ABlockLength: Integer);
+    procedure AddInit(ABlock: TACLTextLayoutBlock; var AScan: PChar; ABlockLength: Integer);
   public
     function BoundingRect: TRect; virtual;
     function Export(AExporter: TACLTextLayoutExporter; AFreeExporter: Boolean): Boolean; virtual;
@@ -186,7 +192,7 @@ type
     FCharacterWidths: PInteger;
     FWidth, FHeight: Word;
   public
-    constructor Create(AText: PWideChar; ATextLength: Word);
+    constructor Create(AText: PChar; ATextLength: Word);
     destructor Destroy; override;
     function Bounds: TRect; override;
     function Export(AExporter: TACLTextLayoutExporter): Boolean; override;
@@ -194,7 +200,7 @@ type
     procedure Shrink(AMaxRight: Integer); override;
     function ToString: string; override;
 
-    property Text: PWideChar read FPositionInText;
+    property Text: PChar read FPositionInText;
     property TextLength: Word read FLength;
     property TextLengthVisible: Word read FCharacterCount;
     property TextHeight: Word read FHeight;
@@ -473,8 +479,8 @@ type
   protected type
   {$REGION 'Sub-Types'}
     TContext = class;
-    TTokenDetector = function (Ctx: TContext; var Scan: PWideChar): Boolean;
-    TTokenDetectorInText = function (Ctx: TContext; S: PWideChar; L: Integer): Boolean;
+    TTokenDetector = function (Ctx: TContext; var Scan: PChar): Boolean;
+    TTokenDetectorInText = function (Ctx: TContext; S: PChar; L: Integer): Boolean;
     TContext = class
     public
       Blocks: TACLTextLayoutBlockList;
@@ -486,16 +492,16 @@ type
   protected
     class function AllocContext(const ASettings: TACLTextFormatSettings): TACLTextImporter.TContext; virtual;
     //# Token Detectors
-    class function IsDelimiter(Ctx: TContext; var Scan: PWideChar): Boolean; static;
-    class function IsLineBreak(Ctx: TContext; var Scan: PWideChar): Boolean; static;
-    class function IsLineBreakCpp(Ctx: TContext; var Scan: PWideChar): Boolean; static;
-    class function IsSpace(Ctx: TContext; var Scan: PWideChar): Boolean; static;
-    class function IsStyle(Ctx: TContext; var Scan: PWideChar): Boolean; static;
-    class function IsText(Ctx: TContext; var Scan: PWideChar): Boolean; static;
+    class function IsDelimiter(Ctx: TContext; var Scan: PChar): Boolean; static;
+    class function IsLineBreak(Ctx: TContext; var Scan: PChar): Boolean; static;
+    class function IsLineBreakCpp(Ctx: TContext; var Scan: PChar): Boolean; static;
+    class function IsSpace(Ctx: TContext; var Scan: PChar): Boolean; static;
+    class function IsStyle(Ctx: TContext; var Scan: PChar): Boolean; static;
+    class function IsText(Ctx: TContext; var Scan: PChar): Boolean; static;
     // # TokenInText Detectors
-    class function IsEmail(Ctx: TContext; S: PWideChar; L: Integer): Boolean; static;
-    class function IsTimeCode(Ctx: TContext; S: PWideChar; L: Integer): Boolean; static;
-    class function IsURL(Ctx: TContext; S: PWideChar; L: Integer): Boolean; static;
+    class function IsEmail(Ctx: TContext; S: PChar; L: Integer): Boolean; static;
+    class function IsTimeCode(Ctx: TContext; S: PChar; L: Integer): Boolean; static;
+    class function IsURL(Ctx: TContext; S: PChar; L: Integer): Boolean; static;
   public
     class constructor Create;
   end;
@@ -523,10 +529,10 @@ type
     function OnHyperlink(ABlock: TACLTextLayoutBlockHyperlink): Boolean; override;
   end;
 
-procedure acDrawFormattedText(ACanvas: TCanvas; const S: UnicodeString; const R: TRect;
+procedure acDrawFormattedText(ACanvas: TCanvas; const S: string; const R: TRect;
   AHorzAlignment: TAlignment; AVertAlignment: TVerticalAlignment; AWordWrap: Boolean);
 function acGetReadingDirection(const C: Char): TACLTextReadingDirection; overload;
-function acGetReadingDirection(P: PWideChar; L: Integer): TACLTextReadingDirection; overload; inline;
+function acGetReadingDirection(P: PChar; L: Integer): TACLTextReadingDirection; overload; inline;
 implementation
 
 type
@@ -895,7 +901,7 @@ begin
   end;
 end;
 
-function acGetReadingDirection(P: PWideChar; L: Integer): TACLTextReadingDirection;
+function acGetReadingDirection(P: PChar; L: Integer): TACLTextReadingDirection;
 begin
   if L > 0 then
     Result := acGetReadingDirection(P^)
@@ -903,7 +909,7 @@ begin
     Result := trdNeutral;
 end;
 
-procedure acDrawFormattedText(ACanvas: TCanvas; const S: UnicodeString; const R: TRect;
+procedure acDrawFormattedText(ACanvas: TCanvas; const S: string; const R: TRect;
   AHorzAlignment: TAlignment; AVertAlignment: TVerticalAlignment; AWordWrap: Boolean);
 var
   AFont: TFont;
@@ -934,7 +940,7 @@ end;
 
 class function TACLTextFormatSettings.Default: TACLTextFormatSettings;
 begin
-  ZeroMemory(@Result, SizeOf(Result));
+  FillChar(Result{%H-}, SizeOf(Result), 0);
   Result.AllowAutoURLDetect := True;
   Result.AllowCppLikeLineBreaks := True;
   Result.AllowFormatting := True;
@@ -942,13 +948,13 @@ end;
 
 class function TACLTextFormatSettings.Formatted: TACLTextFormatSettings;
 begin
-  ZeroMemory(@Result, SizeOf(Result));
+  FillChar(Result{%H-}, SizeOf(Result), 0);
   Result.AllowFormatting := True;
 end;
 
 class function TACLTextFormatSettings.PlainText: TACLTextFormatSettings;
 begin
-  ZeroMemory(@Result, SizeOf(Result));
+  FillChar(Result{%H-}, SizeOf(Result), 0);
 end;
 
 { TACLTextLayout }
@@ -1021,17 +1027,18 @@ end;
 function TACLTextLayout.FindBlock(APositionInText: Integer; out ABlock: TACLTextLayoutBlock): Boolean;
 var
   AItem: TACLTextLayoutBlock;
-  ASearchPosition: NativeUInt;
+  ASearchPosition: PByte;
+  I: Integer;
 begin
   if not InRange(APositionInText, 1, Length(FText)) then
     Exit(False);
 
-  ASearchPosition := NativeUInt(PWideChar(FText) + APositionInText);
-  for var I := 0 to FBlocks.Count - 1 do
+  ASearchPosition := PByte(PChar(FText) + APositionInText);
+  for I := 0 to FBlocks.Count - 1 do
   begin
     AItem := FBlocks.List[I];
-    if (NativeUInt(AItem.FPositionInText) >= ASearchPosition) and
-       (NativeUInt(AItem.FPositionInText) <  ASearchPosition + AItem.FLength)
+    if (PByte(AItem.FPositionInText) >= ASearchPosition) and
+       (PByte(AItem.FPositionInText) <  ASearchPosition + AItem.FLength)
     then
       begin
         ABlock := AItem;
@@ -1095,6 +1102,7 @@ var
   AContext: TACLTextImporter.TContext;
   ACount: Integer;
   AScan: PChar;
+  I: Integer;
 begin
   FLayoutIsDirty := True;
   FLayout.Clear;
@@ -1104,10 +1112,10 @@ begin
   AContext := TACLTextImporter.AllocContext(ASettings);
   try
     AContext.Blocks := FBlocks;
-    AScan := PWideChar(AText);
+    AScan := PChar(AText);
     ACount := Length(AContext.TokenDetectors);
     while AScan^ <> #0 do
-      for var I := 0 to ACount - 1 do
+      for I := 0 to ACount - 1 do
       begin
         if AContext.TokenDetectors[I](AContext, AScan) then
           Break;
@@ -1205,6 +1213,7 @@ var
   AOffsetX: Integer;
   AOffsetY: Integer;
   ARow: TACLTextLayoutRow;
+  I: Integer;
 begin
   AOffsetY := AOrigin.Y;
   case VertAlignment of
@@ -1212,9 +1221,10 @@ begin
       Inc(AOffsetY, Max(0, (AMaxHeight - FLayout.BoundingRect.Bottom)));
     taVerticalCenter:
       Inc(AOffsetY, Max(0, (AMaxHeight - FLayout.BoundingRect.Bottom) div 2));
+  else;
   end;
 
-  for var I := 0 to FLayout.Count - 1 do
+  for I := 0 to FLayout.Count - 1 do
   begin
     ARow := FLayout.List[I];
     AOffsetX := AOrigin.X;
@@ -1263,7 +1273,8 @@ end;
 
 { TACLTextLayoutBlockList }
 
-procedure TACLTextLayoutBlockList.AddInit(ABlock: TACLTextLayoutBlock; var AScan: PWideChar; ABlockLength: Integer);
+procedure TACLTextLayoutBlockList.AddInit(
+  ABlock: TACLTextLayoutBlock; var AScan: PChar; ABlockLength: Integer);
 begin
   Add(ABlock);
   ABlock.FPositionInText := AScan;
@@ -1272,20 +1283,25 @@ begin
 end;
 
 function TACLTextLayoutBlockList.BoundingRect: TRect;
+var
+  I: Integer;
 begin
   if Count = 0 then
     Exit(NullRect);
 
   Result := First.Bounds;
-  for var I := 1 to Count - 1 do
+  for I := 1 to Count - 1 do
     Result.Add(List[I].Bounds);
 end;
 
-function TACLTextLayoutBlockList.Export(AExporter: TACLTextLayoutExporter; AFreeExporter: Boolean): Boolean;
+function TACLTextLayoutBlockList.Export(
+  AExporter: TACLTextLayoutExporter; AFreeExporter: Boolean): Boolean;
+var
+  I: Integer;
 begin
   Result := True;
   try
-    for var I := 0 to Count - 1 do
+    for I := 0 to Count - 1 do
     begin
       if not List[I].Export(AExporter) then
         Exit(False);
@@ -1297,8 +1313,10 @@ begin
 end;
 
 procedure TACLTextLayoutBlockList.Offset(ADeltaX, ADeltaY: Integer);
+var
+  I: Integer;
 begin
-  for var I := 0 to Count - 1 do
+  for I := 0 to Count - 1 do
     List[I].FPosition.Offset(ADeltaX, ADeltaY);
 end;
 
@@ -1329,7 +1347,7 @@ end;
 
 { TACLTextLayoutBlockText }
 
-constructor TACLTextLayoutBlockText.Create(AText: PWideChar; ATextLength: Word);
+constructor TACLTextLayoutBlockText.Create(AText: PChar; ATextLength: Word);
 begin
   inherited Create;
   FPositionInText := AText;
@@ -1503,10 +1521,12 @@ begin
 end;
 
 procedure TACLTextLayoutRow.SetBaseline(AValue: Integer);
+var
+  I: Integer;
 begin
   if AValue <> FBaseline then
   begin
-    for var I := 0 to Count - 1 do
+    for I := 0 to Count - 1 do
       Inc(List[I].FPosition.Y, AValue - FBaseline);
     FBaseline := AValue;
   end;
@@ -1515,6 +1535,7 @@ end;
 procedure TACLTextLayoutRow.SetEndEllipsis(ARightSide: Integer; AEndEllipsis: TACLTextLayoutBlockText);
 var
   ABlock: TACLTextLayoutBlock;
+  I: Integer;
 begin
 {$IFDEF DEBUG}
   if AEndEllipsis = nil then
@@ -1528,7 +1549,7 @@ begin
   FEndEllipsis.FPosition.X := Bounds.Right;
 
   // Ищем последний видимый блок, после которого можно воткнуть '...'
-  for var I := Count - 1 downto 0 do
+  for I := Count - 1 downto 0 do
   begin
     ABlock := List[I];
     ABlock.Shrink(ARightSide);
@@ -1557,19 +1578,23 @@ end;
 { TACLTextLayoutRows }
 
 function TACLTextLayoutRows.BoundingRect: TRect;
+var
+  I: Integer;
 begin
   if Count = 0 then
     Exit(NullRect);
   Result := List[0].Bounds;
-  for var I := 1 to Count - 1 do
+  for I := 1 to Count - 1 do
     Result.Add(List[I].Bounds);
 end;
 
 function TACLTextLayoutRows.Export(AExporter: TACLTextLayoutExporter; AFreeExporter: Boolean): Boolean;
+var
+  I: Integer;
 begin
   Result := True;
   try
-    for var I := 0 to Count - 1 do
+    for I := 0 to Count - 1 do
     begin
       if not List[I].Export(AExporter, False) then
         Exit(False);
@@ -1643,11 +1668,13 @@ begin
 end;
 
 procedure TACLTextLayoutValueStack<T>.Pop(AInvoker: TClass);
+var
+  I, J: Integer;
 begin
-  for var I := FCount - 1 downto 0 do
+  for I := FCount - 1 downto 0 do
     if FData[I].Value = AInvoker then
     begin
-      for var J := I to FCount - 2 do
+      for J := I to FCount - 2 do
         FData[J] := FData[J + 1];
       Dec(FCount);
       Break;
@@ -1892,18 +1919,19 @@ var
   LDistance: Integer;
   LTextSize: TSize;
   LWidthScan: PInteger;
+  I: Integer;
 begin
   if ABlock.FCharacterWidths = nil then
     ABlock.FCharacterWidths := AllocMem(ABlock.TextLength * SizeOf(Integer));
   GetTextExtentExPoint(Canvas.Handle, ABlock.Text, ABlock.TextLength,
-    MaxInt, @LCount, ABlock.FCharacterWidths, LTextSize);
+    MaxInt, @LCount, ABlock.FCharacterWidths, LTextSize{%H-});
   ABlock.FCharacterCount := LCount;
   ABlock.FHeight := LTextSize.cy;
   ABlock.FWidth := LTextSize.cx;
 
   LDistance := 0;
   LWidthScan := ABlock.FCharacterWidths;
-  for var I := 0 to ABlock.FCharacterCount - 1 do
+  for I := 0 to ABlock.FCharacterCount - 1 do
   begin
     LWidthScan^ := LWidthScan^ - LDistance;
     Inc(LDistance, LWidthScan^);
@@ -1914,13 +1942,14 @@ end;
 procedure TACLTextLayoutCalculator.Reorder(ABlocks: TACLTextLayoutBlockList; const ARange: TACLRange);
 var
   R, L: TRect;
+  I: Integer;
 begin
   if ARange.Finish > ARange.Start then
   begin
     R := ABlocks.List[ARange.Start].Bounds;
-    for var I := ARange.Start + 1 to ARange.Finish do
+    for I := ARange.Start + 1 to ARange.Finish do
       R.Add(ABlocks.List[I].Bounds);
-    for var I := ARange.Start to ARange.Finish do
+    for I := ARange.Start to ARange.Finish do
     begin
       L := ABlocks.List[I].Bounds;
       L.Mirror(R);
@@ -1949,6 +1978,8 @@ begin
 end;
 
 procedure TACLTextLayoutCalculator.CompleteRow;
+var
+  I: Integer;
 begin
   if FRow = nil then
     Exit;
@@ -1968,7 +1999,7 @@ begin
   FRows.Add(FRow);
 
 {$IFDEF ACL_TEXTLAYOUT_RTL_SUPPORT}
-  for var I := 0 to FRowRtlRanges.Count - 1 do
+  for I := 0 to FRowRtlRanges.Count - 1 do
     Reorder(FRow, FRowRtlRanges.List[I]);
   FRowRtlRanges.Count := 0;
   FRowRtlRange := False;
@@ -2017,7 +2048,7 @@ procedure TACLTextLayoutCalculator.UpdateMetrics;
 var
   ATextMetric: TTextMetric;
 begin
-  GetTextMetrics(Canvas.Handle, ATextMetric);
+  GetTextMetrics(Canvas.Handle, ATextMetric{%H-});
   FBaseline := ATextMetric.tmHeight - ATextMetric.tmDescent;
   FLineHeight := ATextMetric.tmHeight + ATextMetric.tmExternalLeading;
   FSpaceWidth := Canvas.TextWidth(' ');
@@ -2207,7 +2238,7 @@ end;
 
 function TACLTextPlainTextExporter.OnSpace(ABlock: TACLTextLayoutBlockSpace): Boolean;
 begin
-  FTarget.Append(Space);
+  FTarget.Append(' ');
   Result := True;
 end;
 
@@ -2276,16 +2307,16 @@ begin
 {$ENDREGION}
 end;
 
-class function TACLTextImporter.IsDelimiter(Ctx: TContext; var Scan: PWideChar): Boolean;
+class function TACLTextImporter.IsDelimiter(Ctx: TContext; var Scan: PChar): Boolean;
 begin
   Result := acContains(Scan^, Delimiters);
   if Result then
     Ctx.Blocks.AddInit(TACLTextLayoutBlockText.Create(Scan, 1), Scan, 1);
 end;
 
-class function TACLTextImporter.IsEmail(Ctx: TContext; S: PWideChar; L: Integer): Boolean;
+class function TACLTextImporter.IsEmail(Ctx: TContext; S: PChar; L: Integer): Boolean;
 var
-  ALink: UnicodeString;
+  ALink: string;
 begin
   if acStrScan(S, L, '@') <> nil then // быстрая проверка
   begin
@@ -2301,7 +2332,7 @@ begin
   Result := False;
 end;
 
-class function TACLTextImporter.IsLineBreak(Ctx: TContext; var Scan: PWideChar): Boolean;
+class function TACLTextImporter.IsLineBreak(Ctx: TContext; var Scan: PChar): Boolean;
 begin
   Result := True;
   if Scan^ = #10 then //#10
@@ -2312,27 +2343,27 @@ begin
     Result := False;
 end;
 
-class function TACLTextImporter.IsLineBreakCpp(Ctx: TContext; var Scan: PWideChar): Boolean;
+class function TACLTextImporter.IsLineBreakCpp(Ctx: TContext; var Scan: PChar): Boolean;
 begin
   Result := (Scan^ = '\') and ((Scan + 1)^ = 'n');
   if Result then
     Ctx.Blocks.AddInit(TACLTextLayoutBlockLineBreak.Create, Scan, 2);
 end;
 
-class function TACLTextImporter.IsSpace(Ctx: TContext; var Scan: PWideChar): Boolean;
+class function TACLTextImporter.IsSpace(Ctx: TContext; var Scan: PChar): Boolean;
 begin
   Result := acContains(Scan^, Spaces);
   if Result then
     Ctx.Blocks.AddInit(TACLTextLayoutBlockSpace.Create, Scan, 1);
 end;
 
-class function TACLTextImporter.IsStyle(Ctx: TContext; var Scan: PWideChar): Boolean;
+class function TACLTextImporter.IsStyle(Ctx: TContext; var Scan: PChar): Boolean;
 var
   ABlock: TACLTextLayoutBlockStyle;
   AIsClosing: Boolean;
-  AScanEnd: PWideChar;
-  AScanParam: PWideChar;
-  AScanTag: PWideChar;
+  AScanEnd: PChar;
+  AScanParam: PChar;
+  AScanTag: PChar;
   ATagLength: Integer;
 begin
   Result := False;
@@ -2396,10 +2427,11 @@ begin
   end;
 end;
 
-class function TACLTextImporter.IsText(Ctx: TContext; var Scan: PWideChar): Boolean;
+class function TACLTextImporter.IsText(Ctx: TContext; var Scan: PChar): Boolean;
 var
-  ACursor: PWideChar;
+  ACursor: PChar;
   ALength: Integer;
+  I: Integer;
 begin
   Result := True;
   ACursor := Scan;
@@ -2411,7 +2443,7 @@ begin
       if ALength > 0 then
       begin
         if Ctx.HyperlinkDepth <= 0 then
-          for var I := Low(Ctx.TokenInTextDetectors) to High(Ctx.TokenInTextDetectors) do
+          for I := Low(Ctx.TokenInTextDetectors) to High(Ctx.TokenInTextDetectors) do
           begin
             if Ctx.TokenInTextDetectors[I](Ctx, Scan, ALength) then
             begin
@@ -2426,12 +2458,12 @@ begin
   until False;
 end;
 
-class function TACLTextImporter.IsTimeCode(Ctx: TContext; S: PWideChar; L: Integer): Boolean;
+class function TACLTextImporter.IsTimeCode(Ctx: TContext; S: PChar; L: Integer): Boolean;
 var
   ATime: Single;
 begin
   Result := False;
-  if S^.IsDigit then
+  if CharInSet(S^, ['0'..'9']) then
   begin
     if Ctx.Blocks.Count > 0 then
     begin
@@ -2448,9 +2480,9 @@ begin
   end;
 end;
 
-class function TACLTextImporter.IsURL(Ctx: TContext; S: PWideChar; L: Integer): Boolean;
+class function TACLTextImporter.IsURL(Ctx: TContext; S: PChar; L: Integer): Boolean;
 const
-  Prefix: PWideChar = 'www.';
+  Prefix: PChar = 'www.';
 begin
   if acIsUrlFileName(S, L) then
   begin

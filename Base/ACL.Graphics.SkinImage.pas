@@ -11,10 +11,8 @@
 
 unit ACL.Graphics.SkinImage;
 
-{$I ACL.Config.inc} // FPC:Partial
+{$I ACL.Config.inc} // FPC:OK
 {$MINENUMSIZE 1}
-
-{$MESSAGE WARN 'TODO - TACLImageFormatClass - Commented'}
 
 interface
 
@@ -43,7 +41,7 @@ uses
   ACL.Classes.Collections,
   ACL.Geometry,
   ACL.Graphics,
-  //ACL.Graphics.Images,
+  ACL.Graphics.Images,
   ACL.Hashes,
   ACL.Utils.Common,
   ACL.Utils.FileSystem;
@@ -274,12 +272,12 @@ type
     procedure LoadFromFile(const AFileName: string);
     procedure LoadFromResource(AInstance: HINST; const AName: string; AResRoot: PChar);
     procedure LoadFromStream(AStream: TStream);
-    //procedure SaveToBitmap(ABitmap: TACLDib); overload;
-    //procedure SaveToBitmap(ABitmap: TBitmap); overload;
+    procedure SaveToBitmap(ABitmap: TACLDib); overload;
+    procedure SaveToBitmap(ABitmap: TBitmap); overload;
     procedure SaveToFile(const AFileName: string); overload;
-    //procedure SaveToFile(const AFileName: string; AFormat: TACLImageFormatClass); overload;
+    procedure SaveToFile(const AFileName: string; AFormat: TACLImageFormatClass); overload;
     procedure SaveToStream(AStream: TStream); overload; virtual;
-    //procedure SaveToStream(AStream: TStream; AFormat: TACLImageFormatClass); overload;
+    procedure SaveToStream(AStream: TStream; AFormat: TACLImageFormatClass); overload;
     //# Sizes
     property ActualSizingMode: TACLSkinImageSizingMode read GetActualSizingMode;
     property ClientRect: TRect read GetClientRect;
@@ -372,7 +370,7 @@ type
     class var FOldBmp: HBITMAP;
     class var FOpaque: Boolean;
 
-    class procedure doAlphaBlend(const R, SrcR: TRect);
+    class procedure doAlphaBlend(const R, SrcR: TRect); inline;
     class procedure doAlphaBlendTile(const R, SrcR: TRect);
   {$ELSE}
     class var FAlpha: Byte;
@@ -1119,6 +1117,8 @@ begin
   LDib := TACLDib.Create;
   try
     LDib.Assign(ABitmap);
+    if (ABitmap.PixelFormat > pfDevice) and (ABitmap.PixelFormat < pf32bit) then
+      LDib.MakeTransparent(TACLColors.MaskPixel);
     LoadFromBitmap(LDib);
   finally
     LDib.Free;
@@ -1131,7 +1131,6 @@ begin
   DoCreateBits(ABitmap.Width, ABitmap.Height);
   acFillBitmapInfoHeader(AInfo.bmiHeader, Width, Height);
   GetDIBits(MeasureCanvas.Handle, ABitmap.Handle, 0, Height, Bits, AInfo, DIB_RGB_COLORS);
-
   if (ABitmap.PixelFormat > pfDevice) and (ABitmap.PixelFormat < pf32bit) then
     TACLColors.MakeTransparent(PACLPixel32(Bits), BitCount, TACLColors.MaskPixel);
   if ABitmap.AlphaFormat = afPremultiplied then
@@ -1182,20 +1181,18 @@ procedure TACLSkinImage.LoadFromStream(AStream: TStream);
 
   function ImageToBitmap(AStream: TStream; const AHeader: TACLSkinImageHeader): TBitmap;
   begin
-    {$MESSAGE WARN 'NOTIMPLEMENTED'}
-    raise ENotImplemented.Create('ImageToBitmap');
-    //if PWord(@AHeader.ID[0])^ = TACLImageFormatBMP.FormatPreamble then
-    //begin
-    //  Result := TACLBitmap.Create;
-    //  Result.LoadFromStream(AStream);
-    //end
-    //else
-    //  with TACLImage.Create(AStream) do
-    //  try
-    //    Result := ToBitmap;
-    //  finally
-    //    Free;
-    //  end;
+    if PWord(@AHeader.ID[0])^ = TACLImageFormatBMP.FormatPreamble then
+    begin
+      Result := TACLBitmap.Create;
+      Result.LoadFromStream(AStream);
+    end
+    else
+      with TACLImage.Create(AStream) do
+      try
+        Result := ToBitmap;
+      finally
+        Free;
+      end;
   end;
 
 var
@@ -1228,29 +1225,50 @@ begin
     EndUpdate;
   end;
 end;
-(*
+
+procedure TACLSkinImage.SaveToBitmap(ABitmap: TACLDib);
+begin
+  ABitmap.Resize(Width, Height);
+  if not Empty then
+  begin
+    CheckUnpacked;
+    CheckBitsState(ibsUnpremultiplied);
+    FastMove(Bits^, ABitmap.Colors^, BitCount * SizeOf(TACLPixel32));
+  end;
+end;
+
 procedure TACLSkinImage.SaveToBitmap(ABitmap: TBitmap);
+{$IFNDEF FPC}
 var
-  AInfo: TBitmapInfo;
-  DC: HDC;
+  LDC: HDC;
+  LInfo: TBitmapInfo;
+{$ENDIF}
 begin
   ABitmap.SetSize(Width, Height);
   if not Empty then
   begin
     CheckUnpacked;
     CheckBitsState(ibsUnpremultiplied);
+  {$IFDEF FPC}
+    if HasAlpha then
+      ABitmap.PixelFormat := pf32bit
+    else
+      ABitmap.PixelFormat := pf24bit;
 
-    DC := GetDC(0);
+    acSetBitmapBits(ABitmap, PACLPixel32(Bits), BitCount);
+  {$ELSE}
+    LDC := GetDC(0);
     try
       ABitmap.AlphaFormat := afIgnored;
       ABitmap.PixelFormat := pf32bit;
-      acFillBitmapInfoHeader(AInfo.bmiHeader, Width, Height);
-      SetDIBits(DC, ABitmap.Handle, 0, Height, Bits, AInfo, DIB_RGB_COLORS);
+      acFillBitmapInfoHeader(LInfo.bmiHeader, Width, Height);
+      SetDIBits(LDC, ABitmap.Handle, 0, Height, Bits, LInfo, DIB_RGB_COLORS);
       if not HasAlpha then
         ABitmap.PixelFormat := pf24bit;
     finally
-      ReleaseDC(0, DC);
+      ReleaseDC(0, LDC);
     end;
+  {$ENDIF}
   end;
 end;
 
@@ -1303,8 +1321,6 @@ begin
     end;
   end;
 end;
-
-*)
 
 procedure TACLSkinImage.SaveToFile(const AFileName: string);
 var
@@ -1805,7 +1821,7 @@ begin
           begin
             AFrameBitmap.Reset;
             Draw(AFrameBitmap.Canvas, AFrameBitmap.ClientRect, I);
-            AFrameBitmap.DrawBlend(ABitmap.Canvas.Handle, AFrameRect, MaxByte, True);
+            AFrameBitmap.DrawBlend(ABitmap.Canvas, AFrameRect, MaxByte, True);
             AFrameRect.Offset(0, AFrameRect.Height);
           end;
         finally

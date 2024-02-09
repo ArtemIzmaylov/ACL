@@ -11,12 +11,7 @@
 
 unit ACL.Graphics.Ex;
 
-{$I ACL.Config.inc} // FPC:Partial
-
-{$MESSAGE WARN 'TODO - Commented'}
-(*
-  CreateImage(Image: TACLImage): TACL2DRenderImage
-*)
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
@@ -42,7 +37,7 @@ uses
   ACL.Classes.Collections,
   ACL.Geometry,
   ACL.Graphics,
-  //ACL.Graphics.Images,
+  ACL.Graphics.Images,
   ACL.Graphics.SkinImage,
   ACL.Utils.Common;
 
@@ -61,8 +56,8 @@ type
   public
     procedure DrawBlend(ACanvas: TCanvas; const P: TPoint;
       AMode: TACLBlendMode; AAlpha: Byte = MaxByte); overload;
-    procedure DrawBlend(DC: HDC; const R: TRect;
-      AAlpha: Byte = MaxByte; ASmoothStretch: Boolean = False); overload;
+    procedure DrawBlend(ACanvas: TCanvas; const R: TRect;
+      AAlpha: Byte; ASmoothStretch: Boolean); overload;
   end;
 
   { TACLCacheLayer }
@@ -245,8 +240,7 @@ type
     function CreateImage(Colors: PACLPixel32; Width, Height: Integer;
       AlphaFormat: TAlphaFormat = afDefined): TACL2DRenderImage; overload; virtual; abstract;
     function CreateImage(Image: TACLDib): TACL2DRenderImage; overload; virtual;
-    {$MESSAGE WARN 'Commented'}
-//    function CreateImage(Image: TACLImage): TACL2DRenderImage; overload; virtual;
+    function CreateImage(Image: TACLImage): TACL2DRenderImage; overload; virtual;
     function CreateImageAttributes: TACL2DRenderImageAttributes; virtual; abstract;
     procedure DrawImage(Image: TACLDib; const TargetRect: TRect; Cache: PACL2DRenderImage = nil); overload;
     procedure DrawImage(Image: TACL2DRenderImage; const TargetRect: TRect; Alpha: Byte = MaxByte); overload;
@@ -307,12 +301,11 @@ implementation
 
 uses
   ACL.FastCode,
-  //ACL.Graphics.Ex.Gdip,
   ACL.Math,
   ACL.Threading;
 
-//type
-//  TACLImageAccess = class(TACLImage);
+type
+  TACLImageAccess = class(TACLImage);
 
 {$REGION 'Software-based filters implementation'}
 type
@@ -1277,44 +1270,44 @@ begin
   end;
 end;
 
-procedure TACLBitmapLayer.DrawBlend(DC: HDC;
-  const R: TRect; AAlpha: Byte = 255; ASmoothStretch: Boolean = False);
+procedure TACLBitmapLayer.DrawBlend(ACanvas: TCanvas;
+  const R: TRect; AAlpha: Byte; ASmoothStretch: Boolean);
 {$IFDEF FPC}
 begin
-  acAlphaBlend(DC, Handle, R, ClientRect, AAlpha);
+  DrawBlend(ACanvas, R, ClientRect, AAlpha);
 end;
 {$ELSE}
-//var
-//  AClipBox: TRect;
-//  AImage: TACLImage;
-//  ALayer: TACLDib;
+var
+  AClipBox: TRect;
+  AImage: TACLImage;
+  ALayer: TACLDib;
 begin
-//  if ASmoothStretch and not (Empty or R.EqualSizes(ClientRect)) then
-//  begin
-//    if (GetClipBox(DC, AClipBox) <> NULLREGION) and IntersectRect(AClipBox, AClipBox, R) then
-//    begin
-//      AImage := TACLImage.Create(PRGBQuad(Colors), Width, Height);
-//      try
-//        AImage.StretchQuality := sqLowQuality;
-//        AImage.PixelOffsetMode := ipomHalf;
-//
-//        // Layer is used for better performance
-//        ALayer := TACLDib.Create(AClipBox);
-//        try
-//          SetWindowOrgEx(ALayer.Handle, AClipBox.Left, AClipBox.Top, nil);
-//          AImage.Draw(ALayer.Handle, R);
-//          SetWindowOrgEx(ALayer.Handle, 0, 0, nil);
-//          ALayer.DrawBlend(DC, AClipBox.TopLeft);
-//        finally
-//          ALayer.Free;
-//        end;
-//      finally
-//        AImage.Free;
-//      end;
-//    end;
-//  end
-//  else
-//    acAlphaBlend(DC, Handle, R, ClientRect, AAlpha);
+  if ASmoothStretch and not (Empty or R.EqualSizes(ClientRect)) then
+  begin
+    if (GetClipBox(ACanvas.Handle, AClipBox) <> NULLREGION) and IntersectRect(AClipBox, AClipBox, R) then
+    begin
+      AImage := TACLImage.Create(PACLPixel32(Colors), Width, Height);
+      try
+        AImage.StretchQuality := sqLowQuality;
+        AImage.PixelOffsetMode := ipomHalf;
+
+        // Layer is used for better performance
+        ALayer := TACLDib.Create(AClipBox);
+        try
+          SetWindowOrgEx(ALayer.Handle, AClipBox.Left, AClipBox.Top, nil);
+          AImage.Draw(ALayer.Canvas, R);
+          SetWindowOrgEx(ALayer.Handle, 0, 0, nil);
+          ALayer.DrawBlend(ACanvas, AClipBox.TopLeft);
+        finally
+          ALayer.Free;
+        end;
+      finally
+        AImage.Free;
+      end;
+    end;
+  end
+  else
+    acAlphaBlend(ACanvas.Handle, Handle, R, ClientRect, AAlpha);
 end;
 {$ENDIF}
 
@@ -1625,8 +1618,13 @@ procedure TACL2DRender.BeginPaint(DC: HDC; const BoxRect: TRect);
 begin
   BeginPaint(DC, BoxRect, BoxRect)
 end;
-(*
+
 function TACL2DRender.CreateImage(Image: TACLImage): TACL2DRenderImage;
+{$IFDEF FPC}
+begin
+  if not Image.Empty then
+    Result := CreateImage(TACLImageAccess(Image).Handle)
+{$ELSE}
 var
   AData: TBitmapData;
   AFormat: TAlphaFormat;
@@ -1651,9 +1649,10 @@ begin
   finally
     TACLImageAccess(Image).EndLock(AData);
   end
+{$ENDIF}
   else
     Result := nil;
-end;  *)
+end;
 
 function TACL2DRender.CreateImage(Image: TACLDib): TACL2DRenderImage;
 begin
@@ -1687,22 +1686,26 @@ begin
   end;
 end;
 
-procedure TACL2DRender.DrawImage(Image: TACL2DRenderImage; const TargetRect: TRect; Alpha: Byte);
+procedure TACL2DRender.DrawImage(
+  Image: TACL2DRenderImage; const TargetRect: TRect; Alpha: Byte);
 begin
   DrawImage(Image, TargetRect, Image.ClientRect, Alpha);
 end;
 
-procedure TACL2DRender.DrawEllipse(const R: TRect; Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
+procedure TACL2DRender.DrawEllipse(const R: TRect;
+  Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
 begin
   DrawEllipse(R.Left, R.Top, R.Right, R.Bottom, Color, Width, Style);
 end;
 
-procedure TACL2DRender.DrawRectangle(const R: TRect; Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
+procedure TACL2DRender.DrawRectangle(const R: TRect;
+  Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
 begin
   DrawRectangle(R.Left, R.Top, R.Right, R.Bottom, Color, Width, Style)
 end;
 
-procedure TACL2DRender.Ellipse(const R: TRect; Color, StrokeColor: TAlphaColor; StrokeWidth: Single; StrokeStyle: TACL2DRenderStrokeStyle);
+procedure TACL2DRender.Ellipse(const R: TRect;
+  Color, StrokeColor: TAlphaColor; StrokeWidth: Single; StrokeStyle: TACL2DRenderStrokeStyle);
 begin
   FillEllipse(R, Color);
   DrawEllipse(R, StrokeColor, StrokeWidth, StrokeStyle);
@@ -1718,7 +1721,8 @@ begin
   FillRectangle(R.Left, R.Top, R.Right, R.Bottom, Color);
 end;
 
-procedure TACL2DRender.Line(const Points: array of TPoint; Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
+procedure TACL2DRender.Line(const Points: array of TPoint;
+  Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
 var
   L: Integer;
 begin
