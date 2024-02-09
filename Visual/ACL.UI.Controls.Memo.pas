@@ -350,7 +350,7 @@ end;
 
 procedure TACLCustomEditContainer.DrawContent(ACanvas: TCanvas);
 begin
-  StyleScrollBox.DrawSizeGripArea(ACanvas.Handle, SizeGripArea);
+  StyleScrollBox.DrawSizeGripArea(ACanvas, SizeGripArea);
 end;
 
 procedure TACLCustomEditContainer.ResourceChanged;

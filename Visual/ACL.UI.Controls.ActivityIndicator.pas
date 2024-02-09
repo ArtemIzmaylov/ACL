@@ -106,7 +106,7 @@ begin
   if not Active then
     ARect.Inflate(-2);
 
-  acFillRect(ACanvas.Handle, ARect, AColor);
+  acFillRect(ACanvas, ARect, AColor);
 end;
 
 procedure TACLStyleActivityIndicator.InitializeResources;

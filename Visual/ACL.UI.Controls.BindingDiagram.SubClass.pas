@@ -512,8 +512,8 @@ type
 
 procedure TACLStyleBindingDiagram.DrawObjectBorders(ACanvas: TCanvas; const R: TRect);
 begin
-  acDrawFrame(ACanvas.Handle, R, ColorObjectBorder.Value);
-  acFillRect(ACanvas.Handle, R.InflateTo(-1), ColorObjectContent.Value);
+  acDrawFrame(ACanvas, R, ColorObjectBorder.Value);
+  acFillRect(ACanvas, R.InflateTo(-1), ColorObjectContent.Value);
 end;
 
 procedure TACLStyleBindingDiagram.DrawSelection(ACanvas: TCanvas; const R: TRect);
@@ -521,7 +521,7 @@ var
   LSize: Integer;
 begin
   LSize := MulDiv(TargetDPI, SelectionSize, acDefaultDPI);
-  acDrawFrame(ACanvas.Handle, R.InflateTo(LSize), ColorObjectSelection.Value, LSize);
+  acDrawFrame(ACanvas, R.InflateTo(LSize), ColorObjectSelection.Value, LSize);
 end;
 
 procedure TACLStyleBindingDiagram.InitializeResources;
@@ -950,7 +950,7 @@ procedure TACLBindingDiagramObjectViewInfo.DoDrawCaption(ACanvas: TCanvas);
 begin
   if not IsRectEmpty(CaptionRect) then
   begin
-    acFillRect(ACanvas.Handle, CaptionRect, Style.ColorObjectCaption.Value);
+    acFillRect(ACanvas, CaptionRect, Style.ColorObjectCaption.Value);
 
     ACanvas.Font := SubClass.CaptionFont;
     ACanvas.Font.Color := Style.ColorObjectCaptionText.AsColor;
@@ -1142,11 +1142,11 @@ begin
     LColorArea.Right := LColorArea.Left + LColorArea.Width div FLinks.Count;
     for var I := 0 to FLinks.Count - 2 do
     begin
-      acFillRect(ACanvas.Handle, LColorArea, GetColor(FLinks.List[I]));
+      acFillRect(ACanvas, LColorArea, GetColor(FLinks.List[I]));
       LColorArea.Offset(LColorArea.Width, 0);
     end;
     LColorArea.Right := Bounds.Right;
-    acFillRect(ACanvas.Handle, LColorArea, GetColor(FLinks.Last));
+    acFillRect(ACanvas, LColorArea, GetColor(FLinks.Last));
   end;
 end;
 
@@ -1157,7 +1157,7 @@ begin
   begin
     FOwner.Style.DrawObjectBorders(ACanvas, R);
     if AMode in FHighlightedConnectors then
-      acFillRect(ACanvas.Handle, R, FOwner.Style.ColorObjectDragHighlight.AsColor);
+      acFillRect(ACanvas, R, FOwner.Style.ColorObjectDragHighlight.AsColor);
   end;
 end;
 

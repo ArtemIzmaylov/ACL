@@ -382,7 +382,7 @@ const
 procedure TACLStyleTabControl.DrawTab(ACanvas: TCanvas;
   const R: TRect; AActive, AFocused: Boolean; AStyle: TACLTabsStyle);
 begin
-  HeaderTexture.Draw(ACanvas.Handle, R, Ord(AStyle) * 2 + Ord(AActive));
+  HeaderTexture.Draw(ACanvas, R, Ord(AStyle) * 2 + Ord(AActive));
   if AActive and AFocused then
     acDrawFocusRect(ACanvas, R.Split(HeaderTexture.ContentOffsets));
 end;
@@ -718,8 +718,8 @@ end;
 
 procedure TACLCustomTabControl.DrawContentAreaBackground(ACanvas: TCanvas);
 begin
-  acFillRect(ACanvas.Handle, FFrameRect, Style.ColorContent.AsColor);
-  acDrawComplexFrame(ACanvas.Handle, FFrameRect,
+  acFillRect(ACanvas, FFrameRect, Style.ColorContent.AsColor);
+  acDrawComplexFrame(ACanvas, FFrameRect,
     Style.ColorBorder1.AsColor, Style.ColorBorder2.AsColor, Borders);
 end;
 
@@ -1226,7 +1226,7 @@ end;
 procedure TACLPageControlPage.DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect);
 begin
   if PageControl <> nil then
-    acFillRect(ACanvas.Handle, R, PageControl.Style.ColorContent.AsColor)
+    acFillRect(ACanvas, R, PageControl.Style.ColorContent.AsColor)
   else
     inherited DrawOpaqueBackground(ACanvas, R);
 end;

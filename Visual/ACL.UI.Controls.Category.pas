@@ -48,8 +48,8 @@ type
     procedure DoAssign(ASource: TPersistent); override;
     procedure InitializeResources; override;
   public
-    procedure DrawHeader(DC: HDC; const R: TRect);
-    procedure DrawHeaderText(ACanvas: TCanvas; const R: TRect; const AText: UnicodeString);
+    procedure DrawHeader(ACanvas: TCanvas; const R: TRect);
+    procedure DrawHeaderText(ACanvas: TCanvas; const R: TRect; const AText: string);
     function MeasureHeaderHeight: Integer;
   published
     property HeaderColorContent1: TACLResourceColor index 4 read GetColor write SetColor stored IsColorStored;
@@ -106,13 +106,13 @@ begin
   HeaderTextFont.InitailizeDefaults('Category.Fonts.Header');
 end;
 
-procedure TACLStyleCategory.DrawHeader(DC: HDC; const R: TRect);
+procedure TACLStyleCategory.DrawHeader(ACanvas: TCanvas; const R: TRect);
 begin
-  acDrawGradient(DC, R, HeaderColorContent1.AsColor, HeaderColorContent2.AsColor);
-  acDrawFrame(DC, R, ColorBorder1.AsColor);
+  acDrawGradient(ACanvas, R, HeaderColorContent1.AsColor, HeaderColorContent2.AsColor);
+  acDrawFrame(ACanvas, R, ColorBorder1.AsColor);
 end;
 
-procedure TACLStyleCategory.DrawHeaderText(ACanvas: TCanvas; const R: TRect; const AText: UnicodeString);
+procedure TACLStyleCategory.DrawHeaderText(ACanvas: TCanvas; const R: TRect; const AText: string);
 begin
   ACanvas.Brush.Style := bsClear;
   ACanvas.Font.Assign(HeaderTextFont);
@@ -174,7 +174,7 @@ end;
 procedure TACLCategory.Paint;
 begin
   inherited;
-  Style.DrawHeader(Canvas.Handle, FCaptionRect);
+  Style.DrawHeader(Canvas, FCaptionRect);
   Style.DrawHeaderText(Canvas, FCaptionRect, Caption);
 end;
 

@@ -1199,7 +1199,7 @@ begin
   Painter.DrawBorder(ACanvas, R);
   R.Inflate(-Painter.BorderSize);
   Painter.StyleHatch.Draw(ACanvas, R, 2);
-  acFillRect(ACanvas.Handle, R, ColorInfo.AlphaColor);
+  acFillRect(ACanvas, R, ColorInfo.AlphaColor);
 end;
 
 function TACLColorPickerPreviewCell.MeasureSize: TSize;

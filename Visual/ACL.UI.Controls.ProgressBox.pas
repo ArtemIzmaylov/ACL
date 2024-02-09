@@ -169,8 +169,8 @@ const
 
 procedure TACLStyleProgressBox.Draw(ACanvas: TCanvas; const R: TRect);
 begin
-  acFillRect(ACanvas.Handle, R, ColorContent.Value);
-  acDrawComplexFrame(ACanvas.Handle, R, ColorBorder1.Value, ColorBorder2.Value);
+  acFillRect(ACanvas, R, ColorContent.Value);
+  acDrawComplexFrame(ACanvas, R, ColorBorder1.Value, ColorBorder2.Value);
 end;
 
 procedure TACLStyleProgressBox.InitializeResources;
@@ -295,7 +295,7 @@ begin
   if acRectVisible(Canvas.Handle, ClientRect) then
   begin
     acDrawTransparentControlBackground(Self, Canvas.Handle, ClientRect);
-    acFillRect(Canvas.Handle, ClientRect, GetActualCoverColor);
+    acFillRect(Canvas, ClientRect, GetActualCoverColor);
   end;
 end;
 

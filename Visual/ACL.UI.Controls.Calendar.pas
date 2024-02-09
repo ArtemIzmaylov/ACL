@@ -501,7 +501,7 @@ const
   FrameSize = 2;
 begin
   if AColor <> TAlphaColor.None then
-    acDrawFrame(ACanvas.Handle, Bounds, AColor, dpiApply(FrameSize, CurrentDpi));
+    acDrawFrame(ACanvas, Bounds, AColor, dpiApply(FrameSize, CurrentDpi));
 end;
 
 function TACLCalendarViewCustomCell.GetTextColor: TColor;
@@ -694,7 +694,7 @@ end;
 procedure TACLCalendarCustomViewViewInfo.DoDrawBackground(ACanvas: TCanvas);
 begin
   if not SubClass.Transparent then
-    acFillRect(ACanvas.Handle, Bounds, Style.ColorBackground.Value);
+    acFillRect(ACanvas, Bounds, Style.ColorBackground.Value);
 end;
 
 function TACLCalendarCustomViewViewInfo.IsOutOfActualRange(const AValue: TDate): Boolean;

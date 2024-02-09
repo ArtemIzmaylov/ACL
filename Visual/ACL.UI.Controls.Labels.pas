@@ -207,22 +207,21 @@ type
     property Style: TACLStyleValidationLabel read GetStyle write SetStyle;
   end;
 
-procedure acDrawLabelLine(ACanvas: TCanvas; const ALineRect, ATextRect: TRect; AColor1, AColor2: TAlphaColor);
+procedure acDrawLabelLine(ACanvas: TCanvas;
+  const ALineRect, ATextRect: TRect; AColor1, AColor2: TAlphaColor);
 implementation
 
-uses
-  System.Math;
-
-procedure acDrawLabelLine(ACanvas: TCanvas; const ALineRect, ATextRect: TRect; AColor1, AColor2: TAlphaColor);
+procedure acDrawLabelLine(ACanvas: TCanvas;
+  const ALineRect, ATextRect: TRect; AColor1, AColor2: TAlphaColor);
 var
-  ASaveIndex: Integer;
+  LClipRgn: HRGN;
 begin
-  ASaveIndex := SaveDC(ACanvas.Handle);
+  LClipRgn := acSaveClipRegion(ACanvas.Handle);
   try
     acExcludeFromClipRegion(ACanvas.Handle, ATextRect.InflateTo(4, 0));
-    acDrawComplexFrame(ACanvas.Handle, ALineRect, AColor1, AColor2, [mTop]);
+    acDrawComplexFrame(ACanvas, ALineRect, AColor1, AColor2, [mTop]);
   finally
-    RestoreDC(ACanvas.Handle, ASaveIndex);
+    acRestoreClipRegion(ACanvas.Handle, LClipRgn);
   end;
 end;
 
@@ -493,7 +492,7 @@ end;
 procedure TACLLabel.DrawBackground(ACanvas: TCanvas);
 begin
   if not Transparent then
-    acFillRect(ACanvas.Handle, ClientRect, Style.ColorContent.Value);
+    acFillRect(ACanvas, ClientRect, Style.ColorContent.Value);
 end;
 
 procedure TACLLabel.DrawLabelLine(ACanvas: TCanvas);
@@ -732,7 +731,7 @@ begin
   LGlyphRect := ClientRect;
   LGlyphRect.CenterVert(Style.Icons.FrameHeight);
   LGlyphRect.Width := Style.Icons.FrameWidth;
-  Style.Icons.Draw(ACanvas.Handle, LGlyphRect, Ord(Icon));
+  Style.Icons.Draw(ACanvas, LGlyphRect, Ord(Icon));
 end;
 
 function TACLValidationLabel.GetStyle: TACLStyleValidationLabel;

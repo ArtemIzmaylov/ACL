@@ -109,7 +109,7 @@ begin
       ALayer := TACLBitmapLayer.Create(AImageList.Width, AImageList.Height);
       try
         AImageList.Draw(ALayer.Canvas, 0, 0, AImageIndex, AIsEnabled);
-        ALayer.DrawBlend(ACanvas.Handle, R, MaxByte, True);
+        ALayer.DrawBlend(ACanvas, R, MaxByte, True);
       finally
         ALayer.Free;
       end;
@@ -227,13 +227,13 @@ begin
       end
       else
       begin
-        acFillRect(ALayer.Handle, ALayer.ClientRect, clFuchsia);
+        acFillRect(ALayer.Canvas, ALayer.ClientRect, clFuchsia);
         inherited DoDraw(Index, ALayer.Canvas, 0, 0, Style);
         ALayer.MakeTransparent(clFuchsia);
       end;
       if not Enabled then
         ALayer.MakeDisabled;
-      ALayer.DrawBlend(Canvas.Handle, Point(X, Y));
+      ALayer.DrawBlend(Canvas, Point(X, Y));
     finally
       ALayer.Free;
     end;

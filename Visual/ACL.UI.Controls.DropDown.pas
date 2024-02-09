@@ -375,7 +375,7 @@ end;
 
 procedure TACLCustomDropDownEditButtonViewInfo.DrawBackground(ACanvas: TCanvas; const R: TRect);
 begin
-  Style.Texture.Draw(ACanvas.Handle, R, 5 + Ord(State));
+  Style.Texture.Draw(ACanvas, R, 5 + Ord(State));
 end;
 
 { TACLCustomDropDown }
@@ -569,7 +569,7 @@ end;
 
 procedure TACLDropDownButtonViewInfo.DrawBackground(ACanvas: TCanvas; const R: TRect);
 begin
-  Style.Draw(ACanvas.Handle, R, State);
+  Style.Draw(ACanvas, R, State);
 end;
 
 { TACLDropDownUIInsightAdapter }

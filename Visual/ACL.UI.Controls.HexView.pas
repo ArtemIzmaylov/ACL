@@ -424,12 +424,12 @@ end;
 
 procedure TACLHexViewStyle.DrawBorder(ACanvas: TCanvas; const R: TRect; const ABorders: TACLBorders);
 begin
-  acDrawComplexFrame(ACanvas.Handle, R, ColorBorder1.Value, ColorBorder2.Value, ABorders);
+  acDrawComplexFrame(ACanvas, R, ColorBorder1.Value, ColorBorder2.Value, ABorders);
 end;
 
 procedure TACLHexViewStyle.DrawContent(ACanvas: TCanvas; const R: TRect);
 begin
-  acDrawGradient(ACanvas.Handle, R, ColorContent1.Value, ColorContent2.Value);
+  acDrawGradient(ACanvas, R, ColorContent1.Value, ColorContent2.Value);
 end;
 
 function TACLHexViewStyle.IsTransparentBackground: Boolean;
@@ -1213,13 +1213,13 @@ begin
       AColor := Style.ColorContentSelectedInactive.Value;
 
     for I := Low(FRects) to High(FRects) do
-      acFillRect(ACanvas.Handle, FRects[I], AColor);
+      acFillRect(ACanvas, FRects[I], AColor);
 
     if Focused then
-      acFillRect(ACanvas.Handle, FCursor, Style.ColorContentFocused.Value)
+      acFillRect(ACanvas, FCursor, Style.ColorContentFocused.Value)
     else
       if FRects[0].IsEmpty then // no multiple selection
-        acFillRect(ACanvas.Handle, FCursor, AColor);
+        acFillRect(ACanvas, FCursor, AColor);
   finally
     acRestoreWindowOrg(ACanvas.Handle, AWindowOrg);
   end;

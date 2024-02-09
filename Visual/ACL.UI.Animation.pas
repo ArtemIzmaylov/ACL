@@ -506,7 +506,7 @@ end;
 
 procedure TACLCustomBitmapAnimation.AllocateFrame2(const R: TRect; AProc: TACLAnimationDrawProc);
 begin
-  with AllocateFrame1(R) do
+  with AllocateFrame2(R) do
     AProc(Canvas, ClientRect);
 end;
 

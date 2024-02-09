@@ -1392,12 +1392,12 @@ end;
 
 procedure TACLStyleBackground.DrawBorder(ACanvas: TCanvas; const R: TRect; const ABorders: TACLBorders);
 begin
-  acDrawComplexFrame(ACanvas.Handle, R, ColorBorder1.Value, ColorBorder2.Value, ABorders);
+  acDrawComplexFrame(ACanvas, R, ColorBorder1.Value, ColorBorder2.Value, ABorders);
 end;
 
 procedure TACLStyleBackground.DrawContent(ACanvas: TCanvas; const R: TRect);
 begin
-  acDrawGradient(ACanvas.Handle, R, ColorContent1.Value, ColorContent2.Value);
+  acDrawGradient(ACanvas, R, ColorContent1.Value, ColorContent2.Value);
 end;
 
 function TACLStyleBackground.IsTransparentBackground: Boolean;
@@ -1437,10 +1437,11 @@ begin
   Draw(ACanvas, R, [], ASize);
 end;
 
-procedure TACLStyleHatch.Draw(ACanvas: TCanvas; const R: TRect; ABorders: TACLBorders; ASize: Integer = DefaultSize);
+procedure TACLStyleHatch.Draw(ACanvas: TCanvas; const R: TRect;
+  ABorders: TACLBorders; ASize: Integer = DefaultSize);
 begin
   acDrawHatch(ACanvas.Handle, R, ColorContent1.AsColor, ColorContent2.AsColor, ASize);
-  acDrawFrameEx(ACanvas.Handle, R, ColorBorder.AsColor, ABorders);
+  acDrawFrameEx(ACanvas, R, ColorBorder.AsColor, ABorders);
 end;
 
 procedure TACLStyleHatch.DrawColorPreview(ACanvas: TCanvas; const R: TRect; AColor: TAlphaColor);

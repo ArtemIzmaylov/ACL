@@ -43,8 +43,8 @@ type
   protected
     procedure InitializeResources; override;
   public
-    procedure DrawBackground(DC: HDC; const R: TRect; AEnabled: Boolean);
-    procedure DrawProgress(DC: HDC; const R: TRect);
+    procedure DrawBackground(ACanvas: TCanvas; const R: TRect; AEnabled: Boolean);
+    procedure DrawProgress(ACanvas: TCanvas; const R: TRect);
   published
     property Texture: TACLResourceTexture index 0 read GetTexture write SetTexture stored IsTextureStored;
   end;
@@ -106,26 +106,22 @@ type
 implementation
 
 uses
-  System.Math,
-  System.SysUtils,
-  // ACL
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.Ex.Gdip,
-  ACL.UI.Forms,
-  ACL.Utils.Common,
-  ACL.Utils.FileSystem;
+  ACL.Graphics.SkinImageSet, // inlining
+  ACL.Utils.Common;
 
 { TACLStyleProgress }
 
-procedure TACLStyleProgress.DrawBackground(DC: HDC; const R: TRect; AEnabled: Boolean);
+procedure TACLStyleProgress.DrawBackground(
+  ACanvas: TCanvas; const R: TRect; AEnabled: Boolean);
 begin
-  Texture.Draw(DC, R, 2 * Ord(not AEnabled));
+  Texture.Draw(ACanvas, R, 2 * Ord(not AEnabled));
 end;
 
-procedure TACLStyleProgress.DrawProgress(DC: HDC; const R: TRect);
+procedure TACLStyleProgress.DrawProgress(ACanvas: TCanvas; const R: TRect);
 begin
-  Texture.Draw(DC, R, 1);
+  Texture.Draw(ACanvas, R, 1);
 end;
 
 procedure TACLStyleProgress.InitializeResources;
@@ -208,22 +204,22 @@ end;
 
 procedure TACLProgressBar.Paint;
 var
-  ASaveIndex: Integer;
+  LClipRgn: HRGN;
   R1, R2: TRect;
 begin
-  Style.DrawBackground(Canvas.Handle, ClientRect, Enabled);
+  Style.DrawBackground(Canvas, ClientRect, Enabled);
   if Enabled then
   begin
-    ASaveIndex := SaveDC(Canvas.Handle);
+    LClipRgn := acSaveClipRegion(Canvas.Handle);
     try
       if acIntersectClipRegion(Canvas.Handle, ProgressAreaRect) then
       begin
         CalculateProgressRect(R1, R2);
-        Style.DrawProgress(Canvas.Handle, R1);
-        Style.DrawProgress(Canvas.Handle, R2);
+        Style.DrawProgress(Canvas, R1);
+        Style.DrawProgress(Canvas, R2);
       end;
     finally
-      RestoreDC(Canvas.Handle, ASaveIndex);
+      acRestoreClipRegion(Canvas.Handle, LClipRgn);
     end;
   end;
 end;

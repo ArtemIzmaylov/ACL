@@ -294,7 +294,8 @@ type
 
     procedure CreateAutoScrollTimer;
     procedure InitializeDragWindow(ASourceViewInfo: TACLCompoundControlCustomViewInfo);
-    procedure StartDropSource(AActions: TACLDropSourceActions; ASource: IACLDropSourceOperation; ASourceObject: TObject); virtual;
+    procedure StartDropSource(AActions: TACLDropSourceActions;
+      ASource: IACLDropSourceOperation; ASourceObject: TObject); virtual;
     procedure UpdateAutoScrollDirection(ADelta: Integer); overload;
     procedure UpdateAutoScrollDirection(const P: TPoint; const AArea: TRect); overload;
     procedure UpdateDragTargetZoneWindow(const ATargetScreenBounds: TRect; AVertical: Boolean);
@@ -1741,14 +1742,15 @@ begin
   DoGetHitTest(AInfo.HitPoint - ABounds.TopLeft, ABounds.TopLeft, AInfo);
 end;
 
-procedure TACLCompoundControlBaseContentCellViewInfo.Draw(ACanvas: TCanvas; AData: TObject; const ABounds: TRect);
+procedure TACLCompoundControlBaseContentCellViewInfo.Draw(
+  ACanvas: TCanvas; AData: TObject; const ABounds: TRect);
 begin
   MoveWindowOrg(ACanvas.Handle, ABounds.Left, ABounds.Top);
   try
     Initialize(AData, ABounds.Height);
     DoDraw(ACanvas);
     if HasFocusRect then
-      acDrawFocusRect(ACanvas.Handle, GetFocusRect, acGetActualColor(GetFocusRectColor, ACanvas.Font.Color));
+      acDrawFocusRect(ACanvas, GetFocusRect, GetFocusRectColor);
   finally
     MoveWindowOrg(ACanvas.Handle, -ABounds.Left, -ABounds.Top);
   end;
@@ -2112,7 +2114,7 @@ end;
 
 procedure TACLCompoundControlScrollBarViewInfo.DoDraw(ACanvas: TCanvas);
 begin
-  Style.DrawBackground(ACanvas.Handle, Bounds, Kind);
+  Style.DrawBackground(ACanvas, Bounds, Kind);
   inherited DoDraw(ACanvas);
 end;
 
@@ -2254,7 +2256,7 @@ end;
 procedure TACLCompoundControlScrollBarPartViewInfo.DoDraw(ACanvas: TCanvas);
 begin
   if not AnimationManager.Draw(Self, ACanvas, Bounds) then
-    Style.DrawPart(ACanvas.Handle, Bounds, Part, ActualState, Kind);
+    Style.DrawPart(ACanvas, Bounds, Part, ActualState, Kind);
 end;
 
 procedure TACLCompoundControlScrollBarPartViewInfo.UpdateState;
@@ -2604,7 +2606,7 @@ end;
 procedure TACLCompoundControlScrollContainerViewInfo.DoDraw(ACanvas: TCanvas);
 begin
   inherited DoDraw(ACanvas);
-  SubClass.StyleScrollBox.DrawSizeGripArea(ACanvas.Handle, SizeGripArea);
+  SubClass.StyleScrollBox.DrawSizeGripArea(ACanvas, SizeGripArea);
   ScrollBarHorz.Draw(ACanvas);
   ScrollBarVert.Draw(ACanvas);
 end;

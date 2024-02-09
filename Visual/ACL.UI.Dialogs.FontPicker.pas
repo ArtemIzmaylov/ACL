@@ -309,8 +309,8 @@ begin
   if TACLColors.IsDark(ACanvas.Font.Color) = TACLColors.IsDark(ABackgroundColor) then
     acExchangeIntegers(ABackgroundColor, AForegroundColor);
 
-  acDrawFrame(ACanvas.Handle, R, FontNameEdit.Style.ColorBorder.AsColor);
-  acFillRect(ACanvas.Handle, R.InflateTo(-1, -1), ABackgroundColor);
+  acDrawFrame(ACanvas, R, FontNameEdit.Style.ColorBorder.AsColor);
+  acFillRect(ACanvas, R.InflateTo(-1, -1), ABackgroundColor);
 end;
 
 procedure TACLFontPickerDialog.PlaceControls(var R: TRect);
@@ -378,7 +378,7 @@ begin
     AFocusRect.Inflate(-1);
     ABitmap := TACLBitmap.CreateEx(AFocusRect, pf32bit, True);
     try
-      acFillRect(ABitmap.Canvas.Handle, ABitmap.ClientRect, TAlphaColor(ColorPicker.Tag));
+      acFillRect(ABitmap.Canvas, ABitmap.ClientRect, TAlphaColor(ColorPicker.Tag));
       ColorPicker.Glyph.Overriden := True;
       ColorPicker.Glyph.Scalable := TACLBoolean.False;
       ColorPicker.Glyph.Image.LoadFromBitmap(ABitmap);

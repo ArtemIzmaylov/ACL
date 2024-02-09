@@ -485,7 +485,7 @@ end;
 
 procedure TACLImagePictureGlyph.Draw(ACanvas: TCanvas; const R: TRect; AEnabled: Boolean);
 begin
-  Glyph.Draw(ACanvas.Handle, R, AEnabled);
+  Glyph.Draw(ACanvas, R, AEnabled);
 end;
 
 class function TACLImagePictureGlyph.GetDescription: string;
@@ -987,7 +987,7 @@ begin
     try
       FSelection.Draw(Canvas.Handle, HitTest);
       acExcludeFromClipRegion(Canvas.Handle, FSelection.Bounds);
-      acFillRect(Canvas.Handle, DisplayImageRect, TAlphaColor.FromColor(clBlack, 160));
+      acFillRect(Canvas, DisplayImageRect, TAlphaColor.FromColor(clBlack, 160));
     finally
       RestoreDC(Canvas.Handle, ASaveIndex);
     end;

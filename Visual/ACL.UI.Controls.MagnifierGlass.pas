@@ -170,14 +170,14 @@ end;
 
 procedure TACLMagnifierGlass.PrepareBuffer(const ACursorPos: TPoint);
 
-  procedure DrawBackground(DC: HDC; const R: TRect);
+  procedure DrawBackground(ACanvas: TCanvas; const R: TRect);
   begin
     if csDesigning in ComponentState then
-      acFillRect(DC, R, Style.ColorContent1.AsColor)
+      acFillRect(ACanvas, R, Style.ColorContent1.AsColor)
     else
     begin
-      acFillRect(DC, R, clBlack);
-      acStretchBlt(DC, ScreenCanvas.Handle, R, Bounds(
+      acFillRect(ACanvas, R, clBlack);
+      acStretchBlt(ACanvas.Handle, ScreenCanvas.Handle, R, Bounds(
         ACursorPos.X - FZoomedSize.cx div 2 + 1,
         ACursorPos.Y - FZoomedSize.cy div 2 + 1,
         FZoomedSize.cx, FZoomedSize.cy));
@@ -210,7 +210,7 @@ var
 begin
   if not FBuffer.Empty then
   begin
-    DrawBackground(FBuffer.Canvas.Handle, FBuffer.ClientRect);
+    DrawBackground(FBuffer.Canvas, FBuffer.ClientRect);
     if (Zoom > 2) and ShowGridLines then
       DrawGridLines(FBuffer.Canvas.Handle, FBuffer.ClientRect);
 

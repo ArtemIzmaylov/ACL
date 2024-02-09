@@ -268,9 +268,9 @@ end;
 
 procedure TACLStyleHint.Draw(ACanvas: TCanvas; const R: TRect);
 begin
-  acDrawGradient(ACanvas.Handle, R, ColorContent1.AsColor, ColorContent2.AsColor);
+  acDrawGradient(ACanvas, R, ColorContent1.AsColor, ColorContent2.AsColor);
   if IsWin8OrLater then
-    acDrawFrame(ACanvas.Handle, R, ColorBorder.AsColor)
+    acDrawFrame(ACanvas, R, ColorBorder.AsColor)
   else
   begin
     ACanvas.Brush.Style := bsClear;

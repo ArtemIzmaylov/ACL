@@ -1097,11 +1097,11 @@ end;
 procedure TACLStyleMenu.DrawBackground(ACanvas: TCanvas; const R: TRect; ASelected: Boolean);
 begin
   if ASelected then
-    acFillRect(ACanvas.Handle, R, ColorItemSelected.AsColor)
+    acFillRect(ACanvas, R, ColorItemSelected.AsColor)
   else
-    acFillRect(ACanvas.Handle, R, ColorItem.AsColor);
+    acFillRect(ACanvas, R, ColorItem.AsColor);
 
-  Texture.Draw(ACanvas.Handle, R, Ord(ASelected));
+  Texture.Draw(ACanvas, R, Ord(ASelected));
 end;
 
 procedure TACLStyleMenu.DrawItemImage(ACanvas: TCanvas;
@@ -1135,7 +1135,7 @@ begin
         AGlyph.ImportFromImage(AItem.Bitmap, acDefaultDPI);
         AGlyph.TargetDPI := TargetDPI;
         ARect.Center(AGlyph.FrameSize);
-        AGlyph.Draw(ACanvas.Handle, ARect, AItem.Enabled);
+        AGlyph.Draw(ACanvas, ARect, AItem.Enabled);
       finally
         AGlyph.Free;
       end;
@@ -1234,7 +1234,7 @@ begin
           APrevTargetDPI := ATexture.TargetDPI;
           try
             ATexture.TargetDPI := TargetDPI;
-            ATexture.Draw(ACanvas.Handle, GetStateRect(R, ATexture), Ord(AChecked) * 5 + Ord(ASelected));
+            ATexture.Draw(ACanvas, GetStateRect(R, ATexture), Ord(AChecked) * 5 + Ord(ASelected));
           finally
             ATexture.TargetDPI := APrevTargetDPI;
           end;
@@ -1247,7 +1247,7 @@ begin
     begin
       AImageIndex := Indexes[AIsRadioItem, AChecked] + Ord(ASelected);
       if AImageIndex < TextureGutter.FrameCount then
-        TextureGutter.Draw(ACanvas.Handle, GetStateRect(R, TextureGutter), AImageIndex);
+        TextureGutter.Draw(ACanvas, GetStateRect(R, TextureGutter), AImageIndex);
     end;
   finally
     acRestoreClipRegion(ACanvas.Handle, AClipRegion);
@@ -1275,7 +1275,7 @@ var
 begin
   inherited;
   DoSplitRect(R, ItemGutterWidth, AGutterRect, AContentRect);
-  TextureGutter.Draw(ACanvas.Handle, AGutterRect, Ord(ASelected));
+  TextureGutter.Draw(ACanvas, AGutterRect, Ord(ASelected));
 end;
 
 procedure TACLStylePopupMenu.DrawBorder(ACanvas: TCanvas; const R: TRect);
@@ -1311,10 +1311,12 @@ var
 begin
   if TextureSeparator.ImageDpi <> acDefaultDpi then
   begin
-    ALayer := TACLBitmapLayer.Create(TextureGutter.Image.Width + TextureSeparator.Image.Width, TextureSeparator.Image.Height);
+    ALayer := TACLBitmapLayer.Create(
+      TextureGutter.Image.Width + TextureSeparator.Image.Width,
+      TextureSeparator.Image.Height);
     try
-      acFillRect(ALayer.Handle, R, ColorItem.AsColor);
-      TextureSeparator.Draw(ALayer.Handle, ALayer.ClientRect);
+      acFillRect(ALayer.Canvas, R, ColorItem.AsColor);
+      TextureSeparator.Draw(ALayer.Canvas, ALayer.ClientRect);
       DoSplitRect(ALayer.ClientRect, TextureGutter.Image.Width, ASrcG, ASrcC);
       DoSplitRect(R, ItemGutterWidth, ADstG, ADstC);
       acStretchBlt(ACanvas.Handle, ALayer.Handle, ADstG, ASrcG);
@@ -1325,8 +1327,8 @@ begin
   end
   else
   begin
-    acFillRect(ACanvas.Handle, R, ColorItem.AsColor);
-    TextureSeparator.Draw(ACanvas.Handle, R, 0);
+    acFillRect(ACanvas, R, ColorItem.AsColor);
+    TextureSeparator.Draw(ACanvas, R, 0);
   end;
 end;
 

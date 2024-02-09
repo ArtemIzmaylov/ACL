@@ -863,9 +863,9 @@ var
 begin
   ALayer := TACLBitmapLayer.Create(Width, Height);
   try
-    acFillRect(ALayer.Handle, ALayer.ClientRect, TAlphaColor($FFFAFAFA));
-    acDrawFrame(ALayer.Handle, ALayer.ClientRect, TAlphaColor($FFA5A5A5));
-    Skin.Draw(ALayer.Handle, ALayer.ClientRect.CenterTo(GetSkinSize), Ord(Active and Enabled), Enabled);
+    acFillRect(ALayer.Canvas, ALayer.ClientRect, TAlphaColor($FFFAFAFA));
+    acDrawFrame(ALayer.Canvas, ALayer.ClientRect, TAlphaColor($FFA5A5A5));
+    Skin.Draw(ALayer.Canvas, ALayer.ClientRect.CenterTo(GetSkinSize), Ord(Active and Enabled), Enabled);
     acUpdateLayeredWindow(Handle, ALayer.Handle, BoundsRect);
   finally
     ALayer.Free;
@@ -1832,7 +1832,7 @@ var
 begin
   ARect := FContentRect;
   ARect.Top := FTabsArea.Top;
-  acFillRect(ACanvas.Handle, ARect, Style.ColorContent1.AsColor);
+  acFillRect(ACanvas, ARect, Style.ColorContent1.AsColor);
 
   AClipRgn := acSaveClipRegion(ACanvas.Handle);
   try
@@ -1842,7 +1842,7 @@ begin
     begin
       ATab := FTabs[FTabActiveIndex];
       if not Style.TabArea.IsEmpty then
-        acFillRect(ACanvas.Handle, ATab.Bounds, Style.ColorContent1.AsColor);
+        acFillRect(ACanvas, ATab.Bounds, Style.ColorContent1.AsColor);
       Style.DrawBorder(ACanvas, ATab.Bounds, [mLeft, mRight, mBottom]);
       DrawTabText(ACanvas, ATab);
       acExcludeFromClipRegion(ACanvas.Handle, ATab.Bounds);
@@ -1850,7 +1850,7 @@ begin
 
     ARect.Content(GetOuterPadding, TabAreaBorders);
     if not Style.TabArea.IsEmpty then
-      acFillRect(ACanvas.Handle, ARect, Style.TabArea.Value);
+      acFillRect(ACanvas, ARect, Style.TabArea.Value);
     Style.DrawBorder(ACanvas, ARect, acAllBorders);
 
     ACanvas.Font.Assign(Style.TabFont);
@@ -2939,22 +2939,22 @@ begin
   if HasBorders then
   begin
     Style.DrawBorder(Canvas, ClientRect.Split(GetOuterPadding), acAllBorders);
-    Style.DrawHeader(Canvas.Handle, FCaptionRect);
+    Style.DrawHeader(Canvas, FCaptionRect);
     Style.DrawHeaderText(Canvas, FCaptionTextRect, Caption);
     AClipRgn := acSaveClipRegion(Canvas.Handle);
     try
       acIntersectClipRegion(Canvas.Handle, FCaptionRect);
       for var I := Low(FCaptionButtons) to High(FCaptionButtons) do
       begin
-        Style.HeaderButton.Draw(Canvas.Handle, FCaptionButtons[I], GetCaptionButtonState(I));
-        Style.HeaderButtonGlyphs.Draw(Canvas.Handle, FCaptionButtons[I].InflateTo(-4), Ord(I));
+        Style.HeaderButton.Draw(Canvas, FCaptionButtons[I], GetCaptionButtonState(I));
+        Style.HeaderButtonGlyphs.Draw(Canvas, FCaptionButtons[I].InflateTo(-4), Ord(I));
       end;
     finally
       acRestoreClipRegion(Canvas.Handle, AClipRgn);
     end;
   end;
   if (csDesigning in ComponentState) and not Visible then
-    acFillRect(Canvas.Handle, ClientRect.Split(GetOuterPadding), TAlphaColor.FromColor(clBlack, 30));
+    acFillRect(Canvas, ClientRect.Split(GetOuterPadding), TAlphaColor.FromColor(clBlack, 30));
 end;
 
 procedure TACLDockPanel.SetParent(AParent: TWinControl);
@@ -3315,12 +3315,12 @@ var
 begin
   AActiveTab := Owner.ActiveTab;
 
-  acFillRect(ACanvas.Handle, Bounds, Style.SideBar.AsColor);
+  acFillRect(ACanvas, Bounds, Style.SideBar.AsColor);
 
   for var I := 0 to FTabs.Count - 1 do
   begin
     ATab := FTabs.List[I];
-    Style.SideBarTab.Draw(ACanvas.Handle, ATab.Bounds, 2 + Ord(AActiveTab = ATab), Borders[Side]);
+    Style.SideBarTab.Draw(ACanvas, ATab.Bounds, 2 + Ord(AActiveTab = ATab), Borders[Side]);
 
     if AActiveTab = ATab then
       ACanvas.Font.Assign(Style.SideBarTabFontActive)

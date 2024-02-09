@@ -1044,7 +1044,7 @@ begin
   begin
     SubClass.StylePrepareFont(ACanvas);
     ACanvas.Font.Color := SubClass.StyleGetNodeTextColor(Node);
-    SubClass.StyleInplaceEditButton.Draw(ACanvas.Handle, ButtonRect, absNormal);
+    SubClass.StyleInplaceEditButton.Draw(ACanvas, ButtonRect, absNormal);
     acTextDraw(ACanvas, acEndEllipsis, ButtonRect, taCenter, taVerticalCenter);
   end;
 end;

@@ -458,7 +458,7 @@ end;
 
 procedure TACLSpinButtonViewInfo.DrawBackground(ACanvas: TCanvas; const R: TRect);
 begin
-  Style.Texture.Draw(ACanvas.Handle, R, Ord(State) + 5 * Ord(Tag > 0));
+  Style.Texture.Draw(ACanvas, R, Ord(State) + 5 * Ord(Tag > 0));
 end;
 
 { TACLSpinEditOptionsValue }

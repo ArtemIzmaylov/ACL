@@ -446,16 +446,16 @@ var
 begin
   if IsWin11OrLater then
   begin
-    acDrawFrame(ACanvas.Handle, R, ColorBorder.AsColor);
+    acDrawFrame(ACanvas, R, ColorBorder.AsColor);
     if AFocused then
     begin
       AFocusRect := R.Split(srBottom, Scale(acTextIndent));
-      acFillRect(ACanvas.Handle, AFocusRect, ColorBorderFocused.AsColor);
+      acFillRect(ACanvas, AFocusRect, ColorBorderFocused.AsColor);
       acExcludeFromClipRegion(ACanvas.Handle, AFocusRect);
     end;
   end
   else
-    acDrawFrame(ACanvas.Handle, R, ColorsBorder[AFocused]);
+    acDrawFrame(ACanvas, R, ColorsBorder[AFocused]);
 end;
 
 function TACLStyleEdit.GetBorderColor(Focused: Boolean): TColor;
@@ -934,7 +934,7 @@ end;
 
 procedure TACLCustomEdit.DrawEditorBackground(ACanvas: TCanvas; const R: TRect);
 begin
-  acFillRect(ACanvas.Handle, R, Style.ColorsContent[Enabled]);
+  acFillRect(ACanvas, R, Style.ColorsContent[Enabled]);
   if Borders then
     Style.DrawBorders(ACanvas, R, Focused and not (csDesigning in ComponentState));
 end;

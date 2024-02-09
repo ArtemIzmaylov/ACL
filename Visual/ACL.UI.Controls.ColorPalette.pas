@@ -348,7 +348,7 @@ end;
 procedure TACLColorPaletteItemViewInfo.Draw(ACanvas: TCanvas);
 begin
   Palette.Style.DrawHatch(ACanvas, Bounds);
-  acFillRect(ACanvas.Handle, Bounds, Color);
+  acFillRect(ACanvas, Bounds, Color);
   Palette.Style.DrawFrame(ACanvas, Bounds, Selected, Borders);
   if Selected then
     acExcludeFromClipRegion(ACanvas.Handle, Bounds);
@@ -547,11 +547,12 @@ end;
 
 { TACLStyleColorPalette }
 
-procedure TACLStyleColorPalette.DrawFrame(ACanvas: TCanvas; const R: TRect; ASelected: Boolean; ABorders: TACLBorders);
+procedure TACLStyleColorPalette.DrawFrame(ACanvas: TCanvas;
+  const R: TRect; ASelected: Boolean; ABorders: TACLBorders);
 begin
-  acDrawComplexFrame(ACanvas.Handle, R, ColorBorder1.Value, ColorBorder2.Value, ABorders);
+  acDrawComplexFrame(ACanvas, R, ColorBorder1.Value, ColorBorder2.Value, ABorders);
   if ASelected then
-    acDrawComplexFrame(ACanvas.Handle, R, ColorSelectedBorder1.Value, ColorSelectedBorder2.Value, acAllBorders);
+    acDrawComplexFrame(ACanvas, R, ColorSelectedBorder1.Value, ColorSelectedBorder2.Value, acAllBorders);
 end;
 
 procedure TACLStyleColorPalette.DrawHatch(ACanvas: TCanvas; const R: TRect);

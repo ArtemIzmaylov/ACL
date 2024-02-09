@@ -69,8 +69,10 @@ type
     procedure InitializeResources; override;
     procedure InitializeTextures; virtual;
   public
-    procedure Draw(DC: HDC; const R: TRect; AState: TACLButtonState; APart: TACLButtonPart = abpButton); overload; virtual;
-    procedure Draw(DC: HDC; const R: TRect; AState: TACLButtonState; ACheckBoxState: TCheckBoxState); overload; virtual;
+    procedure Draw(ACanvas: TCanvas; const R: TRect;
+      AState: TACLButtonState; APart: TACLButtonPart = abpButton); overload; virtual;
+    procedure Draw(ACanvas: TCanvas; const R: TRect;
+      AState: TACLButtonState; ACheckBoxState: TCheckBoxState); overload; virtual;
     //
     property ContentOffsets: TRect read GetContentOffsets;
     property TextColors[AState: TACLButtonState]: TColor read GetTextColor;
@@ -624,14 +626,16 @@ uses
 
 { TACLStyleButton }
 
-procedure TACLStyleButton.Draw(DC: HDC; const R: TRect; AState: TACLButtonState; APart: TACLButtonPart = abpButton);
+procedure TACLStyleButton.Draw(ACanvas: TCanvas; const R: TRect;
+  AState: TACLButtonState; APart: TACLButtonPart = abpButton);
 begin
-  Texture.Draw(DC, R, Ord(APart) * 5 + Ord(AState));
+  Texture.Draw(ACanvas, R, Ord(APart) * 5 + Ord(AState));
 end;
 
-procedure TACLStyleButton.Draw(DC: HDC; const R: TRect; AState: TACLButtonState; ACheckBoxState: TCheckBoxState);
+procedure TACLStyleButton.Draw(ACanvas: TCanvas; const R: TRect;
+  AState: TACLButtonState; ACheckBoxState: TCheckBoxState);
 begin
-  Texture.Draw(DC, R, Ord(ACheckBoxState) * 5 + Ord(AState));
+  Texture.Draw(ACanvas, R, Ord(ACheckBoxState) * 5 + Ord(AState));
 end;
 
 procedure TACLStyleButton.InitializeResources;
@@ -1822,7 +1826,7 @@ end;
 
 procedure TACLCheckBoxViewInfo.DrawBackground(ACanvas: TCanvas; const R: TRect);
 begin
-  Style.Draw(ACanvas.Handle, R, State, CheckState);
+  Style.Draw(ACanvas, R, State, CheckState);
 end;
 
 procedure TACLCheckBoxViewInfo.DrawContent(ACanvas: TCanvas);
@@ -1830,9 +1834,11 @@ begin
   if Caption <> '' then
   begin
     AssignCanvasParameters(ACanvas);
-    //#AI: Use the acSysDrawText always to make layout consistent between singleline and multiline checkboxes
-    acSysDrawText(ACanvas, FTextRect, Caption,
-      DT_END_ELLIPSIS or DT_NOPREFIX or acTextAlignHorz[Alignment] or IfThen(WordWrap, DT_WORDBREAK));
+    //#AI:
+    // Always use acSysDrawText to make layout consistent between
+    // singleline and multiline checkboxes
+    acSysDrawText(ACanvas, FTextRect, Caption, DT_END_ELLIPSIS or DT_NOPREFIX or
+      acTextAlignHorz[Alignment] or IfThen(WordWrap, DT_WORDBREAK));
   end;
   if ShowLine then
     acDrawLabelLine(ACanvas, FLineRect, TextRect, Style.ColorLine1.Value, Style.ColorLine2.Value);

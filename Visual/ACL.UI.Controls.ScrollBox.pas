@@ -166,12 +166,12 @@ end;
 
 procedure TACLScrollBoxStyle.DrawBorder(ACanvas: TCanvas; const R: TRect; const ABorders: TACLBorders);
 begin
-  acDrawComplexFrame(ACanvas.Handle, R, ColorBorder1.Value, ColorBorder2.Value, ABorders);
+  acDrawComplexFrame(ACanvas, R, ColorBorder1.Value, ColorBorder2.Value, ABorders);
 end;
 
 procedure TACLScrollBoxStyle.DrawContent(ACanvas: TCanvas; const R: TRect);
 begin
-  acDrawGradient(ACanvas.Handle, R, ColorContent1.Value, ColorContent2.Value);
+  acDrawGradient(ACanvas, R, ColorContent1.Value, ColorContent2.Value);
 end;
 
 function TACLScrollBoxStyle.IsTransparentBackground: Boolean;

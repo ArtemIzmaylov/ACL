@@ -1140,7 +1140,8 @@ type
 
 { TACLStyleTreeList }
 
-procedure TACLStyleTreeList.DrawBackground(ACanvas: TCanvas; const R: TRect; AEnabled: Boolean; ABorders: TACLBorders);
+procedure TACLStyleTreeList.DrawBackground(ACanvas: TCanvas;
+  const R: TRect; AEnabled: Boolean; ABorders: TACLBorders);
 var
   AColor: TAlphaColor;
 begin
@@ -1149,51 +1150,55 @@ begin
   else
     AColor := BackgroundColorDisabled.Value;
 
-  acFillRect(ACanvas.Handle, R, AColor);
-  acDrawFrameEx(ACanvas.Handle, R, BorderColor.Value, ABorders);
+  acFillRect(ACanvas, R, AColor);
+  acDrawFrameEx(ACanvas, R, BorderColor.Value, ABorders);
 end;
 
 procedure TACLStyleTreeList.DrawCheckMark(ACanvas: TCanvas;
   const R: TRect; AState: TACLButtonState; ACheckBoxState: TCheckBoxState);
 begin
   if not R.IsEmpty then
-    CheckMark.Draw(ACanvas.Handle, R, Ord(ACheckBoxState) * 5 + Ord(AState));
+    CheckMark.Draw(ACanvas, R, Ord(ACheckBoxState) * 5 + Ord(AState));
 end;
 
-procedure TACLStyleTreeList.DrawGridline(ACanvas: TCanvas; const R: TRect; ASide: TACLBorder);
+procedure TACLStyleTreeList.DrawGridline(
+  ACanvas: TCanvas; const R: TRect; ASide: TACLBorder);
 begin
-  acDrawFrameEx(ACanvas.Handle, R, GridColor.Value, [ASide]);
+  acDrawFrameEx(ACanvas, R, GridColor.Value, [ASide]);
 end;
 
-procedure TACLStyleTreeList.DrawGroupExpandButton(ACanvas: TCanvas; const R: TRect; AExpanded: Boolean);
+procedure TACLStyleTreeList.DrawGroupExpandButton(
+  ACanvas: TCanvas; const R: TRect; AExpanded: Boolean);
 begin
-  GroupHeaderExpandButton.Draw(ACanvas.Handle, R, Ord(AExpanded));
+  GroupHeaderExpandButton.Draw(ACanvas, R, Ord(AExpanded));
 end;
 
 procedure TACLStyleTreeList.DrawGroupHeader(ACanvas: TCanvas; const R: TRect; ABorders: TACLBorders);
 begin
-  acFillRect(ACanvas.Handle, R, GroupHeaderColor.Value);
-  acDrawFrameEx(ACanvas.Handle, R, GroupHeaderColorBorder.Value, ABorders);
+  acFillRect(ACanvas, R, GroupHeaderColor.Value);
+  acDrawFrameEx(ACanvas, R, GroupHeaderColorBorder.Value, ABorders);
 end;
 
 procedure TACLStyleTreeList.DrawHeader(ACanvas: TCanvas; const R: TRect; ABorders: TACLBorders);
 begin
-  ColumnHeader.Draw(ACanvas.Handle, R, 0, ABorders);
+  ColumnHeader.Draw(ACanvas, R, 0, ABorders);
 end;
 
-procedure TACLStyleTreeList.DrawHeaderSortingArrow(ACanvas: TCanvas; const R: TRect; ADirection, AEnabled: Boolean);
+procedure TACLStyleTreeList.DrawHeaderSortingArrow(
+  ACanvas: TCanvas; const R: TRect; ADirection, AEnabled: Boolean);
 begin
-  ColumnHeaderSortingArrow.Draw(ACanvas.Handle, R, Ord(ADirection) * 2 + Ord(AEnabled));
+  ColumnHeaderSortingArrow.Draw(ACanvas, R, Ord(ADirection) * 2 + Ord(AEnabled));
 end;
 
-procedure TACLStyleTreeList.DrawRowExpandButton(ACanvas: TCanvas; const R: TRect; AExpanded, ASelected: Boolean);
+procedure TACLStyleTreeList.DrawRowExpandButton(
+  ACanvas: TCanvas; const R: TRect; AExpanded, ASelected: Boolean);
 var
   AIndex: Integer;
 begin
   AIndex := Ord(AExpanded);
   if RowExpandButton.FrameCount >= 4 then
     Inc(AIndex, 2 * Ord(ASelected));
-  RowExpandButton.Draw(ACanvas.Handle, R, AIndex);
+  RowExpandButton.Draw(ACanvas, R, AIndex);
 end;
 
 procedure TACLStyleTreeList.InitializeResources;
@@ -2085,9 +2090,9 @@ procedure TACLTreeListNodeViewInfo.DoDraw(ACanvas: TCanvas);
 var
   I: Integer;
 begin
-  acFillRect(ACanvas.Handle, Bounds, SubClass.StyleGetNodeBackgroundColor(Odd(AbsoluteNodeIndex), Node));
+  acFillRect(ACanvas, Bounds, SubClass.StyleGetNodeBackgroundColor(Odd(AbsoluteNodeIndex), Node));
   if IsFocused and (SubClass.FocusedColumn <> nil) and SubClass.Focused then
-    acFillRect(ACanvas.Handle, GetFocusRect, SubClass.Style.RowColorFocused.Value);
+    acFillRect(ACanvas, GetFocusRect, SubClass.Style.RowColorFocused.Value);
   if HasHorzSeparators then
     SubClass.Style.DrawGridline(ACanvas, GetBottomSeparatorRect, mBottom);
 
@@ -2339,9 +2344,9 @@ begin
   begin
     AColor := Owner.SubClass.Style.RowColorText.Value;
     if FInsertMode = dtimOver then
-      acDrawFrame(ACanvas.Handle, Bounds, AColor, MeasureHeight)
+      acDrawFrame(ACanvas, Bounds, AColor, MeasureHeight)
     else
-      acFillRect(ACanvas.Handle, Bounds, AColor);
+      acFillRect(ACanvas, Bounds, AColor);
   end;
 end;
 
@@ -2819,7 +2824,7 @@ end;
 
 procedure TACLTreeListContentViewInfo.DoDrawSelectionRect(ACanvas: TCanvas; const R: TRect);
 begin
-  acDrawSelectionRect(ACanvas.Handle, R, SubClass.Style.SelectionRectColor.Value);
+  acDrawSelectionRect(ACanvas, R, SubClass.Style.SelectionRectColor.Value);
 end;
 
 function TACLTreeListContentViewInfo.GetFirstVisibleNode: TACLTreeListNode;

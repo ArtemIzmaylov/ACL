@@ -92,9 +92,10 @@ type
   protected
     procedure InitializeResources; override;
   public
-    procedure DrawBackground(DC: HDC; const R: TRect; Kind: TScrollBarKind);
-    procedure DrawPart(DC: HDC; const R: TRect; Part: TACLScrollBarPart; State: TACLButtonState; Kind: TScrollBarKind);
-    procedure DrawSizeGripArea(DC: HDC; const R: TRect);
+    procedure DrawBackground(ACanvas: TCanvas; const R: TRect; Kind: TScrollBarKind);
+    procedure DrawPart(ACanvas: TCanvas; const R: TRect;
+      Part: TACLScrollBarPart; State: TACLButtonState; Kind: TScrollBarKind);
+    procedure DrawSizeGripArea(ACanvas: TCanvas; const R: TRect);
     function IsThumbResizable(AKind: TScrollBarKind): Boolean;
     //
     property TextureBackground[Kind: TScrollBarKind]: TACLResourceTexture read GetTextureBackground;
@@ -330,28 +331,29 @@ end;
 
 { TACLStyleScrollBox }
 
-procedure TACLStyleScrollBox.DrawBackground(DC: HDC; const R: TRect; Kind: TScrollBarKind);
+procedure TACLStyleScrollBox.DrawBackground(
+  ACanvas: TCanvas; const R: TRect; Kind: TScrollBarKind);
 begin
-  TextureBackground[Kind].Draw(DC, R);
+  TextureBackground[Kind].Draw(ACanvas, R);
 end;
 
-procedure TACLStyleScrollBox.DrawPart(DC: HDC; const R: TRect;
+procedure TACLStyleScrollBox.DrawPart(ACanvas: TCanvas; const R: TRect;
   Part: TACLScrollBarPart; State: TACLButtonState; Kind: TScrollBarKind);
 begin
   case Part of
     sbpThumbnail:
-      TextureThumb[Kind].Draw(DC, R, Ord(State));
+      TextureThumb[Kind].Draw(ACanvas, R, Ord(State));
     sbpLineUp:
-      TextureButtons[Kind].Draw(DC, R, Ord(State));
+      TextureButtons[Kind].Draw(ACanvas, R, Ord(State));
     sbpLineDown:
-      TextureButtons[Kind].Draw(DC, R, Ord(State) + 4);
+      TextureButtons[Kind].Draw(ACanvas, R, Ord(State) + 4);
+  else;
   end;
 end;
 
-procedure TACLStyleScrollBox.DrawSizeGripArea(DC: HDC; const R: TRect);
+procedure TACLStyleScrollBox.DrawSizeGripArea(ACanvas: TCanvas; const R: TRect);
 begin
-  if not R.IsEmpty then
-    TextureSizeGripArea.Draw(DC, R);
+  TextureSizeGripArea.Draw(ACanvas, R);
 end;
 
 function TACLStyleScrollBox.IsThumbResizable(AKind: TScrollBarKind): Boolean;
@@ -963,9 +965,10 @@ begin
   inherited Destroy;
 end;
 
-procedure TACLScrollBar.DrawPart(ACanvas: TCanvas; const R: TRect; APart: TACLScrollBarPart; AState: TACLButtonState);
+procedure TACLScrollBar.DrawPart(ACanvas: TCanvas;
+  const R: TRect; APart: TACLScrollBarPart; AState: TACLButtonState);
 begin
-  Style.DrawPart(ACanvas.Handle, R, APart, AState, Kind);
+  Style.DrawPart(ACanvas, R, APart, AState, Kind);
 end;
 
 procedure TACLScrollBar.Paint;
@@ -1017,7 +1020,7 @@ end;
 
 procedure TACLScrollBar.DrawBackground(ACanvas: TCanvas; const R: TRect);
 begin
-  Style.DrawBackground(ACanvas.Handle, R, Kind);
+  Style.DrawBackground(ACanvas, R, Kind);
 end;
 
 procedure TACLScrollBar.Scroll(ScrollCode: TScrollCode; var ScrollPos: Integer);

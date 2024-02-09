@@ -113,9 +113,9 @@ var
 begin
   case BorderStyle of
     bbsSimple:
-      acDrawFrameEx(ACanvas.Handle, R, ColorBorder1.Value, Borders);
+      acDrawFrameEx(ACanvas, R, ColorBorder1.Value, Borders);
     bbs3D:
-      acDrawComplexFrame(ACanvas.Handle, R, ColorBorder1.Value, ColorBorder2.Value, Borders);
+      acDrawComplexFrame(ACanvas, R, ColorBorder1.Value, ColorBorder2.Value, Borders);
 
     bbsRounded:
       begin

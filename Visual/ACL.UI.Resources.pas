@@ -430,18 +430,22 @@ type
     destructor Destroy; override;
     procedure Assign(Source: TPersistent); override;
     procedure Clear; inline;
-    procedure Draw(DC: HDC; const R: TRect; AFrameIndex: Integer = 0; AEnabled: Boolean = True; AAlpha: Byte = MaxByte); overload;
-    procedure Draw(DC: HDC; const R: TRect; AFrameIndex: Integer; ABorders: TACLBorders); overload;
-    procedure DrawClipped(DC: HDC; const AClipRect, R: TRect; AFrameIndex: Integer; AAlpha: Byte = MaxByte);
+    procedure Draw(ACanvas: TCanvas; const R: TRect;
+      AFrameIndex: Integer = 0; AEnabled: Boolean = True; AAlpha: Byte = MaxByte); overload;
+    procedure Draw(ACanvas: TCanvas; const R: TRect;
+      AFrameIndex: Integer; ABorders: TACLBorders); overload;
+    procedure DrawClipped(ACanvas: TCanvas; const AClipRect, R: TRect;
+      AFrameIndex: Integer; AAlpha: Byte = MaxByte);
     function HasFrame(AIndex: Integer): Boolean; inline;
     function HitTest(const ABounds: TRect; X, Y: Integer): Boolean; virtual;
-    procedure InitailizeDefaults(const DefaultID: UnicodeString;
-      AInstance: HINST; const AName: UnicodeString; const AMargins, AContentOffsets: TRect;
-      AFrameCount: Integer; ALayout: TACLSkinImageLayout = ilHorizontal; AStretchMode: TACLStretchMode = isStretch); reintroduce; overload;
+    procedure InitailizeDefaults(const DefaultID: string;
+      AInstance: HINST; const AName: string; const AMargins, AContentOffsets: TRect;
+      AFrameCount: Integer; ALayout: TACLSkinImageLayout = ilHorizontal;
+      AStretchMode: TACLStretchMode = isStretch); reintroduce; overload;
     procedure ImportFromImage(const AImage: TBitmap; DPI: Integer = acDefaultDPI);
     procedure ImportFromImageFile(const AFileName: string; DPI: Integer = acDefaultDPI);
     procedure ImportFromImageResource(const AInstance: HINST;
-      const AResName: string; AResType: PWideChar; DPI: Integer = acDefaultDPI);
+      const AResName: string; AResType: PChar; DPI: Integer = acDefaultDPI);
     procedure ImportFromImageStream(const AStream: TStream; DPI: Integer = acDefaultDPI);
     procedure MakeUnique;
     // IACLColorSchema
@@ -489,7 +493,8 @@ type
     procedure DoChanged(AChanges: TACLPersistentChanges); override;
     function GetResourceClass: TACLResourceClass; override;
   public
-    procedure Draw(DC: HDC; const R: TRect; AEnabled: Boolean = True; AAlpha: Byte = $FF); reintroduce;
+    procedure Draw(ACanvas: TCanvas; const R: TRect;
+      AEnabled: Boolean = True; AAlpha: Byte = $FF); reintroduce;
   published
     property FrameIndex: Integer read FFrameIndex write SetFrameIndex default 0;
   end;
@@ -693,7 +698,7 @@ type
     function AddResource(AResource: TACLResource; ID: string = ''): TACLResource;
     function AddTexture(const ID: string; ASkinImage: TACLSkinImageSet): TACLResourceTexture; overload;
     function AddTexture(const ID: string;
-      const AResInstance: HINST; const AResName: UnicodeString;
+      const AResInstance: HINST; const AResName: string;
       const AMargins, AContentOffsets: TRect; AFrameCount: Integer;
       const ALayout: TACLSkinImageLayout = ilHorizontal;
       const AStretchMode: TACLStretchMode = isStretch): TACLResourceTexture; overload;
@@ -2000,8 +2005,9 @@ begin
   DoMasterChanged;
 end;
 
-procedure TACLResourceTexture.LoadFromBitmapResourceCore(AInstance: HINST; const AName: UnicodeString;
-  const AMargins, AContentOffsets: TRect; AFrameCount: Integer; ALayout: TACLSkinImageLayout; AStretchMode: TACLStretchMode);
+procedure TACLResourceTexture.LoadFromBitmapResourceCore(
+  AInstance: HINST; const AName: string; const AMargins, AContentOffsets: TRect;
+  AFrameCount: Integer; ALayout: TACLSkinImageLayout; AStretchMode: TACLStretchMode);
 begin
   Overriden := True;
   FImageSet.BeginUpdate;
@@ -2062,12 +2068,14 @@ begin
   Result := Image.HitTest(ABounds, X, Y);
 end;
 
-procedure TACLResourceTexture.Draw(DC: HDC; const R: TRect; AFrameIndex: Integer; AEnabled: Boolean; AAlpha: Byte);
+procedure TACLResourceTexture.Draw(ACanvas: TCanvas;
+  const R: TRect; AFrameIndex: Integer; AEnabled: Boolean; AAlpha: Byte);
 begin
-  Image.Draw(DC, R, AFrameIndex, AEnabled, AAlpha);
+  Image.Draw(ACanvas, R, AFrameIndex, AEnabled, AAlpha);
 end;
 
-procedure TACLResourceTexture.Draw(DC: HDC; const R: TRect; AFrameIndex: Integer; ABorders: TACLBorders);
+procedure TACLResourceTexture.Draw(ACanvas: TCanvas;
+  const R: TRect; AFrameIndex: Integer; ABorders: TACLBorders);
 var
   LClipRect: TRect;
 begin
@@ -2075,31 +2083,34 @@ begin
   begin
     LClipRect := R;
     LClipRect.Inflate(Margins, acAllBorders - ABorders);
-    DrawClipped(DC, R, LClipRect, AFrameIndex)
+    DrawClipped(ACanvas, R, LClipRect, AFrameIndex)
   end
   else
-    Draw(DC, R, AFrameIndex);
+    Draw(ACanvas, R, AFrameIndex);
 end;
 
-procedure TACLResourceTexture.DrawClipped(DC: HDC; const AClipRect, R: TRect; AFrameIndex: Integer; AAlpha: Byte);
+procedure TACLResourceTexture.DrawClipped(ACanvas: TCanvas;
+  const AClipRect, R: TRect; AFrameIndex: Integer; AAlpha: Byte);
 var
   AClipRegion: HRGN;
 begin
-  AClipRegion := acSaveClipRegion(DC);
+  AClipRegion := acSaveClipRegion(ACanvas.Handle);
   try
-    if acIntersectClipRegion(DC, AClipRect) then
-      Draw(DC, R, AFrameIndex, True, AAlpha);
+    if acIntersectClipRegion(ACanvas.Handle, AClipRect) then
+      Draw(ACanvas, R, AFrameIndex, True, AAlpha);
   finally
-    acRestoreClipRegion(DC, AClipRegion);
+    acRestoreClipRegion(ACanvas.Handle, AClipRegion);
   end;
 end;
 
-procedure TACLResourceTexture.InitailizeDefaults(const DefaultID: UnicodeString;
-  AInstance: HINST; const AName: UnicodeString; const AMargins, AContentOffsets: TRect;
-  AFrameCount: Integer; ALayout: TACLSkinImageLayout = ilHorizontal; AStretchMode: TACLStretchMode = isStretch);
+procedure TACLResourceTexture.InitailizeDefaults(const DefaultID: string;
+  AInstance: HINST; const AName: string; const AMargins, AContentOffsets: TRect;
+  AFrameCount: Integer; ALayout: TACLSkinImageLayout = ilHorizontal;
+  AStretchMode: TACLStretchMode = isStretch);
 begin
   inherited InitailizeDefaults(DefaultID);
-  LoadFromBitmapResourceCore(AInstance, AName, AMargins, AContentOffsets, AFrameCount, ALayout, AStretchMode);
+  LoadFromBitmapResourceCore(AInstance, AName,
+    AMargins, AContentOffsets, AFrameCount, ALayout, AStretchMode);
 end;
 
 procedure TACLResourceTexture.ImportFromImage(const AImage: TBitmap; DPI: Integer = acDefaultDPI);
@@ -2115,7 +2126,7 @@ begin
 end;
 
 procedure TACLResourceTexture.ImportFromImageResource(const AInstance: HINST;
-  const AResName: string; AResType: PWideChar; DPI: Integer = acDefaultDPI);
+  const AResName: string; AResType: PChar; DPI: Integer = acDefaultDPI);
 var
   AStream: TStream;
 begin
@@ -2363,14 +2374,14 @@ end;
 
 { TACLGlyph }
 
-procedure TACLGlyph.Draw(DC: HDC; const R: TRect; AEnabled: Boolean; AAlpha: Byte);
+procedure TACLGlyph.Draw(ACanvas: TCanvas; const R: TRect; AEnabled: Boolean; AAlpha: Byte);
 var
   ALayer: TACLBitmapLayer;
 begin
   ALayer := TACLBitmapLayer.Create(Image.FrameSize);
   try
-    Image.Draw(ALayer.Handle, ALayer.ClientRect, FrameIndex, AEnabled);
-    ALayer.DrawBlend(DC, R, AAlpha, True);
+    Image.Draw(ALayer.Canvas, ALayer.ClientRect, FrameIndex, AEnabled);
+    ALayer.DrawBlend(ACanvas, R, AAlpha, True);
   finally
     ALayer.Free;
   end;
@@ -3004,7 +3015,7 @@ begin
 end;
 
 function TACLResourceCollectionItems.AddTexture(const ID: string;
-  const AResInstance: HINST; const AResName: UnicodeString;
+  const AResInstance: HINST; const AResName: string;
   const AMargins, AContentOffsets: TRect; AFrameCount: Integer;
   const ALayout: TACLSkinImageLayout = ilHorizontal;
   const AStretchMode: TACLStretchMode = isStretch): TACLResourceTexture;

@@ -182,9 +182,9 @@ type
   protected
     procedure InitializeResources; override;
   public
-    procedure Draw(DC: HDC; const R: TRect; AEnabled: Boolean);
-    procedure DrawThumb(DC: HDC; const R: TRect; AState: TACLButtonState);
-    //
+    procedure Draw(ACanvas: TCanvas; const R: TRect; AEnabled: Boolean);
+    procedure DrawThumb(ACanvas: TCanvas; const R: TRect; AState: TACLButtonState);
+    //# Properties
     property MarkColor[Enabled: Boolean]: TAlphaColor read GetMarkColor;
   published
     property ColorMark: TACLResourceColor index 10 read GetColor write SetColor stored IsColorStored;
@@ -697,14 +697,14 @@ end;
 
 { TACLStyleSlider }
 
-procedure TACLStyleSlider.Draw(DC: HDC; const R: TRect; AEnabled: Boolean);
+procedure TACLStyleSlider.Draw(ACanvas: TCanvas; const R: TRect; AEnabled: Boolean);
 begin
-  Texture.Draw(DC, R, Ord(AEnabled));
+  Texture.Draw(ACanvas, R, Ord(AEnabled));
 end;
 
-procedure TACLStyleSlider.DrawThumb(DC: HDC; const R: TRect; AState: TACLButtonState);
+procedure TACLStyleSlider.DrawThumb(ACanvas: TCanvas; const R: TRect; AState: TACLButtonState);
 begin
-  TextureThumb.Draw(DC, R, Ord(AState));
+  TextureThumb.Draw(ACanvas, R, Ord(AState));
 end;
 
 procedure TACLStyleSlider.InitializeResources;
@@ -1679,22 +1679,22 @@ begin
   if AColor.IsValid then
   begin
     for I := 0 to ViewInfo.TickMarks.Count - 1 do
-      acFillRect(ACanvas.Handle, ViewInfo.TickMarks.List[I], AColor);
+      acFillRect(ACanvas, ViewInfo.TickMarks.List[I], AColor);
   end;
 end;
 
 procedure TACLSlider.DrawThumbBar(ACanvas: TCanvas; const ARect: TRect);
 begin
   if not CallCustomDrawEvent(Self, OnDrawThumb, ACanvas, ARect) then
-    Style.DrawThumb(ACanvas.Handle, ARect, FThumbState);
+    Style.DrawThumb(ACanvas, ARect, FThumbState);
 end;
 
 procedure TACLSlider.DrawTrackBar(ACanvas: TCanvas; const ARect: TRect);
 begin
   if not CallCustomDrawEvent(Self, OnDrawBackground, ACanvas, ARect) then
-    Style.Draw(ACanvas.Handle, ARect, Enabled);
+    Style.Draw(ACanvas, ARect, Enabled);
   if not ViewInfo.DefaultValueRect.IsEmpty then
-    acFillRect(ACanvas.Handle, ViewInfo.DefaultValueRect, Style.ColorDefaultValue.Value);
+    acFillRect(ACanvas, ViewInfo.DefaultValueRect, Style.ColorDefaultValue.Value);
 end;
 
 procedure TACLSlider.Paint;
