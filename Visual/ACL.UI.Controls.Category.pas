@@ -11,29 +11,27 @@
 
 unit ACL.UI.Controls.Category;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+  {Winapi.}Messages,
   // System
-  System.Classes,
-  System.Math,
-  System.SysUtils,
-  System.Types,
+  {System.}Classes,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
   // Vcl
-  Vcl.Controls,
-  Vcl.Graphics,
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
   // ACL
   ACL.Classes,
   ACL.Geometry,
   ACL.Graphics,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Resources,
-  ACL.Utils.Common,
-  ACL.Utils.DPIAware;
+  ACL.Utils.Common;
 
 type
 
