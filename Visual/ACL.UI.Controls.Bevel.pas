@@ -4,43 +4,42 @@
 {*               Bevel Control               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.Bevel;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+{$IFDEF FPC}
+  LCLType,
+{$ELSE}
+  {Winapi.}Windows,
+{$ENDIF}
   // System
-  System.Classes,
-  System.SysUtils,
-  System.Types,
+  {System.}Classes,
+  {System.}SysUtils,
+  {System.}Types,
   System.UITypes,
   // Vcl
-  Vcl.Controls,
-  Vcl.ImgList,
-  Vcl.Graphics,
-  Vcl.ActnList,
-  Vcl.ExtCtrls,
+  {Vcl.}Controls,
+  {Vcl.}ImgList,
+  {Vcl.}Graphics,
+  {Vcl.}ActnList,
+  {Vcl.}ExtCtrls,
   // ACL
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Ex,
   ACL.Graphics.SkinImage,
-  ACL.Math,
   ACL.UI.Controls.BaseControls,
-  ACL.UI.Forms,
   ACL.UI.Resources,
-  ACL.Utils.Common,
-  ACL.Utils.FileSystem,
-  ACL.Utils.Shell;
+  ACL.Utils.Common;
 
 type
 
@@ -92,9 +91,6 @@ type
 
 implementation
 
-uses
-  System.Math;
-
 { TACLStyleBevel }
 
 procedure TACLStyleBevel.DoAssign(ASource: TPersistent);
@@ -130,6 +126,7 @@ begin
           acRestoreClipRegion(ACanvas.Handle, AClipRgn);
         end;
       end;
+  else;
   end;
 end;
 
