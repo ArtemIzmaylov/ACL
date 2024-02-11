@@ -11,32 +11,43 @@
 
 unit ACL.UI.Controls.BaseControls;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC: Partial
+
+{$MESSAGE WARN 'TODO - AlignWithMargins'}
 
 interface
 
 uses
-  Winapi.Messages,
-  Winapi.UxTheme,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+  LMessages,
+{$ELSE}
+  Winapi.DwmApi,
   Winapi.Windows,
+  Winapi.UxTheme,
+{$ENDIF}
+  {Winapi.}Messages,
   // System
-  System.Classes,
-  System.Generics.Collections,
-  System.SysUtils,
-  System.Types,
+  {System.}Classes,
+  {System.}Generics.Collections,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
   System.UITypes,
   // Vcl
-  Vcl.ActnList,
-  Vcl.Controls,
-  Vcl.ExtCtrls,
-  Vcl.Graphics,
-  Vcl.ImgList,
-  Vcl.StdCtrls,
+  {Vcl.}ActnList,
+  {Vcl.}Controls,
+  {Vcl.}Forms,
+  {Vcl.}ExtCtrls,
+  {Vcl.}Graphics,
+  {Vcl.}ImgList,
+  {Vcl.}StdCtrls,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
-  ACL.Classes.StringList,
   ACL.Geometry,
+  ACL.Geometry.Utils,
   ACL.Graphics,
   ACL.MUI,
   ACL.ObjectLinks,
@@ -52,6 +63,13 @@ const
   CM_SCALECHANGING = $BF00;
   CM_SCALECHANGED  = $BF01;
 
+{$IFDEF FPC}
+  CS_DROPSHADOW  = 0;
+  WM_MOUSEWHEEL  = LM_MOUSEWHEEL;
+  WM_MOUSEHWHEEL = LM_MOUSEHWHEEL;
+  WM_MOVE = LM_MOVE;
+{$ENDIF}
+
 const
   acIndentBetweenElements = 5;
   acResizeHitTestAreaSize = 6;
@@ -65,6 +83,10 @@ const
   AnchorBottomRight = [akRight, akBottom];
 
 type
+{$IFDEF FPC}
+  TWMMouseWheel = TCMMouseWheel;
+{$ENDIF}
+
   TACLMouseWheelDirection = (
     mwdDown, // Scroll the mouse wheel down (to yourself), the list must be scrolled to next item. equals to LB_LINEDOWN.
     mwdUp    // Scroll the mouse wheel up (from yourself), the list must be scrolled to previous item. equals to LB_LINEUP.
@@ -119,10 +141,10 @@ type
 
   IACLInplaceControl = interface
   ['{494D7949-6E70-6C61-6365-436F6E74726F}']
-    function InplaceGetValue: UnicodeString;
+    function InplaceGetValue: string;
     function InplaceIsFocused: Boolean;
     procedure InplaceSetFocus;
-    procedure InplaceSetValue(const AValue: UnicodeString);
+    procedure InplaceSetValue(const AValue: string);
   end;
 
   { IACLMouseTracking }
@@ -204,12 +226,14 @@ type
     DefaultValue = 3;
   end;
 
+{$IFNDEF FPC}
   { TACLMarginsHelper }
 
   TACLMarginsHelper = class helper for TMargins
   public
     procedure Assign(const S: TRect);
   end;
+{$ENDIF}
 
   { TACLCheckBoxStateHelper }
 
@@ -305,9 +329,13 @@ type
     procedure SetMargins(const Value: TACLMargins);
     procedure SetResourceCollection(AValue: TACLCustomResourceCollection);
   protected
-    procedure AdjustSize; override;
+    {$MESSAGE WARN 'ChangeScale'}
+//    procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
+  protected
+  {$IFDEF FPC}
+    procedure CalculatePreferredSize(var W, H: Integer; X: Boolean); override;
+  {$ENDIF}
     procedure DoGetHint(const P: TPoint; var AHint: string); virtual;
-    procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
     function GetBackgroundStyle: TACLControlBackgroundStyle; virtual;
     procedure Loaded; override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
@@ -325,8 +353,8 @@ type
     function GetCurrentDpi: Integer;
     // IACLMouseTracking
     function IsMouseAtControl: Boolean; virtual;
-    procedure MouseEnter; virtual;
-    procedure MouseLeave; virtual;
+    procedure MouseEnter; reintroduce; virtual;
+    procedure MouseLeave; reintroduce; virtual;
 
     // Mouse
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
@@ -341,10 +369,12 @@ type
     property OnMouseEnter: TNotifyEvent read FOnMouseEnter write FOnMouseEnter;
     property OnMouseLeave: TNotifyEvent read FOnMouseLeave write FOnMouseLeave;
     //# Resources
-    property ResourceCollection: TACLCustomResourceCollection read FResourceCollection write SetResourceCollection;
+    property ResourceCollection: TACLCustomResourceCollection
+      read FResourceCollection write SetResourceCollection;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    procedure AdjustSize; override;
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
@@ -381,7 +411,7 @@ type
     IACLResourceCollection)
   strict private
     FFocusOnClick: Boolean;
-    FLangSection: UnicodeString;
+    FLangSection: string;
     FMargins: TACLMargins;
     FMouseInClient: Boolean;
     FPadding: TACLPadding;
@@ -392,7 +422,7 @@ type
 
     FOnGetHint: TACLGetHintEvent;
 
-    function GetLangSection: UnicodeString;
+    function GetLangSection: string;
     function IsMarginsStored: Boolean;
     function IsPaddingStored: Boolean;
     procedure SetMargins(const Value: TACLMargins);
@@ -418,9 +448,12 @@ type
     procedure WMSize(var Message: TWMSize); message WM_SIZE;
   protected
     procedure AdjustClientRect(var ARect: TRect); override;
-    procedure AdjustSize; override;
-    procedure BoundsChanged; virtual;
-    procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
+    procedure BoundsChanged; {$IFDEF FPC}override;{$ELSE}virtual;{$ENDIF}
+  {$IFDEF FPC}
+    procedure CalculatePreferredSize(var W, H: Integer; X: Boolean); override;
+  {$ENDIF}
+    {$MESSAGE WARN 'ChangeScale'}
+    //procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
     function CreatePadding: TACLPadding; virtual;
     function GetClientRect: TRect; override;
     function GetContentOffset: TRect; virtual;
@@ -431,7 +464,9 @@ type
     procedure Loaded; override;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer); override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
+  {$IFNDEF FPC}
     procedure Resize; override;
+  {$ENDIF}
     procedure SetDefaultSize; virtual;
     procedure SetFocusOnClick; virtual;
     procedure SetTargetDPI(AValue: Integer); virtual;
@@ -448,8 +483,8 @@ type
     function GetCurrentDpi: Integer;
     // IACLMouseTracking
     function IsMouseAtControl: Boolean; virtual;
-    procedure MouseEnter; virtual;
-    procedure MouseLeave; virtual;
+    procedure MouseEnter; reintroduce; virtual;
+    procedure MouseLeave; reintroduce; virtual;
     // IACLResourceCollection
     function GetCollection: TACLCustomResourceCollection;
     // IACLResourcesChangeListener
@@ -459,7 +494,7 @@ type
 
     // Properties
     property FocusOnClick: Boolean read FFocusOnClick write FFocusOnClick default False;
-    property LangSection: UnicodeString read GetLangSection;
+    property LangSection: string read GetLangSection;
     property MouseInClient: Boolean read FMouseInClient;
     property Padding: TACLPadding read FPadding write SetPadding stored IsPaddingStored;
     property ResourceCollection: TACLCustomResourceCollection read FResourceCollection write SetResourceCollection;
@@ -467,23 +502,24 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    procedure AdjustSize; override;
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
     procedure FullRefresh;
     procedure Invalidate; override;
-    procedure ScaleForPPI(NewPPI: Integer); override;
+    {$MESSAGE WARN 'ChangeScale'}
+    //procedure ScaleForPPI(NewPPI: Integer); override;
     // IACLControl
     procedure InvalidateRect(const R: TRect); virtual;
     // IACLColorSchema
     procedure ApplyColorSchema(const ASchema: TACLColorSchema); virtual;
     // IACLLocalizableComponent
     procedure Localize; overload;
-    procedure Localize(const ASection: UnicodeString); overload; virtual;
+    procedure Localize(const ASection: string); overload; virtual;
   published
     property Align;
     property Anchors;
     property Constraints;
-    property Ctl3D;
     property DoubleBuffered default False;
     property DragCursor;
     property DragKind;
@@ -492,7 +528,6 @@ type
     property Font;
     property Margins: TACLMargins read FMargins write SetMargins stored IsMarginsStored;
     property ParentColor;
-    property ParentCtl3D;
     property ParentFont;
     property ParentShowHint;
     property PopupMenu;
@@ -527,6 +562,9 @@ type
   TACLSubControlOptions = class(TPersistent)
   strict private
     FAlign: TACLBoolean;
+  {$IFDEF FPC}
+    FAligning: Boolean;
+  {$ENDIF}
     FControl: TControl;
     FOwner: TControl;
     FPosition: TACLBorder;
@@ -586,9 +624,26 @@ type
     property Style: TACLStyleBackground read FStyle write SetStyle;
   end;
 
-  { TACLControlsHelper }
+  { TACLControlHelper }
 
-  TACLControlsHelper = class
+  TACLControlHelper = class helper for TControl
+  protected
+  {$IFDEF FPC}
+    procedure RemoveFreeNotifications;
+  {$ENDIF}
+  public
+  {$IFDEF FPC}
+    procedure SendCancelMode(Sender: TControl);
+    function FCurrentPPI: Integer;
+    function ExplicitHeight: Integer;
+    function ExplicitWidth: Integer;
+  {$ENDIF}
+    function CalcCursorPos: TPoint;
+  end;
+
+  { TACLControls }
+
+  TACLControls = class
   public
     // Scaling
     class procedure ScaleChanging(AControl: TWinControl; var AState: TObject);
@@ -659,7 +714,8 @@ var
   acUIFadingEnabled: Boolean = acDefaultUIFadingEnabled;
   acUIFadingTime: Integer = 200;
 
-function CallCustomDrawEvent(Sender: TObject; AEvent: TACLCustomDrawEvent; ACanvas: TCanvas; const R: TRect): Boolean;
+function CallCustomDrawEvent(Sender: TObject;
+  AEvent: TACLCustomDrawEvent; ACanvas: TCanvas; const R: TRect): Boolean;
 function CreateControl(AClass: TControlClass; AParent: TWinControl;
   const R: TRect; AAlign: TAlign = alNone; AAnchors: TAnchors = [akLeft, akTop]): TControl; overload;
 procedure CreateControl(var Obj; AClass: TControlClass; AParent: TWinControl;
@@ -678,8 +734,6 @@ function acCanStartDragging(const ADeltaX, ADeltaY, ATargetDpi: Integer): Boolea
 function acCanStartDragging(const P0, P1: TPoint; ATargetDpi: Integer): Boolean; overload;
 procedure acDesignerSetModified(AInvoker: TPersistent);
 function acGetContainer(AControl: TControl): TControl;
-function acGetTargetDPI(const AControl: TWinControl): Integer; overload;
-function acGetTargetDPI(const APoint: TPoint): Integer; overload;
 function acIsChild(AControl, AChildToTest: TControl): Boolean;
 function acIsSemitransparentFill(AContentColor1, AContentColor2: TACLResourceColor): Boolean;
 function acOpacityToAlphaBlendValue(AOpacity: Integer): Byte;
@@ -699,18 +753,15 @@ function acIsShiftPressed(ATest, AState: TShiftState): Boolean;
 function acShiftStateToKeys(AShift: TShiftState): Word;
 
 function MouseTracker: TACLMouseTracking;
+
+{$IFDEF FPC}
+function PointToLParam(const P: TPoint): LPARAM;
+{$ENDIF}
 implementation
 
 uses
-  Winapi.DwmApi,
-  // System
-  System.Math,
-  // Vcl
-  Vcl.Forms,
-  // ACL
   ACL.Threading,
-  ACL.UI.HintWindow,
-  ACL.Utils.Desktop;
+  ACL.UI.HintWindow;
 
 type
   TPersistentAccess = class(TPersistent);
@@ -775,7 +826,8 @@ begin
   Result := 15 + MulDiv(240, AOpacity, 100)
 end;
 
-procedure acDrawTransparentControlBackground(AControl: TWinControl; DC: HDC; R: TRect; APaintWithChildren: Boolean = True);
+procedure acDrawTransparentControlBackground(AControl: TWinControl;
+  DC: HDC; R: TRect; APaintWithChildren: Boolean = True);
 
   procedure DrawControl(DC: HDC; AControl: TWinControl);
   begin
@@ -865,20 +917,26 @@ procedure acDesignerSetModified(AInvoker: TPersistent);
   end;
 
 var
-  ADesigner: IDesignerNotify;
+{$IFDEF FPC}
+  LDesigner: TIDesigner;
+{$ELSE}
+  LDesigner: IDesignerNotify;
+{$ENDIF}
 begin
   if CanSetModified(AInvoker) then
   begin
-    ADesigner := FindRootDesigner(AInvoker);
-    if ADesigner <> nil then
-      ADesigner.Modified;
+    LDesigner := FindRootDesigner(AInvoker);
+    if LDesigner <> nil then
+      LDesigner.Modified;
   end;
 end;
 
 function acCalculateScrollToDelta(const AObjectBounds, AAreaBounds: TRect; AScrollToMode: TACLScrollToMode): TPoint;
 begin
-  Result.X := acCalculateScrollToDelta(AObjectBounds.Left, AObjectBounds.Right, AAreaBounds.Left, AAreaBounds.Right, AScrollToMode);
-  Result.Y := acCalculateScrollToDelta(AObjectBounds.Top, AObjectBounds.Bottom, AAreaBounds.Top, AAreaBounds.Bottom, AScrollToMode);
+  Result.X := acCalculateScrollToDelta(AObjectBounds.Left,
+    AObjectBounds.Right, AAreaBounds.Left, AAreaBounds.Right, AScrollToMode);
+  Result.Y := acCalculateScrollToDelta(AObjectBounds.Top,
+    AObjectBounds.Bottom, AAreaBounds.Top, AAreaBounds.Bottom, AScrollToMode);
 end;
 
 function acCalculateScrollToDelta(AObjectTopValue, AObjectBottomValue: Integer;
@@ -922,28 +980,6 @@ begin
     Result := AIntf.GetInnerContainer
   else
     Result := AControl;
-end;
-
-function acGetTargetDPI(const APoint: TPoint): Integer;
-begin
-  if IsWin8OrLater then
-    Result := MonitorGet(APoint).PixelsPerInch
-  else
-    Result := acGetSystemDpi;
-end;
-
-function acGetTargetDPI(const AControl: TWinControl): Integer;
-var
-  APlacement: TWindowPlacement;
-  APosition: TPoint;
-begin
-  APlacement.length := SizeOf(TWindowPlacement);
-  if GetWindowPlacement(AControl.Handle, APlacement) then
-    APosition := APlacement.rcNormalPosition.CenterPoint
-  else
-    APosition := AControl.ClientToScreen(AControl.ClientRect.CenterPoint);
-
-  Result := acGetTargetDPI(APosition);
 end;
 
 function ImageListSize(AImages: TCustomImageList): TSize;
@@ -1005,16 +1041,17 @@ begin
 end;
 
 procedure acRestoreFocus(ASavedFocus: HWND);
-var
-  AProcessId: Cardinal;
 begin
   if ASavedFocus <> 0 then
   begin
+  {$IFDEF MSWINDOWS}
+    var AProcessId: Cardinal;
     GetWindowThreadProcessId(ASavedFocus, @AProcessId);
     if AProcessId <> GetCurrentProcessId then
       SetForegroundWindow(ASavedFocus)
     else
-      SetFocus(ASavedFocus)
+  {$ENDIF}
+      SetFocus(ASavedFocus);
   end;
 end;
 
@@ -1068,6 +1105,13 @@ begin
   TControl(Obj) := CreateControl(AClass, AParent, R, AAlign, AAnchors);
 end;
 
+{$IFDEF FPC}
+function PointToLParam(const P: TPoint): LPARAM;
+begin
+  Result := LPARAM((P.X and $0000ffff) or (P.Y shl 16));
+end;
+{$ENDIF}
+
 { TACLMouseTracking }
 
 procedure TACLMouseTracking.AfterConstruction;
@@ -1102,7 +1146,7 @@ end;
 
 procedure TACLInplaceInfo.Reset;
 begin
-  ZeroMemory(@Self, SizeOf(Self));
+  FillChar(Self, SizeOf(Self), 0);
 end;
 
 { TACLPadding }
@@ -1129,6 +1173,7 @@ begin
     Changed;
   end
   else
+  {$IFNDEF FPC}
     if Source is TMargins then
     begin
       Left := TMargins(Source).Left;
@@ -1136,6 +1181,7 @@ begin
       Right := TMargins(Source).Right;
       Bottom := TMargins(Source).Bottom;
     end;
+  {$ENDIF}
 end;
 
 function TACLPadding.GetScaledMargins(ATargetDpi: Integer): TRect;
@@ -1243,7 +1289,7 @@ begin
 end;
 
 { TACLMarginsHelper }
-
+{$IFNDEF FPC}
 procedure TACLMarginsHelper.Assign(const S: TRect);
 begin
   Left := S.Left;
@@ -1251,45 +1297,57 @@ begin
   Right := S.Right;
   Top := S.Top;
 end;
+{$ENDIF}
 
-{ TACLControlsHelper }
+{ TACLControls }
 
-class procedure TACLControlsHelper.ScaleChanging(AControl: TWinControl; var AState: TObject);
+class procedure TACLControls.ScaleChanging(AControl: TWinControl; var AState: TObject);
+{$IFNDEF FPC}
 var
   AChildControl: TControlAccess;
+  I: Integer;
+{$ENDIF}
 begin
   AControl.DisableAlign;
   AState := TObject(TWinControlAccess(AControl).AutoSize);
-  for var I := 0 to AControl.ControlCount - 1 do
+{$IFNDEF FPC}
+  for I := 0 to AControl.ControlCount - 1 do
   begin
     AChildControl := TControlAccess(AControl.Controls[I]);
     AChildControl.FAnchorMove := True;
   end;
+{$ENDIF}
   TWinControlAccess(AControl).AutoSize := False;
 end;
 
-class procedure TACLControlsHelper.ScaleChanged(AControl: TWinControl; var AState: TObject);
+class procedure TACLControls.ScaleChanged(AControl: TWinControl; var AState: TObject);
+{$IFNDEF FPC}
 var
   AChildControl: TControlAccess;
+  I: Integer;
+{$ENDIF}
 begin
-  for var I := 0 to AControl.ControlCount - 1 do
+{$IFNDEF FPC}
+  for I := 0 to AControl.ControlCount - 1 do
   begin
     AChildControl := TControlAccess(AControl.Controls[I]);
     AChildControl.FAnchorMove := False;
     AChildControl.UpdateBoundsRect(AChildControl.BoundsRect); // to invoke UpdateAnchorRules
   end;
+{$ENDIF}
   TWinControlAccess(AControl).AutoSize := Boolean(AState);
   TWinControlAccess(AControl).EnableAlign;
 end;
 
-class function TACLControlsHelper.WMSetCursor(ACaller: TWinControl; var Message: TWMSetCursor): Boolean;
+class function TACLControls.WMSetCursor(
+  ACaller: TWinControl; var Message: TWMSetCursor): Boolean;
 
   function GetCursor(AControl: TControl): TCursor;
   var
     ACursorProvider: IACLCursorProvider;
   begin
     if Supports(AControl, IACLCursorProvider, ACursorProvider) then
-      Result := ACursorProvider.GetCursor(TControlAccess(AControl).CalcCursorPos)
+      Result := ACursorProvider.GetCursor(AControl.CalcCursorPos)
     else
       Result := AControl.Cursor;
   end;
@@ -1307,7 +1365,7 @@ begin
     begin
       AControl := GetCaptureControl;
       if AControl = nil then
-        AControl := ACaller.ControlAtPos(TControlAccess(ACaller).CalcCursorPos, False);
+        AControl := ACaller.ControlAtPos(ACaller.CalcCursorPos, False);
       if AControl <> nil then
         ACursor := GetCursor(AControl);
       if ACursor = crDefault then
@@ -1513,9 +1571,18 @@ begin
   //#      RequestAlign;
   //#
   inherited;
+{$IFNDEF FPC}
   if AutoSize then
     RequestAlign;
+{$ENDIF}
 end;
+
+{$IFDEF FPC}
+procedure TACLGraphicControl.CalculatePreferredSize(var W, H: Integer; X: Boolean);
+begin
+  CanAutoSize(W, H);
+end;
+{$ENDIF}
 
 procedure TACLGraphicControl.DoGetHint(const P: TPoint; var AHint: string);
 begin
@@ -1523,12 +1590,12 @@ begin
     OnGetHint(Self, P.X, P.Y, AHint);
 end;
 
-procedure TACLGraphicControl.ChangeScale(M, D: Integer; isDpiChange: Boolean);
-begin
-  inherited ChangeScale(M, D, isDpiChange);
-  SetTargetDPI(FCurrentPPI);
-  MarginsChangeHandler(nil);
-end;
+//procedure TACLGraphicControl.ChangeScale(M, D: Integer; isDpiChange: Boolean);
+//begin
+//  inherited ChangeScale(M, D, isDpiChange);
+//  SetTargetDPI(FCurrentPPI);
+//  MarginsChangeHandler(nil);
+//end;
 
 function TACLGraphicControl.GetBackgroundStyle: TACLControlBackgroundStyle;
 begin
@@ -1536,9 +1603,19 @@ begin
 end;
 
 procedure TACLGraphicControl.InvalidateRect(const R: TRect);
+var
+  LRect: TRect;
 begin
   if (Parent <> nil) and Parent.HandleAllocated then
-    Winapi.Windows.InvalidateRect(Parent.Handle, R.OffsetTo(Left, Top), True);
+  begin
+    LRect := R;
+    LRect.Offset(Left, Top);
+  {$IFDEF FPC}
+    LCLIntf.InvalidateRect(Parent.Handle, @LRect, True);
+  {$ELSE}
+    Winapi.Windows.InvalidateRect(Parent.Handle, LRect, True);
+  {$ENDIF}
+  end;
 end;
 
 function TACLGraphicControl.GetCurrentDpi: Integer;
@@ -1570,7 +1647,7 @@ end;
 
 procedure TACLGraphicControl.SetDefaultSize;
 begin
-  // do nothing
+  SetBounds(Left, Top, 200, 30);
 end;
 
 procedure TACLGraphicControl.SetTargetDPI(AValue: Integer);
@@ -1678,7 +1755,8 @@ end;
 
 procedure TACLGraphicControl.MarginsChangeHandler(Sender: TObject);
 begin
-  inherited Margins.Assign(Margins.GetScaledMargins(FCurrentPPI));
+  {$MESSAGE WARN 'Margins'}
+  //inherited Margins.Assign(Margins.GetScaledMargins(FCurrentPPI));
 end;
 
 procedure TACLGraphicControl.SetMargins(const Value: TACLMargins);
@@ -1750,7 +1828,11 @@ end;
 procedure TACLCustomControl.InvalidateRect(const R: TRect);
 begin
   if HandleAllocated and not (csDestroying in ComponentState) then
+  {$IFDEF FPC}
+    LCLIntf.InvalidateRect(Handle, @R, True);
+  {$ELSE}
     Winapi.Windows.InvalidateRect(Handle, R, True);
+  {$ENDIF}
 end;
 
 procedure TACLCustomControl.ApplyColorSchema(const ASchema: TACLColorSchema);
@@ -1763,7 +1845,7 @@ begin
   LangApplyTo(Copy(LangSection, 1, acLastDelimiter('.', LangSection)), Self);
 end;
 
-procedure TACLCustomControl.Localize(const ASection: UnicodeString);
+procedure TACLCustomControl.Localize(const ASection: string);
 begin
   FLangSection := ASection;
 end;
@@ -1786,7 +1868,7 @@ end;
 
 procedure TACLCustomControl.DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect);
 begin
-  acFillRect(ACanvas.Handle, R, Color);
+  acFillRect(ACanvas, R, Color);
 end;
 
 procedure TACLCustomControl.DrawTransparentBackground(ACanvas: TCanvas; const R: TRect);
@@ -1875,16 +1957,18 @@ begin
   end;
 end;
 
+{$IFNDEF FPC}
 procedure TACLCustomControl.Resize;
 begin
   inherited Resize;
   if not (csDestroying in ComponentState) then
     BoundsChanged;
 end;
+{$ENDIF}
 
 procedure TACLCustomControl.SetDefaultSize;
 begin
-  // do nothing
+  SetBounds(Left, Top, 200, 150);
 end;
 
 procedure TACLCustomControl.SetFocusOnClick;
@@ -1972,17 +2056,17 @@ var
   AClipRgn: HRGN;
   AMemBmp: HBITMAP;
   AMemDC: HDC;
-  APaintBuffer: HPAINTBUFFER;
   APaintStruct: TPaintStruct;
 begin
   if (Message.DC <> 0) or not DoubleBuffered then
     PaintHandler(Message)
   else
+  {$IFNDEF FPC}
     if (csGlassPaint in ControlState) and DwmCompositionEnabled then
     begin
       BeginPaint(Handle, APaintStruct);
       try
-        APaintBuffer := BeginBufferedPaint(APaintStruct.hdc, APaintStruct.rcPaint, BPBF_COMPOSITED, nil, AMemDC);
+        var APaintBuffer := BeginBufferedPaint(APaintStruct.hdc, APaintStruct.rcPaint, BPBF_COMPOSITED, nil, AMemDC);
         if APaintBuffer <> 0 then
         try
           Perform(WM_ERASEBKGND, AMemDC, AMemDC);
@@ -1997,8 +2081,9 @@ begin
       end;
     end
     else
+  {$ENDIF}
     begin
-      BeginPaint(Handle, APaintStruct);
+      BeginPaint(Handle, APaintStruct{%H-});
       try
         AMemDC := acCreateMemDC(APaintStruct.hdc, APaintStruct.rcPaint, AMemBmp, AClipRgn);
         try
@@ -2018,7 +2103,7 @@ end;
 
 procedure TACLCustomControl.WMSetCursor(var Message: TWMSetCursor);
 begin
-  if not TACLControlsHelper.WMSetCursor(Self, Message) then
+  if not TACLControls.WMSetCursor(Self, Message) then
     inherited;
 end;
 
@@ -2030,12 +2115,14 @@ end;
 
 procedure TACLCustomControl.WMSize(var Message: TWMSize);
 begin
-  // для корректной работы anchor-ов при смене dpi
+{$IFNDEF FPC}
+  // Для корректной работы anchor-ов при смене dpi в Delphi
   if not (csDestroying in ComponentState) then
   begin
     UpdateBounds;
     BoundsChanged;
   end;
+{$ENDIF}
 
   inherited;
 
@@ -2050,14 +2137,14 @@ procedure TACLCustomControl.CMScaleChanging(var Message: TMessage);
 begin
   Inc(FScaleChangeCount);
   if FScaleChangeCount = 1 then
-    TACLControlsHelper.ScaleChanging(Self, FScaleChangeState);
+    TACLControls.ScaleChanging(Self, FScaleChangeState);
 end;
 
 procedure TACLCustomControl.CMScaleChanged(var Message: TMessage);
 begin
   Dec(FScaleChangeCount);
   if FScaleChangeCount = 0 then
-    TACLControlsHelper.ScaleChanged(Self, FScaleChangeState);
+    TACLControls.ScaleChanged(Self, FScaleChangeState);
 {$IFDEF DEBUG}
   if FScaleChangeCount < 0 then
     raise EInvalidOperation.Create(ClassName);
@@ -2097,7 +2184,11 @@ end;
 
 procedure TACLCustomControl.AdjustSize;
 begin
+{$IFDEF FPC}
+  SetBoundsKeepBase(Left, Top, Width, Height);
+{$ELSE}
   SetBounds(Left, Top, Width, Height);
+{$ENDIF}
   inherited AdjustSize;
 end;
 
@@ -2106,27 +2197,34 @@ begin
   // do nothing
 end;
 
-procedure TACLCustomControl.ScaleForPPI(NewPPI: Integer);
+{$IFDEF FPC}
+procedure TACLCustomControl.CalculatePreferredSize(var W, H: Integer; X: Boolean);
 begin
-  Perform(CM_SCALECHANGING, 0, 0);
-  try
-    inherited ScaleForPPI(NewPPI);
-  finally
-    Perform(CM_SCALECHANGED, 0, 0);
-  end;
+  CanAutoSize(W, H);
 end;
+{$ENDIF}
 
-procedure TACLCustomControl.ChangeScale(M, D: Integer; isDpiChange: Boolean);
-begin
-  Perform(CM_SCALECHANGING, 0, 0);
-  try
-    inherited ChangeScale(M, D, isDpiChange);
-    SetTargetDPI(FCurrentPPI);
-    MarginsChangeHandler(nil);
-  finally
-    Perform(CM_SCALECHANGED, 0, 0);
-  end;
-end;
+//procedure TACLCustomControl.ScaleForPPI(NewPPI: Integer);
+//begin
+//  Perform(CM_SCALECHANGING, 0, 0);
+//  try
+//    inherited ScaleForPPI(NewPPI);
+//  finally
+//    Perform(CM_SCALECHANGED, 0, 0);
+//  end;
+//end;
+//
+//procedure TACLCustomControl.ChangeScale(M, D: Integer; isDpiChange: Boolean);
+//begin
+//  Perform(CM_SCALECHANGING, 0, 0);
+//  try
+//    inherited;
+//    SetTargetDPI(FCurrentPPI);
+//    MarginsChangeHandler(nil);
+//  finally
+//    Perform(CM_SCALECHANGED, 0, 0);
+//  end;
+//end;
 
 function TACLCustomControl.CreatePadding: TACLPadding;
 begin
@@ -2151,7 +2249,7 @@ begin
   Result := FCurrentPPI;
 end;
 
-function TACLCustomControl.GetLangSection: UnicodeString;
+function TACLCustomControl.GetLangSection: string;
 begin
   if FLangSection = '' then
     FLangSection := LangGetComponentPath(Self);
@@ -2195,7 +2293,8 @@ procedure TACLCustomControl.MarginsChangeHandler(Sender: TObject);
 begin
   DisableAlign;
   try
-    inherited Margins.Assign(Margins.GetScaledMargins(FCurrentPPI));
+    {$MESSAGE WARN 'Margins'}
+    //inherited Margins.Assign(Margins.GetScaledMargins(FCurrentPPI));
   finally
     EnableAlign;
   end;
@@ -2281,6 +2380,46 @@ begin
   FStyle.Assign(Value);
 end;
 
+{ TACLControlHelper }
+
+function TACLControlHelper.CalcCursorPos: TPoint;
+begin
+  Result := ScreenToClient(Mouse.CursorPos);
+end;
+
+{$IFDEF FPC}
+function TACLControlHelper.FCurrentPPI: Integer;
+begin
+  Result := Scale96ToScreen(acDefaultDpi);
+end;
+
+function TACLControlHelper.ExplicitHeight: Integer;
+begin
+  //if AlignWithMargins and (Parent <> nil) then
+  //  Result := ExplicitHeight + FLeft + FRight
+  //else
+  //  Result := ExplicitHeight;
+  Result := Height;
+end;
+
+function TACLControlHelper.ExplicitWidth: Integer;
+begin
+  //if AlignWithMargins and (Parent <> nil) then
+  //  Result := ExplicitWidth + FLeft + FRight
+  //else
+  //  Result := ExplicitWidth;
+  Result := Width;
+end;
+
+procedure TACLControlHelper.RemoveFreeNotifications;
+begin
+end;
+
+procedure TACLControlHelper.SendCancelMode(Sender: TControl);
+begin
+end;
+{$ENDIF}
+
 { TACLMouseWheel }
 
 class constructor TACLMouseWheel.Create;
@@ -2314,7 +2453,11 @@ end;
 class function TACLMouseWheel.HWheelToVWheel(const AMessage: TWMMouseWheel): TWMMouseWheel;
 begin
   Result := AMessage;
+{$IFDEF FPC}
+  Include(Result.ShiftState, ssShift);
+{$ELSE}
   Result.Keys := Result.Keys or MK_SHIFT;
+{$ENDIF}
   Result.WheelDelta := -Result.WheelDelta;
 end;
 
@@ -2342,11 +2485,20 @@ begin
 end;
 
 procedure TACLDeferPlacementUpdate.Apply;
+{$IFDEF FPC}
+begin
+  FBounds.Enum(
+    procedure (const AControl: TControl; const R: TRect)
+    begin
+      AControl.SetBounds(R.Left, R.Top, R.Width, R.Height);
+    end);
+{$ELSE}
 var
   ABounds: TRect;
   AHandle: THandle;
   AVclControls: TList;
   AWinControls: TList;
+  I: Integer;
 begin
   if FBounds.Count > 0 then
   begin
@@ -2369,7 +2521,7 @@ begin
       begin
         AHandle := BeginDeferWindowPos(AWinControls.Count);
         try
-          for var I := 0 to AWinControls.Count - 1 do
+          for I := 0 to AWinControls.Count - 1 do
           begin
             ABounds := Bounds[AWinControls.List[I]];
             DeferWindowPos(AHandle, TWinControl(AWinControls.List[I]).Handle, 0,
@@ -2380,13 +2532,14 @@ begin
         end;
       end;
 
-      for var I := 0 to AVclControls.Count - 1 do
+      for I := 0 to AVclControls.Count - 1 do
         TControl(AVclControls.List[I]).BoundsRect := Bounds[AVclControls.List[I]];
     finally
       AWinControls.Free;
       AVclControls.Free;
     end;
   end;
+{$ENDIF}
 end;
 
 function TACLDeferPlacementUpdate.GetBounds(AControl: TControl): TRect;
@@ -2430,15 +2583,21 @@ begin
 end;
 
 procedure TACLSubControlOptions.WindowProc(var Message: TMessage);
+const
+  SWP_POS_CHANGE = SWP_NOMOVE or SWP_NOSIZE;
 var
   AWindowPos: PWindowPos;
 begin
   if Message.Msg = WM_WINDOWPOSCHANGED then
   begin
-    AWindowPos := TWMWindowPosMsg(Message).WindowPos;
-    if (AWindowPos = nil) or (AWindowPos^.flags and (SWP_NOMOVE or SWP_NOSIZE) <> (SWP_NOMOVE or SWP_NOSIZE)) then
+    AWindowPos := TWMWindowPosChanged(Message).WindowPos;
+    if (AWindowPos = nil) or (AWindowPos^.flags and SWP_POS_CHANGE <> SWP_POS_CHANGE) then
     begin
+    {$IFDEF FPC}
+      if not (FAligning or Control.Parent.AutoSizeDelayed) then
+    {$ELSE}
       if not (csAligning in Control.ControlState) then
+    {$ENDIF}
         TACLMainThread.RunPostponed(Changed, Self);
     end;
   end;
@@ -2491,12 +2650,21 @@ begin
         end;
     end;
 
+  {$IFDEF FPC}
+    FAligning := True;
+    try
+      Control.BoundsRect := LBounds;
+    finally
+      FAligning := False;
+    end;
+  {$ELSE}
     Control.ControlState := Control.ControlState + [csAligning];
     try
       Control.BoundsRect := LBounds;
     finally
       Control.ControlState := Control.ControlState - [csAligning];
     end;
+  {$ENDIF}
   end;
 end;
 
@@ -2569,8 +2737,10 @@ begin
     Control := nil;
   if (Control <> nil) and (Control.Align <> alNone) then
     Control.Align := alNone; // alCustom disables auto-size feature
+{$IFNDEF FPC}
   if (Control <> nil) and (Control.AlignWithMargins) then
     Control.AlignWithMargins := False;
+{$ENDIF}
   Result := Control <> nil;
 end;
 

@@ -4,7 +4,7 @@
 {*             ImageList Classes             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -16,37 +16,43 @@ unit ACL.UI.ImageList;
 interface
 
 uses
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
   Winapi.Messages,
   Winapi.Windows,
+{$ENDIF}
   // System
-  System.Classes,
-  System.Generics.Collections,
-  System.SysUtils,
-  System.Types,
-  System.TypInfo,
-  System.ZLib,
+  {System.}Classes,
+  {System.}Generics.Collections,
+  {System.}SysUtils,
+  {System.}Types,
+  {System.}TypInfo,
+  {System.}ZLib,
   // Vcl
-  Vcl.ActnList,
-  Vcl.Controls,
-  Vcl.Graphics,
-  Vcl.ImgList,
-  Vcl.StdCtrls,
+  {Vcl.}ActnList,
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
+  {Vcl.}ImgList,
+  {Vcl.}StdCtrls,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
   ACL.Timers,
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.Images,
   ACL.Graphics.Ex,
+  ACL.Graphics.Images,
   ACL.Graphics.SkinImage,
   ACL.MUI,
   ACL.ObjectLinks,
   ACL.UI.Animation,
-  ACL.UI.Forms,
+  //ACL.UI.Forms,
   ACL.UI.Resources,
   ACL.Utils.Common;
 
+{$IFDEF MSWINDOWS}
 type
 
   { TACLImageList }
@@ -81,6 +87,7 @@ type
     property Scalable: Boolean read GetScalable write SetScalable stored False;
     property SourceDPI: Integer read FSourceDPI write SetSourceDPI default 96;
   end;
+{$ENDIF}
 
 procedure acDrawImage(ACanvas: TCanvas; const R: TRect; AImageList: TCustomImageList;
   AImageIndex: Integer; AIsEnabled: Boolean = True);
@@ -90,8 +97,8 @@ procedure acSetImageList(AValue: TCustomImageList; var AFieldValue: TCustomImage
 implementation
 
 uses
-  System.Math,
-  System.RTLConsts,
+  {System.}Math,
+  {System.}RTLConsts,
   // ACL
   ACL.Utils.DPIAware,
   ACL.Utils.RTTI,
@@ -102,7 +109,7 @@ procedure acDrawImage(ACanvas: TCanvas; const R: TRect;
 var
   ALayer: TACLBitmapLayer;
 begin
-  if (AImageList <> nil) and (AImageIndex >= 0) and RectVisible(ACanvas.Handle, R) then
+  if (AImageList <> nil) and (AImageIndex >= 0) and acRectVisible(ACanvas.Handle, R) then
   begin
     if (R.Width <> AImageList.Width) or (R.Height <> AImageList.Height) then
     begin
@@ -124,14 +131,16 @@ begin
   if AImageList <> nil then
   begin
     Result := TSize.Create(AImageList.Width, AImageList.Height);
-    if (AImageList is TACLImageList) and TACLImageList(AImageList).Scalable then
-      Result.Scale(ATargetDPI, TACLImageList(AImageList).SourceDPI);
+    {$MESSAGE WARN 'Commented'}
+    //if (AImageList is TACLImageList) and TACLImageList(AImageList).Scalable then
+    //  Result.Scale(ATargetDPI, TACLImageList(AImageList).SourceDPI);
   end
   else
     Result := NullSize;
 end;
 
-procedure acSetImageList(AValue: TCustomImageList; var AFieldValue: TCustomImageList; AChangeLink: TChangeLink; ANotifyComponent: TComponent);
+procedure acSetImageList(AValue: TCustomImageList;
+  var AFieldValue: TCustomImageList; AChangeLink: TChangeLink; ANotifyComponent: TComponent);
 begin
   if AValue <> AFieldValue then
   begin
@@ -153,6 +162,7 @@ begin
   end;
 end;
 
+{$IFDEF MSWINDOWS}
 { TACLImageList }
 
 procedure TACLImageList.AfterConstruction;
@@ -212,7 +222,8 @@ begin
   end;
 end;
 
-procedure TACLImageList.DoDraw(Index: Integer; Canvas: TCanvas; X, Y: Integer; Style: Cardinal; Enabled: Boolean = True);
+procedure TACLImageList.DoDraw(Index: Integer; Canvas: TCanvas;
+  X, Y: Integer; Style: Cardinal; Enabled: Boolean = True);
 var
   ALayer: TACLBitmapLayer;
 begin
@@ -405,4 +416,5 @@ begin
   end;
 end;
 
+{$ENDIF}
 end.

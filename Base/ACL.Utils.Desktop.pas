@@ -4,34 +4,40 @@
 {*           Multi-Monitor Support           *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.Utils.Desktop;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.MultiMon,
-  Winapi.Messages,
-  Winapi.ShellApi,
-  // System
-  System.Types,
-  System.Classes,
-  // Vcl
-{$IFNDEF ACL_BASE_NOVCL}
-  Vcl.Forms,
+{$IFDEF MSWINDOWS}
+  {Winapi.}MultiMon,
+  {Winapi.}ShellApi,
+  {Winapi.}Windows,
+{$ELSE}
+  LCLIntf,
+  LCLType,
 {$ENDIF}
+  // System
+  {System.}Classes,
+  {System.}SysUtils,
+  {System.}Types,
+  // Vcl
+  {Vcl.}Controls,
+  {Vcl.}Forms,
   // ACL
   ACL.Classes.Collections;
 
 type
   TTaskBarPosition = (tbpLeft, tbpTop, tbpRight, tbpBottom);
+
+  TACLMonitor = TMonitor;
 
   { TACLTaskbarInfo }
 
@@ -41,58 +47,6 @@ type
     Position: TTaskBarPosition;
   end;
 
-  { TACLMonitor }
-
-  TACLMonitor = class
-  strict private
-    FHandle: HMONITOR;
-    FIndex: Integer;
-
-    function GetBoundsRect: TRect;
-    function GetHandleIsValid: Boolean;
-    function GetPixelsPerInch: Integer;
-    function GetPrimary: Boolean;
-    function GetWorkareaRect: TRect;
-  protected
-    function GetInfo(out AInfo: TMonitorInfo): Boolean;
-  public
-    constructor Create(AHandle: HMONITOR; AIndex: Integer); virtual;
-    //
-    property BoundsRect: TRect read GetBoundsRect;
-    property Handle: HMONITOR read FHandle;
-    property HandleIsValid: Boolean read GetHandleIsValid;
-    property Index: Integer read FIndex;
-    property PixelsPerInch: Integer read GetPixelsPerInch;
-    property Primary: Boolean read GetPrimary;
-    property WorkareaRect: TRect read GetWorkareaRect;
-  end;
-
-  { TACLScreenHelper }
-
-  TACLScreenHelper = class
-  strict private
-    FMonitors: TACLObjectList;
-
-    function GetMonitor(AIndex: Integer): TACLMonitor;
-    function GetMonitorCount: Integer;
-    function GetPrimaryMonitor: TACLMonitor;
-    procedure MessageHandler(var AMessage: TMessage; var AHandled: Boolean);
-  protected
-    procedure AddMonitor(AHandle: HMONITOR);
-    procedure EnumerateMonitors;
-  public
-    constructor Create; virtual;
-    destructor Destroy; override;
-    function FindByHandle(AHandle: HMONITOR): TACLMonitor;
-    function FindByPoint(const P: TPoint): TACLMonitor;
-    function FindByWnd(AWnd: HWND): TACLMonitor;
-    //
-    property Monitor[Index: Integer]: TACLMonitor read GetMonitor;
-    property MonitorCount: Integer read GetMonitorCount;
-    property PrimaryMonitor: TACLMonitor read GetPrimaryMonitor;
-  end;
-
-function ScreenHelper: TACLScreenHelper;
 // Monitors
 function MonitorAlignPopupWindow(const R: TRect): TRect;
 function MonitorGet(const P: TPoint): TACLMonitor; overload;
@@ -105,9 +59,7 @@ function MonitorGetByIndex(Index: Integer): TACLMonitor;
 function MonitorGetDefault: TACLMonitor;
 function MonitorGetDefaultBounds: TRect;
 function MonitorGetDesktopClientArea(const P: TPoint): TRect;
-{$IFNDEF ACL_BASE_NOVCL}
 function MonitorGetFocusedForm: TCustomForm;
-{$ENDIF}
 function MonitorGetTaskBarInfo: TACLTaskbarInfo;
 function MonitorGetTaskBarRect: TRect;
 function MonitorGetWorkArea(const P: TPoint): TRect;
@@ -119,37 +71,8 @@ function MouseCursorSize: TSize;
 implementation
 
 uses
-{$IFNDEF ACL_BASE_NOVCL}
-  Vcl.Controls,
-{$ENDIF}
-  System.SysUtils,
-  // ACL
-  ACL.Utils.Messaging,
   ACL.Utils.Common,
   ACL.Utils.Strings;
-
-const
-  Shcore = 'Shcore.dll';
-
-{$WARNINGS OFF}
-function GetDpiForMonitor(hmonitor: HMONITOR; dpiType: Cardinal; out dpiX, dpiY: UINT): HRESULT; stdcall; external Shcore delayed;
-{$WARNINGS ON}
-
-var
-  FHelper: TACLScreenHelper;
-
-function ScreenHelper: TACLScreenHelper;
-begin
-  if FHelper = nil then
-    FHelper := TACLScreenHelper.Create;
-  Result := FHelper;
-end;
-
-function EnumMonitorsProc(AHandle: HMONITOR; DC: HDC; R: PRect; Data: TACLScreenHelper): Boolean; stdcall;
-begin
-  Data.AddMonitor(AHandle);
-  Result := True;
-end;
 
 function MonitorAlignPopupWindow(const R: TRect): TRect;
 var
@@ -169,7 +92,7 @@ end;
 
 function MonitorGetDefault: TACLMonitor;
 begin
-  Result := ScreenHelper.PrimaryMonitor;
+  Result := Screen.PrimaryMonitor;
 end;
 
 function MonitorGetDefaultBounds: TRect;
@@ -185,27 +108,28 @@ end;
 
 function MonitorGet(Wnd: THandle): TACLMonitor;
 begin
-  Result := ScreenHelper.FindByWnd(Wnd);
+  Result := Screen.MonitorFromWindow(Wnd);
   if Result = nil then
     Result := MonitorGetDefault;
 end;
 
 function MonitorGet(const P: TPoint): TACLMonitor;
 begin
-  Result := ScreenHelper.FindByPoint(P);
+  Result := Screen.MonitorFromPoint(P);
   if Result = nil then
     Result := MonitorGetDefault;
 end;
 
 function MonitorGetByIndex(Index: Integer): TACLMonitor;
 begin
-  if (Index >= 0) and (Index < ScreenHelper.MonitorCount) then
-    Result := ScreenHelper.Monitor[Index]
+  if (Index >= 0) and (Index < Screen.MonitorCount) then
+    Result := Screen.Monitors[Index]
   else
     Result := MonitorGetDefault;
 end;
 
 function MonitorIsFullScreenApplicationRunning(AMonitor: TACLMonitor = nil): Boolean;
+{$IFDEF MSWINDOWS}
 
   function IsDesktopWindow(AHandle: THandle): Boolean;
   begin
@@ -221,7 +145,7 @@ begin
   AAppHandle := GetForegroundWindow;
   if (AAppHandle <> 0) and not IsDesktopWindow(AAppHandle) then
   begin
-    AAppMonitor := ScreenHelper.FindByWnd(AAppHandle);
+    AAppMonitor := MonitorGet(AAppHandle);
     if (AMonitor = nil) or (AMonitor = AAppMonitor) then
     begin
       if Assigned(AAppMonitor) and GetWindowRect(AAppHandle, R) then
@@ -231,6 +155,10 @@ begin
       end;
     end;
   end;
+{$ELSE}
+begin
+  Result := False;
+{$ENDIF}
 end;
 
 function MonitorGetBoundsByIndex(Index: Integer): TRect;
@@ -273,13 +201,13 @@ end;
 
 function MonitorGetDesktopClientArea(const P: TPoint): TRect;
 var
+  ARect: TRect;
   ATaskBar: TACLTaskbarInfo;
-  R: TRect;
 begin
   //Note: One of our Forms can be a Desktop toolbar, so, we need to calculate client area manually
   Result := MonitorGetBounds(P);
   ATaskBar := MonitorGetTaskBarInfo;
-  if IntersectRect(R, Result, ATaskBar.Bounds) and not ATaskBar.AutoHide then
+  if IntersectRect({%H-}ARect, Result, ATaskBar.Bounds) and not ATaskBar.AutoHide then
     case ATaskBar.Position of
       tbpLeft:
         Result.Left := ATaskBar.Bounds.Right;
@@ -292,7 +220,6 @@ begin
     end;
 end;
 
-{$IFNDEF ACL_BASE_NOVCL}
 function MonitorGetFocusedForm: TCustomForm;
 var
   AControl: TControl;
@@ -303,9 +230,9 @@ begin
   else
     Result := nil;
 end;
-{$ENDIF}
 
 function MonitorGetTaskBarInfo: TACLTaskbarInfo;
+{$IFDEF MSWINDOWS}
 var
 	AData: TAppBarData;
 begin
@@ -324,6 +251,11 @@ begin
     Result.AutoHide := SHAppBarMessage(ABM_GETSTATE, AData) and ABS_AUTOHIDE = ABS_AUTOHIDE;
   end;
 end;
+{$ELSE}
+begin
+  FillChar(Result{%H-}, SizeOf(Result), 0);
+end;
+{$ENDIF}
 
 function MonitorGetTaskBarRect: TRect;
 begin
@@ -354,189 +286,8 @@ end;
 
 function MouseCursorPos: TPoint;
 begin
-  if not GetCursorPos(Result) then
+  if not GetCursorPos(Result{%H-}) then
     Result := Point(-1, -1);
 end;
 
-{ TACLMonitor }
-
-constructor TACLMonitor.Create(AHandle: HMONITOR; AIndex: Integer);
-begin
-  inherited Create;
-  FHandle := AHandle;
-  FIndex := AIndex;
-end;
-
-function TACLMonitor.GetBoundsRect: TRect;
-var
-  AInfo: TMonitorInfo;
-begin
-  if GetInfo(AInfo) then
-    Result := AInfo.rcMonitor
-  else
-    Result := NullRect;
-end;
-
-function TACLMonitor.GetHandleIsValid: Boolean;
-var
-  AInfo: TMonitorInfo;
-begin
-  Result := GetInfo(AInfo);
-end;
-
-function TACLMonitor.GetInfo(out AInfo: TMonitorInfo): Boolean;
-begin
-  AInfo.cbSize := SizeOf(AInfo);
-  try
-    Result := GetMonitorInfo(Handle, @AInfo);
-  except
-    Result := False;
-  end;
-end;
-
-function TACLMonitor.GetPixelsPerInch: Integer;
-var
-  Xdpi, Ydpi: Cardinal;
-{$IFDEF ACL_BASE_NOVCL}
-  DC: HDC;
-{$ENDIF}
-begin
-  if CheckWin32Version(6, 3) and (GetDpiForMonitor(Handle, 0, Xdpi, Ydpi) = S_OK) then
-    Exit(Xdpi);
-
-{$IFDEF ACL_BASE_NOVCL}
-  DC := GetDC(0);
-  try
-    Result := GetDeviceCaps(DC, LOGPIXELSX);
-  finally
-    ReleaseDC(0, DC);
-  end;
-{$ELSE}
-  Result := Screen.PixelsPerInch;
-{$ENDIF}
-end;
-
-function TACLMonitor.GetPrimary: Boolean;
-var
-  AInfo: TMonitorInfo;
-begin
-  Result := GetInfo(AInfo) and (AInfo.dwFlags and MONITORINFOF_PRIMARY <> 0);
-end;
-
-function TACLMonitor.GetWorkareaRect: TRect;
-var
-  AInfo: TMonitorInfo;
-begin
-  if GetInfo(AInfo) then
-    Result := AInfo.rcWork
-  else
-    Result := NullRect;
-end;
-
-{ TACLScreenHelper }
-
-constructor TACLScreenHelper.Create;
-begin
-  inherited Create;
-  FMonitors := TACLObjectList.Create;
-  TACLMessaging.HandlerAdd(MessageHandler);
-end;
-
-destructor TACLScreenHelper.Destroy;
-begin
-  TACLMessaging.HandlerRemove(MessageHandler);
-  FreeAndNil(FMonitors);
-  inherited Destroy;
-end;
-
-procedure TACLScreenHelper.AddMonitor(AHandle: HMONITOR);
-begin
-  FMonitors.Add(TACLMonitor.Create(AHandle, FMonitors.Count));
-end;
-
-procedure TACLScreenHelper.EnumerateMonitors;
-begin
-  FMonitors.Clear;
-  EnumDisplayMonitors(0, nil, @EnumMonitorsProc, NativeUInt(Self));
-end;
-
-function TACLScreenHelper.FindByHandle(AHandle: HMONITOR): TACLMonitor;
-
-  function DoFind(AHandle: HMONITOR): TACLMonitor;
-  var
-    I: Integer;
-  begin
-    Result := nil;
-    for I := 0 to MonitorCount - 1 do
-      if Monitor[I].Handle = AHandle then
-      begin
-        Result := Monitor[I];
-        Break;
-      end;
-  end;
-
-begin
-  Result := DoFind(AHandle);
-  if (Result = nil) and (AHandle <> 0) then
-  begin
-    EnumerateMonitors;
-    Result := DoFind(AHandle);
-  end;
-end;
-
-function TACLScreenHelper.FindByPoint(const P: TPoint): TACLMonitor;
-begin
-  Result := FindByHandle(MonitorFromPoint(P, MONITOR_DEFAULTTONEAREST));
-end;
-
-function TACLScreenHelper.FindByWnd(AWnd: HWND): TACLMonitor;
-begin
-  Result := FindByHandle(MonitorFromWindow(AWnd, MONITOR_DEFAULTTONEAREST));
-end;
-
-procedure TACLScreenHelper.MessageHandler(var AMessage: TMessage; var AHandled: Boolean);
-begin
-  case AMessage.Msg of
-    WM_SETTINGCHANGE, WM_DISPLAYCHANGE:
-      EnumerateMonitors;
-  end;
-end;
-
-function TACLScreenHelper.GetMonitor(AIndex: Integer): TACLMonitor;
-begin
-  Result := TACLMonitor(FMonitors[AIndex]);
-end;
-
-function TACLScreenHelper.GetMonitorCount: Integer;
-begin
-  Result := FMonitors.Count;
-end;
-
-function TACLScreenHelper.GetPrimaryMonitor: TACLMonitor;
-
-  function FindCore: TACLMonitor;
-  var
-    I: Integer;
-  begin
-    for I := 0 to MonitorCount - 1 do
-    begin
-      if Monitor[I].Primary then
-        Exit(Monitor[I]);
-    end;
-    Result := nil;
-  end;
-
-begin
-  Result := FindCore;
-  if Result = nil then
-  begin
-    EnumerateMonitors;
-    Result := FindCore;
-  end;
-end;
-
-initialization
-
-finalization
-  FreeAndNil(FHelper);
 end.

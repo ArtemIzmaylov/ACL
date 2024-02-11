@@ -392,9 +392,14 @@ begin
 end;
 
 procedure TACLIniFileSection.WriteEnum<T>(const AKey: string; const AValue, ADefaultValue: T);
+var
+  LValue1: Integer;
+  LValue2: Integer;
 begin
-  if TACLEnumHelper.GetValue<T>(AValue) <> TACLEnumHelper.GetValue<T>(ADefaultValue) then
-    WriteEnum<T>(AKey, AValue)
+  LValue1 := TACLEnumHelper.GetValue<T>(AValue);
+  LValue2 := TACLEnumHelper.GetValue<T>(ADefaultValue);
+  if LValue1 <> LValue2 then
+    WriteInt32(AKey, LValue1)
   else
     Delete(AKey);
 end;
@@ -934,9 +939,14 @@ begin
 end;
 
 procedure TACLIniFile.WriteEnum<T>(const ASection, AKey: string; const AValue, ADefaultValue: T);
+var
+  LValue1: Integer;
+  LValue2: Integer;
 begin
-  if TACLEnumHelper.GetValue<T>(AValue) <> TACLEnumHelper.GetValue<T>(ADefaultValue) then
-    WriteEnum<T>(ASection, AKey, AValue)
+  LValue1 := TACLEnumHelper.GetValue<T>(AValue);
+  LValue2 := TACLEnumHelper.GetValue<T>(ADefaultValue);
+  if LValue1 <> LValue2 then
+    WriteInteger(ASection, AKey, LValue1)
   else
     DeleteKey(ASection, AKey);
 end;

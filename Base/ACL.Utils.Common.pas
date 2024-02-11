@@ -21,7 +21,6 @@ unit ACL.Utils.Common;
    1) TProcessHelper
    2) HMODULE's sections
    3) WINDOW's section
-   4) GetExactTickCount
 }
 
 interface

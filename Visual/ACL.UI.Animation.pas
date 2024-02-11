@@ -11,28 +11,31 @@
 
 unit ACL.UI.Animation;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
   Winapi.Messages,
+  Winapi.Windows,
+{$ENDIF}
   // System
+  {System.}Types,
+  {System.}Classes,
+  {System.}Generics.Collections,
   System.UITypes,
-  System.Types,
-  System.Classes,
-  System.Generics.Collections,
   // Vcl
-  Vcl.Controls,
-  Vcl.Graphics,
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
   // ACL
   ACL.Classes,
-  ACL.Classes.StringList,
-  ACL.Timers,
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.Ex,
+  ACL.Timers,
   ACL.Utils.Common;
 
 type
@@ -233,11 +236,11 @@ function AnimationManager: TACLAnimationManager;
 implementation
 
 uses
-  System.SysUtils,
-  System.Math,
-  System.StrUtils,
+  {System.}Math,
+  {System.}StrUtils,
+  {System.}SysUtils,
   // VCL
-  Vcl.Forms;
+  {Vcl.}Forms;
 
 var
   FAnimationManager: TACLAnimationManager;

@@ -5,38 +5,41 @@
 {*              Styles Support               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Resources;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 {$R *.res}
 
 interface
 
 uses
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
   Winapi.Windows,
+{$ENDIF}
   // System
+  {System.}Classes,
+  {System.}Generics.Defaults,
+  {System.}Generics.Collections,
+  {System.}Variants,
+  {System.}Types,
   System.UITypes,
-  System.Types,
-  System.Variants,
-  System.Classes,
-  System.Generics.Defaults,
-  System.Generics.Collections,
   // VCL
-  Vcl.Graphics,
+  {Vcl.}Graphics,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
   ACL.Classes.StringList,
-  ACL.FastCode,
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Ex,
-  ACL.Graphics.Ex.Gdip,
   ACL.Graphics.FontCache,
   ACL.Graphics.SkinImage,
   ACL.Graphics.SkinImageSet,
@@ -415,11 +418,12 @@ type
     function EqualsValuesCore(AResource: TACLResource): Boolean; override;
     procedure Initialize; override;
     procedure LoadFromBitmapResourceCore(AInstance: HINST;
-      const AName: UnicodeString; const AMargins, AContentOffsets: TRect;
+      const AName: string; const AMargins, AContentOffsets: TRect;
       AFrameCount: Integer; ALayout: TACLSkinImageLayout = ilHorizontal;
       AStretchMode: TACLStretchMode = isStretch);
 
-    function GetActualImage(ATargetDPI: Integer; AAllowColoration: TACLBoolean): TACLSkinImageSetItem; virtual;
+    function GetActualImage(ATargetDPI: Integer;
+      AAllowColoration: TACLBoolean): TACLSkinImageSetItem; virtual;
     function GetHitTestMode: TACLSkinImageHitTestMode; virtual;
     function IsTextureStored: Boolean;
     function IsValueStored: Boolean; override;
@@ -807,15 +811,13 @@ function acResourceCollectionFieldSet(var AField: TACLCustomResourceCollection; 
 implementation
 
 uses
-  System.TypInfo,
-  System.SysUtils,
-  System.Math,
+  {System.}SysUtils,
+  {System.}TypInfo,
+  {System.}Math,
   // VCL
-  Vcl.Forms,
+  {Vcl.}Forms,
   // ACL
-  ACL.Math,
   ACL.UI.Controls.BaseControls,
-  ACL.UI.Forms,
   ACL.Utils.Strings;
 
 type
@@ -849,7 +851,7 @@ begin
     for I := 0 to APropCount - 1 do
     begin
       APropInfo := APropList^[I];
-      if APropInfo^.PropType^^.Kind = tkClass then
+      if APropInfo^.PropType^.Kind = tkClass then
       begin
         APropObject := GetObjectProp(AObject, APropInfo);
         if (APropObject = nil) or (APropObject is TComponent) then
@@ -1169,7 +1171,7 @@ end;
 
 procedure TACLResource.SetTargetDPI(AValue: Integer);
 begin
-  AValue := acCheckDPIValue(AValue);
+  AValue := EnsureRange(AValue, acMinDpi, acMaxDpi);
   if FTargetDPI <> AValue then
   begin
     FTargetDPI := AValue;
@@ -2585,7 +2587,7 @@ begin
     procedure (const AStyle: TACLStyle)
     begin
       AStyle.Refresh;
-    end, False, [mvPublished]);
+    end, False);
 end;
 
 function TACLStyle.Scale(AValue: Integer): Integer;
@@ -3174,11 +3176,12 @@ end;
 procedure TACLCustomResourceCollection.EnumResources(AResourceClass: TClass; AList: TStrings);
 var
   ATempList: TACLStringList;
+  I: Integer;
 begin
   ATempList := TACLStringList.Create;
   try
     EnumResources(AResourceClass, ATempList);
-    for var I := 0 to ATempList.Count - 1 do
+    for I := 0 to ATempList.Count - 1 do
       AList.AddObject(ATempList[I], ATempList.Objects[I]);
   finally
     ATempList.Free;
@@ -3186,10 +3189,12 @@ begin
 end;
 
 procedure TACLCustomResourceCollection.ApplyColorSchema(const AColorSchema: TACLColorSchema);
+var
+  I: Integer;
 begin
   BeginUpdate;
   try
-    for var I := 0 to Items.Count - 1 do
+    for I := 0 to Items.Count - 1 do
       acApplyColorSchema(Items[I].Resource, AColorSchema);
   finally
     EndUpdate;
@@ -3400,6 +3405,7 @@ class procedure TACLRootResourceCollection.InitializeCursors;
   end;
 
 begin
+{$IFDEF MSWINDOWS}
   DoSetCursor(crNo, LoadCursor(0, IDC_NO));
   DoSetCursor(crAppStart, LoadCursor(0, IDC_APPSTARTING));
   DoSetCursor(crHandPoint, LoadCursor(0, IDC_HAND));
@@ -3415,6 +3421,7 @@ begin
   DoSetCursor(crDrag, LoadCursor(LoadLibrary('ole32.dll'), MakeIntResource(3)));
   DoSetCursor(crRemove, LoadCursor(HInstance, 'CR_REMOVE'));
   DoSetCursor(crDragLink, LoadCursor(HInstance, 'CR_DRAGLINK'));
+{$ENDIF}
 end;
 
 { TACLRootResourceCollectionImpl }

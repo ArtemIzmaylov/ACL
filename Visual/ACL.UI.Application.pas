@@ -4,27 +4,33 @@
 {*           Application Routines            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Application;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
+  {Winapi.}Messages,
+  {Winapi.}Windows,
+{$ENDIF}
   // System
-  System.Math,
+  {System.}Math,
+  {System.}SysUtils,
   System.UITypes,
-  System.SysUtils,
   // VCL
-  Vcl.Graphics,
-  Vcl.Controls,
+  {Vcl.}Graphics,
+  {Vcl.}Controls,
+  {Vcl.}Forms,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -34,7 +40,8 @@ uses
   ACL.Utils.Common;
 
 type
-  TACLApplicationChange = (acDarkMode, acDarkModeForSystem, acAccentColor, acColorSchema, acScalingMode);
+  TACLApplicationChange = (acDarkMode, acDarkModeForSystem,
+    acAccentColor, acColorSchema, acScalingMode, acDefaultFont);
   TACLApplicationChanges = set of TACLApplicationChange;
 
   { IACLApplicationListener }
@@ -56,9 +63,11 @@ type
     class var FColorSchema: TACLColorSchema;
     class var FColorSchemaUseNative: Boolean;
     class var FDarkMode: TACLBoolean;
+    class var FDefaultFont: TFont;
     class var FListeners: TACLListenerList;
     class var FTargetDPI: Integer;
 
+    class procedure DefaultFontChanged(Sender: TObject);
     class function DecodeColorScheme(const AValue: Word): TACLColorSchema;
     class function EncodeColorScheme(const AValue: TACLColorSchema): Word;
     class function GetDefaultFont: TFont; static;
@@ -72,8 +81,9 @@ type
     class procedure Changed(AChanges: TACLApplicationChanges);
   public
     class constructor Create;
-    class procedure ConfigLoad(AConfig: TACLIniFile; const ASection: UnicodeString);
-    class procedure ConfigSave(AConfig: TACLIniFile; const ASection: UnicodeString);
+    class destructor Destroy;
+    class procedure ConfigLoad(AConfig: TACLIniFile; const ASection: string);
+    class procedure ConfigSave(AConfig: TACLIniFile; const ASection: string);
     class procedure ListenerAdd(AListener: IUnknown);
     class procedure ListenerRemove(AListener: IUnknown);
     class procedure SetDefaultFont(AName: TFontName; AHeight: Integer);
@@ -81,7 +91,6 @@ type
 
     class function GetHandle: HWND;
     class function IsMinimized: Boolean;
-    class procedure ExecCommand(ASysCommand: Integer);
     class procedure Minimize;
     class procedure PostTerminate;
     class procedure RestoreIfMinimized;
@@ -116,35 +125,41 @@ type
 implementation
 
 uses
-  Vcl.Forms,
-  // ACL
-  ACL.UI.Controls.BaseControls,
-  ACL.Utils.DPIAware,
-  ACL.Utils.Registry;
+{$IFDEF MSWINDOWS}
+  ACL.Utils.Registry,
+{$ENDIF}
+  ACL.Utils.DPIAware;
 
 { TACLApplication }
 
 class constructor TACLApplication.Create;
 begin
+  FDefaultFont := TFont.Create;
+  FDefaultFont.OnChange := DefaultFontChanged;
   UpdateColorSet;
 end;
 
-class procedure TACLApplication.ConfigLoad(AConfig: TACLIniFile; const ASection: UnicodeString);
+class destructor TACLApplication.Destroy;
+begin
+  FreeAndNil(FDefaultFont);
+end;
+
+class procedure TACLApplication.ConfigLoad(AConfig: TACLIniFile; const ASection: string);
 begin
   TargetDPI := AConfig.ReadInteger(ASection, 'TargetDPI');
-  DarkMode := AConfig.ReadEnum(ASection, 'DarkMode', TACLBoolean.Default);
+  DarkMode := AConfig.ReadEnum<TACLBoolean>(ASection, 'DarkMode', TACLBoolean.Default);
   ColorSchema := DecodeColorScheme(AConfig.ReadInteger(ASection, 'ColorSchema'));
   ColorSchemaUseNative := AConfig.ReadBool(ASection, 'UseNativeColorSchema');
   Application.HintHidePause := AConfig.ReadInteger(ASection, 'HideHintPause', DefaultHideHintPause);
   Application.ShowHint := Application.HintHidePause > 0;
 end;
 
-class procedure TACLApplication.ConfigSave(AConfig: TACLIniFile; const ASection: UnicodeString);
+class procedure TACLApplication.ConfigSave(AConfig: TACLIniFile; const ASection: string);
 begin
   AConfig.WriteInteger(ASection, 'ColorSchema', EncodeColorScheme(ColorSchema), 0);
   AConfig.WriteInteger(ASection, 'TargetDPI', TargetDPI, 0);
   AConfig.WriteInteger(ASection, 'HideHintPause', Application.HintHidePause, DefaultHideHintPause);
-  AConfig.WriteEnum(ASection, 'DarkMode', DarkMode, TACLBoolean.Default);
+  AConfig.WriteEnum<TACLBoolean>(ASection, 'DarkMode', DarkMode, TACLBoolean.Default);
   AConfig.WriteBool(ASection, 'UseNativeColorSchema', ColorSchemaUseNative, False);
 end;
 
@@ -160,7 +175,11 @@ end;
 
 class function TACLApplication.GetDefaultFont: TFont;
 begin
+{$IFDEF FPC}
+  Result := FDefaultFont;
+{$ELSE}
   Result := Application.DefaultFont;
+{$ENDIF}
 end;
 
 class function TACLApplication.GetActualColor(ALightColor, ADarkColor: TColor): TColor;
@@ -222,8 +241,8 @@ class procedure TACLApplication.SetDefaultFont(AName: TFontName; AHeight: Intege
 begin
   TACLFontCache.RemapFont(AName, AHeight);
   AHeight := MulDiv(AHeight, acGetSystemDpi, acDefaultDpi);
-  Application.DefaultFont.Name := AName;
-  Application.DefaultFont.Height := AHeight;
+  DefaultFont.Name := AName;
+  DefaultFont.Height := AHeight;
   DefFontData.Height := AHeight;
 end;
 
@@ -243,6 +262,7 @@ begin
       AActualDarkMode := True;
     TACLBoolean.False:
       AActualDarkMode := False;
+  else;
   end;
 
   AActualAccentColor := GetNativeColorAccent;
@@ -282,10 +302,10 @@ end;
 
 class function TACLApplication.GetHandle: HWND;
 begin
-  if Application.MainFormOnTaskBar then
+  if Application.{%H-}MainFormOnTaskBar then
     Result := Application.MainFormHandle
   else
-    Result := Application.Handle;
+    Result := Application.{%H-}Handle;
 end;
 
 class function TACLApplication.IsMinimized: Boolean;
@@ -293,28 +313,43 @@ begin
   Result := IsIconic(GetHandle);
 end;
 
-class procedure TACLApplication.ExecCommand(ASysCommand: Integer);
-begin
-  SendMessage(GetHandle, WM_SYSCOMMAND, ASysCommand, 0);
-end;
-
 class procedure TACLApplication.Minimize;
 begin
-  ExecCommand(SC_MINIMIZE);
+{$IFDEF MSWINDOWS}
+  SendMessage(GetHandle, WM_SYSCOMMAND, SC_MINIMIZE, 0);
+{$ELSE}
+  Application.Minimize;
+{$ENDIF}
 end;
 
 class procedure TACLApplication.PostTerminate;
 begin
+{$IFDEF MSWINDOWS}
   if Application.MainForm <> nil then
     PostMessage(Application.MainFormHandle, WM_CLOSE, 0, 0)
   else
     PostQuitMessage(0);
+{$ELSE}
+  if Application.MainForm <> nil then
+    Application.MainForm.Close
+  else
+    Application.Terminate;
+{$ENDIF}
 end;
 
 class procedure TACLApplication.RestoreIfMinimized;
 begin
   if IsMinimized then
-    ExecCommand(SC_RESTORE);
+  {$IFDEF MSWINDOWS}
+    SendMessage(GetHandle, WM_SYSCOMMAND, SC_RESTORE, 0);
+  {$ELSE}
+    Application.Restore;
+  {$ENDIF}
+end;
+
+class procedure TACLApplication.DefaultFontChanged(Sender: TObject);
+begin
+  Changed([acDefaultFont]);
 end;
 
 class function TACLApplication.DecodeColorScheme(const AValue: Word): TACLColorSchema;
@@ -322,7 +357,7 @@ begin
   if AValue = 0 then
     Result := TACLColorSchema.Default
   else
-    Result := TACLColorSchema.Create(LoByte(AValue), HiByte(AValue));
+    Result := TACLColorSchema.Create(AValue and $FF, AValue shr 8);
 end;
 
 class function TACLApplication.EncodeColorScheme(const AValue: TACLColorSchema): Word;
@@ -334,9 +369,12 @@ begin
 end;
 
 class function TACLApplication.GetNativeColorAccent: TAlphaColor;
+{$IFDEF MSWINDOWS}
 var
   AKey: HKEY;
+{$ENDIF}
 begin
+{$IFDEF MSWINDOWS}
   if acRegOpenRead(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\DWM\', AKey) then
   try
     Result := acRegReadInt(AKey, 'AccentColor');
@@ -345,13 +383,17 @@ begin
     acRegClose(AKey);
   end
   else
+{$ENDIF}
     Result := TAlphaColor.Default;
 end;
 
 class procedure TACLApplication.GetNativeDarkMode(out ADarkModeForApps, ADarkModeForSystem: Boolean);
+{$IFDEF MSWINDOWS}
 var
   AKey: HKEY;
+{$ENDIF}
 begin
+{$IFDEF MSWINDOWS}
   if acRegOpenRead(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Themes\Personalize', AKey) then
   try
     ADarkModeForApps := acRegReadInt(AKey, 'AppsUseLightTheme', 1) = 0;
@@ -360,6 +402,7 @@ begin
     acRegClose(AKey);
   end
   else
+{$ENDIF}
   begin
     ADarkModeForApps := False;
     ADarkModeForSystem := False;
@@ -398,7 +441,7 @@ end;
 class procedure TACLApplication.SetTargetDPI(AValue: Integer);
 begin
   if AValue <> 0 then
-    AValue := acCheckDPIValue(AValue);
+    AValue := EnsureRange(AValue, acMinDpi, acMaxDpi);
   if AValue <> FTargetDPI then
   begin
     FTargetDPI := AValue;

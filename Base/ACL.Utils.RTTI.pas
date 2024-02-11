@@ -80,6 +80,9 @@ type
     class function FromOrdinal(AType: TRttiType; const AValue: Int64): TValue; overload; static;
   end;
 
+{$IFDEF FPC}
+function GetObjectPropClass(PropInfo: PPropInfo): TClass;
+{$ENDIF}
 implementation
 
 uses
@@ -96,6 +99,18 @@ const
   sErrorNoRttiInfo = 'The %s has no RTTI info';
   sErrorSetEnumPropValue = 'Can''t set "%s" to "%s"';
   sErrorValueOutOfRange = 'Value is out of range';
+
+{$IFDEF FPC}
+function GetObjectPropClass(PropInfo: PPropInfo): TClass;
+var
+  TypeData: PTypeData;
+begin
+  TypeData := GetTypeData(PropInfo^.PropType);
+  if TypeData = nil then
+    raise EPropertyError.CreateRes(@SInvalidPropertyValue);
+  Result := TypeData^.ClassType;
+end;
+{$ENDIF}
 
 { TRTTI }
 

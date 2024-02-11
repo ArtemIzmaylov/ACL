@@ -15,6 +15,12 @@ unit ACL.UI.Menus;
 
 interface
 
+{$IFNDEF MSWINDOWS}
+uses
+  SysUtils,
+  Classes,
+  Menus;
+{$ELSE}
 uses
   Winapi.CommCtrl,
   Winapi.Messages,
@@ -77,8 +83,10 @@ const
   CM_ITEMKEYED     = CM_BASE + $0404;
   CM_ITEMSELECTED  = CM_BASE + $0402;
 
-type
+{$ENDIF}
 {$REGION ' General '}
+type
+
   TMenuItemClass = class of TMenuItem;
   TMenuItemEnumProc = reference to procedure (AMenuItem: TMenuItem);
 
@@ -94,6 +102,8 @@ type
   ['{82B0E75A-647F-43C9-B05A-54E34D0EBD85}']
     procedure OnShow;
   end;
+
+{$IFDEF MSWINDOWS}
 
   { TACLMenuItem }
 
@@ -635,7 +645,11 @@ type
 
 {$ENDREGION}
 
+{$ENDIF}
+
 {$REGION ' Helpers '}
+
+type
 
   { TMenuItemHelper }
 
@@ -646,14 +660,16 @@ type
   protected
     procedure PrepareForShowing;
   public
-    function AddItem(const ACaption, AHint: UnicodeString; ATag: NativeInt = 0;
+    function AddItem(const ACaption, AHint: string; ATag: NativeInt = 0;
       AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem; overload;
-    function AddItem(const ACaption: UnicodeString;
+    function AddItem(const ACaption: string;
       AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem; overload;
-    function AddItem(const ACaption: UnicodeString; ATag: NativeInt;
+    function AddItem(const ACaption: string; ATag: NativeInt;
       AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem; overload;
+  {$IFDEF MSWINDOWS}
     function AddLink(const AMenuItemOrMenu: TComponent): TACLMenuItemLink;
-    function AddRadioItem(const ACaption, AHint: UnicodeString; ATag: NativeInt = 0;
+  {$ENDIF}
+    function AddRadioItem(const ACaption, AHint: string; ATag: NativeInt = 0;
       AEvent: TNotifyEvent = nil; AGroupIndex: Integer = 0; AShortCut: TShortCut = 0): TMenuItem; overload;
     function AddSeparator: TMenuItem;
     function CanBeParent(AParent: TMenuItem): Boolean;
@@ -670,6 +686,15 @@ type
 
 function acMenusHasActivePopup: Boolean;
 implementation
+
+{$IFNDEF MSWINDOWS}
+
+function acMenusHasActivePopup: Boolean;
+begin
+  Result := False;
+end;
+
+{$ELSE}
 
 type
   TApplicationAccess = class(TApplication);
@@ -697,11 +722,13 @@ begin
   Result := TACLMenuController.ActiveMenu <> nil;
 end;
 
+{$ENDIF}
+
 {$REGION ' Helpers '}
 
 { TMenuItemHelper }
 
-function TMenuItemHelper.AddItem(const ACaption, AHint: UnicodeString;
+function TMenuItemHelper.AddItem(const ACaption, AHint: string;
   ATag: NativeInt; AEvent: TNotifyEvent; AShortCut: TShortCut): TMenuItem;
 begin
   Result := TMenuItem.Create(Self);
@@ -713,24 +740,28 @@ begin
   Add(Result);
 end;
 
-function TMenuItemHelper.AddItem(const ACaption: UnicodeString; AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem;
+function TMenuItemHelper.AddItem(const ACaption: string;
+  AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem;
 begin
   Result := AddItem(ACaption, 0, AEvent, AShortCut);
 end;
 
-function TMenuItemHelper.AddItem(const ACaption: UnicodeString; ATag: NativeInt; AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem;
+function TMenuItemHelper.AddItem(const ACaption: string;
+  ATag: NativeInt; AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem;
 begin
   Result := AddItem(ACaption, '', ATag, AEvent, AShortCut);
 end;
 
+{$IFDEF MSWINDOWS}
 function TMenuItemHelper.AddLink(const AMenuItemOrMenu: TComponent): TACLMenuItemLink;
 begin
   Result := TACLMenuItemLink.Create(Self);
   Result.Link := AMenuItemOrMenu;
   Add(Result);
 end;
+{$ENDIF}
 
-function TMenuItemHelper.AddRadioItem(const ACaption, AHint: UnicodeString;
+function TMenuItemHelper.AddRadioItem(const ACaption, AHint: string;
   ATag: NativeInt; AEvent: TNotifyEvent; AGroupIndex: Integer; AShortCut: TShortCut): TMenuItem;
 begin
   Result := AddItem(ACaption, AHint, Atag, AEvent, AShortCut);
@@ -757,8 +788,10 @@ begin
 end;
 
 function TMenuItemHelper.FindByTag(const ATag: NativeInt): TMenuItem;
+var
+  I: Integer;
 begin
-  for var I := Count - 1 downto 0 do
+  for I := Count - 1 downto 0 do
   begin
     if Items[I].Tag = ATag then
       Exit(Items[I]);
@@ -767,8 +800,10 @@ begin
 end;
 
 procedure TMenuItemHelper.DeleteWithTag(const ATag: NativeInt);
+var
+  I: Integer;
 begin
-  for var I := Count - 1 downto 0 do
+  for I := Count - 1 downto 0 do
   begin
     if Items[I].Tag = ATag then
       Delete(I);
@@ -778,8 +813,9 @@ end;
 function TMenuItemHelper.HasVisibleSubItems: Boolean;
 var
   AItem: TMenuItem;
+  I: Integer;
 begin
-  for var I := 0 to Count - 1 do
+  for I := 0 to Count - 1 do
   begin
     AItem := Items[I];
     if not AItem.IsLine and AItem.Visible then
@@ -792,14 +828,16 @@ function TMenuItemHelper.IsCheckable: Boolean;
 var
   Intf: IACLMenuItemCheckable;
 begin
-  Result := Checked or AutoCheck or RadioItem or Succeeded(QueryInterface(IACLMenuItemCheckable, Intf));
+  Result := Checked or AutoCheck or RadioItem or
+    (QueryInterface(IACLMenuItemCheckable, Intf) = 0);
 end;
 
 procedure TMenuItemHelper.PrepareForShowing;
 var
   AIntf: IACLMenuShowHandler;
+  I: Integer;
 begin
-  for var I := 0 to Count - 1 do
+  for I := 0 to Count - 1 do
   begin
     if Supports(Items[I], IACLMenuShowHandler, AIntf) then
       AIntf.OnShow;
@@ -807,8 +845,10 @@ begin
 end;
 
 function TMenuItemHelper.GetDefaultItem: TMenuItem;
+var
+  I: Integer;
 begin
-  for var I := 0 to Count - 1 do
+  for I := 0 to Count - 1 do
   begin
     if Items[I].Default then
       Exit(Items[I]);
@@ -832,6 +872,7 @@ end;
 
 {$ENDREGION}
 
+{$IFDEF MSWINDOWS}
 {$REGION ' General '}
 
 { TACLMenuItem }
@@ -1123,7 +1164,7 @@ begin
       AGlyph := AIntf.GetGlyph;
       AGlyph.TargetDPI := TargetDPI;
       ARect.Center(AGlyph.FrameSize);
-      AGlyph.Draw(ACanvas.Handle, ARect, AItem.Enabled);
+      AGlyph.Draw(ACanvas, ARect, AItem.Enabled);
     end
     else
 
@@ -1179,7 +1220,7 @@ begin
 end;
 
 function TACLStyleMenu.MeasureWidth(ACanvas: TCanvas;
-  const S: UnicodeString; AShortCut: TShortCut; ADefault: Boolean): Integer;
+  const S: string; AShortCut: TShortCut; ADefault: Boolean): Integer;
 begin
   AssignFontParams(ACanvas, True, ADefault, True);
   Result := 2 * GetTextIdent + acTextSize(ACanvas, S).Width;
@@ -3479,4 +3520,5 @@ end;
 
 initialization
   RegisterClasses([TACLMenuItem, TACLMenuItemLink, TACLMenuListItem]);
+{$ENDIF}
 end.

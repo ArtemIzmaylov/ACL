@@ -108,11 +108,13 @@ type
     procedure BeforeDestruction; override;
     procedure Terminate; virtual;
     procedure TerminateForce;
+
     /// <summary>
     ///    Returns True if after AStartTime the specified ATimeout is passed.
     ///    If ATimeout = 0 or ATimeout = INFINITY - function always returns False.
     /// </summary>
-    class function IsTimeout(AStartTime: Cardinal; ATimeOut: Cardinal): Boolean; static;
+    class function IsTimeout(AStartTime, ATimeOut: Cardinal): Boolean; static;
+    class function Timestamp: Cardinal;
   end;
 
   { TACLPauseableThread }
@@ -454,11 +456,11 @@ end;
 const
   MaxWaitTime = 100;
 var
-  AStartWaitTime: Cardinal;
+  LStartWaitTime: Cardinal;
 begin
   if IsMainThread then
   begin
-    AStartWaitTime := TACLThread.GetTickCount;
+    LStartWaitTime := TACLThread.Timestamp;
     while True do
     begin
       case FSyncObj.WaitFor(Min(MaxWaitTime, ATimeOut)) of
@@ -468,7 +470,7 @@ begin
           Exit(True);
       else;
       end;
-      if TACLThread.IsTimeout(AStartWaitTime, ATimeOut) then
+      if TACLThread.IsTimeout(LStartWaitTime, ATimeOut) then
         Exit(False);
     end;
   end
@@ -514,16 +516,21 @@ end;
 
 class function TACLThread.IsTimeout(AStartTime, ATimeOut: Cardinal): Boolean;
 var
-  ANow: Cardinal;
+  LNow: Cardinal;
 begin
   if (ATimeOut = 0) or (ATimeOut = INFINITE) then
     Exit(False);
 
-  ANow := GetTickCount;
-  if ANow < AStartTime then
-    Result := High(Cardinal) - AStartTime + ANow >= ATimeOut
+  LNow := Timestamp;
+  if LNow < AStartTime then
+    Result := High(Cardinal) - AStartTime + LNow >= ATimeOut
   else
-    Result := ANow - AStartTime >= Cardinal(ATimeOut);
+    Result := LNow - AStartTime >= Cardinal(ATimeOut);
+end;
+
+class function TACLThread.Timestamp: Cardinal;
+begin
+  Result := GetTickCount{%H-};
 end;
 
 procedure TACLThread.Terminate;
