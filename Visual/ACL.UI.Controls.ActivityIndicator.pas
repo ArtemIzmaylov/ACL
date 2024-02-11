@@ -4,36 +4,35 @@
 {*        Activity Indicator Control         *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.ActivityIndicator;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+{$IFDEF MSWINDOWS}
+  Windows, // inlining
+{$ENDIF}
   // System
-  System.Classes,
-  System.Generics.Collections,
-  System.SysUtils,
-  System.Types,
+  {System.}Classes,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
   System.UITypes,
   // Vcl
-  Vcl.Controls,
-  Vcl.Graphics,
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
   // ACL
-  ACL.Math,
-  ACL.Classes,
-  ACL.Timers,
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Ex,
+  ACL.Timers,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.Labels,
   ACL.UI.Resources,
@@ -63,13 +62,12 @@ type
   strict private
     FTimer: TACLTimer;
 
+    procedure HandlerTimer(Sender: TObject);
     function GetActive: Boolean;
     function GetStyle: TACLStyleActivityIndicator;
     function GetTextOffset: Integer;
     procedure SetActive(const Value: Boolean);
     procedure SetStyle(const Value: TACLStyleActivityIndicator);
-    //
-    procedure HandlerTimer(Sender: TObject);
   protected
     procedure Calculate(const R: TRect); override;
     function CreateStyle: TACLStyleLabel; override;
@@ -86,9 +84,6 @@ type
   end;
 
 implementation
-
-uses
-  System.Math;
 
 { TACLStyleActivityIndicator }
 
@@ -151,6 +146,7 @@ var
   LDotSize: Integer;
   LIndentBetweenDots: Integer;
   LRect: TRect;
+  I: Integer;
 begin
   inherited;
 
@@ -161,7 +157,7 @@ begin
   LRect := ClientRect;
   LRect.CenterVert(LDotSize);
   LRect.Left := LRect.Right - LDotSize;
-  for var I := Style.DotCount - 1 downto 0 do
+  for I := Style.DotCount - 1 downto 0 do
   begin
     Style.DrawDot(Canvas, LRect, I = FTimer.Tag);
     LRect.Offset(-LDotSize - LIndentBetweenDots, 0);
