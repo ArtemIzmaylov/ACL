@@ -4,26 +4,23 @@
 {*               Panel Control               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.Panel;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  System.Types,
-  System.SysUtils,
-  System.Classes,
-  System.Math,
+  {System.}Classes,
+  {System.}SysUtils,
   // VCL
-  Vcl.Controls,
-  Vcl.Consts,
-  Vcl.Graphics,
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
   // ACL
   ACL.Classes,
   ACL.UI.Controls.BaseControls,
