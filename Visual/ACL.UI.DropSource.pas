@@ -11,7 +11,7 @@
 
 unit ACL.UI.DropSource;
 
-{$I ACL.Config.INC}
+{$I ACL.Config.inc}
 
 interface
 

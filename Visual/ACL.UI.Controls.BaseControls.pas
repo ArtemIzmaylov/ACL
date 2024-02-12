@@ -13,7 +13,9 @@ unit ACL.UI.Controls.BaseControls;
 
 {$I ACL.Config.inc} // FPC: Partial
 
+{$IFDEF FPC}
 {$MESSAGE WARN 'TODO - AlignWithMargins'}
+{$ENDIF}
 
 interface
 
@@ -329,8 +331,8 @@ type
     procedure SetMargins(const Value: TACLMargins);
     procedure SetResourceCollection(AValue: TACLCustomResourceCollection);
   protected
-    {$MESSAGE WARN 'ChangeScale'}
-//    procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
+    {$IFDEF FPC}{$MESSAGE WARN 'ChangeScale'}{$ENDIF}
+    procedure ChangeScale(M, D: Integer; isDpiChange: Boolean);{$IFNDEF FPC}override;{$ENDIF}
   protected
   {$IFDEF FPC}
     procedure CalculatePreferredSize(var W, H: Integer; X: Boolean); override;
@@ -452,8 +454,8 @@ type
   {$IFDEF FPC}
     procedure CalculatePreferredSize(var W, H: Integer; X: Boolean); override;
   {$ENDIF}
-    {$MESSAGE WARN 'ChangeScale'}
-    //procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
+    {$IFDEF FPC}{$MESSAGE WARN 'ChangeScale'}{$ENDIF}
+    procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); {$IFNDEF FPC}override;{$ENDIF}
     function CreatePadding: TACLPadding; virtual;
     function GetClientRect: TRect; override;
     function GetContentOffset: TRect; virtual;
@@ -507,8 +509,8 @@ type
     procedure BeforeDestruction; override;
     procedure FullRefresh;
     procedure Invalidate; override;
-    {$MESSAGE WARN 'ChangeScale'}
-    //procedure ScaleForPPI(NewPPI: Integer); override;
+    {$IFDEF FPC}{$MESSAGE WARN 'ChangeScale'}{$ENDIF}
+    procedure ScaleForPPI(NewPPI: Integer); {$IFNDEF FPC}override;{$ENDIF}
     // IACLControl
     procedure InvalidateRect(const R: TRect); virtual;
     // IACLColorSchema
@@ -1590,12 +1592,14 @@ begin
     OnGetHint(Self, P.X, P.Y, AHint);
 end;
 
-//procedure TACLGraphicControl.ChangeScale(M, D: Integer; isDpiChange: Boolean);
-//begin
-//  inherited ChangeScale(M, D, isDpiChange);
-//  SetTargetDPI(FCurrentPPI);
-//  MarginsChangeHandler(nil);
-//end;
+procedure TACLGraphicControl.ChangeScale(M, D: Integer; isDpiChange: Boolean);
+begin
+{$IFNDEF FPC}
+  inherited;
+{$ENDIF}
+  SetTargetDPI(FCurrentPPI);
+  MarginsChangeHandler(nil);
+end;
 
 function TACLGraphicControl.GetBackgroundStyle: TACLControlBackgroundStyle;
 begin
@@ -1755,8 +1759,11 @@ end;
 
 procedure TACLGraphicControl.MarginsChangeHandler(Sender: TObject);
 begin
+{$IFDEF FPC}
   {$MESSAGE WARN 'Margins'}
-  //inherited Margins.Assign(Margins.GetScaledMargins(FCurrentPPI));
+{$ELSE}
+  inherited Margins.Assign(Margins.GetScaledMargins(FCurrentPPI));
+{$ENDIF}
 end;
 
 procedure TACLGraphicControl.SetMargins(const Value: TACLMargins);
@@ -2204,27 +2211,31 @@ begin
 end;
 {$ENDIF}
 
-//procedure TACLCustomControl.ScaleForPPI(NewPPI: Integer);
-//begin
-//  Perform(CM_SCALECHANGING, 0, 0);
-//  try
-//    inherited ScaleForPPI(NewPPI);
-//  finally
-//    Perform(CM_SCALECHANGED, 0, 0);
-//  end;
-//end;
-//
-//procedure TACLCustomControl.ChangeScale(M, D: Integer; isDpiChange: Boolean);
-//begin
-//  Perform(CM_SCALECHANGING, 0, 0);
-//  try
-//    inherited;
-//    SetTargetDPI(FCurrentPPI);
-//    MarginsChangeHandler(nil);
-//  finally
-//    Perform(CM_SCALECHANGED, 0, 0);
-//  end;
-//end;
+procedure TACLCustomControl.ScaleForPPI(NewPPI: Integer);
+begin
+{$IFNDEF FPC}
+  Perform(CM_SCALECHANGING, 0, 0);
+  try
+    inherited ScaleForPPI(NewPPI);
+  finally
+    Perform(CM_SCALECHANGED, 0, 0);
+  end;
+{$ENDIF}
+end;
+
+procedure TACLCustomControl.ChangeScale(M, D: Integer; isDpiChange: Boolean);
+begin
+  Perform(CM_SCALECHANGING, 0, 0);
+  try
+  {$IFNDEF FPC}
+    inherited;
+  {$ENDIF}
+    SetTargetDPI(FCurrentPPI);
+    MarginsChangeHandler(nil);
+  finally
+    Perform(CM_SCALECHANGED, 0, 0);
+  end;
+end;
 
 function TACLCustomControl.CreatePadding: TACLPadding;
 begin
@@ -2293,8 +2304,11 @@ procedure TACLCustomControl.MarginsChangeHandler(Sender: TObject);
 begin
   DisableAlign;
   try
+  {$IFDEF FPC}
     {$MESSAGE WARN 'Margins'}
-    //inherited Margins.Assign(Margins.GetScaledMargins(FCurrentPPI));
+  {$ELSE}
+    inherited Margins.Assign(Margins.GetScaledMargins(FCurrentPPI));
+  {$ENDIF}
   finally
     EnableAlign;
   end;

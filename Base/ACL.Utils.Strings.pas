@@ -2497,7 +2497,7 @@ begin
         acLowerCase(ASource[ASourceIndex + 1]) =
         acLowerCase(ATarget[ATargetIndex + 1]);
     end,
-    procedure (AIndex: Integer; AState: TDiffState)
+    procedure ({%H-}AIndex: Integer; AState: TDiffState)
     begin
       if AState = tsEquals then
         Inc(AEqualsCount);
@@ -2523,7 +2523,7 @@ begin
     begin
       Result := SameText(ASource[ASourceIndex], ATarget[ATargetIndex]);
     end,
-    procedure (AIndex: Integer; AState: TDiffState)
+    procedure ({%H-}AIndex: Integer; AState: TDiffState)
     begin
       if AState = tsEquals then
         Inc(AEqualsCount);
@@ -3508,7 +3508,7 @@ var
 begin
   AResult := '';
   acExplodeString(PAnsiChar(S), Length(S), '.',
-    procedure (ACursorStart, ACursorFinish: PAnsiChar; var ACanContinue: Boolean)
+    procedure (ACursorStart, ACursorFinish: PAnsiChar; var {%H-}ACanContinue: Boolean)
     var
       A: AnsiString;
     begin
@@ -3660,7 +3660,7 @@ var
 begin
   AResult := '';
   acExplodeString(S, '.',
-    procedure (ACursorStart, ACursorNext: PWideChar; var ACanContinue: Boolean)
+    procedure (ACursorStart, ACursorNext: PWideChar; var {%H-}ACanContinue: Boolean)
     var
       A: AnsiString;
       U: UnicodeString;

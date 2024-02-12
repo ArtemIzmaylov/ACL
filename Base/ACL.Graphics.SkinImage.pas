@@ -903,7 +903,7 @@ procedure TACLSkinImage.Draw(ACanvas: TCanvas; const R: TRect; AFrameIndex: Inte
         R.CenterHorz(ASource.Width);
         R.CenterVert(ASource.Height);
       end;
-      TACLSkinImageRenderer.Fill(R, TAlphaColor(AState));
+      acFillRect(ACanvas, R, TAlphaColor(AState));
       Exit;
     end;
 

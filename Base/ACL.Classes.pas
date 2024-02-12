@@ -260,7 +260,7 @@ function acFindOwnerThatSupportTheInterface(
 function acIsValidIdent(const S: string;
   AAllowUnicodeIdents: Boolean = True; AAllowDots: Boolean = False): Boolean;
 
-{$IFDEF DELPHI}
+{$IFNDEF FPC}
 function acIsDelphiObject(AData: Pointer): Boolean;
 {$ENDIF}
 
@@ -327,7 +327,7 @@ begin
   until Result = nil;
 end;
 
-{$IFDEF DELPHI}
+{$IFNDEF FPC}
 function acIsDelphiObject(AData: Pointer): Boolean;
 var
   P: Pointer;

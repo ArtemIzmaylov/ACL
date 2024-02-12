@@ -1445,8 +1445,8 @@ end;
 
 { TACLXMLBuilder }
 
-constructor TACLXMLBuilder.Create(
-  AStream: TStream; const ASettings: TACLXMLDocumentFormatSettings);
+constructor TACLXMLBuilder.Create(AStream: TStream;
+  const ASettings: TACLXMLDocumentFormatSettings);
 begin
   // just to be a virtual;
 end;

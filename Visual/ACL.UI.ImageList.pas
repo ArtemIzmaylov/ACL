@@ -131,9 +131,12 @@ begin
   if AImageList <> nil then
   begin
     Result := TSize.Create(AImageList.Width, AImageList.Height);
+  {$IFDEF MSWINDOWS}
+    if (AImageList is TACLImageList) and TACLImageList(AImageList).Scalable then
+      Result.Scale(ATargetDPI, TACLImageList(AImageList).SourceDPI);
+  {$ELSE}
     {$MESSAGE WARN 'Commented'}
-    //if (AImageList is TACLImageList) and TACLImageList(AImageList).Scalable then
-    //  Result.Scale(ATargetDPI, TACLImageList(AImageList).SourceDPI);
+  {$ENDIF}
   end
   else
     Result := NullSize;
@@ -346,7 +349,7 @@ end;
 procedure TACLImageList.SetSourceDPI(AValue: Integer);
 begin
   if AValue <> 0 then
-    AValue := acCheckDPIValue(AValue);
+    AValue := EnsureRange(AValue, acMinDpi, acMaxDpi);
   if AValue <> FSourceDPI then
   begin
     FSourceDPI := AValue;

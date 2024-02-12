@@ -359,12 +359,14 @@ const
   SXmlUnexpectedEOFInElementContent = 'Unexpected end of file has occurred. The following elements are not closed: %s';
   SXmlUnexpectedTokenEx = '''%s'' is an unexpected token. The expected token is ''%s''.';
   SXmlUnexpectedTokens2 = '''%s'' is an unexpected token. The expected token is ''%s'' or ''%s''.';
-  SXmlUnknownNs = '''%s'' is an undeclared namespace.';
   SXmlXmlDeclNotFirst = 'Unexpected XML declaration. The XML declaration must be the first node in the document, ' +
     'and no white space characters are allowed to appear before it.';
   SXmlXmlnsPrefix = 'Prefix ''xmlns'' is reserved for use by XML.';
   SXmlXmlPrefix = 'Prefix ''xml'' is reserved for use by XML and can be mapped only to namespace name ' +
     '''http://www.w3.org/XML/1998/namespace''.';
+{$IFDEF DEBUG}
+  SXmlUnknownNs = '''%s'' is an undeclared namespace.';
+{$ENDIF}
 {$ENDREGION}
 
 type

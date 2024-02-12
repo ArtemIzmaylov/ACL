@@ -6,6 +6,7 @@
   {$mode delphi}
   {$modeswitch functionreferences}
   {$modeswitch anonymousfunctions}
+  {$modeswitch advancedrecords}
   {$codepage UTF8}
   {$inline off}
 
@@ -17,6 +18,10 @@
 
   {$IFNDEF LINUX}
     {$MESSAGE FATAL 'ACL was not ready for other platforms using FPC/LCL'}
+  {$ENDIF}
+
+  {$IFDEF LCLGtk2}
+    {$DEFINE ACL_RGBA}
   {$ENDIF}
 {$ENDIF}
 
@@ -44,7 +49,6 @@
     {$RTTI EXPLICIT METHODS([]) FIELDS([]) PROPERTIES([vcPublic, vcPublished])}
   {$IFEND}
 {$IFEND}
-
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Options
