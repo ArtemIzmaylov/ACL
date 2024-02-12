@@ -65,18 +65,18 @@ type
 
   TACLCustomSpinEdit = class(TACLCustomEdit)
   strict private
-    FAutoClickButton: TACLCustomButtonViewInfo;
+    FAutoClickButton: TACLCustomButtonSubClass;
     FAutoClickTimer: Boolean;
     FAutoClickTimerWaitCount: Integer;
-    FButtonLeft: TACLCustomButtonViewInfo;
-    FButtonRight: TACLCustomButtonViewInfo;
+    FButtonLeft: TACLCustomButtonSubClass;
+    FButtonRight: TACLCustomButtonSubClass;
 
     procedure SetAutoClickTimer(AValue: Boolean);
   protected
     function CalculateEditorPosition: TRect; override;
     function CanOpenEditor: Boolean; override;
     function CreateStyleButton: TACLStyleButton; override;
-    function HitTest(X, Y: Integer; var AViewInfo: TACLCustomButtonViewInfo): Boolean;
+    function HitTest(X, Y: Integer; var ASubClass: TACLCustomButtonSubClass): Boolean;
     procedure Calculate(R: TRect); override;
     procedure CalculateAutoHeight(var ANewHeight: Integer); override;
     procedure DoButtonClick(AStep: Integer); virtual;
@@ -92,8 +92,8 @@ type
     procedure WMTimer(var Message: TWMTimer); message WM_TIMER;
     //
     property AutoClickTimer: Boolean read FAutoClickTimer write SetAutoClickTimer;
-    property ButtonLeft: TACLCustomButtonViewInfo read FButtonLeft;
-    property ButtonRight: TACLCustomButtonViewInfo read FButtonRight;
+    property ButtonLeft: TACLCustomButtonSubClass read FButtonLeft;
+    property ButtonRight: TACLCustomButtonSubClass read FButtonRight;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -116,9 +116,9 @@ type
     procedure InitializeTextures; override;
   end;
 
-  { TACLSpinButtonViewInfo }
+  { TACLSpinButtonSubClass }
 
-  TACLSpinButtonViewInfo = class(TACLCustomButtonViewInfo)
+  TACLSpinButtonSubClass = class(TACLCustomButtonSubClass)
   protected
     procedure DrawBackground(ACanvas: TCanvas; const R: TRect); override;
   end;
@@ -284,9 +284,9 @@ constructor TACLCustomSpinEdit.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   ControlStyle := ControlStyle - [csDoubleClicks];
-  FButtonLeft := TACLSpinButtonViewInfo.Create(Self);
+  FButtonLeft := TACLSpinButtonSubClass.Create(Self);
   FButtonLeft.Tag := -1;
-  FButtonRight := TACLSpinButtonViewInfo.Create(Self);
+  FButtonRight := TACLSpinButtonSubClass.Create(Self);
   FButtonRight.Tag := 1;
   EditorOpen;
   ResourceChanged;
@@ -339,17 +339,17 @@ begin
   Result := TACLStyleSpinButton.Create(Self);
 end;
 
-function TACLCustomSpinEdit.HitTest(X, Y: Integer; var AViewInfo: TACLCustomButtonViewInfo): Boolean;
+function TACLCustomSpinEdit.HitTest(X, Y: Integer; var ASubClass: TACLCustomButtonSubClass): Boolean;
 begin
   if PtInRect(ButtonLeft.Bounds, Point(X, Y)) then
-    AViewInfo := ButtonLeft
+    ASubClass := ButtonLeft
   else
     if PtInRect(ButtonRight.Bounds, Point(X, Y)) then
-      AViewInfo := ButtonRight
+      ASubClass := ButtonRight
     else
-      AViewInfo := nil;
+      ASubClass := nil;
 
-  Result := Assigned(AViewInfo);
+  Result := Assigned(ASubClass);
 end;
 
 procedure TACLCustomSpinEdit.EditorMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
@@ -374,10 +374,10 @@ end;
 
 procedure TACLCustomSpinEdit.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 var
-  AViewInfo: TACLCustomButtonViewInfo;
+  ASubClass: TACLCustomButtonSubClass;
 begin
   inherited MouseUp(Button, Shift, X, Y);
-  if HitTest(X, Y, AViewInfo) and (AViewInfo = FAutoClickButton) then
+  if HitTest(X, Y, ASubClass) and (ASubClass = FAutoClickButton) then
   begin
     if not AutoClickTimer or (FAutoClickTimerWaitCount > 0) then
       DoButtonClick(Signs[FAutoClickButton = ButtonRight]);
@@ -391,15 +391,15 @@ end;
 procedure TACLCustomSpinEdit.MouseLeave;
 begin
   inherited MouseLeave;
-  ButtonRight.MouseMove(InvalidPoint);
-  ButtonLeft.MouseMove(InvalidPoint);
+  ButtonRight.MouseMove([], InvalidPoint);
+  ButtonLeft.MouseMove([], InvalidPoint);
 end;
 
 procedure TACLCustomSpinEdit.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
   inherited MouseMove(Shift, X, Y);
-  ButtonRight.MouseMove(Point(X, Y));
-  ButtonLeft.MouseMove(Point(X, Y));
+  ButtonRight.MouseMove(Shift, Point(X, Y));
+  ButtonLeft.MouseMove(Shift, Point(X, Y));
 end;
 
 procedure TACLCustomSpinEdit.DoButtonClick(AStep: Integer);
@@ -454,9 +454,9 @@ begin
   Texture.InitailizeDefaults('EditBox.Textures.SpinButton');
 end;
 
-{ TACLSpinButtonViewInfo }
+{ TACLSpinButtonSubClass }
 
-procedure TACLSpinButtonViewInfo.DrawBackground(ACanvas: TCanvas; const R: TRect);
+procedure TACLSpinButtonSubClass.DrawBackground(ACanvas: TCanvas; const R: TRect);
 begin
   Style.Texture.Draw(ACanvas, R, Ord(State) + 5 * Ord(Tag > 0));
 end;

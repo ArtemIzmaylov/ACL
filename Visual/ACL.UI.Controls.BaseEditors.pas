@@ -101,7 +101,7 @@ type
     FCaption: UnicodeString;
     FEnabled: Boolean;
     FHint: UnicodeString;
-    FViewInfo: TACLButtonViewInfo;
+    FSubClass: TACLButtonSubClass;
     FVisible: Boolean;
     FWidth: Integer;
 
@@ -117,9 +117,9 @@ type
     procedure SetWidth(AValue: Integer);
   protected
     procedure Calculate(var R: TRect);
-    procedure UpdateViewInfo;
+    procedure UpdateSubClass;
     //
-    property ViewInfo: TACLButtonViewInfo read FViewInfo;
+    property SubClass: TACLButtonSubClass read FSubClass;
   public
     constructor Create(ACollection: TCollection); override;
     destructor Destroy; override;
@@ -138,9 +138,9 @@ type
     property OnClick: TNotifyEvent read FOnClick write FOnClick;
   end;
 
-  { TACLEditButtonViewInfo }
+  { TACLEditButtonSubClass }
 
-  TACLEditButtonViewInfo = class(TACLButtonViewInfo)
+  TACLEditButtonSubClass = class(TACLButtonSubClass)
   strict private
     function GetOwnerControl: TControl;
   protected
@@ -515,15 +515,15 @@ begin
   FWidth := 18;
   FEnabled := True;
   FVisible := True;
-  FViewInfo := TACLEditButtonViewInfo.Create(TACLEditButtons(ACollection).ButtonEdit);
+  FSubClass := TACLEditButtonSubClass.Create(TACLEditButtons(ACollection).ButtonEdit);
   inherited Create(ACollection);
-  FViewInfo.OnClick := DoOnClick;
+  FSubClass.OnClick := DoOnClick;
   ImageIndex := -1;
 end;
 
 destructor TACLEditButton.Destroy;
 begin
-  FreeAndNil(FViewInfo);
+  FreeAndNil(FSubClass);
   inherited Destroy;
 end;
 
@@ -541,11 +541,11 @@ end;
 
 procedure TACLEditButton.Calculate(var R: TRect);
 begin
-  if ViewInfo <> nil then
+  if SubClass <> nil then
   begin
-    ViewInfo.IsEnabled := Enabled and ((Collection.ButtonEdit = nil) or Collection.ButtonEdit.ButtonsGetEnabled);
-    ViewInfo.Calculate(R.Split(srRight, IfThen(Visible, dpiApply(Width, ViewInfo.CurrentDpi))));
-    R.Right := ViewInfo.Bounds.Left;
+    SubClass.IsEnabled := Enabled and ((Collection.ButtonEdit = nil) or Collection.ButtonEdit.ButtonsGetEnabled);
+    SubClass.Calculate(R.Split(srRight, IfThen(Visible, dpiApply(Width, SubClass.CurrentDpi))));
+    R.Right := SubClass.Bounds.Left;
   end;
 end;
 
@@ -554,9 +554,9 @@ begin
   CallNotifyEvent(Sender, OnClick);
 end;
 
-procedure TACLEditButton.UpdateViewInfo;
+procedure TACLEditButton.UpdateSubClass;
 begin
-  ViewInfo.Caption := IfThenW(ViewInfo.ImageIndex < 0, Caption);
+  SubClass.Caption := IfThenW(SubClass.ImageIndex < 0, Caption);
 end;
 
 function TACLEditButton.GetCollection: TACLEditButtons;
@@ -566,7 +566,7 @@ end;
 
 function TACLEditButton.GetImageIndex: TImageIndex;
 begin
-  Result := ViewInfo.ImageIndex;
+  Result := SubClass.ImageIndex;
 end;
 
 procedure TACLEditButton.SetCaption(const AValue: UnicodeString);
@@ -574,7 +574,7 @@ begin
   if FCaption <> AValue then
   begin
     FCaption := AValue;
-    UpdateViewInfo;
+    UpdateSubClass;
     Changed(False);
   end;
 end;
@@ -592,8 +592,8 @@ procedure TACLEditButton.SetImageIndex(AValue: TImageIndex);
 begin
   if ImageIndex <> AValue then
   begin
-    ViewInfo.ImageIndex := AValue;
-    UpdateViewInfo;
+    SubClass.ImageIndex := AValue;
+    UpdateSubClass;
     Changed(False);
   end;
 end;
@@ -663,7 +663,7 @@ var
   I: Integer;
 begin
   for I := 0 to Count - 1 do
-    Items[I].ViewInfo.Draw(ACanvas);
+    Items[I].SubClass.Draw(ACanvas);
 end;
 
 function TACLEditButtons.Find(const P: TPoint; out AButton: TACLEditButton): Boolean;
@@ -671,7 +671,7 @@ var
   I: Integer;
 begin
   for I := Count - 1 downto 0 do
-    if PtInRect(Items[I].ViewInfo.Bounds, P) then
+    if PtInRect(Items[I].SubClass.Bounds, P) then
     begin
       AButton := Items[I];
       Exit(True);
@@ -684,7 +684,7 @@ var
   I: Integer;
 begin
   for I := 0 to Count - 1 do
-    Items[I].ViewInfo.MouseDown(Button, P);
+    Items[I].SubClass.MouseDown(Button, P);
 end;
 
 procedure TACLEditButtons.MouseLeave;
@@ -692,7 +692,7 @@ var
   I: Integer;
 begin
   for I := 0 to Count - 1 do
-    Items[I].ViewInfo.MouseMove(InvalidPoint);
+    Items[I].SubClass.MouseMove([], InvalidPoint);
 end;
 
 procedure TACLEditButtons.MouseMove(Shift: TShiftState; const P: TPoint);
@@ -700,7 +700,7 @@ var
   I: Integer;
 begin
   for I := 0 to Count - 1 do
-    Items[I].ViewInfo.MouseMove(P);
+    Items[I].SubClass.MouseMove(Shift, P);
 end;
 
 procedure TACLEditButtons.MouseUp(Button: TMouseButton; const P: TPoint);
@@ -708,7 +708,7 @@ var
   I: Integer;
 begin
   for I := 0 to Count - 1 do
-    Items[I].ViewInfo.MouseUp(Button, P);
+    Items[I].SubClass.MouseUp(Button, P);
 end;
 
 procedure TACLEditButtons.Update(Item: TCollectionItem);
@@ -717,16 +717,16 @@ begin
   ButtonEdit.ButtonOwnerRecalculate;
 end;
 
-{ TACLEditButtonViewInfo }
+{ TACLEditButtonSubClass }
 
-procedure TACLEditButtonViewInfo.StateChanged;
+procedure TACLEditButtonSubClass.StateChanged;
 begin
   if State = absHover then
     Application.CancelHint;
   inherited StateChanged;
 end;
 
-function TACLEditButtonViewInfo.GetOwnerControl: TControl;
+function TACLEditButtonSubClass.GetOwnerControl: TControl;
 var
   AEdit: IACLButtonEdit;
 begin

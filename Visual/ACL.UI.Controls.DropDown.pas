@@ -22,6 +22,7 @@ uses
   Vcl.Controls,
   Vcl.Graphics,
   Vcl.ImgList,
+  Vcl.Forms,
   // System
   System.Classes,
   System.Math,
@@ -48,7 +49,7 @@ uses
   ACL.Utils.Strings;
 
 type
-  TACLCustomDropDownEditButtonViewInfo = class;
+  TACLCustomDropDownEditButtonSubClass = class;
 
   { TACLCustomDropDownEdit }
 
@@ -56,7 +57,7 @@ type
   strict private
     FDropDownAlignment: TAlignment;
     FDropDownClosedAt: Cardinal;
-    FDropDownButton: TACLCustomDropDownEditButtonViewInfo;
+    FDropDownButton: TACLCustomDropDownEditButtonSubClass;
     FDropDownWindow: TACLPopupWindow;
 
     FOnDropDown: TNotifyEvent;
@@ -77,7 +78,7 @@ type
     procedure SetDefaultSize; override;
 
     //# DropDown
-    function CreateDropDownButton: TACLCustomDropDownEditButtonViewInfo; virtual;
+    function CreateDropDownButton: TACLCustomDropDownEditButtonSubClass; virtual;
     function CreateDropDownWindow: TACLPopupWindow; virtual;
     procedure FreeDropDownWindow; virtual;
     procedure ShowDropDownWindow; virtual;
@@ -91,7 +92,7 @@ type
 
     //# Properties
     property DropDownAlignment: TAlignment read FDropDownAlignment write FDropDownAlignment default taLeftJustify;
-    property DropDownButton: TACLCustomDropDownEditButtonViewInfo read FDropDownButton;
+    property DropDownButton: TACLCustomDropDownEditButtonSubClass read FDropDownButton;
     property DropDownWindow: TACLPopupWindow read FDropDownWindow;
   public
     constructor Create(AOwner: TComponent); override;
@@ -104,9 +105,9 @@ type
     property OnDropDown: TNotifyEvent read FOnDropDown write FOnDropDown;
   end;
 
-  { TACLCustomDropDownEditButtonViewInfo }
+  { TACLCustomDropDownEditButtonSubClass }
 
-  TACLCustomDropDownEditButtonViewInfo = class(TACLButtonViewInfo)
+  TACLCustomDropDownEditButtonSubClass = class(TACLButtonSubClass)
   protected
     procedure DrawBackground(ACanvas: TCanvas; const R: TRect); override;
   end;
@@ -140,7 +141,7 @@ type
     // drawing
     procedure Paint; override;
     // button
-    function CreateDropDownButton: TACLCustomDropDownEditButtonViewInfo; override;
+    function CreateDropDownButton: TACLCustomDropDownEditButtonSubClass; override;
     function CreateStyleButton: TACLStyleButton; override;
     function GetGlyph: TACLGlyph;
   public
@@ -173,11 +174,10 @@ type
     property DropDownAlignment;
   end;
 
-  { TACLDropDownButtonViewInfo }
+  { TACLDropDownButtonSubClass }
 
-  TACLDropDownButtonViewInfo = class(TACLCustomDropDownEditButtonViewInfo)
+  TACLDropDownButtonSubClass = class(TACLCustomDropDownEditButtonSubClass)
   protected
-    function CanClickOnDialogChar(Char: Word): Boolean; override;
     procedure DrawBackground(ACanvas: TCanvas; const R: TRect); override;
   end;
 
@@ -240,9 +240,9 @@ begin
   Result := False;
 end;
 
-function TACLCustomDropDownEdit.CreateDropDownButton: TACLCustomDropDownEditButtonViewInfo;
+function TACLCustomDropDownEdit.CreateDropDownButton: TACLCustomDropDownEditButtonSubClass;
 begin
-  Result := TACLCustomDropDownEditButtonViewInfo.Create(Self);
+  Result := TACLCustomDropDownEditButtonSubClass.Create(Self);
 end;
 
 procedure TACLCustomDropDownEdit.DoDropDown;
@@ -350,13 +350,13 @@ end;
 procedure TACLCustomDropDownEdit.MouseLeave;
 begin
   inherited MouseLeave;
-  DropDownButton.MouseMove(InvalidPoint);
+  DropDownButton.MouseMove([], InvalidPoint);
 end;
 
 procedure TACLCustomDropDownEdit.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
   inherited MouseMove(Shift, X, Y);
-  DropDownButton.MouseMove(Point(X, Y));
+  DropDownButton.MouseMove(Shift, Point(X, Y));
 end;
 
 procedure TACLCustomDropDownEdit.CMEnabledChanged(var Message: TMessage);
@@ -371,9 +371,9 @@ begin
   DroppedDown := True;
 end;
 
-{ TACLCustomDropDownEditButtonViewInfo }
+{ TACLCustomDropDownEditButtonSubClass }
 
-procedure TACLCustomDropDownEditButtonViewInfo.DrawBackground(ACanvas: TCanvas; const R: TRect);
+procedure TACLCustomDropDownEditButtonSubClass.DrawBackground(ACanvas: TCanvas; const R: TRect);
 begin
   Style.Texture.Draw(ACanvas, R, 5 + Ord(State));
 end;
@@ -395,9 +395,9 @@ begin
   inherited;
 end;
 
-function TACLCustomDropDown.CreateDropDownButton: TACLCustomDropDownEditButtonViewInfo;
+function TACLCustomDropDown.CreateDropDownButton: TACLCustomDropDownEditButtonSubClass;
 begin
-  Result := TACLDropDownButtonViewInfo.Create(Self);
+  Result := TACLDropDownButtonSubClass.Create(Self);
   Result.HasArrow := True;
 end;
 
@@ -513,8 +513,13 @@ end;
 
 procedure TACLCustomDropDown.CMDialogChar(var Message: TCMDialogChar);
 begin
-  if DropDownButton.DialogChar(Message.CharCode) then
-    Message.Result := 1
+  if IsAccel(Message.CharCode, Caption) and CanFocus or
+    (Message.CharCode = VK_RETURN) and Focused then
+  begin
+    SetFocusOnClick;
+    DropDownButton.PerformClick;
+    Message.Result := 1;
+  end
   else
     inherited;
 end;
@@ -560,14 +565,9 @@ begin
   acComponentFieldSet(FControl, Self, AValue);
 end;
 
-{ TACLDropDownButtonViewInfo }
+{ TACLDropDownButtonSubClass }
 
-function TACLDropDownButtonViewInfo.CanClickOnDialogChar(Char: Word): Boolean;
-begin
-  Result := inherited CanClickOnDialogChar(Char) or (Char = VK_RETURN) and IsFocused;
-end;
-
-procedure TACLDropDownButtonViewInfo.DrawBackground(ACanvas: TCanvas; const R: TRect);
+procedure TACLDropDownButtonSubClass.DrawBackground(ACanvas: TCanvas; const R: TRect);
 begin
   Style.Draw(ACanvas, R, State);
 end;

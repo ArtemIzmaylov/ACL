@@ -372,9 +372,9 @@ var
   ABitmap: TACLBitmap;
   AFocusRect: TRect;
 begin
-  if not ColorPicker.ViewInfo.FocusRect.IsEmpty then
+  if not ColorPicker.SubClass.FocusRect.IsEmpty then
   begin
-    AFocusRect := ColorPicker.ViewInfo.FocusRect;
+    AFocusRect := ColorPicker.SubClass.FocusRect;
     AFocusRect.Inflate(-1);
     ABitmap := TACLBitmap.CreateEx(AFocusRect, pf32bit, True);
     try

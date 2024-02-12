@@ -616,11 +616,11 @@ begin
   try
     ACheckBox.ParentFont := False;
     ACheckBox.InplaceSetValue(Value);
-    ACheckBox.ViewInfo.IsEnabled := True;
+    ACheckBox.SubClass.IsEnabled := True;
     InitializeStyles(ACheckBox);
     ACheckBox.Font := ACanvas.Font;
-    ACheckBox.ViewInfo.Calculate(Rect(ATextBounds.Left, R.Top, R.Right, R.Bottom));
-    ACheckBox.ViewInfo.Draw(ACanvas);
+    ACheckBox.SubClass.Calculate(Rect(ATextBounds.Left, R.Top, R.Right, R.Bottom));
+    ACheckBox.SubClass.Draw(ACanvas);
   finally
     ACheckBox.Free;
   end;

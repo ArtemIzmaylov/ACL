@@ -4,34 +4,38 @@
 {*             GroupBox Controls             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.GroupBox;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:Partial
 
 interface
 
 uses
-  Winapi.Messages,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
   Winapi.Windows,
+{$ENDIF}
+  {Winapi.}Messages,
   // System
-  System.Classes,
-  System.Math,
-  System.SysUtils,
-  System.Types,
+  {System.}Classes,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
   // Vcl
-  Vcl.Controls,
-  Vcl.Graphics,
-  Vcl.ImgList,
-  Vcl.StdCtrls,
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
+  {Vcl.}ImgList,
+  {Vcl.}StdCtrls,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
-  ACL.Classes.StringList,
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.SkinImage,
@@ -39,8 +43,7 @@ uses
   ACL.UI.Controls.Buttons,
   ACL.UI.Resources,
   ACL.Utils.Common,
-  ACL.Utils.DPIAware,
-  ACL.Utils.FileSystem;
+  ACL.Utils.DPIAware;
 
 type
   TACLGroupBox = class;
@@ -51,14 +54,14 @@ type
     IACLButtonOwner,
     IACLCursorProvider)
   strict private
-    FCaptionViewInfo: TACLCheckBoxViewInfo;
+    FCaptionSubClass: TACLCheckBoxSubClass;
     FStyleCaption: TACLStyleCheckBox;
 
     procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
     procedure CheckBoxClickHandler(Sender: TObject);
-    function GetCaption: UnicodeString;
+    function GetCaption: string;
     function GetContentRect: TRect;
-    procedure SetCaption(const S: UnicodeString);
+    procedure SetCaption(const S: string);
     procedure SetStyleCaption(const Value: TACLStyleCheckBox);
   protected
     FCaptionArea: TRect;
@@ -78,7 +81,6 @@ type
     procedure FocusChanged; override;
     function GetContentOffset: TRect; override;
     procedure ResourceChanged; override;
-    procedure SetDefaultSize; override;
     procedure SetTargetDPI(AValue: Integer); override;
 
     // Drawing
@@ -104,18 +106,18 @@ type
     function ButtonOwnerGetStyle: TACLStyleButton;
 
     // IACLCursorProvider
-    function GetCursor(const P: TPoint): TCursor;
+    function GetCursor(const P: TPoint): TCursor; reintroduce;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     //
-    property CaptionViewInfo: TACLCheckBoxViewInfo read FCaptionViewInfo;
+    property CaptionSubClass: TACLCheckBoxSubClass read FCaptionSubClass;
     property ContentRect: TRect read GetContentRect;
   published
     property Anchors;
     property AutoSize;
     property Borders;
-    property Caption: UnicodeString read GetCaption write SetCaption;
+    property Caption: string read GetCaption write SetCaption;
     property DoubleBuffered default True;
     property Padding;
     property StyleCaption: TACLStyleCheckBox read FStyleCaption write SetStyleCaption;
@@ -213,29 +215,29 @@ begin
   inherited Create(AOwner);
   ControlStyle := ControlStyle + [csAcceptsControls];
   FStyleCaption := CreateStyleCaption;
-  FCaptionViewInfo := TACLCheckBoxViewInfo.Create(Self);
-  FCaptionViewInfo.Alignment := taLeftJustify;
-  FCaptionViewInfo.CheckState := cbChecked;
-  FCaptionViewInfo.ShowCheckMark := False;
-  FCaptionViewInfo.OnClick := CheckBoxClickHandler;
+  FCaptionSubClass := TACLCheckBoxSubClass.Create(Self);
+  FCaptionSubClass.Alignment := taLeftJustify;
+  FCaptionSubClass.CheckState := cbChecked;
+  FCaptionSubClass.ShowCheckMark := False;
+  FCaptionSubClass.OnClick := CheckBoxClickHandler;
   DoubleBuffered := True;
 end;
 
 destructor TACLCustomGroupBox.Destroy;
 begin
-  FreeAndNil(FCaptionViewInfo);
+  FreeAndNil(FCaptionSubClass);
   FreeAndNil(FStyleCaption);
   inherited Destroy;
 end;
 
 procedure TACLCustomGroupBox.Calculate(const R: TRect);
 begin
-  TabStop := CaptionViewInfo.ShowCheckMark;
-  FocusOnClick := CaptionViewInfo.ShowCheckMark;
+  TabStop := CaptionSubClass.ShowCheckMark;
+  FocusOnClick := CaptionSubClass.ShowCheckMark;
   CalculateCaptionRect(R);
   CalculateFrameRect(R);
-  CaptionViewInfo.IsEnabled := Enabled;
-  CaptionViewInfo.Calculate(FCaptionContentRect);
+  CaptionSubClass.IsEnabled := Enabled;
+  CaptionSubClass.Calculate(FCaptionContentRect);
 end;
 
 procedure TACLCustomGroupBox.CalculateCaptionRect(const R: TRect);
@@ -245,11 +247,11 @@ var
   AMargins: TRect;
   AWidth: Integer;
 begin
-  if CaptionViewInfo.Caption <> '' then
+  if CaptionSubClass.Caption <> '' then
   begin
     AWidth := -1;
     AHeight := -1;
-    CaptionViewInfo.CalculateAutoSize(AWidth, AHeight);
+    CaptionSubClass.CalculateAutoSize(AWidth, AHeight);
 
     AIndent := Trunc(TACLMargins.DefaultValue * FCurrentPPI / acDefaultDPI);
     AMargins := Padding.GetScaledMargins(FCurrentPPI);
@@ -315,7 +317,7 @@ end;
 procedure TACLCustomGroupBox.FocusChanged;
 begin
   inherited FocusChanged;
-  CaptionViewInfo.IsFocused := Focused;
+  CaptionSubClass.IsFocused := Focused;
   Invalidate;
 end;
 
@@ -328,7 +330,7 @@ end;
 
 function TACLCustomGroupBox.GetCursor(const P: TPoint): TCursor;
 begin
-  if CaptionViewInfo.ShowCheckMark and PtInRect(CaptionViewInfo.Bounds, P) then
+  if CaptionSubClass.ShowCheckMark and PtInRect(CaptionSubClass.Bounds, P) then
     Result := crHandPoint
   else
     Result := Cursor;
@@ -339,11 +341,6 @@ begin
   if not (csDestroying in ComponentState) then
     FullRefresh;
   inherited;
-end;
-
-procedure TACLCustomGroupBox.SetDefaultSize;
-begin
-  SetBounds(Left, Top, 200, 150);
 end;
 
 procedure TACLCustomGroupBox.SetTargetDPI(AValue: Integer);
@@ -360,7 +357,7 @@ end;
 
 procedure TACLCustomGroupBox.DrawCaption(ACanvas: TCanvas; const R: TRect);
 begin
-  CaptionViewInfo.Draw(ACanvas);
+  CaptionSubClass.Draw(ACanvas);
 end;
 
 procedure TACLCustomGroupBox.DrawContent(ACanvas: TCanvas; const R: TRect);
@@ -389,37 +386,37 @@ end;
 procedure TACLCustomGroupBox.KeyDown(var Key: Word; Shift: TShiftState);
 begin
   inherited KeyDown(Key, Shift);
-  CaptionViewInfo.KeyDown(Key, Shift);
+  CaptionSubClass.KeyDown(Key, Shift);
 end;
 
 procedure TACLCustomGroupBox.KeyUp(var Key: Word; Shift: TShiftState);
 begin
   inherited KeyUp(Key, Shift);
-  CaptionViewInfo.KeyUp(Key, Shift);
+  CaptionSubClass.KeyUp(Key, Shift);
 end;
 
 procedure TACLCustomGroupBox.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   inherited MouseDown(Button, Shift, X, Y);
-  CaptionViewInfo.MouseDown(Button, Point(X, Y));
+  CaptionSubClass.MouseDown(Button, Point(X, Y));
 end;
 
 procedure TACLCustomGroupBox.MouseLeave;
 begin
   inherited MouseLeave;
-  CaptionViewInfo.MouseMove(InvalidPoint);
+  CaptionSubClass.MouseMove([], InvalidPoint);
 end;
 
 procedure TACLCustomGroupBox.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
   inherited MouseMove(Shift, X, Y);
-  CaptionViewInfo.MouseMove(Point(X, Y));
+  CaptionSubClass.MouseMove(Shift, Point(X, Y));
 end;
 
 procedure TACLCustomGroupBox.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   inherited MouseUp(Button, Shift, X, Y);
-  CaptionViewInfo.MouseUp(mbLeft, Point(X, Y));
+  CaptionSubClass.MouseUp(mbLeft, Point(X, Y));
 end;
 
 function TACLCustomGroupBox.ButtonOwnerGetFont: TFont;
@@ -437,9 +434,9 @@ begin
   Result := StyleCaption;
 end;
 
-function TACLCustomGroupBox.GetCaption: UnicodeString;
+function TACLCustomGroupBox.GetCaption: string;
 begin
-  Result := CaptionViewInfo.Caption;
+  Result := CaptionSubClass.Caption;
 end;
 
 function TACLCustomGroupBox.GetContentRect: TRect;
@@ -448,11 +445,11 @@ begin
   AdjustClientRect(Result);
 end;
 
-procedure TACLCustomGroupBox.SetCaption(const S: UnicodeString);
+procedure TACLCustomGroupBox.SetCaption(const S: string);
 begin
   if Caption <> S then
   begin
-    CaptionViewInfo.Caption := S;
+    CaptionSubClass.Caption := S;
     FullRefresh;
     Realign;
   end;
@@ -498,12 +495,12 @@ end;
 
 function TACLGroupBoxCheckBox.GetChecked: Boolean;
 begin
-  Result := FOwner.CaptionViewInfo.CheckState = cbChecked;
+  Result := FOwner.CaptionSubClass.CheckState = cbChecked;
 end;
 
 function TACLGroupBoxCheckBox.GetVisible: Boolean;
 begin
-  Result := FOwner.CaptionViewInfo.ShowCheckMark;
+  Result := FOwner.CaptionSubClass.ShowCheckMark;
 end;
 
 procedure TACLGroupBoxCheckBox.SetAction(const Value: TACLGroupBoxCheckBoxAction);
@@ -522,9 +519,9 @@ begin
   if Checked <> Value then
   begin
     if Value then
-      FOwner.CaptionViewInfo.CheckState := cbChecked
+      FOwner.CaptionSubClass.CheckState := cbChecked
     else
-      FOwner.CaptionViewInfo.CheckState := cbUnchecked;
+      FOwner.CaptionSubClass.CheckState := cbUnchecked;
 
     FOwner.ApplyCheckBoxState;
   end;
@@ -534,7 +531,7 @@ procedure TACLGroupBoxCheckBox.SetVisible(const Value: Boolean);
 begin
   if Visible <> Value then
   begin
-    FOwner.CaptionViewInfo.ShowCheckMark := Value;
+    FOwner.CaptionSubClass.ShowCheckMark := Value;
     FOwner.ApplyCheckBoxState;
   end;
 end;
@@ -625,11 +622,12 @@ end;
 procedure TACLGroupBox.DisableChildren;
 var
   AControl: TControl;
+  I: Integer;
 begin
   if FDisabledChildren = nil then
   begin
     FDisabledChildren := TList.Create;
-    for var I := 0 to ControlCount - 1 do
+    for I := 0 to ControlCount - 1 do
     begin
       AControl := Controls[I];
       if AControl.Enabled then
