@@ -56,6 +56,8 @@ const
   acBorderOffsets: TRect = (Left: 2; Top: 2; Right: 2; Bottom: 2);
 
 type
+  PRectArray = ^TRectArray;
+  TRectArray = array [0..0] of TRect;
 
   { TACLRange }
 

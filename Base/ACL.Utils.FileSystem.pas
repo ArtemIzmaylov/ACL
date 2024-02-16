@@ -1652,13 +1652,18 @@ constructor TACLFileStream.Create(const AHandle: THandle);
 begin
   inherited Create(AHandle);
   if Handle = THandle(INVALID_HANDLE_VALUE) then
-    raise EFOpenError.CreateResFmt(@SFOpenErrorEx, [FileName,
-      SysErrorMessage({$IFDEF FPC}GetLastOSError{$ELSE}GetLastError{$ENDIF})]);
+    raise EFOpenError.CreateResFmt(@SFOpenErrorEx, [FileName, acLastSystemErrorMessage]);
 end;
 
 constructor TACLFileStream.Create(const AFileName: string; Mode: Word);
+const
+{$IFDEF MSWINDOWS}
+  DefaultRights = 0;
+{$ELSE}
+  DefaultRights = 438; // = 666 octal which is rw rw rw
+{$ENDIF}
 begin
-  Create(AFileName, Mode, 0);
+  Create(AFileName, Mode, DefaultRights);
 end;
 
 constructor TACLFileStream.Create(const AFileName: string; Mode: Word; Rights: Cardinal);

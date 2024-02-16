@@ -1274,8 +1274,6 @@ procedure TACLBitmapLayer.DrawBlend(ACanvas: TCanvas;
   const R: TRect; AAlpha: Byte; ASmoothStretch: Boolean);
 {$IFDEF FPC}
 begin
-  DrawBlend(ACanvas, R, ClientRect, AAlpha);
-end;
 {$ELSE}
 var
   AClipBox: TRect;
@@ -1307,9 +1305,9 @@ begin
     end;
   end
   else
-    acAlphaBlend(ACanvas.Handle, Handle, R, ClientRect, AAlpha);
-end;
 {$ENDIF}
+    DrawBlend(ACanvas, R, ClientRect, AAlpha);
+end;
 
 { TACLCacheLayer }
 
