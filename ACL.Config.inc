@@ -20,22 +20,28 @@
     {$MESSAGE FATAL 'ACL was not ready for other platforms using FPC/LCL'}
   {$ENDIF}
 
+  {$DEFINE ACL_DRAWTEXT_USE_TEXTLAYOUT}
+
   {$IFDEF LCLGtk2}
     {$DEFINE ACL_RGBA}
   {$ENDIF}
 {$ENDIF}
 
+
 {$IF DEFINED(CPUX64) OR DEFINED(CPU64)}
   {$DEFINE CPUX64}
 {$IFEND}
+
 
 {$IF DEFINED(CPUX64) OR DEFINED(FPC)}
   {$DEFINE ACL_PUREPASCAL}
 {$IFEND}
 
+
 {$IF NOT DEFINED(FPC)}
   {$WARN DUPLICATE_CTOR_DTOR OFF} // We does not support for C++Builder
 {$IFEND}
+
 
 // ---------------------------------------------------------------------------------------------------------------------
 // RTTI
@@ -61,7 +67,8 @@
 {$ENDIF}
 
 {$DEFINE ACL_BLURFILTER_USE_SHARED_RESOURCES}
-{$DEFINE ACL_TEXTLAYOUT_RTL_SUPPORT}
+{$DEFINE ACL_TEXTLAYOUT_SPANS} // support for complex spans
+{$DEFINE ACL_TEXTLAYOUT_RTL}   // support for right-to-left text direction
 
 // Options for TStream.WriteVariant()
 {$DEFINE ACL_PACK_VARIANT_ARRAYS}

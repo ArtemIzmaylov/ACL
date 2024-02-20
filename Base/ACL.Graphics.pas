@@ -17,7 +17,6 @@ unit ACL.Graphics;
 
 {$MESSAGE WARN 'TODO - FPC'}
 (*
-  TACLRegionData
   TACLBitmapBits
 *)
 
@@ -335,7 +334,6 @@ type
     constructor CreateRect(const R: TRect);
     constructor CreateFromDC(DC: HDC);
     constructor CreateFromHandle(AHandle: HRGN);
-    constructor CreateFromWindow(AWnd: HWND);
     destructor Destroy; override;
     //# Methods
     function Clone: THandle;
@@ -638,6 +636,9 @@ uses
   ACL.Graphics.Ex,
   ACL.Graphics.Ex.Gdip,
 {$ENDIF}
+{$IFDEF ACL_DRAWTEXT_USE_TEXTLAYOUT}
+  ACL.Graphics.TextLayout,
+{$ENDIF}
   ACL.Geometry.Utils,
   ACL.Utils.DPIAware,
   ACL.Utils.Strings;
@@ -840,20 +841,20 @@ begin
 end;
 
 function acRectVisible(DC: HDC; const R: TRect): Boolean;
-{$IFDEF FPC}
-var
-  LRect: TRect;
-begin
-  if R.IsEmpty then
-    Exit(False);
-  {$MESSAGE WARN 'LCL-bug'}
-  LRect := R;
-  LPtoDP(DC, LRect, 2);
-  Result := RectVisible(DC, LRect);
-{$ELSE}
+//{$IFDEF FPC}
+//var
+//  LRect: TRect;
+//begin
+//  if R.IsEmpty then
+//    Exit(False);
+//  {$MESSAGE WARN 'LCL-bug'}
+//  LRect := R;
+//  LPtoDP(DC, LRect, 2);
+//  Result := RectVisible(DC, LRect);
+//{$ELSE}
 begin
   Result := not R.IsEmpty and RectVisible(DC, R);
-{$ENDIF}
+//{$ENDIF}
 end;
 
 procedure acRestoreClipRegion(DC: HDC; ARegion: HRGN);
@@ -1214,52 +1215,21 @@ begin
 end;
 
 procedure acSysDrawText(ACanvas: TCanvas; var R: TRect; const AText: string; AFlags: Cardinal);
-//const
-//  HorzAlignMap: array[Boolean, Boolean] of TAlignment = (
-//    (taLeftJustify, taCenter), (taRightJustify, taRightJustify)
-//  );
-//  VertAlignMap: array[Boolean, Boolean] of TVerticalAlignment = (
-//    (taAlignTop, taVerticalCenter), (taAlignBottom, taAlignBottom)
-//  );
-var
-//  ALayout: TACLTextLayout;
-  AMetrics: TTextMetric;
+{$IFDEF ACL_DRAWTEXT_USE_TEXTLAYOUT}
 begin
-//  if IsWine then
-//  begin
-//    ALayout := TACLTextLayout.Create(ACanvas.Font);
-//    try
-//      ALayout.Bounds := R;
-//      ALayout.SetText(AText, TACLTextFormatSettings.PlainText);
-//      ALayout.SetOption(TACLTextLayoutOption.tloEditControl, AFlags and DT_EDITCONTROL <> 0);
-//      ALayout.SetOption(TACLTextLayoutOption.tloEndEllipsis, AFlags and DT_END_ELLIPSIS <> 0);
-//      ALayout.SetOption(TACLTextLayoutOption.tloWordWrap, AFlags and DT_WORDBREAK <> 0);
-//      if AFlags and DT_CALCRECT <> 0 then
-//      begin
-//        ALayout.SetOption(TACLTextLayoutOption.tloAutoWidth, R.Width = 0);
-//        R := acRect(ALayout.MeasureSize);
-//      end
-//      else
-//        ALayout.DrawTo(ACanvas, R,
-//          acPointOffsetNegative(
-//            acTextAlign(R, ALayout.MeasureSize,
-//              HorzAlignMap[AFlags and DT_RIGHT <> 0, AFlags and DT_CENTER <> 0],
-//              VertAlignMap[AFlags and DT_BOTTOM <> 0, AFlags and DT_VCENTER <> 0], True),
-//            R.TopLeft));
-//    finally
-//      ALayout.Free;
-//    end;
-//  end
-//  else
+  acAdvDrawText(ACanvas, AText, R, AFlags);
+{$ELSE}
+var
+  LMetrics: TTextMetric;
+begin
+  DrawText(ACanvas.Handle, PChar(AText), Length(AText), R, AFlags);
+  if AFlags and DT_CALCRECT <> 0 then
   begin
-    DrawText(ACanvas.Handle, PChar(AText), Length(AText), R, AFlags);
-    if AFlags and DT_CALCRECT <> 0 then
-    begin
-      GetTextMetrics(ACanvas.Handle, AMetrics{%H-});
-      if IsWine or (AMetrics.tmItalic <> 0) then
-        Inc(R.Right, AMetrics.tmAveCharWidth div 2);
-    end;
+    GetTextMetrics(ACanvas.Handle, LMetrics{%H-});
+    if IsWine or (LMetrics.tmItalic <> 0) then
+      Inc(R.Right, LMetrics.tmAveCharWidth div 2);
   end;
+{$ENDIF}
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -2278,25 +2248,6 @@ begin
   FHandle := AHandle;
 end;
 
-constructor TACLRegion.CreateFromWindow(AWnd: HWND);
-var
-  R: TRect;
-begin
-  CreateRect(NullRect);
-{$IFDEF MSWINDOWS}
-  GetWindowRgn(AWnd, Handle);
-{$ELSE}
-  {$MESSAGE WARN 'NOTIMPLEMENTED - TACLRegion'}
-  raise ENotImplemented.Create('TACLRegion');
-{$ENDIF}
-  if Empty then
-  begin
-    GetWindowRect(AWnd, R{%H-});
-    R.Offset(-R.Left, -R.Top);
-    SetRectRgn(Handle, R.Left, R.Top, R.Right, R.Bottom);
-  end;
-end;
-
 destructor TACLRegion.Destroy;
 begin
   FreeHandle;
@@ -2509,7 +2460,18 @@ begin
 end;
 
 constructor TACLRegionData.CreateFromHandle(ARgn: HRGN);
+{$IFDEF LCLGtk2}
+type
+  PGdkRectangleArray = ^TGdkRectangleArray;
+  TGdkRectangleArray = array[0..0] of TGdkRectangle;
+var
+  LGdkRectCount: Integer;
+  LGdkRects: PGdkRectangle;
+  LRect: TRect;
+  I: Integer;
+{$ENDIF}
 begin
+{$IF DEFINED(MSWINDOWS)}
   FDataSize := GetRegionData(ARgn, 0, nil);
   if FDataSize > 0 then
   begin
@@ -2518,6 +2480,29 @@ begin
     FRects := @PRgnData(FData)^.Buffer[0];
     FCount := PRgnData(FData)^.rdh.nCount;
   end;
+{$ELSEIF DEFINED(LCLGtk2)}
+  case GetRgnBox(ARgn, @LRect) of
+    SimpleRegion, ComplexRegion:
+      begin
+        LGdkRects := nil;
+        LGdkRectCount := 0;
+        gdk_region_get_rectangles({%H-}PGDIObject(ARgn)^.GDIRegionObject, LGdkRects, @LGdkRectCount);
+        if LGdkRects <> nil then
+        try
+          DataAllocate(LGdkRectCount);
+          for I := 0 to LGdkRectCount - 1 do
+          begin
+            with PGdkRectangleArray(LGdkRects)^[I] do
+              Rects^[I] := Rect(x, y, x + width, y + height);
+          end;
+        finally
+          g_free(LGdkRects);
+        end;
+      end;
+  end;
+{$ELSE}
+  raise ENotImplemented.Create('TACLRegionData.CreateFromHandle');
+{$ENDIF}
 end;
 
 destructor TACLRegionData.Destroy;
@@ -2661,8 +2646,10 @@ end;
 { TFontHelper }
 
 function TFontHelper.Clone: TFont;
+type
+  TFontClass = class of TFont;
 begin
-  Result := TFont.Create;
+  Result := TFontClass(ClassType).Create;
   Result.Assign(Self);
 end;
 

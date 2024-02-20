@@ -251,7 +251,7 @@ begin
   DoubleBuffered := True;
   FStyle := TACLStyleHint.Create(Self);
   FLayout := TACLTextLayout.Create(Canvas.Font);
-  FLayout.Options := [tloWordWrap, tloAutoHeight];
+  FLayout.Options := atoWordWrap or atoAutoHeight;
 {$IFDEF FPC}
   FCurrentPPI := acDefaultDpi;
 {$ENDIF}
