@@ -366,11 +366,12 @@ type
 
 {$REGION ' Native Render '}
 
+  TACLTextLayoutCanvasRenderClass = class of TACLTextLayoutCanvasRender;
   TACLTextLayoutCanvasRender = class(TACLTextLayoutRender)
   strict private
     FCanvas: TCanvas;
   public
-    constructor Create(ACanvas: TCanvas);
+    constructor Create(ACanvas: TCanvas); virtual;
     procedure GetMetrics(out ABaseline, ALineHeight, ASpaceWidth: Integer); override;
     procedure Measure(ABlock: TACLTextLayoutBlockText); override;
     procedure SetFill(AValue: TColor); override;
@@ -486,6 +487,9 @@ const
 type
   TACLTextReadingDirection = (trdNeutral, trdLeftToRight, trdRightToLeft);
 
+var
+  DefaultTextLayoutCanvasRender: TACLTextLayoutCanvasRenderClass = TACLTextLayoutCanvasRender;
+
 /// <summary>
 ///  Аналог функции DrawText на базе TextLayout (c поддержкой форматирования)<p>
 ///  Поддерживаются следующие флаги:
@@ -495,8 +499,10 @@ type
 /// </summary>
 procedure acAdvDrawText(ACanvas: TCanvas;
   const AText: string; var ABounds: TRect; AFlags: Cardinal);
+procedure acExpandPrefixes(var AText: string; AHide: Boolean);
 procedure acDrawFormattedText(ACanvas: TCanvas; const S: string; const R: TRect;
   AHorzAlignment: TAlignment; AVertAlignment: TVerticalAlignment; AWordWrap: Boolean);
+
 function acGetReadingDirection(const C: Char): TACLTextReadingDirection; overload;
 function acGetReadingDirection(P: PChar; L: Integer): TACLTextReadingDirection; overload; inline;
 implementation
@@ -992,7 +998,7 @@ end;
 
 {$REGION ' acAdvDrawText '}
 
-procedure ExpandPrefixes(var AText: string; AHide: Boolean);
+procedure acExpandPrefixes(var AText: string; AHide: Boolean);
 var
 {$IFDEF FPC}
   ABytesInChar: Integer;
@@ -1063,7 +1069,7 @@ begin
     // Text
     LText := AText;
     if AFlags and DT_NOPREFIX = 0 then
-      ExpandPrefixes(LText, AFlags and DT_HIDEPREFIX <> 0);
+      acExpandPrefixes(LText, AFlags and DT_HIDEPREFIX <> 0);
     //if AFlags and DT_EXPANDTABS <> 0 then
     //begin
     //  ATabWidth := DT_DEFAULT_TABWIDTH;
@@ -2684,11 +2690,11 @@ end;
 
 procedure TACLTextLayout.Calculate(ACanvas: TCanvas);
 var
-  LRender: TACLTextLayoutCanvasRender;
+  LRender: TACLTextLayoutRender;
 begin
   if FLayoutIsDirty then
   begin
-    LRender := TACLTextLayoutCanvasRender.Create(ACanvas);
+    LRender := DefaultTextLayoutCanvasRender.Create(ACanvas);
     try
       Calculate(LRender);
     finally
@@ -2721,7 +2727,7 @@ var
 begin
   if Options and atoNoClip <> 0 then
   begin
-    LRender := TACLTextLayoutCanvasRender.Create(ACanvas);
+    LRender := DefaultTextLayoutCanvasRender.Create(ACanvas);
     try
       Draw(LRender);
     finally
@@ -2742,7 +2748,7 @@ begin
     LClipRegion := acSaveClipRegion(ACanvas.Handle);
     try
       acIntersectClipRegion(ACanvas.Handle, AClipRect);
-      LRender := TACLTextLayoutCanvasRender.Create(ACanvas);
+      LRender := DefaultTextLayoutCanvasRender.Create(ACanvas);
       try
         Draw(LRender);
       finally

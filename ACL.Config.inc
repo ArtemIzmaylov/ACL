@@ -20,10 +20,9 @@
     {$MESSAGE FATAL 'ACL was not ready for other platforms using FPC/LCL'}
   {$ENDIF}
 
-  {$DEFINE ACL_DRAWTEXT_USE_TEXTLAYOUT}
-
   {$IFDEF LCLGtk2}
     {$DEFINE ACL_RGBA}
+    {$DEFINE ACL_CAIRO_TEXTOUT}
   {$ENDIF}
 {$ENDIF}
 

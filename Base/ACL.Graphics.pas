@@ -45,7 +45,6 @@ uses
   ACL.Classes.Collections,
   ACL.FastCode,
   ACL.Geometry,
-  ACL.Math,
   ACL.Utils.Common;
 
 type
@@ -606,14 +605,14 @@ procedure acTextDrawVertical(ACanvas: TCanvas; const S: string; const R: TRect;
   AHorzAlignment: TAlignment; AVertAlignment: TVerticalAlignment;
   AEndEllipsis: Boolean = False); overload;
 procedure acTextOut(ACanvas: TCanvas; X, Y: Integer;
-  const S: string; AFlags: Integer; ARect: PRect = nil); inline;
+  const S: string; AClipRect: PRect = nil); overload; inline;
+procedure acTextOut(ACanvas: TCanvas; X, Y: Integer;
+  AText: PChar; ALength: Integer; AClipRect: PRect = nil); overload;
 
+function acTextSize(ACanvas: TCanvas; const AText: string): TSize; overload;
 function acTextSize(ACanvas: TCanvas; const AText: PChar; ALength: Integer): TSize; overload;
-function acTextSize(ACanvas: TCanvas; const AText: string;
-  AStartIndex: Integer = 1; ALength: Integer = MaxInt): TSize; overload;
-function acTextSize(Font: TFont; const AText: string;
-  AStartIndex: Integer = 1; ALength: Integer = MaxInt): TSize; overload;
-function acTextSize(Font: TFont; const AText: PChar; ALength: Integer): TSize; overload;
+function acTextSize(AFont: TFont; const AText: string): TSize; overload;
+function acTextSize(AFont: TFont; const AText: PChar; ALength: Integer): TSize; overload;
 function acTextSizeMultiline(ACanvas: TCanvas;
   const AText: string; AMaxWidth: Integer = 0): TSize;
 
@@ -635,8 +634,11 @@ uses
 {$IFDEF MSWINDOWS}
   ACL.Graphics.Ex,
   ACL.Graphics.Ex.Gdip,
+  ACL.Math,
 {$ENDIF}
-{$IFDEF ACL_DRAWTEXT_USE_TEXTLAYOUT}
+{$IF DEFINED(ACL_CAIRO_TEXTOUT)}
+  ACL.Graphics.Ex.Cairo,
+{$ELSEIF DEFINED(FPC)}
   ACL.Graphics.TextLayout,
 {$ENDIF}
   ACL.Geometry.Utils,
@@ -1027,41 +1029,45 @@ begin
   Result := acTextSize(Font, acMeasureTextPattern).cy;
 end;
 
-function acTextSize(Font: TFont; const AText: string; AStartIndex, ALength: Integer): TSize;
+function acTextSize(AFont: TFont; const AText: string): TSize;
 begin
-  MeasureCanvas.Font := Font;
-  Result := acTextSize(MeasureCanvas, AText, AStartIndex, ALength);
+  MeasureCanvas.Font := AFont;
+  Result := acTextSize(MeasureCanvas, AText);
 end;
 
-function acTextSize(Font: TFont; const AText: PChar; ALength: Integer): TSize;
+function acTextSize(AFont: TFont; const AText: PChar; ALength: Integer): TSize;
 begin
-  MeasureCanvas.Font := Font;
+  MeasureCanvas.Font := AFont;
   Result := acTextSize(MeasureCanvas, AText, ALength);
 end;
 
 function acTextSize(ACanvas: TCanvas; const AText: PChar; ALength: Integer): TSize; overload;
+{$IFNDEF ACL_CAIRO_TEXTOUT}
 var
   AMetrics: TTextMetric;
+{$ENDIF}
 begin
   if ALength <= 0 then
     Exit(NullSize);
-
+{$IFDEF ACL_CAIRO_TEXTOUT}
+  CairoTextSize(ACanvas, acMakeString(AText, ALength), @Result.cx, @Result.cy);
+{$ELSE}
   GetTextExtentPoint32(ACanvas.Handle, AText, ALength, Result);
-
   //# https://forums.embarcadero.com/thread.jspa?messageID=667590&tstart=0
   //# https://github.com/virtual-treeview/virtual-treeview/issues/465
   GetTextMetrics(ACanvas.Handle, AMetrics{%H-});
   if IsWine or (AMetrics.tmItalic <> 0) then
     Inc(Result.cx, AMetrics.tmAveCharWidth div 2);
+{$ENDIF}
 end;
 
-function acTextSize(ACanvas: TCanvas; const AText: string; AStartIndex, ALength: Integer): TSize;
+function acTextSize(ACanvas: TCanvas; const AText: string): TSize;
 begin
-  ALength := MaxMin(ALength, 0, Length(AText) - AStartIndex + 1);
-  if ALength > 0 then
-    Result := acTextSize(ACanvas, @AText[AStartIndex], ALength)
-  else
-    Result := NullSize;
+{$IFDEF ACL_CAIRO_TEXTOUT}
+  CairoTextSize(ACanvas, AText, @Result.cx, @Result.cy);
+{$ELSE}
+  Result := acTextSize(ACanvas, PChar(AText), Length(AText));
+{$ENDIF}
 end;
 
 function acTextSizeMultiline(ACanvas: TCanvas; const AText: string; AMaxWidth: Integer = 0): TSize;
@@ -1107,10 +1113,10 @@ begin
         if AEndEllipsis then
           acTextEllipsize(ACanvas, LText, LTextSize, R.Width);
         LTextOffset := acTextAlign(R, LTextSize, AHorzAlignment, AVertAlignment, APreventTopLeftExceed);
-        acTextOut(ACanvas, LTextOffset.X, LTextOffset.Y, LText, ETO_CLIPPED, @R);
+        acTextOut(ACanvas, LTextOffset.X, LTextOffset.Y, LText, @R);
       end
       else
-        acTextOut(ACanvas, R.Left, R.Top, S, ETO_CLIPPED, @R);
+        acTextOut(ACanvas, R.Left, R.Top, S, @R);
   end;
 end;
 
@@ -1148,7 +1154,7 @@ begin
     LSaveRgn := acSaveClipRegion(ACanvas.Handle);
     try
       acExcludeFromClipRegion(ACanvas.Handle, LHighlightRect);
-      acTextOut(ACanvas, LTextOffset.X, LTextOffset.Y, LText, ETO_CLIPPED, @R);
+      acTextOut(ACanvas, LTextOffset.X, LTextOffset.Y, LText, @R);
     finally
       acRestoreClipRegion(ACanvas.Handle, LSaveRgn);
     end;
@@ -1160,7 +1166,7 @@ begin
         acFillRect(ACanvas, LHighlightRect, AHighlightColor);
         LPrevTextColor := ACanvas.Font.Color;
         ACanvas.Font.Color := AHighlightTextColor;
-        acTextOut(ACanvas, LTextOffset.X, LTextOffset.Y, LText, ETO_CLIPPED, @R);
+        acTextOut(ACanvas, LTextOffset.X, LTextOffset.Y, LText, @R);
         ACanvas.Font.Color := LPrevTextColor;
       end;
     finally
@@ -1189,7 +1195,7 @@ begin
       acTextEllipsize(ACanvas, LText, LTextSize, R.Height);
     acExchangeIntegers(LTextSize.cx, LTextSize.cy);
     LTextOffset := acTextAlign(R, LTextSize, TAlignment(AVertAlignment), MapVert[AHorzAlignment]);
-    acTextOut(ACanvas, LTextOffset.X, LTextOffset.Y + LTextSize.cy, LText, 0);
+    acTextOut(ACanvas, LTextOffset.X, LTextOffset.Y + LTextSize.cy, LText);
   finally
     ACanvas.Font.Orientation := 0;
   end;
@@ -1200,8 +1206,12 @@ function acTextEllipsize(ACanvas: TCanvas;
 begin
   if ATextSize.cx > AMaxWidth then
   begin
-    GetTextExtentExPoint(ACanvas.Handle, PChar(AText), Length(AText),
-      Max(0, AMaxWidth - acTextSize(ACanvas, acEndEllipsis).cx), @Result, nil, ATextSize);
+    AMaxWidth := Max(AMaxWidth - acTextSize(ACanvas, acEndEllipsis).cx, 0);
+  {$IFDEF ACL_CAIRO_TEXTOUT}
+    Result := CairoTextGetLastVisible(ACanvas, AText, AMaxWidth);
+  {$ELSE}
+    GetTextExtentExPoint(ACanvas.Handle, PChar(AText), Length(AText), AMaxWidth, @Result, nil, ATextSize);
+  {$ENDIF}
     AText := Copy(AText, 1, Result) + acEndEllipsis;
     ATextSize := acTextSize(ACanvas, AText);
   end
@@ -1209,13 +1219,28 @@ begin
     Result := Length(AText);
 end;
 
-procedure acTextOut(ACanvas: TCanvas; X, Y: Integer; const S: string; AFlags: Integer; ARect: PRect = nil);
+procedure acTextOut(ACanvas: TCanvas; X, Y: Integer; const S: string; AClipRect: PRect = nil);
 begin
-  ExtTextOut(ACanvas.Handle, X, Y, AFlags, ARect, PChar(S), Length(S), nil);
+  acTextOut(ACanvas, X, Y, PChar(S), Length(S), AClipRect);
+end;
+
+procedure acTextOut(ACanvas: TCanvas; X, Y: Integer;
+  AText: PChar; ALength: Integer; AClipRect: PRect = nil);
+begin
+{$IFDEF ACL_CAIRO_TEXTOUT}
+  CairoTextOut(ACanvas, X, Y, AText, ALength, AClipRect);
+{$ELSE}
+  ExtTextOut(ACanvas.Handle, X, Y,
+    IfThen(AClipRect <> nil, ETO_CLIPPED, 0),
+    AClipRect, AText, ALength, nil);
+{$ENDIF}
 end;
 
 procedure acSysDrawText(ACanvas: TCanvas; var R: TRect; const AText: string; AFlags: Cardinal);
-{$IFDEF ACL_DRAWTEXT_USE_TEXTLAYOUT}
+{$IF DEFINED(ACL_CAIRO_TEXTOUT)}
+begin
+  CairoDrawText(ACanvas, AText, R, AFlags);
+{$ELSEIF DEFINED(FPC)}
 begin
   acAdvDrawText(ACanvas, AText, R, AFlags);
 {$ELSE}
