@@ -103,7 +103,7 @@ type
 
   IACLBlurFilterCore = interface
   ['{89DD6E84-C6CB-4367-90EC-3943D5593372}']
-    procedure Apply(LayerDC: HDC; Colors: PACLPixel32; Width, Height: Integer);
+    procedure Apply(Colors: PACLPixel32; Width, Height: Integer);
     function GetSize: Integer;
   end;
 
@@ -129,8 +129,8 @@ type
     class destructor Destroy;
   {$ENDIF}
     constructor Create;
-    procedure Apply(ALayer: TACLBitmapLayer); overload;
-    procedure Apply(ALayerDC: HDC; AColors: PACLPixel32; AWidth, AHeight: Integer); overload;
+    procedure Apply(ALayer: TACLDib); overload;
+    procedure Apply(AColors: PACLPixel32; AWidth, AHeight: Integer); overload;
     //# Properties
     property Radius: Integer read FRadius write SetRadius;
     property Size: Integer read FSize;
@@ -419,7 +419,7 @@ type
     constructor Create(ARadius: Integer);
     class function CreateBlurFilterCore(ARadius: Integer): IACLBlurFilterCore; static;
     // IACLBlurFilterCore
-    procedure Apply(DC: HDC; AColors: PACLPixel32; AWidth, AHeight: Integer);
+    procedure Apply(AColors: PACLPixel32; AWidth, AHeight: Integer);
     function GetSize: Integer;
   end;
 
@@ -442,7 +442,7 @@ type
     class function CreateBlurFilterCore(ARadius: Integer): IACLBlurFilterCore; static;
     class procedure Register;
     // IACLBlurFilterCore
-    procedure Apply(DC: HDC; AColors: PACLPixel32; AWidth, AHeight: Integer);
+    procedure Apply(AColors: PACLPixel32; AWidth, AHeight: Integer);
     function GetSize: Integer;
   end;
 
@@ -784,7 +784,7 @@ begin
   Result := FSize;
 end;
 
-procedure TACLSoftwareImplGaussianBlur.Apply(DC: HDC; AColors: PACLPixel32; AWidth, AHeight: Integer);
+procedure TACLSoftwareImplGaussianBlur.Apply(AColors: PACLPixel32; AWidth, AHeight: Integer);
 
   function CreateChunks(ACount: Integer): TChunks;
   var
@@ -990,7 +990,7 @@ begin
   Result := FRadius;
 end;
 
-procedure TACLSoftwareImplStackBlur.Apply(DC: HDC; AColors: PACLPixel32; AWidth, AHeight: Integer);
+procedure TACLSoftwareImplStackBlur.Apply(AColors: PACLPixel32; AWidth, AHeight: Integer);
 var
   AColor: PACLPixel32;
   AInputSumA: Integer;
@@ -1528,15 +1528,16 @@ begin
   Radius := 20;
 end;
 
-procedure TACLBlurFilter.Apply(ALayer: TACLBitmapLayer);
-begin
-  Apply(ALayer.Handle, PACLPixel32(ALayer.Colors), ALayer.Width, ALayer.Height);
-end;
-
-procedure TACLBlurFilter.Apply(ALayerDC: HDC; AColors: PACLPixel32; AWidth, AHeight: Integer);
+procedure TACLBlurFilter.Apply(ALayer: TACLDib);
 begin
   if FSize > 0 then
-    FCore.Apply(ALayerDC, AColors, AWidth, AHeight);
+    FCore.Apply(PACLPixel32(ALayer.Colors), ALayer.Width, ALayer.Height);
+end;
+
+procedure TACLBlurFilter.Apply(AColors: PACLPixel32; AWidth, AHeight: Integer);
+begin
+  if FSize > 0 then
+    FCore.Apply(AColors, AWidth, AHeight);
 end;
 
 procedure TACLBlurFilter.SetRadius(AValue: Integer);
