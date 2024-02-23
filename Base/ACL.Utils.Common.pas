@@ -18,7 +18,6 @@ unit ACL.Utils.Common;
   {$MESSAGE WARN 'ACL.Utils.Common'}
 {$ENDIF}
 {%FPC: FIXME:
-   1) TProcessHelper
    2) HMODULE's sections
    3) WINDOW's section
 }
@@ -27,12 +26,13 @@ interface
 
 uses
 {$IFDEF FPC}
+  InterfaceBase,
   LCLIntf,
   LCLType,
+  Process,
 {$ELSE}
-  Winapi.Windows,
-  Winapi.Messages,
   Winapi.PsAPI,
+  Winapi.Windows,
 {$ENDIF}
   // System
   {System.}Classes,
@@ -116,28 +116,28 @@ type
     class function From(AValue: Boolean): TACLBoolean; static;
   end;
 
-{$IFDEF MSWINDOWS}
-
-  { TProcessHelper }
+  { TACLProcess }
 
   TExecuteOption = (eoWaitForTerminate, eoShowGUI);
   TExecuteOptions = set of TExecuteOption;
 
-  TProcessHelper = class
+  TACLProcess = class
   public
-    class function Execute(const ACmdLine: UnicodeString; AOptions: TExecuteOptions = [eoShowGUI];
-      AOutputData: TStream = nil; AErrorData: TStream = nil; AProcessInfo: PProcessInformation = nil;
-      AExitCode: PCardinal = nil): LongBool; overload;
-    class function Execute(const ACmdLine: UnicodeString; ALog: IStringReceiver;
+    class function Execute(const ACmdLine: string; ALog: IStringReceiver;
       AOptions: TExecuteOptions = [eoShowGUI]): LongBool; overload;
-    // Wow64
+    class function Execute(const ACmdLine: string;
+      AOptions: TExecuteOptions = [eoShowGUI]; AOutputData: TStream = nil;
+      AErrorData: TStream = nil; AExitCode: PCardinal = nil): LongBool; overload;
+  {$IFDEF MSWINDOWS}
     class function IsWow64: LongBool; overload;
     class function IsWow64(AProcess: THandle): LongBool; overload;
     class function IsWow64Window(AWindow: HWND): LongBool;
     class function Wow64SetFileSystemRedirection(AValue: Boolean): LongBool;
+  {$ENDIF}
   end;
 
-{$ENDIF}
+  TProcessHelper = class(TACLProcess)
+  end deprecated 'use TACLProcess class';
 
   { TACLInterfaceHelper }
 
@@ -162,6 +162,13 @@ type
     class function CastOrNil<T: class>(AObject: TObject): T; inline;
   end;
 
+const
+{$IF DEFINED(MSWINDOWS)}
+  LibExt = '.dll';
+{$ELSEIF DEFINED(LINUX)}
+  LibExt = '.so';
+{$ENDIF}
+
 var
   IsWin8OrLater: Boolean;
   IsWin10OrLater: Boolean;
@@ -175,23 +182,18 @@ var
   InvariantFormatSettings: TFormatSettings;
 
 // HMODULE
-{$IFDEF MSWINDOWS}
-function acGetProcessFileName(const AWindowHandle: THandle; out AFileName: string): Boolean;
 function acGetProcAddress(ALibHandle: HMODULE; AProcName: PChar; var AResult: Boolean): Pointer;
 function acLoadLibrary(const AFileName: string; AFlags: Cardinal = 0): HMODULE;
+{$IFDEF MSWINDOWS}
 function acModuleFileName(AModule: HMODULE): string; inline;
 function acModuleHandle(const AFileName: string): HMODULE;
 {$ENDIF}
 
 // Window Handles
-{$IFDEF MSWINDOWS}
-function acGetWindowRect(AHandle: HWND): TRect;
 function acFindWindow(const AClassName: string): HWND;
-function acGetClassName(Handle: HWND): string;
-function acGetWindowText(AHandle: HWND): string;
-procedure acSwitchToWindow(AHandle: HWND);
-procedure acSetWindowText(AHandle: HWND; const AText: string);
-{$ENDIF}
+function acGetClassName(AWnd: HWND): string;
+function acGetProcessFileName(AWnd: HWND; out AFileName: string): Boolean;
+function acGetWindowRect(AWnd: HWND): TRect;
 
 // System
 procedure MinimizeMemoryUsage;
@@ -208,15 +210,15 @@ procedure acExchangePointers(var AValue1, AValue2); inline;
 procedure acExchangeStrings(var AValue1, AValue2: string); inline;
 function acBoolToHRESULT(AValue: Boolean): HRESULT; inline;
 function acGenerateGUID: string;
+function acLastSystemErrorMessage: string;
 function acObjectUID(AObject: TObject): string;
 {$IFDEF MSWINDOWS}
 function acSetThreadErrorMode(Mode: DWORD): DWORD;
 {$ENDIF}
 procedure FreeMemAndNil(var P: Pointer);
-function IfThen(AValue: Boolean; ATrue: TACLBoolean; AFalse: TACLBoolean): TACLBoolean; overload;
+function IfThen(AValue: Boolean; ATrue, AFalse: TACLBoolean): TACLBoolean; overload;
 
 {$IFDEF MSWINDOWS}
-// Wine
 function WineGetVersion(out AVersion: string): Boolean;
 {$ENDIF}
 implementation
@@ -275,34 +277,80 @@ end;
 // HMODULE
 //==============================================================================
 
-{$IFDEF MSWINDOWS}
-function acGetProcessFileName(const AWindowHandle: THandle; out AFileName: string): Boolean;
+{$IFDEF LINUX}
+function FindBinPath(const AFileName: string): string;
+const
+  KnownPaths: array[0..5] of string = (
+    '/usr/local/sbin','/usr/local/bin','/usr/sbin','/usr/bin','/sbin','/bin'
+  );
 var
-  AProcess: THandle;
-  AProcessID: Cardinal;
+  I: integer;
 begin
-  Result := False;
-  if (AWindowHandle <> 0) and (GetWindowThreadProcessId(AWindowHandle, AProcessID) > 0) then
+  for I := Low(KnownPaths) to High(KnownPaths) do
   begin
-    AProcess := OpenProcess(PROCESS_QUERY_INFORMATION or PROCESS_VM_READ, True, AProcessID);
-    if AProcess <> 0 then
-    try
-      SetLength(AFileName, MAX_PATH);
-      SetLength(AFileName, GetModuleFileNameEx(AProcess, 0, PWideChar(AFileName), Length(AFileName)));
-      Result := True;
-    finally
-      CloseHandle(AProcess);
-    end;
+    Result := KnownPaths[I] + PathDelim + AFileName;
+    if FileExists(Result) then Exit;
   end;
+  Result := AFilename;
 end;
 
-function acGetProcAddress(ALibHandle: HMODULE; AProcName: PChar; var AResult: Boolean): Pointer;
+function ResolveLibraryPath(ALibraryName: string): string;
+const
+  Arrow = ') => ';
+  OpenBracket = ' (';
+var
+  LCandidate: string;
+  LCandidateFlags: string;
+  LCandidateVersion: string;
+  LLibList: TStrings;
+  LLibVersion: Integer;
+  LPosArrow: Integer;
+  LPosDot: Integer;
+  LPosOpenBracket: Integer;
+  LTemp: string;
 begin
-  Result := GetProcAddress(ALibHandle, AProcName);
-  AResult := AResult and (Result <> nil);
+  if not RunCommand(FindBinPath('ldconfig'), ['-p'], LTemp, []) then
+    Exit('');
+  if TryStrToInt(Copy(ExtractFileExt(ALibraryName), 2), LLibVersion) then
+    ALibraryName := ChangeFileExt(ALibraryName, '')
+  else
+    LLibVersion := 0;
+
+  LLibList := TStringList.Create;
+  try
+    LLibList.Text := LTemp;
+    for LTemp in LLibList do
+    begin
+      LPosArrow := Pos(Arrow, LTemp);
+      LPosOpenBracket := Pos(OpenBracket, LTemp);
+      if (LPosOpenBracket > 0) and (LPosArrow > 0) then
+      begin
+        LCandidate := LTemp.TrimLeft;
+        if LCandidate.StartsWith(ALibraryName + '.') then
+        begin
+          LCandidateVersion := Copy(LCandidate, Length(ALibraryName) + 2, LPosOpenBracket - Length(ALibraryName) - 3);
+          LPosDot := Pos('.', LCandidateVersion);
+          if LPosDot > 0 then
+            LCandidateVersion := Copy(LCandidateVersion, LPosDot - 1);
+          if StrToIntDef(LCandidateVersion, -1) >= LLibVersion then
+          begin
+            Inc(LPosOpenBracket, Length(OpenBracket));
+            LCandidateFlags := Copy(LTemp, LPosOpenBracket, LPosArrow - LPosOpenBracket);
+            if LCandidateFlags.Contains('x86-64') = {$IFDEF CPU64}True{$ELSE}False{$ENDIF} then
+              Exit(Copy(LTemp, LPosArrow + Length(Arrow)));
+          end;
+        end;
+      end;
+    end;
+  finally
+    LLibList.Free;
+  end;
+  Result := '';
 end;
+{$ENDIF}
 
 function acLoadLibrary(const AFileName: string; AFlags: Cardinal = 0): HMODULE;
+{$IFDEF MSWINDOWS}
 var
   AErrorMode: Cardinal;
   APrevCurPath: string;
@@ -313,20 +361,44 @@ begin
     try
       acSetCurrentDir(acExtractFilePath(AFileName));
       if AFlags <> 0 then
-        Result := LoadLibraryEx(PWideChar(AFileName), 0, AFlags)
+        Result := LoadLibraryEx(PChar(AFileName), 0, AFlags)
       else
-        Result := LoadLibrary(PWideChar(AFileName));
+        Result := LoadLibrary(PChar(AFileName));
     finally
       acSetCurrentDir(APrevCurPath);
     end;
   finally
     acSetThreadErrorMode(AErrorMode);
   end;
+{$ELSE}
+var
+  LActualLibPath: string;
+begin
+  if ExtractFilePath(AFileName) <> '' then
+    LActualLibPath := AFileName
+  else
+  begin
+    LActualLibPath := IncludeTrailingPathDelimiter(GetCurrentDir) + AFileName;
+    if not FileExists(LActualLibPath) then
+      LActualLibPath := ResolveLibraryPath(AFileName);
+  end;
+  if LActualLibPath <> '' then
+    Result := LoadLibrary(LActualLibPath)
+  else
+    Result := 0;
+{$ENDIF}
 end;
 
+function acGetProcAddress(ALibHandle: HMODULE; AProcName: PChar; var AResult: Boolean): Pointer;
+begin
+  Result := GetProcAddress(ALibHandle, AProcName);
+  AResult := AResult and (Result <> nil);
+end;
+
+{$IFDEF MSWINDOWS}
 function acModuleHandle(const AFileName: string): HMODULE;
 begin
-  Result := GetModuleHandle(PWideChar(AFileName));
+  Result := GetModuleHandle(PChar(AFileName));
 end;
 
 function acModuleFileName(AModule: HMODULE): string;
@@ -348,7 +420,7 @@ begin
   end;
 end;
 
-function IfThen(AValue: Boolean; ATrue: TACLBoolean; AFalse: TACLBoolean): TACLBoolean;
+function IfThen(AValue: Boolean; ATrue, AFalse: TACLBoolean): TACLBoolean;
 begin
   if AValue then
     Result := ATrue
@@ -439,6 +511,11 @@ begin
   Result := GUIDToString(G);
 end;
 
+function acLastSystemErrorMessage: string;
+begin
+  Result := SysErrorMessage({$IFDEF FPC}GetLastOSError{$ELSE}GetLastError{$ENDIF});
+end;
+
 function acObjectUID(AObject: TObject): string;
 begin
   Result := IntToHex(NativeUInt(AObject), SizeOf(Pointer) * 2);
@@ -454,56 +531,59 @@ end;
 //==============================================================================
 // Window Handle
 //==============================================================================
+
+function acGetClassName(AWnd: HWND): string;
 {$IFDEF MSWINDOWS}
-function acGetClassName(Handle: HWND): UnicodeString;
 var
-  ABuf: array[0..64] of WideChar;
+  ABuf: array[0..64] of Char;
 begin
   ZeroMemory(@ABuf[0], SizeOf(ABuf));
-  GetClassNameW(Handle, @ABuf[0], Length(ABuf));
+  GetClassName(AWnd, @ABuf[0], Length(ABuf));
   Result := ABuf;
+{$ELSE}
+begin
+  Result := '';
+{$ENDIF}
 end;
 
-function acGetWindowRect(AHandle: HWND): TRect;
+function acFindWindow(const AClassName: string): HWND;
 begin
-  if not GetWindowRect(AHandle, Result) then
+{$IFDEF MSWINDOWS}
+  Result := FindWindow(PChar(AClassName), nil);
+{$ELSE}
+  Result := 0;
+{$ENDIF}
+end;
+
+function acGetProcessFileName(AWnd: HWND; out AFileName: string): Boolean;
+{$IFDEF MSWINDOWS}
+var
+  AProcess: THandle;
+  AProcessID: Cardinal;
+{$ENDIF}
+begin
+  Result := False;
+{$IFDEF MSWINDOWS}
+  if (AWnd <> 0) and (GetWindowThreadProcessId(AWnd, AProcessID) > 0) then
+  begin
+    AProcess := OpenProcess(PROCESS_QUERY_INFORMATION or PROCESS_VM_READ, True, AProcessID);
+    if AProcess <> 0 then
+    try
+      SetLength(AFileName, MAX_PATH);
+      SetLength(AFileName, GetModuleFileNameEx(AProcess, 0, PChar(AFileName), Length(AFileName)));
+      Result := True;
+    finally
+      CloseHandle(AProcess);
+    end;
+  end;
+{$ENDIF}
+end;
+
+function acGetWindowRect(AWnd: HWND): TRect;
+begin
+  if GetWindowRect(AWnd, Result{%H-}) = {$IFDEF FPC}0{$ELSE}False{$ENDIF} then
     Result := NullRect;
 end;
-
-function acFindWindow(const AClassName: UnicodeString): HWND;
-begin
-  Result := FindWindowW(PWideChar(AClassName), nil);
-end;
-
-function acGetWindowText(AHandle: HWND): UnicodeString;
-var
-  B: array[BYTE] of WideChar;
-begin
-  GetWindowTextW(AHandle, @B[0], Length(B));
-  Result := B;
-end;
-
-procedure acSetWindowText(AHandle: HWND; const AText: UnicodeString);
-begin
-  if AHandle <> 0 then
-  begin
-    if IsWindowUnicode(AHandle) then
-      SetWindowTextW(AHandle, PWideChar(AText))
-    else
-      DefWindowProcW(AHandle, WM_SETTEXT, 0, LPARAM(PWideChar(AText))); // fix for app handle
-  end;
-end;
-
-procedure acSwitchToWindow(AHandle: HWND);
-var
-  AInput: TInput;
-begin
-  ZeroMemory(@AInput, SizeOf(AInput));
-  SendInput(INPUT_KEYBOARD, AInput, SizeOf(AInput));
-  SetForegroundWindow(AHandle);
-  SetFocus(AHandle);
-end;
-{$ENDIF}
 
 { TACLBooleanHelper }
 
@@ -523,12 +603,12 @@ begin
     Result := TACLBoolean.False;
 end;
 
-{ TProcessHelper }
+{ TACLProcess }
 
+class function TACLProcess.Execute(const ACmdLine: string;
+  AOptions: TExecuteOptions = [eoShowGUI]; AOutputData: TStream = nil;
+  AErrorData: TStream = nil; AExitCode: PCardinal = nil): LongBool;
 {$IFDEF MSWINDOWS}
-class function TProcessHelper.Execute(const ACmdLine: UnicodeString;
-  AOptions: TExecuteOptions = [eoShowGUI]; AOutputData: TStream = nil; AErrorData: TStream = nil;
-  AProcessInfo: PProcessInformation = nil; AExitCode: PCardinal = nil): LongBool;
 
   function CreateProcess(var PI: TProcessInformation; var SI: TStartupInfo): LongBool;
   var
@@ -598,8 +678,6 @@ begin
   Result := CreateProcess(AProcessInformation, AStartupInfo);
   if Result then
   begin
-    if Assigned(AProcessInfo) then
-      AProcessInfo^ := AProcessInformation;
     if eoWaitForTerminate in AOptions then
     try
       if (AOutputData <> nil) or (AErrorData <> nil) then
@@ -634,8 +712,39 @@ begin
   CloseHandle(AStdErrorRead);
   CloseHandle(AStdErrorWrite);
 end;
+{$ELSE}
+var
+  LError: string;
+  LExitCode: Integer;
+  LOutput: string;
+  LProcess: TProcess;
+begin
+  if not (eoWaitForTerminate in AOptions) then
+    {$MESSAGE WARN 'not-implemented-eoWaitForTerminate'}
+    raise ENotImplemented.Create('eoWaitForTerminate');
 
-class function TProcessHelper.Execute(const ACmdLine: UnicodeString;
+  LProcess := DefaultTProcess.Create(nil);
+  try
+    LProcess.{%H-}CommandLine{%H-}:= ACmdLine;
+    if eoShowGUI in AOptions then
+      LProcess.ShowWindow := swoShow
+    else
+      LProcess.ShowWindow := swoHide;
+
+    Result := LProcess.RunCommandLoop(LOutput, LError, LExitCode) = 0;
+    if AExitCode <> nil then
+      AExitCode^ := LExitCode;
+    if AErrorData <> nil then
+      AErrorData.Write(PChar(LError)^, Length(LError));
+    if AOutputData <> nil then
+      AOutputData.Write(PChar(LOutput)^, Length(LOutput));
+  finally
+    LProcess.Free;
+  end;
+end;
+{$ENDIF}
+
+class function TACLProcess.Execute(const ACmdLine: string;
   ALog: IStringReceiver; AOptions: TExecuteOptions = [eoShowGUI]): LongBool;
 var
   AErrorData: TStringStream;
@@ -648,7 +757,7 @@ begin
   try
     if ALog <> nil then
       ALog.Add('Executing: ' + ACmdLine);
-    if Execute(ACmdLine, AOptions, AOutputData, AErrorData, nil, @AExitCode) then
+    if Execute(ACmdLine, AOptions, AOutputData, AErrorData, @AExitCode) then
     begin
       if ALog <> nil then
       begin
@@ -660,7 +769,7 @@ begin
     else
     begin
       if ALog <> nil then
-        ALog.Add(SysErrorMessage(GetLastError));
+        ALog.Add(acLastSystemErrorMessage);
       Result := False;
     end;
   finally
@@ -669,7 +778,17 @@ begin
   end;
 end;
 
-class function TProcessHelper.IsWow64(AProcess: THandle): LongBool;
+{$IFDEF MSWINDOWS}
+class function TACLProcess.IsWow64: LongBool;
+begin
+{$IFDEF CPUX64}
+  Result := False;
+{$ELSE}
+  Result := IsWow64(GetCurrentProcess);
+{$ENDIF}
+end;
+
+class function TACLProcess.IsWow64(AProcess: THandle): LongBool;
 type
   TIsWow64ProcessProc = function (hProcess: THandle; out AValue: LongBool): LongBool; stdcall;
 var
@@ -682,16 +801,7 @@ begin
     Result := False;
 end;
 
-class function TProcessHelper.IsWow64: LongBool;
-begin
-{$IFDEF CPUX64}
-  Result := False;
-{$ELSE}
-  Result := IsWow64(GetCurrentProcess);
-{$ENDIF}
-end;
-
-class function TProcessHelper.IsWow64Window(AWindow: HWND): LongBool;
+class function TACLProcess.IsWow64Window(AWindow: HWND): LongBool;
 var
   AProcessID: Cardinal;
   AProcessHandle: THandle;
@@ -709,7 +819,7 @@ begin
   end;
 end;
 
-class function TProcessHelper.Wow64SetFileSystemRedirection(AValue: Boolean): LongBool;
+class function TACLProcess.Wow64SetFileSystemRedirection(AValue: Boolean): LongBool;
 type
   TWow64SetProc = function (AValue: LongBool): LongBool; stdcall;
 var

@@ -127,7 +127,7 @@ begin
   AHandle := acFindWindow(AWindowClass);
   if AHandle = 0 then
   begin
-    Result := TProcessHelper.Execute(AApplicationFileName);
+    Result := TACLProcess.Execute(AApplicationFileName);
     if Result then
     begin
       AWaitCount := 10;
@@ -159,7 +159,7 @@ begin
   begin
     ZeroMemory(@ACopyData, SizeOf(ACopyData));
     ACopyData.dwData := ID;
-    ATempFileNameUsed := TProcessHelper.IsWow64 <> TProcessHelper.IsWow64Window(AHandle);
+    ATempFileNameUsed := TACLProcess.IsWow64 <> TACLProcess.IsWow64Window(AHandle);
     if ATempFileNameUsed then
     begin
       ACopyData.cbData := NativeInt(DWORD(AHandle));

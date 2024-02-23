@@ -315,6 +315,10 @@ type
 
   TACLFormCorners = (afcDefault, afcRectangular, afcRounded, afcSmallRounded);
 
+function acGetWindowText(AHandle: HWND): string;
+procedure acSetWindowText(AHandle: HWND; const AText: string);
+procedure acSwitchToWindow(AHandle: HWND);
+
 procedure FormDisableCloseButton(AHandle: HWND);
 function FormSetCorners(AHandle: THandle; ACorners: TACLFormCorners): Boolean;
 procedure TerminateOpenForms;
@@ -358,6 +362,59 @@ type
   end;
 
 {$ENDIF}
+
+function acGetWindowText(AHandle: HWND): string;
+{$IFDEF MSWINDOWS}
+var
+  LBuffer: array[Byte] of Char;
+begin
+  GetWindowText(AHandle, @LBuffer[0], Length(LBuffer));
+  Result := LBuffer;
+{$ELSE}
+var
+  LCtrl: TWinControlAccess;
+begin
+  LCtrl := TWinControlAccess(FindControl(AHandle));
+  if LCtrl <> nil then
+    Result := LCtrl.Text
+  else
+    Result := '';
+{$ENDIF}
+end;
+
+procedure acSetWindowText(AHandle: HWND; const AText: string);
+{$IFDEF MSWINDOWS}
+begin
+  if AHandle <> 0 then
+  begin
+    if IsWindowUnicode(AHandle) then
+      SetWindowTextW(AHandle, PWideChar(AText))
+    else
+      DefWindowProcW(AHandle, WM_SETTEXT, 0, LPARAM(PChar(AText))); // fix for app handle
+  end;
+{$ELSE}
+var
+  LCtrl: TWinControlAccess;
+begin
+  LCtrl := TWinControlAccess(FindControl(AHandle));
+  if LCtrl <> nil then
+    LCtrl.Text := AText;
+{$ENDIF}
+end;
+
+procedure acSwitchToWindow(AHandle: HWND);
+{$IFDEF MSWINDOWS}
+var
+  AInput: TInput;
+begin
+  ZeroMemory(@AInput, SizeOf(AInput));
+  SendInput(INPUT_KEYBOARD, AInput, SizeOf(AInput));
+  SetForegroundWindow(AHandle);
+  SetFocus(AHandle);
+{$ELSE}
+begin
+{$ENDIF}
+end;
 
 procedure FormDisableCloseButton(AHandle: HWND);
 begin
