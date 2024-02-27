@@ -4,31 +4,38 @@
 {*               Color Palette               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.ColorPalette;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:Ok
 
 interface
 
 uses
-  Winapi.Windows,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
+  {Winapi.}Windows,
+{$ENDIF}
   // System
-  System.Types,
-  System.Classes,
+  {System.}Classes,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
   System.UITypes,
   // Vcl
-  Vcl.Graphics,
+  {Vcl.}Graphics,
+  {Vcl.}Forms,
   // ACL
   ACL.Classes.Collections,
   ACL.Classes,
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.Ex.Gdip,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Resources,
   ACL.Utils.DPIAware;
@@ -187,7 +194,7 @@ type
 
     FOnColorChanged: TNotifyEvent;
 
-    procedure SetColor(AValue: TAlphaColor);
+    procedure SetColor(AValue: TAlphaColor); reintroduce;
     procedure SetHoveredColor(AValue: TACLColorPaletteItemViewInfo);
     procedure SetItems(AValue: TACLColorPaletteItems);
     procedure SetOptionsView(AValue: TACLColorPaletteOptionsView);
@@ -230,11 +237,6 @@ const
 implementation
 
 uses
-  System.SysUtils,
-  System.Math,
-  // Vcl
-  Vcl.Forms,
-  // ACl
   ACL.Math;
 
 { TACLColorPaletteItem }
@@ -303,7 +305,7 @@ var
   AIndex: Integer;
   APaletteEntries: array[0..NumPaletteEntries - 1] of TPaletteEntry;
 begin
-  ACount := GetPaletteEntries(GetStockObject(DEFAULT_PALETTE), 0, NumPaletteEntries, APaletteEntries);
+  ACount := GetPaletteEntries(GetStockObject(DEFAULT_PALETTE), 0, NumPaletteEntries, APaletteEntries{%H-});
   for AIndex := 0 to ACount - 1 do
   begin
     Add(TAlphaColor.FromARGB(MaxByte,
