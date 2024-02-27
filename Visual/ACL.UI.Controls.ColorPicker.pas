@@ -1051,7 +1051,7 @@ begin
       GpPaintCanvas.FillRectangleByGradient(
         TAlphaColor.FromColor(TACLColors.HSLToRGB(I / AWidth, 1, 0.5)),
         TAlphaColor.FromColor(TACLColors.HSLToRGB(I / AWidth, 0, 0.5)),
-        Rect(I, 0, I + 1, AHeight), gmVertical);
+        Rect(I, 0, I + 1, AHeight), True);
     end;
   finally
     GpPaintCanvas.EndPaint;
@@ -1155,7 +1155,7 @@ begin
   try
     GpPaintCanvas.FillRectangleByGradient(0,
       TAlphaColor.FromColor(ColorInfo.Color),
-      Rect(0, 0, AWidth, AHeight), gmVertical);
+      Rect(0, 0, AWidth, AHeight), True);
   finally
     GpPaintCanvas.EndPaint;
   end;
@@ -1182,8 +1182,8 @@ begin
   GpPaintCanvas.BeginPaint(ACanvas.Handle);
   try
     AColor := TAlphaColor.FromColor(TACLColors.HSLtoRGB(ColorInfo.H, ColorInfo.S, 0.5));
-    GpPaintCanvas.FillRectangleByGradient($FFFFFFFF, AColor, Rect(0, 0, AWidth, AHeight div 2), gmVertical);
-    GpPaintCanvas.FillRectangleByGradient(AColor, $FF000000, Rect(0, AHeight div 2, AWidth, AHeight), gmVertical);
+    GpPaintCanvas.FillRectangleByGradient($FFFFFFFF, AColor, Rect(0, 0, AWidth, AHeight div 2), True);
+    GpPaintCanvas.FillRectangleByGradient(AColor, $FF000000, Rect(0, AHeight div 2, AWidth, AHeight), True);
   finally
     GpPaintCanvas.EndPaint;
   end;

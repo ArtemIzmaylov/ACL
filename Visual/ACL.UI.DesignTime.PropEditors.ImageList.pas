@@ -252,20 +252,21 @@ end;
 
 procedure TfrmImageListEditor.DrawPreview(ACanvas: TCanvas; const R: TRect; AImageIndex: Integer);
 var
-  B: TACLBitmap;
+  B: TACLDib;
 begin
   acDrawHatch(ACanvas.Handle, R);
   if AImageIndex >= 0 then
   begin
-    B := TACLBitmap.CreateEx(EditingImageList.Width, EditingImageList.Height, pf32bit, True);
+    B := TACLDib.Create(EditingImageList.Width, EditingImageList.Height);
     try
+      B.Reset;
       EditingImageList.Draw(B.Canvas, 0, 0, AImageIndex);
-      acAlphaBlend(ACanvas.Handle, B, acFitRect(R, B.Width, B.Height, afmProportionalStretch));
+      B.DrawBlend(ACanvas, acFitRect(R, B.Width, B.Height, afmProportionalStretch));
     finally
       B.Free;
     end;
   end;
-  acDrawFrame(ACanvas.Handle, R, clBlack);
+  acDrawFrame(ACanvas, R, clBlack);
 end;
 
 procedure TfrmImageListEditor.PopulateImages;

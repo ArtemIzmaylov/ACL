@@ -245,7 +245,7 @@ begin
   FOptions := TACLFormattedLabel.DefaultOptions;
   FStyle := TACLStyleFormattedLabel.Create(Self);
   FFormattedText := TACLFormattedLabelFormattedText.Create(Self);
-  FFormattedText.SetOption(tloWordWrap, True);
+  FFormattedText.SetOption(atoWordWrap, True);
 end;
 
 destructor TACLFormattedLabelSubClass.Destroy;
@@ -260,7 +260,7 @@ var
   ABounds: TRect;
   ARowRect: TRect;
 begin
-  FormattedText.Calculate;
+  FormattedText.Calculate(MeasureCanvas);
   ABounds := ViewInfo.ClientBounds;
   ARowRect := FormattedText.FLayout[ARow].Bounds;
   ViewInfo.ViewportY := ViewInfo.ViewportY + acCalculateScrollToDelta(ARowRect.Top, ARowRect.Bottom,
@@ -289,7 +289,7 @@ end;
 
 function TACLFormattedLabelSubClass.GetWordWrap: Boolean;
 begin
-  Result := tloWordWrap in FormattedText.Options;
+  Result := atoWordWrap and FormattedText.Options <> 0;
 end;
 
 procedure TACLFormattedLabelSubClass.SetAlignment(AValue: TAlignment);
@@ -347,7 +347,7 @@ procedure TACLFormattedLabelSubClass.SetWordWrap(AValue: Boolean);
 begin
   if WordWrap <> AValue then
   begin
-    FormattedText.SetOption(tloWordWrap, AValue);
+    FormattedText.SetOption(atoWordWrap, AValue);
     FullRefresh;
   end;
 end;
@@ -386,14 +386,15 @@ begin
   if SubClass.AutoScroll then
   begin
     FormattedText.Bounds := Rect(0, 0, FClientBounds.Width, MaxInt);
-    FormattedText.SetOption(tloEndEllipsis, False);
+    FormattedText.SetOption(atoEndEllipsis, False);
+    FormattedText.Calculate(MeasureCanvas);
     FContentSize := FormattedText.MeasureSize;
   end
   else
   begin
     FContentSize := FClientBounds.Size;
     FormattedText.Bounds := TRect.Create(FContentSize);
-    FormattedText.SetOption(tloEndEllipsis, True);
+    FormattedText.SetOption(atoEndEllipsis, True);
   end;
 end;
 
@@ -487,7 +488,7 @@ end;
 
 procedure TACLFormattedLabel.ResourceChanged;
 begin
-  SubClass.FormattedText.Refresh;
+  SubClass.FormattedText.FlushCalculatedValues;
   inherited;
 end;
 

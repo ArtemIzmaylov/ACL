@@ -353,13 +353,13 @@ begin
   else
     R := Image.FrameSize;
 
-  Image.Draw(pbDisplay.Canvas.Handle, R, seFrame.Value - 1);
+  Image.Draw(pbDisplay.Canvas, R, seFrame.Value - 1);
   if not (FResizing or Image.Margins.IsZero) then
   begin
-    acFillRect(pbDisplay.Canvas.Handle, R.Split(srLeft, Image.Margins.Left, 1), clRed);
-    acFillRect(pbDisplay.Canvas.Handle, R.Split(srTop, Image.Margins.Top, 1), clRed);
-    acFillRect(pbDisplay.Canvas.Handle, R.Split(srRight, R.Right - Image.Margins.Right, 1), clRed);
-    acFillRect(pbDisplay.Canvas.Handle, R.Split(srBottom, R.Bottom - Image.Margins.Bottom, 1), clRed);
+    acFillRect(pbDisplay.Canvas, R.Split(srLeft, Image.Margins.Left, 1), clRed);
+    acFillRect(pbDisplay.Canvas, R.Split(srTop, Image.Margins.Top, 1), clRed);
+    acFillRect(pbDisplay.Canvas, R.Split(srRight, R.Right - Image.Margins.Right, 1), clRed);
+    acFillRect(pbDisplay.Canvas, R.Split(srBottom, R.Bottom - Image.Margins.Bottom, 1), clRed);
   end;
 end;
 
