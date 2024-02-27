@@ -4,33 +4,41 @@
 {*           Progress Box Control            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.ProgressBox;
 
-{$I ACL.Config.INC}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
   Winapi.Messages,
+  Winapi.Windows,
+{$ENDIF}
   // System
-  System.Classes,
-  System.Types,
+  {System.}Classes,
+  {System.}Math,
+  {System.}Types,
+  {System.}SysUtils,
   System.UITypes,
   // Vcl
-  Vcl.Graphics,
-  Vcl.Controls,
+  {Vcl.}Graphics,
+  {Vcl.}Controls,
+  {Vcl.}Forms,
   // ACL
   ACL.Classes,
-  ACL.Classes.StringList,
-  ACL.Timers,
   ACL.Graphics,
   ACL.Graphics.SkinImage,
+  ACL.Timers,
+  ACL.Threading,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.ProgressBar,
@@ -73,7 +81,7 @@ type
     FProgressActive: Boolean;
     FSavedFocus: THandle;
     FStyle: TACLStyleProgressBox;
-    FText: array[0..3] of UnicodeString;
+    FText: array[0..3] of string;
 
     FOnCancel: TNotifyEvent;
     FOnFinish: TNotifyEvent;
@@ -81,20 +89,20 @@ type
     FOnStart: TNotifyEvent;
 
     function GetActualCoverColor: TAlphaColor;
-    function GetProgressTitle: UnicodeString;
+    function GetProgressTitle: string;
     function GetProgressValue: Single;
     function GetStyleButton: TACLStyleButton;
     function GetStyleProgress: TACLStyleProgress;
-    function GetText(Index: Integer): UnicodeString;
+    function GetText(Index: Integer): string;
     function GetTextArea: TRect;
     function GetTextStored(Index: Integer): Boolean;
     procedure SetStyle(const Value: TACLStyleProgressBox);
     procedure SetStyleButton(const Value: TACLStyleButton);
     procedure SetStyleProgress(const Value: TACLStyleProgress);
-    procedure SetText(Index: Integer; const AValue: UnicodeString);
+    procedure SetText(Index: Integer; const AValue: string);
   protected
     procedure CalculateControlsPosition;
-    procedure CalculateLineRects(const R: TRect; const S1, S2: UnicodeString; out L1, L2: TRect);
+    procedure CalculateLineRects(const R: TRect; const S1, S2: string; out L1, L2: TRect);
     procedure CreateControls;
     procedure SetDefaultSize; override;
     procedure SetTargetDPI(AValue: Integer); override;
@@ -112,21 +120,20 @@ type
     procedure ShowProgressBox;
     //
     property BoxRect: TRect read FBoxRect;
-    property ProgressTitle: UnicodeString read GetProgressTitle;
+    property ProgressTitle: string read GetProgressTitle;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
-    //
     procedure Cancel(AWaitForStop: Boolean);
     function Progress(AProgress: Single): Boolean; overload;
     function Progress(ACurrentIndex, ATotalIndexCount: Integer): Boolean; overload;
+    procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
     procedure StartProgress(AShowBoxNow: Boolean; AOptions: TACLProgressBoxOptions); overload;
     procedure StartProgress(AShowBoxNow: Boolean = False); overload;
     procedure StopProgress;
-    //
+    //# Properties
     property ProgressActive: Boolean read FProgressActive;
-    property ProgressMessage: UnicodeString index 0 read GetText write SetText;
+    property ProgressMessage: string index 0 read GetText write SetText;
     property ProgressValue: Single read GetProgressValue;
   published
     property DelayShow: Cardinal read FDelayShow write FDelayShow default 1000;
@@ -136,11 +143,11 @@ type
     property Style: TACLStyleProgressBox read FStyle write SetStyle;
     property StyleButton: TACLStyleButton read GetStyleButton write SetStyleButton;
     property StyleProgress: TACLStyleProgress read GetStyleProgress write SetStyleProgress;
-    property TextButtonCancel: UnicodeString index 1 read GetText write SetText stored GetTextStored;
-    property TextProgressSuffix: UnicodeString index 2 read GetText write SetText stored GetTextStored;
-    property TextWaitingModeTitle: UnicodeString index 3 read GetText write SetText stored GetTextStored;
+    property TextButtonCancel: string index 1 read GetText write SetText stored GetTextStored;
+    property TextProgressSuffix: string index 2 read GetText write SetText stored GetTextStored;
+    property TextWaitingModeTitle: string index 3 read GetText write SetText stored GetTextStored;
     property Visible default False;
-    //
+    //# Event
     property OnCancel: TNotifyEvent read FOnCancel write FOnCancel;
     property OnFinish: TNotifyEvent read FOnFinish write FOnFinish;
     property OnProgress: TNotifyEvent read FOnProgress write FOnProgress;
@@ -150,16 +157,8 @@ type
 implementation
 
 uses
-  System.Math,
-  System.SysUtils,
-  // Vcl
-  Vcl.Forms,
-  // ACL
   ACL.Geometry,
-  ACL.Graphics.Ex.Gdip,
-  ACL.UI.Forms,
-  ACL.Utils.Common,
-  ACL.Utils.FileSystem;
+  ACL.Utils.Common;
 
 const
   sTextCancel = 'Cancel';
@@ -258,7 +257,7 @@ begin
   end;
 end;
 
-procedure TACLProgressBox.CalculateLineRects(const R: TRect; const S1, S2: UnicodeString; out L1, L2: TRect);
+procedure TACLProgressBox.CalculateLineRects(const R: TRect; const S1, S2: string; out L1, L2: TRect);
 begin
   L1 := R;
   if S1 = '' then
@@ -370,10 +369,10 @@ function TACLProgressBox.Progress(AProgress: Single): Boolean;
 begin
   if AProgress < 0 then
   begin
-    if FProgress.WaitingMode and (GetTickCount - FLastUpdateTime >= 500) then
+    if FProgress.WaitingMode and TACLThread.IsTimeout(FLastUpdateTime, 500) then
     begin
-      FCancelled := FCancelled or (GetAsyncKeyState(VK_ESCAPE) < 0);
-      FLastUpdateTime := GetTickCount;
+      FCancelled := FCancelled or (GetKeyState(VK_ESCAPE) < 0);
+      FLastUpdateTime := TACLThread.Timestamp;
       InvalidateTextBox;
       Application.ProcessMessages;
     end;
@@ -411,7 +410,7 @@ begin
     FProgress.WaitingMode := True;
     FProgress.Progress := 0;
     FProgressActive := True;
-    FLastUpdateTime := GetTickCount;
+    FLastUpdateTime := TACLThread.Timestamp;
     FCancelled := False;
     if AShowBoxNow then
       ShowProgressBox
@@ -432,12 +431,12 @@ begin
     FDelayTimer.Enabled := False;
     FProgressActive := False;
     Visible := False;
-    Winapi.Windows.SetFocus(FSavedFocus);
+    acRestoreFocus(FSavedFocus);
     CallNotifyEvent(Self, OnFinish);
   end;
 end;
 
-function TACLProgressBox.GetText(Index: Integer): UnicodeString;
+function TACLProgressBox.GetText(Index: Integer): string;
 begin
   Result := FText[Index];
 end;
@@ -459,7 +458,7 @@ begin
   end;
 end;
 
-procedure TACLProgressBox.SetText(Index: Integer; const AValue: UnicodeString);
+procedure TACLProgressBox.SetText(Index: Integer; const AValue: string);
 begin
   if FText[Index] <> AValue then
   begin
@@ -482,7 +481,7 @@ begin
     Result.A := 50;
 end;
 
-function TACLProgressBox.GetProgressTitle: UnicodeString;
+function TACLProgressBox.GetProgressTitle: string;
 begin
   if FProgress.WaitingMode then
     Result := TextWaitingModeTitle

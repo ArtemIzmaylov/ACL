@@ -1,37 +1,40 @@
 ﻿{*********************************************}
 {*                                           *}
 {*     Artem's Visual Components Library     *}
-{*            ProgressBar Control            *}
+{*            Progress Bar Control           *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.ProgressBar;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+{$IFDEF FPC}
+  LCLType,
+{$ELSE}
+  {Winapi.}Messages,
+  {Winapi.}Windows,
+{$ENDIF}
   // System
-  System.Types,
-  System.Classes,
+  {System.}Classes,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
   // Vcl
-  Vcl.Graphics,
-  Vcl.Controls,
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
   // ACL
   ACL.Classes,
-  ACL.Classes.StringList,
   ACL.Timers,
   ACL.Graphics.SkinImage,
-  ACL.Graphics.SkinImageSet,
   ACL.UI.Controls.BaseControls,
-  ACL.UI.Controls.Buttons,
   ACL.UI.Resources,
   ACL.Utils.DPIAware;
 
@@ -70,11 +73,11 @@ type
     procedure SetWaitingMode(AValue: Boolean);
   protected
     function GetBackgroundStyle: TACLControlBackgroundStyle; override;
-    procedure CalculateProgressRect(var R1, R2: TRect);
+    procedure CalculateProgressRect(out R1, R2: TRect);
     procedure SetTargetDPI(AValue: Integer); override;
     procedure DoTimer(Sender: TObject);
     procedure Paint; override;
-    //
+    //# Properties
     property AnimPosition: Integer read FAnimPosition;
     property ProgressAnimSize: Integer read GetProgressAnimSize;
     property ProgressAreaRect: TRect read GetProgressAreaRect;
@@ -95,7 +98,7 @@ type
     property Progress: Single index 2 read FProgress write SetIndex stored IsIndexStored;
     property Visible;
     property WaitingMode: Boolean read FWaitingMode write SetWaitingMode default False;
-
+	//# Events
     property OnClick;
     property OnDblClick;
     property OnMouseDown;
@@ -108,7 +111,9 @@ implementation
 uses
   ACL.Geometry,
   ACL.Graphics,
+{$IFNDEF FPC}
   ACL.Graphics.SkinImageSet, // inlining
+{$ENDIF}
   ACL.Utils.Common;
 
 { TACLStyleProgress }
@@ -145,7 +150,7 @@ begin
   inherited Destroy;
 end;
 
-procedure TACLProgressBar.CalculateProgressRect(var R1, R2: TRect);
+procedure TACLProgressBar.CalculateProgressRect(out R1, R2: TRect);
 var
   AHalfSize: Integer;
 begin
@@ -269,12 +274,12 @@ begin
       0: begin
            ANeedRedraw := not SameValue(FMax, AValue);
            FMax := AValue;
-           FMin := System.Math.Min(FMin, FMax);
+           FMin := {System.}Math.Min(FMin, FMax);
          end;
       1: begin
            ANeedRedraw := not SameValue(FMin, AValue);
            FMin := AValue;
-           FMax := System.Math.Max(FMin, FMax);
+           FMax := {System.}Math.Max(FMin, FMax);
          end;
       2: begin
            ANeedRedraw := not SameValue(FProgress, AValue);
