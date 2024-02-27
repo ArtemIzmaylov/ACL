@@ -155,8 +155,10 @@ type
       AlphaFormat: TAlphaFormat = afDefined): TACL2DRenderImage; override;
     function CreateImage(Image: TACLImage): TACL2DRenderImage; override;
     function CreateImageAttributes: TACL2DRenderImageAttributes; override;
-    procedure DrawImage(Image: TACL2DRenderImage; const TargetRect, SourceRect: TRect; Attributes: TACL2DRenderImageAttributes); override;
-    procedure DrawImage(Image: TACL2DRenderImage; const TargetRect, SourceRect: TRect; Alpha: Byte = MaxByte); override;
+    procedure DrawImage(Image: TACL2DRenderImage;
+      const TargetRect, SourceRect: TRect; Attributes: TACL2DRenderImageAttributes); override;
+    procedure DrawImage(Image: TACL2DRenderImage;
+      const TargetRect, SourceRect: TRect; Alpha: Byte = MaxByte); override;
 
     // Curves
     procedure DrawCurve2(APenColor: TAlphaColor; APoints: array of TPoint;
@@ -181,7 +183,7 @@ type
       StrokeWidth: Single = 1; StrokeStyle: TACL2DRenderStrokeStyle = ssSolid); override;
     procedure FillHatchRectangle(const R: TRect; Color1, Color2: TAlphaColor; Size: Integer); override;
     procedure FillRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor); override;
-    procedure FillRectangleByGradient(AColor1, AColor2: TAlphaColor; const R: TRect; AMode: TLinearGradientMode);
+    procedure FillRectangleByGradient(AColor1, AColor2: TAlphaColor; const R: TRect; AVertical: Boolean);
 
     // Text
     procedure DrawText(const Text: string; const R: TRect; Color: TAlphaColor; Font: TFont;
@@ -229,6 +231,7 @@ type
   public
     constructor Create; override;
     destructor Destroy; override;
+    procedure BeginPaint(Canvas: TCanvas); reintroduce; overload;
     procedure BeginPaint(DC: HDC); reintroduce; overload;
     procedure BeginPaint(DC: HDC; const Unused1, Unused2: TRect); override;
     procedure EndPaint; override;
@@ -1254,7 +1257,7 @@ begin
 end;
 
 procedure TACLGdiplusRender.FillRectangleByGradient(
-  AColor1, AColor2: TAlphaColor; const R: TRect; AMode: TLinearGradientMode);
+  AColor1, AColor2: TAlphaColor; const R: TRect; AVertical: Boolean);
 var
   ABrush: GpBrush;
   ABrushRect: TGpRect;
@@ -1265,8 +1268,8 @@ begin
   ABrushRect.Height := R.Height + 2;
   if (ABrushRect.Width > 0) and (ABrushRect.Height > 0) then
   begin
-    GdipCheck(GdipCreateLineBrushFromRectI(@ABrushRect, 
-      AColor1, AColor2, TLinearGradientMode(AMode), WrapModeTile, ABrush));
+    GdipCheck(GdipCreateLineBrushFromRectI(@ABrushRect, AColor1, AColor2,
+      TACLMath.IfThen(AVertical, gmVertical, gmHorizontal), WrapModeTile, ABrush));
     GdipCheck(GdipFillRectangleI(FGraphics, ABrush, R.Left, R.Top, R.Width, R.Height));
     GdipCheck(GdipDeleteBrush(ABrush));
   end;
@@ -1355,6 +1358,11 @@ destructor TACLGdiplusPaintCanvas.Destroy;
 begin
   FreeAndNil(FSavedHandles);
   inherited Destroy;
+end;
+
+procedure TACLGdiplusPaintCanvas.BeginPaint(Canvas: TCanvas);
+begin
+  BeginPaint(Canvas.Handle);
 end;
 
 procedure TACLGdiplusPaintCanvas.BeginPaint(DC: HDC);

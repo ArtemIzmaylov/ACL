@@ -17,6 +17,7 @@ interface
 
 uses
 {$IFDEF FPC}
+  Cairo,
   LCLIntf,
   LCLType,
 {$ELSE}
@@ -126,11 +127,11 @@ type
     function ToBitmap(AAlphaFormat: TAlphaFormat = afIgnored): TACLBitmap;
 
     // Drawing
-    procedure Draw(ACanvas: TCanvas; const R, ASource, AMargins: TRect;
+    procedure Draw(ACanvas: TCanvas; const ATarget, ASource, AMargins: TRect;
       AAlpha: Byte = MaxByte; ATile: Boolean = False); overload;
-    procedure Draw(ACanvas: TCanvas; const R, ASource: TRect;
+    procedure Draw(ACanvas: TCanvas; const ATarget, ASource: TRect;
       AAlpha: Byte = MaxByte; ATile: Boolean = False); overload;
-    procedure Draw(ACanvas: TCanvas; const R: TRect;
+    procedure Draw(ACanvas: TCanvas; const ATarget: TRect;
       AAlpha: Byte = MaxByte; ATile: Boolean = False); overload;
   {$IFNDEF FPC}
     procedure Draw(Graphics: GpGraphics; const R, ASource, AMargins: TRect;
@@ -333,10 +334,12 @@ type
 implementation
 
 uses
-{$IFNDEF FPC}
+{$IFDEF MSWINDOWS}
   ACL.FastCode,
   ACL.Math, // inlining
   ACL.Graphics.Ex.Gdip,
+{$ELSE}
+  ACL.Graphics.Ex.Cairo,
 {$ENDIF}
   ACL.Utils.FileSystem,
   ACL.Utils.Stream;
@@ -611,70 +614,77 @@ end;
 {$ENDIF}
 
 procedure TACLImage.Draw(ACanvas: TCanvas;
-  const R, ASource, AMargins: TRect; AAlpha: Byte; ATile: Boolean);
+  const ATarget, ASource, AMargins: TRect; AAlpha: Byte; ATile: Boolean);
 {$IFDEF FPC}
+var
+  LAlpha: Double;
+  LPart: TACLMarginPart;
+  LSource: Pcairo_surface_t;
+  LSourceParts: TACLMarginPartBounds;
+  LTargetParts: TACLMarginPartBounds;
 begin
-  if Handle <> nil then
-    acDrawDibBuffered(ACanvas, R,
-      procedure (ADib: TACLDib; ATarget: TRect)
-      var
-        LPart: TACLMarginPart;
-        LSourceSize: TSize;
-        LSourceParts: TACLMarginPartBounds;
-        LTargetParts: TACLMarginPartBounds;
+  if Handle = nil then
+    Exit;
+
+  LAlpha := AAlpha / 255;
+  LSource := cairo_create_surface(Handle.Colors, Handle.Width, Handle.Height);
+  try
+    GpPaintCanvas.BeginPaint(ACanvas);
+    try
+      if AMargins.IsZero then
+        GpPaintCanvas.FillSurface(ATarget, ASource, LSource, LAlpha, ATile)
+      else
       begin
-        LSourceSize := TSize.Create(Width, Height);
-        if AMargins.IsZero then
-          ADib.Blend(Handle.Colors, LSourceSize, ASource, ATarget, AAlpha, ATile)
-        else
-        begin
-          acCalcPartBounds(LSourceParts, AMargins, ASource, ASource);
-          acCalcPartBounds(LTargetParts, AMargins, ATarget, ASource);
-          for LPart := Low(LPart) to High(LPart) do
-          begin
-            ADib.Blend(Handle.Colors, LSourceSize,
-              LSourceParts[LPart], LTargetParts[LPart], AAlpha, ATile);
-          end;
-        end;
-      end);
+        acCalcPartBounds(LSourceParts, AMargins, ASource, ASource);
+        acCalcPartBounds(LTargetParts, AMargins, ATarget, ASource);
+        for LPart := Low(LPart) to High(LPart) do
+          GpPaintCanvas.FillSurface(LTargetParts[LPart], LSourceParts[LPart], LSource, LAlpha, ATile);
+      end;
+    finally
+      GpPaintCanvas.EndPaint;
+    end;
+  finally
+    cairo_surface_destroy(LSource);
+  end;
 end;
 {$ELSE}
 var
   LGraphics: GpGraphics;
 begin
   GdipCreateFromHDC(ACanvas.Handle, LGraphics);
-  Draw(LGraphics, R, ASource, AMargins, AAlpha, ATile);
+  Draw(LGraphics, ATarget, ASource, AMargins, AAlpha, ATile);
   GdipDeleteGraphics(LGraphics);
 end;
 {$ENDIF}
 
 procedure TACLImage.Draw(ACanvas: TCanvas;
-  const R, ASource: TRect; AAlpha: Byte; ATile: Boolean);
+  const ATarget, ASource: TRect; AAlpha: Byte; ATile: Boolean);
 {$IFDEF FPC}
 begin
-  Draw(ACanvas, R, ASource, NullRect, AAlpha, ATile);
+  Draw(ACanvas, ATarget, ASource, NullRect, AAlpha, ATile);
 end;
 {$ELSE}
 var
   LGraphics: GpGraphics;
 begin
   GdipCreateFromHDC(ACanvas.Handle, LGraphics);
-  Draw(LGraphics, R, ASource, AAlpha, ATile);
+  Draw(LGraphics, ATarget, ASource, AAlpha, ATile);
   GdipDeleteGraphics(LGraphics);
 end;
 {$ENDIF}
 
-procedure TACLImage.Draw(ACanvas: TCanvas; const R: TRect; AAlpha: Byte; ATile: Boolean);
+procedure TACLImage.Draw(ACanvas: TCanvas;
+  const ATarget: TRect; AAlpha: Byte; ATile: Boolean);
 {$IFDEF FPC}
 begin
-  Draw(ACanvas, R, ClientRect, NullRect, AAlpha, ATile);
+  Draw(ACanvas, ATarget, ClientRect, NullRect, AAlpha, ATile);
 end;
 {$ELSE}
 var
   LGraphics: GpGraphics;
 begin
   GdipCreateFromHDC(ACanvas.Handle, LGraphics);
-  Draw(LGraphics, R, AAlpha, ATile);
+  Draw(LGraphics, ATarget, AAlpha, ATile);
   GdipDeleteGraphics(LGraphics);
 end;
 {$ENDIF}

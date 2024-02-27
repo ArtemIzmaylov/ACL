@@ -328,10 +328,16 @@ procedure acCalculateTiledAreas(const R: TRect; const AParams: TACLSkinImageTile
 implementation
 
 uses
+{$IFDEF FPC}
+  cairo,
+{$ENDIF}
+  // ACL
   ACL.FastCode,
   ACL.Graphics.Ex,
 {$IFDEF MSWINDOWS}
   ACL.Graphics.Ex.Gdip,
+{$ELSE}
+  ACL.Graphics.Ex.Cairo,
 {$ENDIF}
   ACL.Math,
   ACL.Threading,
@@ -363,8 +369,8 @@ type
   TACLSkinImageRenderer = class
   strict private
     class var FLock: TACLCriticalSection;
-    class var FDstCanvas: TCanvas;
   {$IFDEF MSWINDOWS}
+    class var FDstCanvas: TCanvas;
     class var FFunc: TBlendFunction;
     class var FMemDC: HDC;
     class var FOldBmp: HBITMAP;
@@ -373,11 +379,9 @@ type
     class procedure doAlphaBlend(const R, SrcR: TRect); inline;
     class procedure doAlphaBlendTile(const R, SrcR: TRect);
   {$ELSE}
-    class var FAlpha: Byte;
-    class var FDib: TACLDib;
-    class var FDstOrigin: TPoint;
-    class var FSrcData: PACLPixel32Array;
-    class var FSrcSize: TSize;
+    class var FAlpha: Double;
+    class var FCairo: TCairoCanvas;
+    class var FSourceSurface: Pcairo_surface_t;
   {$ENDIF}
   public
     class constructor Create;
@@ -590,44 +594,36 @@ begin
   if AInSize < 100 then
     Inc(AOutSize, AInSize div 3);
 
-{$IFDEF ACL_RGBA}
-  TACLColors.BGRAtoRGBA(PACLPixel32(ABits), ACount);
-{$ENDIF}
+  GetMem(Data, AOutSize);
   try
-    GetMem(Data, AOutSize);
+    FillChar(ZStream{%H-}, SizeOf(ZStream), 0);
+    ZStream.next_in := PByteRef(ABits);
+    ZStream.next_out := Data;
+    ZStream.avail_in := AInSize;
+    ZStream.avail_out := AOutSize;
+
+    ZCompressCheck(DeflateInit(ZStream, Levels[FSkinImageCompressionLevel]));
     try
-      FillChar(ZStream{%H-}, SizeOf(ZStream), 0);
-      ZStream.next_in := PByteRef(ABits);
-      ZStream.next_out := Data;
-      ZStream.avail_in := AInSize;
-      ZStream.avail_out := AOutSize;
-
-      ZCompressCheck(DeflateInit(ZStream, Levels[FSkinImageCompressionLevel]));
-      try
-        while ZCompressCheckWithoutBufferError(deflate(ZStream, Z_FINISH)) <> Z_STREAM_END do
-        begin
-          Inc(AOutSize, Delta);
-          ReallocMem(Data, AOutSize);
-          ZStream.next_out := PByteRef(Data) + ZStream.total_out;
-          ZStream.avail_out := Delta;
-        end;
-      finally
-        ZCompressCheck(deflateEnd(ZStream));
+      while ZCompressCheckWithoutBufferError(deflate(ZStream, Z_FINISH)) <> Z_STREAM_END do
+      begin
+        Inc(AOutSize, Delta);
+        ReallocMem(Data, AOutSize);
+        ZStream.next_out := PByteRef(Data) + ZStream.total_out;
+        ZStream.avail_out := Delta;
       end;
-
-      if Abs(Int64(ZStream.total_out) - Int64(AOutSize)) > Delta then
-        ReallocMem(Data, ZStream.total_out);
-
-      DataSize := ZStream.total_out;
-    except
-      FreeMemAndNil(Data);
-      raise;
+    finally
+      ZCompressCheck(deflateEnd(ZStream));
     end;
-  finally
-  {$IFDEF ACL_RGBA}
-    TACLColors.BGRAtoRGBA(PACLPixel32(ABits), ACount);
-  {$ENDIF}
+
+    if Abs(Int64(ZStream.total_out) - Int64(AOutSize)) > Delta then
+      ReallocMem(Data, ZStream.total_out);
+
+    DataSize := ZStream.total_out;
+  except
+    FreeMemAndNil(Data);
+    raise;
   end;
+
   HasAlpha := AHasAlpha;
   State := AState;
 end;
@@ -689,9 +685,6 @@ begin
 
   if ZStream.total_out <> ASize then
     raise EACLSkinImageException.Create(sErrorIncorrectDormantData);
-{$IFDEF ACL_RGBA}
-  TACLColors.BGRAtoRGBA(ABits^, ACount);
-{$ENDIF}
 
   AHasAlpha := HasAlpha;
   AState := State;
@@ -1924,9 +1917,6 @@ begin
   DoCreateBits(AWidth, AHeight);
   if BitCount > 0 then
     AStream.ReadBuffer(Bits^, BitCount * SizeOf(TACLPixel32));
-{$IFDEF ACL_RGBA}
-  TACLColors.BGRAtoRGBA(Bits^, BitCount);
-{$ENDIF}
 
   FHasAlpha := TACLBoolean.From(AFlags and FLAGS_BITS_HASALPHA = FLAGS_BITS_HASALPHA);
   FBitsState := TACLSkinImageBitsState(AFlags and FLAGS_BITS_PREPARED = FLAGS_BITS_PREPARED);
@@ -2232,12 +2222,14 @@ end;
 
 class constructor TACLSkinImageRenderer.Create;
 begin
+  FLock := TACLCriticalSection.Create(nil, 'SkinImageRender');
 {$IFDEF MSWINDOWS}
   ZeroMemory(@FFunc, SizeOf(FFunc));
   FFunc.BlendOp := AC_SRC_OVER;
   FFunc.AlphaFormat := AC_SRC_ALPHA;
+{$ELSE}
+  FCairo := TCairoCanvas.Create;
 {$ENDIF}
-  FLock := TACLCriticalSection.Create(nil, 'SkinImageRender');
 end;
 
 class destructor TACLSkinImageRenderer.Destroy;
@@ -2246,6 +2238,8 @@ begin
 {$IFDEF MSWINDOWS}
   DeleteDC(FMemDC);
   FMemDC := 0;
+{$ELSE}
+  FreeAndNil(FCairo);
 {$ENDIF}
 end;
 
@@ -2311,26 +2305,17 @@ class procedure TACLSkinImageRenderer.Start(ACanvas: TCanvas;
   var ATargetRect: TRect; AAlpha: Byte; AImage: TACLSkinImage; AHasAlpha: Boolean);
 begin
   FLock.Enter;
-  FDstCanvas := ACanvas;
 {$IFDEF MSWINDOWS}
+  FDstCanvas := ACanvas;
   if FMemDC = 0 then
     FMemDC := CreateCompatibleDC(0);
   FOldBmp := SelectObject(FMemDC, AImage.Handle);
   FOpaque := not AHasAlpha and (AAlpha = 255);
   FFunc.SourceConstantAlpha := AAlpha;
 {$ELSE}
-  FAlpha := AAlpha;
-  FDstOrigin := ATargetRect.TopLeft;
-  FSrcData := AImage.Bits;
-  FSrcSize := AImage.ClientRect.Size;
-  if FDstCanvas is TACLDibCanvas then
-    FDib := TACLDibCanvas(FDstCanvas).Owner
-  else
-  begin
-    FDib := TACLDib.Create(ATargetRect);
-    FDib.CopyRect(ACanvas, ATargetRect);
-  end;
-  ATargetRect := FDib.ClientRect;
+  FAlpha := AAlpha / 255;
+  FCairo.BeginPaint(ACanvas);
+  FSourceSurface := cairo_create_surface(AImage.Bits, AImage.Width, AImage.Height);
 {$ENDIF}
 end;
 
@@ -2339,13 +2324,13 @@ begin
 {$IFDEF MSWINDOWS}
   acFillRect(FDstCanvas, ATarget, AColor);
 {$ELSE}
-  FDib.Fill(ATarget, AColor);
+  FCairo.FillRectangle(ATarget.Left, ATarget.Top, ATarget.Right, ATarget.Bottom, AColor);
 {$ENDIF}
 end;
 
 class procedure TACLSkinImageRenderer.Draw(const ATarget, ASource: TRect; AIsTileMode: Boolean);
-begin
 {$IFDEF MSWINDOWS}
+begin
   if FOpaque then
   begin
     if AIsTileMode then
@@ -2359,7 +2344,8 @@ begin
     else
       doAlphaBlend(ATarget, ASource);
 {$ELSE}
-  FDib.Blend(FSrcData, FSrcSize, ASource, ATarget, FAlpha, AIsTileMode);
+begin
+  FCairo.FillSurface(ATarget, ASource, FSourceSurface, FAlpha, AIsTileMode);
 {$ENDIF}
 end;
 
@@ -2367,15 +2353,12 @@ class procedure TACLSkinImageRenderer.Finish;
 begin
 {$IFDEF MSWINDOWS}
   SelectObject(FMemDC, FOldBmp);
-{$ELSE}
-  if FDib.Canvas <> FDstCanvas then
-  try
-    FDib.DrawCopy(FDstCanvas.Handle, FDstOrigin);
-  finally
-    FreeAndNil(FDib);
-  end;
-{$ENDIF}
   FDstCanvas := nil;
+{$ELSE}
+  FCairo.EndPaint;
+  cairo_surface_destroy(FSourceSurface);
+  FSourceSurface := nil;
+{$ENDIF}
   FLock.Leave;
 end;
 

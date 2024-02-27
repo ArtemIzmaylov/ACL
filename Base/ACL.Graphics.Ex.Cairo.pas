@@ -19,16 +19,21 @@ unit ACL.Graphics.Ex.Cairo; // FPC:OK
 interface
 
 uses
+  cairo,
   gdk2,
-  Gtk2Def,
-  Cairo,
+  gtk2Def,
   // LCL
   LazUtf8,
   LCLIntf,
   LCLType,
+  // VCL
+  Math,
   Graphics,
   SysUtils,
-  Types;
+  Types,
+  // ACL
+  ACL.Graphics,
+  ACL.Utils.Common;
 
 type
 
@@ -41,8 +46,36 @@ type
   TCairoColor = record
     R, G, B, A: Double;
     class function From(A, R, G, B: Byte): TCairoColor; overload; static;
+    class function From(Color: TAlphaColor): TCairoColor; overload; static;
     class function From(Color: TColor): TCairoColor; overload; static;
   end;
+
+  { TCairoCanvas }
+
+  TCairoCanvas = class
+  strict private
+    FOrigin: TPoint;
+    FHandle: Pcairo_t;
+    FTargetSurface: Pcairo_surface_t;
+  public
+    //# Initialization
+    procedure BeginPaint(ACanvas: TCanvas);
+    procedure EndPaint;
+
+    //# Drawing
+    procedure FillRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor);
+    procedure FillRectangleByGradient(
+      AFrom, ATo: TAlphaColor; const ARect: TRect; AVertical: Boolean);
+    procedure FillSurface(const ATargetRect, ASourceRect: TRect;
+      ASurface: Pcairo_surface_t; AAlpha: Double; ATileMode: Boolean);
+
+    //# Properties
+    property Origin: TPoint read FOrigin;
+    property Handle: Pcairo_t read FHandle;
+  end;
+
+var
+  GpPaintCanvas: TCairoCanvas;
 
 (*
   Флаги, поддерживаемые имплементацей на чистом cairo:
@@ -51,15 +84,22 @@ type
     DT_WORDBREAK, DT_END_ELLIPSIS
 *)
 procedure CairoDrawText(ACanvas: TCanvas; const S: string; var R: TRect; AFlags: Cardinal);
+
+// GetTextExtPoint & TextOut
 function CairoTextGetLastVisible(ACanvas: TCanvas; const S: string; AMaxWidth: Integer): Integer;
 procedure CairoTextOut(ACanvas: TCanvas; X, Y: Integer; AText: PChar; ALength: Integer; AClipRect: PRect = nil);
 procedure CairoTextSize(ACanvas: TCanvas; const S: string; AWidth, AHeight: PInteger);
+
+// Utilities
+function cairo_create_context(DC: HDC): pcairo_t;
+function cairo_create_surface(AData: PACLPixel32Array; AWidth, AHeight: LongInt): Pcairo_surface_t;
+procedure cairo_set_source_color(ACairo: pcairo_t; const AColor: TAlphaColor); overload;
+procedure cairo_set_source_color(ACairo: pcairo_t; const AColor: TACLPixel32); overload;
+procedure cairo_set_source_color(ACairo: pcairo_t; const AColor: TCairoColor); overload;
 implementation
 
 uses
-  ACL.Graphics,
-  ACL.Graphics.TextLayout,
-  Math;
+  ACL.Graphics.TextLayout;
 
 const
   CairoTextStyleLines = [fsUnderline, fsStrikeOut];
@@ -168,19 +208,17 @@ end;
 
 {$REGION ' Wrappers '}
 
-function cairo_create_context(ACanvas: TCanvas): pcairo_t;
+function cairo_create_context(DC: HDC): pcairo_t;
 begin
-  Result := gdk_cairo_create(TGtkDeviceContext(ACanvas.Handle).Drawable);
+  Result := gdk_cairo_create(TGtkDeviceContext(DC).Drawable);
   if Result = nil then
     raise EGSCairoError.Create('Cannot create cairo context');
-  // Не работает с TForm.Canvas (ничего не рисуется)
-  //Drawable := TGtkDeviceContext(ACanvas.Handle).Drawable;
-  //gdk_window_get_size(Drawable, @Width, @Height);
-  //Result := cairo_xlib_surface_create(
-  //  gdk_x11_drawable_get_xdisplay(Drawable),
-  //  gdk_x11_drawable_get_xid(Drawable),
-  //  gdk_x11_visual_get_xvisual(gdk_visual_get_system),
-  //  Width, Height);
+end;
+
+function cairo_create_surface(AData: PACLPixel32Array; AWidth, AHeight: LongInt): Pcairo_surface_t;
+begin
+  Result := cairo_image_surface_create_for_data(
+    PByte(AData), CAIRO_FORMAT_ARGB32, AWidth, AHeight, AWidth * 4);
 end;
 
 function cairo_set_clipping(ACairo: pcairo_t; ACanvas: TCanvas; const AOrigin: TPoint): Boolean;
@@ -207,10 +245,8 @@ begin
             try
               for I := 0 to LRegionData.Count - 1 do
               begin
-                LRect := LRegionData.Rects^[I];
-                cairo_rectangle(ACairo,
-                  LRect.Left + AOrigin.X, LRect.Top + AOrigin.Y,
-                  LRect.Width, LRect.Height);
+                with LRegionData.Rects^[I] do
+                  cairo_rectangle(ACairo, AOrigin.X + Left, AOrigin.Y + Top, Width, Height);
               end;
               cairo_clip(ACairo);
             finally
@@ -251,16 +287,20 @@ begin
     cairo_set_font_size(ACairo, Abs(AFont.Height));
 end;
 
-procedure cairo_set_source_color(ACairo: pcairo_t; const AColor: TCairoColor); overload;
+procedure cairo_set_source_color(ACairo: pcairo_t; const AColor: TAlphaColor);
+begin
+  cairo_set_source_rgba(ACairo, AColor.R / 255, AColor.G / 255, AColor.B / 255, AColor.A / 255);
+end;
+
+procedure cairo_set_source_color(ACairo: pcairo_t; const AColor: TACLPixel32);
+begin
+  cairo_set_source_rgba(ACairo, AColor.R / 255, AColor.G / 255, AColor.B / 255, AColor.A / 255);
+end;
+
+procedure cairo_set_source_color(ACairo: pcairo_t; const AColor: TCairoColor);
 begin
   cairo_set_source_rgba(ACairo, AColor.R, AColor.G, AColor.B, AColor.A);
 end;
-
-procedure cairo_set_source_color(ACairo: pcairo_t; const AColor: TColor); overload;
-begin
-  cairo_set_source_color(ACairo, TCairoColor.From(AColor));
-end;
-
 {$ENDREGION}
 
 {$REGION ' TextOut'}
@@ -337,7 +377,7 @@ begin
   Dec(X, LOrigin.X);
   Dec(Y, LOrigin.Y);
 
-  LCairo := cairo_create_context(ACanvas);
+  LCairo := cairo_create_context(ACanvas.Handle);
   try
     if cairo_set_clipping(LCairo, ACanvas, LOrigin) then
     begin
@@ -349,7 +389,7 @@ begin
       end;
 
       cairo_set_font(LCairo, ACanvas.Font);
-      cairo_set_source_color(LCairo, TFontAccess(ACanvas.Font).GetColor);
+      cairo_set_source_color(LCairo, TCairoColor.From(TFontAccess(ACanvas.Font).GetColor));
 
       LGlyphs := nil;
       LGlyphCount := 0;
@@ -632,7 +672,7 @@ var
   LOrigin: TPoint;
   LRect: TRect;
 begin
-  LCairo := cairo_create_context(ACanvas);
+  LCairo := cairo_create_context(ACanvas.Handle);
   try
     cairo_set_font(LCairo, ACanvas.Font);
 
@@ -665,7 +705,7 @@ begin
           LLines.Init(LGlyphs, 0, LGlyphCount);
           try
             CairoCalculateTextLayout(LFont, @LLines, LRect, AFlags);
-            cairo_set_source_color(LCairo, TFontAccess(ACanvas.Font).GetColor);
+            cairo_set_source_color(LCairo, TCairoColor.From(TFontAccess(ACanvas.Font).GetColor));
             if AFlags and DT_NOCLIP = 0 then
             begin
               cairo_rectangle(LCairo, LRect.Left, LRect.Top, LRect.Width, LRect.Height);
@@ -723,10 +763,144 @@ begin
   Result.A := A / 255;
 end;
 
+class function TCairoColor.From(Color: TAlphaColor): TCairoColor;
+begin
+  Result := From(Color.A, Color.R, Color.G, Color.B);
+end;
+
 class function TCairoColor.From(Color: TColor): TCairoColor;
 begin
   Color := ColorToRGB(Color);
   Result := From(255, GetRValue(Color), GetGValue(Color), GetBValue(Color));
+end;
+
+{ TCairoCanvas }
+
+procedure TCairoCanvas.BeginPaint(ACanvas: TCanvas);
+begin
+  if FHandle <> nil then
+    raise EInvalidGraphicOperation.Create(ClassName + ' recursive calls not yet supported');
+
+  // Если DC у DIB-а уже захвачен - рисуем на нем, не переключаемся.
+  // Иначе запрос Bits спровоцирует отключение канваса и следующий за нами
+  // вызов уже получит канвас без Handle-а и не сможет получить валидный WindowOrg
+  if not ACanvas.HandleAllocated and (ACanvas is TACLDibCanvas) then
+  begin
+    FTargetSurface := cairo_create_surface(
+      TACLDibCanvas(ACanvas).Owner.Colors,
+      TACLDibCanvas(ACanvas).Owner.Width,
+      TACLDibCanvas(ACanvas).Owner.Height);
+    FHandle := cairo_create(FTargetSurface);
+    FOrigin := NullPoint;
+  end
+  else
+  begin
+    GetWindowOrgEx(ACanvas.Handle, {%H-}FOrigin);
+    FHandle := cairo_create_context(ACanvas.Handle);
+  end;
+
+  cairo_set_clipping(Handle, ACanvas, FOrigin);
+end;
+
+procedure TCairoCanvas.EndPaint;
+begin
+  if FHandle <> nil then
+  try
+    cairo_destroy(FHandle);
+    if FTargetSurface <> nil then
+      cairo_surface_destroy(FTargetSurface);
+    FTargetSurface := nil;
+  finally
+    FHandle := nil;
+  end;
+end;
+
+procedure TCairoCanvas.FillRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor);
+begin
+  if (X2 > X1) and (Y2 > Y1) then
+  begin
+    cairo_set_source_color(Handle, Color);
+    cairo_rectangle(Handle, X1 - Origin.X, Y1 - Origin.Y, X2 - X1, Y2 - Y1);
+    cairo_fill(Handle);
+  end;
+end;
+
+procedure TCairoCanvas.FillRectangleByGradient(
+  AFrom, ATo: TAlphaColor; const ARect: TRect; AVertical: Boolean);
+var
+  LPattern: Pcairo_pattern_t;
+begin
+  if AVertical then
+    LPattern := cairo_pattern_create_linear(0, ARect.Top - Origin.Y, 0, ARect.Bottom - Origin.Y)
+  else
+    LPattern := cairo_pattern_create_linear(ARect.Left - Origin.X, 0, ARect.Right - Origin.X, 0);
+
+  with TCairoColor.From(AFrom) do
+    cairo_pattern_add_color_stop_rgba(LPattern, 0.0, R, G, B, A);
+  with TCairoColor.From(ATo) do
+    cairo_pattern_add_color_stop_rgba(LPattern, 1.0, R, G, B, A);
+
+  cairo_rectangle(Handle, ARect.Left - Origin.X,
+    ARect.Top - Origin.Y, ARect.Width, ARect.Height);
+  cairo_set_source(Handle, LPattern);
+  cairo_fill(Handle);
+
+  cairo_pattern_destroy(LPattern);
+end;
+
+procedure TCairoCanvas.FillSurface(const ATargetRect, ASourceRect: TRect;
+  ASurface: Pcairo_surface_t; AAlpha: Double; ATileMode: Boolean);
+var
+  LCairo: Pcairo_t;
+  LMatrix: cairo_matrix_t;
+  LSurface: Pcairo_surface_t;
+  LSourceW, LSourceH: LongInt;
+  LTargetW, LTargetH: Double;
+  X, Y: Double;
+begin
+  LSourceH := ASourceRect.Height;
+  LSourceW := ASourceRect.Width;
+  LTargetH := ATargetRect.Height;
+  LTargetW := ATargetRect.Width;
+  X := ATargetRect.Left - Origin.X;
+  Y := ATargetRect.Top - Origin.Y;
+
+  if ATileMode then
+  begin
+    LSurface := cairo_image_surface_create(CAIRO_FORMAT_ARGB32, LSourceW, LSourceH);
+
+    LCairo := cairo_create(LSurface);
+    cairo_set_source_surface(LCairo, ASurface, -ASourceRect.Left, -ASourceRect.Top);
+    cairo_rectangle(LCairo, 0, 0, LSourceW, LSourceH);
+    cairo_paint_with_alpha(LCairo, AAlpha);
+    cairo_destroy(LCairo);
+
+    cairo_set_source_surface(Handle, LSurface, X, Y);
+    cairo_pattern_set_extend(cairo_get_source(Handle), CAIRO_EXTEND_REPEAT);
+    cairo_rectangle(Handle, X, Y, LTargetW, LTargetH);
+    cairo_fill(Handle);
+    cairo_surface_destroy(LSurface);
+  end
+  else
+  begin
+    cairo_set_source_surface(Handle, ASurface, 0, 0);
+    cairo_matrix_init_identity(@LMatrix);
+    cairo_matrix_translate(@LMatrix, ASourceRect.Left, ASourceRect.Top);
+    cairo_matrix_scale(@LMatrix, LSourceW / LTargetW, LSourceH / LTargetH);
+    cairo_matrix_translate(@LMatrix, -X, -Y);
+    cairo_pattern_set_matrix(cairo_get_source(Handle), @LMatrix);
+    cairo_pattern_set_filter(cairo_get_source(Handle), CAIRO_FILTER_NEAREST);
+    cairo_rectangle(Handle, X, Y, LTargetW, LTargetH);
+    if AAlpha < 1.0 then
+    begin
+      cairo_save(Handle);
+      cairo_clip(Handle);
+      cairo_paint_with_alpha(Handle, 1.0);
+      cairo_restore(Handle);
+    end
+    else
+      cairo_fill(Handle);
+  end;
 end;
 
 { TCairoTextLine }
@@ -828,7 +1002,7 @@ begin
   begin
     FBitmap := TACLDib.Create(1, 1);
     FBitmap.Canvas.Font := ACanvas.Font;
-    FContext := cairo_create_context(FBitmap.Canvas);
+    FContext := cairo_create_context(FBitmap.Canvas.Handle);
     cairo_set_font(FContext, ACanvas.Font);
   end
   else
@@ -883,7 +1057,7 @@ end;
 constructor TACLTextLayoutCairoRender.Create(ACanvas: TCanvas);
 begin
   inherited Create(ACanvas);
-  FHandle := cairo_create_context(ACanvas);
+  FHandle := cairo_create_context(ACanvas.Handle);
   GetWindowOrgEx(Canvas.Handle, @FOrigin);
   cairo_set_clipping(FHandle, Canvas, FOrigin);
 end;
@@ -1001,8 +1175,12 @@ begin
   end;
 end;
 
-{$IFDEF ACL_CAIRO_TEXTOUT}
 initialization
+  GpPaintCanvas := TCairoCanvas.Create;
+{$IFDEF ACL_CAIRO_TEXTOUT}
   DefaultTextLayoutCanvasRender := TACLTextLayoutCairoRender;
 {$ENDIF}
+
+finalization
+  FreeAndNil(GpPaintCanvas);
 end.

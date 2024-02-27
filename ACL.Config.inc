@@ -21,7 +21,6 @@
   {$ENDIF}
 
   {$IFDEF LCLGtk2}
-    {$DEFINE ACL_RGBA}
     {$DEFINE ACL_CAIRO_TEXTOUT}
   {$ENDIF}
 {$ENDIF}
