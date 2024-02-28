@@ -4,31 +4,35 @@
 {*             Calendar Control              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.Calendar;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
+  {Winapi.}Windows,
+{$ENDIF}
   // System
-  System.Classes,
-  System.SysUtils,
-  System.Types,
+  {System.}Classes,
+  {System.}SysUtils,
+  {System.}Types,
   System.UITypes,
   // Vcl
-  Vcl.Graphics,
-  Vcl.Controls,
+  {Vcl.}Graphics,
+  {Vcl.}Controls,
   // ACL
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.Ex.Gdip,
   ACL.UI.Animation,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.CompoundControl,
@@ -86,12 +90,12 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    //
+    //# Properties
     property Style: TACLStyleCalendar read FStyle;
     property Transparent: Boolean read FTransparent write FTransparent;
     property Value: TDate read FValue write SetValue;
     property ViewInfo: TACLCalendarViewInfo read GetViewInfo;
-    //
+    //# Events
     property OnSelect: TNotifyEvent read FOnSelect write FOnSelect;
   end;
 
@@ -103,7 +107,7 @@ type
     function GetSubClass: TACLCalendarSubClass; inline;
   public
     procedure Invalidate;
-    //
+    //# Properties
     property Style: TACLStyleCalendar read GetStyle;
     property SubClass: TACLCalendarSubClass read GetSubClass;
   end;
@@ -116,7 +120,6 @@ type
   protected const
     TagAnimationFrame = 0;
   strict private
-    function GetActualFrameColor: TAlphaColor;
     // IACLAnimateControl
     procedure IACLAnimateControl.Animate = Invalidate;
     // IACLHotTrackObject
@@ -126,13 +129,14 @@ type
     procedure DoDraw(ACanvas: TCanvas); override;
     procedure DoDrawSelection(ACanvas: TCanvas; AColor: TAlphaColor);
     procedure PrepareCanvas(ACanvas: TCanvas); virtual;
+    function GetActualFrameColor: TAlphaColor;
     function GetDisplayValue: string; virtual; abstract;
     function GetTextColor: TColor; virtual;
     function GetTextStyle: TFontStyles; virtual;
     function IsSelected: Boolean; virtual;
   public
     destructor Destroy; override;
-    //
+    //# Properties
     property DisplayValue: string read GetDisplayValue;
   end;
 
@@ -180,7 +184,7 @@ type
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
     function CalculateHitTest(const AInfo: TACLHitTestInfo): Boolean; override;
-    //
+    //# Properties
     property CellsArea: TRect read FCellsArea;
     property InitialDate: TDate read FInitialDate write SetInitialDate;
   end;
@@ -215,7 +219,7 @@ type
     function IsSelected: Boolean; override;
   public
     constructor Create(AOwner: TACLCalendarCustomViewViewInfo); reintroduce;
-    //
+    //# Properties
     property Value: TDate read FValue write FValue;
   end;
 
@@ -224,7 +228,6 @@ type
   TACLCalendarDayCell = class(TACLCalendarCustomDateCell)
   protected
     FIsToday: Boolean;
-
     function GetTextColor: TColor; override;
   end;
 
@@ -278,9 +281,11 @@ type
     FDirection: TACLMouseWheelDirection;
   protected
     function GetDisplayValue: string; override;
+    procedure DoDraw(ACanvas: TCanvas); override;
   public
-    constructor Create(ASubClass: TACLCalendarSubClass; ADirection: TACLMouseWheelDirection); reintroduce;
-    //
+    constructor Create(ASubClass: TACLCalendarSubClass;
+      ADirection: TACLMouseWheelDirection); reintroduce;
+    //# Properties
     property Direction: TACLMouseWheelDirection read FDirection;
   end;
 
@@ -322,7 +327,7 @@ type
     procedure NextPage(ADirection: TACLMouseWheelDirection); override;
     procedure NextRow(ADirection: TACLMouseWheelDirection); override;
     procedure Select(const ADate: TDateTime);
-    //
+    //# Properties
     property ActiveView: TACLCalendarCustomViewViewInfo read FActiveView;
   end;
 
@@ -342,9 +347,9 @@ type
   protected
     function CreateSubClass: TACLCompoundControlSubClass; override;
     function GetBackgroundStyle: TACLControlBackgroundStyle; override;
-    //
+    //# Properties
     property Style: TACLStyleCalendar read GetStyle write SetStyle;
-    //
+    //# Events
     property OnSelect: TNotifyEvent read GetOnSelect write SetOnSelect;
   public
     property SubClass: TACLCalendarSubClass read GetSubClass;
@@ -360,7 +365,7 @@ type
     property Style;
     property Value;
     property Transparent;
-    //
+    //# Events
     property OnSelect;
   end;
 
@@ -523,8 +528,9 @@ procedure TACLCalendarViewCustomCell.PrepareCanvas(ACanvas: TCanvas);
 begin
   ACanvas.Brush.Style := bsClear;
   ACanvas.Font := SubClass.Font;
-  ACanvas.Font.Style := GetTextStyle;
   ACanvas.Font.Color := GetTextColor;
+  ACanvas.Font.Style := GetTextStyle;
+  ACanvas.Font.ResolveHeight;
 end;
 
 procedure TACLCalendarViewCustomCell.OnHotTrack(Action: TACLHotTrackAction);
@@ -550,6 +556,7 @@ begin
         else
           Invalidate;
       end;
+  else;
   end
 end;
 
@@ -653,8 +660,11 @@ begin
   for X := 0 to FCellsPerRow - 1 do
     for Y := 0 to ARowCount - 1 do
     begin
-      FCells[Y * FCellsPerRow + X].Calculate(System.Types.Bounds(
-        ABounds.Left + X * ACellWidth, ABounds.Top + Y * ACellHeight, ACellWidth, ACellHeight), []);
+      FCells[Y * FCellsPerRow + X].Calculate(
+        Types.Bounds(
+          ABounds.Left + X * ACellWidth,
+          ABounds.Top + Y * ACellHeight,
+          ACellWidth, ACellHeight), []);
     end;
 
   FCellsArea := FCells[Low(FCells)].Bounds;
@@ -699,7 +709,9 @@ end;
 
 function TACLCalendarCustomViewViewInfo.IsOutOfActualRange(const AValue: TDate): Boolean;
 begin
-  Result := (CompareDateTime(AValue, FActualRangeStart) < 0) or (CompareDateTime(AValue, FActualRangeFinish) > 0);
+  Result :=
+    (CompareDateTime(AValue, FActualRangeStart) < 0) or
+    (CompareDateTime(AValue, FActualRangeFinish) > 0);
 end;
 
 procedure TACLCalendarCustomViewViewInfo.SetInitialDate(const AValue: TDate);
@@ -937,7 +949,8 @@ end;
 
 { TACLCalendarScrollButtonCell }
 
-constructor TACLCalendarScrollButtonCell.Create(ASubClass: TACLCalendarSubClass; ADirection: TACLMouseWheelDirection);
+constructor TACLCalendarScrollButtonCell.Create(
+  ASubClass: TACLCalendarSubClass; ADirection: TACLMouseWheelDirection);
 begin
   inherited Create(ASubClass);
   FDirection := ADirection;
@@ -949,6 +962,14 @@ begin
     Result := '>'
   else
     Result := '<';
+end;
+
+procedure TACLCalendarScrollButtonCell.DoDraw(ACanvas: TCanvas);
+const
+  Map: array[Boolean] of TACLArrowKind = (makLeft, makRight);
+begin
+  acDrawArrow(ACanvas, Bounds, GetTextColor, Map[Direction = mwdDown], 192);
+  DoDrawSelection(ACanvas, GetActualFrameColor);
 end;
 
 { TACLCalendarTitleCell }
@@ -1098,19 +1119,19 @@ end;
 procedure TACLCalendarViewInfo.DoDraw(ACanvas: TCanvas);
 var
   AAnimation: TACLAnimation;
-  ASaveIndex: Integer;
+  APrevRgn: HRGN;
 begin
   if AnimationManager.Find(Self, AAnimation) then
   begin
     if AAnimation is TACLBitmapSlideAnimation then
     begin
-      ASaveIndex := SaveDC(ACanvas.Handle);
+      APrevRgn := acSaveClipRegion(ACanvas.Handle);
       try
         AAnimation.Draw(ACanvas, ActiveView.CellsArea);
         acExcludeFromClipRegion(ACanvas.Handle, ActiveView.CellsArea);
         ActiveView.Draw(ACanvas);
       finally
-        RestoreDC(ACanvas.Handle, ASaveIndex);
+        acRestoreClipRegion(ACanvas.Handle, APrevRgn);
       end;
     end
     else
