@@ -1297,7 +1297,7 @@ end;
 
 procedure TACLStylePopupMenu.DoDrawText(ACanvas: TCanvas; ARect: TRect; const S: UnicodeString);
 begin
-  acSysDrawText(ACanvas, ARect, S, DT_LEFT or DT_SINGLELINE or DT_VCENTER);
+  acSysDrawText(ACanvas, ARect, S, DT_LEFT or DT_SINGLELINE or DT_VCENTER or DT_NOPREFIX);
 end;
 
 procedure TACLStylePopupMenu.DoSplitRect(const R: TRect;
@@ -1341,7 +1341,7 @@ const
   ScrollButtonMap: array[Boolean] of TACLArrowKind = (makBottom, makTop);
 begin
   AssignFontParams(ACanvas, False, False, AEnabled);
-  acDrawArrow(ACanvas.Handle, R, ACanvas.Font.Color, ScrollButtonMap[AUp], TargetDPI);
+  acDrawArrow(ACanvas, R, ACanvas.Font.Color, ScrollButtonMap[AUp], TargetDPI);
 end;
 
 procedure TACLStylePopupMenu.DrawSeparator(ACanvas: TCanvas; const R: TRect);
@@ -1382,7 +1382,7 @@ begin
   AssignFontParams(ACanvas, ASelected, AIsDefault, AEnabled);
   DoDrawText(ACanvas, R, S);
   if AHasSubItems then
-    acDrawArrow(ACanvas.Handle, R.Split(srRight, R.Height), ACanvas.Font.Color, makRight, TargetDPI)
+    acDrawArrow(ACanvas, R.Split(srRight, R.Height), ACanvas.Font.Color, makRight, TargetDPI)
   else
     if AShortCut <> scNone then
       acTextDraw(ACanvas, ShortCutToText(AShortCut), R, taRightJustify, taVerticalCenter);

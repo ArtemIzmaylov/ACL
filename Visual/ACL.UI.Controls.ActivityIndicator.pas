@@ -64,8 +64,8 @@ type
 
     procedure HandlerTimer(Sender: TObject);
     function GetActive: Boolean;
+    function GetIndicatorWidth: Integer;
     function GetStyle: TACLStyleActivityIndicator;
-    function GetTextOffset: Integer;
     procedure SetActive(const Value: Boolean);
     procedure SetStyle(const Value: TACLStyleActivityIndicator);
   protected
@@ -132,7 +132,7 @@ var
   ARect: TRect;
 begin
   ARect := R;
-  ARect.Right := ARect.Right - GetTextOffset;
+  ARect.Right := ARect.Right - GetIndicatorWidth;
   inherited Calculate(ARect);
 end;
 
@@ -169,14 +169,16 @@ begin
   Result := FTimer.Enabled;
 end;
 
+function TACLActivityIndicator.GetIndicatorWidth: Integer;
+begin
+  Result := (
+    dpiApply(Style.IndentBetweenDots, FCurrentPPI) +
+    dpiApply(Style.DotSize, FCurrentPPI)) * Style.DotCount;
+end;
+
 function TACLActivityIndicator.GetStyle: TACLStyleActivityIndicator;
 begin
   Result := TACLStyleActivityIndicator(inherited Style);
-end;
-
-function TACLActivityIndicator.GetTextOffset: Integer;
-begin
-  Result := (dpiApply(Style.IndentBetweenDots, FCurrentPPI) + dpiApply(Style.DotSize, FCurrentPPI)) * Style.DotCount;
 end;
 
 procedure TACLActivityIndicator.SetActive(const Value: Boolean);
@@ -197,12 +199,15 @@ begin
 end;
 
 function TACLActivityIndicator.MeasureSize(AWidth: Integer): TSize;
+var
+  LIndicatorWidth: Integer;
 begin
+  LIndicatorWidth := GetIndicatorWidth;
   if AWidth > 0 then
-    Dec(AWidth, GetTextOffset);
+    Dec(AWidth, LIndicatorWidth);
   Result := inherited MeasureSize(AWidth);
   Result.cy := Max(Result.cy, dpiApply(Style.DotSize, FCurrentPPI));
-  Result.cx := Result.cx + GetTextOffset;
+  Result.cx := Result.cx + LIndicatorWidth;
 end;
 
 end.

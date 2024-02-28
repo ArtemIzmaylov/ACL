@@ -96,6 +96,7 @@ type
     procedure WMSettingsChanged(var Message: TWMSettingChange); message WM_SETTINGCHANGE;
   {$ENDIF}
     procedure WMSetCursor(var Message: TWMSetCursor); message WM_SETCURSOR;
+    procedure WMMouseMove(var Message: TWMMouseMove); message WM_MOUSEMOVE;
   protected
   {$IFDEF FPC}
     ScalingFlags: TScalingFlags;
@@ -776,6 +777,12 @@ procedure TACLBasicForm.WMSetCursor(var Message: TWMSetCursor);
 begin
   if not TACLControls.WMSetCursor(Self, Message) then
     inherited;
+end;
+
+procedure TACLBasicForm.WMMouseMove(var Message: TWMMouseMove);
+begin
+  inherited;
+  TACLControls.UpdateCursorOnMove(Self);
 end;
 
 { TACLWindowHooks }

@@ -11,22 +11,17 @@
 
 unit ACL.Graphics;
 
-{$I ACL.Config.inc} // FPC:Partial
+{$I ACL.Config.inc} // FPC:OK
 
 {$POINTERMATH ON}
-
-{$MESSAGE WARN 'TODO - FPC'}
-(*
-  TACLBitmapBits
-*)
 
 interface
 
 uses
 {$IFDEF FPC}
+  GraphType,
   LCLIntf,
   LCLType,
-  GraphType,
 {$ELSE}
   Winapi.GDIPAPI,
   Winapi.Windows,
@@ -475,8 +470,10 @@ type
     class procedure Release(var ARegion: HRGN); inline;
   end;
 
+{$IFDEF MSWINDOWS}
 // AlphaBlend
 procedure acUpdateLayeredWindow(Wnd: THandle; SrcDC: HDC; const R: TRect; AAlpha: Integer = 255); overload;
+{$ENDIF}
 
 // DoubleBuffer
 function acCreateMemDC(ASourceDC: HDC; const R: TRect; out AMemBmp: HBITMAP; out AClipRegion: HRGN): HDC;
@@ -523,7 +520,7 @@ procedure acDrawSelectionRect(ACanvas: TCanvas; const R: TRect; AColor: TAlphaCo
 procedure acDrawShadow(ACanvas: TCanvas; const ARect: TRect; ABKColor: TColor; AShadowSize: Integer = 5);
 procedure acFillRect(ACanvas: TCanvas; const ARect: TRect; AColor: TAlphaColor); overload;
 procedure acFillRect(ACanvas: TCanvas; const ARect: TRect; AColor: TColor); overload;
-procedure acFitFileName(ACanvas: TCanvas; ATargetWidth: Integer; var S: string); deprecated;
+procedure acFitFileName(ACanvas: TCanvas; ATargetWidth: Integer; var S: string);
 procedure acResetFont(AFont: TFont);
 procedure acResetRect(DC: HDC; const R: TRect); inline;
 procedure acStretchBlt(DC, SourceDC: HDC; const ADest, ASource: TRect); inline;
@@ -634,34 +631,6 @@ uses
 type
   TBitmapAccess = class(TBitmap);
   TBitmapImageAccess = class(TBitmapImage);
-{$ENDIF}
-
-{$IFDEF MSWINDOWS}
-
-  { TACLBitmapBits }
-
-  TACLBitmapBits = class
-  strict private
-    FDIB: TDIBSection;
-    FValid: Boolean;
-
-    function GetBits: Integer;
-    function GetRow(ARow: Integer): Pointer;
-  protected
-    procedure ReadColors24(var AColors: TACLPixel32DynArray);
-    procedure ReadColors32(var AColors: TACLPixel32DynArray);
-    procedure WriteColors24(AColors: PACLPixel32; ACount: Integer);
-    procedure WriteColors32(AColors: PACLPixel32; ACount: Integer);
-  public
-    constructor Create(ABitmapHandle: THandle);
-    function ReadColors(out AColors: TACLPixel32DynArray): Boolean;
-    function WriteColors(AColors: PACLPixel32; ACount: Integer): Boolean;
-    //# Properties
-    property Bits: Integer read GetBits;
-    property Row[Index: Integer]: Pointer read GetRow;
-    property Valid: Boolean read FValid;
-  end;
-
 {$ENDIF}
 
 var
@@ -1357,26 +1326,12 @@ begin
 end;
 
 function acGetBitmapBits(ABitmap: TBitmap): TACLPixel32DynArray;
-{$IFDEF MSWINDOWS}
 var
   AInfo: TBitmapInfo;
 begin
-  with TACLBitmapBits.Create(ABitmap.Handle) do
-  try
-    if not ReadColors(Result) then
-    begin
-      SetLength(Result, ABitmap.Width * ABitmap.Height);
-      acFillBitmapInfoHeader(AInfo.bmiHeader, ABitmap.Width, ABitmap.Height);
-      GetDIBits(MeasureCanvas.Handle, ABitmap.Handle, 0, ABitmap.Height, Result, AInfo, DIB_RGB_COLORS);
-    end;
-  finally
-    Free;
-  end;
-{$ELSE}
-begin
-  {$MESSAGE WARN 'NOTIMPLEMENTED-acGetBitmapBits'}
-  raise ENotImplemented.Create('acGetBitmapBits');
-{$ENDIF}
+  SetLength(Result{%H-}, ABitmap.Width * ABitmap.Height);
+  acFillBitmapInfoHeader(AInfo.bmiHeader, ABitmap.Width, ABitmap.Height);
+  GetDIBits(MeasureCanvas.Handle, ABitmap.Handle, 0, ABitmap.Height, Result, AInfo, DIB_RGB_COLORS);
 end;
 
 procedure acSetBitmapBits(ABitmap: TBitmap; const AColors: TACLPixel32DynArray);
@@ -1385,25 +1340,22 @@ begin
 end;
 
 procedure acSetBitmapBits(ABitmap: TBitmap; AColors: PACLPixel32; ACount: Integer);
-{$IFDEF MSWINDOWS}
+{$IFDEF FPC}
+var
+  LRawImage: TRawImage;
+begin
+  LRawImage.Init;
+  LRawImage.Data := PByte(AColors);
+  LRawImage.DataSize := ACount * SizeOf(TACLPixel32);
+  LRawImage.Description.Init_BPP32_B8G8R8A8_BIO_TTB(ABitmap.Width, ABitmap.Height);
+  ABitmap.LoadFromRawImage(LRawImage, False);
+{$ELSE}
 var
   AInfo: TBitmapInfo;
 begin
-  with TACLBitmapBits.Create(ABitmap.Handle) do
-  try
-    if not WriteColors(AColors, ACount) then
-    begin
-      acFillBitmapInfoHeader(AInfo.bmiHeader, ABitmap.Width, ABitmap.Height);
-      SetDIBits(MeasureCanvas.Handle, ABitmap.Handle, 0, ABitmap.Height, AColors, AInfo, DIB_RGB_COLORS);
-    end;
-    TBitmapAccess(ABitmap).Changed(ABitmap);
-  finally
-    Free;
-  end;
-{$ELSE}
-begin
-  {$MESSAGE WARN 'NOTIMPLEMENTED-acSetBitmapBits'}
-  raise ENotImplemented.Create('acSetBitmapBits');
+  acFillBitmapInfoHeader(AInfo.bmiHeader, ABitmap.Width, ABitmap.Height);
+  SetDIBits(MeasureCanvas.Handle, ABitmap.Handle, 0, ABitmap.Height, AColors, AInfo, DIB_RGB_COLORS);
+  TBitmapAccess(ABitmap).Changed(ABitmap);
 {$ENDIF}
 end;
 
@@ -1411,8 +1363,8 @@ end;
 // Alpha Blend Functions
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure acUpdateLayeredWindow(Wnd: THandle; SrcDC: HDC; const R: TRect; AAlpha: Integer = 255);
 {$IFDEF MSWINDOWS}
+procedure acUpdateLayeredWindow(Wnd: THandle; SrcDC: HDC; const R: TRect; AAlpha: Integer = 255);
 var
   ABlendFunc: TBlendFunction;
   ASize: TSize;
@@ -1432,12 +1384,8 @@ begin
   ASize := R.Size;
   ATopLeft := R.TopLeft;
   UpdateLayeredWindow(Wnd, 0, @ATopLeft, @ASize, SrcDC, @N, 0, @ABlendFunc, ULW_ALPHA);
-{$ELSE}
-begin
-  {$MESSAGE WARN 'NOTIMPLEMENTED-acUpdateLayeredWindow'}
-  raise ENotImplemented.Create('acUpdateLayeredWindow');
-{$ENDIF}
 end;
+{$ENDIF}
 
 //----------------------------------------------------------------------------------------------------------------------
 // DoubleBuffer
@@ -2274,120 +2222,6 @@ begin
   SetWindowRgn(AHandle, Clone, ARedraw);
 end;
 
-{$IFDEF MSWINDOWS}
-
-{ TACLBitmapBits }
-
-constructor TACLBitmapBits.Create(ABitmapHandle: THandle);
-begin
-  FValid :=
-    (GetObject(ABitmapHandle, SizeOf(FDIB), @FDIB) <> 0) and
-    (FDIB.dsBmih.biCompression = BI_RGB) and
-    (FDIB.dsBmih.biBitCount in [32, 24]);
-end;
-
-function TACLBitmapBits.GetBits: Integer;
-begin
-  Result := FDIB.dsBmih.biBitCount;
-end;
-
-function TACLBitmapBits.GetRow(ARow: Integer): Pointer;
-begin
-  if FDIB.dsBmih.biHeight > 0 then
-    ARow := FDIB.dsBm.bmHeight - ARow - 1;
-  if ARow < 0 then
-    raise EInvalidArgument.Create('Row is negative');
-  Result := Pointer(NativeUInt(FDIB.dsBm.bmBits) + NativeUInt(ARow * FDIB.dsBm.bmWidthBytes));
-end;
-
-function TACLBitmapBits.ReadColors(out AColors: TACLPixel32DynArray): Boolean;
-begin
-  Result := Valid;
-  if Result then
-  begin
-    SetLength(AColors, FDIB.dsBm.bmWidth * FDIB.dsBm.bmHeight);
-    case Bits of
-      24: ReadColors24(AColors);
-      32: ReadColors32(AColors);
-    end;
-  end;
-end;
-
-function TACLBitmapBits.WriteColors(AColors: PACLPixel32; ACount: Integer): Boolean;
-begin
-  Result := Valid;
-  if Result then
-  begin
-    case Bits of
-      24: WriteColors24(AColors, ACount);
-      32: WriteColors32(AColors, ACount);
-    end;
-  end;
-end;
-
-procedure TACLBitmapBits.ReadColors24(var AColors: TACLPixel32DynArray);
-
-  procedure Convert24(ABuf32: PRGBQuad; ABuf24: PRGBTriple; APixelsCount: Integer);
-  begin
-    while APixelsCount > 0 do
-    begin
-      ABuf32^.rgbRed := ABuf24^.rgbtRed;
-      ABuf32^.rgbBlue := ABuf24^.rgbtBlue;
-      ABuf32^.rgbGreen := ABuf24^.rgbtGreen;
-      ABuf32^.rgbReserved := 255;
-      Dec(APixelsCount);
-      Inc(ABuf32);
-      Inc(ABuf24);
-    end;
-  end;
-
-var
-  ARow: Integer;
-begin
-  for ARow := 0 to FDIB.dsBm.bmHeight - 1 do
-    Convert24(@AColors[ARow * FDIB.dsBm.bmWidth], Row[ARow], FDIB.dsBm.bmWidth);
-end;
-
-procedure TACLBitmapBits.ReadColors32(var AColors: TACLPixel32DynArray);
-var
-  ARow: Integer;
-begin
-  for ARow := 0 to FDIB.dsBm.bmHeight - 1 do
-    CopyMemory(@AColors[ARow * FDIB.dsBm.bmWidth], Row[ARow], FDIB.dsBm.bmWidthBytes);
-end;
-
-procedure TACLBitmapBits.WriteColors24(AColors: PACLPixel32; ACount: Integer);
-
-  procedure Convert24(ABuf24: PRGBTriple; ABuf32: PRGBQuad; APixelsCount: Integer);
-  begin
-    while APixelsCount > 0 do
-    begin
-      ABuf24^.rgbtRed := ABuf32^.rgbRed;
-      ABuf24^.rgbtBlue := ABuf32^.rgbBlue;
-      ABuf24^.rgbtGreen := ABuf32^.rgbGreen;
-      Dec(APixelsCount);
-      Inc(ABuf32);
-      Inc(ABuf24);
-    end;
-  end;
-
-var
-  ARow: Integer;
-begin
-  for ARow := 0 to FDIB.dsBm.bmHeight - 1 do
-    Convert24(Row[ARow], @AColors[ARow * FDIB.dsBm.bmWidth], FDIB.dsBm.bmWidth);
-end;
-
-procedure TACLBitmapBits.WriteColors32(AColors: PACLPixel32; ACount: Integer);
-var
-  ARow: Integer;
-begin
-  for ARow := 0 to FDIB.dsBm.bmHeight - 1 do
-    CopyMemory(Row[ARow], @AColors[ARow * FDIB.dsBm.bmWidth], FDIB.dsBm.bmWidthBytes);
-end;
-
-{$ENDIF}
-
 { TACLRegionData }
 
 constructor TACLRegionData.Create(ACount: Integer);
@@ -2597,7 +2431,7 @@ begin
   if Height = 0 then
   begin
     if GetObject(Handle, SizeOf(ALogFont), @ALogFont) <> 0 then
-      Height := ALogFont.lfHeight;
+      Height := -Abs(ALogFont.lfHeight);
   end;
 end;
 
@@ -3043,11 +2877,9 @@ begin
     FCanvas := TACLDibCanvas.Create(Self);
     FCanvas.Lock;
   end;
-{$IFDEF FPC}
   // Если DC уже задействован - сразу назначаем его канвасу
-  if not FCanvas.HandleAllocated and FCanvasChanged then
+  if not FCanvas.HandleAllocated {$IFDEF FPC}and FCanvasChanged{$ENDIF} then
     FCanvas.Handle := FHandle;
-{$ENDIF}
   Result := FCanvas;
 end;
 
@@ -3066,19 +2898,16 @@ procedure TACLDib.CopyCanvasToColors;
 {$IFDEF LCLGtk2}
 var
   LBuf: PGdkPixbuf;
-  LCtx: TGtkDeviceContext;
   LDst: PACLPixel32;
   LSrc: PACLPixel32;
   LTmp: Byte;
   I: Integer;
 begin
-  LCtx := TGtkDeviceContext(FHandle);
   LBuf := gdk_pixbuf_new(GDK_COLORSPACE_RGB, True, 8, Width, Height);
   try
     // gdk_pixbuf_get_from_drawable сбросит альфа-канал в 255.
     // Это задокументированное поведение.
-    gdk_pixbuf_get_from_drawable(LBuf, LCtx.Drawable, nil,
-      LCtx.Offset.X, LCtx.Offset.Y, 0, 0, Width, Height);
+    gdk_pixbuf_get_from_drawable(LBuf, TGtkDeviceContext(FHandle).Drawable, nil, 0, 0, 0, 0, Width, Height);
     // В общем случае виджеты gtk2 не поддерживают альфа-канал.
     // Поэтому пытаемся перенести альфу вручную
     LSrc := PACLPixel32(gdk_pixbuf_get_pixels(LBuf));
@@ -3091,9 +2920,7 @@ begin
       LSrc^.R := LSrc^.B;
       LSrc^.B := LTmp;
       // Если контент пикселя (не альфа) изменился - забираем его
-      if PDWORD(LSrc)^ and TACLPixel32.EssenceMask <>
-         PDWORD(LDst)^ and TACLPixel32.EssenceMask
-      then
+      if PDWORD(LSrc)^ and TACLPixel32.EssenceMask <> PDWORD(LDst)^ and TACLPixel32.EssenceMask then
         // todo: попробовать восстановить альфу, исходя из фоного и результирующего цветов
         PDWORD(LDst)^ := PDWORD(LSrc)^;
       Inc(LDst);
@@ -3260,11 +3087,11 @@ var
 begin
   if not Empty then
   begin
-    PixelFormat := pf32bit;
     ABits := acGetBitmapBits(Self);
     try
       TACLColors.MakeTransparent(@ABits[0], Length(ABits), TACLPixel32.Create(AColor));
     finally
+      PixelFormat := pf32bit;
       acSetBitmapBits(Self, ABits);
     end;
   end;

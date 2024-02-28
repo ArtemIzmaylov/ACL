@@ -15,7 +15,14 @@ unit ACL.UI.Controls.BaseControls;
 
 {$IFDEF FPC}
 {$MESSAGE WARN 'TODO - AlignWithMargins'}
+{$MESSAGE WARN 'TODO - Cursor - надо рассмотреть возможность миграции на локальное изменение'}
 {$ENDIF}
+
+{$MESSAGE 'TODO - TACLControlBackgroundStyle а оно нам надо?'}
+(*
+
+
+*)
 
 interface
 
@@ -67,6 +74,7 @@ const
 
 {$IFDEF FPC}
   CS_DROPSHADOW  = 0;
+  WM_ACTIVATEAPP = $001C;
   WM_MOUSEWHEEL  = LM_MOUSEWHEEL;
   WM_MOUSEHWHEEL = LM_MOUSEHWHEEL;
   WM_MOVE = LM_MOVE;
@@ -632,10 +640,6 @@ type
   { TACLControlHelper }
 
   TACLControlHelper = class helper for TControl
-  protected
-  {$IFDEF FPC}
-    procedure RemoveFreeNotifications;
-  {$ENDIF}
   public
   {$IFDEF FPC}
     procedure SendCancelMode(Sender: TControl);
@@ -653,6 +657,8 @@ type
     // Scaling
     class procedure ScaleChanging(AControl: TWinControl; var AState: TObject);
     class procedure ScaleChanged(AControl: TWinControl; var AState: TObject);
+    // Helpers
+    class procedure UpdateCursorOnMove(ACaller: TWinControl);
     // Messages
     class function WMSetCursor(ACaller: TWinControl; var Message: TWMSetCursor): Boolean;
   end;
@@ -1342,6 +1348,17 @@ begin
 {$ENDIF}
   TWinControlAccess(AControl).AutoSize := Boolean(AState);
   TWinControlAccess(AControl).EnableAlign;
+end;
+
+class procedure TACLControls.UpdateCursorOnMove(ACaller: TWinControl);
+begin
+{$IFDEF FPC}
+  if not Mouse.IsDragging then
+  begin
+    if ACaller.Perform(WM_SETCURSOR, ACaller.Handle, MakeLong(HTCLIENT, LM_MOUSEMOVE)) = 0 then
+      SetCursor(crDefault);
+  end;
+{$ENDIF}
 end;
 
 class function TACLControls.WMSetCursor(
@@ -2176,6 +2193,7 @@ procedure TACLCustomControl.WMMouseMove(var Message: TWMMouseMove);
 begin
   if IsMouseAtControl then
     MouseTracker.Add(Self);
+  TACLControls.UpdateCursorOnMove(Self);
   inherited;
 end;
 
@@ -2426,10 +2444,6 @@ begin
   //else
   //  Result := ExplicitWidth;
   Result := Width;
-end;
-
-procedure TACLControlHelper.RemoveFreeNotifications;
-begin
 end;
 
 procedure TACLControlHelper.SendCancelMode(Sender: TControl);
