@@ -4,25 +4,31 @@
 {*           DropSource Component            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.DropSource;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:NotImplemented
 
 interface
 
 uses
-  Winapi.Windows,
+{$IFDEF MSWINDOWS}
   Winapi.ActiveX,
   Winapi.ShlObj,
+  Winapi.Windows,
+{$ENDIF}
   // System
-  System.Classes,
-  System.Generics.Collections,
+  {System.}Classes,
+  {System.}Generics.Collections,
+  {System.}Math,
+  {System.}SysUtils,
+{$IFDEF MSWINDOWS}
   System.Win.ComObj,
+{$ENDIF}
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -64,7 +70,7 @@ type
 
   IACLDropSourceDataProviderFilesAsStreams = interface(IACLDropSourceDataProviderFiles)
   ['{76453619-F799-43D4-AA93-D106CD4BD563}']
-    function DropSourceCreateStream(FileIndex: Integer; const FileName: UnicodeString): TStream;
+    function DropSourceCreateStream(FileIndex: Integer; const FileName: string): TStream;
   end;
 
   { IACLDropSourceData }
@@ -101,7 +107,7 @@ type
   public
     constructor Create;
     destructor Destroy; override;
-    //
+    //# Properties
     property Config: TACLIniFile read FConfig;
   end;
 
@@ -123,14 +129,16 @@ type
     function GetStream(Index: Integer): TStream;
   public
     constructor Create; overload;
-    constructor Create(const AFileName: UnicodeString); overload;
+    constructor Create(const AFileName: string); overload;
     constructor Create(const AFiles: TACLStringList); overload;
     constructor Create(const AProvider: IACLDropSourceDataProviderFiles); overload;
     destructor Destroy; override;
-    //
+    //# Properties
     property List: TACLStringList read FList;
     property Provider: IACLDropSourceDataProviderFiles read FProvider;
   end;
+
+{$IFDEF MSWINDOWS}
 
   { TACLDragDropDataProvider }
 
@@ -139,7 +147,8 @@ type
     function GetFormat: TFormatEtc; virtual; abstract;
     function HasData: Boolean; virtual; abstract;
     function IsSupported(const AFormat: TFormatEtc): Boolean; virtual;
-    function Store(var AMedium: TStgMedium; const AFormat: TFormatEtc; ATargetConfig: TACLIniFile = nil): Boolean; virtual; abstract;
+    function Store(var AMedium: TStgMedium; const AFormat: TFormatEtc;
+      ATargetConfig: TACLIniFile = nil): Boolean; virtual; abstract;
   end;
 
   { TACLDragDropDataProviderConfig }
@@ -153,8 +162,9 @@ type
     destructor Destroy; override;
     function GetFormat: TFormatEtc; override;
     function HasData: Boolean; override;
-    function Store(var AMedium: TStgMedium; const AFormat: TFormatEtc; ATargetConfig: TACLIniFile = nil): Boolean; override;
-    //
+    function Store(var AMedium: TStgMedium; const AFormat: TFormatEtc;
+      ATargetConfig: TACLIniFile = nil): Boolean; override;
+    //# Properties
     property Config: TACLIniFile read FConfig;
   end;
 
@@ -169,8 +179,9 @@ type
     constructor Create(AData: IACLDropSourceDataFiles);
     function GetFormat: TFormatEtc; override;
     function HasData: Boolean; override;
-    function Store(var AMedium: TStgMedium; const AFormat: TFormatEtc; ATargetConfig: TACLIniFile = nil): Boolean; override;
-    //
+    function Store(var AMedium: TStgMedium; const AFormat: TFormatEtc;
+      ATargetConfig: TACLIniFile = nil): Boolean; override;
+    //# Properties
     property Data: IACLDropSourceDataFiles read FData;
   end;
 
@@ -183,7 +194,8 @@ type
     constructor Create(AData: IACLDropSourceDataFiles; AIndex: Integer);
     function GetFormat: TFormatEtc; override;
     function IsSupported(const AFormat: TFormatEtc): Boolean; override;
-    function Store(var AMedium: TStgMedium; const AFormat: TFormatEtc; ATargetConfig: TACLIniFile = nil): Boolean; override;
+    function Store(var AMedium: TStgMedium; const AFormat: TFormatEtc;
+      ATargetConfig: TACLIniFile = nil): Boolean; override;
   end;
 
   { TACLDragDropDataProviderFileStreamDescriptor }
@@ -191,7 +203,8 @@ type
   TACLDragDropDataProviderFileStreamDescriptor = class(TACLDragDropDataProviderFiles)
   public
     function GetFormat: TFormatEtc; override;
-    function Store(var AMedium: TStgMedium; const AFormat: TFormatEtc; ATargetConfig: TACLIniFile = nil): Boolean; override;
+    function Store(var AMedium: TStgMedium; const AFormat: TFormatEtc;
+      ATargetConfig: TACLIniFile = nil): Boolean; override;
   end;
 
   { TACLDragDropDataProviderFileURIs }
@@ -219,8 +232,9 @@ type
     constructor Create(const AText: string);
     function GetFormat: TFormatEtc; override;
     function HasData: Boolean; override;
-    function Store(var AMedium: TStgMedium; const AFormat: TFormatEtc; ATargetConfig: TACLIniFile = nil): Boolean; override;
-    //
+    function Store(var AMedium: TStgMedium; const AFormat: TFormatEtc;
+      ATargetConfig: TACLIniFile = nil): Boolean; override;
+    //# Properties
     property Text: string read FText;
   end;
 
@@ -229,7 +243,8 @@ type
   TACLDragDropDataProviderTextAnsi = class(TACLDragDropDataProviderText)
   public
     function GetFormat: TFormatEtc; override;
-    function Store(var AMedium: TStgMedium; const AFormat: TFormatEtc; ATargetConfig: TACLIniFile = nil): Boolean; override;
+    function Store(var AMedium: TStgMedium; const AFormat: TFormatEtc;
+      ATargetConfig: TACLIniFile = nil): Boolean; override;
   end;
 
   { TACLDropSource }
@@ -253,7 +268,8 @@ type
     procedure DetachThread;
   protected
     // IDataObject
-    function DAdvise(const AFormat: TFormatEtc; advf: Longint; const advSink: IAdviseSink; out dwConnection: Longint): HRESULT; stdcall;
+    function DAdvise(const AFormat: TFormatEtc; advf: Longint;
+      const advSink: IAdviseSink; out dwConnection: Longint): HRESULT; stdcall;
     function DUnadvise(AConnection: Longint): HRESULT; stdcall;
     function EnumDAdvise(out AEnumAdvise: IEnumStatData): HRESULT; stdcall;
     function EnumFormatEtc(ADirection: Longint; out AEnumFormat: IEnumFormatEtc): HRESULT; stdcall;
@@ -267,7 +283,7 @@ type
     function QueryContinueDrag(AEscapePressed: LongBool; AKeyState: LongInt): HRESULT; stdcall;
     // IUnknown
     function QueryInterface(const IID: TGUID; out Obj): HRESULT; override; stdcall;
-    //
+    //# Events
     procedure DoDrop(var AAllowDrop: Boolean);
     procedure DoDropFinish;
     procedure DoDropStart;
@@ -276,19 +292,26 @@ type
     destructor Destroy; override;
     function Execute: Boolean;
     procedure ExecuteInThread;
-    //
+    //# Properties
     property AllowedActions: TACLDropSourceActions read FAllowedActions write FAllowedActions;
     property DataProviders: TACLObjectList<TACLDragDropDataProvider> read FDataProviders;
     property Owner: IUnknown read FOwner;
   end;
+
+  {$ELSE}
+
+  TACLDropSource = class
+
+  end;
+
+  {$ENDIF}
 
   { TACLDropSourceOwnerProxy }
 
   TACLDropSourceOwnerProxy = class(TACLInterfacedObject)
   protected
     FOwner: TObject;
-
-    function QueryInterface(const IID: TGUID; out Obj): HRESULT; override; stdcall;
+    function QueryInterface({$IFDEF FPC}constref{$ELSE}const{$ENDIF} IID: TGUID; out Obj): HRESULT; override;
   public
     constructor Create(AOwner: TObject);
     destructor Destroy; override;
@@ -301,11 +324,9 @@ function DropSourceIsActive: Boolean;
 implementation
 
 uses
-  System.Math,
-  System.SysUtils,
-  // Vcl
-  Vcl.Forms;
+  Forms;
 
+{$IFDEF MSWINDOWS}
 type
 
   { TACLDropFormatEtcList }
@@ -348,10 +369,17 @@ type
 
 const
   ResultMap: array[Boolean] of Integer = (S_FALSE, S_OK);
+{$ENDIF}
 
 var
   FDropSourceActiveCount: Integer = 0;
 
+function DropSourceIsActive: Boolean;
+begin
+  Result := FDropSourceActiveCount > 0;
+end;
+
+{$IFDEF MSWINDOWS}
 function EncodeActions(AActions: TACLDropSourceActions): Cardinal;
 begin
   Result := 0;
@@ -362,11 +390,7 @@ begin
   if dsaLink in AActions then
     Result := Result or DROPEFFECT_LINK;
 end;
-
-function DropSourceIsActive: Boolean;
-begin
-  Result := FDropSourceActiveCount > 0;
-end;
+{$ENDIF}
 
 { TACLDropSourceData }
 
@@ -405,7 +429,7 @@ begin
   FList := TACLStringList.Create;
 end;
 
-constructor TACLDropSourceDataFiles.Create(const AFileName: UnicodeString);
+constructor TACLDropSourceDataFiles.Create(const AFileName: string);
 begin
   Create;
   FList.Capacity := 1;
@@ -487,6 +511,7 @@ begin
   end;
 end;
 
+{$IFDEF MSWINDOWS}
 { TACLDragDropDataProvider }
 
 function TACLDragDropDataProvider.IsSupported(const AFormat: TFormatEtc): Boolean;
@@ -646,7 +671,8 @@ end;
 
 function TACLDragDropDataProviderFileStream.IsSupported(const AFormat: TFormatEtc): Boolean;
 begin
-  Result := (AFormat.cfFormat = GetFormat.cfFormat) and (AFormat.tymed and TYMED_ISTREAM <> 0) and (AFormat.lindex = FIndex);
+  Result := (AFormat.cfFormat = GetFormat.cfFormat) and
+    (AFormat.tymed and TYMED_ISTREAM <> 0) and (AFormat.lindex = FIndex);
 end;
 
 function TACLDragDropDataProviderFileStream.Store(var AMedium: TStgMedium;
@@ -1097,6 +1123,7 @@ begin
     Terminate;
   end;
 end;
+{$ENDIF}
 
 { TACLDropSourceOwnerProxy }
 
@@ -1112,7 +1139,7 @@ begin
   inherited Destroy;
 end;
 
-function TACLDropSourceOwnerProxy.QueryInterface(const IID: TGUID; out Obj): HRESULT;
+function TACLDropSourceOwnerProxy.QueryInterface;
 begin
   if GetInterface(IID, Obj) or Supports(FOwner, IID, Obj) then
     Result := S_OK

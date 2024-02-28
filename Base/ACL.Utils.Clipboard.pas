@@ -4,25 +4,31 @@
 {*   Clipboard and Data Sharing Utilities    *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.Utils.Clipboard;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:NotImplemented
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
   Winapi.ActiveX,
+  Winapi.Messages,
   Winapi.ShlObj,
   Winapi.ShellAPI,
+  Winapi.Windows,
+{$ENDIF}
   // System
-  System.Classes,
+  {System.}Classes,
+  {System.}SysUtils,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -40,6 +46,22 @@ type
     destructor Destroy; override;
   end;
 
+// FPC stubs
+{$IFDEF FPC}
+type
+  TStgMedium = record
+
+  end;
+  TFormatEtc = record
+
+  end;
+
+const
+  CF_HDROP = 0;
+  CF_UNICODETEXT = 0;
+  CF_TEXT = 0;
+{$ENDIF}
+
 var
   CF_CONFIG: Word = 0;
   CF_FILEURIS: Word = 0;
@@ -50,33 +72,36 @@ function GlobalAllocFromStream(AStream: TMemoryStream): HGLOBAL;
 function MakeFormat(AFormat: Word): TFormatEtc;
 
 // Clipboard
-function acClipboardFormatName(const AFormat: Word): UnicodeString;
+function acClipboardFormatName(const AFormat: Word): string;
 function acCopyToClipboard(AFormat, AMem: THandle): Cardinal;
-procedure acCopyFilesToClipboard(const AFileList: TACLStringList);
-procedure acCopyFileToClipboard(const AFileName: UnicodeString);
+procedure acCopyFileToClipboard(const AFileName: string);
+procedure acCopyFilesToClipboard(AFileList: TACLStringList);
 procedure acCopyStringToClipboard(const S: AnsiString); overload;
 procedure acCopyStringToClipboard(const S: UnicodeString); overload;
-function acTextFromClipboard(AFormat: Word = CF_UNICODETEXT): UnicodeString;
+function acTextFromClipboard(AFormat: Word = CF_UNICODETEXT): string;
 
 // DropHandle
-function acGetFilesFromDrag(ADragQuery: THandle; const AFiles: TACLStringList; AFreeDropData: Boolean = True): Boolean;
-function acMakeDropHandle(const AFileList: TACLStringList): THandle;
+function acGetFilesFromDrag(ADragQuery: THandle;
+  AFiles: TACLStringList; AFreeDropData: Boolean = True): Boolean;
+function acMakeDropHandle(AFileList: TACLStringList): THandle;
 
 // Files & HGLOBAL
-function acFilesFromHGLOBAL(AGlobal: HGLOBAL): UnicodeString; overload;
+function acFilesFromHGLOBAL(AGlobal: HGLOBAL): string; overload;
 function acFilesFromHGLOBAL(AGlobal: HGLOBAL; AFiles: TACLStringList): Boolean; overload;
 
 // Text & HGLOBAL
 procedure acConfigFromHGLOBAL(AGlobal: HGLOBAL; AConfig: TACLIniFile);
 function acConfigToHGLOBAL(const AConfig: TACLIniFile): HGLOBAL;
 function acTextFromHGLOBAL(AGlobal: HGLOBAL; ALines: TACLStringList; AUnicode: Boolean = False): Boolean; overload;
-function acTextFromHGLOBAL(AGlobal: HGLOBAL; AUnicode: Boolean = False): UnicodeString; overload;
+function acTextFromHGLOBAL(AGlobal: HGLOBAL; AUnicode: Boolean = False): string; overload;
 function acTextToHGLOBAL(const S: AnsiString): HGLOBAL; overload;
 function acTextToHGLOBAL(const S: UnicodeString): HGLOBAL; overload;
 implementation
 
 uses
-  System.SysUtils,
+{$IFDEF FPC}
+  Clipbrd,
+{$ENDIF}
   // ACL
   ACL.FastCode,
   ACL.Utils.FileSystem,
@@ -84,6 +109,7 @@ uses
   ACL.Utils.Strings;
 
 function GlobalAllocFromData(AData: PByte; ADataSize: Integer): HGLOBAL;
+{$IFDEF MSWINDOWS}
 var
   ALockPtr: Pointer;
 begin
@@ -100,6 +126,12 @@ begin
     end;
   end;
 end;
+{$ELSE}
+begin
+  {$MESSAGE WARN 'NotImplemented'}
+  raise ENotImplemented.Create('Clipboard routine');
+end;
+{$ENDIF}
 
 function GlobalAllocFromStream(AStream: TMemoryStream): HGLOBAL;
 begin
@@ -108,29 +140,42 @@ end;
 
 function MakeFormat(AFormat: Word): TFormatEtc;
 begin
+{$IFDEF MSWINDOWS}
   Result.cfFormat := AFormat;
   Result.ptd := nil;
   Result.dwAspect := DVASPECT_CONTENT;
   Result.lindex := -1;
   Result.tymed := TYMED_HGLOBAL;
+{$ELSE}
+  {$MESSAGE WARN 'NotImplemented'}
+  raise ENotImplemented.Create('Clipboard routine');
+{$ENDIF}
 end;
 
-// Clipboard -----------------------------------------------------------------------------------------------------------
+// Clipboard -------------------------------------------------------------------
 
 procedure acCopyStringToClipboard(const S: AnsiString);
 begin
   acCopyToClipboard(CF_TEXT, acTextToHGLOBAL(S));
 end;
 
-function acClipboardFormatName(const AFormat: Word): UnicodeString;
+function acClipboardFormatName(const AFormat: Word): string;
+{$IFDEF MSWINDOWS}
 var
   B: array[0..64] of WideChar;
 begin
   GetClipboardFormatNameW(AFormat, @B[0], Length(B));
   Result := B;
 end;
+{$ELSE}
+begin
+  {$MESSAGE WARN 'NotImplemented'}
+  raise ENotImplemented.Create('Clipboard routine');
+end;
+{$ENDIF}
 
 function acCopyToClipboard(AFormat, AMem: THandle): Cardinal;
+{$IFDEF MSWINDOWS}
 begin
   if not OpenClipboard(0) then
     Exit(GetLastError);
@@ -140,13 +185,19 @@ begin
   Result := GetLastError;
   CloseClipboard;
 end;
+{$ELSE}
+begin
+  {$MESSAGE WARN 'NotImplemented'}
+  raise ENotImplemented.Create('Clipboard routine');
+end;
+{$ENDIF}
 
-procedure acCopyFilesToClipboard(const AFileList: TACLStringList);
+procedure acCopyFilesToClipboard(AFileList: TACLStringList);
 begin
   acCopyToClipboard(CF_HDROP, acMakeDropHandle(AFileList));
 end;
 
-procedure acCopyFileToClipboard(const AFileName: UnicodeString);
+procedure acCopyFileToClipboard(const AFileName: string);
 var
   AList: TACLStringList;
 begin
@@ -167,7 +218,8 @@ begin
   acCopyToClipboard(CF_UNICODETEXT, acTextToHGLOBAL(S));
 end;
 
-function acTextFromClipboard(AFormat: Word = CF_UNICODETEXT): UnicodeString;
+function acTextFromClipboard(AFormat: Word = CF_UNICODETEXT): string;
+{$IFDEF MSWINDOWS}
 begin
   if OpenClipboard(0) then
   try
@@ -178,10 +230,18 @@ begin
   else
     Result := '';
 end;
+{$ELSE}
+begin
+  {$MESSAGE WARN 'NotImplemented'}
+  raise ENotImplemented.Create('Clipboard routine');
+end;
+{$ENDIF}
 
 // DropHandle ----------------------------------------------------------------------------------------------------------
 
-function acGetFilesFromDrag(ADragQuery: THandle; const AFiles: TACLStringList; AFreeDropData: Boolean = True): Boolean;
+function acGetFilesFromDrag(ADragQuery: THandle;
+  AFiles: TACLStringList; AFreeDropData: Boolean = True): Boolean;
+{$IFDEF MSWINDOWS}
 var
   AFilename: PWideChar;
   I, ACount, Size: Integer;
@@ -208,8 +268,15 @@ begin
       DragFinish(ADragQuery);
   end;
 end;
+{$ELSE}
+begin
+  {$MESSAGE WARN 'NotImplemented'}
+  raise ENotImplemented.Create('Clipboard routine');
+end;
+{$ENDIF}
 
-function acMakeDropHandle(const AFileList: TACLStringList): THandle;
+function acMakeDropHandle(AFileList: TACLStringList): THandle;
+{$IFDEF MSWINDOWS}
 var
   ADropFiles: PDropFiles;
   ARequiredSize: Integer;
@@ -230,10 +297,16 @@ begin
     end;
   end;
 end;
+{$ELSE}
+begin
+  {$MESSAGE WARN 'NotImplemented'}
+  raise ENotImplemented.Create('Clipboard routine');
+end;
+{$ENDIF}
 
 // Files ---------------------------------------------------------------------------------------------------------------
 
-function acFilesFromHGLOBAL(AGlobal: HGLOBAL): UnicodeString;
+function acFilesFromHGLOBAL(AGlobal: HGLOBAL): string;
 var
   AList: TACLStringList;
 begin
@@ -247,6 +320,7 @@ begin
 end;
 
 function acFilesFromHGLOBAL(AGlobal: HGLOBAL; AFiles: TACLStringList): Boolean;
+{$IFDEF MSWINDOWS}
 var
   ADropFiles: PDropFiles;
   AFileName: PAnsiChar;
@@ -278,6 +352,12 @@ begin
     GlobalUnlock(AGlobal);
   end;
 end;
+{$ELSE}
+begin
+  {$MESSAGE WARN 'NotImplemented'}
+  raise ENotImplemented.Create('Clipboard routine');
+end;
+{$ENDIF}
 
 // Text ----------------------------------------------------------------------------------------------------------------
 
@@ -287,6 +367,7 @@ begin
 end;
 
 procedure acConfigFromHGLOBAL(AGlobal: HGLOBAL; AConfig: TACLIniFile);
+{$IFDEF MSWINDOWS}
 var
   AStream: TStream;
 begin
@@ -303,8 +384,15 @@ begin
     GlobalUnlock(AGlobal);
   end;
 end;
+{$ELSE}
+begin
+  {$MESSAGE WARN 'NotImplemented'}
+  raise ENotImplemented.Create('Clipboard routine');
+end;
+{$ENDIF}
 
 function acConfigToHGLOBAL(const AConfig: TACLIniFile): HGLOBAL;
+{$IFDEF MSWINDOWS}
 var
   AStream: TMemoryStream;
 begin
@@ -321,6 +409,12 @@ begin
   else
     Result := 0;
 end;
+{$ELSE}
+begin
+  {$MESSAGE WARN 'NotImplemented'}
+  raise ENotImplemented.Create('Clipboard routine');
+end;
+{$ENDIF}
 
 function acTextFromHGLOBAL(AGlobal: HGLOBAL; ALines: TACLStringList; AUnicode: Boolean = False): Boolean;
 begin
@@ -328,7 +422,8 @@ begin
   Result := ALines.Count > 0;
 end;
 
-function acTextFromHGLOBAL(AGlobal: HGLOBAL; AUnicode: Boolean = False): UnicodeString;
+function acTextFromHGLOBAL(AGlobal: HGLOBAL; AUnicode: Boolean = False): string;
+{$IFDEF MSWINDOWS}
 var
   APtr: Pointer;
 begin
@@ -342,6 +437,12 @@ begin
     GlobalUnlock(AGlobal);
   end;
 end;
+{$ELSE}
+begin
+  {$MESSAGE WARN 'NotImplemented'}
+  raise ENotImplemented.Create('Clipboard routine');
+end;
+{$ENDIF}
 
 function acTextToHGLOBAL(const S: UnicodeString): HGLOBAL;
 begin
@@ -353,17 +454,25 @@ end;
 constructor TACLGlobalMemoryStream.Create(AHandle: HGLOBAL);
 begin
   FHandle := AHandle;
+{$IFDEF MSWINDOWS}
   if FHandle <> 0 then
     SetPointer(GlobalLock(FHandle), GlobalSize(FHandle));
+{$ELSE}
+  {$MESSAGE WARN 'NotImplemented'}
+  raise ENotImplemented.Create('Clipboard routine');
+{$ENDIF}
 end;
 
 destructor TACLGlobalMemoryStream.Destroy;
 begin
+{$IFDEF MSWINDOWS}
   if FHandle <> 0 then
     GlobalUnlock(FHandle);
+{$ENDIF}
   inherited;
 end;
 
+{$IFDEF MSWINDOWS}
 initialization
   OleInitialize(nil);
   CF_CONFIG := RegisterClipboardFormat('ACL.CFG');
@@ -372,4 +481,5 @@ initialization
 
 finalization
   OleUninitialize;
+{$ENDIF}
 end.

@@ -4,35 +4,41 @@
 {*          Compoud Control Classes          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.CompoundControl;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Messages,
-  Winapi.Windows,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+  LMessages,
+{$ELSE}
+  {Winapi.}Windows,
+{$ENDIF}
+  {Winapi.}Messages,
   // System
-  System.Classes,
-  System.Types,
+  {System.}Classes,
+  {System.}SysUtils,
+  {System.}Types,
   // Vcl
-  Vcl.Controls,
-  Vcl.Forms,
-  Vcl.Graphics,
-  Vcl.StdCtrls,
+  {Vcl.}Controls,
+  {Vcl.}Forms,
+  {Vcl.}Graphics,
+  {Vcl.}StdCtrls,
   // ACL
   ACL.MUI,
-  ACL.Geometry,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.CompoundControl.SubClass,
-  ACL.UI.HintWindow,
   ACL.UI.Controls.ScrollBar,
+  ACL.UI.HintWindow,
   ACL.UI.Resources;
 
 type
@@ -61,7 +67,7 @@ type
     procedure SetOnUpdateState(const Value: TNotifyEvent);
     procedure SetStyleScrollBox(const AValue: TACLStyleScrollBox);
     procedure SetStyleHint(const Value: TACLStyleHint);
-    //
+    //# Messages
     procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
     procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
     procedure CMWantSpecialKey(var Message: TCMWantSpecialKey); message CM_WANTSPECIALKEY;
@@ -97,19 +103,21 @@ type
     procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
 
     // Touch
+  {$IFNDEF FPC}
     procedure DoGesture(const EventInfo: TGestureEventInfo; var Handled: Boolean); override;
+  {$ENDIF}
 
     // IACLCompoundControlSubClassContainer
-    function ClientToScreen(const P: TPoint): TPoint;
+    function ClientToScreen(const P: TPoint): TPoint; reintroduce;
     function GetControl: TWinControl;
     function IACLCompoundControlSubClassContainer.GetFocused = Focused;
     function GetFont: TFont;
-    function GetMouseCapture: Boolean;
-    function ScreenToClient(const P: TPoint): TPoint; overload;
+    function GetMouseCapture: Boolean; reintroduce;
+    function ScreenToClient(const P: TPoint): TPoint; reintroduce;
     procedure SetMouseCapture(const AValue: Boolean);
 
     // IACLCursorProvider
-    function GetCursor(const P: TPoint): TCursor; virtual;
+    function GetCursor(const P: TPoint): TCursor; reintroduce; virtual;
 
     property StyleHint: TACLStyleHint read GetStyleHint write SetStyleHint;
     property StyleScrollBox: TACLStyleScrollBox read GetStyleScrollBox write SetStyleScrollBox;
@@ -137,7 +145,7 @@ type
     procedure UpdateHitTest(X, Y: Integer); overload;
     procedure UpdateHitTest(const P: TPoint); overload;
     procedure UpdateHitTest; overload;
-    //
+    //# Properties
     property Canvas;
     property SubClass: TACLCompoundControlSubClass read FSubClass;
   published
@@ -147,8 +155,6 @@ type
 implementation
 
 uses
-  System.SysUtils,
-  // ACL
   ACL.Graphics,
   ACL.Utils.Common;
 
@@ -177,11 +183,14 @@ begin
 end;
 
 function TACLCompoundControl.Focused: Boolean;
-var
-  AHandle: THandle;
 begin
-  AHandle := GetFocus;
-  Result := (AHandle <> 0) and (WindowHandle <> 0) and ((AHandle = WindowHandle) or IsChild(WindowHandle, AHandle));
+{$IFDEF FPC}
+  Result := acIsChild(Self, FindControl(GetFocus));
+{$ELSE}
+  var AHandle := GetFocus;
+  Result := (AHandle <> 0) and (WindowHandle <> 0) and
+    ((AHandle = WindowHandle) or IsChild(WindowHandle, AHandle));
+{$ENDIF}
 end;
 
 procedure TACLCompoundControl.DoFullRefresh;
@@ -383,12 +392,14 @@ begin
   inherited MouseUp(Button, Shift, X, Y);
 end;
 
+{$IFNDEF FPC}
 procedure TACLCompoundControl.DoGesture(const EventInfo: TGestureEventInfo; var Handled: Boolean);
 begin
   inherited DoGesture(EventInfo, Handled);
   if not Handled then
     SubClass.Gesture(EventInfo, Handled);
 end;
+{$ENDIF}
 
 function TACLCompoundControl.ClientToScreen(const P: TPoint): TPoint;
 begin
@@ -522,7 +533,8 @@ procedure TACLCompoundControl.CMWantSpecialKey(var Message: TCMWantSpecialKey);
 begin
   inherited;
   if Message.Result = 0 then
-    Message.Result := Ord(SubClass.WantSpecialKey(Message.CharCode, KeyDataToShiftState(Message.KeyData)));
+    Message.Result := Ord(SubClass.WantSpecialKey(
+      Message.CharCode, KeyDataToShiftState(Message.KeyData)));
 end;
 
 procedure TACLCompoundControl.WMHScroll(var Message: TWMHScroll);

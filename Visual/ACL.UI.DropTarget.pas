@@ -4,27 +4,30 @@
 {*           DropTarget Component            *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.DropTarget;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:NotImplemented
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+{$IFDEF MSWINDOWS}
   Winapi.ActiveX,
+  Winapi.ShellApi,
   Winapi.ShlObj,
+  Winapi.Windows,
+{$ENDIF}
+  {Winapi.}Messages,
   // System
-  System.Classes,
-  System.Generics.Collections,
+  {System.}Classes,
+  {System.}Generics.Collections,
   // Vcl
-  Vcl.Controls,
+  {Vcl.}Controls,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -43,9 +46,11 @@ type
 
   TACLDropAction = (daCopy, daMove, daLink);
 
-  TACLDropTargetDropEvent = procedure (Sender: TACLDropTarget; Shift: TShiftState; P: TPoint; Action: TACLDropAction) of object;
-  TACLDropTargetOverEvent = procedure (Sender: TACLDropTarget; Shift: TShiftState; P: TPoint;
-    var Hint: UnicodeString; var Allow: Boolean; var Action: TACLDropAction) of object;
+  TACLDropTargetDropEvent = procedure (Sender: TACLDropTarget;
+    Shift: TShiftState; P: TPoint; Action: TACLDropAction) of object;
+  TACLDropTargetOverEvent = procedure (Sender: TACLDropTarget;
+    Shift: TShiftState; P: TPoint; var Hint: string; var Allow: Boolean;
+    var Action: TACLDropAction) of object;
   TACLDropTargetScrollEvent = procedure (Sender: TObject; P: TPoint;
     Lines: Integer; Direction: TACLMouseWheelDirection; var AHandled: Boolean) of object;
 
@@ -56,7 +61,8 @@ type
     procedure DoDrop(Shift: TShiftState; const ScreenPoint: TPoint; Action: TACLDropAction);
     procedure DoEnter;
     procedure DoLeave;
-    procedure DoOver(Shift: TShiftState; const ScreenPoint: TPoint; var Hint: UnicodeString; var Allow: Boolean; var Action: TACLDropAction);
+    procedure DoOver(Shift: TShiftState; const ScreenPoint: TPoint;
+      var Hint: string; var Allow: Boolean; var Action: TACLDropAction);
     function IsInTarget(const ScreenPoint: TPoint): Boolean;
   end;
 
@@ -66,7 +72,7 @@ type
   ['{D0B4CD71-C793-468C-895E-0DAC648D8AD6}']
     function GetActiveTarget: IACLDropTarget;
     function GetData(AFormat: Word; out AMedium: TStgMedium): Boolean;
-    function GetDataAsString(AFormat: Word; out AString: UnicodeString): Boolean;
+    function GetDataAsString(AFormat: Word; out AString: string): Boolean;
     function HasData(AFormat: Word): Boolean;
     procedure SendConfig(const AConfig: TACLIniFile);
   end;
@@ -116,7 +122,7 @@ type
     procedure DoEnter; virtual;
     procedure DoLeave; virtual;
     procedure DoOver(Shift: TShiftState; const ScreenPoint: TPoint;
-      var Hint: UnicodeString; var Allow: Boolean; var Action: TACLDropAction); virtual;
+      var Hint: string; var Allow: Boolean; var Action: TACLDropAction); virtual;
     procedure DoDrop(Shift: TShiftState; const ScreenPoint: TPoint; Action: TACLDropAction); virtual;
     procedure DoScroll(ALines: Integer; ADirection: TACLMouseWheelDirection; const P: TPoint); virtual;
     function IsInTarget(const AScreenPoint: TPoint): Boolean; virtual;
@@ -128,9 +134,9 @@ type
     // Source Data
     function GetConfig(out AConfig: TACLIniFile): Boolean;
     function GetData(AFormat: Word; out AMedium: TStgMedium): Boolean;
-    function GetDataAsString(AFormat: Word; out AString: UnicodeString): Boolean;
+    function GetDataAsString(AFormat: Word; out AString: string): Boolean;
     function GetFiles(out AFiles: TACLStringList): Boolean;
-    function GetText(out AString: UnicodeString): Boolean;
+    function GetText(out AString: string): Boolean;
     function HasData(AFormat: Word): Boolean;
     function HasFiles: Boolean;
     function HasText: Boolean;
@@ -157,14 +163,16 @@ type
 implementation
 
 uses
-  Winapi.ShellApi,
   // System
-  System.Math,
-  System.SysUtils,
+  {System.}Math,
+  {System.}SysUtils,
+{$IFDEF MSWINDOWS}
   System.Win.ComObj,
+{$ENDIF}
   // Vcl
-  Vcl.Forms;
+  {Vcl.}Forms;
 
+{$IFDEF MSWINDOWS}
 type
 
   { TACLDropTargetHook }
@@ -194,18 +202,20 @@ type
     procedure HockedWndProc(var AMessage: TMessage);
     procedure RegisterTarget(ARegister: Boolean);
     // Hints
-    procedure ShowHint(const AHint: UnicodeString);
+    procedure ShowHint(const AHint: string);
     procedure HideHint;
     // IDropTarget
-    function DragEnter(const ADataObj: IDataObject; AKeyState: LongInt; P: TPoint; var AEffect: LongInt): HRESULT; stdcall;
+    function DragEnter(const ADataObj: IDataObject; AKeyState: LongInt;
+      P: TPoint; var AEffect: LongInt): HRESULT; stdcall;
     function DragLeave: HRESULT; stdcall;
     function DragOver(AKeyState: LongInt; P: TPoint; var AEffect: LongInt): HRESULT; stdcall;
-    function Drop(const ADataObj: IDataObject; AKeyState: LongInt; P: TPoint; var AEffect: LongInt): HRESULT; stdcall;
+    function Drop(const ADataObj: IDataObject; AKeyState: LongInt;
+      P: TPoint; var AEffect: LongInt): HRESULT; stdcall;
   public
     constructor Create(AControl: TWinControl); virtual;
     destructor Destroy; override;
     function GetData(AFormat: Word; out AMedium: TStgMedium): Boolean;
-    function GetDataAsString(AFormat: Word; out AString: UnicodeString): Boolean;
+    function GetDataAsString(AFormat: Word; out AString: string): Boolean;
     function HasData(AFormat: Word): Boolean;
     procedure SendConfig(const AConfig: TACLIniFile);
     //
@@ -228,314 +238,6 @@ type
     class function Register(AControl: TWinControl; AHandler: IACLDropTarget): IACLDropTargetHook;
     class procedure Unregister(AHook: IACLDropTargetHook; AHandler: IACLDropTarget);
   end;
-
-{ TACLDropTargetHookManager }
-
-class function TACLDropTargetHookManager.Register(AControl: TWinControl; AHandler: IACLDropTarget): IACLDropTargetHook;
-var
-  AHookImpl: TACLDropTargetHook;
-begin
-  if (FHooks = nil) or not FHooks.TryGetValue(AControl, AHookImpl) then
-    AHookImpl := TACLDropTargetHook.Create(AControl);
-  AHookImpl.FTargets.Add(AHandler);
-  Result := AHookImpl;
-end;
-
-class procedure TACLDropTargetHookManager.Unregister(AHook: IACLDropTargetHook; AHandler: IACLDropTarget);
-var
-  AHookImpl: TACLDropTargetHook;
-begin
-  if AHook <> nil then
-  begin
-    AHook._AddRef;
-    try
-      AHookImpl := AHook as TACLDropTargetHook;
-      AHookImpl.FTargets.Remove(AHandler);
-      if AHookImpl.ActiveTarget = AHandler then
-        AHookImpl.ActiveTarget := nil;
-    finally
-      AHook._Release;
-    end;
-  end;
-end;
-
-class procedure TACLDropTargetHookManager.DoAdd(AHook: TACLDropTargetHook);
-begin
-  if FHooks = nil then
-    FHooks := TDictionary<TWinControl, TACLDropTargetHook>.Create;
-  FHooks.Add(AHook.Control, AHook);
-end;
-
-class procedure TACLDropTargetHookManager.DoRemove(AHook: TACLDropTargetHook);
-begin
-  if FHooks <> nil then
-  begin
-    FHooks.Remove(AHook.Control);
-    if FHooks.Count = 0 then
-      FreeAndNil(FHooks);
-  end;
-end;
-
-{ TACLDropTarget }
-
-constructor TACLDropTarget.Create(AOwner: TComponent);
-begin
-  inherited Create(AOwner);
-  FOptions := TACLDropTargetOptions.Create;
-  FConfig := TACLIniFile.Create;
-  FConfig.OnChanged := ConfigChangeHandler;
-end;
-
-destructor TACLDropTarget.Destroy;
-begin
-  FreeAndNil(FOptions);
-  FreeAndNil(FConfig);
-  inherited Destroy;
-end;
-
-procedure TACLDropTarget.BeforeDestruction;
-begin
-  inherited BeforeDestruction;
-  Target := nil;
-end;
-
-function TACLDropTarget.GetConfig(out AConfig: TACLIniFile): Boolean;
-var
-  AMedium: TStgMedium;
-begin
-  Result := False;
-  if GetData(CF_CONFIG, AMedium) then
-  try
-    if AMedium.tymed = TYMED_HGLOBAL then
-    begin
-      AConfig := TACLIniFile.Create;
-      acConfigFromHGLOBAL(AMedium.hGlobal, AConfig);
-      Result := True;
-    end;
-  finally
-    ReleaseStgMedium(AMedium);
-  end
-end;
-
-function TACLDropTarget.GetData(AFormat: Word; out AMedium: TStgMedium): Boolean;
-begin
-  Result := (FHook <> nil) and FHook.GetData(AFormat, AMedium) and (AMedium.tymed <> TYMED_NULL);
-end;
-
-function TACLDropTarget.GetDataAsString(AFormat: Word; out AString: UnicodeString): Boolean;
-begin
-  Result := (FHook <> nil) and FHook.GetDataAsString(AFormat, AString);
-end;
-
-function TACLDropTarget.GetFiles(out AFiles: TACLStringList): Boolean;
-var
-  AMedium: TStgMedium;
-  AStream: TACLGlobalMemoryStream;
-  AText: UnicodeString;
-  I: Integer;
-begin
-  Result := False;
-  if GetData(CF_FILEURIS, AMedium) or GetData(CF_HDROP, AMedium) then
-  try
-    AFiles := TACLStringList.Create;
-    Result := (AMedium.tymed = TYMED_HGLOBAL) and acFilesFromHGLOBAL(AMedium.hGlobal, AFiles);
-    if Result then
-      ValidateFiles(AFiles)
-    else
-      FreeAndNil(AFiles);
-  finally
-    ReleaseStgMedium(AMedium);
-  end
-  else
-
-  if GetData(CF_SHELLIDList, AMedium) then
-  try
-    if AMedium.tymed = TYMED_HGLOBAL then
-    begin
-      AStream := TACLGlobalMemoryStream.Create(AMedium.hGlobal);
-      try
-        Result := TPIDLHelper.ShellListStreamToFiles(AStream, AFiles);
-        if Result then
-          ValidateFiles(AFiles);
-      finally
-        AStream.Free;
-      end;
-    end;
-  finally
-    ReleaseStgMedium(AMedium)
-  end
-  else
-
-  if Options.AllowURLsInFiles and GetText(AText) and acIsUrlFileName(AText) then
-  begin
-    AFiles := TACLStringList.Create(AText, True);
-    for I := AFiles.Count - 1 downto 0 do
-    begin
-      if not acIsUrlFileName(AFiles[I]) then
-        AFiles.Delete(I);
-    end;
-    Result := True;
-  end;
-end;
-
-function TACLDropTarget.GetText(out AString: UnicodeString): Boolean;
-begin
-  Result := GetDataAsString(CF_UNICODETEXT, AString) or GetDataAsString(CF_TEXT, AString);
-end;
-
-function TACLDropTarget.HasData(AFormat: Word): Boolean;
-begin
-  Result := (FHook <> nil) and FHook.HasData(AFormat);
-end;
-
-function TACLDropTarget.HasFiles: Boolean;
-begin
-  Result := HasData(CF_HDROP) or HasData(CF_FILEURIS) or Options.AllowURLsInFiles and HasText;
-end;
-
-function TACLDropTarget.HasText: Boolean;
-begin
-  Result := HasData(CF_UNICODETEXT) or HasData(CF_TEXT);
-end;
-
-procedure TACLDropTarget.CheckContentScrolling(const AClientPoint: TPoint);
-var
-  ASpeed: Integer;
-begin
-  ASpeed := TACLDropTargetHelper.GetVScrollSpeed(AClientPoint, GetTargetClientRect);
-  if ASpeed <> 0 then
-    DoScroll(Abs(ASpeed), TACLMouseWheel.GetDirection(ASpeed), AClientPoint);
-end;
-
-function TACLDropTarget.GetTargetClientRect: TRect;
-begin
-  Result := Target.ClientRect;
-end;
-
-function TACLDropTarget.ScreenToClient(const P: TPoint): TPoint;
-begin
-  Result := Target.ScreenToClient(P)
-end;
-
-procedure TACLDropTarget.Notification(AComponent: TComponent; AOperation: TOperation);
-begin
-  inherited Notification(AComponent, AOperation);
-  if AOperation = opRemove then
-  begin
-    if Target = AComponent then
-      Target := nil;
-  end;
-end;
-
-procedure TACLDropTarget.DoDrop(Shift: TShiftState; const ScreenPoint: TPoint; Action: TACLDropAction);
-begin
-  if Assigned(OnDrop) then
-    OnDrop(Self, Shift, ScreenToClient(ScreenPoint), Action);
-end;
-
-procedure TACLDropTarget.DoEnter;
-begin
-  FTargetIsActive := True;
-  CallNotifyEvent(Self, OnEnter);
-  SendConfig(Config);
-end;
-
-procedure TACLDropTarget.DoLeave;
-begin
-  FTargetIsActive := False;
-  SendConfig(nil);
-  CallNotifyEvent(Self, OnLeave);
-end;
-
-procedure TACLDropTarget.DoOver(Shift: TShiftState; const ScreenPoint: TPoint;
-  var Hint: UnicodeString; var Allow: Boolean; var Action: TACLDropAction);
-begin
-  CheckContentScrolling(ScreenToClient(ScreenPoint));
-  if Assigned(OnOver) then
-    OnOver(Self, Shift, ScreenToClient(ScreenPoint), Hint, Allow, Action);
-end;
-
-procedure TACLDropTarget.DoScroll(ALines: Integer; ADirection: TACLMouseWheelDirection; const P: TPoint);
-var
-  AHandled: Boolean;
-begin
-  AHandled := False;
-  if Assigned(OnScroll) then
-    OnScroll(Self, P, ALines, ADirection, AHandled);
-  if not AHandled then
-  begin
-    while ALines > 0 do
-    begin
-      Target.Perform(WM_VSCROLL, TACLMouseWheel.DirectionToScrollCodeI[ADirection], 0);
-      Dec(ALines);
-    end;
-  end;
-end;
-
-function TACLDropTarget.IsInTarget(const AScreenPoint: TPoint): Boolean;
-begin
-  Result := PtInRect(GetTargetClientRect, ScreenToClient(AScreenPoint));
-end;
-
-procedure TACLDropTarget.ConfigChangeHandler(Sender: TObject);
-begin
-  if FTargetIsActive then
-    SendConfig(Config);
-end;
-
-procedure TACLDropTarget.SendConfig(AConfig: TACLIniFile);
-begin
-  if FHook <> nil then
-    FHook.SendConfig(AConfig);
-end;
-
-procedure TACLDropTarget.SetOptions(AValue: TACLDropTargetOptions);
-begin
-  FOptions.Assign(AValue);
-end;
-
-procedure TACLDropTarget.SetTarget(AValue: TWinControl);
-begin
-  if AValue <> FTarget then
-  begin
-    if Target <> nil then
-    begin
-      TACLDropTargetHookManager.Unregister(FHook, Self);
-      FTarget.RemoveFreeNotification(Self);
-      FTarget := nil;
-      FHook := nil;
-    end;
-    if AValue <> nil then
-    begin
-      FTarget := AValue;
-      FTarget.FreeNotification(Self);
-      FHook := TACLDropTargetHookManager.Register(Target, Self);
-    end;
-  end;
-end;
-
-procedure TACLDropTarget.ValidateFiles(AFiles: TACLStringList);
-var
-  AFileName: UnicodeString;
-  I: Integer;
-begin
-  for I := AFiles.Count - 1 downto 0 do
-  begin
-    if acIsUrlFileName(AFiles[I]) then
-    begin
-      if not Options.AllowURLsInFiles then
-        AFiles.Delete(I);
-    end
-    else
-      if Options.ExpandShortcuts then
-      begin
-        if acIsLnkFileName(AFiles[I]) and ShellParseLink(AFiles[I], AFileName) then
-          AFiles[I] := AFileName;
-      end
-      else
-        AFiles[I] := acExpandFileName(AFiles[I]);
-  end;
-end;
 
 { TACLDropTargetHook }
 
@@ -567,7 +269,7 @@ begin
   Result := Succeeded(DataObject.GetData(MakeFormat(AFormat), AMedium));
 end;
 
-function TACLDropTargetHook.GetDataAsString(AFormat: Word; out AString: UnicodeString): Boolean;
+function TACLDropTargetHook.GetDataAsString(AFormat: Word; out AString: string): Boolean;
 var
   AMedium: TStgMedium;
 begin
@@ -625,7 +327,7 @@ begin
   end;
 end;
 
-procedure TACLDropTargetHook.ShowHint(const AHint: UnicodeString);
+procedure TACLDropTargetHook.ShowHint(const AHint: string);
 begin
   if AHint <> '' then
   begin
@@ -642,7 +344,8 @@ begin
   FreeAndNil(FHintWindow);
 end;
 
-function TACLDropTargetHook.DragEnter(const ADataObj: IDataObject; AKeyState: Integer; P: TPoint; var AEffect: Integer): HRESULT;
+function TACLDropTargetHook.DragEnter(const ADataObj: IDataObject;
+  AKeyState: Integer; P: TPoint; var AEffect: Integer): HRESULT;
 begin
   FDataObject := ADataObj;
   FMouseAtTarget := True;
@@ -686,7 +389,8 @@ begin
   ShowHint(AHint);
 end;
 
-function TACLDropTargetHook.Drop(const ADataObj: IDataObject; AKeyState: Integer; P: TPoint; var AEffect: Integer): HRESULT;
+function TACLDropTargetHook.Drop(const ADataObj: IDataObject;
+  AKeyState: Integer; P: TPoint; var AEffect: Integer): HRESULT;
 begin
   Result := S_OK;
   try
@@ -757,6 +461,338 @@ begin
       FActiveTarget.DoEnter;
     end;
   end;
+end;
+
+{ TACLDropTargetHookManager }
+
+class function TACLDropTargetHookManager.Register(
+  AControl: TWinControl; AHandler: IACLDropTarget): IACLDropTargetHook;
+var
+  AHookImpl: TACLDropTargetHook;
+begin
+  if (FHooks = nil) or not FHooks.TryGetValue(AControl, AHookImpl) then
+    AHookImpl := TACLDropTargetHook.Create(AControl);
+  AHookImpl.FTargets.Add(AHandler);
+  Result := AHookImpl;
+end;
+
+class procedure TACLDropTargetHookManager.Unregister(AHook: IACLDropTargetHook; AHandler: IACLDropTarget);
+var
+  AHookImpl: TACLDropTargetHook;
+begin
+  if AHook <> nil then
+  begin
+    AHook._AddRef;
+    try
+      AHookImpl := AHook as TACLDropTargetHook;
+      AHookImpl.FTargets.Remove(AHandler);
+      if AHookImpl.ActiveTarget = AHandler then
+        AHookImpl.ActiveTarget := nil;
+    finally
+      AHook._Release;
+    end;
+  end;
+end;
+
+class procedure TACLDropTargetHookManager.DoAdd(AHook: TACLDropTargetHook);
+begin
+  if FHooks = nil then
+    FHooks := TDictionary<TWinControl, TACLDropTargetHook>.Create;
+  FHooks.Add(AHook.Control, AHook);
+end;
+
+class procedure TACLDropTargetHookManager.DoRemove(AHook: TACLDropTargetHook);
+begin
+  if FHooks <> nil then
+  begin
+    FHooks.Remove(AHook.Control);
+    if FHooks.Count = 0 then
+      FreeAndNil(FHooks);
+  end;
+end;
+{$ENDIF}
+
+{ TACLDropTarget }
+
+constructor TACLDropTarget.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+  FOptions := TACLDropTargetOptions.Create;
+  FConfig := TACLIniFile.Create;
+  FConfig.OnChanged := ConfigChangeHandler;
+end;
+
+destructor TACLDropTarget.Destroy;
+begin
+  FreeAndNil(FOptions);
+  FreeAndNil(FConfig);
+  inherited Destroy;
+end;
+
+procedure TACLDropTarget.BeforeDestruction;
+begin
+  inherited BeforeDestruction;
+  Target := nil;
+end;
+
+function TACLDropTarget.GetConfig(out AConfig: TACLIniFile): Boolean;
+var
+  AMedium: TStgMedium;
+begin
+  Result := False;
+{$IFDEF MSWINDOWS}
+  if GetData(CF_CONFIG, AMedium) then
+  try
+    if AMedium.tymed = TYMED_HGLOBAL then
+    begin
+      AConfig := TACLIniFile.Create;
+      acConfigFromHGLOBAL(AMedium.hGlobal, AConfig);
+      Result := True;
+    end;
+  finally
+    ReleaseStgMedium(AMedium);
+  end
+{$ENDIF}
+end;
+
+function TACLDropTarget.GetData(AFormat: Word; out AMedium: TStgMedium): Boolean;
+begin
+{$IFDEF MSWINDOWS}
+  Result := (FHook <> nil) and FHook.GetData(AFormat, AMedium) and (AMedium.tymed <> TYMED_NULL);
+{$ELSE}
+  Result := False;
+{$ENDIF}
+end;
+
+function TACLDropTarget.GetDataAsString(AFormat: Word; out AString: string): Boolean;
+begin
+{$IFDEF MSWINDOWS}
+  Result := (FHook <> nil) and FHook.GetDataAsString(AFormat, AString);
+{$ELSE}
+  Result := False;
+{$ENDIF}
+end;
+
+function TACLDropTarget.GetFiles(out AFiles: TACLStringList): Boolean;
+{$IFDEF MSWINDOWS}
+var
+  AMedium: TStgMedium;
+  AStream: TACLGlobalMemoryStream;
+  AText: string;
+  I: Integer;
+begin
+  Result := False;
+  if GetData(CF_FILEURIS, AMedium) or GetData(CF_HDROP, AMedium) then
+  try
+    AFiles := TACLStringList.Create;
+    Result := (AMedium.tymed = TYMED_HGLOBAL) and acFilesFromHGLOBAL(AMedium.hGlobal, AFiles);
+    if Result then
+      ValidateFiles(AFiles)
+    else
+      FreeAndNil(AFiles);
+  finally
+    ReleaseStgMedium(AMedium);
+  end
+  else
+
+  if GetData(CF_SHELLIDList, AMedium) then
+  try
+    if AMedium.tymed = TYMED_HGLOBAL then
+    begin
+      AStream := TACLGlobalMemoryStream.Create(AMedium.hGlobal);
+      try
+        Result := TPIDLHelper.ShellListStreamToFiles(AStream, AFiles);
+        if Result then
+          ValidateFiles(AFiles);
+      finally
+        AStream.Free;
+      end;
+    end;
+  finally
+    ReleaseStgMedium(AMedium)
+  end
+  else
+
+  if Options.AllowURLsInFiles and GetText(AText) and acIsUrlFileName(AText) then
+  begin
+    AFiles := TACLStringList.Create(AText, True);
+    for I := AFiles.Count - 1 downto 0 do
+    begin
+      if not acIsUrlFileName(AFiles[I]) then
+        AFiles.Delete(I);
+    end;
+    Result := True;
+  end;
+end;
+{$ELSE}
+begin
+  Result := False;
+end;
+{$ENDIF}
+
+function TACLDropTarget.GetText(out AString: string): Boolean;
+begin
+  Result :=
+    GetDataAsString(CF_UNICODETEXT, AString) or
+    GetDataAsString(CF_TEXT, AString);
+end;
+
+function TACLDropTarget.HasData(AFormat: Word): Boolean;
+begin
+  Result := (FHook <> nil) and FHook.HasData(AFormat);
+end;
+
+function TACLDropTarget.HasFiles: Boolean;
+begin
+  Result := HasData(CF_HDROP) or HasData(CF_FILEURIS) or Options.AllowURLsInFiles and HasText;
+end;
+
+function TACLDropTarget.HasText: Boolean;
+begin
+  Result := HasData(CF_UNICODETEXT) or HasData(CF_TEXT);
+end;
+
+procedure TACLDropTarget.CheckContentScrolling(const AClientPoint: TPoint);
+var
+  ASpeed: Integer;
+begin
+  ASpeed := TACLDropTargetHelper.GetVScrollSpeed(AClientPoint, GetTargetClientRect);
+  if ASpeed <> 0 then
+    DoScroll(Abs(ASpeed), TACLMouseWheel.GetDirection(ASpeed), AClientPoint);
+end;
+
+function TACLDropTarget.GetTargetClientRect: TRect;
+begin
+  Result := Target.ClientRect;
+end;
+
+function TACLDropTarget.ScreenToClient(const P: TPoint): TPoint;
+begin
+  Result := Target.ScreenToClient(P)
+end;
+
+procedure TACLDropTarget.Notification(AComponent: TComponent; AOperation: TOperation);
+begin
+  inherited Notification(AComponent, AOperation);
+  if AOperation = opRemove then
+  begin
+    if Target = AComponent then
+      Target := nil;
+  end;
+end;
+
+procedure TACLDropTarget.DoDrop(Shift: TShiftState; const ScreenPoint: TPoint; Action: TACLDropAction);
+begin
+  if Assigned(OnDrop) then
+    OnDrop(Self, Shift, ScreenToClient(ScreenPoint), Action);
+end;
+
+procedure TACLDropTarget.DoEnter;
+begin
+  FTargetIsActive := True;
+  CallNotifyEvent(Self, OnEnter);
+  SendConfig(Config);
+end;
+
+procedure TACLDropTarget.DoLeave;
+begin
+  FTargetIsActive := False;
+  SendConfig(nil);
+  CallNotifyEvent(Self, OnLeave);
+end;
+
+procedure TACLDropTarget.DoOver(Shift: TShiftState; const ScreenPoint: TPoint;
+  var Hint: string; var Allow: Boolean; var Action: TACLDropAction);
+begin
+  CheckContentScrolling(ScreenToClient(ScreenPoint));
+  if Assigned(OnOver) then
+    OnOver(Self, Shift, ScreenToClient(ScreenPoint), Hint, Allow, Action);
+end;
+
+procedure TACLDropTarget.DoScroll(ALines: Integer; ADirection: TACLMouseWheelDirection; const P: TPoint);
+var
+  AHandled: Boolean;
+begin
+  AHandled := False;
+  if Assigned(OnScroll) then
+    OnScroll(Self, P, ALines, ADirection, AHandled);
+  if not AHandled then
+  begin
+    while ALines > 0 do
+    begin
+      Target.Perform(WM_VSCROLL, TACLMouseWheel.DirectionToScrollCodeI[ADirection], 0);
+      Dec(ALines);
+    end;
+  end;
+end;
+
+function TACLDropTarget.IsInTarget(const AScreenPoint: TPoint): Boolean;
+begin
+  Result := GetTargetClientRect.Contains(ScreenToClient(AScreenPoint));
+end;
+
+procedure TACLDropTarget.ConfigChangeHandler(Sender: TObject);
+begin
+  if FTargetIsActive then
+    SendConfig(Config);
+end;
+
+procedure TACLDropTarget.SendConfig(AConfig: TACLIniFile);
+begin
+  if FHook <> nil then
+    FHook.SendConfig(AConfig);
+end;
+
+procedure TACLDropTarget.SetOptions(AValue: TACLDropTargetOptions);
+begin
+  FOptions.Assign(AValue);
+end;
+
+procedure TACLDropTarget.SetTarget(AValue: TWinControl);
+begin
+  if AValue <> FTarget then
+  begin
+  {$IFDEF MSWINDOWS}
+    if Target <> nil then
+    begin
+      TACLDropTargetHookManager.Unregister(FHook, Self);
+      FTarget.RemoveFreeNotification(Self);
+      FTarget := nil;
+      FHook := nil;
+    end;
+    if AValue <> nil then
+    begin
+      FTarget := AValue;
+      FTarget.FreeNotification(Self);
+      FHook := TACLDropTargetHookManager.Register(Target, Self);
+    end;
+  {$ENDIF}
+  end;
+end;
+
+procedure TACLDropTarget.ValidateFiles(AFiles: TACLStringList);
+var
+  AFileName: string;
+  I: Integer;
+begin
+{$IFDEF MSWINDOWS}
+  for I := AFiles.Count - 1 downto 0 do
+  begin
+    if acIsUrlFileName(AFiles[I]) then
+    begin
+      if not Options.AllowURLsInFiles then
+        AFiles.Delete(I);
+    end
+    else
+      if Options.ExpandShortcuts then
+      begin
+        if acIsLnkFileName(AFiles[I]) and ShellParseLink(AFiles[I], AFileName) then
+          AFiles[I] := AFileName;
+      end
+      else
+        AFiles[I] := acExpandFileName(AFiles[I]);
+  end;
+{$ENDIF}
 end;
 
 { TACLDropTargetHelper }

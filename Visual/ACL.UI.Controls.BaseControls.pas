@@ -86,6 +86,9 @@ const
 
 type
 {$IFDEF FPC}
+  TGestureEventInfo = record
+    {stub}
+  end;
   TWMMouseWheel = TCMMouseWheel;
 {$ENDIF}
 

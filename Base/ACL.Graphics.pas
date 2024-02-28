@@ -486,7 +486,8 @@ procedure acDeleteMemDC(AMemDC: HDC; AMemBmp: HBITMAP; AClipRegion: HRGN);
 procedure acBitBlt(DC, SourceDC: HDC; const R: TRect; const APoint: TPoint); overload; inline;
 procedure acBitBlt(DC: HDC; ABitmap: TBitmap; const ADestPoint: TPoint); overload; inline;
 procedure acBitBlt(DC: HDC; ABitmap: TBitmap; const R: TRect; const APoint: TPoint); overload; inline;
-procedure acDrawArrow(DC: HDC; R: TRect; AColor: TColor; AArrowKind: TACLArrowKind; ATargetDPI: Integer);
+procedure acDrawArrow(ACanvas: TCanvas; R: TRect;
+  AColor: TColor; AArrowKind: TACLArrowKind; ATargetDPI: Integer);
 function acGetArrowSize(AArrowKind: TACLArrowKind; ATargetDPI: Integer): TSize;
 procedure acDrawComplexFrame(ACanvas: TCanvas; const R: TRect;
   AColor1, AColor2: TColor; ABorders: TACLBorders = acAllBorders); overload;
@@ -1481,22 +1482,19 @@ begin
   acBitBlt(DC, ABitmap.Canvas.Handle, R, APoint);
 end;
 
-procedure acDrawArrow(DC: HDC; R: TRect; AColor: TColor; AArrowKind: TACLArrowKind; ATargetDPI: Integer);
+procedure acDrawArrow(ACanvas: TCanvas; R: TRect;
+  AColor: TColor; AArrowKind: TACLArrowKind; ATargetDPI: Integer);
 
   procedure Draw(R: TRect; const Extends: TRect; Count: Integer);
-  var
-    ABrush: HBRUSH;
   begin
     R.CenterHorz(1);
     R.CenterVert(1);
-    ABrush := CreateSolidBrush(ColorToRGB(AColor));
     while Count > 0 do
     begin
-      FillRect(DC, R, ABrush);
+      ACanvas.FillRect(R);
       R.Content(Extends);
       Dec(Count);
     end;
-    DeleteObject(ABrush);
   end;
 
 var
@@ -1514,6 +1512,7 @@ begin
     R.CenterVert(ASize + 1);
   end;
 
+  ACanvas.Brush.Color := AColor;
   case AArrowKind of
     makLeft:
       Draw(R.Split(srLeft, 1), Rect(1, -1, -1, -1), ASize + 1);
