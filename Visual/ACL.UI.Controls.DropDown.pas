@@ -133,13 +133,13 @@ type
   protected
     procedure Calculate(R: TRect); override;
     procedure FocusChanged; override;
-    function GetBackgroundStyle: TACLControlBackgroundStyle; override;
     procedure SetDefaultSize; override;
     // keyboard
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     procedure KeyUp(var Key: Word; Shift: TShiftState); override;
     // drawing
     procedure Paint; override;
+    procedure UpdateTransparency; override;
     // button
     function CreateDropDownButton: TACLCustomDropDownEditButtonSubClass; override;
     function CreateStyleButton: TACLStyleButton; override;
@@ -439,14 +439,6 @@ begin
   inherited KeyUp(Key, Shift);
 end;
 
-function TACLCustomDropDown.GetBackgroundStyle: TACLControlBackgroundStyle;
-begin
-  if DropDownButton.Transparent then
-    Result := cbsTransparent
-  else
-    Result := cbsOpaque;
-end;
-
 procedure TACLCustomDropDown.SetDefaultSize;
 begin
   SetBounds(Left, Top, DefaultButtonWidth, DefaultButtonHeight);
@@ -509,6 +501,14 @@ end;
 procedure TACLCustomDropDown.SetStyle(const Value: TACLStyleButton);
 begin
   StyleButton := Value;
+end;
+
+procedure TACLCustomDropDown.UpdateTransparency;
+begin
+  if DropDownButton.Transparent then
+    ControlStyle := ControlStyle - [csOpaque]
+  else
+    ControlStyle := ControlStyle + [csOpaque];
 end;
 
 procedure TACLCustomDropDown.CMDialogChar(var Message: TCMDialogChar);

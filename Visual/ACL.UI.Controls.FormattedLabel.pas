@@ -164,7 +164,6 @@ type
   protected
     function CreateSubClass: TACLCompoundControlSubClass; override;
     procedure DefineProperties(Filer: TFiler); override;
-    procedure DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect); override;
     function GetContentOffset: TRect; override;
     procedure Paint; override;
     procedure ResourceChanged; override;
@@ -475,14 +474,9 @@ begin
   Result := dpiApply(acBorderOffsets, FCurrentPPI) * Borders;
 end;
 
-procedure TACLFormattedLabel.DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect);
-begin
-  Style.DrawContent(ACanvas, R);
-end;
-
 procedure TACLFormattedLabel.Paint;
 begin
-  Style.DrawBorder(Canvas, ClientRect, Borders);
+  Style.Draw(Canvas, ClientRect, Transparent, Borders);
   inherited Paint;
 end;
 

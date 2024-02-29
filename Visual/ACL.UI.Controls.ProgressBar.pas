@@ -72,11 +72,11 @@ type
     procedure SetStyle(const Value: TACLStyleProgress);
     procedure SetWaitingMode(AValue: Boolean);
   protected
-    function GetBackgroundStyle: TACLControlBackgroundStyle; override;
     procedure CalculateProgressRect(out R1, R2: TRect);
     procedure SetTargetDPI(AValue: Integer); override;
     procedure DoTimer(Sender: TObject);
     procedure Paint; override;
+    procedure UpdateTransparency; override;
     //# Properties
     property AnimPosition: Integer read FAnimPosition;
     property ProgressAnimSize: Integer read GetProgressAnimSize;
@@ -199,14 +199,6 @@ begin
   Invalidate;
 end;
 
-function TACLProgressBar.GetBackgroundStyle: TACLControlBackgroundStyle;
-begin
-  if Style.Texture.HasAlpha then
-    Result := cbsTransparent
-  else
-    Result := cbsOpaque;
-end;
-
 procedure TACLProgressBar.Paint;
 var
   LClipRgn: HRGN;
@@ -307,6 +299,14 @@ begin
     Invalidate;
     Update;
   end;
+end;
+
+procedure TACLProgressBar.UpdateTransparency;
+begin
+  if Style.Texture.HasAlpha then
+    ControlStyle := ControlStyle - [csOpaque]
+  else
+    ControlStyle := ControlStyle + [csOpaque];
 end;
 
 end.

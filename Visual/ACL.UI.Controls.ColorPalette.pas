@@ -29,6 +29,7 @@ uses
   {System.}Types,
   System.UITypes,
   // Vcl
+  {Vcl.}Controls,
   {Vcl.}Graphics,
   {Vcl.}Forms,
   // ACL
@@ -200,13 +201,13 @@ type
     procedure SetOptionsView(AValue: TACLColorPaletteOptionsView);
     procedure SetStyle(AValue: TACLStyleColorPalette);
   protected
-    function GetBackgroundStyle: TACLControlBackgroundStyle; override;
     procedure InitializeDefaultPalette;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X: Integer; Y: Integer); override;
     procedure Paint; override;
     procedure SetTargetDPI(AValue: Integer); override;
-    //
+    procedure UpdateTransparency; override;
+    //# Properties
     property HoveredColor: TACLColorPaletteItemViewInfo read FHoveredColor write SetHoveredColor;
     property ViewInfo: TACLColorPaletteViewInfo read FViewInfo;
   public
@@ -221,7 +222,7 @@ type
     property Color: TAlphaColor read FColor write SetColor default 0;
     property ResourceCollection;
     property Style: TACLStyleColorPalette read FStyle write SetStyle;
-    //
+    //# Events
     property OnColorChanged: TNotifyEvent read FOnColorChanged write FOnColorChanged;
   end;
 
@@ -645,11 +646,6 @@ begin
   inherited;
 end;
 
-function TACLColorPalette.GetBackgroundStyle: TACLControlBackgroundStyle;
-begin
-  Result := cbsTransparent;
-end;
-
 procedure TACLColorPalette.InitializeDefaultPalette;
 begin
   Items.Populate(OptionsView.Style);
@@ -725,6 +721,11 @@ end;
 procedure TACLColorPalette.SetStyle(AValue: TACLStyleColorPalette);
 begin
   FStyle.Assign(AValue);
+end;
+
+procedure TACLColorPalette.UpdateTransparency;
+begin
+  ControlStyle := ControlStyle - [csOpaque]
 end;
 
 end.

@@ -95,8 +95,6 @@ type
     procedure WMDPIChanged(var Message: TWMDpi); message WM_DPICHANGED;
     procedure WMSettingsChanged(var Message: TWMSettingChange); message WM_SETTINGCHANGE;
   {$ENDIF}
-    procedure WMSetCursor(var Message: TWMSetCursor); message WM_SETCURSOR;
-    procedure WMMouseMove(var Message: TWMMouseMove); message WM_MOUSEMOVE;
   protected
   {$IFDEF FPC}
     ScalingFlags: TScalingFlags;
@@ -109,6 +107,7 @@ type
     procedure Loaded; override;
     procedure ReadState(Reader: TReader); override;
     procedure SetPixelsPerInch(Value: Integer); {$IFDEF DELPHI110ALEXANDRIA}override;{$ENDIF}
+    procedure WndProc(var Message: TMessage); override;
 
     // IACLApplicationListener
     procedure IACLApplicationListener.Changed = ApplicationSettingsChanged;
@@ -700,6 +699,12 @@ begin
 {$ENDIF}
 end;
 
+procedure TACLBasicForm.WndProc(var Message: TMessage);
+begin
+  inherited WndProc(Message);
+  TACLControls.WndProc(Self, Message)
+end;
+
 function TACLBasicForm.GetCurrentDpi: Integer;
 begin
   Result := FCurrentPPI;
@@ -772,18 +777,6 @@ begin
 end;
 
 {$ENDIF}
-
-procedure TACLBasicForm.WMSetCursor(var Message: TWMSetCursor);
-begin
-  if not TACLControls.WMSetCursor(Self, Message) then
-    inherited;
-end;
-
-procedure TACLBasicForm.WMMouseMove(var Message: TWMMouseMove);
-begin
-  inherited;
-  TACLControls.UpdateCursorOnMove(Self);
-end;
 
 { TACLWindowHooks }
 

@@ -39,6 +39,7 @@ uses
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.SkinImage,
+  ACL.Graphics.SkinImageSet,
   ACL.UI.Animation,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.Buttons,
@@ -71,7 +72,8 @@ type
     function GetThumbNominalSize: Integer;
     function IsMouseCaptured: Boolean;
     procedure DrawBackground(ACanvas: TCanvas; const R: TRect);
-    procedure DrawPart(ACanvas: TCanvas; const R: TRect; APart: TACLScrollBarPart; AState: TACLButtonState);
+    procedure DrawPart(ACanvas: TCanvas; const R: TRect;
+      APart: TACLScrollBarPart; AState: TACLButtonState);
     procedure InvalidateRect(const R: TRect; AUpdateNow: Boolean = False);
     procedure Scroll(ACode: TScrollCode; var APosition: Integer);
   end;
@@ -102,7 +104,7 @@ type
       Part: TACLScrollBarPart; State: TACLButtonState; Kind: TScrollBarKind);
     procedure DrawSizeGripArea(ACanvas: TCanvas; const R: TRect);
     function IsThumbResizable(AKind: TScrollBarKind): Boolean;
-    //
+    //# Properties
     property TextureBackground[Kind: TScrollBarKind]: TACLResourceTexture read GetTextureBackground;
     property TextureButtons[Kind: TScrollBarKind]: TACLResourceTexture read GetTextureButtons;
     property TextureThumb[Kind: TScrollBarKind]: TACLResourceTexture read GetTextureThumb;
@@ -137,7 +139,7 @@ type
     procedure Draw(ACanvas: TCanvas);
     procedure Invalidate;
     procedure UpdateState;
-    //
+    //# Properties
     property Bounds: TRect read FBounds write FBounds;
     property DisplayBounds: TRect read GetDisplayBounds;
     property Owner: TACLScrollBarViewInfo read FOwner;
@@ -185,7 +187,7 @@ type
     procedure Invalidate(AUpdateNow: Boolean);
     function SetScrollParams(AMin, AMax, APosition, APageSize: Integer; ARedraw: Boolean = True): Boolean; overload;
     procedure SetScrollParams(const AInfo: TScrollInfo; ARedraw: Boolean = True); overload;
-    //
+    //# Properties
     property Bounds: TRect read FBounds;
     property ButtonDown: TACLScrollBarViewInfoItem read FButtonDown;
     property ButtonUp: TACLScrollBarViewInfoItem read FButtonUp;
@@ -224,7 +226,7 @@ type
     procedure MouseUp(AButton: TMouseButton; X, Y: Integer);
     procedure Scroll(AScrollCode: TScrollCode); overload;
     procedure Scroll(AScrollPart: TACLScrollBarPart); overload;
-    //
+    //# Properties
     property ViewInfo: TACLScrollBarViewInfo read FViewInfo;
   end;
 
@@ -245,8 +247,8 @@ type
     procedure SetSmallChange(AValue: Word);
     procedure SetStyle(const Value: TACLStyleScrollBox);
   protected
-    function GetBackgroundStyle: TACLControlBackgroundStyle; override;
     procedure SetTargetDPI(AValue: Integer); override;
+    procedure UpdateTransparency; override;
 
     // IACLScrollBar
     function AllowFading: Boolean;
@@ -1158,6 +1160,7 @@ begin
     ViewInfo.FKind := Value;
     UpdateTransparency;
     AdjustSize;
+    Invalidate;
   end;
 end;
 
@@ -1169,17 +1172,17 @@ begin
   ViewInfo.Calculate(ClientRect);
 end;
 
-function TACLScrollBar.GetBackgroundStyle: TACLControlBackgroundStyle;
-begin
-  if Style.TextureBackground[Kind].HasAlpha then
-    Result := cbsSemitransparent
-  else
-    Result := cbsOpaque;
-end;
-
 procedure TACLScrollBar.SetStyle(const Value: TACLStyleScrollBox);
 begin
   FStyle.Assign(Value);
+end;
+
+procedure TACLScrollBar.UpdateTransparency;
+begin
+  if Style.TextureBackground[Kind].HasAlpha then
+    ControlStyle := ControlStyle - [csOpaque]
+  else
+    ControlStyle := ControlStyle + [csOpaque]
 end;
 
 end.

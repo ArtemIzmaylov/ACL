@@ -73,13 +73,11 @@ type
     procedure SetStyle(const Value: TACLStyleBindingDiagram); inline;
   protected
     function CreateSubClass: TACLCompoundControlSubClass; override;
-    // Drawing
-    procedure DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect); override;
     procedure Paint; override;
   public
     constructor Create(AOwner: TComponent); override;
     procedure DeleteSelectedObject;
-    //
+    //# Properties
     property Data: TACLBindingDiagramData read GetData;
     property SelectedObject: TObject read GetSelectedObject write SetSelectedObject;
     property SelectedObjectAsLink: TACLBindingDiagramLink read GetSelectedObjectAsLink;
@@ -98,7 +96,7 @@ type
     property StyleHint;
     property StyleScrollBox;
     property Transparent;
-    //
+    //# Events
     property OnClick;
     property OnDblClick;
     property OnLinkChanged: TACLBindingDiagramLinkNotifyEvent read GetOnLinkChanged write SetOnLinkChanged;
@@ -132,15 +130,10 @@ begin
   Result := TACLBindingDiagramSubClass.Create(Self);
 end;
 
-procedure TACLBindingDiagram.DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect);
-begin
-  Style.DrawContent(ACanvas, R);
-end;
-
 procedure TACLBindingDiagram.Paint;
 begin
-  Style.DrawBorder(Canvas, ClientRect, Borders);
-  inherited Paint;
+  Style.Draw(Canvas, ClientRect, Transparent, Borders);
+  inherited;
 end;
 
 function TACLBindingDiagram.GetData: TACLBindingDiagramData;

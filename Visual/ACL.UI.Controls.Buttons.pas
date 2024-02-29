@@ -214,12 +214,12 @@ type
     function CreateSubClass: TACLCustomButtonSubClass; virtual; abstract;
     procedure DoGetHint(const P: TPoint; var AHint: string); override;
     procedure FocusChanged; override;
-    function GetBackgroundStyle: TACLControlBackgroundStyle; override;
     procedure Paint; override;
     procedure ResourceChanged; override;
     procedure SetDefaultSize; override;
     procedure SetTargetDPI(AValue: Integer); override;
     procedure UpdateCaption;
+    procedure UpdateTransparency; override;
 
     // Keyboard
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
@@ -410,9 +410,9 @@ type
   protected
     procedure Calculate(R: TRect); override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
-    function GetBackgroundStyle: TACLControlBackgroundStyle; override;
     procedure Paint; override;
     procedure PerformClick; override;
+    procedure UpdateTransparency; override;
     // Keyboard
     procedure KeyUp(var Key: Word; Shift: TShiftState); override;
     // Mouse
@@ -969,14 +969,6 @@ begin
   inherited;
 end;
 
-function TACLCustomButton.GetBackgroundStyle: TACLControlBackgroundStyle;
-begin
-  if SubClass.Transparent then
-    Result := cbsTransparent
-  else
-    Result := cbsOpaque;
-end;
-
 procedure TACLCustomButton.ActionChange(Sender: TObject; CheckDefaults: Boolean);
 begin
   if Assigned(Sender) and (Sender is TCustomAction) then
@@ -1032,6 +1024,14 @@ end;
 procedure TACLCustomButton.UpdateCaption;
 begin
   SubClass.Caption := IfThenW(ShowCaption, Caption);
+end;
+
+procedure TACLCustomButton.UpdateTransparency;
+begin
+  if SubClass.Transparent then
+    ControlStyle := ControlStyle - [csOpaque]
+  else
+    ControlStyle := ControlStyle + [csOpaque];
 end;
 
 procedure TACLCustomButton.KeyDown(var Key: Word; Shift: TShiftState);
@@ -1559,30 +1559,6 @@ begin
   inherited Destroy;
 end;
 
-procedure TACLButton.ShowDropDownMenu;
-var
-  AMenu: IACLPopup;
-  APosition: TPoint;
-begin
-  if Assigned(DropDownMenu) then
-  begin
-    DropDownMenu.PopupComponent := Self;
-    APosition := ClientToScreen(NullPoint);
-    if Supports(DropDownMenu, IACLPopup, AMenu) then
-      AMenu.PopupUnderControl(Bounds(APosition.X, APosition.Y, Width, Height))
-    else
-      DropDownMenu.Popup(APosition.X, APosition.Y + Height + 1);
-  end;
-end;
-
-function TACLButton.GetBackgroundStyle: TACLControlBackgroundStyle;
-begin
-  if SubClass.Transparent or (Kind = sbkDropDownButton) and DropDownSubClass.Transparent then
-    Result := cbsTransparent
-  else
-    Result := cbsOpaque;
-end;
-
 procedure TACLButton.Calculate(R: TRect);
 const
   PartMap: array [Boolean] of TACLButtonPart = (abpButton, abpDropDown);
@@ -1689,6 +1665,30 @@ procedure TACLButton.CMEnabledChanged(var Message: TMessage);
 begin
   inherited;
   DropDownSubClass.IsEnabled := Enabled;
+end;
+
+procedure TACLButton.ShowDropDownMenu;
+var
+  AMenu: IACLPopup;
+  APosition: TPoint;
+begin
+  if Assigned(DropDownMenu) then
+  begin
+    DropDownMenu.PopupComponent := Self;
+    APosition := ClientToScreen(NullPoint);
+    if Supports(DropDownMenu, IACLPopup, AMenu) then
+      AMenu.PopupUnderControl(Bounds(APosition.X, APosition.Y, Width, Height))
+    else
+      DropDownMenu.Popup(APosition.X, APosition.Y + Height + 1);
+  end;
+end;
+
+procedure TACLButton.UpdateTransparency;
+begin
+  if SubClass.Transparent or (Kind = sbkDropDownButton) and DropDownSubClass.Transparent then
+    ControlStyle := ControlStyle - [csOpaque]
+  else
+    ControlStyle := ControlStyle + [csOpaque];
 end;
 
 { TACLStyleCheckBox }

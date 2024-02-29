@@ -74,10 +74,10 @@ type
 
     procedure SetStyle(AValue: TACLStyleBevel);
   protected
-    procedure SetTargetDPI(AValue: Integer); override;
     function CreateStyle: TACLStyleBevel; virtual;
-    function GetBackgroundStyle: TACLControlBackgroundStyle; override;
     procedure Paint; override;
+    procedure SetTargetDPI(AValue: Integer); override;
+    procedure UpdateTransparency; override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -182,11 +182,6 @@ begin
   Result := TACLStyleBevel.Create(Self);
 end;
 
-function TACLBevel.GetBackgroundStyle: TACLControlBackgroundStyle;
-begin
-  Result := cbsTransparent;
-end;
-
 procedure TACLBevel.Paint;
 begin
   Style.Draw(Canvas, ClientRect);
@@ -195,6 +190,11 @@ end;
 procedure TACLBevel.SetStyle(AValue: TACLStyleBevel);
 begin
   FStyle.Assign(AValue);
+end;
+
+procedure TACLBevel.UpdateTransparency;
+begin
+  ControlStyle := ControlStyle - [csOpaque];
 end;
 
 end.

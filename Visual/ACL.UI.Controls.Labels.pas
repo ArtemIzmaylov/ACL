@@ -98,7 +98,7 @@ type
     FSubControl: TACLLabelSubControlOptions;
     FTextRect: TRect;
     FTransparent: Boolean;
-    FURL: UnicodeString;
+    FURL: string;
 
     function GetTextColor: TColor;
     function IsCursorStored: Boolean;
@@ -107,7 +107,7 @@ type
     procedure SetStyle(AValue: TACLStyleLabel);
     procedure SetSubControl(AValue: TACLLabelSubControlOptions);
     procedure SetTransparent(AValue: Boolean);
-    procedure SetUrl(const AValue: UnicodeString);
+    procedure SetUrl(const AValue: string);
     // Messages
     procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
     procedure CMHitTest(var Message: TCMHitTest); message CM_HITTEST;
@@ -117,7 +117,6 @@ type
     function CanAutoSize(var ANewWidth, ANewHeight: Integer): Boolean; override;
     function CreateStyle: TACLStyleLabel; virtual;
     function CreateSubControlOptions: TACLLabelSubControlOptions; virtual;
-    function GetBackgroundStyle: TACLControlBackgroundStyle; override;
     function MeasureSize(AWidth: Integer = 0): TSize; virtual;
     //
     procedure Calculate(const R: TRect); overload; virtual;
@@ -130,6 +129,7 @@ type
     procedure Resize; override;
     procedure SetDefaultSize; override;
     procedure SetTargetDPI(AValue: Integer); override;
+    procedure UpdateTransparency; override;
 
     //# Drawing
     procedure DrawBackground(ACanvas: TCanvas); virtual;
@@ -151,7 +151,7 @@ type
     property Style: TACLStyleLabel read FStyle write SetStyle;
     property SubControl: TACLLabelSubControlOptions read FSubControl write SetSubControl;
     property Transparent: Boolean read FTransparent write SetTransparent default True;
-    property URL: UnicodeString read FURL write SetUrl; // before Font and Cursor
+    property URL: string read FURL write SetUrl; // before Font and Cursor
     //# Inherited
     property Align;
     property Anchors;
@@ -200,7 +200,7 @@ type
     function MeasureSize(AWidth: Integer = 0): TSize; override;
   public
     constructor Create(AOwner: TComponent); override;
-    procedure SetCaption(const AValue: UnicodeString; AIcon: TACLValidationLabelIcon);
+    procedure SetCaption(const AValue: string; AIcon: TACLValidationLabelIcon);
   published
     property AutoSize default True;
     property Icon: TACLValidationLabelIcon read FIcon write SetIcon default vliWarning;
@@ -387,7 +387,7 @@ begin
       FTextRect.CenterHorz(LTextSize.cx);
   end;
 
-  IntersectRect(FTextRect, FTextRect, ClientRect);
+  FTextRect.Intersect(R);
   FLineRect := FTextRect;
   if Odd(FLineRect.Height) then
     Inc(FLineRect.Bottom);
@@ -427,17 +427,6 @@ end;
 function TACLLabel.CreateSubControlOptions: TACLLabelSubControlOptions;
 begin
   Result := TACLLabelSubControlOptions.Create(Self);
-end;
-
-function TACLLabel.GetBackgroundStyle: TACLControlBackgroundStyle;
-begin
-  if Transparent then
-    Result := cbsTransparent
-  else
-    if Style.ColorContent.HasAlpha then
-      Result := cbsSemitransparent
-    else
-      Result := cbsOpaque;
 end;
 
 function TACLLabel.MeasureSize(AWidth: Integer = 0): TSize;
@@ -526,8 +515,8 @@ procedure TACLLabel.DrawTextEffects(ACanvas: TCanvas; var R: TRect);
       sleShadow:
         if Style.EffectSize < 0 then
         begin
-          Inc(R.Left, -Style.EffectSize);
-          Inc(R.Top, -Style.EffectSize);
+          Dec(R.Left, Style.EffectSize);
+          Dec(R.Top, Style.EffectSize);
         end
         else
         begin
@@ -570,6 +559,7 @@ procedure TACLLabel.Paint;
 var
   R: TRect;
 begin
+  inherited;
   DrawBackground(Canvas);
 
   R := FTextRect;
@@ -643,10 +633,11 @@ begin
   begin
     FTransparent := AValue;
     UpdateTransparency;
+    Invalidate;
   end;
 end;
 
-procedure TACLLabel.SetUrl(const AValue: UnicodeString);
+procedure TACLLabel.SetUrl(const AValue: string);
 begin
   if AValue <> FURL then
   begin
@@ -661,6 +652,14 @@ begin
     Calculate;
     Invalidate;
   end;
+end;
+
+procedure TACLLabel.UpdateTransparency;
+begin
+  if Transparent or Style.ColorContent.HasAlpha then
+    ControlStyle := ControlStyle - [csOpaque]
+  else
+    ControlStyle := ControlStyle + [csOpaque];
 end;
 
 procedure TACLLabel.CMFontChanged(var Message: TMessage);
@@ -753,7 +752,8 @@ begin
   Result.cx := Result.cx + GetTextOffset;
 end;
 
-procedure TACLValidationLabel.SetCaption(const AValue: UnicodeString; AIcon: TACLValidationLabelIcon);
+procedure TACLValidationLabel.SetCaption(
+  const AValue: string; AIcon: TACLValidationLabelIcon);
 begin
   Caption := AValue;
   Icon := AIcon;

@@ -60,12 +60,12 @@ type
     procedure SetPictureClassName(const Value: string);
   protected
     function CanAutoSize(var NewWidth, NewHeight: Integer): Boolean; override;
-    function GetBackgroundStyle: TACLControlBackgroundStyle; override;
     procedure Changed;
     procedure Notification(AComponent: TComponent; AOperation: TOperation); override;
     procedure Paint; override;
     procedure SetTargetDPI(AValue: Integer); override;
-    //
+    procedure UpdateTransparency; override;
+    //# Properties
     property PictureRect: TRect read GetPictureRect;
   public
     class var PictureClasses: TACLList<TACLImagePictureClass>;
@@ -78,14 +78,14 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    //
+    //# Properties
     property PictureClass: TACLImagePictureClass read GetPictureClass write SetPictureClass;
   published
     property AutoSize;
     property FitMode: TACLFitMode read FFitMode write SetFitMode default afmProportionalStretch;
     property PictureClassName: string read GetPictureClassName write SetPictureClassName; //#AI: before Picture
     property Picture: TACLImagePicture read FPicture write SetPicture;
-    //
+    //# Events
     property OnClick;
     property OnDblClick;
     property OnMouseDown;
@@ -232,19 +232,19 @@ type
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
-    function GetBackgroundStyle: TACLControlBackgroundStyle; override;
     procedure Paint; override;
     procedure Resize; override;
     procedure SetTargetDPI(AValue: Integer); override;
     procedure UpdateHitTest(X, Y: Integer);
-    // Messages
+    procedure UpdateTransparency; override;
+    //# Messages
     procedure WMGetDlgCode(var AMessage: TWMGetDlgCode); message WM_GETDLGCODE;
-    //
+    //# Properties
     property HitTest: TACLSelectionFrameElement read FHitTest write SetHitTest;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    //
+    //# Properties
     property DisplayImageRect: TRect read FDisplayImageRect;
     property ImageCrop: TRect read GetImageCrop write SetImageCrop;
     property ImageSize: TSize read FImageSize write SetImageSize;
@@ -320,11 +320,6 @@ begin
   end
   else
     Result := NullRect;
-end;
-
-function TACLImageBox.GetBackgroundStyle: TACLControlBackgroundStyle;
-begin
-  Result := cbsTransparent;
 end;
 
 procedure TACLImageBox.Changed;
@@ -445,6 +440,11 @@ begin
   UnRegisterClass(AClass);
   if PictureClasses <> nil then
     PictureClasses.Remove(AClass);
+end;
+
+procedure TACLImageBox.UpdateTransparency;
+begin
+  ControlStyle := ControlStyle - [csOpaque];
 end;
 
 { TACLImagePicture }
@@ -960,11 +960,6 @@ begin
   SetImageCrop(ARect);
 end;
 
-function TACLSubImageSelector.GetBackgroundStyle: TACLControlBackgroundStyle;
-begin
-  Result := cbsTransparent;
-end;
-
 procedure TACLSubImageSelector.Paint;
 var
   ASaveIndex: Integer;
@@ -1009,6 +1004,11 @@ end;
 procedure TACLSubImageSelector.UpdateHitTest(X, Y: Integer);
 begin
   HitTest := FSelection.CalculateHitTest(Point(X, Y));
+end;
+
+procedure TACLSubImageSelector.UpdateTransparency;
+begin
+  ControlStyle := ControlStyle - [csOpaque];
 end;
 
 procedure TACLSubImageSelector.WMGetDlgCode(var AMessage: TWMGetDlgCode);

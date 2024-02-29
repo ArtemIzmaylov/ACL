@@ -354,10 +354,8 @@ type
     function CanAutoSize(var NewWidth, NewHeight: Integer): Boolean; override;
     procedure DoGetHint(const P: TPoint; var AHint: string); override;
     procedure FocusChanged; override;
-    function GetBackgroundStyle: TACLControlBackgroundStyle; override;
-    procedure SetDefaultSize; override;
-
     procedure NextPage(ADirection: Integer; APageSize: Single);
+    procedure SetDefaultSize; override;
 
     // Keyboard
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
@@ -394,7 +392,7 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
-    // Properties
+    //# Properties
     property Moving: Boolean read FMoving;
     property PositionAsInteger: Integer read GetPositionAsInteger write SetPositionAsInteger;
     property ViewInfo: TACLSliderViewInfo read FViewInfo;
@@ -410,7 +408,7 @@ type
     property Position: Single read FPosition write SetPosition stored IsPositionStored;
     property Style: TACLStyleSlider read GetStyleSlider write SetStyleSlider;
     property Transparent;
-    //
+    //# Events
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
     property OnDblClick;
     property OnDrawBackground: TACLCustomDrawEvent read FOnDrawBackground write FOnDrawBackground;
@@ -1485,14 +1483,6 @@ begin
   else
     if Assigned(OnGetHint) then
       OnGetHint(Self, Position, AHint);
-end;
-
-function TACLSlider.GetBackgroundStyle: TACLControlBackgroundStyle;
-begin
-  if Transparent then
-    Result := cbsTransparent
-  else
-    Result := cbsOpaque;
 end;
 
 procedure TACLSlider.NextPage(ADirection: Integer; APageSize: Single);

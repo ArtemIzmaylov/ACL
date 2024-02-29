@@ -106,8 +106,6 @@ type
     procedure SetControl(AControl: TControl);
   protected
     function CreateViewInfo: TACLSplitterViewInfo;
-    function GetBackgroundStyle: TACLControlBackgroundStyle; override;
-    procedure AdjustSize; override;
     procedure DblClick; override;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
@@ -116,12 +114,14 @@ type
     procedure Paint; override;
     procedure RecreateViewInfo;
     procedure UpdateControlBounds;
-    //
+    procedure UpdateTransparency; override;
+    //# Properties
     property Moving: Boolean read FMoving;
     property ViewInfo: TACLSplitterViewInfo read FViewInfo;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    procedure AdjustSize; override;
     procedure ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: UnicodeString);
     procedure ConfigSave(AConfig: TACLIniFile; const ASection, AItem: UnicodeString);
     procedure Refresh;
@@ -131,6 +131,7 @@ type
     property CanToggle: Boolean read FCanToggle write SetCanToggle default True;
     property Control: TControl read FControl write SetControl;
     property Cursor stored False;
+    //# Events
     property OnPaint: TNotifyEvent read FOnPaint write FOnPaint;
   end;
 
@@ -298,9 +299,9 @@ begin
   AdjustSize;
 end;
 
-function TACLSplitter.GetBackgroundStyle: TACLControlBackgroundStyle;
+procedure TACLSplitter.UpdateTransparency;
 begin
-  Result := cbsTransparent;
+  ControlStyle := ControlStyle - [csOpaque];
 end;
 
 function TACLSplitter.GetAlign: TAlign;

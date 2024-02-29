@@ -193,7 +193,6 @@ type
     FTabAreaRect: TRect;
 
     function CreatePadding: TACLPadding; override;
-    function GetBackgroundStyle: TACLControlBackgroundStyle; override;
     function HitTest(X, Y: Integer; var AViewItem: TACLTabViewItem): Boolean;
     function IsTabVisible(AIndex: Integer): Boolean;
     procedure AdjustClientRect(var Rect: TRect); override;
@@ -203,6 +202,7 @@ type
     procedure CreateWnd; override;
     procedure ValidateActiveTab;
     procedure ValidateFocus; virtual;
+    procedure UpdateTransparency; override;
 
     // Calculating
     function CalculateTabPlaceIndents(AItem: TACLTabViewItem): TRect; virtual;
@@ -222,7 +222,6 @@ type
     procedure DrawItem(ACanvas: TCanvas; AViewItem: TACLTabViewItem); virtual;
     procedure DrawItems(ACanvas: TCanvas); virtual;
     procedure DrawItemText(ACanvas: TCanvas; AViewItem: TACLTabViewItem); virtual;
-    procedure DrawTransparentBackground(ACanvas: TCanvas; const R: TRect); override;
     procedure Paint; override;
 
     // Keyboard
@@ -302,7 +301,7 @@ type
   protected
     FTab: TACLTab;
 
-    procedure DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect); override;
+    procedure Paint; override;
     procedure SetParent(AParent: TWinControl); override;
     procedure UpdateTab;
   public
@@ -781,19 +780,6 @@ begin
   end;
 end;
 
-procedure TACLCustomTabControl.DrawTransparentBackground(ACanvas: TCanvas; const R: TRect);
-var
-  LPrevRgn: HRGN;
-begin
-  LPrevRgn := acSaveClipRegion(ACanvas.Handle);
-  try
-    if acIntersectClipRegion(ACanvas.Handle, FTabAreaRect) then
-      inherited;
-  finally
-    acRestoreClipRegion(ACanvas.Handle, LPrevRgn);
-  end;
-end;
-
 procedure TACLCustomTabControl.JumpToNextPage(AForward: Boolean);
 var
   AIndex: Integer;
@@ -814,11 +800,6 @@ begin
     ActiveIndex := AIndex
   else
     ActiveIndex := -1;
-end;
-
-function TACLCustomTabControl.GetBackgroundStyle: TACLControlBackgroundStyle;
-begin
-  Result := cbsTransparent;
 end;
 
 function TACLCustomTabControl.HitTest(X, Y: Integer; var AViewItem: TACLTabViewItem): Boolean;
@@ -950,6 +931,11 @@ begin
     if AControl.CanFocus then
       AForm.ActiveControl := AControl;
   end;
+end;
+
+procedure TACLCustomTabControl.UpdateTransparency;
+begin
+  ControlStyle := ControlStyle - [csOpaque];
 end;
 
 procedure TACLCustomTabControl.CMChildKey(var Message: TCMChildKey);
@@ -1223,12 +1209,10 @@ begin
   inherited Destroy;
 end;
 
-procedure TACLPageControlPage.DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect);
+procedure TACLPageControlPage.Paint;
 begin
   if PageControl <> nil then
-    acFillRect(ACanvas, R, PageControl.Style.ColorContent.AsColor)
-  else
-    inherited DrawOpaqueBackground(ACanvas, R);
+    acFillRect(Canvas, ClientRect, PageControl.Style.ColorContent.AsColor);
 end;
 
 procedure TACLPageControlPage.SetParent(AParent: TWinControl);

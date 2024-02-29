@@ -92,14 +92,11 @@ type
     procedure BoundsChanged; override;
     function CalculateRange(AContentHost: TWinControl): TSize; virtual;
     function CreateSubClass: TACLCompoundControlSubClass; override;
-    function DoCustomDraw(ACanvas: TCanvas; const R: TRect): Boolean;
-    procedure DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect); override;
-    function GetBackgroundStyle: TACLControlBackgroundStyle; override;
     procedure Paint; override;
+    procedure UpdateTransparency; override;
   {$IFNDEF FPC}
     procedure WndProc(var Message: TMessage); override;
   {$ENDIF}
-
     //# Properties
     property ContentHost: TWinControl read FContentHost;
     property ViewInfo: TACLScrollBoxViewInfo read GetViewInfo;
@@ -115,7 +112,7 @@ type
     procedure GetChildren(Proc: TGetChildProc; Root: TComponent); override;
     procedure MakeVisible(AControl: TControl); overload;
     procedure MakeVisible(ARect: TRect); overload;
-    procedure ScrollBy(DeltaX, DeltaY: Integer); virtual;
+    procedure ScrollBy(DeltaX, DeltaY: Integer); reintroduce;
     //# Properties
     property Borders: TACLBorders read FBorders write SetBorders default acAllBorders;
     property Style: TACLScrollBoxStyle read GetStyle write SetStyle;
@@ -138,8 +135,7 @@ type
   TACLScrollBoxContentHost = class(TACLCustomControl)
   protected
     procedure AdjustClientRect(var ARect: TRect); override;
-    procedure DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect); override;
-    function GetBackgroundStyle: TACLControlBackgroundStyle; override;
+    procedure Paint; override;
   end;
 
   { TACLScrollBoxSubClass }
@@ -286,19 +282,6 @@ begin
   Result := TACLScrollBoxSubClass.Create(Self);
 end;
 
-function TACLCustomScrollBox.DoCustomDraw(ACanvas: TCanvas; const R: TRect): Boolean;
-begin
-  Result := False;
-  if Assigned(OnCustomDraw) then
-    OnCustomDraw(Self, ACanvas, R, Result);
-end;
-
-procedure TACLCustomScrollBox.DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect);
-begin
-  if not DoCustomDraw(ACanvas, R) then
-    Style.DrawContent(ACanvas, R);
-end;
-
 procedure TACLCustomScrollBox.DisableAutoRange;
 begin
   BeginUpdate;
@@ -339,17 +322,6 @@ end;
 function TACLCustomScrollBox.GetViewPoint: TPoint;
 begin
   Result := Point(ViewInfo.ViewportX, ViewInfo.ViewportY);
-end;
-
-function TACLCustomScrollBox.GetBackgroundStyle: TACLControlBackgroundStyle;
-begin
-  if Transparent then
-    Result := cbsTransparent
-  else
-    if Style.IsTransparentBackground then
-      Result := cbsSemitransparent
-    else
-      Result := cbsOpaque;
 end;
 
 procedure TACLCustomScrollBox.MakeVisible(AControl: TControl);
@@ -416,9 +388,11 @@ procedure TACLCustomScrollBox.Paint;
 begin
   inherited;
 {$IFDEF SB_DT_WORKAROUND}
-  if csDesigning in ComponentState then Exit;
+  if csDesigning in ComponentState then
+    Style.DrawContent(Canvas, ClientRect)
+  else
 {$ENDIF}
-  Style.DrawBorder(Canvas, ClientRect, Borders);
+    Style.DrawBorder(Canvas, ClientRect, Borders);
 end;
 
 procedure TACLCustomScrollBox.ScrollBy(DeltaX, DeltaY: Integer);
@@ -450,6 +424,14 @@ procedure TACLCustomScrollBox.SetViewPoint(const Value: TPoint);
 begin
   ViewInfo.ViewportX := Value.X;
   ViewInfo.ViewportY := Value.Y;
+end;
+
+procedure TACLCustomScrollBox.UpdateTransparency;
+begin
+  if Transparent or Style.IsTransparentBackground then
+    ContentHost.ControlStyle := ContentHost.ControlStyle - [csOpaque]
+  else
+    ContentHost.ControlStyle := ContentHost.ControlStyle + [csOpaque];
 end;
 
 {$IFNDEF FPC}
@@ -512,14 +494,17 @@ begin
   inherited AdjustClientRect(ARect);
 end;
 
-procedure TACLScrollBoxContentHost.DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect);
+procedure TACLScrollBoxContentHost.Paint;
+var
+  LBox: TACLCustomScrollBox;
+  LHandled: Boolean;
 begin
-  TACLCustomScrollBox(Owner).DrawOpaqueBackground(ACanvas, R);
-end;
-
-function TACLScrollBoxContentHost.GetBackgroundStyle: TACLControlBackgroundStyle;
-begin
-  Result := TACLCustomScrollBox(Owner).GetBackgroundStyle;
+  LHandled := False;
+  LBox := TACLCustomScrollBox(Owner);
+  if Assigned(LBox.OnCustomDraw) then
+    LBox.OnCustomDraw(LBox, Canvas, ClientRect, LHandled);
+  if not LHandled and not LBox.Transparent then
+    LBox.Style.DrawContent(Canvas, ClientRect);
 end;
 
 { TACLScrollBoxSubClass }

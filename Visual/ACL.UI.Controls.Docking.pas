@@ -278,7 +278,7 @@ type
     procedure StartDrag(const P: TPoint);
     procedure StartResize(const P: TPoint; ABorder: TACLBorder);
     //# Drawing
-    procedure DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect); override;
+    procedure Paint; override;
     //# Keyboard
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     //# Mouse
@@ -366,13 +366,12 @@ type
     procedure ControlsAligned; override;
     procedure ControlsAligning; override;
     function HasTabs: Boolean; inline;
-    procedure Paint; override;
     function ResizeChild(AChild: TACLDockControl; ASide: TACLBorder; ADelta: Integer): Integer;
     procedure ValidateInsert(AComponent: TComponent); override;
     // IACLCursorProvider
     function GetCursor(const P: TPoint): TCursor; override;
     //# Drawing
-    procedure DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect); override;
+    procedure Paint; override;
     //# Storing
     procedure LayoutLoad(ANode: TACLXMLNode); override;
     procedure LayoutSave(ANode: TACLXMLNode); override;
@@ -859,9 +858,10 @@ end;
 
 procedure TACLDockZone.Update;
 var
-  ALayer: TACLBitmapLayer;
+  ALayer: TACLDib;
 begin
-  ALayer := TACLBitmapLayer.Create(Width, Height);
+  if (Width = 0) or (Height = 0) then Exit;
+  ALayer := TACLDib.Create(Width, Height);
   try
     acFillRect(ALayer.Canvas, ALayer.ClientRect, TAlphaColor($FFFAFAFA));
     acDrawFrame(ALayer.Canvas, ALayer.ClientRect, TAlphaColor($FFA5A5A5));
@@ -1478,11 +1478,6 @@ begin
   // suppress Explicit // inherited;
 end;
 
-procedure TACLDockControl.DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect);
-begin
-  Style.DrawContent(ACanvas, R);
-end;
-
 function TACLDockControl.GetCursor(const P: TPoint): TCursor;
 var
   ACtrl: TACLDockControl;
@@ -1663,6 +1658,11 @@ begin
   inherited;
 end;
 
+procedure TACLDockControl.Paint;
+begin
+  Style.DrawContent(Canvas, ClientRect);
+end;
+
 procedure TACLDockControl.StartDrag(const P: TPoint);
 begin
   MouseCapture := True;
@@ -1816,12 +1816,6 @@ begin
   FActiveControlIndex := -1;
   Name := CreateUniqueName(Self, 'TACL', '');
   DoubleBuffered := False;
-end;
-
-procedure TACLDockGroup.DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect);
-begin
-  if not FRestSpace.IsEmpty then
-    inherited DrawOpaqueBackground(ACanvas, FRestSpace);
 end;
 
 procedure TACLDockGroup.DrawTabs(ACanvas: TCanvas);
@@ -2510,6 +2504,8 @@ end;
 
 procedure TACLDockGroup.Paint;
 begin
+  if not FRestSpace.IsEmpty then
+    Style.DrawContent(Canvas, FRestSpace);
   if Layout = TACLDockGroupLayout.Tabbed then
   begin
     if not FTabsArea.IsEmpty then

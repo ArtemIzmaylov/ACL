@@ -18,12 +18,6 @@ unit ACL.UI.Controls.BaseControls;
 {$MESSAGE WARN 'TODO - Cursor - надо рассмотреть возможность миграции на локальное изменение'}
 {$ENDIF}
 
-{$MESSAGE 'TODO - TACLControlBackgroundStyle а оно нам надо?'}
-(*
-
-
-*)
-
 interface
 
 uses
@@ -100,17 +94,21 @@ type
   TWMMouseWheel = TCMMouseWheel;
 {$ENDIF}
 
-  TACLMouseWheelDirection = (
-    mwdDown, // Scroll the mouse wheel down (to yourself), the list must be scrolled to next item. equals to LB_LINEDOWN.
-    mwdUp    // Scroll the mouse wheel up (from yourself), the list must be scrolled to previous item. equals to LB_LINEUP.
+  TACLMouseWheelDirection =
+  (
+    mwdDown, // Scroll the mouse wheel down (to yourself),
+             // the list must be scrolled to next item. equals to LB_LINEDOWN.
+    mwdUp    // Scroll the mouse wheel up (from yourself),
+             // the list must be scrolled to previous item. equals to LB_LINEUP.
   );
 
   TACLOrientation = (oHorizontal, oVertical);
   TACLSelectionMode = (smUnselect, smSelect, smInvert);
-  TACLControlBackgroundStyle = (cbsOpaque, cbsTransparent, cbsSemitransparent);
 
-  TACLCustomDrawEvent = procedure (Sender: TObject; ACanvas: TCanvas; const R: TRect; var AHandled: Boolean) of object;
-  TACLKeyPreviewEvent = procedure (AKey: Word; AShift: TShiftState; var AAccept: Boolean) of object;
+  TACLCustomDrawEvent = procedure (Sender: TObject;
+    ACanvas: TCanvas; const R: TRect; var AHandled: Boolean) of object;
+  TACLKeyPreviewEvent = procedure (AKey: Word;
+    AShift: TShiftState; var AAccept: Boolean) of object;
   TACLGetHintEvent = procedure (Sender: TObject; X, Y: Integer; var AHint: string) of object;
 
   { IACLControl }
@@ -276,7 +274,8 @@ type
   protected
     procedure InitializeResources; override;
   public
-    procedure DrawBorder(ACanvas: TCanvas; const R: TRect; const ABorders: TACLBorders);
+    procedure Draw(ACanvas: TCanvas; const R: TRect; ATransparent: Boolean; ABorders: TACLBorders);
+    procedure DrawBorder(ACanvas: TCanvas; const R: TRect; ABorders: TACLBorders);
     procedure DrawContent(ACanvas: TCanvas; const R: TRect);
     function IsTransparentBackground: Boolean;
   published
@@ -349,12 +348,11 @@ type
     procedure CalculatePreferredSize(var W, H: Integer; X: Boolean); override;
   {$ENDIF}
     procedure DoGetHint(const P: TPoint; var AHint: string); virtual;
-    function GetBackgroundStyle: TACLControlBackgroundStyle; virtual;
     procedure Loaded; override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     procedure SetDefaultSize; virtual;
     procedure SetTargetDPI(AValue: Integer); virtual;
-    procedure UpdateTransparency;
+    procedure UpdateTransparency; virtual;
 
     // IACLResourcesChangeListener
     procedure ResourceChanged(Sender: TObject; Resource: TACLResource = nil); overload;
@@ -456,7 +454,6 @@ type
     procedure WMMouseMove(var Message: TWMMouseMove); message WM_MOUSEMOVE;
     procedure WMMouseWheelHorz(var Message: TWMMouseWheel); message WM_MOUSEHWHEEL;
     procedure WMPaint(var Message: TWMPaint); message WM_PAINT;
-    procedure WMSetCursor(var Message: TWMSetCursor); message WM_SETCURSOR;
     procedure WMSetFocus(var Message: TWMSetFocus); message WM_SETFOCUS;
     procedure WMSize(var Message: TWMSize); message WM_SIZE;
   protected
@@ -475,8 +472,8 @@ type
     procedure DoLoaded; virtual;
     procedure FocusChanged; virtual;
     procedure Loaded; override;
-    procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer); override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
+    procedure PaintWindow(DC: HDC); override;
   {$IFNDEF FPC}
     procedure Resize; override;
   {$ENDIF}
@@ -484,22 +481,21 @@ type
     procedure SetFocusOnClick; virtual;
     procedure SetTargetDPI(AValue: Integer); virtual;
     procedure UpdateCursor;
-    procedure UpdateTransparency;
-
-    // Drawing
-    procedure DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect); virtual;
-    procedure DrawTransparentBackground(ACanvas: TCanvas; const R: TRect); virtual;
-    function GetBackgroundStyle: TACLControlBackgroundStyle; virtual;
-    procedure PaintWindow(DC: HDC); override;
+    procedure UpdateTransparency; virtual;
+    procedure WndProc(var Message: TLMessage); override;
 
     // IACLCurrentDpi
     function GetCurrentDpi: Integer;
+
     // IACLMouseTracking
     function IsMouseAtControl: Boolean; virtual;
     procedure MouseEnter; reintroduce; virtual;
     procedure MouseLeave; reintroduce; virtual;
+    procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer); override;
+
     // IACLResourceCollection
     function GetCollection: TACLCustomResourceCollection;
+
     // IACLResourcesChangeListener
     procedure ResourceChanged(Sender: TObject; Resource: TACLResource = nil); overload;
     procedure ResourceChanged; overload; virtual;
@@ -547,7 +543,7 @@ type
     property ShowHint;
     property TabOrder;
     property Visible;
-
+    //# Events
     property OnClick;
     property OnContextPopup;
     property OnDragDrop;
@@ -598,7 +594,7 @@ type
     procedure Notification(AComponent: TComponent; AOperation: TOperation); virtual;
     function TrySetFocus: Boolean;
     procedure UpdateVisibility; virtual;
-    //
+    //# Properties
     property Owner: TControl read FOwner;
   public
     constructor Create(AOwner: TControl);
@@ -619,14 +615,13 @@ type
 
     procedure CMShowingChanged(var Message: TMessage); message CM_SHOWINGCHANGED;
     procedure SetBorders(AValue: TACLBorders);
-    procedure SetStyle(const Value: TACLStyleBackground);
+    procedure SetStyle(AValue: TACLStyleBackground);
   protected
     function CreateStyle: TACLStyleBackground; virtual;
-    procedure DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect); override;
-    function GetBackgroundStyle: TACLControlBackgroundStyle; override;
     function GetContentOffset: TRect; override;
     procedure Paint; override;
     procedure SetTargetDPI(AValue: Integer); override;
+    procedure UpdateTransparency; override;
     //# Properties
     property Borders: TACLBorders read FBorders write SetBorders default acAllBorders;
   public
@@ -657,10 +652,9 @@ type
     // Scaling
     class procedure ScaleChanging(AControl: TWinControl; var AState: TObject);
     class procedure ScaleChanged(AControl: TWinControl; var AState: TObject);
-    // Helpers
-    class procedure UpdateCursorOnMove(ACaller: TWinControl);
     // Messages
     class function WMSetCursor(ACaller: TWinControl; var Message: TWMSetCursor): Boolean;
+    class procedure WndProc(ACaller: TWinControl; var Message: TMessage);
   end;
 
   { TACLMouseTracking }
@@ -1350,17 +1344,6 @@ begin
   TWinControlAccess(AControl).EnableAlign;
 end;
 
-class procedure TACLControls.UpdateCursorOnMove(ACaller: TWinControl);
-begin
-{$IFDEF FPC}
-  if not Mouse.IsDragging then
-  begin
-    if ACaller.Perform(WM_SETCURSOR, ACaller.Handle, MakeLong(HTCLIENT, LM_MOUSEMOVE)) = 0 then
-      SetCursor(crDefault);
-  end;
-{$ENDIF}
-end;
-
 class function TACLControls.WMSetCursor(
   ACaller: TWinControl; var Message: TWMSetCursor): Boolean;
 
@@ -1400,6 +1383,22 @@ begin
       Result := True;
     end;
   end;
+end;
+
+class procedure TACLControls.WndProc(ACaller: TWinControl; var Message: TMessage);
+begin
+{$IFDEF FPC}
+  if (Message.Msg >= LM_MOUSEFIRST) and (Message.Msg <= LM_MOUSELAST) then
+  begin
+    if not Mouse.IsDragging then
+    begin
+      if ACaller.Perform(WM_SETCURSOR, ACaller.Handle, MakeLong(HTCLIENT, Message.Msg)) = 0 then
+        SetCursor(crDefault);
+    end;
+  end;
+{$ENDIF}
+  if Message.Msg = WM_SETCURSOR then
+    WMSetCursor(ACaller, TWMSetCursor(Message));
 end;
 
 { TACLCheckBoxStateHelper }
@@ -1470,7 +1469,15 @@ end;
 
 { TACLStyleBackground }
 
-procedure TACLStyleBackground.DrawBorder(ACanvas: TCanvas; const R: TRect; const ABorders: TACLBorders);
+procedure TACLStyleBackground.Draw(ACanvas: TCanvas;
+  const R: TRect; ATransparent: Boolean; ABorders: TACLBorders);
+begin
+  if not ATransparent then
+    DrawContent(ACanvas, R);
+  DrawBorder(ACanvas, R, ABorders);
+end;
+
+procedure TACLStyleBackground.DrawBorder(ACanvas: TCanvas; const R: TRect; ABorders: TACLBorders);
 begin
   acDrawComplexFrame(ACanvas, R, ColorBorder1.Value, ColorBorder2.Value, ABorders);
 end;
@@ -1621,11 +1628,6 @@ begin
   MarginsChangeHandler(nil);
 end;
 
-function TACLGraphicControl.GetBackgroundStyle: TACLControlBackgroundStyle;
-begin
-  Result := cbsOpaque;
-end;
-
 procedure TACLGraphicControl.InvalidateRect(const R: TRect);
 var
   LRect: TRect;
@@ -1714,44 +1716,6 @@ begin
   MouseTracker.Add(Self);
 end;
 
-procedure TACLGraphicControl.ResourceChanged(Sender: TObject; Resource: TACLResource = nil);
-begin
-  if Sender = ResourceCollection then
-    ResourceCollectionChanged;
-  ResourceChanged;
-end;
-
-procedure TACLGraphicControl.ResourceChanged;
-begin
-  if not (csDestroying in ComponentState) then
-  begin
-    AdjustSize;
-    UpdateTransparency;
-    Invalidate;
-  end;
-end;
-
-procedure TACLGraphicControl.ResourceCollectionChanged;
-begin
-  TACLStyle.Refresh(Self);
-end;
-
-procedure TACLGraphicControl.UpdateTransparency;
-var
-  AStyle: TACLControlBackgroundStyle;
-begin
-  AStyle := GetBackgroundStyle;
-  if (csOpaque in ControlStyle) <> (AStyle = cbsOpaque) then
-  begin
-    if AStyle <> cbsOpaque then
-      ControlStyle := ControlStyle - [csOpaque]
-    else
-      ControlStyle := ControlStyle + [csOpaque];
-
-    Invalidate;
-  end;
-end;
-
 procedure TACLGraphicControl.CMFontChanged(var Message: TMessage);
 begin
   inherited;
@@ -1789,6 +1753,33 @@ end;
 procedure TACLGraphicControl.SetMargins(const Value: TACLMargins);
 begin
   FMargins.Assign(Value);
+end;
+
+procedure TACLGraphicControl.ResourceChanged(Sender: TObject; Resource: TACLResource = nil);
+begin
+  if Sender = ResourceCollection then
+    ResourceCollectionChanged;
+  ResourceChanged;
+end;
+
+procedure TACLGraphicControl.ResourceChanged;
+begin
+  if not (csDestroying in ComponentState) then
+  begin
+    AdjustSize;
+    UpdateTransparency;
+    Invalidate;
+  end;
+end;
+
+procedure TACLGraphicControl.ResourceCollectionChanged;
+begin
+  TACLStyle.Refresh(Self);
+end;
+
+procedure TACLGraphicControl.UpdateTransparency;
+begin
+  // do nothing
 end;
 
 { TACLCustomControl }
@@ -1893,16 +1884,6 @@ begin
   // do nothing
 end;
 
-procedure TACLCustomControl.DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect);
-begin
-  acFillRect(ACanvas, R, Color);
-end;
-
-procedure TACLCustomControl.DrawTransparentBackground(ACanvas: TCanvas; const R: TRect);
-begin
-  acDrawTransparentControlBackground(Self, ACanvas.Handle, R, False);
-end;
-
 procedure TACLCustomControl.FocusChanged;
 begin
   // do nothing
@@ -1955,7 +1936,7 @@ begin
   end;
 end;
 
-procedure TACLCustomControl.MouseDown(Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer);
+procedure TACLCustomControl.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   if FocusOnClick then
     SetFocusOnClick;
@@ -1963,25 +1944,10 @@ begin
 end;
 
 procedure TACLCustomControl.PaintWindow(DC: HDC);
-var
-  LStyle: TACLControlBackgroundStyle;
 begin
-  Canvas.Lock;
-  try
-    Canvas.Handle := DC;
-    try
-      LStyle := GetBackgroundStyle;
-      if LStyle <> cbsOpaque then
-        DrawTransparentBackground(Canvas, ClientRect);
-      if LStyle <> cbsTransparent then
-        DrawOpaqueBackground(Canvas, ClientRect);
-      Paint;
-    finally
-      Canvas.Handle := 0;
-    end;
-  finally
-    Canvas.Unlock;
-  end;
+  if not (csOpaque in ControlStyle) then
+    acDrawTransparentControlBackground(Self, DC, ClientRect, False);
+  inherited PaintWindow(DC);
 end;
 
 {$IFNDEF FPC}
@@ -2048,13 +2014,16 @@ end;
 
 procedure TACLCustomControl.UpdateTransparency;
 begin
-  if GetBackgroundStyle = cbsOpaque then
-    ControlStyle := ControlStyle + [csOpaque]
+  if Transparent then
+    ControlStyle := ControlStyle - [csOpaque]
   else
-    ControlStyle := ControlStyle - [csOpaque];
+    ControlStyle := ControlStyle + [csOpaque];
+end;
 
-  if HandleAllocated then
-    Invalidate;
+procedure TACLCustomControl.WndProc(var Message: TLMessage);
+begin
+  inherited WndProc(Message);
+  TACLControls.WndProc(Self, Message);
 end;
 
 procedure TACLCustomControl.CMEnabledChanged(var Message: TMessage);
@@ -2128,12 +2097,6 @@ begin
     end;
 end;
 
-procedure TACLCustomControl.WMSetCursor(var Message: TWMSetCursor);
-begin
-  if not TACLControls.WMSetCursor(Self, Message) then
-    inherited;
-end;
-
 procedure TACLCustomControl.WMSetFocus(var Message: TWMSetFocus);
 begin
   inherited;
@@ -2193,7 +2156,6 @@ procedure TACLCustomControl.WMMouseMove(var Message: TWMMouseMove);
 begin
   if IsMouseAtControl then
     MouseTracker.Add(Self);
-  TACLControls.UpdateCursorOnMove(Self);
   inherited;
 end;
 
@@ -2222,7 +2184,9 @@ end;
 
 procedure TACLCustomControl.BoundsChanged;
 begin
-  // do nothing
+{$IFDEF FPC}
+  inherited;
+{$ENDIF}
 end;
 
 {$IFDEF FPC}
@@ -2288,14 +2252,6 @@ begin
   Result := FLangSection;
 end;
 
-function TACLCustomControl.GetBackgroundStyle: TACLControlBackgroundStyle;
-begin
-  if Transparent then
-    Result := cbsTransparent
-  else
-    Result := cbsOpaque;
-end;
-
 function TACLCustomControl.IsPaddingStored: Boolean;
 begin
   Result := Padding.IsStored;
@@ -2355,15 +2311,17 @@ begin
   inherited Destroy;
 end;
 
+procedure TACLContainer.CMShowingChanged(var Message: TMessage);
+begin
+  inherited;
+  // Для корректной отработки AutoSize при первом показе контейнера с контролами
+  if Showing then
+    FullRefresh;
+end;
+
 function TACLContainer.CreateStyle: TACLStyleBackground;
 begin
   Result := TACLStyleBackground.Create(Self);
-end;
-
-procedure TACLContainer.SetTargetDPI(AValue: Integer);
-begin
-  inherited SetTargetDPI(AValue);
-  Style.SetTargetDPI(AValue);
 end;
 
 function TACLContainer.GetContentOffset: TRect;
@@ -2371,32 +2329,9 @@ begin
   Result := acBorderOffsets * Borders;
 end;
 
-function TACLContainer.GetBackgroundStyle: TACLControlBackgroundStyle;
-begin
-  if Transparent then
-    Result := cbsTransparent
-  else if Style.IsTransparentBackground then
-    Result := cbsSemitransparent
-  else
-    Result := cbsOpaque;
-end;
-
-procedure TACLContainer.DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect);
-begin
-  Style.DrawContent(ACanvas, R);
-end;
-
 procedure TACLContainer.Paint;
 begin
-  Style.DrawBorder(Canvas, ClientRect, Borders);
-end;
-
-procedure TACLContainer.CMShowingChanged(var Message: TMessage);
-begin
-  inherited;
-  // Для корректной отработки AutoSize при первом показе контейнера с контролами
-  if Showing then
-    FullRefresh;
+  Style.Draw(Canvas, ClientRect, Transparent, Borders);
 end;
 
 procedure TACLContainer.SetBorders(AValue: TACLBorders);
@@ -2410,9 +2345,23 @@ begin
   end;
 end;
 
-procedure TACLContainer.SetStyle(const Value: TACLStyleBackground);
+procedure TACLContainer.SetStyle(AValue: TACLStyleBackground);
 begin
-  FStyle.Assign(Value);
+  FStyle.Assign(AValue);
+end;
+
+procedure TACLContainer.SetTargetDPI(AValue: Integer);
+begin
+  inherited SetTargetDPI(AValue);
+  Style.SetTargetDPI(AValue);
+end;
+
+procedure TACLContainer.UpdateTransparency;
+begin
+  if Transparent or Style.IsTransparentBackground then
+    ControlStyle := ControlStyle - [csOpaque]
+  else
+    ControlStyle := ControlStyle + [csOpaque];
 end;
 
 { TACLControlHelper }

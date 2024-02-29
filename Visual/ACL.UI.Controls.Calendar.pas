@@ -346,7 +346,7 @@ type
     procedure SetValue(const Value: TDate);
   protected
     function CreateSubClass: TACLCompoundControlSubClass; override;
-    function GetBackgroundStyle: TACLControlBackgroundStyle; override;
+    procedure UpdateTransparency; override;
     //# Properties
     property Style: TACLStyleCalendar read GetStyle write SetStyle;
     //# Events
@@ -1143,6 +1143,11 @@ end;
 
 procedure TACLCalendarViewInfo.PrepareAnimationFrame(AFrame: TACLDib; const P: TPoint);
 begin
+  if SubClass.Transparent then
+  begin
+    acDrawTransparentControlBackground(
+      SubClass.Container.GetControl, AFrame.Handle, AFrame.ClientRect, False);
+  end;
   DrawTo(AFrame.Canvas, Bounds.Left - P.X, Bounds.Top - P.Y);
   AFrame.MakeOpaque;
 end;
@@ -1152,17 +1157,6 @@ end;
 function TACLCustomCalendar.CreateSubClass: TACLCompoundControlSubClass;
 begin
   Result := TACLCalendarSubClass.Create(Self);
-end;
-
-function TACLCustomCalendar.GetBackgroundStyle: TACLControlBackgroundStyle;
-begin
-  if Transparent then
-    Result := cbsTransparent
-  else
-    if Style.ColorBackground.HasAlpha then
-      Result := cbsSemitransparent
-    else
-      Result := cbsOpaque;
 end;
 
 function TACLCustomCalendar.GetOnSelect: TNotifyEvent;
@@ -1206,12 +1200,21 @@ begin
   begin
     SubClass.Transparent := Value;
     UpdateTransparency;
+    Invalidate;
   end;
 end;
 
 procedure TACLCustomCalendar.SetValue(const Value: TDate);
 begin
   SubClass.Value := Value;
+end;
+
+procedure TACLCustomCalendar.UpdateTransparency;
+begin
+  if Transparent or Style.ColorBackground.HasAlpha then
+    ControlStyle := ControlStyle - [csOpaque]
+  else
+    ControlStyle := ControlStyle + [csOpaque];
 end;
 
 end.

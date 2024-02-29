@@ -56,18 +56,10 @@ type
 
   { TACLHexViewStyle }
 
-  TACLHexViewStyle = class(TACLStyle)
+  TACLHexViewStyle = class(TACLStyleBackground)
   protected
     procedure InitializeResources; override;
-  public
-    procedure DrawBorder(ACanvas: TCanvas; const R: TRect; const ABorders: TACLBorders);
-    procedure DrawContent(ACanvas: TCanvas; const R: TRect);
-    function IsTransparentBackground: Boolean;
   published
-    property ColorBorder1: TACLResourceColor index 0 read GetColor write SetColor stored IsColorStored;
-    property ColorBorder2: TACLResourceColor index 1 read GetColor write SetColor stored IsColorStored;
-    property ColorContent1: TACLResourceColor index 2 read GetColor write SetColor stored IsColorStored;
-    property ColorContent2: TACLResourceColor index 3 read GetColor write SetColor stored IsColorStored;
     property ColorContentFocused: TACLResourceColor index 4 read GetColor write SetColor stored IsColorStored;
     property ColorContentSelected: TACLResourceColor index 5 read GetColor write SetColor stored IsColorStored;
     property ColorContentSelectedInactive: TACLResourceColor index 6 read GetColor write SetColor stored IsColorStored;
@@ -358,13 +350,13 @@ type
     procedure SetSelLength(const Value: Int64);
     procedure SetSelStart(const Value: Int64);
     procedure SetStyle(AValue: TACLHexViewStyle); inline;
-    //
+    //# Messages
     procedure WMGetDlgCode(var AMessage: TWMGetDlgCode); message WM_GETDLGCODE;
   protected
     function CreateSubClass: TACLCompoundControlSubClass; override;
-    procedure DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect); override;
-    function GetBackgroundStyle: TACLControlBackgroundStyle; override;
     function GetContentOffset: TRect; override;
+    procedure Paint; override;
+    procedure UpdateTransparency; override;
   public
     constructor Create(AOwner: TComponent); override;
     procedure CopyToClipboard; overload;
@@ -372,7 +364,7 @@ type
     function GetSelectedBytes: TBytes;
     procedure SelectAll;
     procedure SetSelection(const AStart, ALength: Int64);
-
+    //# Properties
     property Data: TStream read GetData write SetData;
     property FocusOnClick default True;
     property SelLength: Int64 read GetSelLength write SetSelLength;
@@ -384,7 +376,7 @@ type
     property Style: TACLHexViewStyle read GetStyle write SetStyle;
     property StyleScrollBox;
     property Transparent;
-
+    //# Events
     property OnSelect: TNotifyEvent read GetOnSelect write SetOnSelect;
   end;
 
@@ -422,28 +414,9 @@ end;
 
 { TACLHexViewStyle }
 
-procedure TACLHexViewStyle.DrawBorder(ACanvas: TCanvas; const R: TRect; const ABorders: TACLBorders);
-begin
-  acDrawComplexFrame(ACanvas, R, ColorBorder1.Value, ColorBorder2.Value, ABorders);
-end;
-
-procedure TACLHexViewStyle.DrawContent(ACanvas: TCanvas; const R: TRect);
-begin
-  acDrawGradient(ACanvas, R, ColorContent1.Value, ColorContent2.Value);
-end;
-
-function TACLHexViewStyle.IsTransparentBackground: Boolean;
-begin
-  Result := acIsSemitransparentFill(ColorContent1, ColorContent2);
-end;
-
 procedure TACLHexViewStyle.InitializeResources;
 begin
   inherited;
-  ColorBorder1.InitailizeDefaults('Common.Colors.Border1', True);
-  ColorBorder2.InitailizeDefaults('Common.Colors.Border2', True);
-  ColorContent1.InitailizeDefaults('Common.Colors.Background1', True);
-  ColorContent2.InitailizeDefaults('Common.Colors.Background2', True);
   ColorHeaderText.InitailizeDefaults('Common.Colors.TextHeader');
   ColorContentText1.InitailizeDefaults('HexView.Colors.Text1');
   ColorContentText2.InitailizeDefaults('HexView.Colors.Text2');
@@ -477,21 +450,10 @@ begin
   Result := TACLHexViewSubClass.Create(Self);
 end;
 
-procedure TACLHexView.DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect);
+procedure TACLHexView.Paint;
 begin
-  Style.DrawContent(ACanvas, R);
-  Style.DrawBorder(ACanvas, R, Borders);
-end;
-
-function TACLHexView.GetBackgroundStyle: TACLControlBackgroundStyle;
-begin
-  if Transparent then
-    Result := cbsTransparent
-  else
-    if Style.IsTransparentBackground then
-      Result := cbsSemitransparent
-    else
-      Result := cbsOpaque;
+  Style.Draw(Canvas, ClientRect, Transparent, Borders);
+  inherited;
 end;
 
 function TACLHexView.GetContentOffset: TRect;
@@ -577,6 +539,14 @@ end;
 procedure TACLHexView.SetStyle(AValue: TACLHexViewStyle);
 begin
   SubClass.Style.Assign(AValue);
+end;
+
+procedure TACLHexView.UpdateTransparency;
+begin
+  if Transparent or Style.IsTransparentBackground then
+    ControlStyle := ControlStyle - [csOpaque]
+  else
+    ControlStyle := ControlStyle + [csOpaque];
 end;
 
 procedure TACLHexView.WMGetDlgCode(var AMessage: TWMGetDlgCode);

@@ -157,14 +157,14 @@ type
     procedure SetStyle(const AValue: TACLStyleTreeList);
     procedure SetViewportX(const Value: Integer);
     procedure SetViewportY(const Value: Integer);
-    //
+    //# Messages
     procedure WMGetDlgCode(var AMessage: TWMGetDlgCode); message WM_GETDLGCODE;
   protected
     function CreateSubClass: TACLCompoundControlSubClass; override;
-    function GetBackgroundStyle: TACLControlBackgroundStyle; override;
+    procedure UpdateTransparency; override;
     // IACLFocusableControl2
     procedure SetFocusOnSearchResult;
-    //
+    //# Properties
     property Columns: TACLTreeListColumns read GetColumns write SetColumns;
     property OptionsBehavior: TACLTreeListOptionsBehavior read GetOptionsBehavior write SetOptionsBehavior;
     property OptionsCustomizing: TACLTreeListOptionsCustomizing read GetOptionsCustomizing write SetOptionsCustomizing;
@@ -174,7 +174,7 @@ type
     property StyleInplaceEditButton: TACLStyleEditButton read GetStyleInplaceEditButton write SetStyleInplaceEditButton;
     property StyleMenu: TACLStylePopupMenu read GetStyleMenu write SetStyleMenu;
     property Style: TACLStyleTreeList read GetStyle write SetStyle;
-    //
+    //# Events
     property OnCanDeleteSelected: TACLTreeListConfirmationEvent read GetOnCanDeleteSelected write SetOnCanDeleteSelected;
     property OnColumnClick: TACLTreeListColumnClickEvent read GetOnColumnClick write SetOnColumnClick;
     property OnCompare: TACLTreeListNodeCompareEvent read GetOnCompare write SetOnCompare;
@@ -274,7 +274,7 @@ type
   TACLTreeList = class(TACLCustomTreeList)
   published
     property OnGetNodeClass; // must be first!
-    //
+    //# Properties
     property Columns;
     property OptionsBehavior;
     property OptionsCustomizing;
@@ -286,12 +286,12 @@ type
     property StyleInplaceEdit;
     property StyleInplaceEditButton;
     property StyleScrollBox;
-    //
+    //# CustomDraw Events
     property OnCustomDrawColumnBar;
     property OnCustomDrawNode;
     property OnCustomDrawNodeCell;
     property OnCustomDrawNodeCellValue;
-    //
+    //# Events
     property OnCalculated;
     property OnCanDeleteSelected;
     property OnClick;
@@ -382,6 +382,14 @@ procedure TACLCustomTreeList.StartEditing(AColumn: TACLTreeListColumn = nil);
 begin
   if FocusedNode <> nil then
     SubClass.StartEditing(FocusedNode, AColumn);
+end;
+
+procedure TACLCustomTreeList.UpdateTransparency;
+begin
+  if Style.BackgroundColor.HasAlpha then
+    ControlStyle := ControlStyle - [csOpaque]
+  else
+    ControlStyle := ControlStyle + [csOpaque];
 end;
 
 procedure TACLCustomTreeList.ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: UnicodeString);
@@ -478,14 +486,6 @@ end;
 function TACLCustomTreeList.CreateSubClass: TACLCompoundControlSubClass;
 begin
   Result := TACLTreeListSubClass.Create(Self);
-end;
-
-function TACLCustomTreeList.GetBackgroundStyle: TACLControlBackgroundStyle;
-begin
-  if Style.BackgroundColor.HasAlpha then
-    Result := cbsSemitransparent
-  else
-    Result := cbsOpaque;
 end;
 
 procedure TACLCustomTreeList.SetFocusOnSearchResult;

@@ -258,7 +258,6 @@ end;
 
 procedure TACLCompoundControl.Paint;
 begin
-  inherited Paint;
   SubClass.Draw(Canvas);
 end;
 

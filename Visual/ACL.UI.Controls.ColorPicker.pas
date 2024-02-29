@@ -249,12 +249,10 @@ type
     procedure SetStyleHatch(const Value: TACLStyleHatch);
   protected
     function CreateSubClass: TACLCompoundControlSubClass; override;
-    procedure DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect); override;
     function GetContentOffset: TRect; override;
-    function GetBackgroundStyle: TACLControlBackgroundStyle; override;
     procedure Paint; override;
-    procedure PaintWindow(DC: HDC); override;
-    //
+    procedure UpdateTransparency; override;
+    //# Properties
     property Borders: TACLBorders read FBorders write SetBorders default acAllBorders;
     property Options: TACLColorPickerOptions read GetOptions write SetOptions;
     property Style: TACLStyleContent read GetStyle write SetStyle;
@@ -262,12 +260,12 @@ type
     property StyleEditButton: TACLStyleButton read GetStyleEditButton write SetStyleEditButton;
     property StyleHatch: TACLStyleHatch read GetStyleHatch write SetStyleHatch;
     property SubClass: TACLColorPickerSubClass read GetSubClass;
-    //
+    //# Events
     property OnColorChanged: TNotifyEvent read GetOnColorChanged write SetOnColorChanged;
   public
     constructor Create(AOwner: TComponent); override;
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
-    //
+    //# Properties
     property Color: TAlphaColor read GetColor write SetColor;
   end;
 
@@ -1433,24 +1431,10 @@ begin
   Result := TACLColorPickerSubClass.Create(Self);
 end;
 
-procedure TACLCustomColorPicker.DrawOpaqueBackground(ACanvas: TCanvas; const R: TRect);
-begin
-  Style.DrawContent(ACanvas, R);
-end;
-
 procedure TACLCustomColorPicker.Paint;
 begin
-  Style.DrawBorder(Canvas, ClientRect, Borders);
+  Style.Draw(Canvas, ClientRect, Transparent, Borders);
   inherited Paint;
-end;
-
-procedure TACLCustomColorPicker.PaintWindow(DC: HDC);
-var
-  I: Integer;
-begin
-  for I := 0 to ControlCount - 1 do
-    acExcludeFromClipRegion(DC, Controls[I].BoundsRect);
-  inherited PaintWindow(DC);
 end;
 
 function TACLCustomColorPicker.GetColor: TAlphaColor;
@@ -1463,17 +1447,6 @@ end;
 function TACLCustomColorPicker.GetContentOffset: TRect;
 begin
   Result := dpiApply(acBorderOffsets, FCurrentPPI) * Borders;
-end;
-
-function TACLCustomColorPicker.GetBackgroundStyle: TACLControlBackgroundStyle;
-begin
-  if Transparent then
-    Result := cbsTransparent
-  else
-    if Style.IsTransparentBackground then
-      Result := cbsSemitransparent
-    else
-      Result := cbsOpaque;
 end;
 
 function TACLCustomColorPicker.GetOnColorChanged: TNotifyEvent;
@@ -1555,6 +1528,14 @@ end;
 procedure TACLCustomColorPicker.SetStyleHatch(const Value: TACLStyleHatch);
 begin
   SubClass.StyleHatch.Assign(Value);
+end;
+
+procedure TACLCustomColorPicker.UpdateTransparency;
+begin
+  if Transparent or Style.IsTransparentBackground then
+    ControlStyle := ControlStyle - [csOpaque]
+  else
+    ControlStyle := ControlStyle + [csOpaque];
 end;
 
 end.
