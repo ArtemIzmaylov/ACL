@@ -13,7 +13,7 @@ unit ACL.UI.Controls.CompoundControl.SubClass;
 
 {$I ACL.Config.inc} // FPC:Partial
 
-interface
+interface {$MESSAGE 'TODO - RecreateSubCells'}
 
 uses
 {$IFDEF FPC}
@@ -253,11 +253,11 @@ type
     procedure DoCalculateHitTest(const AInfo: TACLHitTestInfo); override;
     procedure DoDraw(ACanvas: TCanvas); override;
     procedure DoDrawCells(ACanvas: TCanvas); virtual;
-    procedure RecreateSubCells; virtual; abstract;
+    procedure RecreateSubCells; virtual;
   public
     constructor Create(AOwner: TACLCompoundControlSubClass); override;
     destructor Destroy; override;
-    //
+    //# Properties
     property ChildCount: Integer read GetChildCount;
     property Children[Index: Integer]: TACLCompoundControlCustomViewInfo read GetChild;
   end;
@@ -1173,6 +1173,11 @@ end;
 function TACLCompoundControlContainerViewInfo.GetChild(Index: Integer): TACLCompoundControlCustomViewInfo;
 begin
   Result := TACLCompoundControlCustomViewInfo(FChildren.List[Index]);
+end;
+
+procedure TACLCompoundControlContainerViewInfo.RecreateSubCells;
+begin
+  // do nothing
 end;
 
 { TACLCompoundControlDragWindow }

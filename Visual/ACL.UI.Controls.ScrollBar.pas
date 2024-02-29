@@ -11,24 +11,30 @@
 
 unit ACL.UI.Controls.ScrollBar;
 
-{$I ACL.Config.Inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
+  {Winapi.}Windows,
+{$ENDIF}
+  {Winapi.}Messages,
   // System
-  System.SysUtils,
-  System.Classes,
+  {System.}Classes,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
   // Vcl
-  Vcl.Forms,
-  Vcl.StdCtrls,
-  Vcl.Controls,
-  Vcl.Graphics,
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
+  {Vcl.}Forms,
+  {Vcl.}StdCtrls,
   // ACL
   ACL.Classes,
-  ACL.Classes.StringList,
   ACL.Timers,
   ACL.Geometry,
   ACL.Graphics,
@@ -37,8 +43,7 @@ uses
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.Buttons,
   ACL.UI.Resources,
-  ACL.Utils.Common,
-  ACL.Utils.FileSystem;
+  ACL.Utils.Common;
 
 const
   acScrollBarHitArea = 120;
@@ -245,6 +250,7 @@ type
 
     // IACLScrollBar
     function AllowFading: Boolean;
+    function CalcCursorPos: TPoint;
     function GetButtonDownSize: Integer;
     function GetButtonUpSize: Integer;
     function GetScrollBarSize: Integer;
@@ -255,21 +261,26 @@ type
     procedure DrawBackground(ACanvas: TCanvas; const R: TRect);
     procedure DrawPart(ACanvas: TCanvas; const R: TRect; APart: TACLScrollBarPart; AState: TACLButtonState);
     procedure Scroll(ScrollCode: TScrollCode; var ScrollPos: Integer); virtual;
-    //
+
+    //# Mouse
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseEnter; override;
     procedure MouseLeave; override;
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
     procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+
+    //# Paint
     procedure Paint; override;
-    //
+
+    //# Messages
+    procedure CMCancelMode(var Message: TCMCancelMode); message CM_CANCELMODE;
     procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
     procedure CMVisibleChanged(var Message: TMessage); message CM_VISIBLECHANGED;
     procedure CNHScroll(var Message: TWMHScroll); message CN_HSCROLL;
     procedure CNVScroll(var Message: TWMVScroll); message CN_VSCROLL;
-    procedure WMCancelMode(var Message: TWMCancelMode); message WM_CANCELMODE;
     procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
-    //
+
+    //# Properties
     property Controller: TACLScrollBarController read FController;
     property ViewInfo: TACLScrollBarViewInfo read FViewInfo;
   public
@@ -280,7 +291,7 @@ type
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
     procedure SetScrollParams(AMin, AMax, APosition, APageSize: Integer; ARedraw: Boolean = True); overload;
     procedure SetScrollParams(const AInfo: TScrollInfo; ARedraw: Boolean = True); overload;
-    //
+    //# Properties
     property ScrollInfo: TACLScrollInfo read GetScrollInfo;
   published
     property Align;
@@ -295,29 +306,17 @@ type
     property ResourceCollection;
     property Style: TACLStyleScrollBox read FStyle write SetStyle;
     property Visible;
-    //
+    //# Events
     property OnScroll: TScrollEvent read FOnScroll write FOnScroll;
   end;
 
 implementation
 
 uses
-  System.Types,
-  System.Math,
-  // VCL
-  VCL.Consts,
-  // ACL
   ACL.Math;
 
 const
-  SCROLL_BAR_MIN_DISTANCE = 34;
-  SCROLL_BAR_MAX_DISTANCE = 136;
   SCROLL_BAR_TIMER_PARTS = [sbpLineUp, sbpLineDown, sbpPageUp, sbpPageDown];
-
-  // ScrollBar HitTest
-  ssbh_ButtonDown = 1;
-  ssbh_ButtonUp   = 2;
-  ssbh_Thumb      = 3;
 
 { TACLScrollInfo }
 
@@ -584,7 +583,7 @@ begin
         if (ADelta < FThumbnailSize) or (ScrollInfo.Max = ScrollInfo.Min) then Exit;
         ASize := Max(FThumbnailSize, ASize);
         Dec(ADelta, ASize);
-        Result := System.Classes.Bounds(ButtonUp.Bounds.Right, Bounds.Top, ASize, Bounds.Height);
+        Result := {System.}Classes.Bounds(ButtonUp.Bounds.Right, Bounds.Top, ASize, Bounds.Height);
         ASize := (ScrollInfo.Max - ScrollInfo.Min) - (ScrollInfo.Page - 1);
         Result.Offset(MulDiv(ADelta, Min(ScrollInfo.Position - ScrollInfo.Min, ASize), ASize), 0);
       end;
@@ -606,7 +605,7 @@ begin
         if (ADelta < FThumbnailSize) or (ScrollInfo.Max = ScrollInfo.Min) then Exit;
         ASize := Max(ASize, FThumbnailSize);
         Dec(ADelta, ASize);
-        Result := System.Classes.Bounds(Bounds.Left, ButtonUp.Bounds.Bottom, Bounds.Width, ASize);
+        Result := {System.}Classes.Bounds(Bounds.Left, ButtonUp.Bounds.Bottom, Bounds.Width, ASize);
         ASize := (ScrollInfo.Max - ScrollInfo.Min) - (ScrollInfo.Page - 1);
         Result.Offset(0, MulDiv(ADelta, Min(ScrollInfo.Position - ScrollInfo.Min, ASize), ASize));
       end;
@@ -878,13 +877,14 @@ begin
     scLineDown:
       Inc(ANewPos, ViewInfo.SmallChange);
     scPageUp:
-      Dec(ANewPos, System.Math.Max(ViewInfo.SmallChange, ViewInfo.ScrollInfo.Page));
+      Dec(ANewPos, {System.}Math.Max(ViewInfo.SmallChange, ViewInfo.ScrollInfo.Page));
     scPageDown:
-      Inc(ANewPos, System.Math.Max(ViewInfo.SmallChange, ViewInfo.ScrollInfo.Page));
+      Inc(ANewPos, {System.}Math.Max(ViewInfo.SmallChange, ViewInfo.ScrollInfo.Page));
     scTop:
       ANewPos := ViewInfo.ScrollInfo.Min;
     scBottom:
       ANewPos := ViewInfo.ScrollInfo.Max;
+  else;
   end;
   ANewPos := MinMax(ANewPos, ViewInfo.ScrollInfo.Min, ViewInfo.ScrollInfo.Max);
   ViewInfo.Owner.Scroll(AScrollCode, ANewPos);
@@ -1028,6 +1028,12 @@ begin
   if Assigned(OnScroll) then OnScroll(Self, ScrollCode, ScrollPos);
 end;
 
+procedure TACLScrollBar.CMCancelMode(var Message: TCMCancelMode);
+begin
+  Controller.Cancel;
+  inherited;
+end;
+
 procedure TACLScrollBar.CMEnabledChanged(var Message: TMessage);
 begin
   inherited;
@@ -1059,12 +1065,6 @@ begin
   Message.Result := 1;
 end;
 
-procedure TACLScrollBar.WMCancelMode(var Message: TWMCancelMode);
-begin
-  Controller.Cancel;
-  inherited;
-end;
-
 procedure TACLScrollBar.SetTargetDPI(AValue: Integer);
 begin
   inherited SetTargetDPI(AValue);
@@ -1079,6 +1079,11 @@ end;
 function TACLScrollBar.AllowFading: Boolean;
 begin
   Result := acUIFadingEnabled;
+end;
+
+function TACLScrollBar.CalcCursorPos: TPoint;
+begin
+  Result := ScreenToClient(Mouse.CursorPos);
 end;
 
 function TACLScrollBar.GetButtonDownSize: Integer;
