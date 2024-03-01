@@ -4,34 +4,38 @@
 {*              Slider Control               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.Slider;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+  Messages,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
+  {Winapi.}Windows,
+{$ENDIF}
   // System
-  System.Classes,
-  System.Math,
-  System.SysUtils,
-  System.Types,
+  {System.}Classes,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
   System.UITypes,
   // Vcl
-  Vcl.Controls,
-  Vcl.Graphics,
-  Vcl.Forms,
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
+  {Vcl.}Forms,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
-  ACL.Classes.StringList,
   ACL.Timers,
   ACL.FastCode,
   ACL.Geometry,
@@ -45,25 +49,22 @@ uses
   ACL.UI.Resources,
   ACL.Utils.Common,
   ACL.Utils.DPIAware,
-  ACL.Utils.Strings,
-  ACL.Utils.FileSystem;
+  ACL.Utils.Strings;
 
 type
   TACLSlider = class;
 
   TACLSliderIndent = 1..10;
   TACLSliderMarkSize = 1..5;
+  TACLSliderMovingState = (smaStart, smaMoving, smaStop);
 
   TACLSliderGetHintEvent = procedure (Sender: TObject; AValue: Single; var AHint: string) of object;
-
-  TACLSliderMovingState = (smaStart, smaMoving, smaStop);
 
   { TACLSliderCustomOptions }
 
   TACLSliderCustomOptions = class(TACLCustomOptionsPersistent)
   protected
     FOwner: TACLSlider;
-
     procedure DoChanged(AChanges: TACLPersistentChanges); override;
   public
     constructor Create(AOwner: TACLSlider); virtual;
@@ -116,7 +117,7 @@ type
     function FormatCurrentValue(const AValue: Single): string;
     function HasLabels: Boolean;
     function HasRangeLabels: Boolean;
-    //
+    //# Properties
     property IsCurrentValueMasked: Boolean read FIsCurrentValueMasked;
   published
     property CurrentValue: string index 0 read GetText write SetText;
@@ -151,7 +152,7 @@ type
     procedure SetPage(AValue: Single);
     procedure SetPaginate(const Value: Boolean);
     procedure SetReverse(AValue: Boolean);
-    //
+    //# Filers
     procedure ReadDefault(Reader: TReader);
     procedure WriteDefault(Writer: TWriter);
   protected
@@ -162,7 +163,7 @@ type
     procedure Validate; overload;
   public
     constructor Create(AOwner: TACLSlider); override;
-    //
+    //# Properties
     property Range: Single read GetRange;
   published
     property Default: Single read FDefault write FDefault stored IsDefaultStored;
@@ -200,7 +201,7 @@ type
   TACLSliderTextViewInfo = record
     Bounds: TRect;
     HorzAlignment: TAlignment;
-    Text: UnicodeString;
+    Text: string;
     TextColor: TColor;
     TextSize: TSize;
 
@@ -252,7 +253,7 @@ type
     procedure Calculate; virtual;
     function CalculateProgress(X, Y: Integer): Single; virtual; abstract;
     function MeasureSize: TSize; virtual;
-    //
+    //# Properties
     property CurrentDpi: Integer read GetCurrentDpi;
     property DefaultValueRect: TRect read FDefaultValueRect;
     property LabelCurrentValue: TACLSliderTextViewInfo read FLabelCurrentValue;
@@ -649,7 +650,7 @@ end;
 
 procedure TACLSliderOptionsValue.SetMax(AValue: Single);
 begin
-  AValue := System.Math.Max(AValue, Min + 1);
+  AValue := {System.}Math.Max(AValue, Min + 1);
   if AValue <> FMax then
   begin
     FMax := AValue;
@@ -659,7 +660,7 @@ end;
 
 procedure TACLSliderOptionsValue.SetMin(AValue: Single);
 begin
-  AValue := System.Math.Min(AValue, Max - 1);
+  AValue := {System.}Math.Min(AValue, Max - 1);
   if AValue <> FMin then
   begin
     FMin := AValue;
@@ -669,7 +670,7 @@ end;
 
 procedure TACLSliderOptionsValue.SetPage(AValue: Single);
 begin
-  AValue := System.Math.Max(AValue, 0.01);
+  AValue := {System.}Math.Max(AValue, 0.01);
   SetSingleFieldValue(FPage, AValue, [apcLayout]);
 end;
 
@@ -690,7 +691,11 @@ end;
 
 procedure TACLSliderOptionsValue.WriteDefault(Writer: TWriter);
 begin
+{$IFDEF FPC}
+  Writer.WriteFloat(Default);
+{$ELSE}
   Writer.WriteDouble(Default);
+{$ENDIF}
 end;
 
 { TACLStyleSlider }
@@ -779,7 +784,8 @@ end;
 
 procedure TACLSliderViewInfo.CalculateLabels(ACanvas: TCanvas; var R: TRect);
 
-  procedure InitializeViewInfo(var AViewInfo: TACLSliderTextViewInfo; const AText: UnicodeString; ACustomTextWidth: Integer);
+  procedure InitializeViewInfo(var AViewInfo: TACLSliderTextViewInfo;
+    const AText: string; ACustomTextWidth: Integer);
   begin
     if AText <> '' then
     begin
@@ -1528,6 +1534,7 @@ begin
   end;
 
   ShowMovingHint(Position, True);
+  Key := 0;
 end;
 
 function TACLSlider.DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean;
@@ -1621,6 +1628,7 @@ procedure TACLSlider.ShowMovingHint(APosition: Single; AAutoHide: Boolean);
 var
   AHint: string;
 begin
+  AHint := '';
 //  if OptionsLabels.IsCurrentValueMasked then
 //    AHint := OptionsLabels.FormatCurrentValue(APosition);
   if Assigned(OnGetHint) then
