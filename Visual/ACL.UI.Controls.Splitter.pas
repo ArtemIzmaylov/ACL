@@ -4,31 +4,35 @@
 {*             Splitter Control              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.Splitter;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
+  {Winapi.}Messages,
+  {Winapi.}Windows,
+{$ENDIF}
   // System
-  System.Classes,
-  System.SysUtils,
-  System.Types,
-  System.Math,
+  {System.}Classes,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
   // Vcl
-  Vcl.Controls,
-  Vcl.Graphics,
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
   // ACL
   ACL.Classes,
-  ACL.Classes.StringList,
   ACL.FileFormats.INI,
   ACL.Geometry,
   ACL.Graphics,
@@ -36,8 +40,7 @@ uses
   ACL.UI.Forms,
   ACL.UI.Resources,
   ACL.Utils.Common,
-  ACL.Utils.DPIAware,
-  ACL.Utils.FileSystem;
+  ACL.Utils.DPIAware;
 
 type
   TACLSplitter = class;
@@ -64,7 +67,7 @@ type
     // Storing
     procedure RestoreSize;
     procedure StoreSize;
-    //
+    //# Properties
     property Control: TControl read GetControl;
     property ControlParentSize: Integer read GetParentSize;
     property ControlSize: Integer read GetControlSize write SetControlSize;
@@ -101,7 +104,7 @@ type
     function GetAlign: TAlign;
     function GetIsControlVisible: Boolean;
     procedure DoToggle;
-    procedure SetAlign(AValue: TAlign);
+    procedure SetAlign(AValue: TAlign); reintroduce;
     procedure SetCanToggle(AValue: Boolean);
     procedure SetControl(AControl: TControl);
   protected
