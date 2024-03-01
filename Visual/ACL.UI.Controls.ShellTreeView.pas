@@ -126,7 +126,7 @@ type
     procedure InvokeSystemMenu(AOwnerWindow: HWND; ANode: TACLTreeListNode);
     procedure NodeRemoving(ANode: TACLTreeListNode); override;
     procedure ProcessContextPopup(var AHandled: Boolean); override;
-    procedure ProcessKeyDown(AKey: Word; AShift: TShiftState); override;
+    procedure ProcessKeyDown(var AKey: Word; AShift: TShiftState); override;
 
     function AddFolderNode(ID: PItemIDList; AParent: TACLTreeListNode): TACLTreeListNode;
     function FindNodeByPIDL(ID: PItemIDList; ANode: TACLTreeListNode): TACLTreeListNode;
@@ -600,7 +600,7 @@ begin
     InvokeSystemMenu(Container.GetControl.Handle, HitTest.Node);
 end;
 
-procedure TACLShellTreeViewSubClass.ProcessKeyDown(AKey: Word; AShift: TShiftState);
+procedure TACLShellTreeViewSubClass.ProcessKeyDown(var AKey: Word; AShift: TShiftState);
 begin
   if AShift * [ssShift, ssAlt, ssCtrl] = [] then
     case AKey of

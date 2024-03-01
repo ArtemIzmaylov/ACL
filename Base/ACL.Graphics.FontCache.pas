@@ -80,36 +80,11 @@ type
     class property Default: IEqualityComparer<TACLFontData> read GetDefault;
   end;
 
-  { TACLFontGlyphSet }
-
-  TACLFontGlyphSet = class
-  {$IFDEF MSWINDOWS}
-  strict private
-    FPanose: TPanose;
-    FSet: TBits;
-  {$ENDIF}
-  public
-    constructor Create(DC: HDC);
-  {$IFDEF MSWINDOWS}
-    destructor Destroy; override;
-    function Contains(const W: Char): Boolean; inline;
-    function GetPanoseDistance(const ASet: TACLFontGlyphSet): Integer;
-  {$ENDIF}
-  end;
-
   { TACLFontInfo }
 
-  TACLFontInfo = class
-  strict private
-    FFont: TFont;
-    FGlyphSet: TACLFontGlyphSet;
+  TACLFontInfo = class(TFont)
   public
-    constructor Create(AOwnedFont: TFont; AGlyphSet: TACLFontGlyphSet);
-    destructor Destroy; override;
-    procedure AssignTo(AFont: TFont);
-    //# Properties
-    property GlyphSet: TACLFontGlyphSet read FGlyphSet;
-    property Font: TFont read FFont;
+    procedure AssignTo(AFont: TFont); reintroduce;
   end;
 
   { TACLFontCache }
@@ -118,100 +93,38 @@ type
 
   TACLFontCache = class
   strict private type
-  {$REGION 'Internal Types'}
+  {$REGION ' Internal Types '}
     PCallbackData = ^TCallbackData;
     TCallbackData = record
       CheckCanceled: TACLTaskCancelCallback;
-      DC: HDC;
-      TempFont: TFont;
     end;
   {$ENDREGION}
   strict private
-    class var FFontDataToFontInfo: TACLDictionary<TACLFontData, TACLFontInfo>;
+    class var FFontCache: TACLDictionary<TACLFontData, TACLFontInfo>;
+    class var FFonts: TACLStringSet;
     class var FLoaderHandle: THandle;
     class var FLock: TACLCriticalSection;
-    class var FNameToGlyphSet: TACLDictionary<TFontName, TACLFontGlyphSet>;
     class var FRemapFontProc: TACLFontRemapProc;
 
+    class function CreateFont(const AFontData: TACLFontData): TACLFontInfo;
+    //# Loader
     class procedure AsyncFontLoader(ACheckCanceled: TACLTaskCancelCallback);
     class function AsyncFontLoaderEnumProc(var ALogFont: TLogFontW;
-      ATextMetric: PTextMetricW; AFontType: Integer; AData: PCallbackData): Integer; stdcall; static;
+      ATextMetric: PTextMetricW; AFontType: Integer;
+      AData: PCallbackData): Integer; stdcall; static;
     class procedure AsyncFontLoaderFinished;
-    class function AsyncPutGlyphSet(const AName: TFontName; AGlyphSet: TACLFontGlyphSet): TACLFontGlyphSet;
-
-    class function CreateFont(const AFontData: TACLFontData): TFont;
-    class function CreateFontInfo(const AFontData: TACLFontData): TACLFontInfo;
-    class function CreateFontInfoCore(const AFontData: TACLFontData; AOwnedFont: TFont): TACLFontInfo;
     class procedure StartLoader;
     class procedure WaitForLoader(ACancel: Boolean = False);
   public
     class constructor Create;
     class destructor Destroy;
     class procedure EnumFonts(AProc: TACLStringEnumProc);
-    class function GetInfo(const AFont: TFont): TACLFontInfo; overload;
-    class function GetInfo(const AFontData: TACLFontData): TACLFontInfo; overload;
     class function GetInfo(const AName: string; AStyle: TFontStyles;
       AHeight: Integer; ATargetDPI: Integer; AQuality: TFontQuality): TACLFontInfo; overload;
-  {$IFDEF MSWINDOWS}
-    class function GetSubstituteFont(DC: HDC; AFontInfo: TACLFontInfo; const ACharacter: Char): TACLFontInfo;
-  {$ENDIF}
+    class function GetInfo(const AFontData: TACLFontData): TACLFontInfo; overload;
     //# Remap
     class procedure RemapFont(var AName: TFontName; var AHeight: Integer);
     class property RemapFontProc: TACLFontRemapProc read FRemapFontProc write FRemapFontProc;
-  end;
-
-  { TACLTextViewInfo }
-
-  // FIXME: hieroglyphs displays blurry with this approach
-  TACLTextViewInfo = class
-  {$IFDEF MSWINDOWS}
-  strict private type
-    PSpan = ^TSpan;
-    TSpan = record
-      CharacterWidths: PIntegerArray;
-      FontHandle: HFONT;
-      GlyphCount: Integer;
-      Glyphs: PWord;
-      Height: Integer;
-      Width: Integer;
-      Next: PSpan;
-      Prev: PSpan;
-    end;
-  strict private
-    class var FCaretPosBuffer: Pointer;
-    class var FCaretPosBufferSize: Integer;
-    class var FClassLock: TACLCriticalSection;
-    class function GetCaretPosBuffer(AItemCount: Integer): Pointer;
-  strict private
-    FData: PSpan;
-    FSize: TSize;
-
-    procedure AppendSpan(ASpan: PSpan);
-    procedure CalculateSize;
-    function CreateSpan(DC: HDC; AFontInfo: TACLFontInfo; ABuffer: PWideChar; ALength: Integer): PSpan;
-    procedure CreateSpans(DC: HDC; AFontInfo: TACLFontInfo; AText: PWideChar; ATextLength: Integer);
-    procedure Release(ASpan: PSpan);
-  protected
-    class constructor Create;
-    class destructor Destroy;
-  {$ELSE}
-  strict private
-    FFont: TACLFontInfo;
-    FText: PChar;
-    FTextLength: Integer;
-    FSize: TSize;
-  {$ENDIF}
-  public
-    constructor Create(DC: HDC; AFont: TFont; const AText: string); overload;
-    constructor Create(DC: HDC; AFont: TFont; const AText: PChar; ALength: Integer); overload;
-    constructor Create(DC: HDC; AFont: TACLFontInfo; const AText: PChar; ALength: Integer); overload;
-    constructor Create(DC: HDC; AFont: TACLFontInfo; const AText: string); overload;
-    destructor Destroy; override;
-    procedure AdjustToWidth(AWidth: Integer; out AReducedCharacters, AReducedWidth: Integer);
-    procedure Draw(DC: HDC; X, Y: Integer); inline;
-    procedure DrawCore(DC: HDC; X, Y: Integer);
-    //# Properties
-    property Size: TSize read FSize;
   end;
 
 implementation
@@ -279,95 +192,12 @@ begin
   Result := FDefault;
 end;
 
-{ TACLFontGlyphSet }
-
-constructor TACLFontGlyphSet.Create(DC: HDC);
-{$IFDEF MSWINDOWS}
-var
-  AGlyphSet: PGlyphSet;
-  AOutlineTextMetrics: TOutlineTextmetric;
-  ARange: TWCRange;
-  ASize: Integer;
-  I, J: Integer;
-begin
-  FSet := TBits.Create;
-  FSet.Size := MaxWord;
-
-  if GetOutlineTextMetricsW(DC, SizeOf(AOutlineTextMetrics), @AOutlineTextMetrics) <> 0 then
-    FPanose := AOutlineTextMetrics.otmPanoseNumber;
-
-  ASize := {Winapi.}Windows.GetFontUnicodeRanges(DC, nil);
-  if ASize = 0 then //# "Roboto Bk"
-    Exit;
-
-  GetMem(AGlyphSet, ASize);
-  try
-    GetFontUnicodeRanges(DC, AGlyphSet);
-    for I := 0 to 255 do
-      FSet[I] := True;
-    for I := 61440 to 61695 do
-      FSet[I] := True;
-    for I := 0 to AGlyphSet.cRanges - 1 do
-    begin
-      ARange := AGlyphSet.ranges[I];
-      for J := Ord(ARange.wcLow) to Ord(ARange.wcLow) + ARange.cGlyphs - 1 do
-        FSet[J] := True;
-    end;
-  finally
-    FreeMem(AGlyphSet);
-  end;
-{$ELSE}
-begin
-{$ENDIF}
-end;
-
-{$IFDEF MSWINDOWS}
-destructor TACLFontGlyphSet.Destroy;
-begin
-  FreeAndNil(FSet);
-  inherited;
-end;
-
-function TACLFontGlyphSet.Contains(const W: Char): Boolean;
-begin
-  Result := FSet[Ord(W)];
-end;
-
-function TACLFontGlyphSet.GetPanoseDistance(const ASet: TACLFontGlyphSet): Integer;
-var
-  I: Integer;
-  P1, P2: PByte;
-begin
-  Result := 0;
-  P1 := @FPanose;
-  P2 := @ASet.FPanose;
-  for I := 1 to SizeOf(FPanose) do
-  begin
-    Inc(Result, Sqr(P1^ - P2^));
-    Inc(P1);
-    Inc(P2);
-  end;
-end;
-{$ENDIF}
-
 { TACLFontInfo }
-
-constructor TACLFontInfo.Create(AOwnedFont: TFont; AGlyphSet: TACLFontGlyphSet);
-begin
-  FFont := AOwnedFont;
-  FGlyphSet := AGlyphSet;
-end;
-
-destructor TACLFontInfo.Destroy;
-begin
-  FreeAndNil(FFont);
-  inherited;
-end;
 
 procedure TACLFontInfo.AssignTo(AFont: TFont);
 begin
-  if Font.Handle <> AFont.Handle then // Why VCL does not check it?
-    AFont.Assign(Font);
+  if Handle <> AFont.Handle then // Why VCL does not check it?
+    AFont.Assign(Self);
 end;
 
 { TACLFontCache }
@@ -375,8 +205,9 @@ end;
 class constructor TACLFontCache.Create;
 begin
   FLock := TACLCriticalSection.Create;
-  FNameToGlyphSet := TACLDictionary<TFontName, TACLFontGlyphSet>.Create([doOwnsValues], 512, nil);
-  FFontDataToFontInfo := TACLDictionary<TACLFontData, TACLFontInfo>.Create([doOwnsValues], 64, TACLFontDataComparer.Create);
+  FFonts := TACLStringSet.Create(False, 512);
+  FFontCache := TACLDictionary<TACLFontData, TACLFontInfo>.Create(
+    [doOwnsValues], 64, TACLFontDataComparer.Create);
   TACLMainThread.RunPostponed(StartLoader);
 end;
 
@@ -384,8 +215,8 @@ class destructor TACLFontCache.Destroy;
 begin
   TACLMainThread.Unsubscribe(StartLoader);
   WaitForLoader(True);
-  FreeAndNil(FFontDataToFontInfo);
-  FreeAndNil(FNameToGlyphSet);
+  FreeAndNil(FFontCache);
+  FreeAndNil(FFonts);
   FreeAndNil(FLock);
 end;
 
@@ -396,42 +227,45 @@ begin
   WaitForLoader;
   FLock.Enter;
   try
-    for LName in FNameToGlyphSet.GetKeys do
+    for LName in FFonts do
       AProc(LName);
   finally
     FLock.Leave;
   end;
 end;
 
-class function TACLFontCache.GetInfo(const AFont: TFont): TACLFontInfo;
-var
-  AFontData: TACLFontData;
-begin
-  FLock.Enter;
-  try
-    AFontData := TACLFontData.Create(AFont);
-    if not FFontDataToFontInfo.TryGetValue(AFontData, Result) then
-    begin
-    {$IFDEF ACL_LOG_FONTCACHE}
-      AddToDebugLog('FontCache', 'GetInfo(%s)', [AFontData.ToString]);
-    {$ENDIF}
-      Result := CreateFontInfoCore(AFontData, AFont.Clone);
-    end;
-  finally
-    FLock.Leave;
-  end;
-end;
+//class function TACLFontCache.GetInfo(const AFont: TFont): TACLFontInfo;
+//var
+//  LFontData: TACLFontData;
+//begin
+//  FLock.Enter;
+//  try
+//    LFontData := TACLFontData.Create(AFont);
+//    if not FFontCache.TryGetValue(LFontData, Result) then
+//    begin
+//    {$IFDEF ACL_LOG_FONTCACHE}
+//      AddToDebugLog('FontCache', 'GetInfo(%s)', [LFontData.ToString]);
+//    {$ENDIF}
+//      Result := TACLFontInfo.Create;
+//      Result.Assign(AFont);
+//      FFontCache.Add(LFontData, Result);
+//    end;
+//  finally
+//    FLock.Leave;
+//  end;
+//end;
 
 class function TACLFontCache.GetInfo(const AFontData: TACLFontData): TACLFontInfo;
 begin
   FLock.Enter;
   try
-    if not FFontDataToFontInfo.TryGetValue(AFontData, Result) then
+    if not FFontCache.TryGetValue(AFontData, Result) then
     begin
     {$IFDEF ACL_LOG_FONTCACHE}
       AddToDebugLog('FontCache', 'GetInfo(%s)', [AFontData.ToString]);
     {$ENDIF}
-      Result := CreateFontInfo(AFontData);
+      Result := CreateFont(AFontData);
+      FFontCache.Add(AFontData, Result);
     end;
   finally
     FLock.Leave;
@@ -455,50 +289,6 @@ begin
   Result := GetInfo(AData);
 end;
 
-{$IFDEF MSWINDOWS}
-class function TACLFontCache.GetSubstituteFont(DC: HDC; AFontInfo: TACLFontInfo; const ACharacter: Char): TACLFontInfo;
-var
-  ADistance: Integer;
-  AFontData: TACLFontData;
-  AMinDistance: Integer;
-  ASuggestedFontName: TFontName;
-begin
-  WaitForLoader;
-
-  FLock.Enter;
-  try
-    AMinDistance := MaxInt;
-    FNameToGlyphSet.Enum(
-      procedure (const Key: TFontName; const Value: TACLFontGlyphSet)
-      begin
-        if Value.Contains(ACharacter) then
-        begin
-          ADistance := AFontInfo.GlyphSet.GetPanoseDistance(Value);
-          if ADistance < AMinDistance then
-          begin
-            AMinDistance := ADistance;
-            ASuggestedFontName := Key;
-          end;
-        end;
-      end);
-  finally
-    FLock.Leave;
-  end;
-
-  if ASuggestedFontName <> '' then
-  begin
-  {$IFDEF ACL_LOG_FONTCACHE}
-    AddToDebugLog('FontCache', 'GetSubstituteFont(%s -> %s)', [AFontInfo.Font.Name, ASuggestedFontName]);
-  {$ENDIF}
-    AFontData := TACLFontData.Create(AFontInfo.Font);
-    AFontData.Name := ASuggestedFontName;
-    Result := GetInfo(AFontData);
-  end
-  else
-    Result := nil;
-end;
-{$ENDIF}
-
 class procedure TACLFontCache.RemapFont(var AName: TFontName; var AHeight: Integer);
 begin
   if Assigned(RemapFontProc) then
@@ -513,40 +303,24 @@ var
 begin
   ADC := CreateCompatibleDC(0);
   try
-    AData.DC := ADC;
     AData.CheckCanceled := ACheckCanceled;
-    AData.TempFont := TFont.Create;
-    try
-      FillChar(ALogFont{%H-}, SizeOf(ALogFont), #0);
-      ALogFont.lfCharset := DEFAULT_CHARSET;
-      EnumFontFamiliesEx(ADC, {$IFDEF FPC}@{$ENDIF}ALogFont,
-         @AsyncFontLoaderEnumProc, {%H-}LPARAM(@AData), 0);
-    finally
-      AData.TempFont.Free;
-    end;
+    FillChar(ALogFont{%H-}, SizeOf(ALogFont), #0);
+    ALogFont.lfCharset := DEFAULT_CHARSET;
+    EnumFontFamiliesEx(ADC, {$IFDEF FPC}@{$ENDIF}ALogFont,
+       @AsyncFontLoaderEnumProc, {%H-}LPARAM(@AData), 0);
   finally
     DeleteDC(ADC);
   end;
 end;
 
-class function TACLFontCache.AsyncFontLoaderEnumProc(var ALogFont: TLogFontW;
-  ATextMetric: PTextMetricW; AFontType: Integer; AData: PCallbackData): Integer;
-var
-  AFontName: string;
+class function TACLFontCache.AsyncFontLoaderEnumProc(
+  var ALogFont: TLogFontW; ATextMetric: PTextMetricW;
+  AFontType: Integer; AData: PCallbackData): Integer;
 begin
   if AFontType <> RASTER_FONTTYPE then
   begin
-    if ALogFont.lfFaceName[0] <> '@' then
-    begin
-      AFontName := ALogFont.lfFaceName;
-      if not FNameToGlyphSet.ContainsKey(AFontName) then
-      begin
-        AData.TempFont.Name := AFontName;
-        AData.TempFont.Charset := ALogFont.lfCharSet;
-        SelectObject(AData.DC, AData.TempFont.Handle);
-        AsyncPutGlyphSet(AFontName, TACLFontGlyphSet.Create(AData.DC));
-      end;
-    end;
+    if ALogFont.lfFaceName[0] <> '@' then // vertical;
+      FFonts.Include(ALogFont.lfFaceName);
   end;
   Result := Ord(not AData.CheckCanceled);
 end;
@@ -559,26 +333,9 @@ begin
   FLoaderHandle := THandle(-1);
 end;
 
-class function TACLFontCache.AsyncPutGlyphSet(
-  const AName: TFontName; AGlyphSet: TACLFontGlyphSet): TACLFontGlyphSet;
+class function TACLFontCache.CreateFont(const AFontData: TACLFontData): TACLFontInfo;
 begin
-  FLock.Enter;
-  try
-    if FNameToGlyphSet.AddIfAbsent(AName, AGlyphSet) then
-      Result := AGlyphSet
-    else
-    begin
-      AGlyphSet.Free;
-      Result := FNameToGlyphSet.Items[AName];
-    end;
-  finally
-    FLock.Leave;
-  end;
-end;
-
-class function TACLFontCache.CreateFont(const AFontData: TACLFontData): TFont;
-begin
-  Result := TFont.Create;
+  Result := TACLFontInfo.Create;
   Result.Name := AFontData.Name;
   Result.Orientation := AFontData.Orientation;
   Result.Pitch := AFontData.Pitch;
@@ -591,31 +348,6 @@ begin
     Result.Charset := DefFontData.Charset;
 
   acSetFontHeight(Result, AFontData.Height, AFontData.TargetDPI);
-end;
-
-class function TACLFontCache.CreateFontInfo(const AFontData: TACLFontData): TACLFontInfo;
-begin
-  Result := CreateFontInfoCore(AFontData, CreateFont(AFontData));
-end;
-
-class function TACLFontCache.CreateFontInfoCore(const AFontData: TACLFontData; AOwnedFont: TFont): TACLFontInfo;
-var
-  AGlyphSet: TACLFontGlyphSet;
-  AMeasureDC: HDC;
-  APrevFontHandle: HFONT;
-begin
-  if not FNameToGlyphSet.TryGetValue(AFontData.Name, AGlyphSet) then
-  begin
-    AMeasureDC := MeasureCanvas.Handle;
-    APrevFontHandle := SelectObject(AMeasureDC, AOwnedFont.Handle);
-  {$IFDEF ACL_LOG_FONTCACHE}
-    AddToDebugLog('FontCache', 'ForceCreateGlyphSet(%s)', [AFontData.ToString]);
-  {$ENDIF}
-    AGlyphSet := AsyncPutGlyphSet(AFontData.Name, TACLFontGlyphSet.Create(AMeasureDC));
-    SelectObject(AMeasureDC, APrevFontHandle);
-  end;
-  Result := TACLFontInfo.Create(AOwnedFont, AGlyphSet);
-  FFontDataToFontInfo.Add(AFontData, Result);
 end;
 
 class procedure TACLFontCache.StartLoader;
@@ -637,324 +369,4 @@ begin
   end;
 end;
 
-{ TACLTextViewInfo }
-
-constructor TACLTextViewInfo.Create(DC: HDC; AFont: TFont; const AText: string);
-begin
-  Create(DC, AFont, PChar(AText), Length(AText));
-end;
-
-constructor TACLTextViewInfo.Create(DC: HDC; AFont: TFont; const AText: PChar; ALength: Integer);
-begin
-  Create(DC, TACLFontCache.GetInfo(AFont), AText, ALength);
-end;
-
-constructor TACLTextViewInfo.Create(DC: HDC; AFont: TACLFontInfo; const AText: string);
-begin
-  Create(DC, AFont, PChar(AText), Length(AText));
-end;
-
-procedure TACLTextViewInfo.Draw(DC: HDC; X, Y: Integer);
-var
-  LPrevFont: HFONT;
-begin
-  LPrevFont := GetCurrentObject(DC, OBJ_FONT);
-  DrawCore(DC, X, Y);
-  SelectObject(DC, LPrevFont)
-end;
-
-{$IFDEF MSWINDOWS}
-
-class constructor TACLTextViewInfo.Create;
-begin
-  FClassLock := TACLCriticalSection.Create;
-end;
-
-class destructor TACLTextViewInfo.Destroy;
-begin
-  FreeAndNil(FClassLock);
-  FreeMem(FCaretPosBuffer);
-end;
-
-constructor TACLTextViewInfo.Create(DC: HDC;
-  AFont: TACLFontInfo; const AText: PChar; ALength: Integer);
-begin
-  CreateSpans(DC, AFont, AText, ALength);
-  CalculateSize;
-end;
-
-destructor TACLTextViewInfo.Destroy;
-var
-  ASpan: PSpan;
-begin
-  while FData <> nil do
-  begin
-    ASpan := FData;
-    FData := ASpan.Next;
-    Release(ASpan);
-  end;
-  inherited;
-end;
-
-procedure TACLTextViewInfo.AdjustToWidth(
-  AWidth: Integer; out AReducedCharacters, AReducedWidth: Integer);
-
-  procedure AdjustSpanToWidth(ASpan: PSpan;
-    var ACurrentWidth, AReducedCharacters, AReducedWidth: Integer);
-  var
-    ACount: Integer;
-    AScan: PInteger;
-  begin
-    ACount := ASpan^.GlyphCount;
-    AScan := @ASpan^.CharacterWidths^[ACount - 1];
-    while (ACount > 0) and (ACurrentWidth > AWidth) do
-    begin
-      Dec(ACurrentWidth, AScan^);
-      Inc(AReducedWidth, AScan^);
-      Inc(AReducedCharacters);
-      Dec(ACount);
-      Dec(AScan);
-    end;
-  end;
-
-var
-  ACurrentWidth: Integer;
-  ASpan: PSpan;
-begin
-  AReducedCharacters := 0;
-  AReducedWidth := 0;
-  if FData = nil then
-    Exit;
-
-  ASpan := FData;
-  while ASpan.Next <> nil do
-    ASpan := ASpan.Next;
-
-  ACurrentWidth := Size.cx;
-  while (ASpan <> nil) and (ACurrentWidth > AWidth) do
-  begin
-    AdjustSpanToWidth(ASpan, ACurrentWidth, AReducedCharacters, AReducedWidth);
-    ASpan := ASpan.Prev;
-  end;
-end;
-
-procedure TACLTextViewInfo.DrawCore(DC: HDC; X, Y: Integer);
-var
-  ASpan: PSpan;
-begin
-  ASpan := FData;
-  while ASpan <> nil do
-  begin
-    SelectObject(DC, ASpan^.FontHandle);
-    ExtTextOut(DC, X, Y, ETO_GLYPH_INDEX or ETO_IGNORELANGUAGE, nil,
-      @ASpan^.Glyphs^, ASpan^.GlyphCount, @ASpan^.CharacterWidths[0]);
-    Inc(X, ASpan^.Width);
-    ASpan := ASpan.Next;
-  end;
-end;
-
-procedure TACLTextViewInfo.AppendSpan(ASpan: PSpan);
-var
-  ASpanScan: PSpan;
-begin
-  if FData = nil then
-    FData := ASpan
-  else
-  begin
-    ASpanScan := FData;
-    while ASpanScan.Next <> nil do
-      ASpanScan := ASpanScan.Next;
-    ASpan.Next := nil;
-    ASpan.Prev := ASpanScan;
-    ASpanScan.Next := ASpan;
-  end;
-end;
-
-procedure TACLTextViewInfo.CalculateSize;
-var
-  AScan: PSpan;
-begin
-  FSize := NullSize;
-  AScan := FData;
-  while AScan <> nil do
-  begin
-    FSize.cy := Max(FSize.cy, AScan^.Height);
-    Inc(FSize.cx, AScan^.Width);
-    AScan := AScan.Next;
-  end;
-end;
-
-function TACLTextViewInfo.CreateSpan(DC: HDC;
-  AFontInfo: TACLFontInfo; ABuffer: PWideChar; ALength: Integer): PSpan;
-
-  function GetCharacterPlacementSlow(DC: HDC; ABuffer: PWideChar; ALength: Integer;
-    var AGcpResults: TGCPResultsW; AGcpFlags: Cardinal): Integer;
-  var
-    I, AAdd, AStep, AExtraLength: Integer;
-  begin
-    AStep := (ALength + 1) div 2; //# 50% of text length
-    AAdd := AStep;
-    for I := 0 to 2 do
-    begin
-      AExtraLength := ALength + AAdd;
-      AGcpResults.nGlyphs := AExtraLength;
-      ReallocMem(AGcpResults.lpDx, SizeOf(Integer) * AExtraLength);
-      ReallocMem(AGcpResults.lpGlyphs, SizeOf(Word) * AExtraLength);
-      if ALength > 0 then
-        PWord(AGcpResults.lpGlyphs)^ := 0; // unlim number of characters that will be ligated together.
-      Result := GetCharacterPlacement(DC, ABuffer, ALength, 0, AGcpResults, AGcpFlags);
-      if Result <> 0 then
-        Exit;
-      Inc(AAdd, AStep);
-    end;
-  end;
-
-var
-  ACaretBasedWidth: Integer;
-  AGcpFlags: Cardinal;
-  AGcpResults: TGCPResultsW;
-  AHeight: Integer;
-  ALangInfo: Cardinal;
-  AOldFont: HFONT;
-  ASize: Cardinal;
-  AWidth: Integer;
-begin
-  AOldFont := SelectObject(DC, AFontInfo.Font.Handle);
-  FClassLock.Enter;
-  try
-    ZeroMemory(@AGcpResults, SizeOf(TGCPResults));
-    AGcpResults.lStructSize := SizeOf(TGCPResults);
-    AGcpResults.lpCaretPos := GetCaretPosBuffer(ALength);
-    AGcpResults.nGlyphs := ALength;
-
-    AGcpFlags := 0;
-    ALangInfo := 0;
-    if not IsWine then
-      ALangInfo := GetFontLanguageInfo(DC);
-    if ALangInfo and GCP_USEKERNING <> 0 then
-      AGcpFlags := AGcpFlags or GCP_USEKERNING;
-    if ALangInfo and GCP_DIACRITIC <> 0 then
-      AGcpFlags := AGcpFlags or GCP_LIGATE;
-
-    GetMem(AGcpResults.lpDx, SizeOf(Integer) * ALength);
-    GetMem(AGcpResults.lpGlyphs, SizeOf(Word) * ALength);
-    if ALength > 0 then
-      PWord(AGcpResults.lpGlyphs)^ := 0; // unlim number of characters that will be ligated together.
-
-    ASize := GetCharacterPlacement(DC, ABuffer, ALength, 0, AGcpResults, AGcpFlags);
-    if (ASize = 0) and (ALength > 0) then
-      ASize := GetCharacterPlacementSlow(DC, ABuffer, ALength, AGcpResults, AGcpFlags);
-    AWidth := LongRec(ASize).Lo;
-    AHeight := LongRec(ASize).Hi;
-    if ALength > 0 then
-    begin
-      ACaretBasedWidth := PIntegerArray(AGcpResults.lpCaretPos)[ALength - 1];
-      if ACaretBasedWidth > $FFFF then
-        AWidth := ACaretBasedWidth + PIntegerArray(AGcpResults.lpDx)[ALength - 1];
-    end;
-
-    New(Result);
-    Result^.FontHandle := AFontInfo.Font.Handle;
-    Result^.CharacterWidths := Pointer(AGcpResults.lpDx);
-    Result^.GlyphCount := AGcpResults.nGlyphs;
-    Result^.Glyphs := Pointer(AGcpResults.lpGlyphs);
-    Result^.Height := AHeight;
-    Result^.Width := AWidth;
-    Result^.Next := nil;
-    Result^.Prev := nil;
-  finally
-    FClassLock.Leave;
-    SelectObject(DC, AOldFont);
-  end;
-end;
-
-procedure TACLTextViewInfo.CreateSpans(DC: HDC;
-  AFontInfo: TACLFontInfo; AText: PWideChar; ATextLength: Integer);
-
-  procedure ProcessSpan(var ATextScan: PWideChar;
-    var ATextLength: Integer; AFontInfo, ADefaultFontInfo: TACLFontInfo);
-  var
-    ACursor: PWideChar;
-    AOffset: Integer;
-  begin
-    AOffset := 0;
-    ACursor := AText;
-    while (AOffset < ATextLength) and
-      ((AFontInfo = nil) or AFontInfo.GlyphSet.Contains(ACursor^)) and
-      ((AFontInfo = ADefaultFontInfo) or not ADefaultFontInfo.GlyphSet.Contains(ACursor^)) do
-    begin
-      Inc(ACursor);
-      Inc(AOffset);
-    end;
-    if AOffset > 0 then
-    begin
-      if AFontInfo = nil then
-        AFontInfo := ADefaultFontInfo;
-      AppendSpan(CreateSpan(DC, AFontInfo, AText, AOffset));
-      Dec(ATextLength, AOffset);
-      Inc(AText, AOffset);
-    end;
-  end;
-
-begin
-  repeat
-    ProcessSpan(AText, ATextLength, AFontInfo, AFontInfo);
-    if ATextLength > 0 then
-      ProcessSpan(AText, ATextLength, TACLFontCache.GetSubstituteFont(DC, AFontInfo, AText^), AFontInfo);
-  until ATextLength = 0;
-end;
-
-procedure TACLTextViewInfo.Release(ASpan: PSpan);
-begin
-  FreeMem(ASpan^.CharacterWidths);
-  FreeMem(ASpan^.Glyphs);
-  Dispose(ASpan);
-end;
-
-class function TACLTextViewInfo.GetCaretPosBuffer(AItemCount: Integer): Pointer;
-var
-  ASize: Integer;
-begin
-  ASize := SizeOf(Integer) * AItemCount;
-  if ASize > FCaretPosBufferSize then
-  begin
-    ReallocMem(FCaretPosBuffer, ASize);
-    FCaretPosBufferSize := ASize;
-  end;
-  Result := FCaretPosBuffer;
-end;
-
-{$ELSE}
-
-constructor TACLTextViewInfo.Create(DC: HDC; AFont: TACLFontInfo; const AText: PChar; ALength: Integer);
-begin
-  FFont := AFont;
-  FText := AText;
-  FTextLength := ALength;
-  GetTextExtentPoint32(DC, FText, FTextLength, FSize);
-end;
-
-destructor TACLTextViewInfo.Destroy;
-begin
-  inherited;
-end;
-
-procedure TACLTextViewInfo.AdjustToWidth(AWidth: Integer; out AReducedCharacters, AReducedWidth: Integer);
-var
-  LSize: TSize;
-begin
-  LSize := NullSize;
-  FFont.AssignTo(MeasureCanvas.Font);
-  GetTextExtentExPoint(MeasureCanvas.Handle, FText, FTextLength, AWidth, @AReducedCharacters, nil, LSize);
-  AReducedCharacters := UTF8CodepointToByteIndex(FText, FTextLength, AReducedCharacters);
-  GetTextExtentPoint32(MeasureCanvas.Handle, FText, AReducedCharacters, LSize);
-  AReducedWidth := FSize.cx - LSize.cx;
-end;
-
-procedure TACLTextViewInfo.DrawCore(DC: HDC; X, Y: Integer);
-begin
-  ExtTextOut(DC, X, Y, 0, nil, FText, FTextLength, nil);
-end;
-
-{$ENDIF}
 end.

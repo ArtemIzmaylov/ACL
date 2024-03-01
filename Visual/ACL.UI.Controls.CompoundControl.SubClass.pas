@@ -821,9 +821,9 @@ type
     procedure ProcessGesture(const AEventInfo: TGestureEventInfo; var AHandled: Boolean); virtual;
 
     // Keyboard
-    procedure ProcessKeyDown(AKey: Word; AShift: TShiftState); virtual;
-    procedure ProcessKeyPress(AKey: Char); virtual;
-    procedure ProcessKeyUp(AKey: Word; AShift: TShiftState); virtual;
+    procedure ProcessKeyDown(var AKey: Word; AShift: TShiftState); virtual;
+    procedure ProcessKeyPress(var AKey: Char); virtual;
+    procedure ProcessKeyUp(var AKey: Word; AShift: TShiftState); virtual;
 
     // Mouse
     procedure ProcessContextPopup(var AHandled: Boolean); virtual;
@@ -3152,7 +3152,7 @@ begin
   FullRefresh;
 end;
 
-procedure TACLCompoundControlSubClass.ProcessKeyDown(AKey: Word; AShift: TShiftState);
+procedure TACLCompoundControlSubClass.ProcessKeyDown(var AKey: Word; AShift: TShiftState);
 begin
   // do nothing
 end;
@@ -3162,12 +3162,12 @@ begin
   // do nothing
 end;
 
-procedure TACLCompoundControlSubClass.ProcessKeyPress(AKey: Char);
+procedure TACLCompoundControlSubClass.ProcessKeyPress(var AKey: Char);
 begin
   // do nothing
 end;
 
-procedure TACLCompoundControlSubClass.ProcessKeyUp(AKey: Word; AShift: TShiftState);
+procedure TACLCompoundControlSubClass.ProcessKeyUp(var AKey: Word; AShift: TShiftState);
 begin
   // do nothing
 end;

@@ -1121,6 +1121,7 @@ begin
   FFont := cairo_get_scaled_font(FHandle);
   cairo_scaled_font_extents(FFont, @FFontExtents);
   FFontHasLines := CairoTextStyleLines * AFont.Style <> [];
+  FLineHeight := Round(FFontExtents.height);
 end;
 
 procedure TACLTextLayoutCairoRender.Shrink(

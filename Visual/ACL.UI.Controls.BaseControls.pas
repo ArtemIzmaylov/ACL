@@ -482,7 +482,7 @@ type
     procedure SetTargetDPI(AValue: Integer); virtual;
     procedure UpdateCursor;
     procedure UpdateTransparency; virtual;
-    procedure WndProc(var Message: TLMessage); override;
+    procedure WndProc(var Message: TMessage); override;
 
     // IACLCurrentDpi
     function GetCurrentDpi: Integer;
@@ -2020,7 +2020,7 @@ begin
     ControlStyle := ControlStyle + [csOpaque];
 end;
 
-procedure TACLCustomControl.WndProc(var Message: TLMessage);
+procedure TACLCustomControl.WndProc(var Message: TMessage);
 begin
   inherited WndProc(Message);
   TACLControls.WndProc(Self, Message);

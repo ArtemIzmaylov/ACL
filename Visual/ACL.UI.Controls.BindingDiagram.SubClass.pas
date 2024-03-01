@@ -169,7 +169,7 @@ type
     procedure DoDragStarted; override;
     procedure DoHoveredObjectChanged; override;
     procedure ProcessChanges(AChanges: TIntegerSet); override;
-    procedure ProcessKeyUp(AKey: Word; AShift: TShiftState); override;
+    procedure ProcessKeyUp(var AKey: Word; AShift: TShiftState); override;
     procedure ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState); override;
     procedure ProcessMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState); override;
     procedure ResourceChanged; override;
@@ -766,7 +766,7 @@ begin
   inherited;
 end;
 
-procedure TACLBindingDiagramSubClass.ProcessKeyUp(AKey: Word; AShift: TShiftState);
+procedure TACLBindingDiagramSubClass.ProcessKeyUp(var AKey: Word; AShift: TShiftState);
 begin
   if AKey = VK_DELETE then
     RemoveSelected

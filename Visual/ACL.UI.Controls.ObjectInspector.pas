@@ -164,7 +164,7 @@ type
     procedure DoSortReset; override;
 
     function CanStartEditingByMouse(AButton: TMouseButton): Boolean;
-    procedure ProcessKeyDown(AKey: Word; AShift: TShiftState); override;
+    procedure ProcessKeyDown(var AKey: Word; AShift: TShiftState); override;
     procedure ProcessMouseClick(AButton: TMouseButton; AShift: TShiftState); override;
     procedure ProcessMouseClickAtNodeButton(ANode: TACLTreeListNode);
     procedure ProcessMouseDblClick(AButton: TMouseButton; AShift: TShiftState); override;
@@ -933,7 +933,7 @@ begin
   Result := (AButton = mbLeft) and HitTest.HitAtNode and not HitTest.HasAction;
 end;
 
-procedure TACLObjectInspectorSubClass.ProcessKeyDown(AKey: Word; AShift: TShiftState);
+procedure TACLObjectInspectorSubClass.ProcessKeyDown(var AKey: Word; AShift: TShiftState);
 const
   Modifiers = [ssAlt, ssCtrl, ssShift];
 begin

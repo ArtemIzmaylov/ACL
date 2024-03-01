@@ -924,9 +924,9 @@ type
     function GetPrevColumn(out AColumn: TACLTreeListColumn): Boolean;
     function IsMultiSelectOperation(AShift: TShiftState): Boolean;
     procedure NavigateTo(AObject: TObject; AShift: TShiftState);
-    procedure ProcessKeyDown(AKey: Word; AShift: TShiftState); override;
-    procedure ProcessKeyPress(AKey: Char); override;
-    procedure ProcessKeyUp(AKey: Word; AShift: TShiftState); override;
+    procedure ProcessKeyDown(var AKey: Word; AShift: TShiftState); override;
+    procedure ProcessKeyPress(var AKey: Char); override;
+    procedure ProcessKeyUp(var AKey: Word; AShift: TShiftState); override;
 
     // Mouse
     procedure ProcessContextPopup(var AHandled: Boolean); override;
@@ -4865,7 +4865,7 @@ begin
   end;
 end;
 
-procedure TACLTreeListSubClass.ProcessKeyDown(AKey: Word; AShift: TShiftState);
+procedure TACLTreeListSubClass.ProcessKeyDown(var AKey: Word; AShift: TShiftState);
 var
   AColumn: TACLTreeListColumn;
   AExpandable: IACLExpandableObject;
@@ -4944,14 +4944,14 @@ begin
   inherited ProcessKeyDown(AKey, AShift);
 end;
 
-procedure TACLTreeListSubClass.ProcessKeyPress(AKey: Char);
+procedure TACLTreeListSubClass.ProcessKeyPress(var AKey: Char);
 begin
   if OptionsBehavior.IncSearchColumnIndex >= 0 then
     IncSearch.ProcessKey(AKey);
   inherited ProcessKeyPress(AKey);
 end;
 
-procedure TACLTreeListSubClass.ProcessKeyUp(AKey: Word; AShift: TShiftState);
+procedure TACLTreeListSubClass.ProcessKeyUp(var AKey: Word; AShift: TShiftState);
 begin
   case AKey of
     VK_SHIFT:

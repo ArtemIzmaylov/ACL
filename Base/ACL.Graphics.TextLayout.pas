@@ -475,6 +475,16 @@ type
     property Text: string read FText;
   end;
 
+  { TACLTextViewInfo }
+
+  TACLTextViewInfo = class(TACLTextLayoutBlockText)
+  strict private
+    FText: string;
+  public
+    constructor Create(const AText: string); reintroduce;
+    function Measure(ARender: TACLTextLayoutRender): TSize;
+  end;
+
 const
   atoAutoHeight  = 1;
   atoAutoWidth   = 2;
@@ -2961,6 +2971,21 @@ destructor TACLTextImporter.TContext.Destroy;
 begin
   FreeAndNil(Span);
   inherited;
+end;
+
+{ TACLTextViewInfo }
+
+constructor TACLTextViewInfo.Create(const AText: string);
+begin
+  FText := AText;
+  inherited Create(PChar(FText), Length(FText));
+end;
+
+function TACLTextViewInfo.Measure(ARender: TACLTextLayoutRender): TSize;
+begin
+  ARender.Measure(Self);
+  Result.cx := FWidth;
+  Result.cy := FHeight;
 end;
 
 end.
