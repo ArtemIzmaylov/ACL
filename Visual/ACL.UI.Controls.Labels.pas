@@ -4,44 +4,48 @@
 {*              Label Controls               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.Labels;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
   Winapi.Windows,
-  Winapi.Messages,
+{$ENDIF}
+  {Winapi.}Messages,
   // System
-  System.Classes,
-  System.SysUtils,
-  System.Types,
+  {System.}Classes,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
   System.UITypes,
   // Vcl
-  Vcl.Controls,
-  Vcl.ImgList,
-  Vcl.Graphics,
-  Vcl.ActnList,
-  Vcl.ExtCtrls,
+  {Vcl.}ActnList,
+  {Vcl.}Controls,
+  {Vcl.}ImgList,
+  {Vcl.}Graphics,
+  {Vcl.}ExtCtrls,
   // ACL
   ACL.FastCode,
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Ex,
   ACL.Graphics.SkinImage,
-  ACL.Graphics.SkinImageSet,
   ACL.Math,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Resources,
   ACL.Utils.Common,
   ACL.Utils.DPIAware,
-  ACL.Utils.FileSystem,
   ACL.Utils.Shell;
 
 type
@@ -523,6 +527,7 @@ procedure TACLLabel.DrawTextEffects(ACanvas: TCanvas; var R: TRect);
           Dec(R.Right, Style.EffectSize);
           Dec(R.Bottom, Style.EffectSize);
         end;
+    else;
     end;
   end;
 
@@ -535,6 +540,8 @@ procedure TACLLabel.DrawTextEffects(ACanvas: TCanvas; var R: TRect);
     DrawText(ACanvas, LRect, Style.ColorShadow.AsColor);
   end;
 
+var
+  I: Integer;
 begin
   if Style.EffectSize <> 0 then
   begin
@@ -542,15 +549,15 @@ begin
     case Style.Effect of
       sleShadow:
         DrawLabelText(Style.EffectSize, Style.EffectSize);
-
       sleContour:
-        for var I := 1 to Abs(Style.EffectSize) do
+        for I := 1 to Abs(Style.EffectSize) do
         begin
           DrawLabelText( I,  I);
           DrawLabelText( I, -I);
           DrawLabelText(-I,  I);
           DrawLabelText(-I, -I);
         end;
+    else;
     end;
   end;
 end;

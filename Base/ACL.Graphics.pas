@@ -2873,10 +2873,7 @@ end;
 function TACLDib.GetCanvas: TCanvas;
 begin
   if FCanvas = nil then
-  begin
     FCanvas := TACLDibCanvas.Create(Self);
-    FCanvas.Lock;
-  end;
   // Если DC уже задействован - сразу назначаем его канвасу
   if not FCanvas.HandleAllocated {$IFDEF FPC}and FCanvasChanged{$ENDIF} then
     FCanvas.Handle := FHandle;

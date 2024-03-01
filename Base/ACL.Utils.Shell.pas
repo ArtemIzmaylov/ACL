@@ -11,10 +11,11 @@
 
 unit ACL.Utils.Shell;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:NotImplemented
 
 interface
 
+{$IFDEF MSWINDOWS}
 uses
   Winapi.ActiveX,
   Winapi.ShellApi,
@@ -30,10 +31,12 @@ uses
   ACL.Geometry,
   ACL.Utils.Common,
   ACL.Utils.FileSystem;
+{$ENDIF}
 
 const
   acMailToPrefix = 'mailto:';
 
+{$IFDEF MSWINDOWS}
 type
   TShellOperation = (soMove, soCopy, soDelete, soRename);
   TShellOperationFlag = (sofCanUndo, sofNoDialog, sofNoConfirmation);
@@ -215,8 +218,12 @@ function ShellGetSystemImageList: THandle;
 function ShellShowHiddenByDefault: Boolean;
 
 procedure UpdateShellCache;
+{$ELSE}
+function ShellExecute(const AFileName: string): Boolean;
+function ShellExecuteURL(const AFileName: string): Boolean;
+{$ENDIF}
 implementation
-
+{$IFDEF MSWINDOWS}
 uses
   System.SysUtils,
   System.Math,
@@ -1284,5 +1291,18 @@ begin
     MarkerID.mkid.cb := 0;
   end;
 end;
+{$ELSE}
+function ShellExecute(const AFileName: string): Boolean;
+begin
+  {$MESSAGE WARN 'Commented'}
+  Result := False;
+end;
 
+function ShellExecuteURL(const AFileName: string): Boolean;
+begin
+  {$MESSAGE WARN 'Commented'}
+  Result := False;
+end;
+
+{$ENDIF}
 end.
