@@ -11,29 +11,39 @@
 
 unit ACL.UI.Controls.BaseEditors;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+{$IFDEF FPC}
+  LazUTF8,
+  LCLIntf,
+  LCLType,
+{$ELSE}
+  {Winapi.}Windows,
+{$ENDIF}
+  {Winapi.}Messages,
   // Vcl
-  Vcl.Controls,
-  Vcl.Forms,
-  Vcl.Graphics,
-  Vcl.ImgList,
-  Vcl.Mask,
-  Vcl.StdCtrls,
+  {Vcl.}Controls,
+  {Vcl.}Forms,
+  {Vcl.}Graphics,
+  {Vcl.}ImgList,
+  {Vcl.}StdCtrls,
+{$IFDEF FPC}
+  {Vcl.}MaskEdit,
+{$ELSE}
+  {Vcl.}Mask,
+{$ENDIF}
   // System
-  System.Classes,
-  System.Generics.Collections,
-  System.SysUtils,
-  System.Types,
+  {System.}Classes,
+  {System.}Character,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
   System.UITypes,
   // ACL
   ACL.Classes,
-  ACL.Classes.StringList,
   ACL.Geometry,
   ACL.Graphics,
   ACL.MUI,
@@ -52,7 +62,8 @@ type
   TACLEditButtons = class;
 
   TACLEditInputMask = (eimText, eimInteger, eimFloat, eimDateAndTime);
-  TACLEditGetDisplayTextEvent = procedure (Sender: TObject; const AValue: Variant; var ADisplayText: string) of object;
+  TACLEditGetDisplayTextEvent = procedure (Sender: TObject;
+    const AValue: Variant; var ADisplayText: string) of object;
 
   { IACLButtonEdit }
 
@@ -73,7 +84,7 @@ type
     procedure InitializeResources; override;
   public
     procedure DrawBorders(ACanvas: TCanvas; const R: TRect; AFocused: Boolean);
-    //
+    //# Properties
     property ColorsBorder[Focused: Boolean]: TColor read GetBorderColor;
     property ColorsContent[Enabled: Boolean]: TColor read GetContentColor;
     property ColorsText[Enabled: Boolean]: TColor read GetTextColor;
@@ -98,9 +109,9 @@ type
 
   TACLEditButton = class(TACLCollectionItem)
   strict private
-    FCaption: UnicodeString;
+    FCaption: string;
     FEnabled: Boolean;
-    FHint: UnicodeString;
+    FHint: string;
     FSubClass: TACLButtonSubClass;
     FVisible: Boolean;
     FWidth: Integer;
@@ -110,7 +121,7 @@ type
     function GetCollection: TACLEditButtons;
     function GetImageIndex: TImageIndex;
     procedure DoOnClick(Sender: TObject);
-    procedure SetCaption(const AValue: UnicodeString);
+    procedure SetCaption(const AValue: string);
     procedure SetEnabled(AValue: Boolean);
     procedure SetImageIndex(AValue: TImageIndex);
     procedure SetVisible(AValue: Boolean);
@@ -127,9 +138,9 @@ type
     //
     property Collection: TACLEditButtons read GetCollection;
   published
-    property Caption: UnicodeString read FCaption write SetCaption;
+    property Caption: string read FCaption write SetCaption;
     property Enabled: Boolean read FEnabled write SetEnabled default True;
-    property Hint: UnicodeString read FHint write FHint;
+    property Hint: string read FHint write FHint;
     property ImageIndex: TImageIndex read GetImageIndex write SetImageIndex default -1;
     property Index stored False;
     property Visible: Boolean read FVisible write SetVisible default True;
@@ -157,7 +168,7 @@ type
 
     function GetItem(AIndex: Integer): TACLEditButton;
   protected
-    function GetHint(const P: TPoint): UnicodeString;
+    function GetHint(const P: TPoint): string;
     function GetOwner: TPersistent; override;
     procedure Draw(ACanvas: TCanvas);
     procedure MouseDown(Button: TMouseButton; const P: TPoint);
@@ -169,7 +180,7 @@ type
     property ButtonEdit: IACLButtonEdit read FButtonEdit;
   public
     constructor Create(AButtonEdit: IACLButtonEdit); virtual;
-    function Add(const ACaption: UnicodeString = ''): TACLEditButton;
+    function Add(const ACaption: string = ''): TACLEditButton;
     function Find(const P: TPoint; out AButton: TACLEditButton): Boolean;
     //
     property Items[Index: Integer]: TACLEditButton read GetItem; default;
@@ -195,14 +206,14 @@ type
     procedure HandlerEditorEnter(Sender: TObject);
     procedure HandlerEditorExit(Sender: TObject);
     procedure HandlerImageChange(Sender: TObject);
-    //
+    //# Setters
     procedure SetAutoHeight(AValue: Boolean);
     procedure SetBorders(AValue: Boolean);
     procedure SetButtons(AValue: TACLEditButtons);
     procedure SetButtonsImages(const AValue: TCustomImageList);
     procedure SetStyle(AValue: TACLStyleEdit);
     procedure SetStyleButton(AValue: TACLStyleButton);
-    //
+    //# Messages
     procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
     procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
     procedure CMHintShow(var Message: TCMHintShow); message CM_HINTSHOW;
@@ -217,6 +228,9 @@ type
     procedure AssignTextDrawParams(ACanvas: TCanvas); virtual;
     procedure Changed; virtual;
     procedure CreateHandle; override;
+  {$IFDEF FPC}
+    procedure DoAutoSize; override;
+  {$ENDIF}
     procedure DoChange; virtual;
     procedure DoEnter; override;
     procedure DoExit; override;
@@ -272,7 +286,7 @@ type
     function ButtonsGetOwner: TComponent;
 
     // IACLCursorProvider
-    function GetCursor(const P: TPoint): TCursor; virtual;
+    function GetCursor(const P: TPoint): TCursor; reintroduce; virtual;
 
     // Properties
     property AutoHeight: Boolean read FAutoHeight write SetAutoHeight default True;
@@ -288,7 +302,7 @@ type
     destructor Destroy; override;
     procedure BeforeDestruction; override;
     function Focused: Boolean; override;
-    procedure GetTabOrderList(List: TList); override;
+    procedure GetTabOrderList(List: TTabOrderList); override;
     procedure Localize(const ASection: string); override;
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
   published
@@ -301,40 +315,50 @@ type
   strict private
     FInputMask: TACLEditInputMask;
 
-    function GetContainer: TACLCustomEdit;
     procedure SetInputMask(const Value: TACLEditInputMask);
+    // IACLInnerControl
+    function GetContainer: TACLCustomEdit;
+    function GetInnerContainer: TWinControl;
   protected
+  {$IFDEF FPC}
+    procedure CalculatePreferredSize(var
+      PreferredWidth, PreferredHeight: Integer;
+      WithThemeSpace: Boolean); override;
+  {$ENDIF}
     procedure DeleteNearWord(AStartPosition, ADirection: Integer);
     procedure DeleteWordFromLeftOfCursor;
     procedure DeleteWordFromRightOfCursor;
 
     // Numberic
-    function CanType(Key: Char): Boolean;
+    function CanType(Key: WideChar): Boolean;
     // Keyboard
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
-    procedure KeyPress(var Key: Char); override;
+    procedure KeyPress(var Key: Char); override; {$IFDEF FPC}final;{$ENDIF}
+    procedure KeyPressCore(var Key: WideChar); virtual;
     procedure KeyUp(var Key: Word; Shift: TShiftState); override;
+  {$IFDEF FPC}
+    procedure Utf8KeyPress(var Key: TUTF8Char); override; final;
+  {$ENDIF}
+
     // Mouse
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
     procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
 
-    // IACLInnerControl
-    function GetInnerContainer: TWinControl;
-    // Messages
+    //# Messages
     procedure CMEnter(var Message: TCMEnter); message CM_ENTER;
     procedure CMExit(var Message: TCMExit); message CM_EXIT;
     procedure CMWantSpecialKey(var Message: TMessage); message CM_WANTSPECIALKEY;
     procedure WMContextMenu(var Message: TWMContextMenu); message WM_CONTEXTMENU;
     procedure WMNCHitTest(var Message: TWMNCHitTest); message WM_NCHITTEST;
-    //
+    //# Properties
     property Container: TACLCustomEdit read GetContainer;
   public
     constructor Create(AOwner: TComponent); override;
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
-    //
+    //# Properties
     property InputMask: TACLEditInputMask read FInputMask write SetInputMask;
-    //
+    //# Events
     property OnChange;
   end;
 
@@ -349,7 +373,7 @@ type
     function InplaceGetValue: string; virtual; abstract;
     procedure InplaceSetFocus; virtual;
     procedure InplaceSetValue(const AValue: string); virtual; abstract;
-    //
+    //# Properties
     property Inplace: Boolean read FInplace;
   public
     constructor CreateInplace(const AParams: TACLInplaceInfo); virtual;
@@ -377,16 +401,18 @@ type
     procedure Changed;
   public
     procedure Cancel;
-    function CanProcessKey(Key: Word; Shift: TShiftState; ACanStartEvent: TACLKeyPreviewEvent = nil): Boolean;
+    function CanProcessKey(Key: Word; Shift: TShiftState;
+      ACanStartEvent: TACLKeyPreviewEvent = nil): Boolean;
     function Contains(const AText: string): Boolean;
-    function GetHighlightBounds(const AText: string; out AHighlightStart, AHighlightFinish: Integer): Boolean;
-    function ProcessKey(Key: Char): Boolean; overload;
+    function GetHighlightBounds(const AText: string;
+      out AHighlightStart, AHighlightFinish: Integer): Boolean;
+    function ProcessKey(Key: WideChar): Boolean; overload;
     function ProcessKey(Key: Word; Shift: TShiftState): Boolean; overload;
-    //
+    //# Properties
     property Active: Boolean read GetActive;
     property Mode: TACLIncrementalSearchMode read FMode write SetMode;
     property Text: string read FText write SetText;
-    //
+    //# Events
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
     property OnLookup: TLookupEvent read FOnLookup write FOnLookup;
   end;
@@ -395,12 +421,6 @@ function EditDateTimeFormat: TFormatSettings;
 function EditDateTimeFormatToMask: string;
 function EditDateTimeFormatToString: string;
 implementation
-
-uses
-  System.Math,
-  System.Character,
-  // VCL
-  Vcl.Consts;
 
 type
   TWinControlAccess = class(TWinControl);
@@ -428,14 +448,15 @@ end;
 function EditDateTimeFormatToMask: string;
 var
   I: Integer;
+  U: UnicodeString;
 begin
-  Result := EditDateTimeFormatToString;
-  for I := 1 to Length(Result) do
+  U := _U(EditDateTimeFormatToString);
+  for I := 1 to Length(U) do
   begin
-    if Result[I].IsLetter then
-      Result[I] := '0';
+    if U[I].IsLetter then
+      U[I] := '0';
   end;
-  Result := Result + ';1;_';
+  Result := _S(U) + ';1;_';
 end;
 
 { TACLStyleEdit }
@@ -569,7 +590,7 @@ begin
   Result := SubClass.ImageIndex;
 end;
 
-procedure TACLEditButton.SetCaption(const AValue: UnicodeString);
+procedure TACLEditButton.SetCaption(const AValue: string);
 begin
   if FCaption <> AValue then
   begin
@@ -624,7 +645,7 @@ begin
   inherited Create(TACLEditButton);
 end;
 
-function TACLEditButtons.Add(const ACaption: UnicodeString = ''): TACLEditButton;
+function TACLEditButtons.Add(const ACaption: string = ''): TACLEditButton;
 begin
   BeginUpdate;
   try
@@ -635,7 +656,7 @@ begin
   end;
 end;
 
-function TACLEditButtons.GetHint(const P: TPoint): UnicodeString;
+function TACLEditButtons.GetHint(const P: TPoint): string;
 var
   AItem: TACLEditButton;
 begin
@@ -870,6 +891,13 @@ begin
   EditorOpen;
 end;
 
+{$IFDEF FPC}
+procedure TACLCustomEdit.DoAutoSize;
+begin
+  // do nothing
+end;
+{$ENDIF}
+
 procedure TACLCustomEdit.DoChange;
 begin
   CallNotifyEvent(Self, OnChange);
@@ -970,7 +998,6 @@ procedure TACLCustomEdit.EditorInitialize;
 begin
   TWinControlAccess(FEditor).OnExit := HandlerEditorExit;
   TWinControlAccess(FEditor).OnEnter := HandlerEditorEnter;
-  TWinControlAccess(FEditor).Anchors := AnchorClient;
 end;
 
 procedure TACLCustomEdit.EditorUpdateBounds;
@@ -981,6 +1008,7 @@ begin
   begin
     LTemp := CalculateEditorPosition;
     FEditor.BoundsRect := LTemp;
+  {$IFNDEF FPC}
     if FEditor.Height > LTemp.Height then
     begin
       FEditor.BoundsRect := LTemp.CenterTo(LTemp.Width, FEditor.Height);
@@ -990,6 +1018,7 @@ begin
     else
       if HandleAllocated then
         SetWindowRgn(FEditor.Handle, 0, False);
+  {$ENDIF}
   end;
 end;
 
@@ -1098,7 +1127,7 @@ end;
 
 procedure TACLCustomEdit.CMHintShow(var Message: TCMHintShow);
 var
-  AHint: UnicodeString;
+  AHint: string;
 begin
   AHint := Buttons.GetHint(Message.HintInfo^.CursorPos);
   if AHint <> '' then
@@ -1117,7 +1146,7 @@ begin
     Result := Cursor;
 end;
 
-procedure TACLCustomEdit.GetTabOrderList(List: TList);
+procedure TACLCustomEdit.GetTabOrderList(List: TTabOrderList);
 begin
   inherited GetTabOrderList(List);
   if HasEditor and (List.IndexOf(FEditor) >= 0) then
@@ -1215,42 +1244,30 @@ begin
   AutoSelect := True;
 end;
 
-procedure TACLInnerEdit.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
-begin
-  if AutoSize then
-    AHeight := acFontHeight(Font);
-  inherited SetBounds(ALeft, ATop, AWidth, AHeight);
-end;
-
 procedure TACLInnerEdit.DeleteNearWord(AStartPosition, ADirection: Integer);
-
-  function InBounds(const S: UnicodeString; APosition: Integer): Boolean;
-  begin
-    Result := InRange(APosition, 1, Length(S));
-  end;
-
-  function IsSpace(const S: UnicodeString; APosition: Integer): Boolean;
-  begin
-    Result := acPos(S[APosition], acParserDefaultDelimiterChars) > 0;
-  end;
-
+const
+  Delims: UnicodeString = acParserDefaultDelimiterChars;
 var
-  AFinishPosition: Integer;
-  AText: UnicodeString;
+  LPosition: Integer;
+  LText: UnicodeString;
+  LTextLen: Integer;
 begin
-  AText := Text;
-  AFinishPosition := AStartPosition + ADirection;
+  LText := _U(Text);
+  LTextLen := Length(LText);
+  LPosition := AStartPosition + ADirection;
 
   // Skip spaces
-  while InBounds(AText, AFinishPosition) and IsSpace(AText, AFinishPosition) do
-    Inc(AFinishPosition, ADirection);
+  while InRange(LPosition, 1, LTextLen) and acContains(LText[LPosition], Delims) do
+    Inc(LPosition, ADirection);
 
   // Skip first word
-  while InBounds(AText, AFinishPosition) and not IsSpace(AText, AFinishPosition) do
-    Inc(AFinishPosition, ADirection);
+  while InRange(LPosition, 1, LTextLen) and not acContains(LText[LPosition], Delims) do
+    Inc(LPosition, ADirection);
     
-  Text := Copy(AText, 1, Min(AStartPosition, AFinishPosition)) + Copy(AText, Max(AStartPosition, AFinishPosition) + 1, MaxInt);
-  SelStart := Min(AStartPosition, AFinishPosition);  
+  Text := _S(
+    Copy(LText, 1, Min(AStartPosition, LPosition)) +
+    Copy(LText, Max(AStartPosition, LPosition) + 1));
+  SelStart := Min(AStartPosition, LPosition);
 end;
 
 procedure TACLInnerEdit.DeleteWordFromLeftOfCursor;
@@ -1263,25 +1280,29 @@ begin
   DeleteNearWord(SelStart, 1);
 end;
 
-function TACLInnerEdit.CanType(Key: Char): Boolean;
+function TACLInnerEdit.CanType(Key: WideChar): Boolean;
 var
-  AValueD: Double;
-  AValueI: Integer;
-  S: string;
+  LTemp: string;
+  LTempD: Double;
+  LTempI: Integer;
+  LText: UnicodeString;
 begin
   Result := True;
-  S := Copy(Text, 1, SelStart) + Key + Copy(Text, SelStart + SelLength + 1, MaxInt);
-  if (S <> '-') and (S <> '+') then
-    case InputMask of
-      eimInteger:
-        Result := TryStrToInt(S, AValueI);
-      eimFloat:
-        Result := TryStrToFloat(S, AValueD) or TryStrToFloat(S, AValueD, InvariantFormatSettings);
+  if InputMask in [eimInteger, eimFloat] then
+  begin
+    LText := _U(Text);
+    LTemp := _S(Copy(LText, 1, SelStart) + Key + Copy(LText, SelStart + SelLength + 1));
+    if (LTemp <> '-') and (LTemp <> '+') then
+    begin
+      if InputMask = eimFloat then
+        Result := TryStrToFloat(LTemp, LTempD) or TryStrToFloat(LTemp, LTempD, InvariantFormatSettings)
+      else
+        Result := TryStrToInt(LTemp, LTempI);
     end;
-
+  end;
 {$IFDEF DEBUG}
   if not Result and (InputMask = eimFloat) and (Key = '.') then
-    raise Exception.CreateFmt('Test: %d, %d, (%s)', [SelStart, SelLength, S]);
+    raise Exception.CreateFmt('Test: %d, %d, (%s)', [SelStart, SelLength, LTemp]);
 {$ENDIF}
 end;
 
@@ -1289,43 +1310,40 @@ procedure TACLInnerEdit.KeyDown(var Key: Word; Shift: TShiftState);
 begin
   inherited;
   Container.KeyDown(Key, Shift);
-
   if [ssCtrl, ssShift, ssAlt] * Shift = [ssCtrl] then
   begin
     if (Key = 65) and ReadOnly then
       SelectAll;
-    if Key = VK_DELETE then
-    begin
-      DeleteWordFromRightOfCursor;
-      Key := 0;
-    end;
+    if Key = VK_BACK then
+      DeleteWordFromLeftOfCursor
+    else if Key = VK_DELETE then
+      DeleteWordFromRightOfCursor
+    else
+      Exit;
+    Key := 0;
   end;
 end;
 
 procedure TACLInnerEdit.KeyPress(var Key: Char);
 begin
   inherited;
+{$IFDEF UNICODE}
+  KeyPressCore(Key);
+{$ENDIF}
+  Container.KeyPress(Key);
+end;
 
-  if not IsMasked and (InputMask <> eimText) then
+procedure TACLInnerEdit.KeyPressCore(var Key: WideChar);
+begin
+  if not IsMasked and (InputMask <> eimText) and not Key.IsControl then
   begin
-    if not Key.IsControl then
-    begin
-      if not CanType(Key) then
-        Key := #0;
-    end;
+    if not CanType(Key) then
+      Key := #0;
   end;
-
   case Ord(Key) of
-    $7F: {Ctrl+Backspace}
-      begin
-        DeleteWordFromLeftOfCursor;
-        Key := #0;
-      end;
     VK_RETURN, VK_ESCAPE:
       Key := #0;
   end;
-
-  Container.KeyPress(Key);
 end;
 
 procedure TACLInnerEdit.KeyUp(var Key: Word; Shift: TShiftState);
@@ -1333,6 +1351,25 @@ begin
   inherited;
   Container.KeyUp(Key, Shift);
 end;
+
+{$IFDEF FPC}
+procedure TACLInnerEdit.Utf8KeyPress(var Key: TUTF8Char);
+var
+  LKey: WideChar;
+  LStr: UnicodeString;
+begin
+  inherited;
+  LStr := UTF8ToString(Key);
+  if Length(LStr) = 1 then
+  begin
+    LKey := LStr[1];
+    KeyPressCore(LKey);
+    if LKey <> LStr[1] then
+      Key := UTF8Encode(LKey);
+  end;
+  Container.UTF8KeyPress(Key);
+end;
+{$ENDIF}
 
 procedure TACLInnerEdit.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
@@ -1402,6 +1439,13 @@ begin
   Result := Parent as TACLCustomEdit;
 end;
 
+procedure TACLInnerEdit.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
+begin
+  if AutoSize then
+    AHeight := acFontHeight(Font);
+  inherited SetBounds(ALeft, ATop, AWidth, AHeight);
+end;
+
 procedure TACLInnerEdit.SetInputMask(const Value: TACLEditInputMask);
 begin
   if FInputMask <> Value then
@@ -1411,6 +1455,14 @@ begin
     Hint := IfThenW(InputMask = eimDateAndTime, EditDateTimeFormatToString);
   end;
 end;
+
+{$IFDEF FPC}
+procedure TACLInnerEdit.CalculatePreferredSize(
+  var PreferredWidth, PreferredHeight: Integer; WithThemeSpace: Boolean);
+begin
+  PreferredHeight := acFontHeight(Font);
+end;
+{$ENDIF}
 
 { TACLCustomInplaceEdit }
 
@@ -1443,7 +1495,8 @@ begin
   SetText('');
 end;
 
-function TACLIncrementalSearch.CanProcessKey(Key: Word; Shift: TShiftState; ACanStartEvent: TACLKeyPreviewEvent = nil): Boolean;
+function TACLIncrementalSearch.CanProcessKey(Key: Word;
+  Shift: TShiftState; ACanStartEvent: TACLKeyPreviewEvent = nil): Boolean;
 const
   ControlKeys = [91, VK_F1..VK_F20, VK_CONTROL, VK_SHIFT, VK_MENU, VK_RETURN, VK_DELETE, VK_INSERT];
 begin
@@ -1461,11 +1514,11 @@ begin
   end;
 end;
 
-function TACLIncrementalSearch.ProcessKey(Key: Char): Boolean;
+function TACLIncrementalSearch.ProcessKey(Key: WideChar): Boolean;
 begin
   Result := not Key.IsControl and (Key <> #8) and (Active or (Key <> ' '));
   if Result then
-    SetText(Text + Key);
+    SetText(Text + _S(Key));
 end;
 
 function TACLIncrementalSearch.ProcessKey(Key: Word; Shift: TShiftState): Boolean;
@@ -1474,10 +1527,14 @@ begin
   case Key of
     VK_ESCAPE:
       Cancel;
-    VK_BACK:
-      SetText(Copy(Text, 1, Length(Text) - 1));
     VK_SPACE:
       Result := Active and ([ssAlt, ssCtrl] * Shift = []);
+    VK_BACK:
+    {$IFDEF FPC}
+      SetText(UTF8Copy(Text, 1, UTF8Length(Text) - 1));
+    {$ELSE}
+      SetText(Copy(Text, 1, Length(Text) - 1));
+    {$ENDIF}
   else
     Result := False;
   end;
@@ -1490,7 +1547,8 @@ begin
   Result := not Active or GetHighlightBounds(AText, X, X);
 end;
 
-function TACLIncrementalSearch.GetHighlightBounds(const AText: string; out AHighlightStart, AHighlightFinish: Integer): Boolean;
+function TACLIncrementalSearch.GetHighlightBounds(
+  const AText: string; out AHighlightStart, AHighlightFinish: Integer): Boolean;
 var
   APosition: Integer;
 begin

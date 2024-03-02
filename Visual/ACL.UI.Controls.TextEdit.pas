@@ -4,39 +4,42 @@
 {*                 Text Editor               *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.TextEdit;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
+  {Winapi.}Windows,
+{$ENDIF}
+  {Winapi.}Messages,
   // System
+  {System.}Classes,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
   System.UITypes,
-  System.Classes,
-  System.Types,
   // Vcl
-  Vcl.Controls,
-  Vcl.Graphics,
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
   // ACL
-  ACL.Classes,
-  ACL.Classes.StringList,
   ACL.Geometry,
   ACL.Graphics,
   ACL.MUI,
   ACL.ObjectLinks,
-  ACL.Parsers,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Forms,
-  ACL.UI.ImageList,
   ACL.UI.Resources,
   ACL.Utils.Common,
   ACL.Utils.DPIAware,
@@ -46,7 +49,8 @@ type
 
   { TACLCustomTextEdit }
 
-  TACLTextEditCustomDrawEvent = procedure (Sender: TObject; ACanvas: TCanvas; const R: TRect; var AHandled: Boolean) of object;
+  TACLTextEditCustomDrawEvent = procedure (Sender: TObject;
+    ACanvas: TCanvas; const R: TRect; var AHandled: Boolean) of object;
 
   TACLCustomTextEdit = class(TACLCustomInplaceEdit)
   strict private
@@ -54,7 +58,7 @@ type
     FMaxLength: Integer;
     FPasswordChar: Boolean;
     FReadOnly: Boolean;
-    FTextHint: UnicodeString;
+    FTextHint: string;
 
     FOnCustomDraw: TACLTextEditCustomDrawEvent;
 
@@ -62,7 +66,7 @@ type
     function GetInnerEdit: TACLInnerEdit;
     function GetSelLength: Integer;
     function GetSelStart: Integer;
-    function GetSelText: UnicodeString;
+    function GetSelText: string;
     function GetValue: Variant;
     procedure SetInputMask(AValue: TACLEditInputMask);
     procedure SetMaxLength(AValue: Integer);
@@ -70,13 +74,13 @@ type
     procedure SetReadOnly(AValue: Boolean);
     procedure SetSelLength(const Value: Integer);
     procedure SetSelStart(const Value: Integer);
-    procedure SetSelText(const Value: UnicodeString);
-    procedure SetText(AValue: UnicodeString);
-    procedure SetTextHint(const AValue: UnicodeString);
+    procedure SetSelText(const Value: string);
+    procedure SetText(AValue: string);
+    procedure SetTextHint(const AValue: string);
     procedure SetValue(const AValue: Variant);
   protected
     FContentRect: TRect;
-    FText: UnicodeString;
+    FText: string;
     FTextChangeLockCount: Integer;
     FTextRect: TRect;
 
@@ -88,12 +92,12 @@ type
     procedure Paint; override;
     procedure SetDefaultSize; override;
     procedure SetFocusToInnerEdit; override;
-    procedure SetTextCore(const AValue: UnicodeString); virtual;
+    procedure SetTextCore(const AValue: string); virtual;
 
     // Validation
-    function TextToDisplayText(const AText: UnicodeString): UnicodeString; virtual;
-    function TextToValue(const AText: UnicodeString): Variant; virtual;
-    function ValueToText(const AValue: Variant): UnicodeString; virtual;
+    function TextToDisplayText(const AText: string): string; virtual;
+    function TextToValue(const AText: string): Variant; virtual;
+    function ValueToText(const AValue: Variant): string; virtual;
 
     // InnerEdit
     function CanOpenEditor: Boolean; override;
@@ -116,19 +120,19 @@ type
     property MaxLength: Integer read FMaxLength write SetMaxLength default 0;
     property PasswordChar: Boolean read FPasswordChar write SetPasswordChar default False;
     property ReadOnly: Boolean read FReadOnly write SetReadOnly default False;
-    property Text: UnicodeString read FText write SetText;
-    property TextHint: UnicodeString read FTextHint write SetTextHint;
+    property Text: string read FText write SetText;
+    property TextHint: string read FTextHint write SetTextHint;
     property Value: Variant read GetValue write SetValue;
-
+    //# Events
     property OnCustomDraw: TACLTextEditCustomDrawEvent read FOnCustomDraw write FOnCustomDraw;
   public
     procedure Localize(const ASection: string); override;
     procedure SelectAll;
-    //
+    //# Properties
     property InnerEdit: TACLInnerEdit read GetInnerEdit;
     property SelLength: Integer read GetSelLength write SetSelLength;
     property SelStart: Integer read GetSelStart write SetSelStart;
-    property SelText: UnicodeString read GetSelText write SetSelText;
+    property SelText: string read GetSelText write SetSelText;
     property ContentRect: TRect read FContentRect;
     property TextRect: TRect read FTextRect;
   published
@@ -160,29 +164,10 @@ type
 
 implementation
 
-uses
-  Vcl.Consts,
-  // System
-  System.Math,
-  System.Character,
-  System.SysUtils;
-
 type
   TACLInnerEditAccess = class(TACLInnerEdit);
 
 { TACLCustomTextEdit }
-
-procedure TACLCustomTextEdit.Localize(const ASection: string);
-begin
-  inherited Localize(ASection);
-  TextHint := LangGet(ASection, 'th', TextHint);
-end;
-
-procedure TACLCustomTextEdit.SelectAll;
-begin
-  SelStart := 0;
-  SelLength := MaxInt;
-end;
 
 procedure TACLCustomTextEdit.CalculateContent(const R: TRect);
 begin
@@ -220,6 +205,12 @@ begin
     Changed;
 end;
 
+procedure TACLCustomTextEdit.Localize(const ASection: string);
+begin
+  inherited Localize(ASection);
+  TextHint := LangGet(ASection, 'th', TextHint);
+end;
+
 procedure TACLCustomTextEdit.Paint;
 begin
   inherited Paint;
@@ -229,6 +220,11 @@ begin
     if not DoCustomDraw(Canvas) then
       DrawEditorContent(Canvas);
   end;
+end;
+
+procedure TACLCustomTextEdit.SelectAll;
+begin
+  InnerEdit.SelectAll;
 end;
 
 procedure TACLCustomTextEdit.SetDefaultSize;
@@ -254,12 +250,12 @@ begin
   Invalidate;
 end;
 
-procedure TACLCustomTextEdit.SetTextCore(const AValue: UnicodeString);
+procedure TACLCustomTextEdit.SetTextCore(const AValue: string);
 begin
   FText := AValue;
 end;
 
-function TACLCustomTextEdit.TextToDisplayText(const AText: UnicodeString): UnicodeString;
+function TACLCustomTextEdit.TextToDisplayText(const AText: string): string;
 begin
   if PasswordChar then
     Result := acDupeString('x', Length(AText))
@@ -267,7 +263,7 @@ begin
     Result := AText;
 end;
 
-function TACLCustomTextEdit.TextToValue(const AText: UnicodeString): Variant;
+function TACLCustomTextEdit.TextToValue(const AText: string): Variant;
 begin
   case InputMask of
     eimInteger:
@@ -281,7 +277,7 @@ begin
   end;
 end;
 
-function TACLCustomTextEdit.ValueToText(const AValue: Variant): UnicodeString;
+function TACLCustomTextEdit.ValueToText(const AValue: Variant): string;
 begin
   if InputMask = eimDateAndTime then
     Result := FormatDateTime(EditDateTimeFormatToString, AValue, EditDateTimeFormat)
@@ -298,7 +294,7 @@ function TACLCustomTextEdit.CreateEditor: TWinControl;
 var
   AEdit: TACLInnerEdit;
 begin
-  AEdit := TACLInnerEdit.Create(nil);
+  AEdit := TACLInnerEdit.Create(Self);
   AEdit.OnChange := HandlerInnerEditChanged;
   Result := AEdit;
 end;
@@ -389,7 +385,7 @@ begin
     Result := 0;
 end;
 
-function TACLCustomTextEdit.GetSelText: UnicodeString;
+function TACLCustomTextEdit.GetSelText: string;
 begin
   if InnerEdit <> nil then
     Result := InnerEdit.SelText
@@ -452,7 +448,7 @@ begin
     InnerEdit.SelStart := Value;
 end;
 
-procedure TACLCustomTextEdit.SetSelText(const Value: UnicodeString);
+procedure TACLCustomTextEdit.SetSelText(const Value: string);
 begin
   HandleNeeded;
   if HasEditor then
@@ -460,7 +456,7 @@ begin
   Text := Text;
 end;
 
-procedure TACLCustomTextEdit.SetText(AValue: UnicodeString);
+procedure TACLCustomTextEdit.SetText(AValue: string);
 begin
   if AValue <> Text then
   begin
@@ -474,7 +470,7 @@ begin
   end;
 end;
 
-procedure TACLCustomTextEdit.SetTextHint(const AValue: UnicodeString);
+procedure TACLCustomTextEdit.SetTextHint(const AValue: string);
 begin
   if AValue <> FTextHint then
   begin

@@ -69,6 +69,7 @@ const
 {$IFDEF FPC}
   CS_DROPSHADOW  = 0;
   WM_ACTIVATEAPP = $001C;
+  WM_CONTEXTMENU = LM_CONTEXTMENU;
   WM_MOUSEWHEEL  = LM_MOUSEWHEEL;
   WM_MOUSEHWHEEL = LM_MOUSEHWHEEL;
   WM_MOVE = LM_MOVE;
@@ -81,16 +82,18 @@ const
   crDragLink = TCursor(-26);
 
 const
-  AnchorTop = [akLeft, akTop, akRight];
-  AnchorClient = [akLeft, akTop, akRight, akBottom];
-  AnchorBottomLeft = [akLeft, akBottom];
-  AnchorBottomRight = [akRight, akBottom];
+  acAnchorTop = [akLeft, akTop, akRight];
+  acAnchorClient = [akLeft, akTop, akRight, akBottom];
+  acAnchorBottomLeft = [akLeft, akBottom];
+  acAnchorBottomRight = [akRight, akBottom];
 
 type
+  TTabOrderList = {$IFDEF FPC}TFPList{$ELSE}TList{$ENDIF};
 {$IFDEF FPC}
   TGestureEventInfo = record
     {stub}
   end;
+  TWMContextMenu = TLMContextMenu;
   TWMMouseWheel = TCMMouseWheel;
 {$ENDIF}
 
