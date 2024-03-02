@@ -4,36 +4,33 @@
 {*          Binding Diagram Control          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.BindingDiagram;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  System.Types,
-  System.SysUtils,
-  System.Classes,
+  {System.}Classes,
+  {System.}SysUtils,
   // Vcl
-  Vcl.Graphics,
-  Vcl.Controls,
+  {Vcl.}Graphics,
+  {Vcl.}Controls,
   // ACL
   ACL.Geometry,
   ACL.UI.Controls.BaseControls,
-  ACL.UI.Controls.CompoundControl,
-  ACL.UI.Controls.CompoundControl.SubClass,
   ACL.UI.Controls.BindingDiagram.SubClass,
   ACL.UI.Controls.BindingDiagram.Types,
+  ACL.UI.Controls.CompoundControl,
+  ACL.UI.Controls.CompoundControl.SubClass,
   ACL.UI.Forms,
-  ACL.UI.HintWindow,
   ACL.UI.Resources,
-  ACL.Utils.Common,
-  ACL.Utils.FileSystem;
+  ACL.Utils.Common;
 
 type
 

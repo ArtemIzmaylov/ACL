@@ -4,32 +4,28 @@
 {*          Binding Diagram Control          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.BindingDiagram.Types;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  System.Types,
-  System.SysUtils,
-  System.Classes,
+  {System.}Classes,
+  {System.}SysUtils,
+  {System.}Types,
   // Vcl
-  Vcl.Controls,
+  {Vcl.}Controls,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
-  ACL.Classes.StringList,
-  ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.Ex.Gdip,
-  ACL.Utils.Common,
-  ACL.Utils.FileSystem;
+  ACL.Utils.Common;
 
 type
   TACLBindingDiagramData = class;
@@ -42,7 +38,7 @@ type
   TACLBindingDiagramObject = class(TACLLockablePersistent)
   strict private
     FCanRemove: Boolean;
-    FCaption: UnicodeString;
+    FCaption: string;
     FData: Pointer;
     FHint: string;
     FOwner: TACLBindingDiagramData;
@@ -52,9 +48,9 @@ type
     function GetPin(Index: Integer): TACLBindingDiagramObjectPin; inline;
     function GetPinCount: Integer; inline;
     procedure SetCanRemove(const Value: Boolean);
-    procedure SetCaption(const Value: UnicodeString);
+    procedure SetCaption(const Value: string);
     procedure SetPosition(const Value: TPoint);
-    //
+    //# Handlers
     procedure ListChanged(Sender: TObject = nil);
   protected
     FPins: TACLObjectList;
@@ -65,13 +61,15 @@ type
     constructor Create(AOwner: TACLBindingDiagramData); virtual;
     destructor Destroy; override;
     procedure BeforeDestruction; override;
-    function Add(const ACaption: string; AMode: TACLBindingDiagramObjectPinModes; ATag: NativeInt = 0): TACLBindingDiagramObjectPin;
+    function Add(const ACaption: string;
+      AMode: TACLBindingDiagramObjectPinModes;
+      ATag: NativeInt = 0): TACLBindingDiagramObjectPin;
     procedure Clear;
     procedure Delete(Index: Integer);
     function Find(const ACaption: string): TACLBindingDiagramObjectPin;
-    //
+    //# Properties
     property CanRemove: Boolean read FCanRemove write SetCanRemove;
-    property Caption: UnicodeString read FCaption write SetCaption;
+    property Caption: string read FCaption write SetCaption;
     property Hint: string read FHint write FHint;
     property PinCount: Integer read GetPinCount;
     property Pins[Index: Integer]: TACLBindingDiagramObjectPin read GetPin;
@@ -90,16 +88,15 @@ type
     FOwner: TACLBindingDiagramObject;
     FTag: NativeInt;
 
+    function GetIndex: Integer;
     procedure SetCaption(const Value: string);
     procedure SetMode(const Value: TACLBindingDiagramObjectPinModes);
-  private
-    function GetIndex: Integer;
   protected
     procedure Changed;
   public
     constructor Create(AOwner: TACLBindingDiagramObject);
     procedure BeforeDestruction; override;
-    //
+    //# Properties
     property Caption: string read FCaption write SetCaption;
     property Index: Integer read GetIndex;
     property Mode: TACLBindingDiagramObjectPinModes read FMode write SetMode;
@@ -130,7 +127,7 @@ type
   public
     constructor Create(AOwner: TACLBindingDiagramData);
     procedure BeforeDestruction; override;
-    //
+    //# Properties
     property Arrows: TACLBindingDiagramLinkArrows read FArrows write SetArrows;
     property Hint: string read FHint write FHint;
     property Source: TACLBindingDiagramObjectPin read FSource;
@@ -167,7 +164,7 @@ type
     procedure Clear;
     procedure ClearLinks;
     function ContainsLink(ASource, ATarget: TACLBindingDiagramObjectPin): Boolean;
-    //
+    //# Properties
     property ObjectCount: Integer read GetObjectCount;
     property Objects[Index: Integer]: TACLBindingDiagramObject read GetObject;
     property LinkCount: Integer read GetLinkCount;
@@ -278,7 +275,7 @@ begin
   end;
 end;
 
-procedure TACLBindingDiagramObject.SetCaption(const Value: UnicodeString);
+procedure TACLBindingDiagramObject.SetCaption(const Value: string);
 begin
   if FCaption <> Value then
   begin
@@ -470,8 +467,10 @@ begin
 end;
 
 function TACLBindingDiagramData.ContainsLink(ASource, ATarget: TACLBindingDiagramObjectPin): Boolean;
+var
+  I: Integer;
 begin
-  for var I := 0 to LinkCount - 1 do
+  for I := 0 to LinkCount - 1 do
   begin
     if (Links[I].Source = ASource) and (Links[I].Target = ATarget) then
       Exit(True);

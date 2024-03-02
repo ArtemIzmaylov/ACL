@@ -61,8 +61,10 @@ type
 
   TACLArrayManager<T> = class
   public
-    procedure Move(var AArray: array of T; FromIndex, ToIndex, Count: Integer); overload; virtual; abstract;
-    procedure Move(var FromArray, ToArray: array of T; FromIndex, ToIndex, Count: Integer); overload; virtual; abstract;
+    procedure Move(var AArray: array of T;
+      FromIndex, ToIndex, Count: Integer); overload; virtual; abstract;
+    procedure Move(var FromArray, ToArray: array of T;
+      FromIndex, ToIndex, Count: Integer); overload; virtual; abstract;
     procedure Finalize(var AArray: array of T; Index, Count: Integer); virtual; abstract;
   end;
 
@@ -79,8 +81,10 @@ type
 
   TACLMoveArrayManager<T> = class(TACLArrayManager<T>)
   public
-    procedure Move(var AArray: array of T; FromIndex, ToIndex, Count: Integer); overload; override;
-    procedure Move(var FromArray, ToArray: array of T; FromIndex, ToIndex, Count: Integer); overload; override;
+    procedure Move(var AArray: array of T;
+      FromIndex, ToIndex, Count: Integer); overload; override;
+    procedure Move(var FromArray, ToArray: array of T;
+      FromIndex, ToIndex, Count: Integer); overload; override;
     procedure Finalize(var AArray: array of T; Index, Count: Integer); override;
   end;
 
@@ -88,8 +92,10 @@ type
 
   TACLManagedArrayManager<T> = class(TACLArrayManager<T>)
   public
-    procedure Move(var AArray: array of T; FromIndex, ToIndex, Count: Integer); overload; override;
-    procedure Move(var FromArray, ToArray: array of T; FromIndex, ToIndex, Count: Integer); overload; override;
+    procedure Move(var AArray: array of T;
+      FromIndex, ToIndex, Count: Integer); overload; override;
+    procedure Move(var FromArray, ToArray: array of T;
+      FromIndex, ToIndex, Count: Integer); overload; override;
     procedure Finalize(var AArray: array of T; Index, Count: Integer); override;
   end;
 
@@ -1230,17 +1236,37 @@ begin
 end;
 
 function TACLList<T>.BinarySearch(const Value: T; out Index: Integer): Boolean;
-{$IFDEF FPC}
 var
-  LIndex: SizeInt;
-{$ENDIF}
+  L, H: Integer;
+  mid, cmp: Integer;
 begin
-{$IFDEF FPC}
-  Result := TArrayHelper<T>.BinarySearch(FItems, Value, LIndex, FComparer, 0, Count);
-  Index := Integer(LIndex);
-{$ELSE}
-  Result := TArray.BinarySearch<T>(FItems, Value, Index, FComparer, 0, Count);
-{$ENDIF}
+  if Count = 0 then
+  begin
+    Index := 0;
+    Exit(False);
+  end;
+
+  L := 0;
+  H := Count - 1;
+  while L <= H do
+  begin
+    mid := L + (H - L) shr 1;
+    cmp := FComparer.Compare(FItems[mid], Value);
+    if cmp < 0 then
+      L := mid + 1
+    else if cmp > 0 then
+      H := mid - 1
+    else
+    begin
+      repeat
+        Dec(mid);
+      until (mid < 0) or (FComparer.Compare(FItems[mid], Value) <> 0);
+      Index := mid + 1;
+      Exit(True);
+    end;
+  end;
+  Index := L;
+  Result := False;
 end;
 
 function TACLList<T>.Contains(const Value: T): Boolean;
@@ -3077,10 +3103,7 @@ end;
 
 constructor TACLStringSet.Create(const IgnoreCase: Boolean; InitialCapacity: Integer);
 begin
-  if IgnoreCase then
-    inherited Create(TACLStringComparer.Create, InitialCapacity)
-  else
-    inherited Create(TStringComparer.Ordinal, InitialCapacity);
+  inherited Create(TACLStringComparer.Create(IgnoreCase), InitialCapacity);
 end;
 
 function TACLStringSet.Contains(const Item: PChar; ItemLength: Integer): Boolean;

@@ -317,6 +317,7 @@ begin
   Canvas.Font := Font;
   Layout.Bounds := Rect(0, 0, MaxWidth, 2);
   SetHintData(AHint, AData);
+  Layout.Calculate(Canvas);
   Result := TRect.Create(Layout.MeasureSize);
 
   Inc(Result.Right, 2 * dpiApply(HintTextIndentH, FCurrentPPI));

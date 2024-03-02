@@ -247,7 +247,7 @@ type
   protected
     FChildren: TACLObjectList;
 
-    procedure AddCell(ACell: TACLCompoundControlCustomViewInfo; var AObj);
+    procedure AddCell(ACell: TACLCompoundControlCustomViewInfo; out AObj);
     procedure CalculateSubCells(const AChanges: TIntegerSet); virtual;
     procedure DoCalculate(AChanges: TIntegerSet); override;
     procedure DoCalculateHitTest(const AInfo: TACLHitTestInfo); override;
@@ -1110,7 +1110,8 @@ begin
   inherited Destroy;
 end;
 
-procedure TACLCompoundControlContainerViewInfo.AddCell(ACell: TACLCompoundControlCustomViewInfo; var AObj);
+procedure TACLCompoundControlContainerViewInfo.AddCell(
+  ACell: TACLCompoundControlCustomViewInfo; out AObj);
 begin
   TObject(AObj) := ACell;
   FChildren.Add(ACell);

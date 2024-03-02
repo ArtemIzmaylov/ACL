@@ -33,6 +33,7 @@ uses
   Types,
   // ACL
   ACL.Graphics,
+  ACL.Graphics.Ex,
   ACL.Utils.Common;
 
 type
@@ -57,6 +58,8 @@ type
     FOrigin: TPoint;
     FHandle: Pcairo_t;
     FTargetSurface: Pcairo_surface_t;
+
+    procedure SetLineStyle(AWidth: Single; AStyle: TACL2DRenderStrokeStyle);
   public
     //# Initialization
     procedure BeginPaint(ACanvas: TCanvas);
@@ -68,6 +71,8 @@ type
       AFrom, ATo: TAlphaColor; const ARect: TRect; AVertical: Boolean);
     procedure FillSurface(const ATargetRect, ASourceRect: TRect;
       ASurface: Pcairo_surface_t; AAlpha: Double; ATileMode: Boolean);
+    procedure Line(X1, Y1, X2, Y2: Single; Color: TAlphaColor;
+      Width: Single = 1; Style: TACL2DRenderStrokeStyle = ssSolid);
 
     //# Properties
     property Origin: TPoint read FOrigin;
@@ -259,6 +264,11 @@ begin
   finally
     DeleteObject(LRegion);
   end;
+end;
+
+procedure cairo_set_dash(ACairo: pcairo_t; const ADashes: array of Double); overload;
+begin
+  cairo_set_dash(ACairo, @ADashes[0], Length(ADashes), 0);
 end;
 
 procedure cairo_set_font(ACairo: pcairo_t; AFont: TFont);
@@ -900,6 +910,33 @@ begin
     end
     else
       cairo_fill(Handle);
+  end;
+end;
+
+procedure TCairoCanvas.Line(X1, Y1, X2, Y2: Single;
+  Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
+begin
+  SetLineStyle(Width, Style);
+  cairo_set_source_color(FHandle, Color);
+  cairo_set_line_width(FHandle, Width);
+  cairo_move_to(FHandle, X1 - Origin.X, Y1 - Origin.Y);
+  cairo_line_to(FHandle, X2 - Origin.X, Y2 - Origin.Y);
+  cairo_stroke(FHandle);
+end;
+
+procedure TCairoCanvas.SetLineStyle(AWidth: Single; AStyle: TACL2DRenderStrokeStyle);
+begin
+  case AStyle of
+    ssDashDotDot:
+      cairo_set_dash(FHandle, [4 * AWidth, AWidth, AWidth, AWidth, AWidth, AWidth]);
+    ssDashDot:
+      cairo_set_dash(FHandle, [4 * AWidth, AWidth, AWidth, AWidth]);
+    ssDash:
+      cairo_set_dash(FHandle, [4 * AWidth, AWidth]);
+    ssDot:
+      cairo_set_dash(FHandle, [AWidth]);
+  else
+    cairo_set_dash(FHandle, nil, 0, 0);
   end;
 end;
 

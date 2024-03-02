@@ -3398,30 +3398,33 @@ end;
 
 class procedure TACLRootResourceCollection.InitializeCursors;
 
-  procedure DoSetCursor(ID: Integer; ACursor: HCURSOR);
+  procedure InitCursor(ID: Integer; AInstance: HINST; AName: PChar);
+  var
+    LCursor: HCURSOR;
   begin
-    if ACursor <> 0 then
-      Screen.Cursors[ID] := ACursor;
+    LCursor := LoadCursor(AInstance, AName);
+    if LCursor <> 0 then
+      Screen.Cursors[ID] := LCursor;
   end;
 
 begin
 {$IFDEF MSWINDOWS}
-  DoSetCursor(crNo, LoadCursor(0, IDC_NO));
-  DoSetCursor(crAppStart, LoadCursor(0, IDC_APPSTARTING));
-  DoSetCursor(crHandPoint, LoadCursor(0, IDC_HAND));
-  DoSetCursor(crHourGlass, LoadCursor(0, IDC_WAIT));
-  DoSetCursor(crSizeAll, LoadCursor(0, IDC_SIZEALL));
-  DoSetCursor(crSizeNESW, LoadCursor(0, IDC_SIZENESW));
-  DoSetCursor(crSizeNS, LoadCursor(0, IDC_SIZENS));
-  DoSetCursor(crSizeNWSE, LoadCursor(0, IDC_SIZENWSE));
-  DoSetCursor(crSizeWE, LoadCursor(0, IDC_SIZEWE));
-  DoSetCursor(crNoDrop, LoadCursor(0, IDC_NO));
-  DoSetCursor(crHSplit, LoadCursor(0, IDC_SIZEWE));
-  DoSetCursor(crVSplit, LoadCursor(0, IDC_SIZENS));
-  DoSetCursor(crDrag, LoadCursor(LoadLibrary('ole32.dll'), MakeIntResource(3)));
-  DoSetCursor(crRemove, LoadCursor(HInstance, 'CR_REMOVE'));
-  DoSetCursor(crDragLink, LoadCursor(HInstance, 'CR_DRAGLINK'));
+  InitCursor(crNo, 0, IDC_NO);
+  InitCursor(crAppStart, 0, IDC_APPSTARTING);
+  InitCursor(crDrag, LoadLibrary('ole32.dll'), MakeIntResource(3));
+  InitCursor(crHandPoint, 0, IDC_HAND);
+  InitCursor(crHourGlass, 0, IDC_WAIT);
+  InitCursor(crSizeAll, 0, IDC_SIZEALL);
+  InitCursor(crSizeNESW, 0, IDC_SIZENESW);
+  InitCursor(crSizeNS, 0, IDC_SIZENS);
+  InitCursor(crSizeNWSE, 0, IDC_SIZENWSE);
+  InitCursor(crSizeWE, 0, IDC_SIZEWE);
+  InitCursor(crNoDrop, 0, IDC_NO);
+  InitCursor(crHSplit, 0, IDC_SIZEWE);
+  InitCursor(crVSplit, 0, IDC_SIZENS);
 {$ENDIF}
+  InitCursor(crRemove, HInstance, 'CR_REMOVE');
+  InitCursor(crDragLink, HInstance, 'CR_DRAGLINK');
 end;
 
 { TACLRootResourceCollectionImpl }
