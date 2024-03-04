@@ -803,7 +803,8 @@ begin
   ANewState := CalculateState;
   if ANewState <> FState then
   begin
-    if AllowAnimation and (FState = absHover) and (ANewState in [absActive, absNormal]) then
+    if AllowAnimation and not ButtonRect.IsEmpty and
+      (FState = absHover) and (ANewState in [absActive, absNormal]) then
     begin
       AAnimator := TACLBitmapFadingAnimation.Create(Self, acUIFadingTime);
       AAnimator.AllocateFrame1(ButtonRect, DrawBackground);

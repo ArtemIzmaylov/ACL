@@ -163,6 +163,12 @@ type
   { TACLStreamHelper }
 
   TACLStreamHelper = class helper for TStream
+  strict private type
+    // FPC has different order of TValueType elements, so redefine correct one here
+    TValueType = (vaNull, vaList, vaInt8, vaInt16, vaInt32, vaExtended,
+      vaString, vaIdent, vaFalse, vaTrue, vaBinary, vaSet, vaLString,
+      vaNil, vaCollection, vaSingle, vaCurrency, vaDate, vaWString,
+      vaInt64, vaUTF8String, vaDouble);
   public
     procedure Assign(ASource: TStream);
 
@@ -938,8 +944,7 @@ const
   (
     varNull, varError, varShortInt, varSmallInt, varInteger, varDouble, varString,
     varError, varBoolean, varBoolean, varError, varError, varString, varEmpty,
-    varError, varSingle, varCurrency, varDate, varOleStr, varInt64, varError,
-    varDouble{$IFDEF FPC}, varInteger{vaQWord}{$ENDIF}
+    varError, varSingle, varCurrency, varDate, varOleStr, varInt64, varError, varDouble
   );
 var
   LSize: Integer;

@@ -36,12 +36,12 @@ uses
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
-  ACL.Timers,
   ACL.FastCode,
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.SkinImage,
-  ACL.Graphics.SkinImageSet,
+  ACL.Math,
+  ACL.Timers,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.Buttons,
   ACL.UI.Forms,
@@ -421,8 +421,10 @@ type
 
 implementation
 
+{$IFNDEF FPC}
 uses
-  ACL.Math;
+  ACL.Graphics.SkinImageSet;
+{$ENDIF}
 
 { TACLSliderCustomOptions }
 

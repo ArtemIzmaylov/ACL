@@ -407,7 +407,6 @@ type
     class procedure Grayscale(P: PACLPixel32; Count: Integer; IgnoreMask: Boolean = False); overload; static;
     class procedure Grayscale(var P: TACLPixel32; IgnoreMask: Boolean = False); overload; inline; static;
     class function Hue(Color: TColor): Single; overload; static;
-    class function Invert(Color: TColor): TColor; static;
     class function Lightness(Color: TColor): Single; overload; static;
     class procedure MakeDisabled(P: PACLPixel32; Count: Integer; IgnoreMask: Boolean = False); overload; static;
     class procedure MakeDisabled(var P: TACLPixel32; IgnoreMask: Boolean = False); overload; inline; static;
@@ -744,6 +743,23 @@ begin
     S := Copy(S, 1, APosPrev) + CollapsedPath + Copy(S, APos, MaxInt);
     Inc(APosPrev, Length(CollapsedPath) + 1);
   end;
+end;
+
+procedure acResetFont(AFont: TFont);
+var
+  ATempFont: TFont;
+begin
+  ATempFont := TFont.Create;
+  try
+    AFont.Assign(ATempFont);
+  finally
+    ATempFont.Free;
+  end;
+end;
+
+procedure acResetRect(DC: HDC; const R: TRect);
+begin
+  FillRect(DC, R, GetStockObject(BLACK_BRUSH));
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -1289,23 +1305,6 @@ end;
 //----------------------------------------------------------------------------------------------------------------------
 // Bitmaps
 //----------------------------------------------------------------------------------------------------------------------
-
-procedure acResetFont(AFont: TFont);
-var
-  ATempFont: TFont;
-begin
-  ATempFont := TFont.Create;
-  try
-    AFont.Assign(ATempFont);
-  finally
-    ATempFont.Free;
-  end;
-end;
-
-procedure acResetRect(DC: HDC; const R: TRect);
-begin
-  FillRect(DC, R, GetStockObject(BLACK_BRUSH));
-end;
 
 procedure acFillBitmapInfoHeader(out AHeader: TBitmapInfoHeader; AWidth, AHeight: Integer);
 begin
@@ -3363,11 +3362,6 @@ begin
     P.G := P.B;
     P.R := P.B;
   end;
-end;
-
-class function TACLColors.Invert(Color: TColor): TColor;
-begin
-  Result := $FFFFFF xor ColorToRGB(Color);
 end;
 
 class function TACLColors.Lightness(Color: TColor): Single;

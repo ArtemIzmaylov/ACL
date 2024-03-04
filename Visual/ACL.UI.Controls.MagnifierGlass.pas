@@ -31,7 +31,6 @@ uses
   // VCL
   {Vcl.}Graphics,
   // ACL
-  ACL.Math,
   ACL.Graphics,
   ACL.Graphics.Ex,
   ACL.Timers,

@@ -32,6 +32,7 @@ uses
 
 operator - (const L: TRect; const R: TPoint): TRect;
 operator + (const L: TRect; const R: TPoint): TRect;
+operator * (const L: TRectF; Factor: Single): TRectF;
 operator * (const L: TRect; Borders: TACLBorders): TRect;
 operator * (const L: TRect; Factor: Single): TRect;
 operator * (const L: TPoint; Factor: Single): TPoint;
@@ -57,6 +58,14 @@ operator * (const L: TPoint; Factor: Single): TPoint;
 begin
   Result.X := Round(L.X * Factor);
   Result.Y := Round(L.Y * Factor);
+end;
+
+operator * (const L: TRectF; Factor: Single): TRectF;
+begin
+  Result.Top := L.Top * Factor;
+  Result.Left := L.Left * Factor;
+  Result.Right := L.Right * Factor;
+  Result.Bottom := L.Bottom * Factor;
 end;
 
 operator * (const L: TRect; Borders: TACLBorders): TRect;

@@ -14,12 +14,14 @@ unit ACL.Graphics.Ex.Cairo; // FPC:OK
 
 {$I ACL.Config.inc}
 
+{$RANGECHECKS OFF}
 {$POINTERMATH ON}
 
 interface
 
 uses
   cairo,
+  glib2,
   gdk2,
   gtk2Def,
   // LCL
@@ -228,41 +230,46 @@ end;
 
 function cairo_set_clipping(ACairo: pcairo_t; ACanvas: TCanvas; const AOrigin: TPoint): Boolean;
 var
+  LGdkRect: PGdkRectangle;
+  LGdkRectCount: Integer;
+  LGdkRects: PGdkRectangle;
   LRect: TRect;
-  LRegion: HRGN;
-  LRegionData: TACLRegionData;
-  I: Integer;
+  LRegion: PGDIObject;
 begin
   Result := True;
-  LRegion := CreateRectRgn(0, 0, 0, 0);
-  try
-    if GetClipRgn(ACanvas.Handle, LRegion) = 1 then
-      case GetRgnBox(LRegion, @LRect) of
-        SimpleRegion:
-          begin
-            cairo_rectangle(ACairo, LRect.Left, LRect.Top, LRect.Width, LRect.Height);
-            cairo_clip(ACairo);
-          end;
-
-        ComplexRegion:
-          begin
-            LRegionData := TACLRegionData.CreateFromHandle(LRegion);
-            try
-              for I := 0 to LRegionData.Count - 1 do
-              begin
-                with LRegionData.Rects^[I] do
-                  cairo_rectangle(ACairo, AOrigin.X + Left, AOrigin.Y + Top, Width, Height);
-              end;
-              cairo_clip(ACairo);
-            finally
-              LRegionData.Free;
-            end;
-          end;
-      else
-        Result := False;
+  if not ACanvas.HandleAllocated then
+    Exit; // DibCanvas, no handle = no clipping
+  case GetClipBox(ACanvas.Handle, @LRect) of
+    SimpleRegion:
+      begin
+        LRect.Offset(-AOrigin.X, -AOrigin.Y);
+        cairo_rectangle(ACairo, LRect.Left, LRect.Top, LRect.Width, LRect.Height);
+        cairo_clip(ACairo);
       end;
-  finally
-    DeleteObject(LRegion);
+
+    ComplexRegion:
+      begin
+        LGdkRects := nil;
+        LGdkRectCount := 0;
+        LRegion := TGtkDeviceContext(ACanvas.Handle).ClipRegion;
+        if LRegion = nil then Exit;
+        gdk_region_get_rectangles({%H-}LRegion^.GDIRegionObject, LGdkRects, @LGdkRectCount);
+        try
+          LGdkRect := LGdkRects;
+          while LGdkRectCount > 0 do
+          begin
+            cairo_rectangle(ACairo, LGdkRect^.X, LGdkRect^.Y, LGdkRect^.width, LGdkRect^.height);
+            Dec(LGdkRectCount);
+            Inc(LGdkRect);
+          end;
+          cairo_clip(ACairo);
+        finally
+          if LGdkRects <> nil then
+            g_free(LGdkRects);
+        end;
+      end;
+  else
+    Result := False;
   end;
 end;
 

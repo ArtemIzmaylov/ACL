@@ -179,8 +179,8 @@ type
 
   TACL2DRenderImageAttributes = class(TACL2DRenderResource)
   strict private
-    FTintColor: TAlphaColor;
     FAlpha: Byte;
+    FTintColor: TAlphaColor;
   protected
     procedure SetAlpha(AValue: Byte); virtual;
     procedure SetTintColor(AValue: TAlphaColor); virtual;

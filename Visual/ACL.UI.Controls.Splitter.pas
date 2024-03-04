@@ -125,8 +125,8 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure AdjustSize; override;
-    procedure ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: UnicodeString);
-    procedure ConfigSave(AConfig: TACLIniFile; const ASection, AItem: UnicodeString);
+    procedure ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: string);
+    procedure ConfigSave(AConfig: TACLIniFile; const ASection, AItem: string);
     procedure Refresh;
     procedure Toggle;
   published
@@ -180,7 +180,7 @@ begin
   SetCursorPos(APoint.X, APoint.Y);
 end;
 
-procedure TACLSplitter.ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: UnicodeString);
+procedure TACLSplitter.ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: string);
 begin
   if Control <> nil then
   begin
@@ -191,7 +191,7 @@ begin
   end;
 end;
 
-procedure TACLSplitter.ConfigSave(AConfig: TACLIniFile; const ASection, AItem: UnicodeString);
+procedure TACLSplitter.ConfigSave(AConfig: TACLIniFile; const ASection, AItem: string);
 begin
   if Control <> nil then
   begin
