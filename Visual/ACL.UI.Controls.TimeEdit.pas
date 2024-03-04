@@ -79,7 +79,7 @@ type
     procedure SetTime(AValue: TTime);
   protected
     function CreateEditor: TWinControl; override;
-    procedure DoButtonClick(AStep: Integer); override;
+    procedure ButtonClick(AStep: Integer); override;
     procedure DoEditChange(Sender: TObject);
     function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean; override;
     //
@@ -307,7 +307,7 @@ begin
   end;
 end;
 
-procedure TACLTimeEdit.DoButtonClick(AStep: Integer);
+procedure TACLTimeEdit.ButtonClick(AStep: Integer);
 begin
   Edit.Increase(AStep > 0);
 end;

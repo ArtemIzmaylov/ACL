@@ -35,6 +35,8 @@ uses
 {$IFDEF FPC}
 const
   WM_TIMER = LM_TIMER;
+type
+  TWMTimer = TLMTimer;
 {$ENDIF}
 
 type

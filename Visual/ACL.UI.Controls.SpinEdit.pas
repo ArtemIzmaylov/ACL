@@ -11,28 +11,34 @@
 
 unit ACL.UI.Controls.SpinEdit;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Messages,
-  Winapi.Windows,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
+  {Winapi.}Windows,
+{$ENDIF}
+  {Winapi.}Messages,
   // System
-  System.Classes,
-  System.Types,
+  {System.}Classes,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Variants,
+  {System.}Types,
   System.UITypes,
   // Vcl
-  Vcl.Controls,
-  Vcl.Forms,
-  Vcl.Graphics,
+  {Vcl.}Controls,
+  {Vcl.}Forms,
+  {Vcl.}Graphics,
   // ACL
   ACL.Classes,
-  ACL.Classes.StringList,
-  ACL.Timers,
   ACL.Graphics.SkinImage,
-  ACL.Graphics.SkinImageSet,
   ACL.MUI,
+  ACL.Timers,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.Buttons,
@@ -41,25 +47,7 @@ uses
   ACL.Utils.DPIAware;
 
 type
-  TACLCustomSpinEdit = class;
-  TACLSpinEdit = class;
-
   TACLSpinEditValueType = (evtInteger, evtFloat);
-
-  { TACLInnerSpinEdit }
-
-  TACLInnerSpinEdit = class(TACLInnerEdit, IACLInnerControl)
-  protected
-    procedure CreateParams(var Params: TCreateParams); override;
-    // Keyboard
-    function CheckChar(var AChar: Char): Boolean; virtual;
-    procedure KeyPress(var Key: Char); override;
-    // IACLInnerControl
-    function GetInnerContainer: TWinControl;
-    // Messages
-    procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
-    procedure WMPaste(var Message: TMessage); message WM_PASTE;
-  end;
 
   { TACLCustomSpinEdit }
 
@@ -73,24 +61,25 @@ type
 
     procedure SetAutoClickTimer(AValue: Boolean);
   protected
-    function CalculateEditorPosition: TRect; override;
-    function CanOpenEditor: Boolean; override;
-    function CreateStyleButton: TACLStyleButton; override;
-    function HitTest(X, Y: Integer; var ASubClass: TACLCustomButtonSubClass): Boolean;
     procedure Calculate(R: TRect); override;
     procedure CalculateAutoHeight(var ANewHeight: Integer); override;
-    procedure DoButtonClick(AStep: Integer); virtual;
-    procedure DrawContent(ACanvas: TCanvas); override;
-    procedure EditorMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
-    procedure EditorInitialize; override;
+    function CalculateEditorPosition: TRect; override;
+    function CanOpenEditor: Boolean; override;
+    //# Buttons
+    function ButtonAtPos(X, Y: Integer; out AButton: TACLCustomButtonSubClass): Boolean;
+    procedure ButtonClick(AStep: Integer); virtual;
+    function CreateStyleButton: TACLStyleButton; override;
+    //# Mouse
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X,Y: Integer); override;
     procedure MouseLeave; override;
     procedure MouseMove(Shift: TShiftState; X: Integer; Y: Integer); override;
     procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
-    //
+    //# Paint
+    procedure DrawContent(ACanvas: TCanvas); override;
+    //# Messages
     procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
     procedure WMTimer(var Message: TWMTimer); message WM_TIMER;
-    //
+    //# Properties
     property AutoClickTimer: Boolean read FAutoClickTimer write SetAutoClickTimer;
     property ButtonLeft: TACLCustomButtonSubClass read FButtonLeft;
     property ButtonRight: TACLCustomButtonSubClass read FButtonRight;
@@ -105,7 +94,7 @@ type
     property Style;
     property StyleButton;
     property TabOrder;
-    //
+    //# Events
     property OnChange;
   end;
 
@@ -125,6 +114,7 @@ type
 
   { TACLSpinEditOptionsValue }
 
+  TACLSpinEdit = class;
   TACLSpinEditAssignedValue = (seavIncCount, seavMaxValue, seavMinValue);
   TACLSpinEditAssignedValues = set of TACLSpinEditAssignedValue;
 
@@ -133,7 +123,7 @@ type
     DefaultDisplayFormat = '%s';
   strict private
     FAssignedValues: TACLSpinEditAssignedValues;
-    FDisplayFormat: UnicodeString;
+    FDisplayFormat: string;
     FOwner: TACLSpinEdit;
     FValues: array[0..2] of Variant;
     FValueType: TACLSpinEditValueType;
@@ -142,7 +132,7 @@ type
     function IsDisplayFormatStored: Boolean;
     function IsValueStored(const Index: Integer): Boolean;
     procedure SetAssignedValues(const Value: TACLSpinEditAssignedValues);
-    procedure SetDisplayFormat(const Value: UnicodeString);
+    procedure SetDisplayFormat(const Value: string);
     procedure SetValue(const Index: Integer; const AValue: Variant);
     procedure SetValueType(const Value: TACLSpinEditValueType);
   protected
@@ -153,9 +143,9 @@ type
   public
     constructor Create(AOwner: TACLSpinEdit); virtual;
   published
-    property ValueType: TACLSpinEditValueType read FValueType write SetValueType default evtInteger; // must be first!
+    property ValueType: TACLSpinEditValueType read FValueType write SetValueType default evtInteger; // first!
     property AssignedValues: TACLSpinEditAssignedValues read FAssignedValues write SetAssignedValues stored False;
-    property DisplayFormat: UnicodeString read FDisplayFormat write SetDisplayFormat stored IsDisplayFormatStored;
+    property DisplayFormat: string read FDisplayFormat write SetDisplayFormat stored IsDisplayFormatStored;
     property IncCount: Variant index 0 read GetValue write SetValue stored IsValueStored;
     property MaxValue: Variant index 1 read GetValue write SetValue stored IsValueStored;
     property MinValue: Variant index 2 read GetValue write SetValue stored IsValueStored;
@@ -174,20 +164,21 @@ type
 
     function FormatValue(const AValue: Variant): string;
     procedure HandlerDelayValidate(Sender: TObject);
-    function GetEdit: TACLInnerSpinEdit;
+    function GetInnerEdit: TACLInnerEdit;
     function IsValueStored: Boolean;
     procedure SetOnGetDisplayText(const Value: TACLEditGetDisplayTextEvent);
     procedure SetOptionsValue(const Value: TACLSpinEditOptionsValue);
     procedure SetValue(AValue: Variant);
   protected
+    procedure ButtonClick(AStep: Integer); override;
     function CreateEditor: TWinControl; override;
-    procedure DoButtonClick(AStep: Integer); override;
+    procedure EditorUpdateParamsCore; override;
     procedure DoSpinEditChanged(Sender: TObject);
     procedure SetDefaultSize; override;
     procedure UpdateDisplayValue; virtual;
-    //
-    function InplaceGetValue: UnicodeString;
-    procedure InplaceSetValue(const AValue: UnicodeString);
+    // Inplace
+    function InplaceGetValue: string;
+    procedure InplaceSetValue(const AValue: string);
     // Keyboard
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     // Mouse
@@ -199,8 +190,8 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure RefreshDisplayValue;
-    //
-    property Edit: TACLInnerSpinEdit read GetEdit;
+    //# Properties
+    property InnerEdit: TACLInnerEdit read GetInnerEdit;
   published
     property Align;
     property OptionsValue: TACLSpinEditOptionsValue read FOptionsValue write SetOptionsValue;
@@ -214,69 +205,14 @@ type
 implementation
 
 uses
-  System.Math,
-  System.Variants,
-  System.SysUtils,
-  // ACL
+{$IFNDEF FPC}
+  ACL.Graphics.SkinImageSet, // inlinging
+{$ENDIF}
   ACL.Geometry,
   ACL.Graphics,
   ACL.Math,
   ACL.Utils.Common,
   ACL.Utils.Strings;
-
-type
-  TWinControlAccess = class(TWinControl);
-
-{ TACLInnerSpinEdit }
-
-procedure TACLInnerSpinEdit.CreateParams(var Params: TCreateParams);
-begin
-  inherited CreateParams(Params);
-  Params.Style := Params.Style or ES_CENTER;
-end;
-
-function TACLInnerSpinEdit.CheckChar(var AChar: Char): Boolean;
-var
-  S: UnicodeString;
-  X: Double;
-begin
-  if AChar = '.' then
-    AChar := FormatSettings.DecimalSeparator;
-  Result := CharInSet(AChar, ['0'..'9', '-', FormatSettings.DecimalSeparator]);
-  if Result then
-  begin
-    S := Text;
-    S := Copy(S, 1, SelStart) + AChar + Copy(S, SelStart + SelLength + 1, MaxInt);
-    Result := (S = '-') or TryStrToFloat(S, X);
-  end;
-end;
-
-procedure TACLInnerSpinEdit.KeyPress(var Key: Char);
-begin
-  inherited KeyPress(Key);
-  if not (CharInSet(Key, [#3, #$16, Char(VK_BACK)]) or CheckChar(Key)) then
-  begin
-    Key := #0;
-    Beep;
-  end;
-end;
-
-procedure TACLInnerSpinEdit.WMPaste(var Message: TMessage);
-begin
-  inherited;
-  TACLSpinEdit(Container).UpdateDisplayValue;
-end;
-
-function TACLInnerSpinEdit.GetInnerContainer: TWinControl;
-begin
-  Result := Parent;
-end;
-
-procedure TACLInnerSpinEdit.CMTextChanged(var Message: TMessage);
-begin
-  if not (csLoading in Parent.ComponentState) then
-    inherited;
-end;
 
 { TACLCustomSpinEdit }
 
@@ -288,8 +224,6 @@ begin
   FButtonLeft.Tag := -1;
   FButtonRight := TACLSpinButtonSubClass.Create(Self);
   FButtonRight.Tag := 1;
-  EditorOpen;
-  ResourceChanged;
 end;
 
 destructor TACLCustomSpinEdit.Destroy;
@@ -305,7 +239,7 @@ var
   ASize: TSize;
 begin
   ASize := StyleButton.Texture.FrameSize;
-  ASize.Scale(R.Height, ASize.cy);
+  ASize.Height := R.Height;
   FButtonLeft.IsEnabled := Enabled;
   FButtonLeft.Calculate(Bounds(0, 0, ASize.cx, ASize.cy));
   FButtonRight.IsEnabled := Enabled;
@@ -315,7 +249,8 @@ end;
 
 procedure TACLCustomSpinEdit.CalculateAutoHeight(var ANewHeight: Integer);
 begin
-  ANewHeight := Max(StyleButton.Texture.FrameHeight, CalculateTextHeight);
+  ANewHeight := CalculateTextHeight + 2 * 1{border size};
+  ANewHeight := Max(ANewHeight, StyleButton.Texture.FrameHeight);
 end;
 
 function TACLCustomSpinEdit.CalculateEditorPosition: TRect;
@@ -334,39 +269,32 @@ begin
   Result := True;
 end;
 
+function TACLCustomSpinEdit.ButtonAtPos(X, Y: Integer; out AButton: TACLCustomButtonSubClass): Boolean;
+begin
+  if PtInRect(ButtonLeft.Bounds, Point(X, Y)) then
+    AButton := ButtonLeft
+  else if PtInRect(ButtonRight.Bounds, Point(X, Y)) then
+    AButton := ButtonRight
+  else
+    AButton := nil;
+
+  Result := Assigned(AButton);
+end;
+
+procedure TACLCustomSpinEdit.ButtonClick(AStep: Integer);
+begin
+  // do nothing
+end;
+
 function TACLCustomSpinEdit.CreateStyleButton: TACLStyleButton;
 begin
   Result := TACLStyleSpinButton.Create(Self);
 end;
 
-function TACLCustomSpinEdit.HitTest(X, Y: Integer; var ASubClass: TACLCustomButtonSubClass): Boolean;
-begin
-  if PtInRect(ButtonLeft.Bounds, Point(X, Y)) then
-    ASubClass := ButtonLeft
-  else
-    if PtInRect(ButtonRight.Bounds, Point(X, Y)) then
-      ASubClass := ButtonRight
-    else
-      ASubClass := nil;
-
-  Result := Assigned(ASubClass);
-end;
-
-procedure TACLCustomSpinEdit.EditorMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
-begin
-  MouseMove(Shift, X + FEditor.Left, Y + FEditor.Top);
-end;
-
-procedure TACLCustomSpinEdit.EditorInitialize;
-begin
-  inherited EditorInitialize;
-  TWinControlAccess(FEditor).OnMouseMove := EditorMouseMove;
-end;
-
 procedure TACLCustomSpinEdit.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   inherited MouseDown(Button, Shift, X, Y);
-  if HitTest(X, Y, FAutoClickButton) then
+  if ButtonAtPos(X, Y, FAutoClickButton) then
     AutoClickTimer := True;
   ButtonLeft.MouseDown(Button, Point(X, Y));
   ButtonRight.MouseDown(Button, Point(X, Y));
@@ -374,13 +302,13 @@ end;
 
 procedure TACLCustomSpinEdit.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 var
-  ASubClass: TACLCustomButtonSubClass;
+  LButton: TACLCustomButtonSubClass;
 begin
   inherited MouseUp(Button, Shift, X, Y);
-  if HitTest(X, Y, ASubClass) and (ASubClass = FAutoClickButton) then
+  if ButtonAtPos(X, Y, LButton) and (LButton = FAutoClickButton) then
   begin
     if not AutoClickTimer or (FAutoClickTimerWaitCount > 0) then
-      DoButtonClick(Signs[FAutoClickButton = ButtonRight]);
+      ButtonClick(Signs[FAutoClickButton = ButtonRight]);
   end;
   ButtonRight.MouseUp(Button, Point(X, Y));
   ButtonLeft.MouseUp(Button, Point(X, Y));
@@ -402,15 +330,24 @@ begin
   ButtonLeft.MouseMove(Shift, Point(X, Y));
 end;
 
-procedure TACLCustomSpinEdit.DoButtonClick(AStep: Integer);
-begin
-  // do nothing
-end;
-
 procedure TACLCustomSpinEdit.DrawContent(ACanvas: TCanvas);
+var
+  LInnerBounds: TRect;
+  LPrevClip: HRGN;
 begin
-  ButtonLeft.Draw(ACanvas);
-  ButtonRight.Draw(ACanvas);
+  LPrevClip := acSaveClipRegion(ACanvas.Handle);
+  try
+    LInnerBounds := ClientRect;
+    if Borders then
+      LInnerBounds.Inflate(-1, -1);
+    if acIntersectClipRegion(ACanvas.Handle, LInnerBounds) then
+    begin
+      ButtonLeft.Draw(ACanvas);
+      ButtonRight.Draw(ACanvas);
+    end;
+  finally
+    acRestoreClipRegion(ACanvas.Handle, LPrevClip);
+  end;
 end;
 
 procedure TACLCustomSpinEdit.CMEnabledChanged(var Message: TMessage);
@@ -428,7 +365,7 @@ begin
       Dec(FAutoClickTimerWaitCount)
     else
       if Assigned(FAutoClickButton) then
-        DoButtonClick(10 * Signs[FAutoClickButton = ButtonRight])
+        ButtonClick(10 * Signs[FAutoClickButton = ButtonRight])
       else
         AutoClickTimer := False;
   end;
@@ -488,6 +425,7 @@ end;
 
 procedure TACLSpinEditOptionsValue.DoChanged(AChanges: TACLPersistentChanges);
 begin
+  FOwner.EditorUpdateParams;
   FOwner.Value := FOwner.Value;
   FOwner.UpdateDisplayValue;
 end;
@@ -496,9 +434,9 @@ procedure TACLSpinEditOptionsValue.ValidateValue(var V: Variant);
 begin
   ValidateValueType(V);
   if seavMaxValue in AssignedValues then
-    V := Min(V, MaxValue);
+    V := Min(Double(V), Double(MaxValue));
   if seavMinValue in AssignedValues then
-    V := Max(V, MinValue);
+    V := Max(Double(V), Double(MinValue));
   ValidateValueType(V);
 end;
 
@@ -538,7 +476,7 @@ begin
   end;
 end;
 
-procedure TACLSpinEditOptionsValue.SetDisplayFormat(const Value: UnicodeString);
+procedure TACLSpinEditOptionsValue.SetDisplayFormat(const Value: string);
 begin
   if FDisplayFormat <> Value then
   begin
@@ -559,10 +497,11 @@ begin
       case TACLSpinEditAssignedValue(Index) of
         seavMaxValue:
           if seavMinValue in AssignedValues then
-            MinValue := Min(MinValue, MaxValue);
+            MinValue := Min(Double(MinValue), Double(MaxValue));
         seavMinValue:
           if seavMaxValue in AssignedValues then
-            MaxValue := Max(MaxValue, MinValue);
+            MaxValue := Max(Double(MaxValue), Double(MinValue));
+      else;
       end;
       Changed([apcLayout]);
     end;
@@ -602,37 +541,45 @@ end;
 
 procedure TACLSpinEdit.RefreshDisplayValue;
 begin
-  if not Edit.Focused then
+  if not InnerEdit.Focused then
     UpdateDisplayValue;
 end;
 
 function TACLSpinEdit.CreateEditor: TWinControl;
 var
-  AEdit: TACLInnerSpinEdit;
+  AEdit: TACLInnerEdit;
 begin
-  AEdit := TACLInnerSpinEdit.Create(nil);
+  AEdit := TACLInnerEdit.Create(Self);
+  AEdit.Alignment := taCenter;
   AEdit.Parent := Self;
   AEdit.Text := '0';
-  AEdit.BorderStyle := bsNone;
-  AEdit.Ctl3D := False;
   AEdit.OnChange := DoSpinEditChanged;
+  AEdit.OnValidate := UpdateDisplayValue;
   Result := AEdit;
 end;
 
-procedure TACLSpinEdit.DoButtonClick(AStep: Integer);
+procedure TACLSpinEdit.EditorUpdateParamsCore;
+const
+  Map: array[TACLSpinEditValueType] of TACLEditInputMask = (eimInteger, eimFloat);
+begin
+  InnerEdit.InputMask := Map[OptionsValue.ValueType];
+  inherited;
+end;
+
+procedure TACLSpinEdit.ButtonClick(AStep: Integer);
 begin
   Value := Value + AStep * OptionsValue.IncCount;
-  Edit.SelectAll;
+  InnerEdit.SelectAll;
 end;
 
 procedure TACLSpinEdit.DoSpinEditChanged(Sender: TObject);
 begin
-  if Edit.Focused then
+  if InnerEdit.Focused then
   begin
     FChanging := True;
     try
       FreeAndNil(FValidateDelayTimer);
-      InplaceSetValue(Edit.Text);
+      InplaceSetValue(InnerEdit.Text);
       FValidateDelayTimer := TACLTimer.CreateEx(HandlerDelayValidate, 750, True);
     finally
       FChanging := False;
@@ -644,14 +591,14 @@ procedure TACLSpinEdit.UpdateDisplayValue;
 var
   ASelStart: Integer;
 begin
-  if Edit.Focused then
+  if InnerEdit.Focused then
   begin
-    ASelStart := Edit.SelStart;
-    Edit.Text := InplaceGetValue;
-    Edit.SelStart := ASelStart;
+    ASelStart := InnerEdit.SelStart;
+    InnerEdit.Text := InplaceGetValue;
+    InnerEdit.SelStart := ASelStart;
   end
   else
-    Edit.Text := FormatValue(InplaceGetValue);
+    InnerEdit.Text := FormatValue(InplaceGetValue);
 end;
 
 procedure TACLSpinEdit.KeyDown(var Key: Word; Shift: TShiftState);
@@ -661,9 +608,9 @@ begin
     VK_RETURN:
       UpdateDisplayValue;
     VK_UP:
-      DoButtonClick(1);
+      ButtonClick(1);
     VK_DOWN:
-      DoButtonClick(-1);
+      ButtonClick(-1);
   else
     Exit;
   end;
@@ -675,7 +622,7 @@ begin
   Result := inherited DoMouseWheel(Shift, WheelDelta, MousePos);
   if not Result then
   begin
-    DoButtonClick(Signs[WheelDelta > 0]);
+    ButtonClick(Signs[WheelDelta > 0]);
     Result := True;
   end;
 end;
@@ -684,8 +631,8 @@ procedure TACLSpinEdit.CMEnter(var Message: TCMEnter);
 begin
   inherited;
   UpdateDisplayValue;
-  if Edit.AutoSelect and Edit.Focused then
-    Edit.SelectAll;
+  if InnerEdit.AutoSelect and InnerEdit.Focused then
+    InnerEdit.SelectAll;
 end;
 
 procedure TACLSpinEdit.CMExit(var Message: TCMExit);
@@ -694,7 +641,7 @@ begin
   UpdateDisplayValue;
 end;
 
-function TACLSpinEdit.InplaceGetValue: UnicodeString;
+function TACLSpinEdit.InplaceGetValue: string;
 begin
   if OptionsValue.ValueType = evtInteger then
     Result := IntToStr(Value)
@@ -702,28 +649,27 @@ begin
     Result := FormatFloat('0.00######', Value);
 end;
 
-procedure TACLSpinEdit.InplaceSetValue(const AValue: UnicodeString);
+procedure TACLSpinEdit.InplaceSetValue(const AValue: string);
 begin
   Value := StrToFloatDef(AValue, 0);
 end;
 
 procedure TACLSpinEdit.HandlerDelayValidate(Sender: TObject);
 var
- APrevValue: UnicodeString;
+ APrevValue: string;
 begin
-  APrevValue := Edit.Text;
-  if (Edit.SelLength = 0) and (APrevValue <> '') then
+  APrevValue := InnerEdit.Text;
+  if (InnerEdit.SelLength = 0) and (APrevValue <> '') then
   begin
     FreeAndNil(FValidateDelayTimer);
     UpdateDisplayValue;
-    if Edit.Text <> APrevValue then
-      Beep;
+    if InnerEdit.Text <> APrevValue then Beep;
   end;
 end;
 
-function TACLSpinEdit.GetEdit: TACLInnerSpinEdit;
+function TACLSpinEdit.GetInnerEdit: TACLInnerEdit;
 begin
-  Result := FEditor as TACLInnerSpinEdit;
+  Result := FEditor as TACLInnerEdit;
 end;
 
 function TACLSpinEdit.IsValueStored: Boolean;
