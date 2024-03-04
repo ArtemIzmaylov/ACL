@@ -213,7 +213,7 @@ var
 
 function CanDraw(ACanvas: TCanvas; const R: TRect; AFont: TACLFont): Boolean; overload; inline;
 begin
-  Result := acRectVisible(ACanvas.Handle, R) and
+  Result := acRectVisible(ACanvas, R) and
     ((AFont.ColorAlpha > 0) and (AFont.Color <> clNone) or AFont.Shadow.Assigned);
 end;
 

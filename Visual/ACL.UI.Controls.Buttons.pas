@@ -712,7 +712,7 @@ procedure TACLCustomButtonSubClass.Draw(ACanvas: TCanvas);
 var
   AClipRgn: HRGN;
 begin
-  if acRectVisible(ACanvas.Handle, Bounds) then
+  if acRectVisible(ACanvas, Bounds) then
   begin
     ACanvas.Font := Font;
     AClipRgn := acSaveClipRegion(ACanvas.Handle);

@@ -386,7 +386,7 @@ type
   public
     class constructor Create;
     class destructor Destroy;
-    class procedure Start(ACanvas: TCanvas; var ATargetRect: TRect;
+    class procedure Start(ACanvas: TCanvas;
       AAlpha: Byte; AImage: TACLSkinImage; AHasAlpha: Boolean);
     class procedure Fill(const ATarget: TRect; AColor: TAlphaColor);
     class procedure Draw(const ATarget, ASource: TRect; AIsTileMode: Boolean);
@@ -900,7 +900,7 @@ procedure TACLSkinImage.Draw(ACanvas: TCanvas; const R: TRect; AFrameIndex: Inte
       Exit;
     end;
 
-    TACLSkinImageRenderer.Start(ACanvas, ATarget, AAlpha, Self, not AState.IsOpaque);
+    TACLSkinImageRenderer.Start(ACanvas, AAlpha, Self, not AState.IsOpaque);
     try
       case ActualSizingMode of
         ismMargins:
@@ -921,7 +921,7 @@ procedure TACLSkinImage.Draw(ACanvas: TCanvas; const R: TRect; AFrameIndex: Inte
   end;
 
 begin
-  if not Empty and acRectVisible(ACanvas.Handle, R) then
+  if not Empty and acRectVisible(ACanvas, R) then
   begin
     CheckUnpacked;
     CheckBitsState(ibsPremultiplied);
@@ -980,7 +980,7 @@ var
 begin
   LClipRegion := acSaveClipRegion(ACanvas.Handle);
   try
-    if acIntersectClipRegion(ACanvas.Handle, LClipRegion) then
+    if acIntersectClipRegion(ACanvas.Handle, AClipRect) then
       Draw(ACanvas, R, AFrameIndex, AAlpha);
   finally
     acRestoreClipRegion(ACanvas.Handle, LClipRegion);
@@ -2302,7 +2302,7 @@ end;
 {$ENDIF}
 
 class procedure TACLSkinImageRenderer.Start(ACanvas: TCanvas;
-  var ATargetRect: TRect; AAlpha: Byte; AImage: TACLSkinImage; AHasAlpha: Boolean);
+  AAlpha: Byte; AImage: TACLSkinImage; AHasAlpha: Boolean);
 begin
   FLock.Enter;
 {$IFDEF MSWINDOWS}

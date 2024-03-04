@@ -291,7 +291,7 @@ begin
   Style.Draw(Canvas, BoxRect);
   DrawTextArea(Canvas, GetTextArea);
   acExcludeFromClipRegion(Canvas.Handle, BoxRect);
-  if acRectVisible(Canvas.Handle, ClientRect) then
+  if acRectVisible(Canvas, ClientRect) then
   begin
     acDrawTransparentControlBackground(Self, Canvas.Handle, ClientRect);
     acFillRect(Canvas, ClientRect, GetActualCoverColor);

@@ -535,7 +535,7 @@ procedure acExcludeFromClipRegion(DC: HDC; const R: TRect); overload; inline;
 procedure acExcludeFromClipRegion(DC: HDC; ARegion: HRGN; AConsiderWindowOrg: Boolean = True); overload; inline;
 function acIntersectClipRegion(DC: HDC; const R: TRect): Boolean; overload; inline;
 function acIntersectClipRegion(DC: HDC; ARegion: HRGN; AConsiderWindowOrg: Boolean = True): Boolean; overload; inline;
-function acRectVisible(DC: HDC; const R: TRect): Boolean; inline;
+function acRectVisible(ACanvas: TCanvas; const R: TRect): Boolean; inline;
 procedure acRestoreClipRegion(DC: HDC; ARegion: HRGN); inline;
 function acSaveClipRegion(DC: HDC): HRGN; inline;
 
@@ -796,21 +796,15 @@ begin
   Result := acCombineWithClipRegion(DC, ARegion, RGN_AND, AConsiderWindowOrg);
 end;
 
-function acRectVisible(DC: HDC; const R: TRect): Boolean;
-//{$IFDEF FPC}
-//var
-//  LRect: TRect;
-//begin
-//  if R.IsEmpty then
-//    Exit(False);
-//  {$MESSAGE WARN 'LCL-bug'}
-//  LRect := R;
-//  LPtoDP(DC, LRect, 2);
-//  Result := RectVisible(DC, LRect);
-//{$ELSE}
+function acRectVisible(ACanvas: TCanvas; const R: TRect): Boolean;
 begin
-  Result := not R.IsEmpty and RectVisible(DC, R);
-//{$ENDIF}
+  if R.IsEmpty then
+    Exit(False);
+{$IFDEF FPC}
+  if not ACanvas.HandleAllocated and (ACanvas is TACLDibCanvas) then
+    Exit(R.IntersectsWith(TACLDibCanvas(ACanvas).Owner.ClientRect));
+{$ENDIF}
+  Result := RectVisible(ACanvas.Handle, R);
 end;
 
 procedure acRestoreClipRegion(DC: HDC; ARegion: HRGN);
@@ -1044,7 +1038,7 @@ var
   LTextRect: TRect;
   LTextSize: TSize;
 begin
-  if (S <> '') and acRectVisible(ACanvas.Handle, R) then
+  if (S <> '') and acRectVisible(ACanvas, R) then
   begin
     LMultiLine := acPos(#13, S) > 0;
     if AWordWrap or LMultiLine then
@@ -2799,11 +2793,18 @@ end;
 
 procedure TACLDib.Reset;
 var
-  APrevPoint: TPoint;
+  LPrevPoint: TPoint;
 begin
-  SetWindowOrgEx(Handle, 0, 0, @APrevPoint);
+{$IFDEF FPC}
+  if not FCanvasChanged then
+  begin
+    FastZeroMem(Colors, ColorCount * SizeOf(TACLPixel32));
+    Exit;
+  end;
+{$ENDIF}
+  SetWindowOrgEx(Handle, 0, 0, @LPrevPoint);
   acResetRect(Handle, ClientRect);
-  SetWindowOrgEx(Handle, APrevPoint.X, APrevPoint.Y, nil);
+  SetWindowOrgEx(Handle, LPrevPoint.X, LPrevPoint.Y, nil);
 end;
 
 procedure TACLDib.Reset(const R: TRect);

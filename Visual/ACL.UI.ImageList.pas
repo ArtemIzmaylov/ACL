@@ -109,7 +109,7 @@ procedure acDrawImage(ACanvas: TCanvas; const R: TRect;
 var
   ALayer: TACLBitmapLayer;
 begin
-  if (AImageList <> nil) and (AImageIndex >= 0) and acRectVisible(ACanvas.Handle, R) then
+  if (AImageList <> nil) and (AImageIndex >= 0) and acRectVisible(ACanvas, R) then
   begin
     if (R.Width <> AImageList.Width) or (R.Height <> AImageList.Height) then
     begin

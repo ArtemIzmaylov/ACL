@@ -1153,7 +1153,7 @@ var
   AImages: TCustomImageList;
   AIntf: IACLGlyph;
 begin
-  if not acRectVisible(ACanvas.Handle, ARect) then Exit;
+  if not acRectVisible(ACanvas, ARect) then Exit;
 
   AClipRegion := acSaveClipRegion(ACanvas.Handle);
   try

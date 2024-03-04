@@ -1059,7 +1059,7 @@ end;
 
 procedure TACLCompoundControlCustomViewInfo.Draw(ACanvas: TCanvas);
 begin
-  if acRectVisible(ACanvas.Handle, Bounds) then
+  if acRectVisible(ACanvas, Bounds) then
     DoDraw(ACanvas);
 end;
 

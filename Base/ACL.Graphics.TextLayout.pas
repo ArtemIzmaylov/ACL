@@ -1135,7 +1135,7 @@ var
   AFont: TFont;
   AText: TACLTextLayout;
 begin
-  if (S <> '') and acRectVisible(ACanvas.Handle, R) then
+  if (S <> '') and acRectVisible(ACanvas, R) then
   begin
     AFont := ACanvas.Font.Clone;
     try
@@ -2753,7 +2753,7 @@ var
   LClipRegion: HRGN;
   LRender: TACLTextLayoutRender;
 begin
-  if acRectVisible(ACanvas.Handle, AClipRect) then
+  if acRectVisible(ACanvas, AClipRect) then
   begin
     LClipRegion := acSaveClipRegion(ACanvas.Handle);
     try

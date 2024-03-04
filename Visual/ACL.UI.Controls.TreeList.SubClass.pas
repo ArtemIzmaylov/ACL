@@ -2111,7 +2111,7 @@ procedure TACLTreeListNodeViewInfo.DoDrawCell(
 var
   ASaveIndex: HRGN;
 begin
-  if acRectVisible(ACanvas.Handle, R) then
+  if acRectVisible(ACanvas, R) then
   begin
     if Node <> nil then
     begin
