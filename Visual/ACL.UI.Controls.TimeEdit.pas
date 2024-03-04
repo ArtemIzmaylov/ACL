@@ -4,36 +4,40 @@
 {*                 Time Edit                 *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.TimeEdit;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
+  {Winapi.}Windows,
+{$ENDIF}
   // System
-  System.Classes,
-  System.Types,
+  {System.}Classes,
+  {System.}Math,
+  {System.}Variants,
+  {System.}SysUtils,
+  {System.}Types,
   System.UITypes,
   // Vcl
-  Vcl.Controls,
-  Vcl.Graphics,
-  Vcl.Forms,
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
+  {Vcl.}Forms,
   // ACL
-  ACL.Classes,
-  ACL.Classes.StringList,
   ACL.Timers,
   ACL.Graphics.SkinImage,
   ACL.MUI,
   ACL.UI.Controls.BaseControls,
-  ACL.UI.Controls.Buttons,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.SpinEdit,
   ACL.UI.Forms,
@@ -49,20 +53,20 @@ type
     function GetDateTime: TDateTime;
     function GetFocusedSection: TACLTimeEditorSection;
     function GetTime: TTime;
-    function Replace(const AStr, AWithStr: UnicodeString; AFrom, ALength: Integer): UnicodeString;
+    function Replace(const AStr, AWithStr: string; AFrom, ALength: Integer): string;
     procedure CleanSelection;
     procedure SetTime(AValue: TTime);
   protected
-    procedure Decode(const AText: UnicodeString; var H, M, S: Integer);
+    procedure Decode(const AText: string; out H, M, S: Integer);
     procedure Encode(H, M, S: Integer);
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
-    procedure KeyPress(var Key: Char); override;
+    procedure KeyPressCore(var Key: WideChar); override;
     procedure Validate(var H, M, S: Integer); reintroduce;
-    procedure ValidateEdit(const AText: UnicodeString); reintroduce;
+    procedure ValidateEdit(const AText: string); reintroduce;
   public
     constructor Create(AOwner: TComponent); override;
     procedure Increase(AForward: Boolean);
-    //
+    //# Properties
     property DateTime: TDateTime read GetDateTime;
     property FocusedSection: TACLTimeEditorSection read GetFocusedSection;
     property Time: TTime read GetTime write SetTime;
@@ -81,8 +85,8 @@ type
     function CreateEditor: TWinControl; override;
     procedure ButtonClick(AStep: Integer); override;
     procedure DoEditChange(Sender: TObject);
-    function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean; override;
-    //
+    function DoMouseWheel(Shift: TShiftState; Delta: Integer; Pos: TPoint): Boolean; override;
+    //# Properties
     property Edit: TACLInnerTimeEdit read GetEdit;
   public
     property DateTime: TDateTime read GetDateTime;
@@ -93,18 +97,10 @@ type
 implementation
 
 uses
-  System.Math,
-  System.Variants,
-  System.SysUtils,
-  // ACL
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Math,
   ACL.Utils.Common,
   ACL.Utils.Strings;
-
-type
-  TWinControlAccess = class(TWinControl);
 
 { TACLInnerTimeEdit }
 
@@ -112,25 +108,24 @@ constructor TACLInnerTimeEdit.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   MaxLength := 8;
-  NumbersOnly := True;
   Alignment := taCenter;
   ValidateEdit(Text);
 end;
 
 procedure TACLInnerTimeEdit.CleanSelection;
 var
-  ASavedSelStart: Integer;
+  LPrevSelStart: Integer;
 begin
-  ASavedSelStart := SelStart;
+  LPrevSelStart := SelStart;
   try
     ValidateEdit(Replace(Text, acDupeString('0', SelLength), SelStart, SelLength));
   finally
-    SelStart := ASavedSelStart;
+    SelStart := LPrevSelStart;
     SelLength := 0;
   end;
 end;
 
-procedure TACLInnerTimeEdit.Decode(const AText: UnicodeString; var H, M, S: Integer);
+procedure TACLInnerTimeEdit.Decode(const AText: string; out H, M, S: Integer);
 begin
   H := StrToIntDef(Copy(AText, 1, 2), 0);
   M := StrToIntDef(Copy(AText, 4, 2), 0);
@@ -147,10 +142,10 @@ end;
 
 procedure TACLInnerTimeEdit.Increase(AForward: Boolean);
 var
-  ASavedSelStart: Integer;
+  LPrevSelStart: Integer;
   H, M, S: Integer;
 begin
-  ASavedSelStart := SelStart;
+  LPrevSelStart := SelStart;
   try
     Decode(Text, H, M, S);
     case FocusedSection of
@@ -160,11 +155,12 @@ begin
         Inc(M, Signs[AForward]);
       tesSeconds:
         Inc(S, Signs[AForward]);
+    else;
     end;
     Validate(H, M, S);
     Encode(H, M, S);
   finally
-    SelStart := ASavedSelStart;
+    SelStart := LPrevSelStart;
   end;
 end;
 
@@ -197,29 +193,32 @@ begin
   end;
 end;
 
-procedure TACLInnerTimeEdit.KeyPress(var Key: Char);
+procedure TACLInnerTimeEdit.KeyPressCore(var Key: WideChar);
 var
-  ACursor: Integer;
+  LCursor: Integer;
 begin
   if CharInSet(Key, ['0'..'9']) then
   begin
-    ACursor := SelStart;
+    LCursor := SelStart;
     try
       if SelLength > 0 then
         CleanSelection;
       if FocusedSection = tesNone then
-        Inc(ACursor, 1);
-      ValidateEdit(Replace(Text, Key, ACursor, 1));
+        Inc(LCursor, 1);
+      ValidateEdit(Replace(Text, _S(Key), LCursor, 1));
     finally
-      SelStart := ACursor + 1;
+      SelStart := LCursor + 1;
     end;
   end;
   Key := #0;
 end;
 
-function TACLInnerTimeEdit.Replace(const AStr, AWithStr: UnicodeString; AFrom, ALength: Integer): UnicodeString;
+function TACLInnerTimeEdit.Replace(
+  const AStr, AWithStr: string; AFrom, ALength: Integer): string;
 begin
-  Result := Copy(AStr, 1, AFrom) + AWithStr + Copy(AStr, AFrom + ALength + 1, MaxInt);
+  Result :=
+    Copy(AStr, 1, AFrom) + AWithStr +
+    Copy(AStr, AFrom + ALength + 1);
 end;
 
 procedure TACLInnerTimeEdit.Validate(var H, M, S: Integer);
@@ -234,7 +233,7 @@ begin
   H := AValue mod 24;
 end;
 
-procedure TACLInnerTimeEdit.ValidateEdit(const AText: UnicodeString);
+procedure TACLInnerTimeEdit.ValidateEdit(const AText: string);
 var
   H, M, S: Integer;
 begin
@@ -287,7 +286,6 @@ var
 begin
   AEdit := TACLInnerTimeEdit.Create(Self);
   AEdit.Parent := Self;
-  AEdit.BorderStyle := bsNone;
   AEdit.OnChange := DoEditChange;
   Result := AEdit;
 end;
@@ -297,14 +295,11 @@ begin
   if Assigned(OnChange) then OnChange(Self);
 end;
 
-function TACLTimeEdit.DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean;
+function TACLTimeEdit.DoMouseWheel;
 begin
-  Result := inherited DoMouseWheel(Shift, WheelDelta, MousePos);
-  if not Result then
-  begin
-    Edit.Increase(WheelDelta >= 0);
-    Result := True;
-  end;
+  if not inherited then
+    Edit.Increase(Delta >= 0);
+  Result := True;
 end;
 
 procedure TACLTimeEdit.ButtonClick(AStep: Integer);
