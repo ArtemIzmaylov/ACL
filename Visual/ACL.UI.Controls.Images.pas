@@ -11,34 +11,44 @@
 
 unit ACL.UI.Controls.Images;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Messages,
-  Winapi.Windows,
-  // Vcl
-  Vcl.Controls,
-  Vcl.Graphics,
-  Vcl.ImgList,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+  LMessages,
+{$ELSE}
+  {Winapi.}Windows,
+{$ENDIF}
+  {Winapi.}Messages,
   // System
-  System.Classes,
-  System.SysUtils,
-  System.Types,
+  {System.}Classes,
+  {System.}Generics.Defaults,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
+  // Vcl
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
+  {Vcl.}ImgList,
   System.UITypes,
   // ACL
   ACL.Math,
   ACL.Classes,
   ACL.Classes.Collections,
   ACL.Geometry,
+  ACL.Geometry.Utils,
   ACL.Graphics,
   ACL.Graphics.Ex,
   ACL.Graphics.SkinImage,
-  ACL.Graphics.SkinImageSet,
   ACL.UI.Controls.BaseControls,
   ACL.UI.ImageList,
-  ACL.UI.Resources;
+  ACL.UI.Resources,
+  ACL.Utils.Common,
+  ACL.Utils.DPIAware;
 
 type
   TACLImagePictureClass = class of TACLImagePicture;
@@ -190,7 +200,7 @@ type
     function CalculateHitTest(const P: TPoint): TACLSelectionFrameHitTestCode;
     procedure Draw(ARender: TACL2DRender; ASelectedElement: TACLSelectionFrameHitTestCode = sfeNone); overload;
     procedure Draw(DC: HDC; ASelectedElement: TACLSelectionFrameHitTestCode = sfeNone); overload;
-    //
+    //# Properties
     property AllowedElements: TACLSelectionFrameElements read FAllowedElements write FAllowedElements;
     property Bounds: TRect read FBounds;
     property HandleAlignment: TACLSelectionFrameHandleAlignment read FHandleAlignment write FHandleAlignment;
@@ -262,11 +272,37 @@ type
 
 implementation
 
+{$IFNDEF FPC}
 uses
-  System.Math,
-  // ACL
-  ACL.Utils.Common,
-  ACL.Utils.DPIAware;
+  ACL.Graphics.SkinImageSet; // inlining
+{$ENDIF}
+
+procedure acInvertRect(DC: HDC; const R: TRect);
+{$IFDEF FPC}
+var
+  LDib: TACLDib;
+  LPix: PACLPixel32;
+  I: Integer;
+begin
+  LDib := TACLDib.Create(R);
+  try
+    acBitBlt(LDib.handle, DC, LDib.ClientRect, R.TopLeft);
+    for I := 0 to LDib.ColorCount - 1 do
+    begin
+      LPix := @LDib.Colors^[I];
+      LPix^.R := $FF xor LPix^.R;
+      LPix^.G := $FF xor LPix^.G;
+      LPix^.B := $FF xor LPix^.B;
+    end;
+    LDib.DrawCopy(DC, R.TopLeft);
+  finally
+    LDib.Free;
+  end;
+{$ELSE}
+begin
+  PatBlt(DC, R.Left, R.Top, R.Width, R.Height, PATINVERT);
+{$ENDIF}
+end;
 
 { TACLImageBox }
 
@@ -620,6 +656,7 @@ end;
 procedure TACLSelectionFrame.Calculate(const ABounds: TRect; ATargetDpi: Integer);
 var
   ACornerSize: Integer;
+  AElement: TACLSelectionFrameElement;
   ARect: TRect;
   ASideSize: Integer;
 begin
@@ -658,7 +695,7 @@ begin
   FElements[sfeTop] := ARect;
   FElements[sfeTop].Height := ACornerSize;
 
-  for var AElement := Low(TACLSelectionFrameElement) to High(TACLSelectionFrameElement) do
+  for AElement := Low(TACLSelectionFrameElement) to High(TACLSelectionFrameElement) do
   begin
     if not (AElement in AllowedElements) then
       FElements[AElement] := NullRect;
@@ -696,11 +733,13 @@ end;
 procedure TACLSelectionFrame.Draw(ARender: TACL2DRender; ASelectedElement: TACLSelectionFrameHitTestCode);
 
   procedure DrawElements(const AClipRect: TRect);
+  var
+    I: TACLSelectionFrameElement;
   begin
     ARender.SaveClipRegion;
     try
       ARender.IntersectClipRect(AClipRect);
-      for var I := Low(FElements) to High(FElements) do
+      for I := Low(FElements) to High(FElements) do
       begin
         if I = ASelectedElement then
           ARender.FillHatchRectangle(FElements[I], TAlphaColors.Black, TAlphaColors.White, 1)
@@ -745,7 +784,7 @@ procedure TACLSelectionFrame.Draw(DC: HDC; ASelectedElement: TACLSelectionFrameH
       if ASelectedElement = AElement then
         acDrawHatch(DC, R, clWhite, clBlack, 1)
       else
-        PatBlt(DC, R.Left, R.Top, R.Width, R.Height, PATINVERT);
+        acInvertRect(DC, R);
 
       acExcludeFromClipRegion(DC, R.InflateTo(2 * FLineSize));
     end;
