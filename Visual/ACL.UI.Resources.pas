@@ -49,6 +49,10 @@ uses
   ACL.Utils.DPIAware,
   ACL.Utils.RTTI;
 
+const
+  crDragRemove = TCursor(-25);
+  crDragLink = TCursor(-26);
+
 type
   TACLGlyph = class;
   TACLResource = class;
@@ -3423,8 +3427,8 @@ begin
   InitCursor(crHSplit, 0, IDC_SIZEWE);
   InitCursor(crVSplit, 0, IDC_SIZENS);
 {$ENDIF}
-  InitCursor(crRemove, HInstance, 'CR_REMOVE');
   InitCursor(crDragLink, HInstance, 'CR_DRAGLINK');
+  InitCursor(crDragRemove, HInstance, 'CR_DRAGREMOVE');
 end;
 
 { TACLRootResourceCollectionImpl }

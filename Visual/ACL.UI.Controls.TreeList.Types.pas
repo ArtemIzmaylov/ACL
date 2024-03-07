@@ -4,36 +4,39 @@
 {*             TreeList Control              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.TreeList.Types;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
+  {Winapi.}Windows,
+{$ENDIF}
   // Vcl
-  Vcl.Graphics,
-  Vcl.Controls,
-  Vcl.ImgList,
-  Vcl.StdCtrls,
+  {Vcl.}Graphics,
+  {Vcl.}Controls,
+  {Vcl.}ImgList,
+  {Vcl.}StdCtrls,
   // System
-  System.Classes,
-  System.Generics.Collections,
-  System.Generics.Defaults,
-  System.SysUtils,
-  System.Types,
+  {System.}Classes,
+  {System.}Generics.Collections,
+  {System.}Generics.Defaults,
+  {System.}SysUtils,
+  {System.}Types,
   System.UITypes,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
-  ACL.Classes.StringList,
   ACL.FileFormats.INI,
   ACL.ObjectLinks,
   ACL.UI.Resources,
@@ -132,7 +135,7 @@ type
   strict private
     FAutoBestFit: Boolean;
     FCanResize: Boolean;
-    FCaption: UnicodeString;
+    FCaption: string;
     FCompareMode: TACLTreeListCompareMode;
     FImageIndex: TImageIndex;
     FTag: NativeInt;
@@ -152,7 +155,7 @@ type
     function IsWidthStored: Boolean;
     procedure SetAutoBestFit(AValue: Boolean);
     procedure SetCanResize(AValue: Boolean);
-    procedure SetCaption(const AValue: UnicodeString);
+    procedure SetCaption(const AValue: string);
     procedure SetCompareMode(AValue: TACLTreeListCompareMode);
     procedure SetDrawIndex(AValue: Integer);
     procedure SetImageIndex(AValue: TImageIndex);
@@ -166,7 +169,7 @@ type
 
     procedure Changed(AChanges: TIntegerSet); reintroduce;
     procedure InitializeFields; virtual;
-    procedure Localize(const ASection: UnicodeString); virtual;
+    procedure Localize(const ASection: string); virtual;
     procedure VisibleChanged; virtual;
   public
     constructor Create(Collection: TCollection); override;
@@ -182,7 +185,7 @@ type
   published
     property AutoBestFit: Boolean read FAutoBestFit write SetAutoBestFit default False;
     property CanResize: Boolean read FCanResize write SetCanResize stored IsCanResizeStored;
-    property Caption: UnicodeString read FCaption write SetCaption;
+    property Caption: string read FCaption write SetCaption;
     property CompareMode: TACLTreeListCompareMode read FCompareMode write SetCompareMode default tlcmSmart;
     property DrawIndex: Integer read GetDrawIndex write SetDrawIndex stored IsDrawIndexStored;
     property ImageIndex: TImageIndex read FImageIndex write SetImageIndex default -1;
@@ -211,7 +214,7 @@ type
 
     function GetColumnClass: TACLTreeListColumnClass; virtual;
     function GetOwner: TPersistent; override;
-    procedure Notify(Item: TCollectionItem; Action: TCollectionNotification); override;
+    procedure Notify(Item: TCollectionItem; Action: Classes.TCollectionNotification); override;
     procedure Update(Item: TCollectionItem); override;
 
     // Properties
@@ -221,12 +224,12 @@ type
   public
     constructor Create(AOwner: IACLTreeList); virtual;
     destructor Destroy; override;
-    function Add(const AText: UnicodeString = ''): TACLTreeListColumn;
+    function Add(const AText: string = ''): TACLTreeListColumn;
     procedure ApplyBestFit(AAuto: Boolean = False);
-    function FindByCaption(const ACaption: UnicodeString): TACLTreeListColumn;
+    function FindByCaption(const ACaption: string): TACLTreeListColumn;
     function IsValid(AColumn: TACLTreeListColumn): Boolean; overload; inline;
     function IsValid(AIndex: Integer): Boolean; overload; inline;
-    procedure Localize(const ASection: UnicodeString);
+    procedure Localize(const ASection: string);
 
     function First: TACLTreeListColumn; inline;
     function Last: TACLTreeListColumn; inline;
@@ -236,9 +239,9 @@ type
     procedure EndUpdate; override;
 
     // Customized Settings
-    procedure ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: UnicodeString); overload;
+    procedure ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: string); overload;
     procedure ConfigLoad(AStream: TStream); overload;
-    procedure ConfigSave(AConfig: TACLIniFile; const ASection, AItem: UnicodeString); overload;
+    procedure ConfigSave(AConfig: TACLIniFile; const ASection, AItem: string); overload;
     procedure ConfigSave(AStream: TStream); overload;
 
     // Properties
@@ -263,7 +266,7 @@ type
     IACLSelectableObject,
     IACLTreeNodeLink)
   strict private
-    FCaption: UnicodeString;
+    FCaption: string;
     FLinks: TACLTreeListNodeList;
     FOwner: TACLTreeListGroups;
 
@@ -294,12 +297,12 @@ type
     function GetParent: TObject;
 
     // IUnknown
-    function QueryInterface(const IID: TGUID; out Obj): HRESULT; override;
+    function QueryInterface({$IFDEF FPC}constref{$ELSE}const{$ENDIF} IID: TGUID; out Obj): HRESULT; override;
 
     property Owner: TACLTreeListGroups read FOwner;
     property TreeList: IACLTreeList read GetTreeList;
   public
-    constructor Create(const ACaption: UnicodeString; AOwner: TACLTreeListGroups); virtual;
+    constructor Create(const ACaption: string; AOwner: TACLTreeListGroups); virtual;
     destructor Destroy; override;
     procedure BeforeDestruction; override;
     //
@@ -308,7 +311,7 @@ type
     property NextSibling: TACLTreeListGroup read GetNextSibling;
     property PrevSibling: TACLTreeListGroup read GetPrevSibling;
   published
-    property Caption: UnicodeString read FCaption;
+    property Caption: string read FCaption;
     property CheckBoxState: TCheckBoxState read GetCheckBoxState write SetCheckBoxState;
     property Expanded: Boolean read GetExpanded write SetExpanded;
     property Index: Integer read GetIndex;
@@ -330,14 +333,14 @@ type
     FIndexLockCount: Integer;
     FTreeList: IACLTreeList;
   protected
-    function CreateGroup(const ACaption: UnicodeString): TACLTreeListGroup; virtual;
+    function CreateGroup(const ACaption: string): TACLTreeListGroup; virtual;
     procedure Notify(const Item: TACLTreeListGroup; Action: TCollectionNotification); override;
   public
     constructor Create(ATreeList: IACLTreeList);
     destructor Destroy; override;
-    function Add(const ACaption: UnicodeString): TACLTreeListGroup;
+    function Add(const ACaption: string): TACLTreeListGroup;
     procedure ClearLinks;
-    function Find(const ACaption: UnicodeString): TACLTreeListGroup;
+    function Find(const ACaption: string): TACLTreeListGroup;
     procedure Move(ATargetIndex: Integer; AGroupsToMove: TACLList<TACLTreeListGroup>);
     procedure SetExpanded(AValue: Boolean);
     procedure Sort(AIntf: IComparer<TACLTreeListGroup>); reintroduce;
@@ -404,11 +407,11 @@ type
     procedure SetChildrenCapacity(AValue: Integer);
 
     // Values
-    function GetValue(Index: Integer): UnicodeString; virtual; abstract;
+    function GetValue(Index: Integer): string; virtual; abstract;
     function GetValuesCapacity: Integer; virtual;
     function GetValuesCount: Integer; virtual; abstract;
     procedure SetValuesCapacity(AValue: Integer); virtual;
-    procedure SetValue(Index: Integer; const S: UnicodeString); virtual;
+    procedure SetValue(Index: Integer; const S: string); virtual;
 
     // IACLCheckableObject
     function CanCheck: Boolean;
@@ -429,7 +432,7 @@ type
     function GetParent: TObject;
 
     // IUnknown
-    function QueryInterface(const IID: TGUID; out Obj): HRESULT; override; stdcall;
+    function QueryInterface({$IFDEF FPC}constref{$ELSE}const{$ENDIF} IID: TGUID; out Obj): HRESULT; override;
 
     property ActualVisible: Boolean read GetActualVisible;
   public
@@ -437,11 +440,11 @@ type
     destructor Destroy; override;
     procedure Assign(ANode: TACLTreeListNode);
     procedure BeforeDestruction; override;
-    //
+    //# General
     function AddChild: TACLTreeListNode; overload;
-    function AddChild(const AValues: array of UnicodeString): TACLTreeListNode; overload;
-    function AddValue(const S: UnicodeString): Integer; virtual;
-    function AddValues(const S: array of UnicodeString): Integer;
+    function AddChild(const AValues: array of string): TACLTreeListNode; overload;
+    function AddValue(const S: string): Integer; virtual;
+    function AddValues(const S: array of string): Integer;
     procedure ChildrenNeeded;
     procedure Clear; virtual;
     procedure DeleteChildren; virtual;
@@ -451,11 +454,11 @@ type
     function IsChild(ANode: TACLTreeListNode): Boolean;
     // Search
     function Find(const AData: Pointer; ARecursive: Boolean = True): TACLTreeListNode; overload;
-    function Find(const AValue: UnicodeString; AColumnIndex: Integer = 0; ARecursive: Boolean = True): TACLTreeListNode; overload;
+    function Find(const AValue: string; AColumnIndex: Integer = 0; ARecursive: Boolean = True): TACLTreeListNode; overload;
     function Find(out ANode: TACLTreeListNode; const AData: Pointer; ARecursive: Boolean = True): Boolean; overload;
     function Find(out ANode: TACLTreeListNode; const AFunc: TACLTreeListNodeFilterFunc; ARecursive: Boolean = True): Boolean; overload;
     function Find(out ANode: TACLTreeListNode; const ATag: NativeInt; ARecursive: Boolean = True): Boolean; overload;
-    function Find(out ANode: TACLTreeListNode; const AValue: UnicodeString; AColumnIndex: Integer = 0; ARecursive: Boolean = True): Boolean; overload;
+    function Find(out ANode: TACLTreeListNode; const AValue: string; AColumnIndex: Integer = 0; ARecursive: Boolean = True): Boolean; overload;
     // ForEach
     procedure ForEach(const AFunc: TACLTreeListNodeForEachFunc; ARecursive: Boolean = True);
     // Children
@@ -465,11 +468,11 @@ type
     property ChildrenLoaded: Boolean read GetChildrenLoaded;
     property HasChildren: Boolean read GetHasChildren write FHasChildren;
     // Values
-    property Caption: UnicodeString index 0 read GetValue write SetValue;
-    property Values[Index: Integer]: UnicodeString read GetValue write SetValue; default;
+    property Caption: string index 0 read GetValue write SetValue;
+    property Values[Index: Integer]: string read GetValue write SetValue; default;
     property ValuesCapacity: Integer read GetValuesCapacity write SetValuesCapacity;
     property ValuesCount: Integer read GetValuesCount;
-    //
+     //# Properties
     property AbsoluteVisibleIndex: Integer read GetAbsoluteVisibleIndex;
     property Checked: Boolean read GetChecked write SetChecked;
     property CheckMarkEnabled: Boolean read FCheckMarkEnabled write SetCheckMarkEnabled;
@@ -482,13 +485,13 @@ type
     property Level: Integer read GetLevel;
     property Selected: Boolean read GetSelected write SetSelected;
     property Tag: NativeInt read FTag write FTag;
-    //
+    //# Tree
     property Group: TACLTreeListGroup read FGroup;
     property NextSibling: TACLTreeListNode read GetNextSibling;
     property Parent: TACLTreeListNode read FParent write SetParent;
     property PrevSibling: TACLTreeListNode read GetPrevSibling;
     property TopLevel: TACLTreeListNode read GetTopLevel;
-    //
+    //# TreeList
     property TreeList: IACLTreeList read FTreeList;
   end;
 
@@ -496,13 +499,13 @@ type
 
   TACLTreeListStringNode = class(TACLTreeListNode)
   protected
-    FValues: TACLList<UnicodeString>;
+    FValues: TACLList<string>;
 
-    function GetValue(Index: Integer): UnicodeString; override;
+    function GetValue(Index: Integer): string; override;
     function GetValuesCapacity: Integer; override;
     function GetValuesCount: Integer; override;
     procedure SetValuesCapacity(AValue: Integer); override;
-    procedure SetValue(Index: Integer; const S: UnicodeString); override;
+    procedure SetValue(Index: Integer; const S: string); override;
   public
     destructor Destroy; override;
     procedure DeleteValues; override;
@@ -555,9 +558,7 @@ uses
   // ACL
   ACL.Math,
   ACL.MUI,
-  ACL.Hashes,
   ACL.Utils.Common,
-  ACL.Utils.Stream,
   ACL.Utils.Strings;
 
 const
@@ -623,7 +624,7 @@ begin
   FWidth := DefaultWidth;
 end;
 
-procedure TACLTreeListColumn.Localize(const ASection: UnicodeString);
+procedure TACLTreeListColumn.Localize(const ASection: string);
 begin
   Caption := LangGet(ASection, 'c[' + IntToStr(Index) + ']', Caption);
 end;
@@ -715,7 +716,7 @@ begin
   end;
 end;
 
-procedure TACLTreeListColumn.SetCaption(const AValue: UnicodeString);
+procedure TACLTreeListColumn.SetCaption(const AValue: string);
 begin
   if AValue <> FCaption then
   begin
@@ -818,7 +819,7 @@ begin
   FreeAndNil(FDrawingItems);
 end;
 
-function TACLTreeListColumns.Add(const AText: UnicodeString = ''): TACLTreeListColumn;
+function TACLTreeListColumns.Add(const AText: string = ''): TACLTreeListColumn;
 begin
   BeginUpdate;
   try
@@ -847,7 +848,7 @@ begin
   end;
 end;
 
-function TACLTreeListColumns.FindByCaption(const ACaption: UnicodeString): TACLTreeListColumn;
+function TACLTreeListColumns.FindByCaption(const ACaption: string): TACLTreeListColumn;
 var
   I: Integer;
 begin
@@ -879,7 +880,7 @@ begin
   Result := (AIndex >= 0) and (AIndex < Count);
 end;
 
-procedure TACLTreeListColumns.Localize(const ASection: UnicodeString);
+procedure TACLTreeListColumns.Localize(const ASection: string);
 var
   I: Integer;
 begin
@@ -914,8 +915,8 @@ begin
   try
     SortByList.Clear;
 
-    SetLength(ADrawingIndexes, Count);
-    SetLength(ASortingIndexes, Count);
+    SetLength(ADrawingIndexes{%H-}, Count);
+    SetLength(ASortingIndexes{%H-}, Count);
     for I := 0 to Count - 1 do
     begin
       ADrawingIndexes[I] := -1;
@@ -923,7 +924,7 @@ begin
     end;
 
     for I := 0 to Count - 1 do
-      if AStream.Read(AInfo, SizeOf(AInfo)) = SizeOf(AInfo) then
+      if AStream.Read(AInfo{%H-}, SizeOf(AInfo)) = SizeOf(AInfo) then
       begin
         AColumn := Items[I];
         if TreeList.ColumnsCanCustomizeVisibility then
@@ -963,7 +964,7 @@ begin
   end;
 end;
 
-procedure TACLTreeListColumns.ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: UnicodeString);
+procedure TACLTreeListColumns.ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: string);
 var
   AStream: TMemoryStream;
 begin
@@ -982,7 +983,7 @@ end;
 procedure TACLTreeListColumns.ConfigSave(AStream: TStream);
 var
   AColumn: TACLTreeListColumn;
-  AInfo: TACLTreeListColumnInfo;
+  {%H-}AInfo: TACLTreeListColumnInfo;
   I: Integer;
 begin
   for I := 0 to Count - 1 do
@@ -997,7 +998,7 @@ begin
   end;
 end;
 
-procedure TACLTreeListColumns.ConfigSave(AConfig: TACLIniFile; const ASection, AItem: UnicodeString);
+procedure TACLTreeListColumns.ConfigSave(AConfig: TACLIniFile; const ASection, AItem: string);
 var
  AStream: TMemoryStream;
 begin
@@ -1029,9 +1030,10 @@ begin
     Result := nil;
 end;
 
-procedure TACLTreeListColumns.Notify(Item: TCollectionItem; Action: TCollectionNotification);
+procedure TACLTreeListColumns.Notify(
+  Item: TCollectionItem; Action: Classes.TCollectionNotification);
 begin
-  if Action = cnAdded then
+  if Action = Classes.TCollectionNotification.cnAdded then
     FDrawingItems.Add(TACLTreeListColumn(Item))
   else
   begin
@@ -1092,7 +1094,7 @@ end;
 
 { TACLTreeListGroup }
 
-constructor TACLTreeListGroup.Create(const ACaption: UnicodeString; AOwner: TACLTreeListGroups);
+constructor TACLTreeListGroup.Create(const ACaption: string; AOwner: TACLTreeListGroups);
 begin
   inherited Create;
   FOwner := AOwner;
@@ -1158,7 +1160,7 @@ begin
   Result := nil;
 end;
 
-function TACLTreeListGroup.QueryInterface(const IID: TGUID; out Obj): HRESULT;
+function TACLTreeListGroup.QueryInterface;
 begin
   Result := inherited QueryInterface(IID, Obj);
   if Result = E_NOINTERFACE then
@@ -1280,7 +1282,7 @@ begin
   inherited;
 end;
 
-function TACLTreeListGroups.Add(const ACaption: UnicodeString): TACLTreeListGroup;
+function TACLTreeListGroups.Add(const ACaption: string): TACLTreeListGroup;
 begin
   if not FIndex.TryGetValue(ACaption, Result) then
   begin
@@ -1290,12 +1292,14 @@ begin
 end;
 
 procedure TACLTreeListGroups.ClearLinks;
+var
+  I: Integer;
 begin
-  for var I := Count - 1 downto 0 do
+  for I := Count - 1 downto 0 do
     List[I].Links.Count := 0;
 end;
 
-function TACLTreeListGroups.Find(const ACaption: UnicodeString): TACLTreeListGroup;
+function TACLTreeListGroups.Find(const ACaption: string): TACLTreeListGroup;
 begin
   if not FIndex.TryGetValue(ACaption, Result) then
     Result := nil;
@@ -1329,10 +1333,12 @@ begin
 end;
 
 procedure TACLTreeListGroups.SetExpanded(AValue: Boolean);
+var
+  I: Integer;
 begin
   TreeList.BeginUpdate;
   try
-    for var I := Count - 1 downto 0 do
+    for I := Count - 1 downto 0 do
       List[I].Expanded := AValue;
   finally
     TreeList.EndUpdate;
@@ -1348,11 +1354,12 @@ procedure TACLTreeListGroups.SortByNodeIndex;
 var
   AGroup: TACLTreeListGroup;
   ASubNodes: TACLTreeListNodeList;
+  I: Integer;
 begin
   ASubNodes := TreeList.RootNode.FSubNodes;
   if ASubNodes = nil then Exit;
   ASubNodes.InitSortData;
-  for var I := 0 to Count - 1 do
+  for I := 0 to Count - 1 do
   begin
     AGroup := List[I];
     if AGroup.Links.Count > 0 then
@@ -1372,15 +1379,17 @@ begin
 end;
 
 procedure TACLTreeListGroups.Validate;
+var
+  I: Integer;
 begin
-  for var I := Count - 1 downto 0 do
+  for I := Count - 1 downto 0 do
   begin
     if List[I].Links.Count = 0 then
       Delete(I)
   end;
 end;
 
-function TACLTreeListGroups.CreateGroup(const ACaption: UnicodeString): TACLTreeListGroup;
+function TACLTreeListGroups.CreateGroup(const ACaption: string): TACLTreeListGroup;
 begin
   Result := TACLTreeListGroup.Create(ACaption, Self);
 end;
@@ -1393,6 +1402,7 @@ begin
         FIndex.Remove(Item.Caption);
       cnAdded:
         FIndex.Add(Item.Caption, Item);
+    else;
     end;
   inherited;
 end;
@@ -1434,7 +1444,7 @@ begin
   Clear;
 end;
 
-function TACLTreeListNode.AddChild(const AValues: array of UnicodeString): TACLTreeListNode;
+function TACLTreeListNode.AddChild(const AValues: array of string): TACLTreeListNode;
 begin
   TreeList.BeginUpdate;
   try
@@ -1457,13 +1467,13 @@ begin
   end;
 end;
 
-function TACLTreeListNode.AddValue(const S: UnicodeString): Integer;
+function TACLTreeListNode.AddValue(const S: string): Integer;
 begin
   Result := ValuesCount;
   Values[Result] := S;
 end;
 
-function TACLTreeListNode.AddValues(const S: array of UnicodeString): Integer;
+function TACLTreeListNode.AddValues(const S: array of string): Integer;
 var
   I: Integer;
 begin
@@ -1567,7 +1577,7 @@ begin
 end;
 
 function TACLTreeListNode.Find(out ANode: TACLTreeListNode;
-  const AValue: UnicodeString; AColumnIndex: Integer = 0; ARecursive: Boolean = True): Boolean;
+  const AValue: string; AColumnIndex: Integer = 0; ARecursive: Boolean = True): Boolean;
 begin
   Result := Find(ANode,
     function (ANode: TACLTreeListNode): Boolean
@@ -1583,7 +1593,7 @@ begin
     Result := nil;
 end;
 
-function TACLTreeListNode.Find(const AValue: UnicodeString;
+function TACLTreeListNode.Find(const AValue: string;
   AColumnIndex: Integer = 0; ARecursive: Boolean = True): TACLTreeListNode;
 begin
   if not Find(Result, AValue, AColumnIndex, ARecursive) then
@@ -1813,9 +1823,9 @@ begin
     Result := Parent;
 end;
 
-function TACLTreeListNode.QueryInterface(const IID: TGUID; out Obj): HRESULT;
+function TACLTreeListNode.QueryInterface;
 begin
-  Result := inherited QueryInterface(IID, Obj);
+  Result := inherited;
   if Result = E_NOINTERFACE then
     Result := TreeList.QueryChildInterface(Self, IID, Obj);
 end;
@@ -1884,7 +1894,7 @@ begin
   Result := 0;
 end;
 
-procedure TACLTreeListNode.SetValue(Index: Integer; const S: UnicodeString);
+procedure TACLTreeListNode.SetValue(Index: Integer; const S: string);
 begin
   raise ENotSupportedException.Create(ClassName + '.SetValue');
 end;
@@ -1962,7 +1972,11 @@ begin
   if Parent <> nil then
   begin
     if not Parent.FSubNodes.ChangePlace(Index, AValue) then
-      raise EACLTreeListException.CreateFmt(sArgumentOutOfRange_Index, [AValue, Parent.ChildrenCount - 1]);
+    begin
+      raise EACLTreeListException.CreateFmt(
+        {$IFDEF FPC}SOutOfRange{$ELSE}sArgumentOutOfRange_Index{$ENDIF},
+        [AValue, Parent.ChildrenCount - 1]);
+    end;
     StructChanged;
   end;
 end;
@@ -2010,7 +2024,7 @@ begin
   end;
 end;
 
-function TACLTreeListStringNode.GetValue(Index: Integer): UnicodeString;
+function TACLTreeListStringNode.GetValue(Index: Integer): string;
 begin
   if (FValues <> nil) and (Index >= 0) and (Index < FValues.Count) then
     Result := FValues.List[Index]
@@ -2034,7 +2048,7 @@ begin
     Result := 0;
 end;
 
-procedure TACLTreeListStringNode.SetValue(Index: Integer; const S: UnicodeString);
+procedure TACLTreeListStringNode.SetValue(Index: Integer; const S: string);
 var
   I: Integer;
 begin
@@ -2043,7 +2057,7 @@ begin
   if (FValues = nil) or (Index >= FValues.Count) or (FValues.List[Index] <> S) then
   begin
     if FValues = nil then
-      FValues := TACLList<UnicodeString>.Create;
+      FValues := TACLList<string>.Create;
     for I := FValues.Count to Index do
       FValues.Add(EmptyStr);
     FValues.Items[Index] := S;
@@ -2056,7 +2070,7 @@ begin
   if AValue <> ValuesCapacity then
   begin
     if FValues = nil then
-      FValues := TACLList<UnicodeString>.Create;
+      FValues := TACLList<string>.Create;
     FValues.Capacity := AValue;
   end;
 end;
@@ -2105,14 +2119,18 @@ begin
 end;
 
 procedure TACLTreeListNodeList.InitSortData;
+var
+  I: Integer;
 begin
-  for var I := 0 to Count - 1 do
+  for I := 0 to Count - 1 do
     TACLTreeListNode(List[I]).FSortData := I;
 end;
 
 function TACLTreeListNodeList.IsChild(ANode: TACLTreeListNode): Boolean;
+var
+  I: Integer;
 begin
-  for var I := 0 to Count - 1 do
+  for I := 0 to Count - 1 do
   begin
     if TACLTreeListNode(List[I]).IsChild(ANode) then
       Exit(True);
@@ -2171,7 +2189,7 @@ end;
 
 function TACLTreeListNodesDataEnumerator<T>.GetCurrent: T;
 begin
-  Result := FList[FIndex].Data;
+  Result := T(FList[FIndex].Data);
 end;
 
 function TACLTreeListNodesDataEnumerator<T>.GetEnumerator: IACLEnumerator<T>;

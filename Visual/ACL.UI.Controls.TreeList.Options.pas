@@ -4,37 +4,36 @@
 {*             TreeList Control              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.TreeList.Options;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
+  {Winapi.}Windows,
+{$ENDIF}
   // System
-  System.Types,
-  System.Generics.Defaults,
-  System.Generics.Collections,
-  System.SysUtils,
-  System.Classes,
+  {System.}Generics.Defaults,
+  {System.}Classes,
+  {System.}SysUtils,
   System.UITypes,
   // Vcl
-  Vcl.Controls,
-  Vcl.StdCtrls,
-  Vcl.Graphics,
-  Vcl.Forms,
-  Vcl.ImgList,
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
+  {Vcl.}Forms,
+  {Vcl.}ImgList,
   // ACL
   ACL.Classes,
-  ACL.Classes.StringList,
-  ACL.FileFormats.INI,
   ACL.Geometry,
   ACL.Graphics,
   ACL.ObjectLinks,
@@ -42,17 +41,9 @@ uses
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.CompoundControl.SubClass,
-  ACL.UI.DropSource,
-  ACL.UI.DropTarget,
-  ACL.UI.Controls.GroupBox,
-  ACL.UI.Controls.Category,
-  ACL.UI.Controls.Panel,
-  ACL.UI.Controls.Labels,
-  ACL.UI.Menus,
-  ACL.UI.Resources,
   ACL.UI.Controls.TreeList.Types,
-  ACL.Utils.Common,
-  ACL.Utils.Desktop;
+  ACL.UI.Resources,
+  ACL.Utils.Common;
 
 type
 
@@ -78,7 +69,7 @@ type
     procedure DoChanged(AChanges: TACLPersistentChanges); override;
   public
     constructor Create(const ATreeList: IACLTreeListOptionsListener); virtual;
-    //
+    //# Properties
     property TreeList: IACLTreeListOptionsListener read FTreeList;
   end;
 

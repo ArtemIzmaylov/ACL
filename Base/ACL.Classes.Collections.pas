@@ -149,7 +149,7 @@ type
   public
     function ChangePlace(AOldIndex, ANewIndex: Integer): Boolean;
     procedure Exchange(Index1, Index2: Integer);
-    //
+    //# Events
     property OnChanged: TNotifyEvent read FOnChanged write FOnChanged;
   end;
 
@@ -162,6 +162,10 @@ type
     procedure Invert;
     function IsValid(Index: Integer): Boolean; inline;
     procedure Randomize;
+  {$IFDEF FPC}
+    function IndexOfItem(Item: Pointer; Direction: TDirection): Integer;
+    function RemoveItem(Item: Pointer; Direction: TDirection): Integer;
+  {$ENDIF}
   end;
 
   TACLListCompareProc<T> = reference to function (const Left, Right: T): Integer;
@@ -1623,6 +1627,34 @@ begin
   end;
 end;
 
+{$IFDEF FPC}
+function TACLListHelper.IndexOfItem(Item: Pointer; Direction: TDirection): Integer;
+var
+  P: PPointer;
+begin
+  if Direction = FromBeginning then
+    Exit(IndexOf(Item));
+  if Count > 0 then
+  begin
+    P := Pointer(@List[Count - 1]);
+    for Result := Count - 1 downto 0 do
+    begin
+      if P^ = Item then
+        Exit;
+      Dec(P);
+    end;
+  end;
+  Result := -1;
+end;
+
+function TACLListHelper.RemoveItem(Item: Pointer; Direction: TDirection): Integer;
+begin
+  Result := IndexOfItem(Item, Direction);
+  if Result >= 0 then
+    Delete(Result);
+end;
+{$ENDIF}
+
 { TDictionary<TKey,TValue> }
 
 constructor TACLDictionary<TKey, TValue>.Create(ACapacity: Integer = 0);
@@ -2578,7 +2610,7 @@ begin
   if AObject <> nil then
     Result := TryGetValue(AObject.ClassType, AValue)
   else
-    Result := TryGetValue(nil, AValue);
+    Result := TryGetValue(TClass(nil), AValue);
 end;
 
 function TACLClassMap<T>.TryGetValue(AClass: TClass; out AValue: T): Boolean;

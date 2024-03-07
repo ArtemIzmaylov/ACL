@@ -4,34 +4,43 @@
 {*             TreeList Control              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.TreeList.SubClass.DragAndDrop;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.ActiveX,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
+  {Winapi.}ActiveX,
+  {Winapi.}Messages,
+  {Winapi.}Windows,
+{$ENDIF}
   // System
-  System.Generics.Collections,
-  System.Types,
-  System.Classes,
+  {System.}Classes,
+  {System.}Generics.Collections,
+  {System.}Math,
+  {System.}Types,
+  {System.}SysUtils,
+  System.UITypes,
   // Vcl
-  Vcl.Controls,
-  Vcl.Forms,
-  Vcl.StdCtrls,
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
+  {Vcl.}Forms,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
-  ACL.Classes.StringList,
-  ACL.Timers,
+  ACL.Graphics,
   ACL.Geometry,
+  ACL.Timers,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.CompoundControl.SubClass,
   ACL.UI.Controls.TreeList.SubClass,
@@ -58,7 +67,8 @@ type
     function GetHitTest: TACLTreeListHitTest;
     function GetNodeViewInfo: TACLTreeListNodeViewInfo;
   protected
-    function CalculateDropTarget(var AObject: TObject; var AMode: TACLTreeListDropTargetInsertMode): Boolean; virtual;
+    function CalculateDropTarget(var AObject: TObject;
+      var AMode: TACLTreeListDropTargetInsertMode): Boolean; virtual;
     function CalculateInsertMode(ANode: TACLTreeListNode): TACLTreeListDropTargetInsertMode;
     function CanChangeNodeLevel: Boolean; virtual;
     function GetTargetClientRect: TRect; override;
@@ -69,12 +79,12 @@ type
     procedure DoEnter; override;
     procedure DoLeave; override;
     procedure DoOver(Shift: TShiftState; const ScreenPoint: TPoint;
-      var Hint: UnicodeString; var Allow: Boolean; var Action: TACLDropAction); override;
+      var Hint: string; var Allow: Boolean; var Action: TACLDropAction); override;
     procedure DoScroll(ALines: Integer; ADirection: TACLMouseWheelDirection; const P: TPoint); override;
   public
     constructor Create(ASubClass: TACLTreeListSubClass); reintroduce; virtual;
     destructor Destroy; override;
-    //
+    //# Properties
     property AutoExpandTimer: TACLTimer read FAutoExpandTimer;
     property ContentViewInfo: TACLTreeListContentViewInfo read GetContentViewInfo;
     property DragAndDropController: TACLTreeListDragAndDropController read GetDragAndDropController;
@@ -99,12 +109,13 @@ type
 
     procedure PopulateSelection;
   protected
-    function CalculateDropTarget(var AObject: TObject; var AMode: TACLTreeListDropTargetInsertMode): Boolean; override;
+    function CalculateDropTarget(var AObject: TObject;
+      var AMode: TACLTreeListDropTargetInsertMode): Boolean; override;
     procedure DoDropObjects; override;
   public
     constructor Create(ASubClass: TACLTreeListSubClass); override;
     destructor Destroy; override;
-    //
+    //# Properties
     property Selection: TACLList<TACLTreeListGroup> read FSelection;
   end;
 
@@ -118,14 +129,16 @@ type
 
     procedure PopulateSelection;
   protected
-    function CalculateDropTarget(var AObject: TObject; var AMode: TACLTreeListDropTargetInsertMode): Boolean; override;
     function CanChangeNodeLevel: Boolean; override;
-    function DoDragSortingDrop(ANode: TACLTreeListNode; AMode: TACLTreeListDropTargetInsertMode): Boolean;
+    function CalculateDropTarget(var AObject: TObject;
+      var AMode: TACLTreeListDropTargetInsertMode): Boolean; override;
+    function DoDragSortingDrop(ANode: TACLTreeListNode;
+      AMode: TACLTreeListDropTargetInsertMode): Boolean;
     procedure DoDropObjects; override;
   public
     constructor Create(ASubClass: TACLTreeListSubClass); override;
     destructor Destroy; override;
-    //
+    //# Properties
     property SelectedGroup: TACLTreeListGroup read FSelectedGroup write FSelectedGroup;
     property SelectedLevel: TACLTreeListNode read FSelectedLevel write FSelectedLevel;
     property Selection: TACLTreeListNodeList read FSelection;
@@ -145,10 +158,9 @@ type
     procedure DropSourceDrop(var AllowDrop: Boolean);
     procedure DropSourceEnd(AActions: TACLDropSourceActions; AShiftState: TShiftState);
   public
-    procedure DragFinished(ACanceled: Boolean); override;
-    procedure DragMove(const P: TPoint; var ADeltaX: Integer; var ADeltaY: Integer); override;
+    procedure DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer); override;
     function DragStart: Boolean; override;
-    //
+    //# Properties
     property HitTest: TACLTreeListHitTest read GetHitTest;
     property SubClass: TACLTreeListSubClass read GetSubClass;
   end;
@@ -164,7 +176,7 @@ type
     function GetSubClass: TACLTreeListSubClass;
   public
     constructor Create(AColumnViewInfo: TACLTreeListColumnViewInfo); virtual;
-    //
+    //# Properties
     property Column: TACLTreeListColumn read GetColumn;
     property ColumnBarViewInfo: TACLTreeListColumnBarViewInfo read GetColumnBarViewInfo;
     property ColumnViewInfo: TACLTreeListColumnViewInfo read FColumnViewInfo;
@@ -175,18 +187,16 @@ type
 
   TACLTreeListColumnDragMoveObject = class(TACLTreeListColumnCustomDragObject)
   strict private
-    FAutoScrollTimer: TACLTimer;
-
-    procedure AutoScrollTimerHandler(Sender: TObject);
-    function CalculateAutoScrollingDelta(const P: TPoint): Integer;
-    procedure CheckAutoScrolling(ADelta: Integer);
-    function GetHitTest: TACLTreeListHitTest;
+    FHighlightBounds: TRect;
+    procedure UpdateHighlight; overload;
+    procedure UpdateHighlight(const R: TRect); overload;
+  protected
+    procedure DoAutoScroll(ADelta: Integer); override;
   public
-    procedure DragFinished(ACanceled: Boolean); override;
-    procedure DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer); override;
     function DragStart: Boolean; override;
-    //
-    property HitTest: TACLTreeListHitTest read GetHitTest;
+    procedure DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer); override;
+    procedure DragFinished(ACanceled: Boolean); override;
+    procedure Draw(ACanvas: TCanvas); override;
   end;
 
   { TACLTreeListColumnDragResizeObject }
@@ -207,10 +217,11 @@ type
   protected
     procedure CheckSelection; virtual;
     function GetDropTargetClass: TACLTreeListDropTargetClass; override;
-    procedure StartDropSource(AActions: TACLDropSourceActions; ASource: IACLDropSourceOperation; ASourceObject: TObject); override;
+    procedure StartDropSource(AActions: TACLDropSourceActions;
+      ASource: IACLDropSourceOperation; ASourceObject: TObject); override;
   public
     constructor Create(AGroup: TACLTreeListGroup); virtual;
-    //
+    //# Properties
     property Group: TACLTreeListGroup read FGroup;
   end;
 
@@ -236,7 +247,7 @@ type
     procedure DragFinished(ACanceled: Boolean); override;
     procedure DragMove(const P: TPoint; var ADeltaX: Integer; var ADeltaY: Integer); override;
     function DragStart: Boolean; override;
-    //
+    //# Properties
     property ContentViewInfo: TACLTreeListContentViewInfo read GetContentViewInfo;
     property Selection: TACLTreeListNodeList read GetSelection;
     property StartNode: TACLTreeListNode read FStartNode;
@@ -251,10 +262,6 @@ type
   end;
 
 implementation
-
-uses
-  System.Math,
-  System.SysUtils;
 
 type
   TACLTreeListNodeAccess = class(TACLTreeListNode);
@@ -304,7 +311,7 @@ begin
 end;
 
 procedure TACLTreeListDropTarget.DoOver(Shift: TShiftState;
-  const ScreenPoint: TPoint; var Hint: UnicodeString; var Allow: Boolean; var Action: TACLDropAction);
+  const ScreenPoint: TPoint; var Hint: string; var Allow: Boolean; var Action: TACLDropAction);
 var
   AMode: TACLTreeListDropTargetInsertMode;
   AObject: TObject;
@@ -585,6 +592,7 @@ begin
         Result := Result and (Selection.IndexOf(TACLTreeListNode(AObject).PrevSibling) < 0);
       dtimAfter:
         Result := Result and (Selection.IndexOf(TACLTreeListNode(AObject).NextSibling) < 0);
+    else;
     end;
   end;
 
@@ -628,6 +636,7 @@ begin
             AInsertIndex := AParentNode.Index + 1;
             AParentNode := AParentNode.Parent;
           end;
+      else;
       end;
 
       for I := 0 to Selection.Count - 1 do
@@ -683,11 +692,6 @@ begin
 end;
 
 { TACLTreeListCustomDragSortingObject }
-
-procedure TACLTreeListCustomDragSortingObject.DragFinished(ACanceled: Boolean);
-begin
-  // do nothing
-end;
 
 procedure TACLTreeListCustomDragSortingObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
 begin
@@ -757,85 +761,98 @@ end;
 
 { TACLTreeListColumnDragMoveObject }
 
+procedure TACLTreeListColumnDragMoveObject.DoAutoScroll(ADelta: Integer);
+begin
+  SubClass.ScrollBy(-10 * ADelta, 0);
+  SubClass.UpdateHitTest;
+  UpdateHighlight;
+end;
+
 procedure TACLTreeListColumnDragMoveObject.DragFinished(ACanceled: Boolean);
 begin
   if not ACanceled then
   begin
-    if HitTest.HitAtColumn then
-      ColumnViewInfo.Column.DrawIndex := HitTest.Column.DrawIndex
-    else
-      if SubClass.OptionsCustomizing.ColumnVisibility then
-        ColumnViewInfo.Column.Visible := False;
+    if SubClass.HitTest.HitAtColumn then
+      ColumnViewInfo.Column.DrawIndex := SubClass.HitTest.Column.DrawIndex
+    else if SubClass.OptionsCustomizing.ColumnVisibility then
+      ColumnViewInfo.Column.Visible := False;
   end;
-  FreeAndNil(FAutoScrollTimer);
+  UpdateHighlight(NullRect);
+  inherited;
 end;
 
 procedure TACLTreeListColumnDragMoveObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
 var
-  LColumnViewInfo: TACLTreeListColumnViewInfo;
-  LDropTargetBounds: TRect;
+  LRect: TRect;
 begin
-  DragWindow.SetVisible(True);
-  DragWindow.SetBounds(DragWindow.Left + ADeltaX, DragWindow.Top + ADeltaY, DragWindow.Width, DragWindow.Height);
-
-  CheckAutoScrolling(CalculateAutoScrollingDelta(P));
-  if HitTest.HitAtColumn then
-  begin
-    LColumnViewInfo := HitTest.ColumnViewInfo;
-    LDropTargetBounds := LColumnViewInfo.Bounds;
-    if LColumnViewInfo.Column.DrawIndex > ColumnViewInfo.Column.DrawIndex then
-      LDropTargetBounds.Left := LDropTargetBounds.Right - 1
-    else
-      LDropTargetBounds.Width := 1;
-
-    UpdateDragTargetZoneWindow(SubClass.ClientToScreen(LDropTargetBounds), True);
-    Cursor := crDefault;
-  end
-  else
-  begin
-    UpdateDragTargetZoneWindow(NullRect, True);
-    if SubClass.OptionsCustomizing.ColumnVisibility then
-      Cursor := crRemove;
-  end;
+  LRect := ColumnBarViewInfo.Bounds;
+  LRect.Intersect(SubClass.Bounds);
+  UpdateAutoScrollDirection(Point(0, P.X), Rect(0, LRect.Left + 50, 0, LRect.Right - 50));
+  UpdateHighlight;
+  if SubClass.HitTest.HitAtColumn then
+    UpdateCursor(crDefault)
+  else if SubClass.OptionsCustomizing.ColumnVisibility then
+    UpdateCursor(crDragRemove);
 end;
 
 function TACLTreeListColumnDragMoveObject.DragStart: Boolean;
 begin
   Result := SubClass.OptionsCustomizing.ColumnOrder;
   if Result then
-    InitializeDragWindow(ColumnViewInfo);
-end;
-
-procedure TACLTreeListColumnDragMoveObject.AutoScrollTimerHandler(Sender: TObject);
-begin
-  SubClass.ScrollBy(10 * FAutoScrollTimer.Tag, 0);
-end;
-
-function TACLTreeListColumnDragMoveObject.CalculateAutoScrollingDelta(const P: TPoint): Integer;
-var
-  R: TRect;
-begin
-  Result := 0;
-  if IntersectRect(R, ColumnBarViewInfo.Bounds, SubClass.Bounds) then
   begin
-    if P.X > R.Right - 50 then
-      Result := 1;
-    if P.X < R.Left + 50 then
-      Result := -1;
+    InitializePreview(ColumnViewInfo);
+    CreateAutoScrollTimer(10);
   end;
 end;
 
-procedure TACLTreeListColumnDragMoveObject.CheckAutoScrolling(ADelta: Integer);
+procedure TACLTreeListColumnDragMoveObject.Draw(ACanvas: TCanvas);
+var
+  LArrowDpi: Integer;
+  LRect: TRect;
 begin
-  if FAutoScrollTimer = nil then
-    FAutoScrollTimer := TACLTimer.CreateEx(AutoScrollTimerHandler, 1);
-  FAutoScrollTimer.Tag := ADelta;
-  FAutoScrollTimer.Enabled := ADelta <> 0;
+  if not FHighlightBounds.IsEmpty then
+  begin
+    ACanvas.Brush.Color := ACanvas.Font.Color;
+    ACanvas.FillRect(FHighlightBounds);
+
+    LArrowDpi := MulDiv(SubClass.CurrentDpi, 3, 2);
+
+    LRect := FHighlightBounds;
+    LRect.Height := acGetArrowSize(makBottom, LArrowDpi).Height - 1;
+    acDrawArrow(ACanvas, LRect, ACanvas.Brush.Color, makBottom, LArrowDpi);
+
+    LRect := FHighlightBounds;
+    LRect.Top := LRect.Bottom - acGetArrowSize(makTop, LArrowDpi).Height;
+    acDrawArrow(ACanvas, LRect, ACanvas.Brush.Color, makTop, LArrowDpi);
+  end;
 end;
 
-function TACLTreeListColumnDragMoveObject.GetHitTest: TACLTreeListHitTest;
+procedure TACLTreeListColumnDragMoveObject.UpdateHighlight;
+var
+  LColumnViewInfo: TACLTreeListColumnViewInfo;
+  LRect: TRect;
 begin
-  Result := SubClass.HitTest;
+  if SubClass.HitTest.HitAtColumn then
+  begin
+    LColumnViewInfo := SubClass.HitTest.ColumnViewInfo;
+    LRect := LColumnViewInfo.Bounds;
+    if LColumnViewInfo.Column.DrawIndex <= ColumnViewInfo.Column.DrawIndex then
+      LRect.Right := LRect.Left;
+    LRect.Left := LRect.Right - 1;
+    UpdateHighlight(LRect);
+  end
+  else
+    UpdateHighlight(NullRect);
+end;
+
+procedure TACLTreeListColumnDragMoveObject.UpdateHighlight(const R: TRect);
+begin
+  if R <> FHighlightBounds then
+  begin
+    FHighlightBounds := R;
+    SubClass.InvalidateRect(ColumnBarViewInfo.Bounds);
+    SubClass.Update;
+  end;
 end;
 
 { TACLTreeListColumnDragResizeObject }
@@ -881,22 +898,23 @@ procedure TACLTreeListColumnDragResizeObject.DragMoveAutoWidthColumns(
   
 var
   LColumnViewInfo: TACLTreeListColumnViewInfo;
-  ANextSibling: TACLTreeListColumn;
+  LNextSibling: TACLTreeListColumn;
+  I: Integer;
 begin
-  ANextSibling := Column.NextSibling;
-  if ANextSibling = nil then Exit;
+  LNextSibling := Column.NextSibling;
+  if LNextSibling = nil then Exit;
 
   SubClass.BeginUpdate;
   try
-    for var I := 0 to ColumnBarViewInfo.ChildCount - 1 do
+    for I := 0 to ColumnBarViewInfo.ChildCount - 1 do
     begin
       LColumnViewInfo := ColumnBarViewInfo.Children[I];
       LColumnViewInfo.Column.Width := dpiRevert(LColumnViewInfo.ActualWidth, CurrentDpi);
     end;
     if ADeltaX > 0 then
-      DoResize(Column, ANextSibling, 1)
+      DoResize(Column, LNextSibling, 1)
     else
-      DoResize(ANextSibling, Column, -1);
+      DoResize(LNextSibling, Column, -1);
   finally
     SubClass.EndUpdate;
   end;

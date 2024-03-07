@@ -11,45 +11,43 @@
 
 unit ACL.UI.Menus;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:NotImplemented
 
 interface
 
-{$IFNDEF MSWINDOWS}
 uses
-  SysUtils,
-  Classes,
-  Menus;
+{$IFDEF FPC}
+  LCLIntf,
+  LCLProc,
+  LCLType,
 {$ELSE}
-uses
   Winapi.CommCtrl,
   Winapi.Messages,
   Winapi.MMSystem,
   Winapi.ShellApi,
   Winapi.Windows,
   Winapi.OleAcc,
+{$ENDIF}
   // Vcl
-  Vcl.Forms,
-  Vcl.ActnList,
-  Vcl.Consts,
-  Vcl.Controls,
-  Vcl.Dialogs,
-  Vcl.ExtCtrls,
-  Vcl.Graphics,
-  Vcl.ImgList,
-  Vcl.Menus,
-  Vcl.StdCtrls,
-  Vcl.Themes,
+  {Vcl.}Forms,
+  {Vcl.}ActnList,
+  {Vcl.}Controls,
+  {Vcl.}Dialogs,
+  {Vcl.}ExtCtrls,
+  {Vcl.}Graphics,
+  {Vcl.}ImgList,
+  {Vcl.}Menus,
+  {Vcl.}StdCtrls,
+  {Vcl.}Themes,
   // System
-  System.Actions,
-  System.Character,
-  System.Classes,
-  System.Contnrs,
-  System.Generics.Collections,
-  System.Generics.Defaults,
-  System.Math,
-  System.SysUtils,
-  System.Types,
+  {System.}Character,
+  {System.}Classes,
+  {System.}Contnrs,
+  {System.}Generics.Collections,
+  {System.}Generics.Defaults,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
   System.UITypes,
   // ACL
   ACL.Classes,
@@ -83,10 +81,8 @@ const
   CM_ITEMKEYED     = CM_BASE + $0404;
   CM_ITEMSELECTED  = CM_BASE + $0402;
 
-{$ENDIF}
 {$REGION ' General '}
 type
-
   TMenuItemClass = class of TMenuItem;
   TMenuItemEnumProc = reference to procedure (AMenuItem: TMenuItem);
 
@@ -102,8 +98,6 @@ type
   ['{82B0E75A-647F-43C9-B05A-54E34D0EBD85}']
     procedure OnShow;
   end;
-
-{$IFDEF MSWINDOWS}
 
   { TACLMenuItem }
 
@@ -147,7 +141,8 @@ type
     procedure AssignTo(Dest: TPersistent); override;
     procedure Expand(AProc: TMenuItemEnumProc); virtual; abstract;
   published
-    property ExpandMode: TACLMenuItemLinkExpandMode read FExpandMode write FExpandMode default lemExpandInplace;
+    property ExpandMode: TACLMenuItemLinkExpandMode
+      read FExpandMode write FExpandMode default lemExpandInplace;
   end;
 
   { TACLMenuItemLink }
@@ -155,7 +150,6 @@ type
   TACLMenuItemLink = class(TACLMenuContainerItem)
   strict private
     FLink: TComponent;
-
     procedure SetLink(AValue: TComponent);
   protected
     procedure AssignTo(Dest: TPersistent); override;
@@ -205,22 +199,23 @@ type
     GlyphSize = 16;
   strict private
     FItemHeight: Integer;
-
     function GetItemHeight: Integer; inline;
   protected
     function CalculateItemHeight: Integer; virtual;
     procedure DoChanged(AChanges: TACLPersistentChanges); override;
-    procedure DoDrawImage(ACanvas: TCanvas; const ARect: TRect; AImages: TCustomImageList;
-      AImageIndex: TImageIndex; AEnabled, ASelected: Boolean); virtual;
+    procedure DoDrawImage(ACanvas: TCanvas; const ARect: TRect;
+      AImages: TCustomImageList; AImageIndex: TImageIndex;
+      AEnabled, ASelected: Boolean); virtual;
     function GetTextIdent: Integer; inline;
     procedure InitializeResources; override;
   public
     procedure AfterConstruction; override;
-    procedure AssignFontParams(ACanvas: TCanvas; ASelected, AIsDefault, AEnabled: Boolean); virtual;
+    procedure AssignFontParams(ACanvas: TCanvas;
+      ASelected, AIsDefault, AEnabled: Boolean); virtual;
     procedure DrawBackground(ACanvas: TCanvas; const R: TRect; ASelected: Boolean); virtual;
     procedure DrawItemImage(ACanvas: TCanvas;
       ARect: TRect; AItem: TMenuItem; ASelected: Boolean); virtual;
-    function MeasureWidth(ACanvas: TCanvas; const S: UnicodeString;
+    function MeasureWidth(ACanvas: TCanvas; const S: string;
       AShortCut: TShortCut = scNone; ADefault: Boolean = False): Integer; virtual;
     property ItemHeight: Integer read GetItemHeight;
   published
@@ -244,7 +239,7 @@ type
     function GetSeparatorHeight: Integer; inline;
   protected
     function CalculateItemHeight: Integer; override;
-    procedure DoDrawText(ACanvas: TCanvas; ARect: TRect; const S: UnicodeString); virtual;
+    procedure DoDrawText(ACanvas: TCanvas; ARect: TRect; const S: string); virtual;
     procedure DoSplitRect(const R: TRect; AGutterWidth: Integer; out AGutterRect, AContentRect: TRect);
     procedure InitializeResources; override;
   public
@@ -252,13 +247,14 @@ type
     procedure DrawBorder(ACanvas: TCanvas; const R: TRect); virtual;
     procedure DrawCheckMark(ACanvas: TCanvas; const R: TRect;
       AChecked, AIsRadioItem, ASelected: Boolean);
-    procedure DrawItem(ACanvas: TCanvas; R: TRect; const S: UnicodeString;
+    procedure DrawItem(ACanvas: TCanvas; R: TRect; const S: string;
       AShortCut: TShortCut; ASelected, AIsDefault, AEnabled, AHasSubItems: Boolean); virtual;
     procedure DrawItemImage(ACanvas: TCanvas; ARect: TRect;
       AItem: TMenuItem; ASelected: Boolean); override;
-    procedure DrawScrollButton(ACanvas: TCanvas; const R: TRect; AUp, AEnabled: Boolean); virtual;
+    procedure DrawScrollButton(ACanvas: TCanvas;
+      const R: TRect; AUp, AEnabled: Boolean); virtual;
     procedure DrawSeparator(ACanvas: TCanvas; const R: TRect); virtual;
-    function MeasureWidth(ACanvas: TCanvas; const S: UnicodeString;
+    function MeasureWidth(ACanvas: TCanvas; const S: string;
       AShortCut: TShortCut = scNone; ADefault: Boolean = False): Integer; override;
 
     property ItemGutterWidth: Integer read GetItemGutterWidth;
@@ -315,7 +311,7 @@ type
   strict private
     FAutoScale: Boolean;
     FCurrentDpi: Integer;
-    FHint: UnicodeString;
+    FHint: string;
     FOptions: TACLPopupMenuOptions;
     FPopupWindow: TObject;
     FStyle: TACLPopupMenuStyle;
@@ -339,7 +335,7 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure BeforeDestruction; override;
-    function CreateMenuItem: TMenuItem; override;
+    function CreateMenuItem: TMenuItem; {$IFNDEF FPC}override;{$ENDIF}
     procedure ScaleForDpi(ATargetDpi: Integer);
     procedure Popup(const P: TPoint); reintroduce; overload;
     procedure Popup(X, Y: Integer); overload; override;
@@ -350,7 +346,7 @@ type
     property IsShown: Boolean read GetIsShown;
   published
     property AutoScale: Boolean read FAutoScale write FAutoScale default True;
-    property Hint: UnicodeString read FHint write FHint;
+    property Hint: string read FHint write FHint;
     property Options: TACLPopupMenuOptions read FOptions write SetOptions;
     property Style: TACLPopupMenuStyle read FStyle write SetStyle;
   end;
@@ -359,6 +355,7 @@ type
 
 {$REGION ' Internal Classes '}
 
+{$IFDEF MSWINDOWS}
   TACLMenuWindow = class;
   TACLMenuPopupWindow = class;
 
@@ -666,11 +663,10 @@ type
       AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem; overload;
     function AddItem(const ACaption: string; ATag: NativeInt;
       AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem; overload;
-  {$IFDEF MSWINDOWS}
     function AddLink(const AMenuItemOrMenu: TComponent): TACLMenuItemLink;
-  {$ENDIF}
     function AddRadioItem(const ACaption, AHint: string; ATag: NativeInt = 0;
-      AEvent: TNotifyEvent = nil; AGroupIndex: Integer = 0; AShortCut: TShortCut = 0): TMenuItem; overload;
+      AEvent: TNotifyEvent = nil; AGroupIndex: Integer = 0;
+      AShortCut: TShortCut = 0): TMenuItem; overload;
     function AddSeparator: TMenuItem;
     function CanBeParent(AParent: TMenuItem): Boolean;
     function FindByTag(const ATag: NativeInt): TMenuItem;
@@ -752,17 +748,16 @@ begin
   Result := AddItem(ACaption, '', ATag, AEvent, AShortCut);
 end;
 
-{$IFDEF MSWINDOWS}
 function TMenuItemHelper.AddLink(const AMenuItemOrMenu: TComponent): TACLMenuItemLink;
 begin
   Result := TACLMenuItemLink.Create(Self);
   Result.Link := AMenuItemOrMenu;
   Add(Result);
 end;
-{$ENDIF}
 
 function TMenuItemHelper.AddRadioItem(const ACaption, AHint: string;
-  ATag: NativeInt; AEvent: TNotifyEvent; AGroupIndex: Integer; AShortCut: TShortCut): TMenuItem;
+  ATag: NativeInt; AEvent: TNotifyEvent; AGroupIndex: Integer;
+  AShortCut: TShortCut): TMenuItem;
 begin
   Result := AddItem(ACaption, AHint, Atag, AEvent, AShortCut);
   Result.RadioItem := True;
@@ -872,7 +867,6 @@ end;
 
 {$ENDREGION}
 
-{$IFDEF MSWINDOWS}
 {$REGION ' General '}
 
 { TACLMenuItem }
@@ -984,6 +978,8 @@ begin
 end;
 
 procedure TACLMenuItemLink.Expand(AProc: TMenuItemEnumProc);
+var
+  I: Integer;
 begin
   if Enabled then
   begin
@@ -993,7 +989,7 @@ begin
       if Link is TPopupMenu then
       begin
         TPopupMenu(Link).Items.PrepareForShowing;
-        for var I := 0 to TPopupMenu(Link).Items.Count - 1 do
+        for I := 0 to TPopupMenu(Link).Items.Count - 1 do
           AProc(TPopupMenu(Link).Items[I]);
       end;
   end;
@@ -1056,10 +1052,11 @@ end;
 procedure TACLMenuListItem.Expand(AProc: TMenuItemEnumProc);
 var
   AItem: TMenuItem;
+  I: Integer;
 begin
   while Count > 0 do
     Delete(0);
-  for var I := 0 to Items.Count - 1 do
+  for I := 0 to Items.Count - 1 do
   begin
     AItem := AddItem(Items[I], I, HandlerItemClick);
     if AutoCheck then
@@ -1295,7 +1292,7 @@ begin
   end;
 end;
 
-procedure TACLStylePopupMenu.DoDrawText(ACanvas: TCanvas; ARect: TRect; const S: UnicodeString);
+procedure TACLStylePopupMenu.DoDrawText(ACanvas: TCanvas; ARect: TRect; const S: string);
 begin
   acSysDrawText(ACanvas, ARect, S, DT_LEFT or DT_SINGLELINE or DT_VCENTER or DT_NOPREFIX);
 end;
@@ -1373,8 +1370,7 @@ begin
   end;
 end;
 
-procedure TACLStylePopupMenu.DrawItem(
-  ACanvas: TCanvas; R: TRect; const S: UnicodeString;
+procedure TACLStylePopupMenu.DrawItem(ACanvas: TCanvas; R: TRect; const S: string;
   AShortCut: TShortCut; ASelected, AIsDefault, AEnabled, AHasSubItems: Boolean);
 begin
   Inc(R.Left, ItemGutterWidth);
@@ -1388,7 +1384,8 @@ begin
       acTextDraw(ACanvas, ShortCutToText(AShortCut), R, taRightJustify, taVerticalCenter);
 end;
 
-procedure TACLStylePopupMenu.DrawItemImage(ACanvas: TCanvas; ARect: TRect; AItem: TMenuItem; ASelected: Boolean);
+procedure TACLStylePopupMenu.DrawItemImage(
+  ACanvas: TCanvas; ARect: TRect; AItem: TMenuItem; ASelected: Boolean);
 begin
   if AItem.IsCheckable then
     DrawCheckMark(ACanvas, ARect, AItem.Checked, AItem.RadioItem, ASelected)
@@ -1411,7 +1408,7 @@ begin
 end;
 
 function TACLStylePopupMenu.MeasureWidth(ACanvas: TCanvas;
-  const S: UnicodeString; AShortCut: TShortCut; ADefault: Boolean): Integer;
+  const S: string; AShortCut: TShortCut; ADefault: Boolean): Integer;
 begin
   Result := inherited + ItemGutterWidth + ItemHeight;
   if AShortCut <> scNone then
@@ -1443,6 +1440,29 @@ procedure TACLPopupMenuOptions.Assign(Source: TPersistent);
 begin
   if Source is TACLPopupMenuOptions then
     CloseMenuOnItemCheck := TACLPopupMenuOptions(Source).CloseMenuOnItemCheck;
+end;
+
+{ TACLPopupMenuStyle }
+
+procedure TACLPopupMenuStyle.DoAssign(Source: TPersistent);
+begin
+  inherited DoAssign(Source);
+  if Source is TACLPopupMenuStyle then
+    AllowTextFormatting := TACLPopupMenuStyle(Source).AllowTextFormatting;
+end;
+
+procedure TACLPopupMenuStyle.DoDrawText(ACanvas: TCanvas; R: TRect; const S: string);
+begin
+  if AllowTextFormatting then
+    acDrawFormattedText(ACanvas, StripHotkey(S), R, taLeftJustify, taVerticalCenter, False)
+  else
+    inherited DoDrawText(ACanvas, R, S);
+end;
+
+procedure TACLPopupMenuStyle.DoReset;
+begin
+  inherited DoReset;
+  AllowTextFormatting := False;
 end;
 
 { TACLPopupMenu }
@@ -1496,12 +1516,17 @@ end;
 
 procedure TACLPopupMenu.PopupUnderControl(const ControlRect: TRect);
 begin
+{$IFDEF FPC}
+  {$MESSAGE WARN 'NotImplemented'}
+  raise ENotImplemented.Create('TACLPopupMenu');
+{$ELSE}
   if not IsShown then
   begin
     SetPopupPoint(Point(ControlRect.Left, ControlRect.Bottom));
     DoInitialize;
     DoShow(ControlRect);
   end;
+{$ENDIF}
 end;
 
 function TACLPopupMenu.CreateOptions: TACLPopupMenuOptions;
@@ -1515,11 +1540,13 @@ begin
 end;
 
 procedure TACLPopupMenu.DoInitialize;
+var
+  I: Integer;
 begin
   DoPopup(Self);
   if AutoScale then
     ScaleForDpi(CalculateTargetDpi);
-  for var I := 0 to Items.Count - 1 do
+  for I := 0 to Items.Count - 1 do
     Items[I].InitiateAction;
 end;
 
@@ -1530,11 +1557,20 @@ end;
 
 procedure TACLPopupMenu.DoSelect(Item: TMenuItem);
 begin
+{$IFDEF FPC}
+  {$MESSAGE WARN 'NotImplemented'}
+  raise ENotImplemented.Create('TACLPopupMenu');
+{$ELSE}
   PostMessage(PopupList.Window, WM_COMMAND, Item.Command, 0);
+{$ENDIF}
 end;
 
 procedure TACLPopupMenu.DoShow(const ControlRect: TRect);
 begin
+{$IFDEF FPC}
+  {$MESSAGE WARN 'NotImplemented'}
+  raise ENotImplemented.Create('TACLPopupMenu');
+{$ELSE}
   if not IsShown then
   try
     FPopupWindow := TACLMenuPopupWindow.Create(Self);
@@ -1548,6 +1584,7 @@ begin
   finally
     DoClose;
   end;
+{$ENDIF}
 end;
 
 function TACLPopupMenu.GetCurrentDpi: Integer;
@@ -1579,33 +1616,11 @@ begin
   end;
 end;
 
-{ TACLPopupMenuStyle }
-
-procedure TACLPopupMenuStyle.DoAssign(Source: TPersistent);
-begin
-  inherited DoAssign(Source);
-  if Source is TACLPopupMenuStyle then
-    AllowTextFormatting := TACLPopupMenuStyle(Source).AllowTextFormatting;
-end;
-
-procedure TACLPopupMenuStyle.DoDrawText(ACanvas: TCanvas; R: TRect; const S: string);
-begin
-  if AllowTextFormatting then
-    acDrawFormattedText(ACanvas, StripHotkey(S), R, taLeftJustify, taVerticalCenter, False)
-  else
-    inherited DoDrawText(ACanvas, R, S);
-end;
-
-procedure TACLPopupMenuStyle.DoReset;
-begin
-  inherited DoReset;
-  AllowTextFormatting := False;
-end;
-
 {$ENDREGION}
 
 {$REGION ' Internal Classes '}
 
+{$IFDEF MSWINDOWS}
 { TACLMenuWindow }
 
 constructor TACLMenuWindow.Create(AOwner: TComponent);

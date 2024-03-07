@@ -78,8 +78,6 @@ const
 const
   acIndentBetweenElements = 5;
   acResizeHitTestAreaSize = 6;
-  crRemove = TCursor(-25);
-  crDragLink = TCursor(-26);
 
 const
   acAnchorTop = [akLeft, akTop, akRight];

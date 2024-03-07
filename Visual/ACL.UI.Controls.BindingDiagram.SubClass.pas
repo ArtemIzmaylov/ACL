@@ -454,7 +454,6 @@ type
     FOwner: TACLBindingDiagramSubClassViewInfo;
   public
     constructor Create(AOwner: TACLBindingDiagramSubClassViewInfo);
-    procedure DragFinished(ACanceled: Boolean); override;
     procedure DragMove(const P: TPoint; var ADeltaX: Integer; var ADeltaY: Integer); override;
     function DragStart: Boolean; override;
   end;
@@ -1482,17 +1481,11 @@ begin
   FOwner := AOwner;
 end;
 
-procedure TACLBindingDiagramScrollDragObject.DragFinished(ACanceled: Boolean);
-begin
-  inherited;
-  Cursor := crDefault;
-end;
-
 procedure TACLBindingDiagramScrollDragObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
 var
   LOldViewport: TPoint;
 begin
-  Cursor := crSizeAll;
+  UpdateCursor(crSizeAll);
   LOldViewport := FOwner.Viewport;
   FOwner.Viewport := Point(LOldViewport.X - ADeltaX, LOldViewport.Y - ADeltaY);
   ADeltaX := LOldViewport.X - FOwner.ViewportX;
@@ -1762,8 +1755,6 @@ begin
 end;
 
 procedure TACLBindingDiagramCustomLinkDragObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
-const
-  CursorMap: array[Boolean] of TCursor = (crNoDrop, crDrag);
 begin
   if HitTest.HitObject is TACLBindingDiagramObjectPinViewInfo then
     TargetPin := TACLBindingDiagramObjectPinViewInfo(HitTest.HitObject)
@@ -1775,7 +1766,10 @@ begin
   else
     SetLine(GetPoint(FStartPin, FStartPinMode), P);
 
-  Cursor := CursorMap[TargetPin <> nil];
+  if TargetPin <> nil then
+    UpdateCursor(crDrag)
+  else
+    UpdateCursor(crNoDrop);
 end;
 
 procedure TACLBindingDiagramCustomLinkDragObject.DragFinished(ACanceled: Boolean);

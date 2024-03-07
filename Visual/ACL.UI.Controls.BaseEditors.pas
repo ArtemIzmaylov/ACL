@@ -1357,7 +1357,7 @@ end;
 procedure TACLInnerEdit.KeyPress(var Key: Char);
 begin
   inherited;
-{$IFDEF UNICODE}
+{$IFNDEF FPC}
   KeyPressCore(Key);
 {$ENDIF}
   Container.KeyPress(Key);
@@ -1386,19 +1386,9 @@ end;
 
 {$IFDEF FPC}
 procedure TACLInnerEdit.Utf8KeyPress(var Key: TUTF8Char);
-var
-  LKey: WideChar;
-  LStr: UnicodeString;
 begin
   inherited;
-  LStr := UTF8ToString(Key);
-  if Length(LStr) = 1 then
-  begin
-    LKey := LStr[1];
-    KeyPressCore(LKey);
-    if LKey <> LStr[1] then
-      Key := UTF8Encode(LKey);
-  end;
+  ProcessUtf8KeyPress(Key, KeyPressCore);
   Container.UTF8KeyPress(Key);
 end;
 {$ENDIF}

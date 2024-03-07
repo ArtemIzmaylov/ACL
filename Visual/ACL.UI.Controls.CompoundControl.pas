@@ -93,6 +93,9 @@ type
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     procedure KeyPress(var Key: Char); override;
     procedure KeyUp(var Key: Word; Shift: TShiftState); override;
+  {$IFDEF FPC}
+    procedure UTF8KeyPress(var Key: TUTF8Char); override;
+  {$ENDIF}
 
     // Mouse
     function DoMouseWheelDown(Shift: TShiftState; MousePos: TPoint): Boolean; override;
@@ -343,8 +346,10 @@ end;
 
 procedure TACLCompoundControl.KeyPress(var Key: Char);
 begin
-  inherited KeyPress(Key);
+  inherited;
+{$IFNDEF FPC}
   SubClass.KeyPress(Key);
+{$ENDIF}
 end;
 
 procedure TACLCompoundControl.KeyUp(var Key: Word; Shift: TShiftState);
@@ -352,6 +357,14 @@ begin
   inherited KeyUp(Key, Shift);
   SubClass.KeyUp(Key, Shift);
 end;
+
+{$IFDEF FPC}
+procedure TACLCompoundControl.UTF8KeyPress(var Key: TUTF8Char);
+begin
+  inherited;
+  ProcessUtf8KeyPress(Key, SubClass.KeyPress);
+end;
+{$ENDIF}
 
 function TACLCompoundControl.DoMouseWheelDown(Shift: TShiftState; MousePos: TPoint): Boolean;
 begin

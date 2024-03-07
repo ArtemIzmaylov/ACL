@@ -11,34 +11,36 @@
 
 unit ACL.UI.Controls.TreeList;
 
-{$I ACL.Config.INC}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
+  {Winapi.}Windows,
+{$ENDIF}
+  {Winapi.}Messages,
   // System
+  {System.}Classes,
   System.UITypes,
-  System.Types,
-  System.Classes,
   // Vcl
-  Vcl.Controls,
-  Vcl.Graphics,
-  Vcl.StdCtrls,
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
+  {Vcl.}StdCtrls,
   // ACL
   ACL.Classes,
   ACL.FileFormats.INI,
   ACL.Graphics,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.BaseEditors,
-  ACL.UI.Controls.Buttons,
   ACL.UI.Controls.CompoundControl,
   ACL.UI.Controls.CompoundControl.SubClass,
   ACL.UI.Controls.TreeList.Options,
   ACL.UI.Controls.TreeList.SubClass,
   ACL.UI.Controls.TreeList.Types,
-  ACL.UI.HintWindow,
   ACL.UI.Menus,
   ACL.UI.Resources;
 
@@ -219,8 +221,8 @@ type
     procedure StartEditing(AColumn: TACLTreeListColumn = nil); inline;
 
     // Customized Settings
-    procedure ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: UnicodeString); inline;
-    procedure ConfigSave(AConfig: TACLIniFile; const ASection, AItem: UnicodeString); inline;
+    procedure ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: string); inline;
+    procedure ConfigSave(AConfig: TACLIniFile; const ASection, AItem: string); inline;
 
     // Make Top/Visible
     procedure MakeFirstVisibleFocused;
@@ -240,9 +242,9 @@ type
     procedure SortBy(AColumn: TACLTreeListColumn; AResetPrevSortingParams: Boolean = False); overload; inline;
 
     // Paths
-    function GetPath: UnicodeString; overload; inline;
-    function GetPath(ANode: TACLTreeListNode): UnicodeString; overload; inline;
-    procedure SetPath(const APath: UnicodeString); inline;
+    function GetPath: string; overload; inline;
+    function GetPath(ANode: TACLTreeListNode): string; overload; inline;
+    procedure SetPath(const APath: string); inline;
 
     // Selection
     procedure SelectAll; inline;
@@ -344,8 +346,10 @@ implementation
 constructor TACLCustomTreeList.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+{$IFNDEF FPC}
   Touch.InteractiveGestures := [igPan];
   Touch.InteractiveGestureOptions := [igoPanSingleFingerVertical, igoPanSingleFingerHorizontal, igoPanInertia];
+{$ENDIF}
   FocusOnClick := True;
   TabStop := True;
 end;
@@ -392,12 +396,12 @@ begin
     ControlStyle := ControlStyle + [csOpaque];
 end;
 
-procedure TACLCustomTreeList.ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: UnicodeString);
+procedure TACLCustomTreeList.ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: string);
 begin
   SubClass.ConfigLoad(AConfig, ASection, AItem);
 end;
 
-procedure TACLCustomTreeList.ConfigSave(AConfig: TACLIniFile; const ASection, AItem: UnicodeString);
+procedure TACLCustomTreeList.ConfigSave(AConfig: TACLIniFile; const ASection, AItem: string);
 begin
   SubClass.ConfigSave(AConfig, ASection, AItem);
 end;
@@ -458,17 +462,17 @@ begin
   SubClass.SortBy(AColumn, AResetPrevSortingParams);
 end;
 
-function TACLCustomTreeList.GetPath: UnicodeString;
+function TACLCustomTreeList.GetPath: string;
 begin
   Result := GetPath(FocusedNode);
 end;
 
-function TACLCustomTreeList.GetPath(ANode: TACLTreeListNode): UnicodeString;
+function TACLCustomTreeList.GetPath(ANode: TACLTreeListNode): string;
 begin
   Result := SubClass.GetPath(ANode);
 end;
 
-procedure TACLCustomTreeList.SetPath(const APath: UnicodeString);
+procedure TACLCustomTreeList.SetPath(const APath: string);
 begin
   SubClass.SetPath(APath);
 end;
