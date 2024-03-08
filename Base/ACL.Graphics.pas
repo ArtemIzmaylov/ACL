@@ -1754,12 +1754,12 @@ end;
 
 procedure acDrawDropArrow(DC: HDC; const R: TRect; AColor: TColor; const AArrowSize: TSize);
 var
-  ABrush: THandle;
+  ABrush: HBRUSH;
   APoints: array[0..2] of TPoint;
-  ARegion: THandle;
+  ARegion: HRGN;
   X, Y: Integer;
 begin
-  if not IsRectEmpty(R) then
+  if not R.IsEmpty then
   begin
     X := (R.Right + R.Left - AArrowSize.cx) div 2;
     Y := (R.Bottom + R.Top - AArrowSize.cy) div 2;
@@ -1768,7 +1768,7 @@ begin
     APoints[2] := Point(X + AArrowSize.cx div 2, Y + AArrowSize.cy + 1);
 
     ABrush := CreateSolidBrush(ColorToRGB(AColor));
-    ARegion := CreatePolygonRgn(APoints, Length(APoints), WINDING);
+    ARegion := CreatePolygonRgn({$IFDEF FPC}@{$ENDIF}APoints[0], 3, WINDING);
     FillRgn(DC, ARegion, ABrush);
     DeleteObject(ARegion);
     DeleteObject(ABrush);

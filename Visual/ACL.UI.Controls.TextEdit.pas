@@ -232,7 +232,8 @@ end;
 
 procedure TACLCustomTextEdit.SelectAll;
 begin
-  InnerEdit.SelectAll;
+  if InnerEdit <> nil then
+    InnerEdit.SelectAll;
 end;
 
 procedure TACLCustomTextEdit.SetDefaultSize;

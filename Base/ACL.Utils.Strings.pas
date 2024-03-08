@@ -12,12 +12,15 @@
 unit ACL.Utils.Strings;
 
 {$I ACL.Config.inc} //FPC:OK
+{$POINTERMATH ON}
 
 interface
 
 uses
 {$IFDEF MSWINDOWS}
   Winapi.Windows,
+{$ELSE}
+  LazUtf8,
 {$ENDIF}
   // VCL
 {$IFNDEF ACL_BASE_NOVCL}
@@ -442,8 +445,9 @@ function acExplodeString(const S: UnicodeString;
 function acExplodeString(const S, ADelimiters: string; out AParts: TStringDynArray): Integer; overload;
 function acExplodeStringAsIntegerArray(const S: string;
   ADelimiter: Char; AArray: PInteger; AArrayLength: Integer): Integer;
-function acGetCharacterCount(const S, ACharacters: string): Integer; overload;
-function acGetCharacterCount(P: PChar; ALength: Integer; const ACharacters: string): Integer; overload;
+function acCharCount(const S: string): Integer; overload;
+function acCharCount(const S, ACharacters: string): Integer; overload;
+function acCharCount(P: PChar; ALength: Integer; const ACharacters: string): Integer; overload;
 
 // Case
 function acAllWordsWithCaptialLetter(const S: UnicodeString; IgnoreSourceCase: Boolean = False): UnicodeString; overload;
@@ -560,10 +564,6 @@ uses
   ACL.Parsers,
   ACL.Utils.FileSystem,
   ACL.Utils.Stream;
-
-{$ifdef fpc}
-  {$WARN 4055 off : Conversion between ordinals and pointers is not portable}
-{$endif}
 
 const
   MaxPreambleLength = 3;
@@ -1183,7 +1183,7 @@ begin
   if L > 0 then
   begin
     SetLength(Result, L * 3); // SetLength includes space for null terminator
-    L := UnicodeToUtf8(PAnsiChar(Result), Length(Result) + 1, PWideChar(Source), L);
+    L := System.UnicodeToUtf8(PAnsiChar(Result), Length(Result) + 1, PWideChar(Source), L);
     if L > 0 then
       SetLength(Result, L - 1)
   end;
@@ -1244,7 +1244,7 @@ begin
   AScan := PChar(S);
   AScanCount := Length(S);
 
-  Result := acGetCharacterCount(AScan, AScanCount, ADelimiters) + 1;
+  Result := acCharCount(AScan, AScanCount, ADelimiters) + 1;
   SetLength(AParts{%H-}, Result);
   if Result > 0 then
   begin
@@ -1325,12 +1325,21 @@ begin
       end);
 end;
 
-function acGetCharacterCount(const S, ACharacters: string): Integer;
+function acCharCount(const S: string): Integer;
 begin
-  Result := acGetCharacterCount(PChar(S), Length(S), ACharacters);
+{$IFDEF UNICODE}
+  Result := Length(S);
+{$ELSE}
+  Result := UTF8Length(S);
+{$ENDIF}
 end;
 
-function acGetCharacterCount(P: PChar; ALength: Integer; const ACharacters: string): Integer;
+function acCharCount(const S, ACharacters: string): Integer;
+begin
+  Result := acCharCount(PChar(S), Length(S), ACharacters);
+end;
+
+function acCharCount(P: PChar; ALength: Integer; const ACharacters: string): Integer;
 begin
   Result := 0;
   while ALength > 0 do

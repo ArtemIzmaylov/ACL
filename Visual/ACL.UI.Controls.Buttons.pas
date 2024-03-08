@@ -222,6 +222,7 @@ type
     procedure UpdateTransparency; override;
 
     // Keyboard
+    function DialogChar(var Message: TWMKey): Boolean; override;
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     procedure KeyUp(var Key: Word; Shift: TShiftState); override;
 
@@ -239,7 +240,6 @@ type
     function ButtonOwnerGetStyle: TACLStyleButton; virtual;
 
     // Messages
-    procedure CMDialogChar(var Message: TCMDialogChar); message {%H-}CM_DIALOGCHAR;
     procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
     procedure CMFontchanged(var Message: TMessage); message CM_FONTCHANGED;
     procedure CMHintShow(var Message: TCMHintShow); message CM_HINTSHOW;
@@ -1035,6 +1035,18 @@ begin
     ControlStyle := ControlStyle + [csOpaque];
 end;
 
+function TACLCustomButton.DialogChar(var Message: TWMKey): Boolean;
+begin
+  if IsAccel(Message.CharCode, Caption) and CanFocus then
+  begin
+    SetFocusOnClick;
+    SubClass.PerformClick;
+    Result := True;
+  end
+  else
+    Result := inherited;
+end;
+
 procedure TACLCustomButton.KeyDown(var Key: Word; Shift: TShiftState);
 begin
   inherited KeyDown(Key, Shift);
@@ -1091,18 +1103,6 @@ end;
 function TACLCustomButton.ButtonOwnerGetStyle: TACLStyleButton;
 begin
   Result := Style;
-end;
-
-procedure TACLCustomButton.CMDialogChar(var Message: TCMDialogChar);
-begin
-  if IsAccel(Message.CharCode, Caption) and CanFocus then
-  begin
-    SetFocusOnClick;
-    SubClass.PerformClick;
-    Message.Result := 1;
-  end
-  else
-    inherited;
 end;
 
 procedure TACLCustomButton.CMEnabledChanged(var Message: TMessage);
@@ -2228,8 +2228,8 @@ end;
 
 procedure TACLInplaceCheckBox.InplaceSetValue(const AValue: string);
 begin
-  Caption := AValue;
-  Checked := AValue = BoolToStr(True, True);
+  Checked := (AValue = BoolToStr(True, True)) or (StrToIntDef(AValue, 0) <> 0);
+  Caption := InplaceGetValue;
 end;
 
 procedure TACLInplaceCheckBox.SetDefaultSize;

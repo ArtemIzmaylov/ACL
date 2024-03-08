@@ -11,31 +11,34 @@
 
 unit ACL.UI.Controls.DropDown;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
+  {Winapi.}Windows,
+{$ENDIF}
+  {Winapi.}Messages,
   // VCL
-  Vcl.Controls,
-  Vcl.Graphics,
-  Vcl.ImgList,
-  Vcl.Forms,
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
+  {Vcl.}ImgList,
+  {Vcl.}Forms,
   // System
-  System.Classes,
-  System.Math,
-  System.SysUtils,
-  System.Types,
+  {System.}Classes,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
   System.UITypes,
   // ACL
   ACL.Classes,
-  ACL.Classes.StringList,
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.SkinImage,
-  ACL.Graphics.SkinImageSet,
   ACL.MUI,
   ACL.Threading,
   ACL.UI.Controls.BaseControls,
@@ -118,22 +121,22 @@ type
   strict private
     FGlyph: TACLGlyph;
 
-    function GetCaption: UnicodeString;
+    function GetCaption: string;
     function GetImageIndex: TImageIndex;
     function GetImages: TCustomImageList;
     function GetStyle: TACLStyleButton;
     function IsGlyphStored: Boolean;
-    procedure SetCaption(const AValue: UnicodeString);
+    procedure SetCaption(const AValue: string);
     procedure SetGlyph(const Value: TACLGlyph);
     procedure SetImageIndex(AIndex: TImageIndex);
     procedure SetImages(const Value: TCustomImageList);
     procedure SetStyle(const Value: TACLStyleButton);
-    // Messages
-    procedure CMDialogChar(var Message: TCMDialogChar); message CM_DIALOGCHAR;
   protected
     procedure Calculate(R: TRect); override;
     procedure FocusChanged; override;
     procedure SetDefaultSize; override;
+    // Accelerators
+    function DialogChar(var Message: TWMKey): Boolean; override;
     // keyboard
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     procedure KeyUp(var Key: Word; Shift: TShiftState); override;
@@ -148,7 +151,7 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
   published
-    property Caption: UnicodeString read GetCaption write SetCaption;
+    property Caption: string read GetCaption write SetCaption;
     property Cursor default crHandPoint;
     property FocusOnClick default True;
     property Glyph: TACLGlyph read FGlyph write SetGlyph stored IsGlyphStored;
@@ -184,10 +187,12 @@ type
 implementation
 
 uses
+{$IFNDEF FPC}
+  ACL.Graphics.SkinImageSet, // inlining
+{$ENDIF}
   ACL.UI.Insight;
 
 type
-  TControlAccess = class(TControl);
 
   { TACLDropDownUIInsightAdapter }
 
@@ -252,13 +257,14 @@ end;
 
 procedure TACLCustomDropDownEdit.HandlerDropDownClose(Sender: TObject);
 begin
-  FDropDownClosedAt := GetTickCount;
+  FDropDownClosedAt := TACLThread.Timestamp;
   TACLMainThread.RunPostponed(FreeDropDownWindow, Self);
 end;
 
 function TACLCustomDropDownEdit.Focused: Boolean;
 begin
-  Result := inherited or (DropDownWindow <> nil) and IsChild(DropDownWindow.Handle, GetFocus);
+  Result := inherited or (DropDownWindow <> nil) and
+    acIsChild(DropDownWindow, FindControl(GetFocus));
 end;
 
 function TACLCustomDropDownEdit.GetCursor(const P: TPoint): TCursor;
@@ -312,7 +318,7 @@ begin
     if AValue and (DropDownWindow = nil) and Enabled then
     begin
       DoDropDown;
-      if Enabled and (GetTickCount - FDropDownClosedAt > 200) then
+      if Enabled and TACLThread.IsTimeout(FDropDownClosedAt, 200) then
       begin
         FDropDownWindow := CreateDropDownWindow;
         if DropDownWindow <> nil then
@@ -427,6 +433,19 @@ begin
   DropDownButton.IsFocused := Focused;
 end;
 
+function TACLCustomDropDown.DialogChar(var Message: TWMKey): Boolean;
+begin
+  Result := (Message.CharCode = VK_RETURN) and Focused or
+    (IsAccel(Message.CharCode, Caption) and CanFocus);
+  if Result then
+  begin
+    SetFocusOnClick;
+    DropDownButton.PerformClick;
+  end
+  else
+    Result := inherited;
+end;
+
 procedure TACLCustomDropDown.KeyDown(var Key: Word; Shift: TShiftState);
 begin
   inherited KeyDown(Key, Shift);
@@ -450,7 +469,7 @@ begin
   DropDownButton.Draw(Canvas);
 end;
 
-function TACLCustomDropDown.GetCaption: UnicodeString;
+function TACLCustomDropDown.GetCaption: string;
 begin
   if DropDownButton <> nil then
     Result := DropDownButton.Caption
@@ -478,7 +497,7 @@ begin
   Result := not FGlyph.Empty;
 end;
 
-procedure TACLCustomDropDown.SetCaption(const AValue: UnicodeString);
+procedure TACLCustomDropDown.SetCaption(const AValue: string);
 begin
   DropDownButton.Caption := AValue;
 end;
@@ -509,19 +528,6 @@ begin
     ControlStyle := ControlStyle - [csOpaque]
   else
     ControlStyle := ControlStyle + [csOpaque];
-end;
-
-procedure TACLCustomDropDown.CMDialogChar(var Message: TCMDialogChar);
-begin
-  if IsAccel(Message.CharCode, Caption) and CanFocus or
-    (Message.CharCode = VK_RETURN) and Focused then
-  begin
-    SetFocusOnClick;
-    DropDownButton.PerformClick;
-    Message.Result := 1;
-  end
-  else
-    inherited;
 end;
 
 { TACLDropDown }

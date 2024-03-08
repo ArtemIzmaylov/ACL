@@ -758,7 +758,7 @@ begin
   ACommonPath := ARootPath;
   if acGetMinimalCommonPath(ACommonPath, acExtractFilePath(AFileName)) then
   begin
-    ALevel := acGetCharacterCount(Copy(ARootPath, Length(ACommonPath) + 1, MaxInt), PathDelim);
+    ALevel := acCharCount(Copy(ARootPath, Length(ACommonPath) + 1, MaxInt), PathDelim);
   {$IFDEF MSWINDOWS}
     if (ALevel > 2) and acSameText(acIncludeTrailingPathDelimiter(acExtractFileDrive(AFileName)), ACommonPath) then
       Result := Copy(AFileName, 3, MaxInt)

@@ -11,23 +11,30 @@
 
 unit ACL.UI.Controls.ComboBox;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+  LMessages,
+{$ELSE}
+  {Winapi.}Windows,
+{$ENDIF}
+  {Winapi.}Messages,
   // System
-  System.SysUtils,
-  System.Classes,
-  System.Types,
+  {System.}Classes,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
   // VCL
-  Vcl.Controls,
-  Vcl.Graphics,
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
   // ACL
-  ACL.Graphics.SkinImage,
   ACL.MUI,
+  ACL.Graphics.SkinImage,
   ACL.ObjectLinks,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.BaseEditors,
@@ -41,7 +48,8 @@ uses
   ACL.UI.Forms,
   ACL.UI.Insight,
   ACL.UI.Resources,
-  ACL.Utils.Common;
+  ACL.Utils.Common,
+  ACL.Utils.Strings;
 
 type
   TACLComboBox = class;
@@ -87,11 +95,11 @@ type
     procedure HandlerMouseUp(Sender: TObject;
       Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
   protected
-    procedure AdjustSize; override;
     procedure DoClick(AHitTest: TACLTreeListHitTest); virtual;
     procedure PopulateList(AList: TACLTreeList); virtual; abstract;
   public
     constructor Create(AOwner: TComponent); override;
+    procedure AdjustSize; override;
     //# Properties
     property Owner: TACLCustomComboBox read FOwner;
     property Control: TACLTreeList read FControl;
@@ -218,7 +226,7 @@ type
     procedure ItemIndexChanged; override;
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     procedure SetItemIndex(AValue: Integer); override;
-    procedure SetTextCore(const AValue: UnicodeString); override;
+    procedure SetTextCore(const AValue: string); override;
     procedure SynchronizeText;
 
     // Events
@@ -228,10 +236,10 @@ type
     constructor Create(AOwner: TComponent); override;
     constructor CreateInplace(const AParams: TACLInplaceInfo); override;
     destructor Destroy; override;
-    procedure AddItem(const S: UnicodeString; AObject: TObject = nil);
+    procedure AddItem(const S: string; AObject: TObject = nil);
     function IndexOf(const S: string): Integer;
     function IndexOfObject(AObject: TObject): Integer;
-    procedure Localize(const ASection: UnicodeString); override;
+    procedure Localize(const ASection: string); override;
     //# Properties
     property HasSelection: Boolean read GetHasSelection;
     property SelectedObject: TObject read GetSelectedObject;
@@ -286,14 +294,10 @@ type
 implementation
 
 uses
-  Math,
-  // ACL
   ACL.Classes,
-  ACL.Classes.StringList,
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Math,
-  ACL.Utils.Strings;
+  ACL.Math;
 
 type
 
@@ -307,10 +311,22 @@ type
     procedure Changed; override;
   public
     constructor Create(AOwner: TACLComboBox);
-    function FindItemBeginsWith(const AText: UnicodeString): Integer;
+    function FindItemBeginsWith(const AText: string): Integer;
     procedure Clear; override;
     procedure Delete(Index: Integer); override;
   end;
+
+{$IFDEF FPC}
+  TACLStringsHelper = class helper for TStrings
+  public
+    function Updating: Boolean;
+  end;
+
+function TACLStringsHelper.Updating: Boolean;
+begin
+  Result := UpdateCount > 0;
+end;
+{$ENDIF}
 
 { TACLCustomComboBox }
 
@@ -417,7 +433,8 @@ end;
 
 procedure TACLCustomComboBoxDropDown.AdjustSize;
 begin
-  Height := CalculateHeight;
+  if Control <> nil then
+    Height := CalculateHeight;
 end;
 
 procedure TACLCustomComboBoxDropDown.DoClick(AHitTest: TACLTreeListHitTest);
@@ -447,8 +464,10 @@ begin
 end;
 
 procedure TACLComboBoxDropDown.PopulateListCore(AList: TACLTreeList);
+var
+  I: Integer;
 begin
-  for var I := 0 to TACLComboBox(Owner).Items.Count - 1 do
+  for I := 0 to TACLComboBox(Owner).Items.Count - 1 do
     AddItem(AList, TACLComboBox(Owner).Items[I]);
 end;
 
@@ -473,28 +492,9 @@ begin
   inherited Destroy;
 end;
 
-procedure TACLComboBox.AddItem(const S: UnicodeString; AObject: TObject = nil);
+procedure TACLComboBox.AddItem(const S: string; AObject: TObject = nil);
 begin
   Items.AddObject(S, AObject)
-end;
-
-procedure TACLComboBox.Localize(const ASection: UnicodeString);
-var
-  ASavedItemIndex: Integer;
-begin
-  LockChanges(True);
-  try
-    inherited Localize(ASection);
-
-    ASavedItemIndex := FItemIndex;
-    try
-      LangApplyToItems(ASection, Items);
-    finally
-      ItemIndex := ASavedItemIndex;
-    end;
-  finally
-    LockChanges(False);
-  end;
 end;
 
 function TACLComboBox.CalculateEditorPosition: TRect;
@@ -515,6 +515,26 @@ begin
   Result := (Mode = cbmList) and inherited CanDropDown(X, Y);
 end;
 
+function TACLComboBox.CanOpenEditor: Boolean;
+begin
+  Result := (Mode = cbmEdit) and not (csDesigning in ComponentState);
+end;
+
+function TACLComboBox.CreateDropDownWindow: TACLPopupWindow;
+begin
+  Result := TACLComboBoxDropDown.Create(Self);
+end;
+
+function TACLComboBox.CreateEditor: TWinControl;
+var
+  AEdit: TACLInnerEdit;
+begin
+  AEdit := TACLInnerEdit.Create(nil);
+  AEdit.Text := Text; // Must be before assigning OnChange event
+  AEdit.OnChange := DoTextFromEditorChanged;
+  Result := AEdit;
+end;
+
 procedure TACLComboBox.DoStringChanged;
 begin
   ItemIndex := Items.IndexOf(Text);
@@ -522,7 +542,8 @@ end;
 
 procedure TACLComboBox.DoTextFromEditorChanged(Sender: TObject);
 var
-  ASavedText: UnicodeString;
+  LCurrText: string;
+  LCurrTextLen: Integer;
 begin
   if FTextChangeLockCount = 0 then
   begin
@@ -530,13 +551,14 @@ begin
     begin
       Inc(FTextChangeLockCount);
       try
-        ASavedText := InnerEdit.Text;
-        FItemIndex := TACLComboBoxStrings(FItems).FindItemBeginsWith(ASavedText);
+        LCurrText := InnerEdit.Text;
+        FItemIndex := TACLComboBoxStrings(FItems).FindItemBeginsWith(LCurrText);
         if ItemIndex >= 0 then
         begin
+          LCurrTextLen := acCharCount(LCurrText);
           InnerEdit.Text := Items.Strings[ItemIndex];
-          InnerEdit.SelStart := Length(ASavedText);
-          InnerEdit.SelLength := Length(InnerEdit.Text) - Length(ASavedText);
+          InnerEdit.SelStart := LCurrTextLen;
+          InnerEdit.SelLength := acCharCount(InnerEdit.Text) - LCurrTextLen;
         end;
       finally
         Dec(FTextChangeLockCount);
@@ -568,29 +590,41 @@ begin
   inherited KeyDown(Key, Shift);
 end;
 
-function TACLComboBox.CanOpenEditor: Boolean;
-begin
-  Result := (Mode = cbmEdit) and not (csDesigning in ComponentState);
-end;
-
-function TACLComboBox.CreateDropDownWindow: TACLPopupWindow;
-begin
-  Result := TACLComboBoxDropDown.Create(Self);
-end;
-
-function TACLComboBox.CreateEditor: TWinControl;
-var
-  AEdit: TACLInnerEdit;
-begin
-  AEdit := TACLInnerEdit.Create(nil);
-  AEdit.Text := Text; // Must be before assigning OnChange event
-  AEdit.OnChange := DoTextFromEditorChanged;
-  Result := AEdit;
-end;
-
 function TACLComboBox.GetCount: Integer;
 begin
   Result := Items.Count;
+end;
+
+function TACLComboBox.GetHasSelection: Boolean;
+begin
+  Result := (ItemIndex >= 0) and (ItemIndex < Items.Count);
+end;
+
+function TACLComboBox.GetSelectedObject: TObject;
+begin
+  if HasSelection then
+    Result := Items.Objects[ItemIndex]
+  else
+    Result := nil;
+end;
+
+procedure TACLComboBox.Localize(const ASection: string);
+var
+  ASavedItemIndex: Integer;
+begin
+  LockChanges(True);
+  try
+    inherited Localize(ASection);
+
+    ASavedItemIndex := FItemIndex;
+    try
+      LangApplyToItems(ASection, Items);
+    finally
+      ItemIndex := ASavedItemIndex;
+    end;
+  finally
+    LockChanges(False);
+  end;
 end;
 
 procedure TACLComboBox.SetItems(AItems: TStrings);
@@ -627,7 +661,7 @@ begin
     end;
 end;
 
-procedure TACLComboBox.SetTextCore(const AValue: UnicodeString);
+procedure TACLComboBox.SetTextCore(const AValue: string);
 begin
   FText := '';
   if not HasSelection or (Items[ItemIndex] <> AValue) then
@@ -650,19 +684,6 @@ begin
     Text := Items.Strings[ItemIndex]
   else
     Text := '';
-end;
-
-function TACLComboBox.GetHasSelection: Boolean;
-begin
-  Result := (ItemIndex >= 0) and (ItemIndex < Items.Count);
-end;
-
-function TACLComboBox.GetSelectedObject: TObject;
-begin
-  if HasSelection then
-    Result := Items.Objects[ItemIndex]
-  else
-    Result := nil;
 end;
 
 { TACLBasicComboBox }
@@ -942,8 +963,10 @@ begin
 end;
 
 procedure TACLComboBoxStrings.Clear;
+var
+  I: Integer;
 begin
-  for var I := Count - 1 downto 0 do
+  for I := Count - 1 downto 0 do
     BeforeRemoveItem(Objects[I]);
   inherited Clear;
 end;
@@ -954,11 +977,13 @@ begin
   inherited Delete(Index);
 end;
 
-function TACLComboBoxStrings.FindItemBeginsWith(const AText: UnicodeString): Integer;
+function TACLComboBoxStrings.FindItemBeginsWith(const AText: string): Integer;
+var
+  I: Integer;
 begin
   Result := -1;
   if Length(AText) > 0 then
-    for var I := 0 to Count - 1 do
+    for I := 0 to Count - 1 do
     begin
       if Copy(Strings[I], 1, Length(AText)) = AText then
         Exit(I);
@@ -981,8 +1006,9 @@ class procedure TACLComboBoxUIInsightAdapter.GetChildren(
   AObject: TObject; ABuilder: TACLUIInsightSearchQueueBuilder);
 var
   AComboBox: TACLComboBox absolute AObject;
+  I: Integer;
 begin
-  for var I := 0 to AComboBox.Count - 1 do
+  for I := 0 to AComboBox.Count - 1 do
     ABuilder.AddCandidate(AComboBox, AComboBox.Items[I]);
 end;
 

@@ -157,6 +157,9 @@ type
   protected
     FOwnerHandle: THandle;
     FRecreateWndLockCount: Integer;
+  {$IFDEF FPC}
+    Padding: TRect; {$MESSAGE WARN 'Padding-Implement!'}
+  {$ENDIF}
 
     procedure AfterFormCreate; virtual;
     procedure BeforeFormCreate; virtual;
@@ -234,19 +237,23 @@ type
     procedure CMCancelMode(var Message: TCMCancelMode); message CM_CANCELMODE;
   protected
     procedure CreateParams(var Params: TCreateParams); override;
+    procedure Deactivate; override;
+  {$IFDEF FPC}
+    procedure KeyDownBeforeInterface(var Key: Word; Shift: TShiftState); override;
+  {$ENDIF}
     procedure WndProc(var Message: TMessage); override;
     //# Events
     procedure DoPopup; virtual;
     procedure DoPopupClosed; virtual;
     //# Mouse
     function IsMouseInControl: Boolean;
-    //procedure MouseTracking; virtual;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure ClosePopup;
     procedure Popup(R: TRect); virtual;
-    procedure PopupUnderControl(const AControlBoundsOnScreen: TRect; AAlignment: TAlignment = taLeftJustify);
+    procedure PopupUnderControl(const AControlBoundsOnScreen: TRect;
+      AAlignment: TAlignment = taLeftJustify);
     //# Properties
     property AutoSize;
     //# Events
@@ -360,7 +367,6 @@ type
     class destructor Destroy;
     class procedure CheckInstalled;
   end;
-
 {$ENDIF}
 
 function acGetWindowText(AHandle: HWND): string;
@@ -414,6 +420,13 @@ begin
 {$ELSE}
 begin
 {$ENDIF}
+end;
+
+function acWantSpecialKey(AChild: TControl; ACharCode: Word; AShift: TShiftState): Boolean;
+begin
+  Result := (AChild <> nil) and ([ssCtrl, ssAlt, ssShift] * AShift = []) and (
+    (AChild.Perform(CM_WANTSPECIALKEY, ACharCode, 0) <> 0) or
+    (AChild.Perform(WM_GETDLGCODE, 0, 0) and DLGC_WANTALLKEYS <> 0));
 end;
 
 procedure FormDisableCloseButton(AHandle: HWND);
@@ -893,7 +906,7 @@ begin
 
       Position := poDesigned;
       DefaultMonitor := dmDesktop;
-      if not BoundsRect.Contains(MonitorGetBounds(BoundsRect.TopLeft)) then
+      if not MonitorGetBounds(BoundsRect.TopLeft).Contains(BoundsRect) then
         MakeFullyVisible;
     end;
 
@@ -1223,6 +1236,10 @@ begin
   DefaultMonitor := dmDesktop;
   Position := poDesigned;
   FormStyle := fsStayOnTop;
+{$IFDEF FPC}
+  KeyPreview := True;
+  ShowInTaskBar := stNever;
+{$ENDIF}
   InitScaling;
 end;
 
@@ -1279,6 +1296,14 @@ begin
   if Owner is TWinControl then
     Params.WndParent := TWinControl(Owner).Handle;
   Params.WindowClass.Style := Params.WindowClass.Style or CS_HREDRAW or CS_VREDRAW or CS_DROPSHADOW;
+end;
+
+procedure TACLPopupWindow.Deactivate;
+begin
+{$IFDEF FPC}
+  TACLMainThread.RunPostponed(ClosePopup, Self);
+{$ENDIF}
+  inherited Deactivate;
 end;
 
 procedure TACLPopupWindow.DoPopup;
@@ -1401,6 +1426,27 @@ begin
   Visible := True;
 end;
 
+{$IFDEF FPC}
+procedure TACLPopupWindow.KeyDownBeforeInterface(var Key: Word; Shift: TShiftState);
+var
+  LHandler: TControl;
+begin
+  if Key = VK_ESCAPE then
+  begin
+    LHandler := ActiveControl;
+    if LHandler = nil then
+      LHandler := ActiveDefaultControl;
+    if not acWantSpecialKey(LHandler, Key, Shift) then
+    begin
+      ClosePopup;
+      Key := 0;
+      Exit;
+    end;
+  end;
+  inherited;
+end;
+{$ENDIF}
+
 procedure TACLPopupWindow.WndProc(var Message: TMessage);
 begin
   if Visible then
@@ -1423,18 +1469,17 @@ begin
 //        if TWMTimer(Message).TimerID = MouseTrackerId then
 //          MouseTracking;
 
-    {$IFDEF MSWINDOWS}
       WM_ACTIVATEAPP:
         ClosePopup;
-      WM_CONTEXTMENU, CM_MOUSEWHEEL:
+      WM_CONTEXTMENU, WM_MOUSEWHEEL, WM_MOUSEHWHEEL, CM_MOUSEWHEEL:
         Exit;
+    {$IFNDEF FPC}
       WM_ACTIVATE:
         with TWMActivate(Message) do
           if Active = WA_INACTIVE then
             TACLMainThread.RunPostponed(ClosePopup, Self)
           else // c нашей формой, по идее, это не нужно:
             SendMessage(ActiveWindow, WM_NCACTIVATE, WPARAM(True), 0);
-    {$ENDIF}
 
       WM_KEYDOWN, CM_DIALOGKEY, CM_WANTSPECIALKEY:
         if TWMKey(Message).CharCode = VK_ESCAPE then
@@ -1444,6 +1489,7 @@ begin
           TWMKey(Message).Result := 1;
           Exit;
         end;
+    {$ENDIF}
     end;
   inherited;
 end;

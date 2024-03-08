@@ -11,36 +11,37 @@
 
 unit ACL.UI.Controls.ImageComboBox;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Messages,
-  Winapi.Windows,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
+  {Winapi.}Windows,
+{$ENDIF}
   // Vcl
-  Vcl.Controls,
-  Vcl.Graphics,
-  Vcl.ImgList,
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
+  {Vcl.}ImgList,
   // System
-  System.Classes,
-  System.ImageList,
-  System.Types,
+  {System.}Classes,
+  {System.}Types,
+  {System.}Math,
+  {System.}SysUtils,
   System.UITypes,
   // ACL
-  ACL.Classes,
-  ACL.Classes.StringList,
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.SkinImage,
   ACL.MUI,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.BaseEditors,
-  ACL.UI.Controls.Buttons,
   ACL.UI.Controls.ComboBox,
   ACL.UI.Controls.CompoundControl.SubClass,
   ACL.UI.Controls.TreeList,
-  ACL.UI.Controls.TreeList.SubClass,
   ACL.UI.Controls.TreeList.Types,
   ACL.UI.Forms,
   ACL.UI.ImageList,
@@ -57,10 +58,10 @@ type
     FData: Pointer;
     FImageIndex: TImageIndex;
     FTag: NativeInt;
-    FText: UnicodeString;
+    FText: string;
 
     procedure SetImageIndex(AValue: TImageIndex);
-    procedure SetText(const AValue: UnicodeString);
+    procedure SetText(const AValue: string);
   public
     constructor Create(Collection: TCollection); override;
     procedure Assign(Source: TPersistent); override;
@@ -68,7 +69,7 @@ type
   published
     property ImageIndex: TImageIndex read FImageIndex write SetImageIndex default -1;
     property Tag: NativeInt read FTag write FTag default 0;
-    property Text: UnicodeString read FText write SetText;
+    property Text: string read FText write SetText;
   end;
 
   { TACLImageComboBoxItems }
@@ -83,9 +84,9 @@ type
     procedure Update(Item: TCollectionItem); override;
   public
     constructor Create(AComboBox: TACLImageComboBox);
-    function Add(const AText: UnicodeString; AImageIndex: TImageIndex): TACLImageComboBoxItem;
+    function Add(const AText: string; AImageIndex: TImageIndex): TACLImageComboBoxItem;
     function FindByData(AData: Pointer; out AItem: TACLImageComboBoxItem): Boolean;
-    function FindByText(const AText: UnicodeString; out AItem: TACLImageComboBoxItem): Boolean;
+    function FindByText(const AText: string; out AItem: TACLImageComboBoxItem): Boolean;
     // Properties
     property ComboBox: TACLImageComboBox read FComboBox;
     property Items[Index: Integer]: TACLImageComboBoxItem read GetItem; default;
@@ -165,9 +166,6 @@ type
 implementation
 
 uses
-  System.SysUtils,
-  System.Math,
-  // ACL
   ACL.Utils.Common,
   ACL.Utils.DPIAware,
   ACL.Utils.Strings;
@@ -200,7 +198,7 @@ begin
   end;
 end;
 
-procedure TACLImageComboBoxItem.SetText(const AValue: UnicodeString);
+procedure TACLImageComboBoxItem.SetText(const AValue: string);
 begin
   if AValue <> FText then
   begin
@@ -230,7 +228,7 @@ begin
     end;
 end;
 
-function TACLImageComboBoxItems.FindByText(const AText: UnicodeString; out AItem: TACLImageComboBoxItem): Boolean;
+function TACLImageComboBoxItems.FindByText(const AText: string; out AItem: TACLImageComboBoxItem): Boolean;
 var
   I: Integer;
 begin
@@ -243,7 +241,7 @@ begin
     end;
 end;
 
-function TACLImageComboBoxItems.Add(const AText: UnicodeString; AImageIndex: TImageIndex): TACLImageComboBoxItem;
+function TACLImageComboBoxItems.Add(const AText: string; AImageIndex: TImageIndex): TACLImageComboBoxItem;
 begin
   BeginUpdate;
   try
@@ -376,9 +374,10 @@ procedure TACLImageComboBoxDropDown.PopulateListCore(AList: TACLTreeList);
 var
   LImages: TACLImageComboBoxItems;
   LItem: TACLImageComboBoxItem;
+  I: Integer;
 begin
   LImages := TACLImageComboBox(Owner).Items;
-  for var I := 0 to LImages.Count - 1 do
+  for I := 0 to LImages.Count - 1 do
   begin
     LItem := LImages[I];
     AddItem(AList, LItem.Text).ImageIndex := LItem.ImageIndex;
@@ -391,8 +390,9 @@ class procedure TACLImageComboBoxUIInsightAdapter.GetChildren(
   AObject: TObject; ABuilder: TACLUIInsightSearchQueueBuilder);
 var
   LImageComboBox: TACLImageComboBox absolute AObject;
+  I: Integer;
 begin
-  for var I := 0 to LImageComboBox.Count - 1 do
+  for I := 0 to LImageComboBox.Count - 1 do
     ABuilder.AddCandidate(LImageComboBox, LImageComboBox.Items[I].Text);
 end;
 

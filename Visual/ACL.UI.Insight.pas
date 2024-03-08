@@ -11,37 +11,43 @@
 
 unit ACL.UI.Insight;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:NotImplemented
 {$R ACL.UI.Insight.res}
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLProc,
+  LCLType,
+  LMessages,
+{$ELSE}
+  {Winapi.}Windows,
+{$ENDIF}
+  {Winapi.}Messages,
   // System
+  {System.}Classes,
+  {System.}Generics.Collections,
+  {System.}Generics.Defaults,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
+  {System.}TypInfo,
   System.Actions,
   System.UITypes,
-  System.Generics.Collections,
-  System.Generics.Defaults,
-  System.SysUtils,
-  System.Classes,
-  System.Types,
   // Vcl
-  Vcl.ActnList,
-  Vcl.Menus,
-  Vcl.Controls,
-  Vcl.Graphics,
-  Vcl.Forms,
+  {Vcl.}ActnList,
+  {Vcl.}Menus,
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
+  {Vcl.}Forms,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
-  ACL.Classes.StringList,
   ACL.Timers,
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.Ex.Gdip,
-  ACL.Math,
   ACL.Threading,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.BaseEditors,
@@ -200,8 +206,11 @@ type
 implementation
 
 uses
-  System.Math,
-  System.TypInfo;
+{$IFDEF FPC}
+  ACL.Graphics.Ex.Cairo;
+{$ELSE}
+  ACL.Graphics.Ex.Gdip;
+{$ENDIF}
 
 type
 
@@ -367,6 +376,7 @@ var
 {$IFNDEF DELPHI110ALEXANDRIA}
   C: TArray<string>;
 {$ENDIF}
+  I: Integer;
 begin
   Result := '';
   if FNestedCaptions.Count > 0 then
@@ -376,7 +386,7 @@ begin
     {$IFNDEF DELPHI110ALEXANDRIA}
       C := FNestedCaptions.ToArray;
     {$ENDIF}
-      for var I := 0 to FNestedCaptions.Count - 1 do
+      for I := 0 to FNestedCaptions.Count - 1 do
       begin
         if B.Length > 0 then
           B.Append(' » ');
@@ -593,14 +603,16 @@ end;
 procedure TACLUIInsightHighlightWindow.CreateParams(var Params: TCreateParams);
 begin
   inherited;
+{$IFDEF MSWINDOWS}
   Params.ExStyle := WS_EX_TOPMOST or WS_EX_LAYERED;
+{$ENDIF}
   Params.WindowClass.style := Params.WindowClass.style and not CS_DROPSHADOW;
 end;
 
 procedure TACLUIInsightHighlightWindow.DoPopup;
 begin
   Color := clRed;
-  FTimestamp := GetTickCount;
+  FTimestamp := TACLThread.Timestamp;
   SetAlpha(Alpha);
   SetTimer(Handle, FlashTimerId, GetCaretBlinkTime, nil);
   inherited;
@@ -614,14 +626,19 @@ end;
 
 procedure TACLUIInsightHighlightWindow.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
-  if (GetTickCount - FTimestamp > HideDelay) and IsMouseInControl then
+  if TACLThread.IsTimeout(FTimestamp, HideDelay) and IsMouseInControl then
     ClosePopup;
 end;
 
 procedure TACLUIInsightHighlightWindow.SetAlpha(AValue: Byte);
 begin
+{$IFDEF MSWINDOWS}
   if Assigned(SetLayeredWindowAttributes) then
     SetLayeredWindowAttributes(Handle, 0, AValue, LWA_ALPHA);
+{$ELSE}
+  AlphaBlend := True;
+  AlphaBlendValue := AValue;
+{$ENDIF}
 end;
 
 procedure TACLUIInsightHighlightWindow.WMTimer(var Message: TWMTimer);
@@ -741,7 +758,7 @@ begin
       Inc(FContentMargins.Bottom, ABeakSize.cy);
     end;
 
-  ARegion := CreatePolygonRgn(FPolyline[0], Length(FPolyline), WINDING);
+  ARegion := CreatePolygonRgn({$IFDEF FPC}@{$ENDIF}FPolyline[0], Length(FPolyline), WINDING);
   SetWindowRgn(Handle, ARegion, True);
   DeleteObject(ARegion);
 end;
@@ -768,12 +785,16 @@ end;
 
 procedure TACLUIInsightSearchPopupWindow.Paint;
 begin
-  GpPaintCanvas.BeginPaint(Canvas.Handle);
+  GpPaintCanvas.BeginPaint(Canvas);
   try
+  {$IFDEF FPC}
+    {$MESSAGE WARN 'NotImplemented'}
+  {$ELSE}
     GpPaintCanvas.SmoothingMode := smNone;
     GpPaintCanvas.PixelOffsetMode := pomHalf;
     GpPaintCanvas.FillRectangle(ClientRect, TAlphaColor.FromColor(Color));
     GpPaintCanvas.Line(FPolyline, TAlphaColor.FromColor(FBorderColor), 2);
+  {$ENDIF}
   finally
     GpPaintCanvas.EndPaint;
   end;

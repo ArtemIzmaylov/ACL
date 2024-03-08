@@ -15,7 +15,6 @@ unit ACL.UI.Controls.BaseControls;
 
 {$IFDEF FPC}
 {$MESSAGE WARN 'TODO - AlignWithMargins'}
-{$MESSAGE WARN 'TODO - Cursor - надо рассмотреть возможность миграции на локальное изменение'}
 {$ENDIF}
 
 interface
@@ -67,6 +66,8 @@ const
   CM_SCALECHANGED  = $BF01;
 
 {$IFDEF FPC}
+  GetCaretBlinkTime = 500;
+
   CS_DROPSHADOW  = 0;
   WM_ACTIVATEAPP = $001C;
   WM_CONTEXTMENU = LM_CONTEXTMENU;
@@ -87,6 +88,8 @@ const
 
 type
   TTabOrderList = {$IFDEF FPC}TFPList{$ELSE}TList{$ENDIF};
+  TWideKeyEvent = procedure(var Key: WideChar) of object;
+
 {$IFDEF FPC}
   TGestureEventInfo = record
     {stub}
@@ -445,6 +448,7 @@ type
     procedure MarginsChangeHandler(Sender: TObject);
     procedure PaddingChangeHandler(Sender: TObject);
     //# Messages
+    procedure CMDialogChar(var Message: TCMDialogChar); message CM_DIALOGCHAR;
     procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
     procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
     procedure CMHintShow(var Message: TCMHintShow); message CM_HINTSHOW;
@@ -466,6 +470,7 @@ type
     {$IFDEF FPC}{$MESSAGE WARN 'ChangeScale'}{$ENDIF}
     procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); {$IFNDEF FPC}override;{$ENDIF}
     function CreatePadding: TACLPadding; virtual;
+    function DialogChar(var Message: TWMKey): Boolean; {$IFDEF FPC}override;{$ELSE}virtual;{$ENDIF}
     function GetClientRect: TRect; override;
     function GetContentOffset: TRect; virtual;
     procedure DoFullRefresh; virtual;
@@ -639,9 +644,12 @@ type
   public
   {$IFDEF FPC}
     procedure SendCancelMode(Sender: TControl);
+    function GetAlignWithMargins: Boolean;
     function FCurrentPPI: Integer;
     function ExplicitHeight: Integer;
     function ExplicitWidth: Integer;
+    procedure SetAlignWithMargins(AValue: Boolean);
+    property AlignWithMargins: Boolean read GetAlignWithMargins write SetAlignWithMargins;
   {$ENDIF}
     function CalcCursorPos: TPoint;
   end;
@@ -724,7 +732,7 @@ function CallCustomDrawEvent(Sender: TObject;
   AEvent: TACLCustomDrawEvent; ACanvas: TCanvas; const R: TRect): Boolean;
 function CreateControl(AClass: TControlClass; AParent: TWinControl;
   const R: TRect; AAlign: TAlign = alNone; AAnchors: TAnchors = [akLeft, akTop]): TControl; overload;
-procedure CreateControl(var Obj; AClass: TControlClass; AParent: TWinControl;
+procedure CreateControl(out Obj; AClass: TControlClass; AParent: TWinControl;
   const R: TRect; AAlign: TAlign = alNone; AAnchors: TAnchors = [akLeft, akTop]); overload;
 function GetElementWidthIncludeOffset(const R: TRect; ATargetDpi: Integer): Integer;
 
@@ -762,6 +770,7 @@ function MouseTracker: TACLMouseTracking;
 
 {$IFDEF FPC}
 function PointToLParam(const P: TPoint): LPARAM;
+procedure ProcessUtf8KeyPress(var Key: TUTF8Char; AEvent: TWideKeyEvent);
 {$ENDIF}
 implementation
 
@@ -1105,7 +1114,7 @@ begin
   Result.Anchors := AAnchors;
 end;
 
-procedure CreateControl(var Obj; AClass: TControlClass; AParent: TWinControl;
+procedure CreateControl(out Obj; AClass: TControlClass; AParent: TWinControl;
   const R: TRect; AAlign: TAlign = alNone; AAnchors: TAnchors = [akLeft, akTop]);
 begin
   TControl(Obj) := CreateControl(AClass, AParent, R, AAlign, AAnchors);
@@ -1115,6 +1124,21 @@ end;
 function PointToLParam(const P: TPoint): LPARAM;
 begin
   Result := LPARAM((P.X and $0000ffff) or (P.Y shl 16));
+end;
+
+procedure ProcessUtf8KeyPress(var Key: TUTF8Char; AEvent: TWideKeyEvent);
+var
+  LKey: WideChar;
+  LStr: UnicodeString;
+begin
+  LStr := UTF8ToString(Key);
+  if Length(LStr) = 1 then
+  begin
+    LKey := LStr[1];
+    AEvent(LKey);
+    if LKey <> LStr[1] then
+      Key := UTF8Encode(LKey);
+  end;
 end;
 {$ENDIF}
 
@@ -1937,7 +1961,8 @@ begin
   end;
 end;
 
-procedure TACLCustomControl.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+procedure TACLCustomControl.MouseDown(
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   if FocusOnClick then
     SetFocusOnClick;
@@ -2025,6 +2050,14 @@ procedure TACLCustomControl.WndProc(var Message: TMessage);
 begin
   inherited WndProc(Message);
   TACLControls.WndProc(Self, Message);
+end;
+
+procedure TACLCustomControl.CMDialogChar(var Message: TCMDialogChar);
+begin
+  if DialogChar(Message) then
+    Message.Result := 1
+  else
+    inherited;
 end;
 
 procedure TACLCustomControl.CMEnabledChanged(var Message: TMessage);
@@ -2193,6 +2226,7 @@ end;
 {$IFDEF FPC}
 procedure TACLCustomControl.CalculatePreferredSize(var W, H: Integer; X: Boolean);
 begin
+  inherited;
   CanAutoSize(W, H);
 end;
 {$ENDIF}
@@ -2226,6 +2260,15 @@ end;
 function TACLCustomControl.CreatePadding: TACLPadding;
 begin
   Result := TACLPadding.Create(0);
+end;
+
+function TACLCustomControl.DialogChar(var Message: TWMKey): Boolean;
+begin
+{$IFDEF FPC}
+  Result := inherited;
+{$ELSE}
+  Result := False;
+{$ENDIF}
 end;
 
 function TACLCustomControl.GetClientRect: TRect;
@@ -2396,8 +2439,18 @@ begin
   Result := Width;
 end;
 
+procedure TACLControlHelper.SetAlignWithMargins(AValue: Boolean);
+begin
+
+end;
+
 procedure TACLControlHelper.SendCancelMode(Sender: TControl);
 begin
+end;
+
+function TACLControlHelper.GetAlignWithMargins: Boolean;
+begin
+  Result := False;
 end;
 {$ENDIF}
 
