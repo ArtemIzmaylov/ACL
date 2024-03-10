@@ -201,6 +201,7 @@ type
     procedure SetOptionsView(AValue: TACLColorPaletteOptionsView);
     procedure SetStyle(AValue: TACLStyleColorPalette);
   protected
+    function CanAutoSize(var NewWidth, NewHeight: Integer): Boolean; override;
     procedure InitializeDefaultPalette;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X: Integer; Y: Integer); override;
@@ -213,7 +214,11 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+  {$IFDEF FPC}
+    procedure SetBoundsKeepBase(aLeft, aTop, aWidth, aHeight: Integer); override;
+  {$ELSE}
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
+  {$ENDIF}
   published
     property DoubleBuffered default True;
     property FocusOnClick;
@@ -646,15 +651,27 @@ begin
   inherited;
 end;
 
+function TACLColorPalette.CanAutoSize(var NewWidth, NewHeight: Integer): Boolean;
+begin
+  ViewInfo.Calculate(Rect(0, 0, NewWidth, NewHeight));
+  NewHeight := ViewInfo.Height;
+  NewWidth := ViewInfo.Width;
+  Result := True;
+end;
+
 procedure TACLColorPalette.InitializeDefaultPalette;
 begin
   Items.Populate(OptionsView.Style);
 end;
 
-procedure TACLColorPalette.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
+{$IFDEF FPC}
+procedure TACLColorPalette.SetBoundsKeepBase(aLeft, aTop, aWidth, aHeight: Integer);
+{$ELSE}
+procedure TACLColorPalette.SetBounds(aLeft, aTop, aWidth, aHeight: Integer);
+{$ENDIF}
 begin
-  ViewInfo.Calculate(Rect(0, 0, AWidth, AHeight));
-  inherited SetBounds(ALeft, ATop, ViewInfo.Width, ViewInfo.Height);
+  CanAutoSize(AWidth, AHeight);
+  inherited;
 end;
 
 procedure TACLColorPalette.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);

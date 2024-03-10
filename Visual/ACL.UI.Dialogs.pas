@@ -11,35 +11,43 @@
 
 unit ACL.UI.Dialogs;
 
-{$I ACL.Config.INC}
+{$I ACL.Config.inc} // FPC:NotImplemented
 {$WARN SYMBOL_PLATFORM OFF}
 
 interface
 
 uses
+{$IFDEF MSWINDOWS}
   Winapi.ActiveX,
   Winapi.CommDlg,
-  Winapi.Messages,
   Winapi.ShlObj,
   Winapi.Windows,
+{$ELSE}
+  LCLIntf,
+  LCLType,
+  LMessages,
+{$ENDIF}
+  {Winapi.}Messages,
   // System
-  System.Classes,
-  System.Generics.Collections,
-  System.Math,
-  System.SysUtils,
-  System.Types,
-  System.Variants,
+  {System.}Classes,
+  {System.}Generics.Collections,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
+  {System.}Variants,
   // Vcl
-  Vcl.ActnList,
+  {Vcl.}ActnList,
+  {Vcl.}Controls,
+  {Vcl.}Dialogs,
+  {Vcl.}ExtCtrls,
+  {Vcl.}Forms,
+  {Vcl.}Graphics,
+  {Vcl.}ImgList,
+  {Vcl.}Menus,
+  {Vcl.}StdCtrls,
+{$IFDEF MSWINDOWS}
   Vcl.Consts,
-  Vcl.Controls,
-  Vcl.Dialogs,
-  Vcl.ExtCtrls,
-  Vcl.Forms,
-  Vcl.Graphics,
-  Vcl.ImgList,
-  Vcl.Menus,
-  Vcl.StdCtrls,
+{$ENDIF}
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -50,7 +58,6 @@ uses
   ACL.MUI,
   ACL.Parsers,
   ACL.Threading,
-  ACL.UI.AeroPeek,
   ACL.UI.Application,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.Buttons,
@@ -58,17 +65,21 @@ uses
   ACL.UI.Controls.ComboBox,
   ACL.UI.Controls.ImageComboBox,
   ACL.UI.Controls.TextEdit,
-  ACL.UI.Controls.Memo,
-  ACL.UI.Forms,
   ACL.UI.Controls.Labels,
-  ACL.UI.ImageList,
   ACL.UI.Controls.ProgressBar,
+{$IFDEF MSWINDOWS}
+  ACL.UI.AeroPeek,
+  ACL.UI.Controls.Memo,
+{$ENDIF}
+  ACL.UI.Forms,
+  ACL.UI.ImageList,
   ACL.Utils.Common,
   ACL.Utils.DPIAware,
   ACL.Utils.FileSystem,
   ACL.Utils.Strings;
 
 type
+{$IFDEF MSWINDOWS}
 {$REGION 'FileDialogs'}
 
   { TACLFileDialog }
@@ -188,12 +199,11 @@ type
   end;
 
 {$ENDREGION}
+{$ENDIF}
 
   { TACLCustomDialog }
 
   TACLCustomDialog = class(TACLForm)
-  strict private
-    procedure CMDialogKey(var Message: TCMDialogKey); message CM_DIALOGKEY;
   protected const
     ButtonHeight = 25;
     ButtonWidth = 96;
@@ -201,6 +211,11 @@ type
     function CanApply: Boolean; virtual;
     procedure CreateParams(var Params: TCreateParams); override;
     procedure DoApply(Sender: TObject = nil); virtual;
+  {$IFDEF FPC}
+    function DialogChar(var Message: TLMKey): Boolean; override;
+  {$ELSE}
+    procedure CMDialogKey(var Message: TCMDialogKey); message CM_DIALOGKEY;
+  {$ENDIF}
   public
     procedure AfterConstruction; override;
     function IsShortCut(var Message: TWMKey): Boolean; override;
@@ -217,7 +232,7 @@ type
     FButtonOK: TACLButton;
     FHasChanges: Boolean;
     FPrevClientRect: TRect;
-  strict protected
+  protected
     procedure AfterFormCreate; override;
     procedure CreateControls; virtual;
     procedure SetHasChanges(AValue: Boolean);
@@ -238,7 +253,9 @@ type
     property ButtonOK: TACLButton read FButtonOK;
   end;
 
-  { TACLCustomInputQueryDialog }
+{$IFDEF MSWINDOWS}
+
+ { TACLCustomInputQueryDialog }
 
   TACLCustomInputQueryDialog = class abstract(TACLCustomInputDialog)
   strict private
@@ -399,28 +416,35 @@ type
     destructor Destroy; override;
     class procedure Execute(AParentWnd: HWND);
   end;
+{$ENDIF}
 
+type
   { TACLDialogsStrs }
 
   TACLDialogsStrs = class
   strict private const
     LangSection = 'CommonDialogs';
   public class var
-    ButtonApply: UnicodeString;
-    FolderBrowserCaption: UnicodeString;
-    FolderBrowserNewFolder: UnicodeString;
-    FolderBrowserRecursive: UnicodeString;
-    MsgDlgButtons: array[TMsgDlgBtn] of UnicodeString;
-    MsgDlgCaptions: array[TMsgDlgType] of UnicodeString;
+    ButtonApply: string;
+    FolderBrowserCaption: string;
+    FolderBrowserNewFolder: string;
+    FolderBrowserRecursive: string;
+    MsgDlgButtons: array[TMsgDlgBtn] of string;
+    MsgDlgCaptions: array[TMsgDlgType] of string;
+{$IFDEF MSWINDOWS}
   public
     class constructor Create;
     class procedure ApplyLocalization;
     class procedure ResetLocalization;
+{$ENDIF}
   end;
 
+{$IFDEF MSWINDOWS}
 function acMessageBox(AHandle: THandle; const AMessage, ACaption: UnicodeString; AFlags: Integer): Integer;
+{$ENDIF}
 implementation
 
+{$IFDEF MSWINDOWS}
 type
   TControlAccess = class(TControl);
 
@@ -991,6 +1015,7 @@ begin
 end;
 
 {$ENDREGION}
+{$ENDIF}
 
 { TACLCustomDialog }
 
@@ -1042,6 +1067,27 @@ begin
   // do nothing
 end;
 
+{$IFDEF FPC}
+function TACLCustomDialog.DialogChar(var Message: TLMKey): Boolean;
+begin
+  Result := False;
+  case Message.CharCode of
+    VK_ESCAPE:
+      begin
+        ModalResult := mrCancel;
+        Result := True;
+      end;
+
+    VK_RETURN:
+      if CanApply then
+      begin
+        DoApply;
+        ModalResult := mrOk;
+        Result := True;
+      end;
+  end;
+end;
+{$ELSE}
 procedure TACLCustomDialog.CMDialogKey(var Message: TCMDialogKey);
 begin
   case Message.CharCode of
@@ -1057,6 +1103,7 @@ begin
     inherited;
   end;
 end;
+{$ENDIF}
 
 {$REGION 'InputDialogs'}
 
@@ -1078,19 +1125,19 @@ end;
 
 procedure TACLCustomInputDialog.CreateControls;
 begin
-  FButtonOK := TACLButton(CreateControl(TACLButton, Self, NullRect));
+  CreateControl(FButtonOK, TACLButton, Self, NullRect, alCustom);
   FButtonOK.Caption := TACLDialogsStrs.MsgDlgButtons[mbOK];
   FButtonOK.OnClick := DoApply;
   FButtonOK.Default := True;
   FButtonOK.ModalResult := mrOk;
 
-  FButtonCancel := TACLButton(CreateControl(TACLButton, Self, NullRect));
+  CreateControl(FButtonCancel, TACLButton, Self, NullRect, alCustom);
   FButtonCancel.Caption := TACLDialogsStrs.MsgDlgButtons[mbCancel];
   FButtonCancel.OnClick := DoCancel;
   FButtonCancel.ModalResult := mrCancel;
   FButtonCancel.Cursor := crHandPoint;
 
-  FButtonApply := TACLButton(CreateControl(TACLButton, Self, NullRect));
+  CreateControl(FButtonApply, TACLButton, Self, NullRect, alCustom);
   FButtonApply.Caption := TACLDialogsStrs.ButtonApply;
   FButtonApply.Cursor := crHandPoint;
   FButtonApply.OnClick := DoApply;
@@ -1195,6 +1242,7 @@ begin
   end;
 end;
 
+{$IFDEF MSWINDOWS}
 { TACLCustomInputQueryDialog }
 
 destructor TACLCustomInputQueryDialog.Destroy;
@@ -1938,4 +1986,5 @@ end;
 initialization
   if IsWinSevenOrLater then
     TACLExceptionMessageDialog.Register;
+{$ENDIF}
 end.
