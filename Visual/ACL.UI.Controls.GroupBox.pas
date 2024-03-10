@@ -11,7 +11,7 @@
 
 unit ACL.UI.Controls.GroupBox;
 
-{$I ACL.Config.inc} // FPC:Partial
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 

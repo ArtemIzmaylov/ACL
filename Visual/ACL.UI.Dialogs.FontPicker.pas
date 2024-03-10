@@ -4,37 +4,39 @@
 {*            Font Picker Dialog             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Dialogs.FontPicker;
 
+{$I ACL.Config.inc} // FPC:OK
+
 interface
 
 uses
-  Winapi.Windows,
+{$IFNDEF FPC}
+  {Winapi.}Windows,
+{$ENDIF}
   // System
-  System.Classes,
-  System.SysUtils,
-  System.Types,
+  {System.}Classes,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
   System.UITypes,
   // Vcl
-  Vcl.ExtCtrls,
-  Vcl.Graphics,
-  Vcl.Controls,
-  Vcl.Forms,
+  {Vcl.}Graphics,
+  {Vcl.}Controls,
+  {Vcl.}Forms,
+  {Vcl.}Dialogs,
+  {Vcl.}ExtCtrls,
   // ACL
-  ACL.Classes,
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.FontCache,
-  ACL.Graphics.Ex.Gdip,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.Buttons,
-  ACL.UI.Controls.Category,
-  ACL.UI.Controls.ColorPicker,
   ACL.UI.Controls.ComboBox,
   ACL.UI.Controls.GroupBox,
   ACL.UI.Controls.Panel,
@@ -113,9 +115,6 @@ type
   end;
 
 implementation
-
-uses
-  System.Math;
 
 { TACLFontPickerDialog }
 
@@ -369,14 +368,14 @@ end;
 
 procedure TACLFontPickerDialog.UpdateColorPickerPreview;
 var
-  ABitmap: TACLBitmap;
+  ABitmap: TACLDib;
   AFocusRect: TRect;
 begin
   if not ColorPicker.SubClass.FocusRect.IsEmpty then
   begin
     AFocusRect := ColorPicker.SubClass.FocusRect;
     AFocusRect.Inflate(-1);
-    ABitmap := TACLBitmap.CreateEx(AFocusRect, pf32bit, True);
+    ABitmap := TACLDib.Create(AFocusRect);
     try
       acFillRect(ABitmap.Canvas, ABitmap.ClientRect, TAlphaColor(ColorPicker.Tag));
       ColorPicker.Glyph.Overriden := True;

@@ -109,9 +109,8 @@ type
     class function CreateFont(const AFontData: TACLFontData): TACLFontInfo;
     //# Loader
     class procedure AsyncFontLoader(ACheckCanceled: TACLTaskCancelCallback);
-    class function AsyncFontLoaderEnumProc(var ALogFont: TLogFontW;
-      ATextMetric: PTextMetricW; AFontType: Integer;
-      AData: PCallbackData): Integer; stdcall; static;
+    class function AsyncFontLoaderEnumProc(var ALogFont: TLogFont;
+      ATextMetric: PTextMetric; AFontType: Integer; AData: PCallbackData): Integer; stdcall; static;
     class procedure AsyncFontLoaderFinished;
     class procedure StartLoader;
     class procedure WaitForLoader(ACancel: Boolean = False);
@@ -313,9 +312,8 @@ begin
   end;
 end;
 
-class function TACLFontCache.AsyncFontLoaderEnumProc(
-  var ALogFont: TLogFontW; ATextMetric: PTextMetricW;
-  AFontType: Integer; AData: PCallbackData): Integer;
+class function TACLFontCache.AsyncFontLoaderEnumProc(var ALogFont: TLogFont;
+  ATextMetric: PTextMetric; AFontType: Integer; AData: PCallbackData): Integer;
 begin
   if AFontType <> RASTER_FONTTYPE then
   begin
