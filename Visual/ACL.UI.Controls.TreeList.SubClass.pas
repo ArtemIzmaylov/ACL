@@ -4986,11 +4986,12 @@ procedure TACLTreeListSubClass.ProcessMouseClick(AButton: TMouseButton; AShift: 
 begin
   if HitTest.HitAtColumn then
     ProcessMouseClickAtColumn(AButton, AShift, HitTest.Column)
+  else if HitTest.HitAtGroup then
+    ProcessMouseClickAtGroup(AButton, AShift, HitTest.Group)
+  else if HitTest.HitAtNode and HitTest.IsExpandable and (ssAlt in AShift) and (AButton = mbLeft) then
+    RootNode.ExpandCollapseChildren(not HitTest.Node.Expanded, False)
   else
-    if HitTest.HitAtGroup then
-      ProcessMouseClickAtGroup(AButton, AShift, HitTest.Group)
-    else
-      inherited ProcessMouseClick(AButton, AShift);
+    inherited ProcessMouseClick(AButton, AShift);
 end;
 
 procedure TACLTreeListSubClass.ProcessMouseClickAtColumn(
@@ -4998,7 +4999,6 @@ procedure TACLTreeListSubClass.ProcessMouseClickAtColumn(
 begin
   if AButton <> mbLeft then
     Exit;
-
   if HitTest.IsCheckable then
     RootNode.ChildrenCheckState := TCheckBoxState.Create(RootNode.ChildrenCheckState <> cbChecked)
   else

@@ -4,33 +4,32 @@
 {*             Object Inspector              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.ObjectInspector.PropertyEditors;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  // System
-  System.TypInfo,
-  System.Types,
-  System.Classes,
-  System.Generics.Collections,
-  System.Contnrs,
+  {System.}Classes,
+  {System.}Contnrs,
+  {System.}Generics.Collections,
+  {System.}SysUtils,
+  {System.}TypInfo,
+  {System.}Types,
   // VCL
-  Vcl.Graphics,
-  Vcl.Controls,
+  {Vcl.}Graphics,
+  {Vcl.}Controls,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
   ACL.Classes.StringList,
   ACL.Graphics,
-  ACL.Graphics.Ex.Gdip,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.Buttons,
@@ -39,7 +38,6 @@ uses
   ACL.UI.Dialogs.FontPicker,
   ACL.UI.Resources,
   ACL.Utils.Common,
-  ACL.Utils.DPIAware,
   ACL.Utils.RTTI;
 
 type
@@ -118,15 +116,15 @@ type
     FInfo: PPropInfo;
     FOwner: TObject;
   protected
-    FFullName: UnicodeString;
+    FFullName: string;
     FStyleSet: IACLObjectInspectorStyleSet;
 
     function Changing(const AValue: Variant): Boolean;
     procedure Changed;
-    function GetFullName: UnicodeString; virtual;
-    function GetName: UnicodeString; virtual;
-    function GetValue: UnicodeString; virtual;
-    procedure SetValue(const AValue: UnicodeString); virtual;
+    function GetFullName: string; virtual;
+    function GetName: string; virtual;
+    function GetValue: string; virtual;
+    procedure SetValue(const AValue: string); virtual;
   public
     constructor Create(AInfo: PPropInfo; AOwner: TObject; ADesigner: IACLObjectInspector);
     function Attributes: TACLPropertyEditorAttributes; virtual;
@@ -135,11 +133,11 @@ type
     function IsReadOnly: Boolean;
     //
     property Designer: IACLObjectInspector read FDesigner;
-    property FullName: UnicodeString read GetFullName;
+    property FullName: string read GetFullName;
     property Info: PPropInfo read FInfo;
-    property Name: UnicodeString read GetName;
+    property Name: string read GetName;
     property Owner: TObject read FOwner;
-    property Value: UnicodeString read GetValue write SetValue;
+    property Value: string read GetValue write SetValue;
   end;
 
   { TACLPropertyEditors }
@@ -161,10 +159,11 @@ type
   public
     class destructor Destroy;
     class function GetEditorClass(PropInfo: PPropInfo; Obj: TObject): TACLPropertyEditorClass; overload;
-    class function GetEditorClass(TypeInfo: PTypeInfo; Obj: TObject; const PropName: string): TACLPropertyEditorClass; overload;
+    class function GetEditorClass(TypeInfo: PTypeInfo; Obj: TObject;
+      const PropName: string): TACLPropertyEditorClass; overload;
 
-    class procedure Hide(AClass: TClass; const APropertyNames: array of UnicodeString); overload;
-    class procedure Hide(AClass: TClass; const APropertyName: UnicodeString); overload;
+    class procedure Hide(AClass: TClass; const APropertyNames: array of string); overload;
+    class procedure Hide(AClass: TClass; const APropertyName: string); overload;
 
     class procedure Register(Kind: TTypeKind;  EditorClass: TACLPropertyEditorClass); overload;
     class procedure Register(PropertyType: PTypeInfo; ComponentClass: TClass;
@@ -314,24 +313,19 @@ type
   TACLSetSubPropertyEditor = class(TACLBooleanPropertyEditor)
   strict private
     FIndex: Integer;
-    FName: UnicodeString;
+    FName: string;
   protected
-    function GetFullName: UnicodeString; override;
+    function GetFullName: string; override;
     function GetName: string; override;
     function GetValue: string; override;
     procedure SetValue(const AValue: string); override;
   public
-    constructor Create(AInfo: PPropInfo; const AName: UnicodeString;
+    constructor Create(AInfo: PPropInfo; const AName: string;
       AOwner: TObject; AIndex: Integer; ADesigner: IACLObjectInspector); reintroduce;
   end;
 {$ENDREGION}
 
 implementation
-
-uses
-  System.SysUtils,
-  // ACL
-  ACL.Geometry;
 
 type
   TACLInplaceCheckBoxAccess = class(TACLInplaceCheckBox);
@@ -364,17 +358,17 @@ begin
     FDesigner.PropertyChanged(Self);
 end;
 
-function TACLPropertyEditor.GetFullName: UnicodeString;
+function TACLPropertyEditor.GetFullName: string;
 begin
   Result := FFullName;
 end;
 
-function TACLPropertyEditor.GetName: UnicodeString;
+function TACLPropertyEditor.GetName: string;
 begin
-  Result := UnicodeString(FInfo.Name);
+  Result := string(FInfo.Name);
 end;
 
-function TACLPropertyEditor.GetValue: UnicodeString;
+function TACLPropertyEditor.GetValue: string;
 begin
   if not TRTTI.GetPropValue(Owner, Info, Result) then
     Result := '';
@@ -387,8 +381,8 @@ end;
 
 function TACLPropertyEditor.IsNonStorable: Boolean;
 begin
-  if (UIntPtr(Info^.StoredProc) and (not NativeUInt($FF))) = 0 then // is constant
-    Result := UIntPtr(Info^.StoredProc) and $FF = 0
+  if ({%H-}UIntPtr(Info^.StoredProc) and (not NativeUInt($FF))) = 0 then // is constant
+    Result := {%H-}UIntPtr(Info^.StoredProc) and $FF = 0
   else
     Result := False;
 end;
@@ -398,7 +392,7 @@ begin
   Result := (Info.SetProc = nil) and (Info.PropType^.Kind <> tkClass);
 end;
 
-procedure TACLPropertyEditor.SetValue(const AValue: UnicodeString);
+procedure TACLPropertyEditor.SetValue(const AValue: string);
 begin
   if not IsReadOnly and Changing(AValue) then
   begin
@@ -414,41 +408,49 @@ begin
   FreeAndNil(FList);
 end;
 
-class function TACLPropertyEditors.GetEditorClass(PropInfo: PPropInfo; Obj: TObject): TACLPropertyEditorClass;
+class function TACLPropertyEditors.GetEditorClass(
+  PropInfo: PPropInfo; Obj: TObject): TACLPropertyEditorClass;
 begin
-  Result := GetEditorClass(PropInfo^.PropType^, Obj, GetPropName(PropInfo));
+  Result := GetEditorClass(GetPropType(PropInfo), Obj, GetPropName(PropInfo));
 end;
 
-class function TACLPropertyEditors.GetEditorClass(TypeInfo: PTypeInfo; Obj: TObject; const PropName: string): TACLPropertyEditorClass;
+class function TACLPropertyEditors.GetEditorClass(
+  TypeInfo: PTypeInfo; Obj: TObject; const PropName: string): TACLPropertyEditorClass;
 
   function InterfaceInheritsFrom(Child, Parent: PTypeData): Boolean;
   begin
     while (Child <> nil) and (Child <> Parent) and (Child^.IntfParent <> nil) do
-      Child := GetTypeData(Child^.IntfParent^);
+      Child := GetTypeData(Child^.IntfParent{$IFNDEF FPC}^{$ENDIF});
     Result := (Child <> nil) and (Child = Parent);
   end;
 
   function IsClassInherited(S, T: PTypeInfo): Boolean;
   begin
-    Result := (S^.Kind = tkClass) and (T^.Kind = tkClass) and GetTypeData(S)^.ClassType.InheritsFrom(GetTypeData(T)^.ClassType);
+    Result := (S^.Kind = tkClass) and (T^.Kind = tkClass) and
+      GetTypeData(S)^.ClassType.InheritsFrom(GetTypeData(T)^.ClassType);
   end;
 
   function IsInterfaceInherited(S, T: PTypeInfo): Boolean;
   begin
-    Result := (S^.Kind = tkInterface) and (T^.Kind = tkInterface) and InterfaceInheritsFrom(GetTypeData(S), GetTypeData(T));
+    Result := (S^.Kind = tkInterface) and (T^.Kind = tkInterface) and
+      InterfaceInheritsFrom(GetTypeData(S), GetTypeData(T));
   end;
 
   function IsBetter(ANew, ACur: PPropertyInfo; T: PTypeInfo): Boolean;
   begin
-    Result := (ACur^.ComponentClass = nil) and (ANew^.ComponentClass <> nil) or (ACur^.PropertyName = '') and (ANew^.PropertyName <> '');
+    Result :=
+      (ACur^.ComponentClass = nil) and (ANew^.ComponentClass <> nil) or
+      (ACur^.PropertyName = '') and (ANew^.PropertyName <> '');
     // ANew's proptype match is exact, but ACur's isn't
     Result := Result or (ACur^.PropertyType <> T) and (ANew^.PropertyType = T);
     // ANew's proptype is more specific than ACur's proptype
     Result := Result or (ANew^.PropertyType <> ACur^.PropertyType) and
-      (IsClassInherited(ANew.PropertyType, ACur.PropertyType) or IsInterfaceInherited(ANew.PropertyType, ACur.PropertyType));
+      (IsClassInherited(ANew.PropertyType, ACur.PropertyType) or
+       IsInterfaceInherited(ANew.PropertyType, ACur.PropertyType));
     // ANew's component class is more specific than ACur's component class
     Result := Result or (ANew^.ComponentClass <> nil) and (ACur^.ComponentClass <> nil) and
-      (ANew^.ComponentClass <> ACur^.ComponentClass) and ANew^.ComponentClass.InheritsFrom(ACur^.ComponentClass);
+      (ANew^.ComponentClass <> ACur^.ComponentClass) and
+      (ANew^.ComponentClass.InheritsFrom(ACur^.ComponentClass));
   end;
 
   function IsSituable(P: PPropertyInfo): Boolean;
@@ -482,7 +484,7 @@ begin
     Result := FDefaultEditors[T.Kind];
 end;
 
-class procedure TACLPropertyEditors.Hide(AClass: TClass; const APropertyNames: array of UnicodeString);
+class procedure TACLPropertyEditors.Hide(AClass: TClass; const APropertyNames: array of string);
 var
   I: Integer;
 begin
@@ -490,13 +492,13 @@ begin
     Hide(AClass, APropertyNames[I]);
 end;
 
-class procedure TACLPropertyEditors.Hide(AClass: TClass; const APropertyName: UnicodeString);
+class procedure TACLPropertyEditors.Hide(AClass: TClass; const APropertyName: string);
 var
   AInfo: PPropInfo;
 begin
   AInfo := GetPropInfo(AClass, APropertyName);
   if AInfo <> nil then
-    Register(AInfo.PropType^, AClass, APropertyName, nil);
+    Register(GetPropType(AInfo), AClass, APropertyName, nil);
 end;
 
 class procedure TACLPropertyEditors.Register(Kind: TTypeKind; EditorClass: TACLPropertyEditorClass);
@@ -563,7 +565,9 @@ var
 begin
   R1 := R;
   R1.Right := R1.Left + R1.Height;
-  acTextDraw(ACanvas, Value, Rect(R1.Right + acTextIndent, R.Top, R.Right, R.Bottom), taLeftJustify, taVerticalCenter);
+  acTextDraw(ACanvas, Value,
+    Rect(R1.Right + acTextIndent, R.Top, R.Right, R.Bottom),
+    taLeftJustify, taVerticalCenter);
   FStyleSet.StyleHatch.DrawColorPreview(ACanvas, R1, ValueAsColor);
 end;
 
@@ -686,10 +690,11 @@ end;
 procedure TACLCustomComponentPropertyEditor.AfterConstruction;
 begin
   inherited AfterConstruction;
-  FPropClass := GetObjectPropClass(Owner, Info);
+  FPropClass := GetObjectPropClass(Info);
 end;
 
-procedure TACLCustomComponentPropertyEditor.AddChildrenToList(AComponent: TComponent; AValues: TACLStringList);
+procedure TACLCustomComponentPropertyEditor.AddChildrenToList(
+  AComponent: TComponent; AValues: TACLStringList);
 var
   I: Integer;
 begin
@@ -697,13 +702,15 @@ begin
     AddToList(AComponent.Components[I], AValues);
 end;
 
-procedure TACLCustomComponentPropertyEditor.AddToList(AComponent: TComponent; AValues: TACLStringList);
+procedure TACLCustomComponentPropertyEditor.AddToList(
+  AComponent: TComponent; AValues: TACLStringList);
 begin
   if (AComponent.Name <> '') and AComponent.InheritsFrom(FPropClass) then
     AValues.Add(GetComponentName(AComponent), AComponent);
 end;
 
-procedure TACLCustomComponentPropertyEditor.AddToList(AComponentList: TACLComponentList; AValues: TACLStringList);
+procedure TACLCustomComponentPropertyEditor.AddToList(
+  AComponentList: TACLComponentList; AValues: TACLStringList);
 var
   I: Integer;
 begin
@@ -772,7 +779,8 @@ procedure TACLCustomComponentPropertyEditor.SetValueAsComponent(const Value: TCo
 begin
   if Changing(NativeUInt(Value)) then
   begin
-    SetObjectProp(Owner, Info, Value, True);
+    if (Value = nil) or (Value is GetObjectPropClass(Info)) then
+      SetObjectProp(Owner, Info, Value);
     Changed;
   end;
 end;
@@ -801,12 +809,14 @@ end;
 
 procedure TACLEnumPropertyEditor.GetValues(const AValues: TACLStringList);
 var
-  ATypeData: PTypeData;
+  LTypeData: PTypeData;
+  LTypeInfo: PTypeInfo;
   I: Integer;
 begin
-  ATypeData := GetTypeData(Info.PropType^);
-  for I := ATypeData^.MinValue to ATypeData^.MaxValue do
-    AValues.Add(GetEnumName(Info.PropType^, I), TObject(I));
+  LTypeInfo := GetPropType(Info);
+  LTypeData := GetTypeData(LTypeInfo);
+  for I := LTypeData^.MinValue to LTypeData^.MaxValue do
+    AValues.Add(GetEnumName(LTypeInfo, I), TObject(I));
 end;
 
 { TACLFontPropertyEditor }
@@ -852,7 +862,7 @@ begin
   if AObject <> nil then
     Result := AObject.ToString;
   if Result = '' then
-    Result := GetObjectPropClass(Owner, Info).ClassName;
+    Result := GetObjectPropClass(Info).ClassName;
   Result := '(' + Result + ')';
 end;
 
@@ -874,7 +884,8 @@ var
   ATypeInfo: PTypeInfo;
   I: Integer;
 begin
-  ATypeInfo := GetTypeData(Info.PropType^)^.CompType^;
+  ATypeInfo := GetPropType(Info);
+  ATypeInfo := GetTypeData(ATypeInfo)^.CompType{$IFNDEF FPC}^{$ENDIF};
   ATypeData := GetTypeData(ATypeInfo);
   for I := ATypeData^.MinValue to ATypeData^.MaxValue do
     AProc(TACLSetSubPropertyEditor.Create(Info, GetEnumName(ATypeInfo, I), Owner, I, Designer))
@@ -883,14 +894,14 @@ end;
 { TACLSetSubPropertyEditor }
 
 constructor TACLSetSubPropertyEditor.Create(AInfo: PPropInfo;
-  const AName: UnicodeString; AOwner: TObject; AIndex: Integer; ADesigner: IACLObjectInspector);
+  const AName: string; AOwner: TObject; AIndex: Integer; ADesigner: IACLObjectInspector);
 begin
   inherited Create(AInfo, AOwner, ADesigner);
   FIndex := AIndex;
   FName := AName;
 end;
 
-function TACLSetSubPropertyEditor.GetFullName: UnicodeString;
+function TACLSetSubPropertyEditor.GetFullName: string;
 begin
   Result := inherited;
   Result := Copy(Result, 1, LastDelimiter('.', Result) - 1);

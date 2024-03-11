@@ -4,30 +4,37 @@
 {*             Object Inspector              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.ObjectInspector;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
+  {Winapi.}Windows,
+{$ENDIF}
+  {Winapi.}Messages,
   // System
-  System.Types,
-  System.TypInfo,
-  System.Variants,
-  System.Classes,
-  System.Generics.Collections,
+  {System.}Classes,
+  {System.}Generics.Collections,
+  {System.}SysUtils,
+  {System.}Types,
+  {System.}TypInfo,
+  {System.}Variants,
   // VCL
-  Vcl.Graphics,
-  Vcl.Controls,
-  Vcl.ImgList,
+  {Vcl.}Graphics,
+  {Vcl.}Controls,
+  {Vcl.}ImgList,
+  {Vcl.}Forms,
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
@@ -40,7 +47,6 @@ uses
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.ComboBox,
-  ACL.UI.Controls.CompoundControl,
   ACL.UI.Controls.CompoundControl.SubClass,
   ACL.UI.Controls.ObjectInspector.PropertyEditors,
   ACL.UI.Controls.ScrollBar,
@@ -68,8 +74,9 @@ type
     AObject: TObject; APropInfo: PPropInfo; var AAllow: Boolean) of object;
   TACLObjectInspectorPropertyChangedEvent = procedure (Sender: TObject;
     AObject: TObject; APropInfo: PPropInfo; AProperty: TACLPropertyEditor) of object;
-  TACLObjectInspectorPropertyChangingEvent = procedure (Sender: TObject; AObject: TObject;
-    APropInfo: PPropInfo; AProperty: TACLPropertyEditor; const AValue: Variant; var AAllow: Boolean) of object;
+  TACLObjectInspectorPropertyChangingEvent = procedure (Sender: TObject;
+    AObject: TObject; APropInfo: PPropInfo; AProperty: TACLPropertyEditor;
+    const AValue: Variant; var AAllow: Boolean) of object;
   TACLObjectInspectorPropertyGetGroupNameEvent = procedure (
     Sender: TObject; Node: TACLObjectInspectorNode; var GroupName: string) of object;
 
@@ -188,8 +195,8 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    function FindItem(const AProperyName: UnicodeString): TACLObjectInspectorNode;
-    procedure ExecutePropertyEditor(const AProperyName: UnicodeString);
+    function FindItem(const AProperyName: string): TACLObjectInspectorNode;
+    procedure ExecutePropertyEditor(const AProperyName: string);
     function GoToNextProperty(AForward: Boolean): Boolean;
     procedure Regroup;
     procedure ReloadProperties;
@@ -349,10 +356,10 @@ type
     procedure CMChildKey(var Message: TCMChildKey); message CM_CHILDKEY;
   public
     constructor Create(AOwner: TComponent); override;
-    procedure ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: UnicodeString); inline;
-    procedure ConfigSave(AConfig: TACLIniFile; const ASection, AItem: UnicodeString); inline;
-    procedure ExecutePropertyEditor(const AProperyName: UnicodeString);
-    function FindItem(const AProperyName: UnicodeString): TACLObjectInspectorNode;
+    procedure ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: string); inline;
+    procedure ConfigSave(AConfig: TACLIniFile; const ASection, AItem: string); inline;
+    procedure ExecutePropertyEditor(const AProperyName: string);
+    function FindItem(const AProperyName: string): TACLObjectInspectorNode;
     procedure Localize(const ASection: string); override;
     procedure ReloadData;
     //# Properties
@@ -391,16 +398,11 @@ type
 
 implementation
 
-uses
-  System.SysUtils,
-  // VCL
-  Vcl.Forms;
-
 type
   TACLPropertyEditorAccess = class(TACLPropertyEditor);
   TACLCustomTextEditAccess = class(TACLCustomTextEdit);
 
-function ExtractPropertyName(const S: UnicodeString): UnicodeString;
+function ExtractPropertyName(const S: string): string;
 begin
   Result := Copy(S, acLastDelimiter('.', S) + 1, MaxInt);
 end;
@@ -434,7 +436,7 @@ procedure TACLObjectInspectorExpandedNodes.Store;
 
   procedure Store(AValues: TACLStringList; ANode: TACLTreeListNode);
   var
-    APath: UnicodeString;
+    APath: string;
     I: Integer;
   begin
     if ANode.Expanded then
@@ -563,7 +565,7 @@ begin
   inherited Destroy;
 end;
 
-function TACLObjectInspectorSubClass.FindItem(const AProperyName: UnicodeString): TACLObjectInspectorNode;
+function TACLObjectInspectorSubClass.FindItem(const AProperyName: string): TACLObjectInspectorNode;
 var
   AArr: TStringDynArray;
   ALast: TACLTreeListNode;
@@ -583,7 +585,7 @@ begin
   Result := TACLObjectInspectorNode(ALast);
 end;
 
-procedure TACLObjectInspectorSubClass.ExecutePropertyEditor(const AProperyName: UnicodeString);
+procedure TACLObjectInspectorSubClass.ExecutePropertyEditor(const AProperyName: string);
 var
   AItem: TACLObjectInspectorNode;
 begin
@@ -669,7 +671,8 @@ begin
     Result := nil;
 end;
 
-function TACLObjectInspectorSubClass.DoEditCreate(const AParams: TACLInplaceInfo; AEditor: TACLPropertyEditor): TComponent;
+function TACLObjectInspectorSubClass.DoEditCreate(
+  const AParams: TACLInplaceInfo; AEditor: TACLPropertyEditor): TComponent;
 
   function CreateEdit(AMask: TACLEditInputMask): TACLEdit;
   begin
@@ -719,13 +722,14 @@ begin
     end
     else
 
-    case AEditor.Info.PropType^^.Kind of
+    case GetPropType(AEditor.Info).Kind of
       tkString, tkUString, tkWString, tkLString, tkVariant:
         Result := CreateEdit(eimText);
       tkInteger, tkInt64:
         Result := CreateEdit(eimInteger);
       tkFloat:
         Result := CreateEdit(eimFloat);
+    else;
     end;
 
     if Supports(AEditor, IACLPropertyEditorDialog, ADialogIntf) and (Result is TACLCustomTextEdit) then
@@ -792,7 +796,8 @@ begin
   end;
 end;
 
-function TACLObjectInspectorSubClass.AddProperty(AParent: TACLTreeListNode; AEditor: TACLPropertyEditor): TACLObjectInspectorNode;
+function TACLObjectInspectorSubClass.AddProperty(
+  AParent: TACLTreeListNode; AEditor: TACLPropertyEditor): TACLObjectInspectorNode;
 
   function FullName(ANode: TACLTreeListNode): string;
   begin
@@ -853,10 +858,11 @@ procedure TACLObjectInspectorSubClass.LoadObject(AObject: TObject; AParentNode: 
 var
   ACount: Integer;
   AList: PPropList;
+  I: Integer;
 begin
   if TRTTI.GetProperties(AObject, AList, ACount) then
   try
-    for var I := 0 to ACount - 1 do
+    for I := 0 to ACount - 1 do
       LoadObjectProperty(AList[I], AObject, AParentNode);
   finally
     FreeMemAndNil(Pointer(AList));
@@ -883,7 +889,7 @@ begin
         end);
     end
     else
-      if APropInfo.PropType^^.Kind = tkClass then
+      if GetPropType(APropInfo).Kind = tkClass then
       begin
         AObject := GetObjectProp(AObject, APropInfo);
         if (AObject <> nil) and not (AObject is TComponent) then
@@ -934,8 +940,6 @@ begin
 end;
 
 procedure TACLObjectInspectorSubClass.ProcessKeyDown(var AKey: Word; AShift: TShiftState);
-const
-  Modifiers = [ssAlt, ssCtrl, ssShift];
 begin
   inherited ProcessKeyDown(AKey, AShift);
   if FocusedNode <> nil then
@@ -1156,9 +1160,9 @@ function TACLObjectInspectorExpressionEdit.TextToValue(const AText: string): Var
 begin
   case InputMask of
     eimInteger:
-      VarCast(Result, Evaluate(AText), varInteger);
+      VarCast(Result{%H-}, Evaluate(AText), varInteger);
     eimFloat:
-      VarCast(Result, Evaluate(AText), varDouble);
+      VarCast(Result{%H-}, Evaluate(AText), varDouble);
   else
     Result := inherited;
   end;
@@ -1167,7 +1171,7 @@ end;
 function TACLObjectInspectorExpressionEdit.ValueToText(const AValue: Variant): string;
 begin
   if VarIsFloat(AValue) then
-    Result := FloatToStr(AValue, InvariantFormatSettings)
+    Result := FloatToStr(Double(AValue), InvariantFormatSettings)
   else
     Result := inherited;
 end;
@@ -1231,17 +1235,17 @@ begin
   end;
 end;
 
-procedure TACLObjectInspector.ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: UnicodeString);
+procedure TACLObjectInspector.ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: string);
 begin
   FInnerControl.ConfigLoad(AConfig, ASection, AItem);
 end;
 
-procedure TACLObjectInspector.ConfigSave(AConfig: TACLIniFile; const ASection, AItem: UnicodeString);
+procedure TACLObjectInspector.ConfigSave(AConfig: TACLIniFile; const ASection, AItem: string);
 begin
   FInnerControl.ConfigSave(AConfig, ASection, AItem);
 end;
 
-function TACLObjectInspector.FindItem(const AProperyName: UnicodeString): TACLObjectInspectorNode;
+function TACLObjectInspector.FindItem(const AProperyName: string): TACLObjectInspectorNode;
 begin
   Result := SubClass.FindItem(AProperyName);
 end;
@@ -1252,7 +1256,7 @@ begin
   SearchBoxTextHint := LangGet(ASection, 'th');
 end;
 
-procedure TACLObjectInspector.ExecutePropertyEditor(const AProperyName: UnicodeString);
+procedure TACLObjectInspector.ExecutePropertyEditor(const AProperyName: string);
 begin
   SubClass.ExecutePropertyEditor(AProperyName);
 end;

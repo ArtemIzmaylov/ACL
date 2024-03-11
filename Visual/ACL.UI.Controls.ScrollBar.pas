@@ -35,11 +35,11 @@ uses
   {Vcl.}StdCtrls,
   // ACL
   ACL.Classes,
-  ACL.Timers,
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.SkinImage,
-  ACL.Graphics.SkinImageSet,
+  ACL.Math,
+  ACL.Timers,
   ACL.UI.Animation,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.Buttons,
@@ -314,8 +314,10 @@ type
 
 implementation
 
+{$IFNDEF FPC}
 uses
-  ACL.Math;
+  ACL.Graphics.SkinImageSet;
+{$ENDIF}
 
 const
   SCROLL_BAR_TIMER_PARTS = [sbpLineUp, sbpLineDown, sbpPageUp, sbpPageDown];

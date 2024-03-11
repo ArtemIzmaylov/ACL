@@ -82,7 +82,9 @@ type
 
 {$IFDEF FPC}
 function GetObjectPropClass(PropInfo: PPropInfo): TClass;
+function GetPropName(PropInfo: PPropInfo): string;
 {$ENDIF}
+function GetPropType(PropInfo: PPropInfo): PTypeInfo; inline;
 implementation
 
 uses
@@ -110,7 +112,17 @@ begin
     raise EPropertyError.CreateRes(@SInvalidPropertyValue);
   Result := TypeData^.ClassType;
 end;
+
+function GetPropName(PropInfo: PPropInfo): string;
+begin
+  Result := PropInfo^.Name;
+end;
 {$ENDIF}
+
+function GetPropType(PropInfo: PPropInfo): PTypeInfo; inline;
+begin
+  Result := PropInfo^.PropType{$IFNDEF FPC}^{$ENDIF};
+end;
 
 { TRTTI }
 
@@ -273,14 +285,14 @@ begin
   Result := False;
   if APropInfo^.PropType^.Kind = tkInteger then
   begin
-    ATypeData := GetTypeData(APropInfo^.PropType{$IFNDEF FPC}^{$ENDIF});
+    ATypeData := GetTypeData(GetPropType(APropInfo));
     Result := ATypeData.MinValue >= ATypeData.MaxValue;
   end;
 end;
 
 class function TRTTI.IsSameType(APropInfo: PPropInfo; const ATypeInfo: Pointer): Boolean;
 begin
-  Result := (APropInfo <> nil) and (APropInfo^.PropType{$IFNDEF FPC}^{$ENDIF} = ATypeInfo);
+  Result := (APropInfo <> nil) and (GetPropType(APropInfo) = ATypeInfo);
 end;
 
 class function TRTTI.GetPropValue(AObject: TObject; APropInfo: PPropInfo): string;
@@ -343,10 +355,10 @@ var
   ATypeData: PTypeData;
   AValueOrd: Integer;
 begin
-  AData := GetEnumValue(APropInfo^.PropType{$IFNDEF FPC}^{$ENDIF}, AValue);
+  AData := GetEnumValue(GetPropType(APropInfo), AValue);
   if AData < 0 then
   begin
-    ATypeData := GetTypeData(APropInfo^.PropType{$IFNDEF FPC}^{$ENDIF});
+    ATypeData := GetTypeData(GetPropType(APropInfo));
     AValueOrd := StrToIntDef(AValue, ATypeData^.MinValue - 1);
     if (AValueOrd >= ATypeData^.MinValue) and (AValueOrd <= ATypeData^.MaxValue) then
       AData := AValueOrd;
