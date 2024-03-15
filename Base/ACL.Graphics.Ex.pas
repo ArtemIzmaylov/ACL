@@ -151,6 +151,13 @@ type
     procedure GdiDraw(Proc: TACL2DRenderGdiDrawProc);
   end;
 
+  { IACL2DRenderWndBased }
+
+  IACL2DRenderWndBased = interface
+  ['{90451EAC-9428-467B-8702-42035FDF253B}']
+    procedure SetWndHandle(AWndHandle: HWND);
+  end;
+
   { TACL2DRenderResource }
 
   TACL2DRenderResource = class
@@ -194,7 +201,8 @@ type
 
   TACL2DRenderPath = class(TACL2DRenderResource)
   public
-    procedure AddArc(CX, CY, RadiusX, RadiusY, StartAngle, SweepAngle: Single); virtual; abstract;
+    procedure AddArc(CenterX, CenterY, RadiusX, RadiusY: Single;
+      StartAngle, SweepAngle: Single); virtual; abstract;
     procedure AddLine(X1, Y1, X2, Y2: Single); virtual; abstract;
     procedure AddRect(const R: TRectF); virtual;
     procedure AddRoundRect(const R: TRectF; RadiusX, RadiusY: Single);

@@ -183,7 +183,7 @@ type
 
   { TACLDirect2DHwndBasedRender }
 
-  TACLDirect2DHwndBasedRender = class(TACLDirect2DAbstractRender)
+  TACLDirect2DHwndBasedRender = class(TACLDirect2DAbstractRender, IACL2DRenderWndBased)
   strict private
     FBufferIsValid: Boolean;
     FCopyToDC: HDC;
@@ -217,6 +217,7 @@ type
       const ADevice3D: ID3D11Device; const ADevice3DContext: ID3D11DeviceContext);
     procedure BeginPaint(DC: HDC; const BoxRect, UpdateRect: TRect); override;
     procedure EndPaint; override;
+    // IACL2DRenderWndBased
     procedure SetWndHandle(AHandle: HWND);
   end;
 
@@ -452,76 +453,30 @@ begin
     Result := Result - PI2;
 end;
 
-function D2D1CalculateArcPoint(const ACenter, APoint: TD2D1Point2F; AAngle: Single; const ARadius: TD2D1SizeF): TD2D1Point2F;
-var
-  AA, BB: Single;
-  ASlope: Single;
-begin
-  AAngle := D2D1NormalizeAngle(AAngle);
-
-  AA := Sqr(ARadius.width);
-  BB := Sqr(ARadius.height);
-  ASlope := Sqr(APoint.Y - ACenter.y) / Max(Sqr(APoint.X - ACenter.x), 0.1);
-
-  Result.x := Sqrt(AA * BB / (BB + AA * ASlope));
-  Result.y := Sqrt(BB * (1 - Min(Sqr(Result.x) / AA, 1)));
-
-  if (AAngle < Pi / 2) or (AAngle > 3 * PI / 2) then
-    Result.x := ACenter.x + Result.x
-  else
-    Result.x := ACenter.x - Result.x;
-
-  if AAngle > PI then
-    Result.y := ACenter.y + Result.y
-  else
-    Result.y := ACenter.y - Result.y;
-end;
-
-procedure D2D1CalculateArcSegmentCore(ACenterX, ACenterY, ARadiusX, ARadiusY, AStartAngle, ASweepAngle: Single; out AStartPoint, AEndPoint: TPointF);
+//function D2D1CalculateArcPoint(const ACenter, APoint: TD2D1Point2F; AAngle: Single; const ARadius: TD2D1SizeF): TD2D1Point2F;
+//var
+//  AA, BB: Single;
+//  ASlope: Single;
+//begin
+//  AAngle := D2D1NormalizeAngle(AAngle);
 //
-//                      A * B
-//  V = ---------------------------------------------
-//      Sqrt(A^2 * Sin^2(Alpha) + B^2 * Cos^2(Alpha))
+//  AA := Sqr(ARadius.width);
+//  BB := Sqr(ARadius.height);
+//  ASlope := Sqr(APoint.Y - ACenter.y) / Max(Sqr(APoint.X - ACenter.x), 0.1);
 //
-//  Radial.X = V * Cos(Alpha)
-//  Radial.Y = V * Sin(Alpha)
+//  Result.x := Sqrt(AA * BB / (BB + AA * ASlope));
+//  Result.y := Sqrt(BB * (1 - Min(Sqr(Result.x) / AA, 1)));
 //
-//  where:
-//    A - horizontal ellipse semiaxis
-//    B - vertical ellipse semiaxis
-//    Angle - an angle between Radius-Vector and A calculated in counterclockwise direction
+//  if (AAngle < Pi / 2) or (AAngle > 3 * PI / 2) then
+//    Result.x := ACenter.x + Result.x
+//  else
+//    Result.x := ACenter.x - Result.x;
 //
-var
-  A, B, C: Double;
-  ASin, ACos, AValue: Extended;
-begin
-  if IsZero(ARadiusX) or IsZero(ARadiusY) then
-  begin
-    AStartPoint := PointF(ACenterX, ACenterY);
-    AEndPoint := AStartPoint;
-  end
-  else
-  begin
-    C := ARadiusX * ARadiusY;
-    A := Sqr(ARadiusX);
-    B := Sqr(ARadiusY);
-
-    SinCos(DegToRad(AStartAngle), ASin, ACos);
-    AValue := C / Sqrt(A * Sqr(ASin) + B * Sqr(ACos));
-    AStartPoint.X := ACenterX + AValue * ACos;
-    AStartPoint.Y := ACenterY - AValue * ASin;
-
-    if IsZero(ASweepAngle) then
-      AEndPoint := AStartPoint
-    else
-    begin
-      SinCos(DegToRad(AStartAngle + ASweepAngle), ASin, ACos);
-      AValue := C / Sqrt(A * Sqr(ASin) + B * Sqr(ACos));
-      AEndPoint.X := ACenterX + AValue * ACos;
-      AEndPoint.Y := ACenterY - AValue * ASin;
-    end;
-  end;
-end;
+//  if AAngle > PI then
+//    Result.y := ACenter.y + Result.y
+//  else
+//    Result.y := ACenter.y - Result.y;
+//end;
 
 function D2D1CalculateArcSegment(CenterX, CenterY, RadiusX, RadiusY: Single;
   StartAngle, SweepAngle: Single; out AStartPoint: TD2D1Point2F): TD2D1ArcSegment;
@@ -542,7 +497,8 @@ begin
   else
     Result.arcSize := D2D1_ARC_SIZE_SMALL;
 
-  D2D1CalculateArcSegmentCore(CenterX, CenterY, RadiusX, RadiusY, StartAngle, SweepAngle, P3, P4);
+  acCalcArcSegment(CenterX, CenterY, RadiusX, RadiusY,
+    DegToRad(StartAngle), DegToRad(StartAngle + SweepAngle), P3, P4);
   AStartPoint := D2D1PointF(P3.X, P3.Y);
   Result.point := D2D1PointF(P4.X, P4.Y);
 

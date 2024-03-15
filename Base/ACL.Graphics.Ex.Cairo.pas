@@ -29,11 +29,15 @@ uses
   LCLIntf,
   LCLType,
   // VCL
+  Classes,
+  Generics.Collections,
   Math,
   Graphics,
   SysUtils,
   Types,
   // ACL
+  ACL.Geometry,
+  ACL.Geometry.Utils,
   ACL.Graphics,
   ACL.Graphics.Ex,
   ACL.Utils.Common;
@@ -51,38 +55,100 @@ type
     class function From(A, R, G, B: Byte): TCairoColor; overload; static;
     class function From(Color: TAlphaColor): TCairoColor; overload; static;
     class function From(Color: TColor): TCairoColor; overload; static;
+    class function From(Font: TFont): TCairoColor; overload; static;
   end;
 
-  { TCairoCanvas }
+{$REGION ' Render2D '}
 
-  TCairoCanvas = class
+  { TACLCairoRender }
+
+  TACLCairoRender = class(TACL2DRender)
   strict private
     FOrigin: TPoint;
     FHandle: Pcairo_t;
     FTargetSurface: Pcairo_surface_t;
+    FWorldTransforms: TStack<cairo_matrix_t>;
 
-    procedure SetLineStyle(AWidth: Single; AStyle: TACL2DRenderStrokeStyle);
+    procedure PathEllipseArc(X1, Y1, X2, Y2: Double);
+    procedure PathPolyline(Points: PPoint; Count: Integer; ClosePath: Boolean);
   public
-    //# Initialization
-    procedure BeginPaint(ACanvas: TCanvas);
-    procedure EndPaint;
+    constructor Create;
+    destructor Destroy; override;
+    procedure BeginPaint(ACanvas: TCanvas); overload;
+    procedure BeginPaint(ASurface: Pcairo_surface_t); overload;
+    procedure BeginPaint(DC: HDC; const BoxRect, UpdateRect: TRect); overload; override;
+    procedure EndPaint; override;
 
-    //# Drawing
-    procedure FillRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor);
+    // Clipping
+    function IntersectClipRect(const R: TRect): Boolean; override;
+    function IsVisible(const R: TRect): Boolean; override;
+    procedure RestoreClipRegion; override;
+    procedure SaveClipRegion; override;
+
+    // Ellipse
+    procedure DrawEllipse(X1, Y1, X2, Y2: Single; Color: TAlphaColor;
+      Width: Single; Style: TACL2DRenderStrokeStyle); override;
+    procedure FillEllipse(X1, Y1, X2, Y2: Single; Color: TAlphaColor); override;
+
+    // Line
+    procedure Line(X1, Y1, X2, Y2: Single; Color: TAlphaColor;
+      Width: Single = 1; Style: TACL2DRenderStrokeStyle = ssSolid); override;
+    procedure Line(const Points: PPoint; Count: Integer; Color: TAlphaColor;
+      Width: Single = 1; Style: TACL2DRenderStrokeStyle = ssSolid); override;
+
+    // Images
+    function CreateImage(Colors: PACLPixel32; Width, Height: Integer;
+      AlphaFormat: TAlphaFormat = afDefined): TACL2DRenderImage; override;
+    function CreateImageAttributes: TACL2DRenderImageAttributes; override;
+    procedure DrawImage(Image: TACL2DRenderImage;
+      const TargetRect, SourceRect: TRect; Alpha: Byte = MaxByte); override;
+    procedure DrawImage(Image: TACL2DRenderImage;
+      const TargetRect, SourceRect: TRect; Attributes: TACL2DRenderImageAttributes); override;
+
+    // Rectangles
+    procedure DrawRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor;
+      Width: Single = 1; Style: TACL2DRenderStrokeStyle = ssSolid); override;
+    procedure FillHatchRectangle(const R: TRect; Color1, Color2: TAlphaColor; Size: Integer); override;
+    procedure FillRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor); override;
     procedure FillRectangleByGradient(
       AFrom, ATo: TAlphaColor; const ARect: TRect; AVertical: Boolean);
     procedure FillSurface(const ATargetRect, ASourceRect: TRect;
       ASurface: Pcairo_surface_t; AAlpha: Double; ATileMode: Boolean);
-    procedure Line(X1, Y1, X2, Y2: Single; Color: TAlphaColor;
-      Width: Single = 1; Style: TACL2DRenderStrokeStyle = ssSolid);
+
+    // Text
+    procedure DrawText(const Text: string; const R: TRect;
+      Color: TAlphaColor; Font: TFont; HorzAlign: TAlignment = taLeftJustify;
+      VertAlign: TVerticalAlignment = taVerticalCenter; WordWrap: Boolean = False); override;
+
+    // Paths
+    function CreatePath: TACL2DRenderPath; override;
+    procedure DrawPath(Path: TACL2DRenderPath; Color: TAlphaColor;
+      Width: Single = 1; Style: TACL2DRenderStrokeStyle = ssSolid); override;
+    procedure FillPath(Path: TACL2DRenderPath; Color: TAlphaColor); override;
+
+    // Polygons
+    procedure DrawPolygon(const Points: array of TPoint; Color: TAlphaColor;
+      Width: Single = 1; Style: TACL2DRenderStrokeStyle = ssSolid); override;
+    procedure FillPolygon(const Points: array of TPoint; Color: TAlphaColor); override;
+
+    // World Transform
+    procedure ModifyWorldTransform(const XForm: TXForm); override;
+    procedure RestoreWorldTransform; override;
+    procedure SaveWorldTransform; override;
+    procedure ScaleWorldTransform(ScaleX, ScaleY: Single); overload; override;
+    procedure SetWorldTransform(const XForm: TXForm); override;
+    procedure TransformPoints(Points: PPointF; Count: Integer); override;
+    procedure TranslateWorldTransform(OffsetX, OffsetY: Single); override;
 
     //# Properties
     property Origin: TPoint read FOrigin;
     property Handle: Pcairo_t read FHandle;
   end;
 
+{$ENDREGION}
+
 var
-  GpPaintCanvas: TCairoCanvas;
+  GpPaintCanvas: TACLCairoRender;
 
 (*
   Флаги, поддерживаемые имплементацей на чистом cairo:
@@ -99,7 +165,8 @@ procedure CairoTextSize(ACanvas: TCanvas; const S: string; AWidth, AHeight: PInt
 
 // Utilities
 function cairo_create_context(DC: HDC): pcairo_t;
-function cairo_create_surface(AData: PACLPixel32Array; AWidth, AHeight: LongInt): Pcairo_surface_t;
+function cairo_create_surface(AWidth, AHeight: LongInt): Pcairo_surface_t; overload;
+function cairo_create_surface(AData: PACLPixel32Array; AWidth, AHeight: LongInt): Pcairo_surface_t; overload;
 procedure cairo_set_source_color(ACairo: pcairo_t; const AColor: TAlphaColor); overload;
 procedure cairo_set_source_color(ACairo: pcairo_t; const AColor: TACLPixel32); overload;
 procedure cairo_set_source_color(ACairo: pcairo_t; const AColor: TCairoColor); overload;
@@ -108,6 +175,7 @@ implementation
 uses
   ACL.Graphics.TextLayout;
 
+{$REGION ' DrawText '}
 const
   CairoTextStyleLines = [fsUnderline, fsStrikeOut];
 
@@ -117,6 +185,20 @@ type
 
   PCairoGlyphArray = ^TCairoGlyphArray;
   TCairoGlyphArray = array[0..0] of cairo_glyph_t;
+
+  { TCairoFontMetrics }
+
+  TCairoFontMetrics = record
+    // same to cairo_font_extents_t
+    ascent: Double;
+    descent: Double;
+    height: Double;
+    max_x_advance: Double;
+    max_y_advance: Double;
+    // our extensions:
+    baseline: Double;
+    line_thickness: Double;
+  end;
 
   { TCairoTextLayoutMetrics }
 
@@ -167,7 +249,7 @@ type
   strict private
     FFont: Pcairo_scaled_font_t;
     FFontColor: TCairoColor;
-    FFontExtents: cairo_font_extents_t;
+    FFontMetrics: TCairoFontMetrics;
     FFontHasLines: Boolean;
     FFillColor: TCairoColor;
     FFillColorAssigned: Boolean;
@@ -185,35 +267,71 @@ type
     procedure TextOut(ABlock: TACLTextLayoutBlockText; X, Y: Integer); override;
   end;
 
-{$REGION ' Utilities '}
+{$ENDREGION}
 
-function Contains(const D: TLongWordDynArray; Index: LongWord): Boolean;
-var
-  I: Integer;
-begin
-  for I := Low(D) to High(D) do
-  begin
-    if D[I] = Index then
-      Exit(True);
+{$REGION ' Render2D '}
+
+  { TACLCairoRenderImage }
+
+  TACLCairoRenderImage = class(TACL2DRenderImage)
+  strict private
+    FColors: Pointer;
+    FHandle: Pcairo_surface_t;
+  public
+    constructor Create(ARender: TACL2DRender; AColors: PACLPixel32;
+      AWidth, AHeight: Integer; AAlphaFormat: TAlphaFormat);
+    destructor Destroy; override;
+    property Handle: Pcairo_surface_t read FHandle;
   end;
-  Result := False;
-end;
 
-procedure OffsetGlyphs(AGlyphs: PCairoGlyphArray; ACount: Integer; ADeltaX, ADeltaY: Double);
-var
-  I: Integer;
-begin
-  for I := 0 to ACount - 1 do
-    with AGlyphs^[I] do
-    begin
-      X := X + ADeltaX;
-      Y := Y + ADeltaY;
+  { TACLCairoRenderPath }
+
+  TACLCairoRenderPath = class(TACL2DRenderPath)
+  strict private type
+  {$REGION ' Items '}
+    TItem = class
+    public
+      X, Y: Single;
+      constructor Create(X, Y: Single);
+      procedure Write(Handle: Pcairo_t; dX, dY: Single); virtual; abstract;
     end;
-end;
+
+    TArc = class(TItem)
+    public
+      CX, CY, RX, RY, Angle1, Angle2: Single;
+      procedure Write(Handle: Pcairo_t; dX, dY: Single); override;
+    end;
+
+    TMoveTo = class(TItem)
+    public
+      procedure Write(Handle: Pcairo_t; dX, dY: Single); override;
+    end;
+
+    TLineTo = class(TItem)
+    public
+      procedure Write(Handle: Pcairo_t; dX, dY: Single); override;
+    end;
+
+    TFigure = TObjectList<TItem>;
+  {$ENDREGION}
+  strict private
+    FFigure: TFigure;
+    FFigures: TObjectList<TFigure>;
+
+    function StartFigureIfNecessary(X, Y: Single): TFigure;
+  protected
+    procedure Write(Handle: Pcairo_t; dX, dY: Single);
+  public
+    destructor Destroy; override;
+    procedure AddArc(CenterX, CenterY, RadiusX, RadiusY, StartAngle, SweepAngle: Single); override;
+    procedure AddLine(X1, Y1, X2, Y2: Single); override;
+    procedure FigureClose; override;
+    procedure FigureStart; override;
+  end;
 
 {$ENDREGION}
 
-{$REGION ' Wrappers '}
+{$REGION ' Generic '}
 
 function cairo_create_context(DC: HDC): pcairo_t;
 begin
@@ -222,13 +340,35 @@ begin
     raise EGSCairoError.Create('Cannot create cairo context');
 end;
 
+function cairo_create_surface(AWidth, AHeight: LongInt): Pcairo_surface_t;
+begin
+  Result := cairo_image_surface_create(CAIRO_FORMAT_ARGB32, AWidth, AHeight);
+end;
+
 function cairo_create_surface(AData: PACLPixel32Array; AWidth, AHeight: LongInt): Pcairo_surface_t;
 begin
   Result := cairo_image_surface_create_for_data(
     PByte(AData), CAIRO_FORMAT_ARGB32, AWidth, AHeight, AWidth * 4);
 end;
 
-function cairo_set_clipping(ACairo: pcairo_t; ACanvas: TCanvas; const AOrigin: TPoint): Boolean;
+procedure cairo_font_metrics(AFont: Pcairo_scaled_font_t; out AMetrics: TCairoFontMetrics);
+begin
+  cairo_scaled_font_extents(AFont, @AMetrics);
+  AMetrics.baseline := AMetrics.height - AMetrics.descent;
+  AMetrics.line_thickness := Max(1.0, AMetrics.height / 16.0);
+end;
+
+procedure cairo_matrix_init(out matrix: cairo_matrix_t; const form: TXForm);
+begin
+  matrix.xx := form.eM11;
+  matrix.yx := form.eM12;
+  matrix.xy := form.eM21;
+  matrix.yy := form.eM22;
+  matrix.x0 := form.eDx;
+  matrix.y0 := form.eDy;
+end;
+
+function cairo_set_clipping(ACairo: pcairo_t; DC: HDC; const AOrigin: TPoint): Boolean;
 var
   LGdkRect: PGdkRectangle;
   LGdkRectCount: Integer;
@@ -237,9 +377,7 @@ var
   LRegion: PGDIObject;
 begin
   Result := True;
-  if not ACanvas.HandleAllocated then
-    Exit; // DibCanvas, no handle = no clipping
-  case GetClipBox(ACanvas.Handle, @LRect) of
+  case GetClipBox(DC, @LRect) of
     SimpleRegion:
       begin
         LRect.Offset(-AOrigin.X, -AOrigin.Y);
@@ -251,7 +389,7 @@ begin
       begin
         LGdkRects := nil;
         LGdkRectCount := 0;
-        LRegion := TGtkDeviceContext(ACanvas.Handle).ClipRegion;
+        LRegion := TGtkDeviceContext(DC).ClipRegion;
         if LRegion = nil then Exit;
         gdk_region_get_rectangles({%H-}LRegion^.GDIRegionObject, LGdkRects, @LGdkRectCount);
         try
@@ -276,6 +414,23 @@ end;
 procedure cairo_set_dash(ACairo: pcairo_t; const ADashes: array of Double); overload;
 begin
   cairo_set_dash(ACairo, @ADashes[0], Length(ADashes), 0);
+end;
+
+procedure cairo_set_line(ACairo: pcairo_t; AWidth: Single; AStyle: TACL2DRenderStrokeStyle);
+begin
+  case AStyle of
+    ssDashDotDot:
+      cairo_set_dash(ACairo, [4 * AWidth, AWidth, AWidth, AWidth, AWidth, AWidth]);
+    ssDashDot:
+      cairo_set_dash(ACairo, [4 * AWidth, AWidth, AWidth, AWidth]);
+    ssDash:
+      cairo_set_dash(ACairo, [4 * AWidth, AWidth]);
+    ssDot:
+      cairo_set_dash(ACairo, [AWidth]);
+  else
+    cairo_set_dash(ACairo, nil, 0, 0);
+  end;
+  cairo_set_line_width(ACairo, AWidth);
 end;
 
 procedure cairo_set_font(ACairo: pcairo_t; AFont: TFont);
@@ -318,140 +473,77 @@ procedure cairo_set_source_color(ACairo: pcairo_t; const AColor: TCairoColor);
 begin
   cairo_set_source_rgba(ACairo, AColor.R, AColor.G, AColor.B, AColor.A);
 end;
-{$ENDREGION}
 
-{$REGION ' TextOut'}
-
-procedure CairoDrawTextStyleLines(ACairo: Pcairo_t; AFontStyle: TFontStyles;
-  X, Y, AWidth: Double; const AFontExtents: cairo_font_extents_t); overload;
-var
-  LThickness: Double;
+function cairo_text_to_glyphs(AFont: Pcairo_scaled_font_t;
+  AText: PChar; ATextLen: Integer; out AGlyphs: Pcairo_glyph_t;
+  out AGlyphCount: Integer; X, Y: Double): Boolean; overload;
 begin
-  if CairoTextStyleLines * AFontStyle <> [] then
-  begin
-    LThickness := Max(AFontExtents.height / 16, 1.0);
-    if fsUnderline in AFontStyle then
-      cairo_rectangle(ACairo, X, Y + AFontExtents.ascent + LThickness, AWidth, LThickness);
-    if fsStrikeOut in AFontStyle then
-      cairo_rectangle(ACairo, X, Y + Round(AFontExtents.height / 2) + LThickness, AWidth, LThickness);
-    cairo_fill(ACairo);
-  end;
+  AGlyphs := nil;
+  AGlyphCount:= 0;
+  cairo_scaled_font_text_to_glyphs(AFont, X, Y,
+    AText, ATextLen, @AGlyphs, @AGlyphCount, nil, nil, nil);
+  Result := AGlyphs <> nil;
 end;
 
-procedure CairoDrawTextStyleLines(ACairo: Pcairo_t; AFontStyle: TFontStyles;
-  ALines: PCairoTextLine; const AFontExtents: cairo_font_extents_t); overload;
+function cairo_text_to_glyphs(AFont: Pcairo_scaled_font_t;
+  const AText: string; out AGlyphs: PCairoGlyphArray; out AGlyphCount: Integer): Boolean; overload;
 begin
-  while ALines <> nil do
-  begin
-    if ALines.GlyphCount > 0 then
-      CairoDrawTextStyleLines(ACairo, AFontStyle, ALines^.Glyphs^[0].X,
-        ALines^.Glyphs^[0].Y - AFontExtents.height + AFontExtents.descent,
-        ALines^.Width, AFontExtents);
-    ALines := ALines^.NextLine;
-  end;
+  Result := cairo_text_to_glyphs(AFont, PChar(AText), Length(AText),
+    Pcairo_glyph_t(AGlyphs), AGlyphCount, 0, 0);
 end;
 
-function CairoTextGetLastVisible(ACanvas: TCanvas; const S: string; AMaxWidth: Integer): Integer;
-var
-  LCairo: pcairo_t;
-  LFont: pcairo_scaled_font_t;
-  LGlyphCount: Integer;
-  LGlyphs: PCairoGlyphArray;
-  LTextExtents: cairo_text_extents_t;
+{ TCairoColor }
+
+class function TCairoColor.From(A, R, G, B: Byte): TCairoColor;
 begin
-  LGlyphs := nil;
-  LGlyphCount := 0;
-  LCairo := TCairoMeasurer.Context(ACanvas);
-  LFont := cairo_get_scaled_font(LCairo);
-  cairo_scaled_font_text_to_glyphs(LFont, 0, 0,
-    PChar(S), Length(S), @LGlyphs, @LGlyphCount, nil, nil, nil);
-  if LGlyphs <> nil then
-  try
-    cairo_scaled_font_glyph_extents(LFont, @LGlyphs^[0], LGlyphCount, @LTextExtents);
-    while (LGlyphCount > 0) and (LTextExtents.x_advance > AMaxWidth) do
-    begin
-      LTextExtents.x_advance := LGlyphs^[LGlyphCount - 1].x;
-      Dec(LGlyphCount);
-    end;
-    Result := UTF8CodepointToByteIndex(PChar(S), Length(S), LGlyphCount);
-  finally
-    cairo_glyph_free(@LGlyphs^[0]);
-  end;
+  Result.R := R / 255;
+  Result.G := G / 255;
+  Result.B := B / 255;
+  Result.A := A / 255;
 end;
 
-procedure CairoTextOut(ACanvas: TCanvas; X, Y: Integer;
-  AText: PChar; ALength: Integer; AClipRect: PRect = nil);
-var
-  LCairo: pcairo_t;
-  LOrigin: TPoint;
-  LFont: pcairo_scaled_font_t;
-  LFontExtents: cairo_font_extents_t;
-  LTextExtents: cairo_text_extents_t;
-  LGlyphCount: Integer;
-  LGlyphs: pcairo_glyph_t;
+class function TCairoColor.From(Color: TAlphaColor): TCairoColor;
 begin
-  GetWindowOrgEx(ACanvas.Handle, @LOrigin);
-  Dec(X, LOrigin.X);
-  Dec(Y, LOrigin.Y);
-
-  LCairo := cairo_create_context(ACanvas.Handle);
-  try
-    if cairo_set_clipping(LCairo, ACanvas, LOrigin) then
-    begin
-      if AClipRect <> nil then
-      begin
-        cairo_rectangle(LCairo, AClipRect.Left - LOrigin.X,
-          AClipRect.Top - LOrigin.Y, AClipRect.Width, AClipRect.Height);
-        cairo_clip(LCairo);
-      end;
-
-      cairo_set_font(LCairo, ACanvas.Font);
-      cairo_set_source_color(LCairo, TCairoColor.From(TFontAccess(ACanvas.Font).GetColor));
-
-      LGlyphs := nil;
-      LGlyphCount := 0;
-      LFont := cairo_get_scaled_font(LCairo);
-      cairo_scaled_font_extents(LFont, @LFontExtents);
-      cairo_scaled_font_text_to_glyphs(LFont,
-        X, Y + LFontExtents.height - LFontExtents.descent,
-        AText, ALength, @LGlyphs, @LGlyphCount, nil, nil, nil);
-      if LGlyphs <> nil then
-      try
-        cairo_scaled_font_glyph_extents(LFont, LGlyphs, LGlyphCount, @LTextExtents);
-        cairo_show_glyphs(LCairo, LGlyphs, LGlyphCount);
-        if CairoTextStyleLines * ACanvas.Font.Style <> [] then
-          CairoDrawTextStyleLines(LCairo, ACanvas.Font.Style, X, Y, LTextExtents.x_advance, LFontExtents);
-      finally
-        cairo_glyph_free(LGlyphs);
-      end;
-    end;
-  finally
-    cairo_destroy(LCairo);
-  end;
+  Result := From(Color.A, Color.R, Color.G, Color.B);
 end;
 
-procedure CairoTextSize(ACanvas: TCanvas; const S: string; AWidth, AHeight: PInteger);
-var
-  LCairo: pcairo_t;
-  LFontExtents: cairo_font_extents_t;
-  LTextExtents: cairo_text_extents_t;
+class function TCairoColor.From(Color: TColor): TCairoColor;
 begin
-  LCairo := TCairoMeasurer.Context(ACanvas);
-  if AHeight <> nil then
-  begin
-    cairo_font_extents(LCairo, @LFontExtents);
-    AHeight^ := Round(LFontExtents.height);
-  end;
-  if AWidth <> nil then
-  begin
-    cairo_text_extents(LCairo, PChar(S), @LTextExtents);
-    AWidth^ := Round(LTextExtents.width);
-  end;
+  Color := ColorToRGB(Color);
+  Result := From(255, GetRValue(Color), GetGValue(Color), GetBValue(Color));
 end;
 
+class function TCairoColor.From(Font: TFont): TCairoColor;
+begin
+  Result := From(TFontAccess(Font).GetColor);
+end;
 {$ENDREGION}
 
 {$REGION ' DrawText '}
+
+function Contains(const D: TLongWordDynArray; Index: LongWord): Boolean;
+var
+  I: Integer;
+begin
+  for I := Low(D) to High(D) do
+  begin
+    if D[I] = Index then
+      Exit(True);
+  end;
+  Result := False;
+end;
+
+procedure OffsetGlyphs(AGlyphs: PCairoGlyphArray; ACount: Integer; ADeltaX, ADeltaY: Double);
+var
+  I: Integer;
+begin
+  for I := 0 to ACount - 1 do
+    with AGlyphs^[I] do
+    begin
+      X := X + ADeltaX;
+      Y := Y + ADeltaY;
+    end;
+end;
 
 function CairoCalculateTextLayout(AFont: Pcairo_scaled_font_t;
   ALines: PCairoTextLine; const ARect: TRect; AFlags: Cardinal): Integer;
@@ -467,11 +559,7 @@ const
     LGlyphs: PCairoGlyphArray;
   begin
     D := nil;
-    LGlyphs := nil;
-    LGlyphCount := 0;
-    cairo_scaled_font_text_to_glyphs(AFont, 0, 0,
-      PChar(S), Length(S), @LGlyphs, @LGlyphCount, nil, nil, nil);
-    if LGlyphs <> nil then
+    if cairo_text_to_glyphs(AFont, S, LGlyphs, LGlyphCount) then
     try
       SetLength(D{%H-}, LGlyphCount);
       for I := 0 to LGlyphCount - 1 do
@@ -491,7 +579,7 @@ var
   LGlyphWidth: Double;
   LGlyphWidths: TDoubleDynArray;
   LEndEllipsis: TLongWordDynArray;
-  LFontExtents: cairo_font_extents_t;
+  LFontMetrics: TCairoFontMetrics;
   LTextExtents: cairo_text_extents_t;
   LLineScan: PCairoTextLine;
   LLineStart: Integer;
@@ -503,7 +591,7 @@ var
 begin
   LGlyphs := ALines^.Glyphs;
   LGlyphCount := ALines^.GlyphCount;
-  cairo_scaled_font_extents(AFont, @LFontExtents);
+  cairo_font_metrics(AFont, LFontMetrics);
 
   // Считаем лейаут
   if AFlags and DT_SINGLELINE = 0 then
@@ -525,7 +613,7 @@ begin
         if Contains(LLineBreaks, LGlyphs^[I].Index) then
         begin
           ALines.Push(LGlyphs, I + 1, LGlyphCount);
-          LOffsetY := LOffsetY + LFontExtents.height;
+          LOffsetY := LOffsetY + LFontMetrics.height;
           LOffsetX := 0;
         end;
       end;
@@ -556,7 +644,7 @@ begin
           begin
             LLineStart := J + 1;
             ALines.Push(LGlyphs, LLineStart, LGlyphCount);
-            LOffsetY := LOffsetY + LFontExtents.height;
+            LOffsetY := LOffsetY + LFontMetrics.height;
             LOffsetX := 0;
             I := LLineStart;
             Continue;
@@ -570,7 +658,7 @@ begin
         begin
           LLineStart := I + 1;
           ALines.Push(LGlyphs, LLineStart, LGlyphCount);
-          LOffsetY := LOffsetY + LFontExtents.height;
+          LOffsetY := LOffsetY + LFontMetrics.height;
           LOffsetX := 0;
         end;
         Inc(I);
@@ -587,10 +675,10 @@ begin
     LLineScan := ALines;
     LHeight := ARect.Height;
     // В случае DT_EDITCONTROL - нам нужна последняя полностью видимая строка!
-    LOffsetY := IfThen(AFlags and DT_EDITCONTROL <> 0, LFontExtents.height, 0);
+    LOffsetY := IfThen(AFlags and DT_EDITCONTROL <> 0, LFontMetrics.height, 0);
     while LHeight > LOffsetY do
     begin
-      LHeight := LHeight - LFontExtents.height;
+      LHeight := LHeight - LFontMetrics.height;
       if (LHeight > LOffsetY) and (LLineScan.NextLine <> nil) then
         LLineScan := LLineScan.NextLine
       else
@@ -647,15 +735,15 @@ begin
       LHeight := 0;
       LLineScan := ALines;
       LGlyphCount := 0;
-      while (LLineScan <> nil) and (LHeight + LFontExtents.height <= ARect.Height) do
+      while (LLineScan <> nil) and (LHeight + LFontMetrics.height <= ARect.Height) do
       begin
         Inc(LGlyphCount, LLineScan^.GlyphCount);
-        LHeight := LHeight + LFontExtents.height;
+        LHeight := LHeight + LFontMetrics.height;
         LLineScan := LLineScan.NextLine;
       end;
     end
     else
-      LHeight := ALines.GetCount * LFontExtents.height;
+      LHeight := ALines.GetCount * LFontMetrics.height;
 
     // Выравнивание по горизонтали
     if AFlags and DT_CENTER <> 0 then
@@ -671,10 +759,34 @@ begin
     else
       LDeltaY := ARect.Top;
 
-    OffsetGlyphs(LGlyphs, LGlyphCount, ARect.Left,
-      LDeltaY + LFontExtents.height - LFontExtents.descent);
+    OffsetGlyphs(LGlyphs, LGlyphCount, ARect.Left, LDeltaY + LFontMetrics.baseline);
   end;
   Result := LGlyphCount;
+end;
+
+procedure CairoDrawTextStyleLines(ACairo: Pcairo_t; AFontStyle: TFontStyles;
+  X, Y, AWidth: Double; const AMetrics: TCairoFontMetrics); overload;
+begin
+  if CairoTextStyleLines * AFontStyle <> [] then
+  begin
+    if fsUnderline in AFontStyle then
+      cairo_rectangle(ACairo, X, Y + AMetrics.baseline + AMetrics.line_thickness, AWidth, AMetrics.line_thickness);
+    if fsStrikeOut in AFontStyle then
+      cairo_rectangle(ACairo, X, Y + AMetrics.height / 2, AWidth, AMetrics.line_thickness);
+    cairo_fill(ACairo);
+  end;
+end;
+
+procedure CairoDrawTextStyleLines(ACairo: Pcairo_t; AFontStyle: TFontStyles;
+  ALines: PCairoTextLine; const AMetrics: TCairoFontMetrics); overload;
+begin
+  while ALines <> nil do
+  begin
+    if ALines.GlyphCount > 0 then
+      CairoDrawTextStyleLines(ACairo, AFontStyle, ALines^.Glyphs^[0].X,
+        ALines^.Glyphs^[0].Y - AMetrics.baseline, ALines^.Width, AMetrics);
+    ALines := ALines^.NextLine;
+  end;
 end;
 
 procedure CairoDrawTextCore(ACanvas: TCanvas;
@@ -682,7 +794,7 @@ procedure CairoDrawTextCore(ACanvas: TCanvas;
 var
   LCairo: Pcairo_t;
   LFont: Pcairo_scaled_font_t;
-  LFontExtents: cairo_font_extents_t;
+  LFontMetrics: TCairoFontMetrics;
   LGlyphCount: Integer;
   LGlyphs: PCairoGlyphArray;
   LLines: TCairoTextLine;
@@ -692,21 +804,16 @@ begin
   LCairo := cairo_create_context(ACanvas.Handle);
   try
     cairo_set_font(LCairo, ACanvas.Font);
-
-    LGlyphs := nil;
-    LGlyphCount:= 0;
     LFont := cairo_get_scaled_font(LCairo);
-    cairo_scaled_font_text_to_glyphs(LFont, 0, 0,
-      PChar(S), Length(S), @LGlyphs, @LGlyphCount, nil, nil, nil);
-    if LGlyphs <> nil then
+    if cairo_text_to_glyphs(LFont, S, LGlyphs, LGlyphCount) then
     try
-      cairo_scaled_font_extents(LFont, @LFontExtents);
+      cairo_font_metrics(LFont, LFontMetrics);
       if AFlags and DT_CALCRECT <> 0 then
       begin
         LLines.Init(LGlyphs, 0, LGlyphCount);
         try
           CairoCalculateTextLayout(LFont, @LLines, R, AFlags);
-          R.Height := Ceil(LLines.GetCount * LFontExtents.height);
+          R.Height := Ceil(LLines.GetCount * LFontMetrics.height);
           R.Width := Ceil(LLines.GetMaxWidth);
         finally
           LLines.Free;
@@ -715,14 +822,14 @@ begin
       else
       begin
         GetWindowOrgEx(ACanvas.Handle, @LOrigin);
-        if cairo_set_clipping(LCairo, ACanvas, LOrigin) then
+        if cairo_set_clipping(LCairo, ACanvas.Handle, LOrigin) then
         begin
           LRect := R;
           LRect.Offset(-LOrigin.X, -LOrigin.Y);
           LLines.Init(LGlyphs, 0, LGlyphCount);
           try
             CairoCalculateTextLayout(LFont, @LLines, LRect, AFlags);
-            cairo_set_source_color(LCairo, TCairoColor.From(TFontAccess(ACanvas.Font).GetColor));
+            cairo_set_source_color(LCairo, TCairoColor.From(ACanvas.Font));
             if AFlags and DT_NOCLIP = 0 then
             begin
               cairo_rectangle(LCairo, LRect.Left, LRect.Top, LRect.Width, LRect.Height);
@@ -730,7 +837,7 @@ begin
             end;
             cairo_show_glyphs(LCairo, @LGlyphs^[0], LGlyphCount);
             if CairoTextStyleLines * ACanvas.Font.Style <> [] then
-              CairoDrawTextStyleLines(LCairo, ACanvas.Font.Style, @LLines, LFontExtents);
+              CairoDrawTextStyleLines(LCairo, ACanvas.Font.Style, @LLines, LFontMetrics);
           finally
             LLines.Free;
           end;
@@ -768,183 +875,144 @@ begin
   CairoDrawTextCore(ACanvas, LText, R, AFlags);
 end;
 
-{$ENDREGION}
-
-{ TCairoColor }
-
-class function TCairoColor.From(A, R, G, B: Byte): TCairoColor;
+function CairoTextGetLastVisible(ACanvas: TCanvas; const S: string; AMaxWidth: Integer): Integer;
+var
+  LCairo: pcairo_t;
+  LFont: pcairo_scaled_font_t;
+  LGlyphCount: Integer;
+  LGlyphs: PCairoGlyphArray;
+  LTextExtents: cairo_text_extents_t;
 begin
-  Result.R := R / 255;
-  Result.G := G / 255;
-  Result.B := B / 255;
-  Result.A := A / 255;
-end;
-
-class function TCairoColor.From(Color: TAlphaColor): TCairoColor;
-begin
-  Result := From(Color.A, Color.R, Color.G, Color.B);
-end;
-
-class function TCairoColor.From(Color: TColor): TCairoColor;
-begin
-  Color := ColorToRGB(Color);
-  Result := From(255, GetRValue(Color), GetGValue(Color), GetBValue(Color));
-end;
-
-{ TCairoCanvas }
-
-procedure TCairoCanvas.BeginPaint(ACanvas: TCanvas);
-begin
-  if FHandle <> nil then
-    raise EInvalidGraphicOperation.Create(ClassName + ' recursive calls not yet supported');
-
-  // Если DC у DIB-а уже захвачен - рисуем на нем, не переключаемся.
-  // Иначе запрос Bits спровоцирует отключение канваса и следующий за нами
-  // вызов уже получит канвас без Handle-а и не сможет получить валидный WindowOrg
-  if not ACanvas.HandleAllocated and (ACanvas is TACLDibCanvas) then
-  begin
-    FTargetSurface := cairo_create_surface(
-      TACLDibCanvas(ACanvas).Owner.Colors,
-      TACLDibCanvas(ACanvas).Owner.Width,
-      TACLDibCanvas(ACanvas).Owner.Height);
-    FHandle := cairo_create(FTargetSurface);
-    FOrigin := NullPoint;
-  end
-  else
-  begin
-    GetWindowOrgEx(ACanvas.Handle, {%H-}FOrigin);
-    FHandle := cairo_create_context(ACanvas.Handle);
-  end;
-
-  cairo_set_clipping(Handle, ACanvas, FOrigin);
-end;
-
-procedure TCairoCanvas.EndPaint;
-begin
-  if FHandle <> nil then
+  LCairo := TCairoMeasurer.Context(ACanvas);
+  LFont := cairo_get_scaled_font(LCairo);
+  if cairo_text_to_glyphs(LFont, S, LGlyphs, LGlyphCount) then
   try
-    cairo_destroy(FHandle);
-    if FTargetSurface <> nil then
-      cairo_surface_destroy(FTargetSurface);
-    FTargetSurface := nil;
+    cairo_scaled_font_glyph_extents(LFont, @LGlyphs^[0], LGlyphCount, @LTextExtents);
+    while (LGlyphCount > 0) and (LTextExtents.x_advance > AMaxWidth) do
+    begin
+      LTextExtents.x_advance := LGlyphs^[LGlyphCount - 1].x;
+      Dec(LGlyphCount);
+    end;
+    Result := UTF8CodepointToByteIndex(PChar(S), Length(S), LGlyphCount);
   finally
-    FHandle := nil;
+    cairo_glyph_free(@LGlyphs^[0]);
   end;
 end;
 
-procedure TCairoCanvas.FillRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor);
-begin
-  if (X2 > X1) and (Y2 > Y1) then
-  begin
-    cairo_set_source_color(Handle, Color);
-    cairo_rectangle(Handle, X1 - Origin.X, Y1 - Origin.Y, X2 - X1, Y2 - Y1);
-    cairo_fill(Handle);
-  end;
-end;
-
-procedure TCairoCanvas.FillRectangleByGradient(
-  AFrom, ATo: TAlphaColor; const ARect: TRect; AVertical: Boolean);
+procedure CairoTextOut(ACanvas: TCanvas; X, Y: Integer;
+  AText: PChar; ALength: Integer; AClipRect: PRect = nil);
 var
-  LPattern: Pcairo_pattern_t;
+  LCairo: pcairo_t;
+  LOrigin: TPoint;
+  LFont: pcairo_scaled_font_t;
+  LFontMetrics: TCairoFontMetrics;
+  LTextExtents: cairo_text_extents_t;
+  LGlyphCount: Integer;
+  LGlyphs: Pcairo_glyph_t;
 begin
-  if AVertical then
-    LPattern := cairo_pattern_create_linear(0, ARect.Top - Origin.Y, 0, ARect.Bottom - Origin.Y)
-  else
-    LPattern := cairo_pattern_create_linear(ARect.Left - Origin.X, 0, ARect.Right - Origin.X, 0);
+  GetWindowOrgEx(ACanvas.Handle, @LOrigin);
+  Dec(X, LOrigin.X);
+  Dec(Y, LOrigin.Y);
 
-  with TCairoColor.From(AFrom) do
-    cairo_pattern_add_color_stop_rgba(LPattern, 0.0, R, G, B, A);
-  with TCairoColor.From(ATo) do
-    cairo_pattern_add_color_stop_rgba(LPattern, 1.0, R, G, B, A);
+  LCairo := cairo_create_context(ACanvas.Handle);
+  try
+    if cairo_set_clipping(LCairo, ACanvas.Handle, LOrigin) then
+    begin
+      if AClipRect <> nil then
+      begin
+        cairo_rectangle(LCairo, AClipRect.Left - LOrigin.X,
+          AClipRect.Top - LOrigin.Y, AClipRect.Width, AClipRect.Height);
+        cairo_clip(LCairo);
+      end;
 
-  cairo_rectangle(Handle, ARect.Left - Origin.X,
-    ARect.Top - Origin.Y, ARect.Width, ARect.Height);
-  cairo_set_source(Handle, LPattern);
-  cairo_fill(Handle);
+      cairo_set_font(LCairo, ACanvas.Font);
+      cairo_set_source_color(LCairo, TCairoColor.From(ACanvas.Font));
 
-  cairo_pattern_destroy(LPattern);
-end;
-
-procedure TCairoCanvas.FillSurface(const ATargetRect, ASourceRect: TRect;
-  ASurface: Pcairo_surface_t; AAlpha: Double; ATileMode: Boolean);
-var
-  LCairo: Pcairo_t;
-  LMatrix: cairo_matrix_t;
-  LSurface: Pcairo_surface_t;
-  LSourceW, LSourceH: LongInt;
-  LTargetW, LTargetH: Double;
-  X, Y: Double;
-begin
-  LSourceH := ASourceRect.Height;
-  LSourceW := ASourceRect.Width;
-  LTargetH := ATargetRect.Height;
-  LTargetW := ATargetRect.Width;
-  X := ATargetRect.Left - Origin.X;
-  Y := ATargetRect.Top - Origin.Y;
-
-  if ATileMode then
-  begin
-    LSurface := cairo_image_surface_create(CAIRO_FORMAT_ARGB32, LSourceW, LSourceH);
-
-    LCairo := cairo_create(LSurface);
-    cairo_set_source_surface(LCairo, ASurface, -ASourceRect.Left, -ASourceRect.Top);
-    cairo_rectangle(LCairo, 0, 0, LSourceW, LSourceH);
-    cairo_paint_with_alpha(LCairo, AAlpha);
+      LFont := cairo_get_scaled_font(LCairo);
+      cairo_font_metrics(LFont, LFontMetrics);
+      if cairo_text_to_glyphs(LFont, AText, ALength, LGlyphs, LGlyphCount, X, Y + LFontMetrics.baseline) then
+      try
+        cairo_scaled_font_glyph_extents(LFont, LGlyphs, LGlyphCount, @LTextExtents);
+        cairo_show_glyphs(LCairo, LGlyphs, LGlyphCount);
+        if CairoTextStyleLines * ACanvas.Font.Style <> [] then
+          CairoDrawTextStyleLines(LCairo, ACanvas.Font.Style, X, Y, LTextExtents.x_advance, LFontMetrics);
+      finally
+        cairo_glyph_free(LGlyphs);
+      end;
+    end;
+  finally
     cairo_destroy(LCairo);
+  end;
+end;
 
-    cairo_set_source_surface(Handle, LSurface, X, Y);
-    cairo_pattern_set_extend(cairo_get_source(Handle), CAIRO_EXTEND_REPEAT);
-    cairo_rectangle(Handle, X, Y, LTargetW, LTargetH);
-    cairo_fill(Handle);
-    cairo_surface_destroy(LSurface);
+procedure CairoTextSize(ACanvas: TCanvas; const S: string; AWidth, AHeight: PInteger);
+var
+  LCairo: pcairo_t;
+  LFontExtents: cairo_font_extents_t;
+  LTextExtents: cairo_text_extents_t;
+begin
+  LCairo := TCairoMeasurer.Context(ACanvas);
+  if AHeight <> nil then
+  begin
+    cairo_font_extents(LCairo, @LFontExtents);
+    AHeight^ := Round(LFontExtents.height);
+  end;
+  if AWidth <> nil then
+  begin
+    cairo_text_extents(LCairo, PChar(S), @LTextExtents);
+    AWidth^ := Round(LTextExtents.width);
+  end;
+end;
+
+{ TCairoMeasurer }
+
+class destructor TCairoMeasurer.Destroy;
+begin
+  if FContext <> nil then
+  begin
+    cairo_destroy(FContext);
+    FContext := nil;
+  end;
+  FreeAndNil(FBitmap);
+end;
+
+class function TCairoMeasurer.Context(ACanvas: TCanvas): Pcairo_t;
+begin
+  if FBitmap = nil then
+  begin
+    FBitmap := TACLDib.Create(1, 1);
+    FBitmap.Canvas.Font := ACanvas.Font;
+    FContext := cairo_create_context(FBitmap.Canvas.Handle);
+    cairo_set_font(FContext, ACanvas.Font);
   end
   else
-  begin
-    cairo_set_source_surface(Handle, ASurface, 0, 0);
-    cairo_matrix_init_identity(@LMatrix);
-    cairo_matrix_translate(@LMatrix, ASourceRect.Left, ASourceRect.Top);
-    cairo_matrix_scale(@LMatrix, LSourceW / LTargetW, LSourceH / LTargetH);
-    cairo_matrix_translate(@LMatrix, -X, -Y);
-    cairo_pattern_set_matrix(cairo_get_source(Handle), @LMatrix);
-    cairo_pattern_set_filter(cairo_get_source(Handle), CAIRO_FILTER_NEAREST);
-    cairo_rectangle(Handle, X, Y, LTargetW, LTargetH);
-    if AAlpha < 1.0 then
+    if FBitmap.Canvas.Font.Handle <> ACanvas.Font.Handle then
+    //if not ACanvas.Font.IsEqual(FBitmap.Canvas.Font) then
     begin
-      cairo_save(Handle);
-      cairo_clip(Handle);
-      cairo_paint_with_alpha(Handle, 1.0);
-      cairo_restore(Handle);
-    end
-    else
-      cairo_fill(Handle);
-  end;
+      FBitmap.Canvas.Font := ACanvas.Font;
+      cairo_set_font(FContext, ACanvas.Font);
+    end;
+
+  Result := FContext;
 end;
 
-procedure TCairoCanvas.Line(X1, Y1, X2, Y2: Single;
-  Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
+class function TCairoMeasurer.DefaultFontName: string;
 begin
-  SetLineStyle(Width, Style);
-  cairo_set_source_color(FHandle, Color);
-  cairo_set_line_width(FHandle, Width);
-  cairo_move_to(FHandle, X1 - Origin.X, Y1 - Origin.Y);
-  cairo_line_to(FHandle, X2 - Origin.X, Y2 - Origin.Y);
-  cairo_stroke(FHandle);
+  if FDefaultFontData.Name = '' then
+    InitDefaultFont;
+  Result := FDefaultFontData.Name;
 end;
 
-procedure TCairoCanvas.SetLineStyle(AWidth: Single; AStyle: TACL2DRenderStrokeStyle);
+class function TCairoMeasurer.DefaultFontSize: Integer;
 begin
-  case AStyle of
-    ssDashDotDot:
-      cairo_set_dash(FHandle, [4 * AWidth, AWidth, AWidth, AWidth, AWidth, AWidth]);
-    ssDashDot:
-      cairo_set_dash(FHandle, [4 * AWidth, AWidth, AWidth, AWidth]);
-    ssDash:
-      cairo_set_dash(FHandle, [4 * AWidth, AWidth]);
-    ssDot:
-      cairo_set_dash(FHandle, [AWidth]);
-  else
-    cairo_set_dash(FHandle, nil, 0, 0);
-  end;
+  if FDefaultFontData.Height = 0 then
+    InitDefaultFont;
+  Result := FDefaultFontData.Height;
+end;
+
+class procedure TCairoMeasurer.InitDefaultFont;
+begin
+  FDefaultFontData := GetFontData(GetStockObject(DEFAULT_GUI_FONT));
 end;
 
 { TCairoTextLine }
@@ -1028,57 +1096,6 @@ begin
   LCurr^.GlyphCount := LCurr^.NextLine^.Glyphs - LCurr^.Glyphs;
 end;
 
-{ TCairoMeasurer }
-
-class destructor TCairoMeasurer.Destroy;
-begin
-  if FContext <> nil then
-  begin
-    cairo_destroy(FContext);
-    FContext := nil;
-  end;
-  FreeAndNil(FBitmap);
-end;
-
-class function TCairoMeasurer.Context(ACanvas: TCanvas): Pcairo_t;
-begin
-  if FBitmap = nil then
-  begin
-    FBitmap := TACLDib.Create(1, 1);
-    FBitmap.Canvas.Font := ACanvas.Font;
-    FContext := cairo_create_context(FBitmap.Canvas.Handle);
-    cairo_set_font(FContext, ACanvas.Font);
-  end
-  else
-    if FBitmap.Canvas.Font.Handle <> ACanvas.Font.Handle then
-    //if not ACanvas.Font.IsEqual(FBitmap.Canvas.Font) then
-    begin
-      FBitmap.Canvas.Font := ACanvas.Font;
-      cairo_set_font(FContext, ACanvas.Font);
-    end;
-
-  Result := FContext;
-end;
-
-class function TCairoMeasurer.DefaultFontName: string;
-begin
-  if FDefaultFontData.Name = '' then
-    InitDefaultFont;
-  Result := FDefaultFontData.Name;
-end;
-
-class function TCairoMeasurer.DefaultFontSize: Integer;
-begin
-  if FDefaultFontData.Height = 0 then
-    InitDefaultFont;
-  Result := FDefaultFontData.Height;
-end;
-
-class procedure TCairoMeasurer.InitDefaultFont;
-begin
-  FDefaultFontData := GetFontData(GetStockObject(DEFAULT_GUI_FONT));
-end;
-
 { TCairoTextLayoutMetrics }
 
 class function TCairoTextLayoutMetrics.Allocate(AGlyphCount: Integer): PCairoTextLayoutMetrics;
@@ -1103,7 +1120,7 @@ begin
   inherited Create(ACanvas);
   FHandle := cairo_create_context(ACanvas.Handle);
   GetWindowOrgEx(Canvas.Handle, @FOrigin);
-  cairo_set_clipping(FHandle, Canvas, FOrigin);
+  cairo_set_clipping(FHandle, Canvas.Handle, FOrigin);
 end;
 
 destructor TACLTextLayoutCairoRender.Destroy;
@@ -1119,8 +1136,8 @@ var
 begin
   cairo_text_extents(FHandle, ' ', @LTextExtents);
   ASpaceWidth := Round(LTextExtents.x_advance);
-  ALineHeight := Round(FFontExtents.height);
-  ABaseLine := Round(FFontExtents.height - FFontExtents.descent);
+  ALineHeight := Round(FFontMetrics.height);
+  ABaseLine := Round(FFontMetrics.baseline);
   FLineHeight := ALineHeight;
 end;
 
@@ -1131,12 +1148,8 @@ var
   LGlyphCount: Integer;
   LGlyphs: Pcairo_glyph_t;
 begin
-  LGlyphs := nil;
-  LGlyphCount := 0;
   LBlock.FLengthVisible := 0;
-  cairo_scaled_font_text_to_glyphs(FFont, 0, 0,
-    LBlock.Text, LBlock.TextLength, @LGlyphs, @LGlyphCount, nil, nil, nil);
-  if LGlyphs <> nil then
+  if cairo_text_to_glyphs(FFont, LBlock.Text, LBlock.TextLength, LGlyphs, LGlyphCount, 0, 0) then
   try
     if LBlock.FMetrics = nil then
       LBlock.FMetrics := TCairoTextLayoutMetrics.Allocate(LGlyphCount);
@@ -1160,12 +1173,12 @@ procedure TACLTextLayoutCairoRender.SetFont(AFont: TFont);
 begin
   Canvas.Font := AFont; // иначе TFont.GetColor не сработает
   cairo_set_font(FHandle, AFont);
-  FFontColor := TCairoColor.From(TFontAccess(Canvas.Font).GetColor);
+  FFontColor := TCairoColor.From(Canvas.Font);
   cairo_set_source_color(FHandle, FFontColor);
   FFont := cairo_get_scaled_font(FHandle);
-  cairo_scaled_font_extents(FFont, @FFontExtents);
+  cairo_font_metrics(FFont, FFontMetrics);
   FFontHasLines := CairoTextStyleLines * AFont.Style <> [];
-  FLineHeight := Round(FFontExtents.height);
+  FLineHeight := Round(FFontMetrics.height);
 end;
 
 procedure TACLTextLayoutCairoRender.Shrink(
@@ -1194,7 +1207,6 @@ procedure TACLTextLayoutCairoRender.TextOut(ABlock: TACLTextLayoutBlockText; X, 
 var
   LBlock: TTextBlock absolute ABlock;
   LMetrics: PCairoTextLayoutMetrics;
-  LOffsetY: Double;
 begin
   LMetrics := PCairoTextLayoutMetrics(LBlock.FMetrics);
   if (LMetrics <> nil) and (LMetrics^.Count > 0) then
@@ -1210,18 +1222,709 @@ begin
       cairo_set_source_color(FHandle, FFontColor);
     end;
 
-    LOffsetY := Y + FFontExtents.height - FFontExtents.descent;
-    OffsetGlyphs(@LMetrics^.Glyphs[0], LMetrics^.Count,  X,  LOffsetY);
+    OffsetGlyphs(@LMetrics^.Glyphs[0], LMetrics^.Count,  X,  Y + FFontMetrics.baseline);
     cairo_show_glyphs(FHandle, @LMetrics^.Glyphs[0], LMetrics^.Count);
-    OffsetGlyphs(@LMetrics^.Glyphs[0], LMetrics^.Count, -X, -LOffsetY);
+    OffsetGlyphs(@LMetrics^.Glyphs[0], LMetrics^.Count, -X, -Y - FFontMetrics.baseline);
 
     if FFontHasLines then
-      CairoDrawTextStyleLines(FHandle, Canvas.Font.Style, X, Y, ABlock.TextWidth, FFontExtents);
+      CairoDrawTextStyleLines(FHandle, Canvas.Font.Style, X, Y, ABlock.TextWidth, FFontMetrics);
+  end;
+end;
+{$ENDREGION}
+
+{$REGION ' Render2D '}
+
+{ TACLCairoRender }
+
+constructor TACLCairoRender.Create;
+begin
+  inherited;
+  FWorldTransforms := TStack<cairo_matrix_t>.Create;
+end;
+
+destructor TACLCairoRender.Destroy;
+begin
+  FreeAndNil(FWorldTransforms);
+  inherited Destroy;
+end;
+
+procedure TACLCairoRender.BeginPaint(ACanvas: TCanvas);
+begin
+  if Handle <> nil then
+    raise EInvalidGraphicOperation.Create(ClassName + ' recursive calls not yet supported');
+
+  FOrigin := NullPoint;
+  // Если DC у DIB-а уже захвачен - рисуем на нем, не переключаемся.
+  // Иначе запрос Bits спровоцирует отключение канваса и следующий за нами
+  // вызов уже получит канвас без Handle-а и не сможет получить валидный WindowOrg
+  if not ACanvas.HandleAllocated and (ACanvas is TACLDibCanvas) then
+  begin
+    FTargetSurface := cairo_create_surface(
+      TACLDibCanvas(ACanvas).Owner.Colors,
+      TACLDibCanvas(ACanvas).Owner.Width,
+      TACLDibCanvas(ACanvas).Owner.Height);
+    FHandle := cairo_create(FTargetSurface);
+  end
+  else
+  begin
+    FTargetSurface := nil;
+    GetWindowOrgEx(ACanvas.Handle, @FOrigin);
+    FHandle := cairo_create_context(ACanvas.Handle);
+    cairo_set_clipping(Handle, ACanvas.Handle, FOrigin);
   end;
 end;
 
+procedure TACLCairoRender.BeginPaint(ASurface: Pcairo_surface_t);
+begin
+  FTargetSurface := nil;
+  FHandle := cairo_create(ASurface);
+  FOrigin := NullPoint;
+end;
+
+procedure TACLCairoRender.BeginPaint(DC: HDC; const BoxRect, UpdateRect: TRect);
+begin
+  FTargetSurface := nil;
+  FHandle := cairo_create_context(DC);
+  GetWindowOrgEx(DC, {%H-}FOrigin);
+  cairo_rectangle(FHandle,
+    UpdateRect.Left - FOrigin.X,
+    UpdateRect.Top - FOrigin.Y,
+    UpdateRect.Width, UpdateRect.Height);
+  cairo_clip(FHandle);
+end;
+
+procedure TACLCairoRender.EndPaint;
+begin
+  if FHandle <> nil then
+  try
+    cairo_destroy(FHandle);
+    if FTargetSurface <> nil then
+      cairo_surface_destroy(FTargetSurface);
+    FTargetSurface := nil;
+  finally
+    FHandle := nil;
+  end;
+end;
+
+function TACLCairoRender.CreateImage(Colors: PACLPixel32;
+  Width, Height: Integer; AlphaFormat: TAlphaFormat): TACL2DRenderImage;
+begin
+  Result := TACLCairoRenderImage.Create(Self, Colors, Width, Height, AlphaFormat);
+end;
+
+function TACLCairoRender.CreateImageAttributes: TACL2DRenderImageAttributes;
+begin
+  Result := TACL2DRenderImageAttributes.Create(Self);
+end;
+
+function TACLCairoRender.CreatePath: TACL2DRenderPath;
+begin
+  Result := TACLCairoRenderPath.Create(Self);
+end;
+
+function TACLCairoRender.IntersectClipRect(const R: TRect): Boolean;
+begin
+  cairo_rectangle(Handle, R.Left - Origin.X, R.Top - Origin.Y, R.Width, R.Height);
+  cairo_clip(Handle);
+  Result := IsVisible(R);
+end;
+
+function TACLCairoRender.IsVisible(const R: TRect): Boolean;
+begin
+  Result := True;
+end;
+
+procedure TACLCairoRender.RestoreClipRegion;
+begin
+  SaveWorldTransform;
+  cairo_restore(Handle);
+  RestoreWorldTransform;
+end;
+
+procedure TACLCairoRender.SaveClipRegion;
+begin
+  cairo_save(Handle);
+end;
+
+procedure TACLCairoRender.DrawEllipse(X1, Y1, X2, Y2: Single;
+  Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
+begin
+  if (X2 > X1) and (Y2 > Y1) and Color.IsValid then
+  begin
+    PathEllipseArc(X1, Y1, X2, Y2);
+    cairo_set_line(Handle, Width, Style);
+    cairo_set_source_color(Handle, Color);
+    cairo_stroke(Handle);
+  end;
+end;
+
+procedure TACLCairoRender.FillEllipse(X1, Y1, X2, Y2: Single; Color: TAlphaColor);
+begin
+  if (X2 > X1) and (Y2 > Y1) and Color.IsValid then
+  begin
+    PathEllipseArc(X1, Y1, X2, Y2);
+    cairo_set_source_color(Handle, Color);
+    cairo_fill(Handle);
+  end;
+end;
+
+procedure TACLCairoRender.Line(X1, Y1, X2, Y2: Single;
+  Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
+begin
+  cairo_move_to(Handle, X1 - Origin.X, Y1 - Origin.Y);
+  cairo_line_to(Handle, X2 - Origin.X, Y2 - Origin.Y);
+  cairo_set_source_color(Handle, Color);
+  cairo_set_line(Handle, Width, Style);
+  cairo_stroke(Handle);
+end;
+
+procedure TACLCairoRender.Line(const Points: PPoint; Count: Integer;
+  Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
+begin
+  if (Count > 1) and Color.IsValid and (Width > 0) then
+  begin
+    PathPolyline(Points, Count, False);
+    cairo_set_source_color(Handle, Color);
+    cairo_set_line(Handle, Width, Style);
+    cairo_stroke(Handle);
+  end;
+end;
+
+procedure TACLCairoRender.DrawImage(Image: TACL2DRenderImage;
+  const TargetRect, SourceRect: TRect; Alpha: Byte);
+begin
+  if IsValid(Image) then
+    FillSurface(TargetRect, SourceRect, TACLCairoRenderImage(Image).Handle, Alpha / 255, False);
+end;
+
+procedure TACLCairoRender.DrawImage(Image: TACL2DRenderImage;
+  const TargetRect, SourceRect: TRect; Attributes: TACL2DRenderImageAttributes);
+var
+  LColor: TCairoColor;
+  LTemp: TACLCairoRender;
+  LTempRect: TRect;
+  LTempSurface: Pcairo_surface_t;
+begin
+  if not IsValid(Image) then
+    Exit;
+  if not IsValid(Attributes) then
+  begin
+    DrawImage(Image, TargetRect, SourceRect);
+    Exit;
+  end;
+
+  if Attributes.TintColor.IsValid then
+  begin
+    LColor := TCairoColor.From(Attributes.TintColor);
+    LColor.A := LColor.A * Attributes.Alpha / MaxByte;
+    cairo_set_source_color(Handle, LColor);
+
+    if TargetRect.EqualSizes(SourceRect) then
+    begin
+      cairo_mask_surface(Handle, TACLCairoRenderImage(Image).Handle,
+        TargetRect.Left - Origin.X, TargetRect.Top - Origin.Y);
+    end
+    else
+    begin
+      LTempRect := TargetRect - TargetRect.TopLeft;
+      LTempSurface := cairo_create_surface(LTempRect.Right, LTempRect.Bottom);
+      try
+        LTemp := TACLCairoRender.Create;
+        try
+          LTemp.BeginPaint(LTempSurface);
+          LTemp.FillSurface(LTempRect, SourceRect,
+            TACLCairoRenderImage(Image).Handle, 1.0, False);
+          LTemp.EndPaint;
+        finally
+          LTemp.Free;
+        end;
+        cairo_mask_surface(Handle, LTempSurface,
+          TargetRect.Left - Origin.X, TargetRect.Top - Origin.Y);
+      finally
+        cairo_surface_destroy(LTempSurface);
+      end;
+    end;
+  end
+  else
+    DrawImage(Image, TargetRect, SourceRect, Attributes.Alpha);
+end;
+
+procedure TACLCairoRender.DrawRectangle(X1, Y1, X2, Y2: Single;
+  Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
+begin
+  if (X2 > X1) and (Y2 > Y1) then
+  begin
+    cairo_rectangle(Handle, X1 - Origin.X, Y1 - Origin.Y, X2 - X1, Y2 - Y1);
+    cairo_set_source_color(Handle, Color);
+    cairo_set_line(Handle, Width, Style);
+    cairo_stroke(Handle);
+  end;
+end;
+
+procedure TACLCairoRender.FillHatchRectangle(
+  const R: TRect; Color1, Color2: TAlphaColor; Size: Integer);
+var
+  LTemp: Pcairo_t;
+  LTempSurface: Pcairo_surface_t;
+  X, Y: Double;
+begin
+  LTempSurface := cairo_create_surface(2 * Size, 2 * Size);
+  try
+    LTemp := cairo_create(LTempSurface);
+    try
+      // Color1
+      cairo_set_source_color(LTemp, Color1);
+      cairo_rectangle(LTemp,    0,    0, Size, Size);
+      cairo_rectangle(LTemp, Size, Size, Size, Size);
+      cairo_fill(LTemp);
+      // Color2
+      cairo_set_source_color(LTemp, Color2);
+      cairo_rectangle(LTemp,    0, Size, Size, Size);
+      cairo_rectangle(LTemp, Size,    0, Size, Size);
+      cairo_fill(LTemp);
+    finally
+      cairo_destroy(LTemp);
+    end;
+
+    X := R.Left - Origin.X;
+    Y := R.Top - Origin.Y;
+    cairo_set_source_surface(Handle, LTempSurface, X, Y);
+    cairo_pattern_set_extend(cairo_get_source(Handle), CAIRO_EXTEND_REPEAT);
+    cairo_rectangle(Handle, X, Y, R.Width, R.Height);
+    cairo_fill(Handle);
+  finally
+    cairo_surface_destroy(LTempSurface);
+  end;
+end;
+
+procedure TACLCairoRender.FillRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor);
+begin
+  if (X2 > X1) and (Y2 > Y1) then
+  begin
+    cairo_set_source_color(Handle, Color);
+    cairo_rectangle(Handle, X1 - Origin.X, Y1 - Origin.Y, X2 - X1, Y2 - Y1);
+    cairo_fill(Handle);
+  end;
+end;
+
+procedure TACLCairoRender.FillRectangleByGradient(
+  AFrom, ATo: TAlphaColor; const ARect: TRect; AVertical: Boolean);
+var
+  LPattern: Pcairo_pattern_t;
+begin
+  if AVertical then
+    LPattern := cairo_pattern_create_linear(0, ARect.Top - Origin.Y, 0, ARect.Bottom - Origin.Y)
+  else
+    LPattern := cairo_pattern_create_linear(ARect.Left - Origin.X, 0, ARect.Right - Origin.X, 0);
+
+  with TCairoColor.From(AFrom) do
+    cairo_pattern_add_color_stop_rgba(LPattern, 0.0, R, G, B, A);
+  with TCairoColor.From(ATo) do
+    cairo_pattern_add_color_stop_rgba(LPattern, 1.0, R, G, B, A);
+
+  cairo_rectangle(Handle, ARect.Left - Origin.X,
+    ARect.Top - Origin.Y, ARect.Width, ARect.Height);
+  cairo_set_source(Handle, LPattern);
+  cairo_fill(Handle);
+
+  cairo_pattern_destroy(LPattern);
+end;
+
+procedure TACLCairoRender.FillSurface(const ATargetRect, ASourceRect: TRect;
+  ASurface: Pcairo_surface_t; AAlpha: Double; ATileMode: Boolean);
+var
+  LCairo: Pcairo_t;
+  LMatrix: cairo_matrix_t;
+  LSurface: Pcairo_surface_t;
+  LSourceW, LSourceH: LongInt;
+  LTargetW, LTargetH: Double;
+  X, Y: Double;
+begin
+  LSourceH := ASourceRect.Height;
+  LSourceW := ASourceRect.Width;
+  LTargetH := ATargetRect.Height;
+  LTargetW := ATargetRect.Width;
+  X := ATargetRect.Left - Origin.X;
+  Y := ATargetRect.Top - Origin.Y;
+
+  if ATileMode then
+  begin
+    LSurface := cairo_create_surface(LSourceW, LSourceH);
+
+    LCairo := cairo_create(LSurface);
+    cairo_set_source_surface(LCairo, ASurface, -ASourceRect.Left, -ASourceRect.Top);
+    cairo_rectangle(LCairo, 0, 0, LSourceW, LSourceH);
+    cairo_paint_with_alpha(LCairo, AAlpha);
+    cairo_destroy(LCairo);
+
+    cairo_set_source_surface(Handle, LSurface, X, Y);
+    cairo_pattern_set_extend(cairo_get_source(Handle), CAIRO_EXTEND_REPEAT);
+    cairo_rectangle(Handle, X, Y, LTargetW, LTargetH);
+    cairo_fill(Handle);
+    cairo_surface_destroy(LSurface);
+  end
+  else
+  begin
+    cairo_set_source_surface(Handle, ASurface, 0, 0);
+    cairo_matrix_init_identity(@LMatrix);
+    cairo_matrix_translate(@LMatrix, ASourceRect.Left, ASourceRect.Top);
+    cairo_matrix_scale(@LMatrix, LSourceW / LTargetW, LSourceH / LTargetH);
+    cairo_matrix_translate(@LMatrix, -X, -Y);
+    cairo_pattern_set_matrix(cairo_get_source(Handle), @LMatrix);
+    cairo_pattern_set_filter(cairo_get_source(Handle), CAIRO_FILTER_NEAREST);
+    cairo_rectangle(Handle, X, Y, LTargetW, LTargetH);
+    if AAlpha < 1.0 then
+    begin
+      cairo_save(Handle);
+      cairo_clip(Handle);
+      cairo_paint_with_alpha(Handle, AAlpha);
+      cairo_restore(Handle);
+    end
+    else
+      cairo_fill(Handle);
+  end;
+end;
+
+procedure TACLCairoRender.DrawText(const Text: string; const R: TRect;
+  Color: TAlphaColor; Font: TFont; HorzAlign: TAlignment;
+  VertAlign: TVerticalAlignment; WordWrap: Boolean);
+var
+  LFont: Pcairo_scaled_font_t;
+  LFontMetrics: TCairoFontMetrics;
+  LGlyphCount: Integer;
+  LGlyphs: PCairoGlyphArray;
+  LLines: TCairoTextLine;
+  LFlags: Cardinal;
+begin
+  if R.IsEmpty or not Color.IsValid or (Text = '') then
+    Exit;
+
+  LFlags := acTextAlignHorz[HorzAlign] or acTextAlignVert[VertAlign];
+  if WordWrap then
+    LFlags := LFlags or DT_WORDBREAK;
+
+  cairo_set_font(Handle, Font);
+  LFont := cairo_get_scaled_font(Handle);
+  if cairo_text_to_glyphs(LFont, Text, LGlyphs, LGlyphCount) then
+  try
+    LLines.Init(LGlyphs, 0, LGlyphCount);
+    try
+      CairoCalculateTextLayout(LFont, @LLines, R + Origin, LFlags);
+      cairo_set_source_color(Handle, Color);
+      cairo_show_glyphs(Handle, @LGlyphs^[0], LGlyphCount);
+      if CairoTextStyleLines * Font.Style <> [] then
+      begin
+        cairo_font_metrics(LFont, LFontMetrics);
+        CairoDrawTextStyleLines(Handle, Font.Style, @LLines, LFontMetrics);
+      end;
+    finally
+      LLines.Free;
+    end;
+  finally
+    cairo_glyph_free(@LGlyphs^[0]);
+  end;
+end;
+
+procedure TACLCairoRender.DrawPath(Path: TACL2DRenderPath;
+  Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
+begin
+  if IsValid(Path) then
+  begin
+    TACLCairoRenderPath(Path).Write(Handle, -Origin.X, -Origin.Y);
+    cairo_set_source_color(Handle, Color);
+    cairo_set_line(Handle, Width, Style);
+    cairo_stroke(Handle);
+  end;
+end;
+
+procedure TACLCairoRender.FillPath(Path: TACL2DRenderPath; Color: TAlphaColor);
+begin
+  if IsValid(Path) then
+  begin
+    TACLCairoRenderPath(Path).Write(Handle, -Origin.X, -Origin.Y);
+    cairo_set_source_color(Handle, Color);
+    cairo_fill(Handle);
+  end;
+end;
+
+procedure TACLCairoRender.DrawPolygon(const Points: array of TPoint;
+  Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
+begin
+  if (Length(Points) > 1) and Color.IsValid and (Width > 0) then
+  begin
+    PathPolyline(@Points[0], Length(Points), True);
+    cairo_set_source_color(Handle, Color);
+    cairo_set_line(Handle, Width, Style);
+    cairo_stroke(Handle);
+  end;
+end;
+
+procedure TACLCairoRender.FillPolygon(const Points: array of TPoint; Color: TAlphaColor);
+begin
+  if (Length(Points) > 1) and Color.IsValid then
+  begin
+    PathPolyline(@Points[0], Length(Points), True);
+    cairo_set_source_color(Handle, Color);
+    cairo_fill(Handle);
+  end;
+end;
+
+procedure TACLCairoRender.ModifyWorldTransform(const XForm: TXForm);
+var
+  LMatrix: cairo_matrix_t;
+begin
+  cairo_matrix_init(LMatrix, XForm);
+  cairo_transform(Handle, @LMatrix);
+end;
+
+procedure TACLCairoRender.RestoreWorldTransform;
+var
+  LMatrix: cairo_matrix_t;
+begin
+  LMatrix := FWorldTransforms.Pop;
+  cairo_set_matrix(Handle, @LMatrix);
+end;
+
+procedure TACLCairoRender.SaveWorldTransform;
+var
+  LMatrix: cairo_matrix_t;
+begin
+  cairo_get_matrix(Handle, @LMatrix);
+  FWorldTransforms.Push(LMatrix);
+end;
+
+procedure TACLCairoRender.ScaleWorldTransform(ScaleX, ScaleY: Single);
+begin
+  cairo_scale(Handle, ScaleX, ScaleY);
+end;
+
+procedure TACLCairoRender.SetWorldTransform(const XForm: TXForm);
+var
+  LMatrix: cairo_matrix_t;
+begin
+  cairo_matrix_init(LMatrix, XForm);
+  cairo_set_matrix(Handle, @LMatrix);
+end;
+
+procedure TACLCairoRender.TranslateWorldTransform(OffsetX, OffsetY: Single);
+begin
+  cairo_translate(Handle, OffsetX, OffsetY);
+end;
+
+procedure TACLCairoRender.TransformPoints(Points: PPointF; Count: Integer);
+var
+  LMatrix: cairo_matrix_t;
+  LPoint: TPointF;
+begin
+  cairo_get_matrix(Handle, @LMatrix);
+  while Count > 0 do
+  begin
+    LPoint := Points^;
+    Points^.X := LPoint.X * LMatrix.xx + LPoint.Y * LMatrix.yx + LMatrix.x0;
+    Points^.Y := LPoint.X * LMatrix.xy + LPoint.Y * LMatrix.yy + LMatrix.y0;
+    Inc(Points);
+    Dec(Count);
+  end;
+end;
+
+procedure TACLCairoRender.PathEllipseArc(X1, Y1, X2, Y2: Double);
+begin
+  if (X2 > X1) and (Y2 > Y1) then
+  begin
+    cairo_save(Handle);
+    try
+      cairo_translate(Handle, (X1 + X2) * 0.5 - Origin.X, (Y1 + Y2) * 0.5 - Origin.Y);
+      cairo_scale(Handle, (X2 - X1) * 0.5, (Y2 - Y1) * 0.5);
+      cairo_move_to(Handle, 1, 0);
+      cairo_arc(Handle, 0, 0, 1, 0, 2 * PI);
+    finally
+      cairo_restore(Handle);
+    end;
+  end;
+end;
+
+procedure TACLCairoRender.PathPolyline(Points: PPoint; Count: Integer; ClosePath: Boolean);
+var
+  LFirstPoint: PPoint;
+begin
+  if Count > 1 then
+  begin
+    LFirstPoint := Points;
+    cairo_move_to(Handle, Points^.X - Origin.X, Points^.Y - Origin.X);
+    while Count > 1 do
+    begin
+      Inc(Points);
+      Dec(Count);
+      cairo_line_to(Handle, Points^.X - Origin.X, Points^.Y - Origin.X);
+    end;
+    if ClosePath then
+      cairo_line_to(Handle, LFirstPoint^.X - Origin.X, LFirstPoint^.Y - Origin.X);
+  end;
+end;
+
+{ TACLCairoRenderImage }
+
+constructor TACLCairoRenderImage.Create(ARender: TACL2DRender;
+  AColors: PACLPixel32; AWidth, AHeight: Integer; AAlphaFormat: TAlphaFormat);
+var
+  LNumBytes: Integer;
+begin
+  inherited Create(ARender);
+  if AAlphaFormat <> afPremultiplied then
+  begin
+    LNumBytes := AWidth * AHeight * SizeOf(TACLPixel32);
+    FColors := GetMem(LNumBytes);
+    Move(AColors^, FColors^, LNumBytes);
+    if AAlphaFormat = afDefined then
+      TACLColors.Premultiply(FColors, AWidth * AHeight);
+    if AAlphaFormat = afIgnored then
+      TACLColors.MakeOpaque(FColors, AWidth * AHeight);
+    AColors := PACLPixel32(FColors);
+  end;
+  FHandle := cairo_create_surface(PACLPixel32Array(AColors), AWidth, AHeight);
+  FHeight := AHeight;
+  FWidth := AWidth;
+end;
+
+destructor TACLCairoRenderImage.Destroy;
+begin
+  cairo_surface_destroy(FHandle);
+  FreeMemAndNil(FColors);
+  inherited;
+end;
+
+{ TACLCairoRenderPath }
+
+destructor TACLCairoRenderPath.Destroy;
+begin
+  FreeAndNil(FFigures);
+  inherited Destroy;
+end;
+
+procedure TACLCairoRenderPath.AddArc(
+  CenterX, CenterY, RadiusX, RadiusY, StartAngle, SweepAngle: Single);
+var
+  LItem: TArc;
+  LAngle1: Single;
+  LAngle2: Single;
+  P1, P2: TPointF;
+begin
+  LAngle1 := DegToRad(StartAngle);
+  LAngle2 := DegToRad(StartAngle + SweepAngle);
+  acCalcArcSegment(CenterX, CenterY, RadiusX, RadiusY, 2 * PI - LAngle1, 2 * PI - LAngle2, P1, P2);
+  LItem := TArc.Create(P2.X, P2.Y);
+  LItem.CX := CenterX;
+  LItem.CY := CenterY;
+  LItem.RX := RadiusX;
+  LItem.RY := RadiusY;
+  LItem.Angle1 := LAngle1;
+  LItem.Angle2 := LAngle2;
+  StartFigureIfNecessary(P1.X, P1.Y).Add(LItem);
+end;
+
+procedure TACLCairoRenderPath.AddLine(X1, Y1, X2, Y2: Single);
+begin
+  StartFigureIfNecessary(X1, Y1).Add(TLineTo.Create(X2, Y2));
+end;
+
+procedure TACLCairoRenderPath.FigureClose;
+var
+  LLast, LFirst: TItem;
+begin
+  if FFigure <> nil then
+  begin
+    if FFigure.Count > 0 then
+    begin
+      LLast := FFigure.Last;
+      LFirst := FFigure.First;
+      if not (SameValue(LLast.X, LFirst.X) and SameValue(LLast.Y, LFirst.Y)) then
+        FFigure.Add(TLineTo.Create(LFirst.X, LFirst.Y));
+    end;
+    FFigure := nil;
+  end;
+end;
+
+procedure TACLCairoRenderPath.FigureStart;
+begin
+  FigureClose;
+end;
+
+function TACLCairoRenderPath.StartFigureIfNecessary(X, Y: Single): TFigure;
+begin
+  if FFigure = nil then
+  begin
+    if FFigures = nil then
+      FFigures := TObjectList<TFigure>.Create(True);
+    FFigure := TFigure.Create;
+    FFigures.Add(FFigure);
+  end;
+
+  if (FFigure.Count = 0) or
+    not SameValue(X, FFigure.Last.X) or
+    not SameValue(Y, FFigure.Last.Y)
+  then
+    FFigure.Add(TMoveTo.Create(X, Y));
+
+  Result := FFigure;
+end;
+
+procedure TACLCairoRenderPath.Write(Handle: Pcairo_t; dX, dY: Single);
+var
+  LFigure: TFigure;
+  I, J: Integer;
+begin
+  if FFigures = nil then
+    Exit;
+  for I := 0 to FFigures.Count - 1 do
+  begin
+    LFigure := FFigures.List[I];
+    for J := 0 to LFigure.Count - 1 do
+      LFigure.List[J].Write(Handle, dX, dY);
+  end;
+end;
+
+{ TACLCairoRenderPath.TArc }
+
+procedure TACLCairoRenderPath.TArc.Write(Handle: Pcairo_t; dX, dY: Single);
+begin
+  cairo_save(Handle);
+  try
+    cairo_translate(Handle, CX + dX, CY + dY);
+    cairo_scale(Handle, RX, RY);
+    if Angle2 > Angle1 then
+      cairo_arc(Handle, 0, 0, 1, Angle1, Angle2)
+    else
+      cairo_arc_negative(Handle, 0, 0, 1, Angle1, Angle2);
+  finally
+    cairo_restore(Handle);
+  end;
+end;
+
+{ TACLCairoRenderPath.TItem }
+
+constructor TACLCairoRenderPath.TItem.Create(X, Y: Single);
+begin
+  Self.X := X;
+  Self.Y := Y;
+end;
+
+{ TACLCairoRenderPath.TMoveTo }
+
+procedure TACLCairoRenderPath.TMoveTo.Write(Handle: Pcairo_t; dX, dY: Single);
+begin
+  cairo_move_to(Handle, X + dX, Y + dY);
+end;
+
+{ TACLCairoRenderPath.TLineTo }
+
+procedure TACLCairoRenderPath.TLineTo.Write(Handle: Pcairo_t; dX, dY: Single);
+begin
+  cairo_line_to(Handle, X + dX, Y + dY);
+end;
+{$ENDREGION}
+
 initialization
-  GpPaintCanvas := TCairoCanvas.Create;
+  GpPaintCanvas := TACLCairoRender.Create;
 {$IFDEF ACL_CAIRO_TEXTOUT}
   DefaultTextLayoutCanvasRender := TACLTextLayoutCairoRender;
 {$ENDIF}

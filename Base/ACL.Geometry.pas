@@ -281,6 +281,8 @@ type
     function Transform(const P: TPointF): TPointF;
   end;
 
+procedure acCalcArcSegment(ACenterX, ACenterY, ARadiusX, ARadiusY: Single;
+  AAngle1, AAngle2: Single{Rad}; out AStartPoint, AEndPoint: TPointF);
 procedure acCalcPartBounds(out AParts: TACLMarginPartBounds; const AMargins: TRect;
   const ADestRect, ASourceRect: TRect; AStretchMode: TACLStretchMode = isStretch);
 function acCalcPatternCount(ADestSize, APatternSize: Integer): Integer;
@@ -308,12 +310,51 @@ function acMapPoint(const ASource, ATarget: HWND; const P: TPoint): TPoint;
 function acMapRect(const ASource, ATarget: HWND; const R: TRect): TRect;
 implementation
 
-function acCalcPatternCount(ADestSize, APatternSize: Integer): Integer;
+procedure acCalcArcSegment(ACenterX, ACenterY, ARadiusX, ARadiusY: Single;
+  AAngle1, AAngle2: Single; out AStartPoint, AEndPoint: TPointF);
+//
+//                      A * B
+//  V = ---------------------------------------------
+//      Sqrt(A^2 * Sin^2(Alpha) + B^2 * Cos^2(Alpha))
+//
+//  Radial.X = V * Cos(Alpha)
+//  Radial.Y = V * Sin(Alpha)
+//
+//  where:
+//    A - horizontal ellipse semiaxis
+//    B - vertical ellipse semiaxis
+//    Angle - an angle between Radius-Vector and A calculated in counterclockwise direction
+//
+var
+  A, B, C: Double;
+  ASin, ACos, AValue: Extended;
 begin
-  if (ADestSize <= 0) or (APatternSize = 0) then
-    Result := 0
+  if IsZero(ARadiusX) or IsZero(ARadiusY) then
+  begin
+    AStartPoint := PointF(ACenterX, ACenterY);
+    AEndPoint := AStartPoint;
+  end
   else
-    Result := ADestSize div APatternSize + Ord(ADestSize mod APatternSize <> 0);
+  begin
+    C := ARadiusX * ARadiusY;
+    A := Sqr(ARadiusX);
+    B := Sqr(ARadiusY);
+
+    SinCos(AAngle1, ASin, ACos);
+    AValue := C / Sqrt(A * Sqr(ASin) + B * Sqr(ACos));
+    AStartPoint.X := ACenterX + AValue * ACos;
+    AStartPoint.Y := ACenterY - AValue * ASin;
+
+    if SameValue(AAngle1, AAngle2) then
+      AEndPoint := AStartPoint
+    else
+    begin
+      SinCos(AAngle2, ASin, ACos);
+      AValue := C / Sqrt(A * Sqr(ASin) + B * Sqr(ACos));
+      AEndPoint.X := ACenterX + AValue * ACos;
+      AEndPoint.Y := ACenterY - AValue * ASin;
+    end;
+  end;
 end;
 
 procedure acCalcPartBounds(out AParts: TACLMarginPartBounds; const AMargins: TRect;
@@ -392,6 +433,14 @@ begin
     else;
     end;
   end;
+end;
+
+function acCalcPatternCount(ADestSize, APatternSize: Integer): Integer;
+begin
+  if (ADestSize <= 0) or (APatternSize = 0) then
+    Result := 0
+  else
+    Result := ADestSize div APatternSize + Ord(ADestSize mod APatternSize <> 0);
 end;
 
 procedure acReduceFraction(var A, B: Integer);

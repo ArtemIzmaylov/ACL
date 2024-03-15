@@ -410,6 +410,7 @@ type
     class function Lightness(Color: TColor): Single; overload; static;
     class procedure MakeDisabled(P: PACLPixel32; Count: Integer; IgnoreMask: Boolean = False); overload; static;
     class procedure MakeDisabled(var P: TACLPixel32; IgnoreMask: Boolean = False); overload; inline; static;
+    class procedure MakeOpaque(P: PACLPixel32; Count: Integer); overload; static;
     class procedure MakeTransparent(P: PACLPixel32; ACount: Integer; const AColor: TACLPixel32); overload;
 
     // ApplyColorSchema
@@ -2743,16 +2744,8 @@ begin
 end;
 
 procedure TACLDib.MakeOpaque;
-var
-  I: Integer;
-  P: PACLPixel32;
 begin
-  P := @Colors^[0];
-  for I := 0 to ColorCount - 1 do
-  begin
-    P^.A := $FF;
-    Inc(P);
-  end;
+  TACLColors.MakeOpaque(@Colors^[0], ColorCount);
 end;
 
 procedure TACLDib.MakeTransparent(const AColor: TACLPixel32);
@@ -3394,6 +3387,16 @@ begin
     P.B := APixel;
     P.G := APixel;
     P.R := APixel;
+  end;
+end;
+
+class procedure TACLColors.MakeOpaque(P: PACLPixel32; Count: Integer);
+begin
+  while Count > 0 do
+  begin
+    P^.A := MaxByte;
+    Dec(Count);
+    Inc(P);
   end;
 end;
 

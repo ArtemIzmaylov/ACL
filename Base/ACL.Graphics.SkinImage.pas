@@ -380,7 +380,7 @@ type
     class procedure doAlphaBlendTile(const R, SrcR: TRect);
   {$ELSE}
     class var FAlpha: Double;
-    class var FCairo: TCairoCanvas;
+    class var FCairo: TACLCairoRender;
     class var FSourceSurface: Pcairo_surface_t;
   {$ENDIF}
   public
@@ -2228,7 +2228,7 @@ begin
   FFunc.BlendOp := AC_SRC_OVER;
   FFunc.AlphaFormat := AC_SRC_ALPHA;
 {$ELSE}
-  FCairo := TCairoCanvas.Create;
+  FCairo := TACLCairoRender.Create;
 {$ENDIF}
 end;
 
