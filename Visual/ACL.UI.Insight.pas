@@ -11,7 +11,7 @@
 
 unit ACL.UI.Insight;
 
-{$I ACL.Config.inc} // FPC:NotImplemented
+{$I ACL.Config.inc} // FPC:OK
 {$R ACL.UI.Insight.res}
 
 interface
@@ -223,13 +223,15 @@ type
     FlashTimerId = 42;
   strict private
     FTimestamp: Cardinal;
-    procedure SetAlpha(AValue: Byte);
+    procedure UpdateAlpha;
     procedure WMTimer(var Message: TWMTimer); message WM_TIMER;
   protected
     procedure CreateParams(var Params: TCreateParams); override;
     procedure DoPopup; override;
     procedure DoPopupClosed; override;
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
+  public
+    constructor Create(AOwner: TComponent); override;
   end;
 
   { TACLUIInsightSearchBox }
@@ -266,7 +268,7 @@ type
       Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
   protected
     procedure AdjustClientRect(var Rect: TRect); override;
-    procedure CalculateViewInfo;
+    procedure Calculate;
     procedure DoPopup; override;
     procedure Paint; override;
     procedure PopulateCandidates; virtual;
@@ -600,22 +602,27 @@ end;
 
 { TACLUIInsightHighlightWindow }
 
+constructor TACLUIInsightHighlightWindow.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+  AlphaBlend := True;
+  Color := clRed;
+end;
+
 procedure TACLUIInsightHighlightWindow.CreateParams(var Params: TCreateParams);
 begin
   inherited;
-{$IFDEF MSWINDOWS}
-  Params.ExStyle := WS_EX_TOPMOST or WS_EX_LAYERED;
-{$ENDIF}
+  Params.ExStyle := Params.ExStyle or WS_EX_TOPMOST;
   Params.WindowClass.style := Params.WindowClass.style and not CS_DROPSHADOW;
 end;
 
 procedure TACLUIInsightHighlightWindow.DoPopup;
 begin
-  Color := clRed;
   FTimestamp := TACLThread.Timestamp;
-  SetAlpha(Alpha);
+  AlphaBlendValue := Alpha;
   SetTimer(Handle, FlashTimerId, GetCaretBlinkTime, nil);
   inherited;
+  TACLMainThread.RunPostponed(UpdateAlpha, Self);
 end;
 
 procedure TACLUIInsightHighlightWindow.DoPopupClosed;
@@ -630,15 +637,9 @@ begin
     ClosePopup;
 end;
 
-procedure TACLUIInsightHighlightWindow.SetAlpha(AValue: Byte);
+procedure TACLUIInsightHighlightWindow.UpdateAlpha;
 begin
-{$IFDEF MSWINDOWS}
-  if Assigned(SetLayeredWindowAttributes) then
-    SetLayeredWindowAttributes(Handle, 0, AValue, LWA_ALPHA);
-{$ELSE}
-  AlphaBlend := True;
-  AlphaBlendValue := AValue;
-{$ENDIF}
+  AlphaBlendValue := MulDiv(Tag + 1, Alpha, 2);
 end;
 
 procedure TACLUIInsightHighlightWindow.WMTimer(var Message: TWMTimer);
@@ -646,7 +647,7 @@ begin
   if Message.TimerID = FlashTimerId then
   begin
     Tag := (Tag + 1) mod 2;
-    SetAlpha(MulDiv(Tag + 1, Alpha, 2));
+    UpdateAlpha;
   end
   else
     inherited;
@@ -697,6 +698,7 @@ end;
 
 destructor TACLUIInsightSearchPopupWindow.Destroy;
 begin
+  TACLMainThread.Unsubscribe(Self);
   FreeAndNil(FCandidates);
   FreeAndNil(FHintFont);
   inherited;
@@ -708,18 +710,19 @@ begin
   PopulateCandidates;
 end;
 
-procedure TACLUIInsightSearchPopupWindow.CalculateViewInfo;
+procedure TACLUIInsightSearchPopupWindow.Calculate;
 var
   ABeakSize: TSize;
   ABounds: TRect;
   AButtonCenter: TPoint;
+  AContentMargins: TRect;
   ARegion: HRGN;
 begin
   ABounds := ClientRect;
   ABeakSize.cy := dpiApply(BeakSize, FCurrentPPI);
   ABeakSize.cx := {2 * }ABeakSize.cy;
   AButtonCenter := acMapRect(Owner.Handle, Handle, Owner.ClientRect).CenterPoint;
-  FContentMargins := TRect.CreateMargins(dpiApply(acIndentBetweenElements, FCurrentPPI));
+  AContentMargins := TRect.CreateMargins(dpiApply(acIndentBetweenElements, FCurrentPPI));
 
   if (AButtonCenter.X < ABounds.Left + ABeakSize.cx) or (AButtonCenter.X > ABounds.Right - ABeakSize.cx) then
   begin
@@ -742,7 +745,7 @@ begin
       FPolyline[5] := Point(ABounds.Right, ABounds.Bottom);
       FPolyline[6] := Point(ABounds.Left, ABounds.Bottom);
       FPolyline[7] := Point(ABounds.Left, ABounds.Top + ABeakSize.cy);
-      Inc(FContentMargins.Top, ABeakSize.cy);
+      Inc(AContentMargins.Top, ABeakSize.cy);
     end
     else
     begin
@@ -755,12 +758,18 @@ begin
       FPolyline[5] := Point(AButtonCenter.X - ABeakSize.cx, ABounds.Bottom - ABeakSize.cy);
       FPolyline[6] := Point(ABounds.Left, ABounds.Bottom - ABeakSize.cy);
       FPolyline[7] := Point(ABounds.Left, ABounds.Top);
-      Inc(FContentMargins.Bottom, ABeakSize.cy);
+      Inc(AContentMargins.Bottom, ABeakSize.cy);
     end;
 
   ARegion := CreatePolygonRgn({$IFDEF FPC}@{$ENDIF}FPolyline[0], Length(FPolyline), WINDING);
   SetWindowRgn(Handle, ARegion, True);
   DeleteObject(ARegion);
+
+  if AContentMargins <> FContentMargins then
+  begin
+    FContentMargins := AContentMargins;
+    Realign;
+  end;
 end;
 
 procedure TACLUIInsightSearchPopupWindow.AdjustClientRect(var Rect: TRect);
@@ -776,25 +785,27 @@ begin
     Color := LColor.AsColor;
   if TACLRootResourceCollection.GetResource('Common.Colors.Border3', TACLResourceColor, nil, LColor) then
     FBorderColor := LColor.AsColor;
+  Font.ResolveHeight;
   FHintFont.Assign(Font);
   FHintFont.Size := FHintFont.Size - 1;
   FSearchResults.OptionsView.Nodes.Height := 3 * acTextIndent +
     dpiRevert(acFontHeight(Font) + acFontHeight(FHintFont), FCurrentPPI);
   inherited;
+{$IFDEF FPC}
+  TACLMainThread.RunPostponed(Calculate, Self);
+{$ENDIF}
 end;
 
 procedure TACLUIInsightSearchPopupWindow.Paint;
 begin
   GpPaintCanvas.BeginPaint(Canvas);
   try
-  {$IFDEF FPC}
-    {$MESSAGE WARN 'NotImplemented'}
-  {$ELSE}
+  {$IFNDEF FPC}
     GpPaintCanvas.SmoothingMode := smNone;
     GpPaintCanvas.PixelOffsetMode := pomHalf;
+  {$ENDIF}
     GpPaintCanvas.FillRectangle(ClientRect, TAlphaColor.FromColor(Color));
     GpPaintCanvas.Line(FPolyline, TAlphaColor.FromColor(FBorderColor), 2);
-  {$ENDIF}
   finally
     GpPaintCanvas.EndPaint;
   end;
@@ -808,9 +819,8 @@ end;
 
 procedure TACLUIInsightSearchPopupWindow.Resize;
 begin
-  CalculateViewInfo;
   inherited;
-  Realign;
+  Calculate;
 end;
 
 procedure TACLUIInsightSearchPopupWindow.SelectCandidate(const ANode: TACLTreeListNode);
