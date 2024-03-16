@@ -90,6 +90,7 @@ type
     function GetCurrentDpi: Integer;
     //# Messages
   {$IFNDEF FPC}
+    procedure CMDialogKey(var Message: TCMDialogKey); message CM_DIALOGKEY;
     procedure CMParentFontChanged(var Message: TCMParentFontChanged); message CM_PARENTFONTCHANGED;
     procedure WMAppCommand(var Message: TMessage); message WM_APPCOMMAND;
     procedure WMDPIChanged(var Message: TWMDpi); message WM_DPICHANGED;
@@ -101,6 +102,7 @@ type
   {$ENDIF}
 
     procedure ChangeScale(M, D: Integer{$IFNDEF FPC}; IsDpiChange: Boolean{$ENDIF}); override;
+    function DialogChar(var Message: TWMKey): Boolean; {$IFDEF FPC}override;{$ELSE}virtual;{$ENDIF}
     procedure DoShow; override;
     procedure DpiChanged; virtual;
     procedure InitializeNewForm; {$IFDEF FPC}virtual;{$ELSE}override;{$ENDIF}
@@ -142,7 +144,7 @@ type
     IACLResourceChangeListener,
     IACLResourceProvider)
   strict private
-    FFormCreated: Boolean;
+    FInCreation: TACLBoolean;
     FInMenuLoop: Integer;
   {$IFNDEF FPC}
     FShowOnTaskBar: Boolean;
@@ -605,6 +607,15 @@ begin
   ScaleForPPI(ATargetPPI, nil);
 end;
 
+function TACLBasicForm.DialogChar(var Message: TWMKey): Boolean;
+begin
+{$IFDEF FPC}
+  Result := inherited;
+{$ELSE}
+  Result := False;
+{$ENDIF}
+end;
+
 procedure TACLBasicForm.DoShow;
 begin
   inherited DoShow;
@@ -745,6 +756,14 @@ begin
 end;
 
 {$IFNDEF FPC}
+procedure TACLBasicForm.CMDialogKey(var Message: TCMDialogChar);
+begin
+  if DialogChar(Message) then
+    Message.Result := 1
+  else
+    inherited;
+end;
+
 procedure TACLBasicForm.CMParentFontChanged(var Message: TCMParentFontChanged);
 begin
   if ParentFont then
@@ -838,9 +857,16 @@ end;
 
 constructor TACLForm.CreateNew(AOwner: TComponent; Dummy: Integer = 0);
 begin
-  BeforeFormCreate;
-  inherited CreateNew(AOwner, Dummy);
-  AfterFormCreate;
+  // Lazarus вызывает CreateNew из Create.
+  // Из-за чего у нас возникал двойной вызов событий before/after form create
+  if FInCreation = TACLBoolean.Default then
+  begin
+    BeforeFormCreate;
+    inherited CreateNew(AOwner, Dummy);
+    AfterFormCreate;
+  end
+  else
+    inherited CreateNew(AOwner, Dummy);
 end;
 
 destructor TACLForm.Destroy;
@@ -850,6 +876,55 @@ begin
   FreeAndNil(FWndProcHooks[whmPostprocess]);
   FreeAndNil(FWndProcHooks[whmPreprocess]);
   MinimizeMemoryUsage;
+end;
+
+procedure TACLForm.AfterConstruction;
+begin
+  inherited;
+  FInCreation := acFalse;
+  ResourceChanged;
+  UpdateImageLists;
+end;
+
+procedure TACLForm.AfterFormCreate;
+begin
+  DoubleBuffered := True;
+  TACLRootResourceCollection.ListenerAdd(Self);
+{$IFDEF MSWINDOWS}
+  TACLFormMouseWheelHelper.CheckInstalled;
+{$ENDIF}
+end;
+
+procedure TACLForm.BeforeFormCreate;
+begin
+  FInCreation := acTrue;
+end;
+
+function TACLForm.CanCloseByEscape: Boolean;
+begin
+  Result := False;
+end;
+
+procedure TACLForm.CreateParams(var Params: TCreateParams);
+begin
+  inherited CreateParams(Params);
+  if (Parent = nil) and (ParentWindow = 0) then
+  begin
+    if ShowOnTaskBar then
+      Params.ExStyle := Params.ExStyle or WS_EX_APPWINDOW;
+    if (Application.MainForm <> nil) and Application.MainForm.HandleAllocated then
+      Params.WndParent := Application.MainFormHandle;
+    if FOwnerHandle <> 0 then
+      Params.WndParent := FOwnerHandle;
+  end;
+end;
+
+procedure TACLForm.DpiChanged;
+begin
+  inherited;
+  if FInCreation = acFalse then
+    ResourceChanged;
+  UpdateImageLists;
 end;
 
 procedure TACLForm.HookWndProc(AHook: TWindowHook; AMode: TACLWindowHookMode = whmPreprocess);
@@ -957,55 +1032,6 @@ begin
   SetFocus;
 end;
 
-procedure TACLForm.AfterConstruction;
-begin
-  inherited;
-  FFormCreated := True;
-  ResourceChanged;
-  UpdateImageLists;
-end;
-
-procedure TACLForm.AfterFormCreate;
-begin
-  DoubleBuffered := True;
-  TACLRootResourceCollection.ListenerAdd(Self);
-{$IFDEF MSWINDOWS}
-  TACLFormMouseWheelHelper.CheckInstalled;
-{$ENDIF}
-end;
-
-procedure TACLForm.BeforeFormCreate;
-begin
-  // do nothing
-end;
-
-function TACLForm.CanCloseByEscape: Boolean;
-begin
-  Result := False;
-end;
-
-procedure TACLForm.CreateParams(var Params: TCreateParams);
-begin
-  inherited CreateParams(Params);
-  if (Parent = nil) and (ParentWindow = 0) then
-  begin
-    if ShowOnTaskBar then
-      Params.ExStyle := Params.ExStyle or WS_EX_APPWINDOW;
-    if (Application.MainForm <> nil) and Application.MainForm.HandleAllocated then
-      Params.WndParent := Application.MainFormHandle;
-    if FOwnerHandle <> 0 then
-      Params.WndParent := FOwnerHandle;
-  end;
-end;
-
-procedure TACLForm.DpiChanged;
-begin
-  inherited;
-  if FFormCreated then
-    ResourceChanged;
-  UpdateImageLists;
-end;
-
 procedure TACLForm.UpdateImageLists;
 begin
   TACLFormImageListReplacer.Execute(FCurrentPPI, Self);
@@ -1048,7 +1074,7 @@ end;
 
 procedure TACLForm.ResourceChanged(Sender: TObject; Resource: TACLResource = nil);
 begin
-  if FFormCreated then
+  if FInCreation = acFalse then
     ResourceChanged;
 end;
 
@@ -1108,7 +1134,7 @@ end;
 
 procedure TACLForm.CMFontChanged(var Message: TMessage);
 begin
-  if FFormCreated then
+  if FInCreation = acFalse then
     ResourceChanged;
   inherited;
 end;

@@ -72,8 +72,8 @@ type
     procedure SetMaxLength(AValue: Integer);
     procedure SetPasswordChar(AValue: Boolean);
     procedure SetReadOnly(AValue: Boolean);
-    procedure SetSelLength(const Value: Integer);
-    procedure SetSelStart(const Value: Integer);
+    procedure SetSelLength(AValue: Integer);
+    procedure SetSelStart(AValue: Integer);
     procedure SetSelText(const Value: string);
     procedure SetText(AValue: string);
     procedure SetTextHint(const AValue: string);
@@ -436,14 +436,17 @@ begin
   end;
 end;
 
-procedure TACLCustomTextEdit.SetSelLength(const Value: Integer);
+procedure TACLCustomTextEdit.SetSelLength(AValue: Integer);
 begin
-  InnerEdit.SelLength := Value;
+{$IFDEF FPC}
+  AValue := Min(AValue, Length(Text));
+{$ENDIF}
+  InnerEdit.SelLength := AValue;
 end;
 
-procedure TACLCustomTextEdit.SetSelStart(const Value: Integer);
+procedure TACLCustomTextEdit.SetSelStart(AValue: Integer);
 begin
-  InnerEdit.SelStart := Value;
+  InnerEdit.SelStart := AValue;
 end;
 
 procedure TACLCustomTextEdit.SetSelText(const Value: string);

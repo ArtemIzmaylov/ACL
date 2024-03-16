@@ -1037,7 +1037,9 @@ begin
   if FEditor <> nil then
   begin
     LTemp := CalculateEditorPosition;
-    FEditor.BoundsRect := LTemp.CenterTo(LTemp.Width, FEditor.Height);
+    FEditor.BoundsRect := LTemp;
+    if FEditor.Height <> LTemp.Height then
+      FEditor.BoundsRect := LTemp.CenterTo(LTemp.Width, FEditor.Height);
     if HandleAllocated then
     begin
       if FEditor.Height > LTemp.Height then

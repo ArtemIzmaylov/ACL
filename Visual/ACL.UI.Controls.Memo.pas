@@ -4,35 +4,44 @@
 {*             Editors Controls              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Controls.Memo;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:Partical
+
+// FPC: TODO - scrollbars drawing are not overridden
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
-  // VCL
-  Vcl.Controls,
-  Vcl.Graphics,
-  Vcl.Forms,
-  Vcl.Menus,
-  Vcl.StdCtrls,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
+  {Winapi.}Windows,
+{$ENDIF}
+  {Winapi.}Messages,
   // System
+  {System.}Classes,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
+  // VCL
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
+  {Vcl.}Forms,
+  {Vcl.}Menus,
+  {Vcl.}StdCtrls,
+{$IFNDEF FPC}
   System.UITypes,
-  System.Classes,
-  System.Types,
+{$ENDIF}
   // ACL
   ACL.Classes,
-  ACL.Classes.StringList,
   ACL.UI.Controls.BaseControls,
-  ACL.UI.Controls.Buttons,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.ScrollBar,
   ACL.UI.Resources;
@@ -50,25 +59,27 @@ type
   {$IFDEF DELPHI110ALEXANDRIA}
     procedure UpdateEditMargins; override;
   {$ENDIF}
-    procedure WndProc(var Message: TMessage); override;
+    // IACLInnerControl
+    function GetInnerContainer: TWinControl;
     // Key
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     procedure KeyPress(var Key: Char); override;
     procedure KeyUp(var Key: Word; Shift: TShiftState); override;
     // Mouse
-    procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer); override;
-    procedure MouseMove(Shift: TShiftState; X: Integer; Y: Integer); override;
-    procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer); override;
-    // IACLInnerControl
-    function GetInnerContainer: TWinControl;
+    procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+    procedure MouseMove(Shift: TShiftState; X,  Y: Integer); override;
+    procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     // Messages
     procedure WMContextMenu(var Message: TWMContextMenu); message WM_CONTEXTMENU;
+  {$IFNDEF FPC}
     procedure WMNCCalcSize(var Message: TWMNCCalcSize); message WM_NCCALCSIZE;
     procedure WMNCHitTest(var Message: TWMNCHitTest); message WM_NCHitTest;
     procedure WMNCPaint(var Message: TWMNCPaint); message WM_NCPAINT;
+    procedure WndProc(var Message: TMessage); override;
+  {$ENDIF}
   public
     constructor Create(AOwner: TComponent); override;
-    //
+    //# Properties
     property Container: TACLMemo read GetContainer;
   end;
 
@@ -82,9 +93,12 @@ type
     FStyleScrollBox: TACLStyleScrollBox;
 
     function GetSizeGripArea: TRect;
+    procedure ScrollBarHandler(Sender: TObject;
+      ScrollCode: TScrollCode; var ScrollPos: Integer);
     procedure SetStyleScrollBox(AValue: TACLStyleScrollBox);
-    procedure ScrollBarHandler(Sender: TObject; ScrollCode: TScrollCode; var ScrollPos: Integer);
+  {$IFNDEF FPC}
     procedure WMCommand(var Message: TWMCommand); message WM_COMMAND;
+  {$ENDIF}
   protected
     procedure CalculateContent(const R: TRect); override;
     function CalculateEditorPosition: TRect; override;
@@ -122,10 +136,10 @@ type
     function GetMaxLength: Integer;
     function GetReadOnly: Boolean;
     function GetSelLength: Integer;
-    function GetSelLine: UnicodeString;
+    function GetSelLine: string;
     function GetSelStart: Integer;
-    function GetSelText: UnicodeString;
-    function GetText: UnicodeString;
+    function GetSelText: string;
+    function GetText: string;
     procedure SetCaretPos(const AValue: TPoint);
     procedure SetHideSelection(const Value: Boolean);
     procedure SetLines(AValue: TStrings);
@@ -133,28 +147,29 @@ type
     procedure SetReadOnly(AValue: Boolean);
     procedure SetSelLength(const Value: Integer);
     procedure SetSelStart(const Value: Integer);
-    procedure SetSelText(const Value: UnicodeString);
-    procedure SetText(const Value: UnicodeString);
+    procedure SetSelText(const Value: string);
+    procedure SetText(const Value: string);
   protected
     function GetScrollBars: TScrollStyle; override;
     procedure SetScrollBars(AValue: TScrollStyle); override;
 
     function CanOpenEditor: Boolean; override;
     function CreateEditor: TWinControl; override;
+    function CalculateEditorPosition: TRect; override;
   public
     constructor Create(AOwner: TComponent); override;
     procedure Clear;
     procedure CopyToClipboard;
     procedure CutToClipboard;
     procedure PasteFromClipboard;
-    //
+    //# Properties
     property CaretPos: TPoint read GetCaretPos write SetCaretPos;
     property InnerMemo: TACLInnerMemo read GetInnerMemo;
     property SelLength: Integer read GetSelLength write SetSelLength;
-    property SelLine: UnicodeString read GetSelLine;
+    property SelLine: string read GetSelLine;
     property SelStart: Integer read GetSelStart write SetSelStart;
-    property SelText: UnicodeString read GetSelText write SetSelText;
-    property Text: UnicodeString read GetText write SetText;
+    property SelText: string read GetSelText write SetSelText;
+    property Text: string read GetText write SetText;
   published
     property Borders;
     property Lines: TStrings read GetLines write SetLines;
@@ -171,13 +186,8 @@ type
 implementation
 
 uses
-  System.Math,
-  System.SysUtils,
-  // ACL
-  ACL.Geometry,
-  ACL.Utils.Common,
   ACL.MUI,
-  ACL.Math;
+  ACL.Utils.Common;
 
 { TACLInnerMemo }
 
@@ -191,22 +201,6 @@ procedure TACLInnerMemo.Change;
 begin
   Container.Changed;
   Container.UpdateScrollBars;
-end;
-
-{$IFDEF DELPHI110ALEXANDRIA}
-procedure TACLInnerMemo.UpdateEditMargins;
-begin
-  // do nothing
-end;
-{$ENDIF}
-
-procedure TACLInnerMemo.WndProc(var Message: TMessage);
-begin
-  inherited WndProc(Message);
-  case Message.Msg of
-    WM_VSCROLL, WM_HSCROLL, WM_WINDOWPOSCHANGED:
-      Container.UpdateScrollBars;
-  end;
 end;
 
 procedure TACLInnerMemo.KeyDown(var Key: Word; Shift: TShiftState);
@@ -239,10 +233,22 @@ begin
   Container.MouseUp(Button, Shift, X, Y);
 end;
 
+function TACLInnerMemo.GetContainer: TACLMemo;
+begin
+  Result := TACLMemo(Owner);
+end;
+
 function TACLInnerMemo.GetInnerContainer: TWinControl;
 begin
   Result := TWinControl(Owner);
 end;
+
+{$IFDEF DELPHI110ALEXANDRIA}
+procedure TACLInnerMemo.UpdateEditMargins;
+begin
+  // do nothing
+end;
+{$ENDIF}
 
 procedure TACLInnerMemo.WMContextMenu(var Message: TWMContextMenu);
 begin
@@ -250,6 +256,16 @@ begin
   Message.Result := Parent.Perform(Message.Msg, Parent.Handle, TMessage(Message).LParam);
   if Message.Result = 0 then
     inherited;
+end;
+
+{$IFNDEF FPC}
+procedure TACLInnerMemo.WndProc(var Message: TMessage);
+begin
+  inherited WndProc(Message);
+  case Message.Msg of
+    WM_VSCROLL, WM_HSCROLL, WM_WINDOWPOSCHANGED:
+      Container.UpdateScrollBars;
+  end;
 end;
 
 procedure TACLInnerMemo.WMNCCalcSize(var Message: TWMNCCalcSize);
@@ -273,11 +289,7 @@ procedure TACLInnerMemo.WMNCPaint(var Message: TWMNCPaint);
 begin
   // do nothing
 end;
-
-function TACLInnerMemo.GetContainer: TACLMemo;
-begin
-  Result := TACLMemo(Owner);
-end;
+{$ENDIF}
 
 { TACLCustomEditContainer }
 
@@ -315,8 +327,13 @@ procedure TACLCustomEditContainer.CalculateContent(const R: TRect);
 begin
   inherited CalculateContent(R);
 
+{$IFDEF FPC}
+  ScrollBarHorz.Visible := False;
+  ScrollBarVert.Visible := False;
+{$ELSE}
   ScrollBarHorz.Visible := ScrollBars in [TScrollStyle.ssBoth, TScrollStyle.ssHorizontal];
   ScrollBarVert.Visible := ScrollBars in [TScrollStyle.ssBoth, TScrollStyle.ssVertical];
+{$ENDIF}
 
   if ScrollBarVert.Visible then
   begin
@@ -362,7 +379,8 @@ begin
   inherited;
 end;
 
-procedure TACLCustomEditContainer.Scroll(Kind: TScrollBarKind; ScrollCode: TScrollCode; var ScrollPos: Integer);
+procedure TACLCustomEditContainer.Scroll(
+  Kind: TScrollBarKind; ScrollCode: TScrollCode; var ScrollPos: Integer);
 
   function GetWParam: WParam;
   begin
@@ -392,6 +410,7 @@ begin
 end;
 
 procedure TACLCustomEditContainer.UpdateScrollBars;
+{$IFNDEF FPC}
 
   procedure SetScrollBarParameters(AScrollBar: TACLScrollBar);
   const
@@ -424,9 +443,13 @@ begin
     SetScrollBarParameters(ScrollBarHorz);
     SetScrollBarParameters(ScrollBarVert);
   end;
+{$ELSE}
+begin
+{$ENDIF}
 end;
 
-procedure TACLCustomEditContainer.ScrollBarHandler(Sender: TObject; ScrollCode: TScrollCode; var ScrollPos: Integer);
+procedure TACLCustomEditContainer.ScrollBarHandler(
+  Sender: TObject; ScrollCode: TScrollCode; var ScrollPos: Integer);
 begin
   if Sender = ScrollBarHorz then
     Scroll(sbHorizontal, ScrollCode, ScrollPos)
@@ -456,15 +479,16 @@ begin
   FStyleScrollBox.Assign(AValue);
 end;
 
+{$IFNDEF FPC}
 procedure TACLCustomEditContainer.WMCommand(var Message: TWMCommand);
 begin
   inherited;
-
   case Message.NotifyCode of
     EN_VSCROLL, EN_HSCROLL:
       UpdateScrollBars;
   end;
 end;
+{$ENDIF}
 
 { TACLMemo }
 
@@ -493,6 +517,11 @@ end;
 function TACLMemo.CreateEditor: TWinControl;
 begin
   Result := TACLInnerMemo.Create(Self);
+end;
+
+function TACLMemo.CalculateEditorPosition: TRect;
+begin
+  Result:=inherited CalculateEditorPosition;
 end;
 
 procedure TACLMemo.CutToClipboard;
@@ -540,7 +569,7 @@ begin
   Result := InnerMemo.SelLength;
 end;
 
-function TACLMemo.GetSelLine: UnicodeString;
+function TACLMemo.GetSelLine: string;
 begin
   if (CaretPos.Y >= 0) and (CaretPos.Y < Lines.Count) then
     Result := Lines.Strings[CaretPos.Y]
@@ -553,12 +582,12 @@ begin
   Result := InnerMemo.SelStart;
 end;
 
-function TACLMemo.GetSelText: UnicodeString;
+function TACLMemo.GetSelText: string;
 begin
   Result := InnerMemo.SelText;
 end;
 
-function TACLMemo.GetText: UnicodeString;
+function TACLMemo.GetText: string;
 begin
   Result := Lines.Text;
 end;
@@ -613,12 +642,12 @@ begin
   InnerMemo.SelStart := Value;
 end;
 
-procedure TACLMemo.SetSelText(const Value: UnicodeString);
+procedure TACLMemo.SetSelText(const Value: string);
 begin
   InnerMemo.SelText := Value;
 end;
 
-procedure TACLMemo.SetText(const Value: UnicodeString);
+procedure TACLMemo.SetText(const Value: string);
 begin
   Lines.Text := Value;
 end;

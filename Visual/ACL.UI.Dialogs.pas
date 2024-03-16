@@ -4,23 +4,20 @@
 {*          Common Dialogs Wrappes           *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.Dialogs;
 
-{$I ACL.Config.inc} // FPC:NotImplemented
+{$I ACL.Config.inc} // FPC:OK
 {$WARN SYMBOL_PLATFORM OFF}
 
 interface
 
 uses
 {$IFDEF MSWINDOWS}
-  Winapi.ActiveX,
-  Winapi.CommDlg,
-  Winapi.ShlObj,
   Winapi.Windows,
 {$ELSE}
   LCLIntf,
@@ -56,21 +53,18 @@ uses
   ACL.Geometry,
   ACL.Graphics,
   ACL.MUI,
-  ACL.Parsers,
   ACL.Threading,
+  ACL.UI.AeroPeek,
   ACL.UI.Application,
   ACL.UI.Controls.BaseControls,
-  ACL.UI.Controls.Buttons,
   ACL.UI.Controls.BaseEditors,
+  ACL.UI.Controls.Buttons,
   ACL.UI.Controls.ComboBox,
   ACL.UI.Controls.ImageComboBox,
-  ACL.UI.Controls.TextEdit,
   ACL.UI.Controls.Labels,
-  ACL.UI.Controls.ProgressBar,
-{$IFDEF MSWINDOWS}
-  ACL.UI.AeroPeek,
   ACL.UI.Controls.Memo,
-{$ENDIF}
+  ACL.UI.Controls.ProgressBar,
+  ACL.UI.Controls.TextEdit,
   ACL.UI.Forms,
   ACL.UI.ImageList,
   ACL.Utils.Common,
@@ -79,127 +73,6 @@ uses
   ACL.Utils.Strings;
 
 type
-{$IFDEF MSWINDOWS}
-{$REGION 'FileDialogs'}
-
-  { TACLFileDialog }
-
-  TACLFileDialogCustomWrapper = class;
-
-  TACLFileDialogOption = (ofOverwritePrompt, ofHideReadOnly, ofNoChangeDir, ofNoValidate, ofAllowMultiSelect,
-    ofPathMustExist, ofFileMustExist,  ofCreatePrompt, ofShareAware, ofNoReadOnlyReturn, ofNoTestFileCreate,
-    ofNoNetworkButton, ofNoDereferenceLinks, ofEnableIncludeNotify, ofEnableSizing, ofDontAddToRecent,
-    ofForceShowHidden, ofAutoExtension);
-  TACLFileDialogOptions = set of TACLFileDialogOption;
-
-  TACLFileDialog = class(TComponent)
-  public const
-    DefaultOptions = [ofHideReadOnly, ofEnableSizing, ofOverwritePrompt, ofAutoExtension];
-  strict private
-    FFileName: UnicodeString;
-    FFiles: TACLStringList;
-    FFilter: UnicodeString;
-    FFilterIndex: Integer;
-    FInitialDir: UnicodeString;
-    FMRUId: UnicodeString;
-    FOptions: TACLFileDialogOptions;
-    FTitle: UnicodeString;
-  protected
-    function AutoExtension(const AFileName: UnicodeString): UnicodeString;
-    function CreateWrapper(ASaveDialog: Boolean; AOwner: THandle = 0): TACLFileDialogCustomWrapper; virtual;
-    function GetActualInitialDir: UnicodeString;
-  public
-    class var MRUPaths: TACLStringList;
-  public
-    class constructor Create;
-    class destructor Destroy;
-    constructor Create(AOwner: TComponent); override;
-    destructor Destroy; override;
-    function Execute(ASaveDialog: Boolean; AOwner: THandle = 0): Boolean; virtual;
-    //
-    property FileName: UnicodeString read FFilename write FFileName;
-    property Files: TACLStringList read FFiles;
-    property InitialDir: UnicodeString read FInitialDir write FInitialDir;
-  published
-    property Filter: UnicodeString read FFilter write FFilter;
-    property FilterIndex: Integer read FFilterIndex write FFilterIndex default 0;
-    property MRUId: UnicodeString read FMRUId write FMRUId;
-    property Options: TACLFileDialogOptions read FOptions write FOptions default DefaultOptions;
-    property Title: UnicodeString read FTitle write FTitle;
-  end;
-
-  { TACLFileDialogCustomWrapper }
-
-  TACLFileDialogCustomWrapper = class(TACLUnknownObject)
-  strict private
-    FDialog: TACLFileDialog;
-    FSaveDialog: Boolean;
-  protected
-    FDefaultExts: UnicodeString;
-    FParent: THandle;
-
-    procedure PopulateDefaultExts;
-  public
-    constructor Create(AParent: THandle; ADialog: TACLFileDialog; ASaveDialog: Boolean); virtual;
-    function Execute: Boolean; virtual; abstract;
-    //
-    property SaveDialog: Boolean read FSaveDialog;
-    property Dialog: TACLFileDialog read FDialog;
-    property Parent: THandle read FParent;
-  end;
-
-  { TACLFileDialogOldStyleWrapper }
-
-  TACLFileDialogOldStyleWrapper = class(TACLFileDialogCustomWrapper)
-  strict private
-    FStruct: TOpenFilenameW;
-    FTempBuffer: PWideChar;
-    FTempBufferSize: Cardinal;
-    FTempFilter: UnicodeString;
-    FTempInitialPath: string;
-
-    class function DialogHook(Wnd: HWND; Msg: UINT; WParam: WPARAM; LParam: LPARAM): UINT_PTR; stdcall; static;
-  protected
-    function AllocFilterStr(const S: UnicodeString): UnicodeString;
-    procedure GetFileNames(AFileList: TACLStringList);
-    procedure PrepareConst(var AStruct: TOpenFilenameW);
-    procedure PrepareFlags(var AStruct: TOpenFilenameW);
-  public
-    constructor Create(AParent: THandle; ADialog: TACLFileDialog; ASaveDialog: Boolean); override;
-    destructor Destroy; override;
-    function Execute: Boolean; override;
-  end;
-
-  { TACLFileDialogVistaStyleWrapper }
-
-  TACLFileDialogVistaStyleWrapper = class(TACLFileDialogCustomWrapper, IFileDialogEvents)
-  strict private
-    FFileDialog: IFileDialog;
-  protected
-    FExts: UnicodeString;
-    FFilter: TStringDynArray;
-
-    function GetItemName(const AItem: IShellItem): UnicodeString;
-    procedure Initialize; virtual;
-    procedure InitializeFilter; virtual;
-    procedure QuerySeletectedFiles(AFileList: TACLStringList);
-    // IFileDialogEvents
-    function OnFileOk(const pfd: IFileDialog): HRESULT; virtual; stdcall;
-    function OnFolderChange(const pfd: IFileDialog): HRESULT; virtual; stdcall;
-    function OnFolderChanging(const pfd: IFileDialog; const psiFolder: IShellItem): HRESULT; virtual; stdcall;
-    function OnOverwrite(const pfd: IFileDialog; const psi: IShellItem; out pResponse: Cardinal): HRESULT; virtual; stdcall;
-    function OnSelectionChange(const pfd: IFileDialog): HRESULT; virtual; stdcall;
-    function OnShareViolation(const pfd: IFileDialog; const psi: IShellItem; out pResponse: Cardinal): HRESULT; virtual; stdcall;
-    function OnTypeChange(const pfd: IFileDialog): HRESULT; virtual; stdcall;
-    //
-    property FileDialog: IFileDialog read FFileDialog;
-  public
-    constructor Create(AParent: THandle; ADialog: TACLFileDialog; ASaveDialog: Boolean); override;
-    function Execute: Boolean; override;
-  end;
-
-{$ENDREGION}
-{$ENDIF}
 
   { TACLCustomDialog }
 
@@ -210,18 +83,81 @@ type
   protected
     function CanApply: Boolean; virtual;
     procedure CreateParams(var Params: TCreateParams); override;
+    function DialogChar(var Message: TWMKey): Boolean; override;
     procedure DoApply(Sender: TObject = nil); virtual;
-  {$IFDEF FPC}
-    function DialogChar(var Message: TLMKey): Boolean; override;
-  {$ELSE}
-    procedure CMDialogKey(var Message: TCMDialogKey); message CM_DIALOGKEY;
-  {$ENDIF}
   public
     procedure AfterConstruction; override;
     function IsShortCut(var Message: TWMKey): Boolean; override;
   end;
 
-{$REGION 'InputDialogs'}
+{$REGION ' FileDialogs '}
+
+  { TACLFileDialog }
+
+  TACLFileDialogImpl = class;
+
+  TACLFileDialogOption = (ofOverwritePrompt, ofHideReadOnly, ofAllowMultiSelect,
+    ofPathMustExist, ofFileMustExist, ofEnableSizing, ofForceShowHidden, ofAutoExtension);
+  TACLFileDialogOptions = set of TACLFileDialogOption;
+
+  TACLFileDialog = class(TComponent)
+  public const
+    DefaultOptions = [ofHideReadOnly, ofEnableSizing, ofOverwritePrompt, ofAutoExtension];
+  strict private
+    FFileName: string;
+    FFiles: TACLStringList;
+    FFilter: string;
+    FFilterIndex: Integer;
+    FInitialDir: string;
+    FMRUId: string;
+    FOptions: TACLFileDialogOptions;
+    FTitle: string;
+  protected
+    function AutoExtension(const AFileName: string): string;
+    function CreateImpl(ASaveDialog: Boolean; AOwnerWnd: HWND = 0): TACLFileDialogImpl; virtual;
+    function GetActualInitialDir: string;
+  public
+    class var MRUPaths: TACLStringList;
+  public
+    class constructor Create;
+    class destructor Destroy;
+    constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
+    function Execute(ASaveDialog: Boolean; AOwnerWnd: HWND = 0): Boolean; virtual;
+    //# Properties
+    property FileName: string read FFilename write FFileName;
+    property Files: TACLStringList read FFiles;
+    property InitialDir: string read FInitialDir write FInitialDir;
+  published
+    property Filter: string read FFilter write FFilter;
+    property FilterIndex: Integer read FFilterIndex write FFilterIndex default 0;
+    property MRUId: string read FMRUId write FMRUId;
+    property Options: TACLFileDialogOptions read FOptions write FOptions default DefaultOptions;
+    property Title: string read FTitle write FTitle;
+  end;
+
+  { TACLFileDialogImpl }
+
+  TACLFileDialogImpl = class(TACLUnknownObject)
+  strict private
+    FDialog: TACLFileDialog;
+    FSaveDialog: Boolean;
+  protected
+    FDefaultExts: string;
+    FParentWnd: HWND;
+    procedure PopulateDefaultExts;
+  public
+    constructor Create(AParentWnd: HWND;
+      ADialog: TACLFileDialog; ASaveDialog: Boolean); virtual;
+    function Execute: Boolean; virtual;
+    //# Properties
+    property Dialog: TACLFileDialog read FDialog;
+    property ParentWnd: HWND read FParentWnd;
+    property SaveDialog: Boolean read FSaveDialog;
+  end;
+{$ENDREGION}
+
+{$REGION ' InputDialogs '}
 
   { TACLCustomInputDialog }
 
@@ -253,26 +189,23 @@ type
     property ButtonOK: TACLButton read FButtonOK;
   end;
 
-{$IFDEF MSWINDOWS}
-
- { TACLCustomInputQueryDialog }
+  { TACLCustomInputQueryDialog }
 
   TACLCustomInputQueryDialog = class abstract(TACLCustomInputDialog)
   strict private
     FEditors: TACLObjectList<TWinControl>;
     FLabels: TACLObjectList<TACLLabel>;
-  strict protected
+  protected
     procedure CreateEditors(AValueCount: Integer); virtual;
     function GetEditClass: TControlClass; virtual; abstract;
+    procedure Initialize(AValueCount: Integer);
     procedure InitializeEdit(AEdit: TWinControl); virtual; abstract;
     procedure PlaceControl(var R: TRect; AControl: TControl; AIndent: Integer);
     procedure PlaceControls(var R: TRect); override;
     procedure PlaceEditors(var R: TRect); virtual;
-    //
+    //# Properties
     property Editors: TACLObjectList<TWinControl> read FEditors;
     property Labels: TACLObjectList<TACLLabel> read FLabels;
-  protected
-    procedure Initialize(AValueCount: Integer);
   public
     destructor Destroy; override;
   end;
@@ -280,31 +213,34 @@ type
   { TACLInputQueryDialog }
 
   TACLInputQueryValidateEvent = reference to procedure (Sender: TObject;
-    const AValueIndex: Integer; const AValue: UnicodeString; var AIsValid: Boolean);
+    const AValueIndex: Integer; const AValue: string; var AIsValid: Boolean);
 
   TACLInputQueryDialog = class(TACLCustomInputQueryDialog)
   strict private
     FOnValidate: TACLInputQueryValidateEvent;
-  strict protected
+  protected
     function CanApply: Boolean; override;
     procedure DoModified(Sender: TObject = nil); override;
     function GetEditClass: TControlClass; override;
     function GetFieldValue(AIndex: Integer): Variant;
     procedure InitializeEdit(AEdit: TWinControl); override;
   protected
-    procedure InitializeField(AIndex: Integer; const AFieldName: UnicodeString;
+    procedure InitializeField(AIndex: Integer; const AFieldName: string;
       const AValue: Variant; ASelStart: Integer = 0; ASelLength: Integer = MaxInt);
-
+    //# Events
     property OnValidate: TACLInputQueryValidateEvent read FOnValidate write FOnValidate;
   public
-    class function Execute(const ACaption, APrompt: UnicodeString; var AStr: UnicodeString;
+    class function Execute(const ACaption, APrompt: string; var AStr: string;
       AOwner: TComponent = nil; AValidateEvent: TACLInputQueryValidateEvent = nil): Boolean; overload;
-    class function Execute(const ACaption, APrompt: UnicodeString; var AStr: UnicodeString;
-      ASelStart, ASelLength: Integer; AOwner: TComponent = nil; AValidateEvent: TACLInputQueryValidateEvent = nil): Boolean; overload;
-    class function Execute(const ACaption: UnicodeString; const APrompt: UnicodeString;
-      var AValue: Variant; AOwner: TComponent = nil; AValidateEvent: TACLInputQueryValidateEvent = nil): Boolean; overload;
-    class function Execute(const ACaption: UnicodeString; const APrompts: array of UnicodeString;
-      var AValues: array of Variant; AOwner: TComponent = nil; AValidateEvent: TACLInputQueryValidateEvent = nil): Boolean; overload;
+    class function Execute(const ACaption, APrompt: string; var AStr: string;
+      ASelStart, ASelLength: Integer; AOwner: TComponent = nil;
+      AValidateEvent: TACLInputQueryValidateEvent = nil): Boolean; overload;
+    class function Execute(const ACaption: string; const APrompt: string;
+      var AValue: Variant; AOwner: TComponent = nil;
+      AValidateEvent: TACLInputQueryValidateEvent = nil): Boolean; overload;
+    class function Execute(const ACaption: string; const APrompts: array of string;
+      var AValues: array of Variant; AOwner: TComponent = nil;
+      AValidateEvent: TACLInputQueryValidateEvent = nil): Boolean; overload;
   end;
 
   { TACLMemoQueryDialog }
@@ -315,20 +251,19 @@ type
     FDialogSizeAssigned: Boolean;
   strict private
     FMemo: TACLMemo;
-
-    procedure MemoKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure HandleKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure PrepareDialogSize;
-  strict protected
+  protected
     procedure CreateControls; override;
     procedure PlaceControls(var R: TRect); override;
-
+    //# Properties
     property Memo: TACLMemo read FMemo;
   public
-    constructor Create(AOwnerHandle: THandle); reintroduce;
-    class function Execute(const ACaption: UnicodeString; AItems: TStrings;
-      APopupMenu: TPopupMenu = nil; AOwnerHandle: THandle = 0): Boolean; overload;
-    class function Execute(const ACaption: UnicodeString; var AText: UnicodeString;
-      APopupMenu: TPopupMenu = nil; AOwnerHandle: THandle = 0): Boolean; overload;
+    constructor Create(AOwnerHandle: HWND); reintroduce;
+    class function Execute(const ACaption: string; AItems: TStrings;
+      APopupMenu: TPopupMenu = nil; AOwnerHandle: HWND = 0): Boolean; overload;
+    class function Execute(const ACaption: string; var AText: string;
+      APopupMenu: TPopupMenu = nil; AOwnerHandle: HWND = 0): Boolean; overload;
   end;
 
   { TACLSelectQueryDialog }
@@ -337,14 +272,14 @@ type
   strict private
     function GetEditor: TACLComboBox;
     procedure SelectHandler(Sender: TObject);
-  strict protected
+  protected
     function CanApply: Boolean; override;
     function GetEditClass: TControlClass; override;
     procedure InitializeEdit(AEdit: TWinControl); override;
-    //
+    //# Properties
     property Editor: TACLComboBox read GetEditor;
   public
-    class function Execute(const ACaption, APrompt: UnicodeString;
+    class function Execute(const ACaption, APrompt: string;
       AValues: TACLStringList; var AItemIndex: Integer; AOwner: TComponent = nil): Boolean;
   end;
 
@@ -356,8 +291,8 @@ type
   strict private
     FAeroPeak: TACLAeroPeek;
     FShowProgressInCaption: Boolean;
-    FTextCaption: UnicodeString;
-    FTextProgress: UnicodeString;
+    FTextCaption: string;
+    FTextProgress: string;
 
     FOnCancel: TNotifyEvent;
 
@@ -373,12 +308,12 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    procedure Progress(const APosition, ATotal: Int64; const AText: UnicodeString = ''); virtual;
-    //
+    procedure Progress(const APosition, ATotal: Int64; const AText: string = ''); virtual;
+    //# Properties
     property ShowProgressInCaption: Boolean read FShowProgressInCaption write FShowProgressInCaption;
-    property TextCaption: UnicodeString read FTextCaption write FTextCaption;
-    property TextProgress: UnicodeString read FTextProgress write FTextProgress;
-    //
+    property TextCaption: string read FTextCaption write FTextCaption;
+    property TextProgress: string read FTextProgress write FTextProgress;
+    //# Events
     property OnCancel: TNotifyEvent read FOnCancel write FOnCancel;
   end;
 
@@ -395,9 +330,10 @@ type
     function GetSelectedTag: NativeInt;
     procedure Populate;
   protected
-    procedure EnumLangs(ALangFileBuffer: TACLIniFile; AProc: TACLLanguageDialogEnumProc); virtual; abstract;
+    procedure EnumLangs(ALangFileBuffer: TACLIniFile;
+      AProc: TACLLanguageDialogEnumProc); virtual; abstract;
     procedure SelectDefaultLanguage; virtual;
-    //
+    //# Properties
     property SelectedTag: NativeInt read GetSelectedTag;
   public
     constructor Create(AOwner: TComponent); override;
@@ -409,16 +345,14 @@ type
   TACLLanguageDialog = class(TACLCustomLanguageDialog)
   protected
     FLangFiles: TACLStringList;
-
-    procedure EnumLangs(ALangFileBuffer: TACLIniFile; AProc: TACLLanguageDialogEnumProc); override;
+    procedure EnumLangs(ALangFileBuffer: TACLIniFile;
+      AProc: TACLLanguageDialogEnumProc); override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     class procedure Execute(AParentWnd: HWND);
   end;
-{$ENDIF}
 
-type
   { TACLDialogsStrs }
 
   TACLDialogsStrs = class
@@ -431,62 +365,31 @@ type
     FolderBrowserRecursive: string;
     MsgDlgButtons: array[TMsgDlgBtn] of string;
     MsgDlgCaptions: array[TMsgDlgType] of string;
-{$IFDEF MSWINDOWS}
   public
     class constructor Create;
     class procedure ApplyLocalization;
     class procedure ResetLocalization;
-{$ENDIF}
   end;
 
-{$IFDEF MSWINDOWS}
-function acMessageBox(AHandle: THandle; const AMessage, ACaption: UnicodeString; AFlags: Integer): Integer;
-{$ENDIF}
+function acMessageBox(AHandle: HWND; const AMessage, ACaption: string; AFlags: Integer): Integer;
 implementation
 
 {$IFDEF MSWINDOWS}
+uses
+  ACL.UI.Dialogs.Impl.Windows;
+{$ENDIF}
+
 type
   TControlAccess = class(TControl);
 
-  { TACLExceptionMessageDialog }
-
-  // Provides per-monitor dpi support for Exception Messages
-  TACLExceptionMessageDialog = class
-  protected
-    class procedure ShowException(E: Exception);
-  public
-    class destructor Destroy;
-    class procedure Register;
-  end;
-
-  { TACLMessageTaskDialog }
-
-  // Provides per-monitor dpi support
-  TACLMessageTaskDialog = class(TTaskDialog)
-  strict private const
-    IconMap: array[TMsgDlgType] of TTaskDialogIcon = (
-      tdiWarning, tdiError, tdiInformation, tdiInformation, tdiNone
-    );
-    ModalResults: array[TMsgDlgBtn] of Integer = (
-      mrYes, mrNo, mrOk, mrCancel, mrAbort, mrRetry, mrIgnore, mrAll, mrNoToAll, mrYesToAll, -1, mrClose
-    );
-  strict private type
-    TMsgDlgBtns = array of TMsgDlgBtn;
-  strict private
-    function FlagsToButtons(AFlags: Integer): TMsgDlgBtns;
-    function FlagsToDefaultButton(AFlags: Integer; AButtons: TMsgDlgBtns): TMsgDlgBtn;
-    function FlagsToDialogType(AFlags: Integer): TMsgDlgType;
-  public
-    constructor Create(const AMessage, ACaption: UnicodeString; AFlags: Integer); reintroduce;
-  end;
-
-function acMessageBox(AHandle: THandle; const AMessage, ACaption: UnicodeString; AFlags: Integer): Integer;
+function acMessageBox(AHandle: HWND; const AMessage, ACaption: string; AFlags: Integer): Integer;
 begin
   if AHandle = 0 then
     AHandle := Application.MainFormHandle;
 
   Application.ModalStarted;
   try
+  {$IFDEF MSWINDOWS}
     if IsWinSevenOrLater and UseLatestCommonDialogs then
     begin
       with TACLMessageTaskDialog.Create(AMessage, ACaption, AFlags) do
@@ -500,7 +403,8 @@ begin
       end;
     end
     else
-      Result := MessageBoxW(AHandle, PWideChar(AMessage), PWideChar(ACaption), AFlags);
+  {$ENDIF}
+      Result := MessageBox(AHandle, PChar(AMessage), PChar(ACaption), AFlags);
   finally
     Application.ModalFinished;
   end;
@@ -533,44 +437,43 @@ begin
   inherited Destroy;
 end;
 
-function TACLFileDialog.Execute(ASaveDialog: Boolean; AOwner: THandle = 0): Boolean;
+function TACLFileDialog.Execute(ASaveDialog: Boolean; AOwnerWnd: HWND): Boolean;
 var
-  AWrapper: TACLFileDialogCustomWrapper;
-  APrevPath: UnicodeString;
+  AImpl: TACLFileDialogImpl;
+  APrevPath: string;
 begin
   APrevPath := acGetCurrentDir;
   try
     Application.ModalStarted;
     try
-      AWrapper := CreateWrapper(ASaveDialog, AOwner);
+      AImpl := CreateImpl(ASaveDialog, AOwnerWnd);
       try
         Files.Clear;
-        Result := AWrapper.Execute;
+        Result := AImpl.Execute;
         if Result then
         begin
           FFileName := '';
-          if Result and (Files.Count > 0) then
+          if Files.Count > 0 then
             FFileName := Files.Strings[0];
-          if Result and ASaveDialog and (ofAutoExtension in Options) then
+          if ASaveDialog and (ofAutoExtension in Options) then
             FFileName := AutoExtension(FileName);
-          if Result and (MRUId <> '') then
+          if MRUId <> '' then
             MRUPaths.ValueFromName[MRUId] := acExtractFilePath(FileName);
         end;
       finally
-        AWrapper.Free;
+        AImpl.Free;
       end;
     finally
       Application.ModalFinished;
     end;
   finally
     acSetCurrentDir(APrevPath);
-    CoFreeUnusedLibraries;
   end;
 end;
 
-function TACLFileDialog.AutoExtension(const AFileName: UnicodeString): UnicodeString;
+function TACLFileDialog.AutoExtension(const AFileName: string): string;
 
-  function ExtractExt(const S: UnicodeString): UnicodeString;
+  function ExtractExt(const S: string): string;
   var
     ADelimPos: Integer;
   begin
@@ -580,7 +483,7 @@ function TACLFileDialog.AutoExtension(const AFileName: UnicodeString): UnicodeSt
     Result := Copy(S, 2, ADelimPos - 2);
   end;
 
-  function GetSelectedExt(out AExt: UnicodeString): Boolean;
+  function GetSelectedExt(out AExt: string): Boolean;
   var
     ACount: Integer;
     AParts: TStringDynArray;
@@ -592,7 +495,7 @@ function TACLFileDialog.AutoExtension(const AFileName: UnicodeString): UnicodeSt
   end;
 
 var
-  ASelectedExt: UnicodeString;
+  ASelectedExt: string;
 begin
   if not GetSelectedExt(ASelectedExt) or (ASelectedExt = '*.*') then
     Result := AFileName
@@ -603,15 +506,19 @@ begin
       Result := AFileName + ASelectedExt;
 end;
 
-function TACLFileDialog.CreateWrapper(ASaveDialog: Boolean; AOwner: THandle = 0): TACLFileDialogCustomWrapper;
+function TACLFileDialog.CreateImpl(ASaveDialog: Boolean; AOwnerWnd: HWND): TACLFileDialogImpl;
 begin
+{$IFDEF MSWINDOWS}
   if IsWinVistaOrLater then
-    Result := TACLFileDialogVistaStyleWrapper.Create(AOwner, Self, ASaveDialog)
+    Result := TACLFileDialogVistaImpl.Create(AOwnerWnd, Self, ASaveDialog)
   else
-    Result := TACLFileDialogOldStyleWrapper.Create(AOwner, Self, ASaveDialog);
+    Result := TACLFileDialogOldImpl.Create(AOwnerWnd, Self, ASaveDialog);
+{$ELSE}
+  Result := TACLFileDialogImpl.Create(AOwnerWnd, Self, ASaveDialog);
+{$ENDIF}
 end;
 
-function TACLFileDialog.GetActualInitialDir: UnicodeString;
+function TACLFileDialog.GetActualInitialDir: string;
 begin
   if InitialDir <> '' then
     Result := InitialDir
@@ -621,23 +528,58 @@ begin
     Result := EmptyStr;
 end;
 
-{ TACLFileDialogCustomWrapper }
+{ TACLFileDialogImpl }
 
-constructor TACLFileDialogCustomWrapper.Create(AParent: THandle; ADialog: TACLFileDialog; ASaveDialog: Boolean);
+constructor TACLFileDialogImpl.Create(
+  AParentWnd: HWND; ADialog: TACLFileDialog; ASaveDialog: Boolean);
 begin
   inherited Create;
   FDialog := ADialog;
   FSaveDialog := ASaveDialog;
-  if AParent = 0 then
-    FParent := TACLApplication.GetHandle
-  else
-    FParent := AParent;
-
+  FParentWnd := AParentWnd;
+  if ParentWnd = 0 then
+    FParentWnd := TACLApplication.GetHandle;
   if ASaveDialog then
     PopulateDefaultExts;
 end;
 
-procedure TACLFileDialogCustomWrapper.PopulateDefaultExts;
+function TACLFileDialogImpl.Execute: Boolean;
+var
+  LDialog: TOpenDialog;
+  LOptions: TOpenOptions;
+begin
+  LOptions := [];
+  if ofOverwritePrompt in Dialog.Options then
+    Include(LOptions, TOpenOption.ofOverwritePrompt);
+  if ofHideReadOnly in Dialog.Options then
+    Include(LOptions, TOpenOption.ofHideReadOnly);
+  if ofAllowMultiSelect in Dialog.Options then
+    Include(LOptions, TOpenOption.ofAllowMultiSelect);
+  if ofPathMustExist in Dialog.Options then
+    Include(LOptions, TOpenOption.ofPathMustExist);
+  if ofFileMustExist in Dialog.Options then
+    Include(LOptions, TOpenOption.ofFileMustExist);
+  if ofEnableSizing in Dialog.Options then
+    Include(LOptions, TOpenOption.ofEnableSizing);
+  if ofForceShowHidden in Dialog.Options then
+    Include(LOptions, TOpenOption.ofForceShowHidden);
+
+  if SaveDialog then
+    LDialog := TSaveDialog.Create(nil)
+  else
+    LDialog := TOpenDialog.Create(nil);
+  try
+    LDialog.InitialDir := Dialog.GetActualInitialDir;
+    LDialog.Options := LOptions;
+    Result := LDialog.Execute;
+    if Result then
+      Dialog.Files.Assign(LDialog.Files);
+  finally
+    LDialog.Free;
+  end;
+end;
+
+procedure TACLFileDialogImpl.PopulateDefaultExts;
 var
   F: TStringDynArray;
   I: Integer;
@@ -653,369 +595,7 @@ begin
   if (FDefaultExts.Length > 0) and (FDefaultExts[FDefaultExts.Length] = ';') then
     Delete(FDefaultExts, Length(FDefaultExts), 1);
 end;
-
-{ TACLFileDialogOldStyleWrapper }
-
-constructor TACLFileDialogOldStyleWrapper.Create(AParent: THandle; ADialog: TACLFileDialog; ASaveDialog: Boolean);
-begin
-  inherited Create(AParent, ADialog, ASaveDialog);
-  FTempInitialPath := ADialog.GetActualInitialDir;
-  FTempFilter := AllocFilterStr(ADialog.Filter);
-  FTempBufferSize := MAXWORD;
-  FTempBuffer := AllocMem(FTempBufferSize);
-  ZeroMemory(@FStruct, SizeOf(FStruct));
-  FStruct.FlagsEx := 0;
-  FStruct.hInstance := HINSTANCE;
-  FStruct.hWndOwner := Parent;
-  FStruct.lpfnHook := DialogHook;
-  FStruct.lpstrFilter := PWideChar(FTempFilter);
-  FStruct.lpstrInitialDir := PWideChar(FTempInitialPath);
-  FStruct.lpstrTitle := PWideChar(ADialog.Title);
-  FStruct.lStructSize := SizeOf(TOpenFilenameW);
-  FStruct.nFilterIndex := ADialog.FilterIndex;
-  if FDefaultExts <> '' then
-    FStruct.lpstrDefExt := PWideChar(FDefaultExts);
-  PrepareFlags(FStruct);
-  PrepareConst(FStruct);
-end;
-
-destructor TACLFileDialogOldStyleWrapper.Destroy;
-begin
-  FreeMemAndNil(Pointer(FTempBuffer));
-  inherited Destroy;
-end;
-
-function TACLFileDialogOldStyleWrapper.Execute: Boolean;
-begin
-  if SaveDialog then
-    Result := GetSaveFileNameW(FStruct)
-  else
-    Result := GetOpenFileNameW(FStruct);
-
-  if Result then
-  begin
-    GetFileNames(Dialog.Files);
-    Dialog.FilterIndex := FStruct.nFilterIndex;
-  end;
-end;
-
-function TACLFileDialogOldStyleWrapper.AllocFilterStr(const S: UnicodeString): UnicodeString;
-var
-  P: PWideChar;
-begin
-  Result := '';
-  if S <> '' then
-  begin
-    Result := S + #0;  // double null terminators
-    P := acStrScan(PWideChar(Result), '|');
-    while P <> nil do
-    begin
-      P^ := #0;
-      Inc(P);
-      P := acStrScan(P, '|');
-    end;
-  end;
-end;
-
-procedure TACLFileDialogOldStyleWrapper.PrepareConst(var AStruct: TOpenFilenameW);
-const
-  MultiSelectBufferSize = High(Word) - 16;
-begin
-//  if WindowsVersion in [wvWinME, wvWin2K] then
-//    Dec(AStruct.lStructSize, SizeOf(DWORD) shl 1 + SizeOf(Pointer));
-  AStruct.nMaxFile := FTempBufferSize - 2; // two zeros in end
-  ZeroMemory(FTempBuffer, FTempBufferSize);
-  AStruct.lpstrFile := FTempBuffer;
-  acStrLCopy(FTempBuffer, Dialog.FileName, Length(Dialog.Filename));
-end;
-
-procedure TACLFileDialogOldStyleWrapper.PrepareFlags(var AStruct: TOpenFilenameW);
-const
-  OpenOptions: array [TACLFileDialogOption] of DWORD = (
-    OFN_OVERWRITEPROMPT, OFN_HIDEREADONLY, OFN_NOCHANGEDIR, OFN_NOVALIDATE,
-    OFN_ALLOWMULTISELECT, OFN_PATHMUSTEXIST, OFN_FILEMUSTEXIST, OFN_CREATEPROMPT, OFN_SHAREAWARE,
-    OFN_NOREADONLYRETURN, OFN_NOTESTFILECREATE, OFN_NONETWORKBUTTON,
-    OFN_NODEREFERENCELINKS, OFN_ENABLEINCLUDENOTIFY,
-    OFN_ENABLESIZING, OFN_DONTADDTORECENT, OFN_FORCESHOWHIDDEN, 0
-  );
-var
-  Option: TACLFileDialogOption;
-begin
-  AStruct.Flags := OFN_ENABLEHOOK;
-  for Option := Low(TACLFileDialogOption) to High(TACLFileDialogOption) do
-  begin
-    if Option in Dialog.Options then
-      AStruct.Flags := AStruct.Flags or OpenOptions[Option];
-  end;
-  AStruct.Flags := AStruct.Flags xor OFN_EXPLORER;
-end;
-
-procedure TACLFileDialogOldStyleWrapper.GetFileNames(AFileList: TACLStringList);
-
-  function ExtractFileName(P: PWideChar; var S: UnicodeString): PWideChar;
-  begin
-    Result := acStrScan(P, #0);
-    if Result = nil then
-    begin
-      S := P;
-      Result := StrEnd(P);
-    end
-    else
-    begin
-      SetString(S, P, Result - P);
-      Inc(Result);
-    end;
-  end;
-
-  procedure ExtractFileNames(P: PWideChar);
-  var
-    ADirName, AFileName: UnicodeString;
-  begin
-    P := ExtractFileName(P, ADirName);
-    P := ExtractFileName(P, AFileName);
-    if AFileName = '' then
-      AFileList.Add(ADirName, nil)
-    else
-    begin
-      ADirName := acIncludeTrailingPathDelimiter(ADirName);
-      repeat
-        if (AFileName[1] <> '\') and ((Length(AFileName) <= 3) or
-           (AFileName[2] <> ':') or  (AFileName[3] <> '\'))
-        then
-          AFileName := ADirName + AFileName;
-        AFileList.Add(AFileName, nil);
-        P := ExtractFileName(P, AFileName);
-      until AFileName = '';
-    end;
-  end;
-
-begin
-  if not (ofAllowMultiSelect in Dialog.Options) or SaveDialog then
-    AFileList.Add(FTempBuffer)
-  else
-    ExtractFileNames(FTempBuffer);
-end;
-
-class function TACLFileDialogOldStyleWrapper.DialogHook(Wnd: HWND; Msg: UINT; WParam: WPARAM; LParam: LPARAM): UINT_PTR;
-
-  procedure CenterWindow(Wnd: HWnd);
-  var
-    Monitor: TMonitor;
-    Rect: TRect;
-  begin
-    GetWindowRect(Wnd, Rect);
-    if Application.MainForm = nil then
-      Monitor := Screen.Monitors[0]
-    else
-      if Assigned(Screen.ActiveForm) then
-        Monitor := Screen.ActiveForm.Monitor
-      else
-        Monitor := Application.MainForm.Monitor;
-
-    SetWindowPos(Wnd, HWND_TOP,
-      Monitor.Left + ((Monitor.Width - Rect.Right + Rect.Left) div 2),
-      Monitor.Top + ((Monitor.Height - Rect.Bottom + Rect.Top) div 3),
-      0, 0, SWP_NOSIZE);
-  end;
-
-var
-  AParent: HWND;
-begin
-  if Msg = WM_INITDIALOG then
-    CenterWindow(Wnd)
-  else
-    if (Msg = WM_NOTIFY) and (POFNotify(LParam)^.hdr.code = CDN_INITDONE) then
-    begin
-      AParent := GetWindowLong(Wnd, GWL_HWNDPARENT);
-      CenterWindow(AParent);
-      SetForegroundWindow(AParent);
-    end;
-
-  Result := DefWindowProc(Wnd, Msg, WParam, LParam);
-end;
-
-{ TACLFileDialogVistaStyleWrapper }
-
-constructor TACLFileDialogVistaStyleWrapper.Create(AParent: THandle; ADialog: TACLFileDialog; ASaveDialog: Boolean);
-begin
-  inherited Create(AParent, ADialog, ASaveDialog);
-  if ASaveDialog then
-    CoCreateInstance(CLSID_FileSaveDialog, nil, CLSCTX_INPROC_SERVER, IFileSaveDialog, FFileDialog)
-  else
-    CoCreateInstance(CLSID_FileOpenDialog, nil, CLSCTX_INPROC_SERVER, IFileOpenDialog, FFileDialog);
-end;
-
-function TACLFileDialogVistaStyleWrapper.Execute: Boolean;
-var
-  AFilterIndex: Cardinal;
-begin
-  Initialize;
-  InitializeFilter;
-  Result := Succeeded(FileDialog.Show(FParent));
-  if Result then
-  begin
-    QuerySeletectedFiles(Dialog.Files);
-    if Succeeded(FileDialog.GetFileTypeIndex(AFilterIndex)) then
-      Dialog.FilterIndex := AFilterIndex;
-  end;
-end;
-
-procedure TACLFileDialogVistaStyleWrapper.Initialize;
-const
-  DialogOptions: array[TACLFileDialogOption] of DWORD = (
-    FOS_OVERWRITEPROMPT, 0, FOS_NOCHANGEDIR, FOS_NOVALIDATE, FOS_ALLOWMULTISELECT,
-    FOS_PATHMUSTEXIST, FOS_FILEMUSTEXIST, FOS_CREATEPROMPT, FOS_SHAREAWARE,
-    FOS_NOREADONLYRETURN, FOS_NOTESTFILECREATE, 0, FOS_NODEREFERENCELINKS, 0, 0,
-    FOS_DONTADDTORECENT, FOS_FORCESHOWHIDDEN, 0
-  );
-var
-  ACookie: DWORD;
-  AFlags: DWORD;
-  AOption: TACLFileDialogOption;
-  ASelectedPath: UnicodeString;
-  AShellItem: IShellItem;
-begin
-  ASelectedPath := Dialog.GetActualInitialDir;
-  if Dialog.Title <> '' then
-    FFileDialog.SetTitle(PWideChar(Dialog.Title));
-  if FDefaultExts <> '' then
-    FFileDialog.SetDefaultExtension(PWideChar(FDefaultExts));
-  if Dialog.FileName <> '' then
-  begin
-    FFileDialog.SetFileName(PWideChar(acExtractFileName(Dialog.FileName)));
-    if ASelectedPath = '' then
-      ASelectedPath := acExtractFilePath(Dialog.FileName);
-  end;
-  if ASelectedPath <> '' then
-  begin
-    if Succeeded(SHCreateItemFromParsingName(PWideChar(ASelectedPath), nil, StringToGUID(SID_IShellItem), AShellItem)) then
-      FFileDialog.SetFolder(AShellItem);
-  end;
-
-  AFlags := 0;
-  for AOption := Low(TACLFileDialogOption) to High(TACLFileDialogOption) do
-  begin
-    if AOption in Dialog.Options then
-      AFlags := AFlags or DialogOptions[AOption];
-  end;
-  FFileDialog.SetOptions(AFlags);
-
-  FFileDialog.Advise(Self, ACookie);
-end;
-
-procedure TACLFileDialogVistaStyleWrapper.InitializeFilter;
-var
-  AFilterStr: TComdlgFilterSpecArray;
-  I: Integer;
-begin
-  acExplodeString(Dialog.Filter, '|', FFilter);
-  SetLength(AFilterStr, Length(FFilter) div 2);
-  if Length(AFilterStr) > 0 then
-  begin
-    for I := 0 to Length(AFilterStr) - 1 do
-    begin
-      AFilterStr[I].pszName := PWideChar(FFilter[2 * I]);
-      AFilterStr[I].pszSpec := PWideChar(FFilter[2 * I + 1]);
-    end;
-    FFileDialog.SetFileTypes(Length(AFilterStr), AFilterStr);
-    FFileDialog.SetFileTypeIndex(Dialog.FilterIndex);
-  end;
-end;
-
-procedure TACLFileDialogVistaStyleWrapper.QuerySeletectedFiles(AFileList: TACLStringList);
-
-  procedure OpenDialogPopulateSelectedFiles(AFileList: TACLStringList);
-  var
-    ACount: Integer;
-    AEnumerator: IEnumShellItems;
-    AItems: IShellItemArray;
-    AResult: HRESULT;
-    AShellItem: IShellItem;
-  begin
-    if Succeeded((FFileDialog as IFileOpenDialog).GetResults(AItems)) then
-    begin
-      if Succeeded(AItems.EnumItems(AEnumerator)) then
-      begin
-        AResult := AEnumerator.Next(1, AShellItem, @ACount);
-        while Succeeded(AResult) and (ACount <> 0) do
-        begin
-          AFileList.Add(GetItemName(AShellItem));
-          AResult := AEnumerator.Next(1, AShellItem, @ACount);
-        end;
-      end;
-    end;
-  end;
-
-  procedure SaveDialogPopulateSelectedFileName(AFileList: TACLStringList);
-  var
-    AItem: IShellItem;
-  begin
-    if Succeeded((FFileDialog as IFileSaveDialog).GetResult(AItem)) then
-      AFileList.Add(GetItemName(AItem));
-  end;
-
-begin
-  AFileList.Clear;
-  if SaveDialog then
-    SaveDialogPopulateSelectedFileName(AFileList)
-  else
-    OpenDialogPopulateSelectedFiles(AFileList);
-end;
-
-function TACLFileDialogVistaStyleWrapper.OnFileOk(const pfd: IFileDialog): HRESULT;
-begin
-  Result := S_OK;
-end;
-
-function TACLFileDialogVistaStyleWrapper.OnFolderChange(const pfd: IFileDialog): HRESULT;
-begin
-  Result := S_OK;
-end;
-
-function TACLFileDialogVistaStyleWrapper.OnFolderChanging(const pfd: IFileDialog; const psiFolder: IShellItem): HRESULT;
-begin
-  Result := S_OK;
-end;
-
-function TACLFileDialogVistaStyleWrapper.OnOverwrite(const pfd: IFileDialog; const psi: IShellItem; out pResponse: Cardinal): HRESULT;
-begin
-  Result := S_OK;
-end;
-
-function TACLFileDialogVistaStyleWrapper.OnSelectionChange(const pfd: IFileDialog): HRESULT;
-begin
-  Result := S_OK;
-end;
-
-function TACLFileDialogVistaStyleWrapper.OnShareViolation(const pfd: IFileDialog; const psi: IShellItem; out pResponse: Cardinal): HRESULT;
-begin
-  Result := S_OK;
-end;
-
-function TACLFileDialogVistaStyleWrapper.OnTypeChange(const pfd: IFileDialog): HRESULT;
-begin
-  Result := S_OK;
-end;
-
-function TACLFileDialogVistaStyleWrapper.GetItemName(const AItem: IShellItem): UnicodeString;
-var
-  AError: HRESULT;
-  AName: PWideChar;
-begin
-  Result := '';
-  AError := AItem.GetDisplayName(SIGDN_FILESYSPATH, AName);
-  if Failed(AError) then
-    AError := AItem.GetDisplayName(SIGDN_NORMALDISPLAY, AName);
-  if Succeeded(AError) then
-  try
-    Result := acSimplifyLongFileName(AName);
-  finally
-    CoTaskMemFree(AName);
-  end;
-end;
-
 {$ENDREGION}
-{$ENDIF}
 
 { TACLCustomDialog }
 
@@ -1067,15 +647,13 @@ begin
   // do nothing
 end;
 
-{$IFDEF FPC}
-function TACLCustomDialog.DialogChar(var Message: TLMKey): Boolean;
+function TACLCustomDialog.DialogChar(var Message: TWMKey): Boolean;
 begin
-  Result := False;
   case Message.CharCode of
     VK_ESCAPE:
       begin
         ModalResult := mrCancel;
-        Result := True;
+        Exit(True);
       end;
 
     VK_RETURN:
@@ -1083,29 +661,13 @@ begin
       begin
         DoApply;
         ModalResult := mrOk;
-        Result := True;
+        Exit(True);
       end;
   end;
+  Result := inherited;
 end;
-{$ELSE}
-procedure TACLCustomDialog.CMDialogKey(var Message: TCMDialogKey);
-begin
-  case Message.CharCode of
-    VK_ESCAPE:
-      ModalResult := mrCancel;
-    VK_RETURN:
-      if CanApply then
-      begin
-        DoApply;
-        ModalResult := mrOk;
-      end;
-  else
-    inherited;
-  end;
-end;
-{$ENDIF}
 
-{$REGION 'InputDialogs'}
+{$REGION ' InputDialogs '}
 
 { TACLCustomInputDialog }
 
@@ -1242,7 +804,6 @@ begin
   end;
 end;
 
-{$IFDEF MSWINDOWS}
 { TACLCustomInputQueryDialog }
 
 destructor TACLCustomInputQueryDialog.Destroy;
@@ -1318,8 +879,9 @@ end;
 
 { TACLInputQueryDialog }
 
-class function TACLInputQueryDialog.Execute(const ACaption, APrompt: UnicodeString; var AStr: UnicodeString;
-  ASelStart, ASelLength: Integer; AOwner: TComponent; AValidateEvent: TACLInputQueryValidateEvent): Boolean;
+class function TACLInputQueryDialog.Execute(const ACaption, APrompt: string;
+  var AStr: string; ASelStart, ASelLength: Integer; AOwner: TComponent;
+  AValidateEvent: TACLInputQueryValidateEvent): Boolean;
 var
   ADialog: TACLInputQueryDialog;
 begin
@@ -1337,16 +899,18 @@ begin
   end;
 end;
 
-class function TACLInputQueryDialog.Execute(const ACaption, APrompt: UnicodeString;
-  var AStr: UnicodeString; AOwner: TComponent; AValidateEvent: TACLInputQueryValidateEvent): Boolean;
+class function TACLInputQueryDialog.Execute(const ACaption, APrompt: string;
+  var AStr: string; AOwner: TComponent; AValidateEvent: TACLInputQueryValidateEvent): Boolean;
 begin
   Result := Execute(ACaption, APrompt, AStr, 0, MaxInt, AOwner, AValidateEvent);
 end;
 
-class function TACLInputQueryDialog.Execute(const ACaption: UnicodeString; const APrompts: array of UnicodeString;
-  var AValues: array of Variant; AOwner: TComponent; AValidateEvent: TACLInputQueryValidateEvent): Boolean;
+class function TACLInputQueryDialog.Execute(const ACaption: string;
+  const APrompts: array of string; var AValues: array of Variant;
+  AOwner: TComponent; AValidateEvent: TACLInputQueryValidateEvent): Boolean;
 var
   ADialog: TACLInputQueryDialog;
+  I: Integer;
 begin
   if Length(AValues) <> Length(APrompts) then
     raise EInvalidArgument.Create(ClassName);
@@ -1356,13 +920,13 @@ begin
     ADialog.Caption := ACaption;
     ADialog.OnValidate := AValidateEvent;
     ADialog.Initialize(Length(AValues));
-    for var I := 0 to Length(AValues) - 1 do
+    for I := 0 to Length(AValues) - 1 do
       ADialog.InitializeField(I, APrompts[I], AValues[I]);
 
     Result := ADialog.ShowModal = mrOk;
     if Result then
     begin
-      for var I := 0 to Length(AValues) - 1 do
+      for I := 0 to Length(AValues) - 1 do
         AValues[I] := ADialog.GetFieldValue(I);
     end;
   finally
@@ -1370,14 +934,14 @@ begin
   end;
 end;
 
-class function TACLInputQueryDialog.Execute(const ACaption, APrompt: UnicodeString;
+class function TACLInputQueryDialog.Execute(const ACaption, APrompt: string;
   var AValue: Variant; AOwner: TComponent; AValidateEvent: TACLInputQueryValidateEvent): Boolean;
 var
-  APrompts: array of UnicodeString;
+  APrompts: array of string;
   AValues: array of Variant;
 begin
-  SetLength(APrompts, 1);
-  SetLength(AValues, 1);
+  SetLength(APrompts{%H-}, 1);
+  SetLength(AValues{%H-}, 1);
   APrompts[0] := APrompt;
   AValues[0] := AValue;
   Result := Execute(ACaption, APrompts, AValues, AOwner, AValidateEvent);
@@ -1396,7 +960,7 @@ begin
 end;
 
 procedure TACLInputQueryDialog.InitializeField(
-  AIndex: Integer; const AFieldName: UnicodeString; const AValue: Variant;
+  AIndex: Integer; const AFieldName: string; const AValue: Variant;
   ASelStart, ASelLength: Integer);
 var
   AEdit: TACLEdit;
@@ -1424,9 +988,10 @@ end;
 function TACLInputQueryDialog.CanApply: Boolean;
 var
   AIsValid: Boolean;
+  I: Integer;
 begin
   AIsValid := True;
-  for var I := 0 to Editors.Count - 1 do
+  for I := 0 to Editors.Count - 1 do
   begin
     if Assigned(OnValidate) then
       OnValidate(Self, Editors[I].Tag, TACLEdit(Editors[I]).Text, AIsValid);
@@ -1444,7 +1009,7 @@ end;
 
 { TACLMemoQueryDialog }
 
-constructor TACLMemoQueryDialog.Create(AOwnerHandle: THandle);
+constructor TACLMemoQueryDialog.Create(AOwnerHandle: HWND);
 begin
   CreateDialog(AOwnerHandle, True);
   BorderStyle := bsSizeable;
@@ -1456,10 +1021,10 @@ begin
   CreateControls;
 end;
 
-class function TACLMemoQueryDialog.Execute(const ACaption: UnicodeString;
-  AItems: TStrings; APopupMenu: TPopupMenu; AOwnerHandle: THandle): Boolean;
+class function TACLMemoQueryDialog.Execute(const ACaption: string;
+  AItems: TStrings; APopupMenu: TPopupMenu; AOwnerHandle: HWND): Boolean;
 var
-  AText: UnicodeString;
+  AText: string;
 begin
   AText := AItems.Text;
   Result := Execute(ACaption, AText, APopupMenu, AOwnerHandle);
@@ -1467,8 +1032,8 @@ begin
     AItems.Text := AText;
 end;
 
-class function TACLMemoQueryDialog.Execute(const ACaption: UnicodeString;
-  var AText: UnicodeString; APopupMenu: TPopupMenu; AOwnerHandle: THandle): Boolean;
+class function TACLMemoQueryDialog.Execute(const ACaption: string;
+  var AText: string; APopupMenu: TPopupMenu; AOwnerHandle: HWND): Boolean;
 var
   ADialog: TACLMemoQueryDialog;
 begin
@@ -1490,18 +1055,30 @@ end;
 
 procedure TACLMemoQueryDialog.CreateControls;
 begin
-  FMemo := TACLMemo(CreateControl(TACLMemo, Self, NullRect, alClient));
-  FMemo.AlignWithMargins := True;
+  FMemo := TACLMemo(CreateControl(TACLMemo, Self, NullRect, alCustom));
   FMemo.ScrollBars := ssBoth;
-  FMemo.Margins.Margins := Rect(0, 0, 0, 36);
-  FMemo.OnKeyDown := MemoKeyDown;
-
+  FMemo.OnKeyDown := HandleKeyDown;
   inherited CreateControls;
 end;
 
-procedure TACLMemoQueryDialog.PlaceControls(var R: TRect);
+procedure TACLMemoQueryDialog.HandleKeyDown(
+  Sender: TObject; var Key: Word; Shift: TShiftState);
 begin
-  R.Top := FMemo.BoundsRect.Bottom + dpiApply(10, FCurrentPPI);
+  if (Key = VK_RETURN) and (ssCtrl in Shift) then
+  begin
+    Key := 0;
+    ModalResult := mrOk;
+  end;
+end;
+
+procedure TACLMemoQueryDialog.PlaceControls(var R: TRect);
+var
+  LMemoRect: TRect;
+begin
+  LMemoRect := R;
+  Dec(LMemoRect.Bottom, dpiApply(36, FCurrentPPI));
+  FMemo.BoundsRect := LMemoRect;
+  R.Top := LMemoRect.Bottom + dpiApply(10, FCurrentPPI);
   inherited;
 end;
 
@@ -1519,18 +1096,9 @@ begin
   end;
 end;
 
-procedure TACLMemoQueryDialog.MemoKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
-begin
-  if (Key = VK_RETURN) and (ssCtrl in Shift) then
-  begin
-    Key := 0;
-    ModalResult := mrOk;
-  end;
-end;
-
 { TACLSelectQueryDialog }
 
-class function TACLSelectQueryDialog.Execute(const ACaption, APrompt: UnicodeString;
+class function TACLSelectQueryDialog.Execute(const ACaption, APrompt: string;
   AValues: TACLStringList; var AItemIndex: Integer; AOwner: TComponent): Boolean;
 var
   ADialog: TACLSelectQueryDialog;
@@ -1614,7 +1182,7 @@ begin
   FreeAndNil(FAeroPeak);
 end;
 
-procedure TACLProgressDialog.Progress(const APosition, ATotal: Int64; const AText: UnicodeString);
+procedure TACLProgressDialog.Progress(const APosition, ATotal: Int64; const AText: string);
 begin
   if ShowProgressInCaption then
     Caption := Format('[%d/%d] %s', [APosition, ATotal, TextCaption]);
@@ -1666,7 +1234,7 @@ class procedure TACLDialogsStrs.ApplyLocalization;
 var
   AButton: TMsgDlgBtn;
   AType: TMsgDlgType;
-  AValue: UnicodeString;
+  AValue: string;
 begin
   ResetLocalization;
 
@@ -1692,10 +1260,11 @@ end;
 
 class procedure TACLDialogsStrs.ResetLocalization;
 const
-  StdButtons: array[TMsgDlgBtn] of UnicodeString = (
-    '&Yes', '&No', 'OK', 'Cancel', '&Abort', '&Retry', '&Ignore', '&All', 'N&o to All', 'Yes to &All', '&Help', '&Close'
+  StdButtons: array[TMsgDlgBtn] of string = (
+    '&Yes', '&No', 'OK', 'Cancel', '&Abort', '&Retry', '&Ignore',
+    '&All', 'N&o to All', 'Yes to &All', '&Help', '&Close'
   );
-  StdCaptions: array[TMsgDlgType] of UnicodeString = (
+  StdCaptions: array[TMsgDlgType] of string = (
     'Warning', 'Error', 'Information', 'Confirm', ''
   );
 var
@@ -1782,7 +1351,7 @@ begin
   AItem := FEditor.Items.Insert(GetInsertionIndex(AData.Name)) as TACLImageComboBoxItem;
   AItem.Text := AData.Name;
   AItem.ImageIndex := AIconIndex;
-  AItem.Data := Pointer(AData.LangID);
+  AItem.Data := {%H-}Pointer(AData.LangID);
   AItem.Tag := ATag;
 end;
 
@@ -1827,7 +1396,10 @@ procedure TACLCustomLanguageDialog.SelectDefaultLanguage;
 var
   AItem: TACLImageComboBoxItem;
 begin
-  if FEditor.Items.FindByData(Pointer(GetUserDefaultUILanguage), AItem) or
+  if
+  {$IFDEF MSWINDOWS}
+     FEditor.Items.FindByData(Pointer(GetUserDefaultUILanguage), AItem) or
+  {$ENDIF}
      FEditor.Items.FindByData(Pointer(LANG_EN_US), AItem)
   then
     FEditor.ItemIndex := AItem.Index
@@ -1873,118 +1445,4 @@ begin
   end;
 end;
 
-{ TACLExceptionMessageDialog }
-
-class procedure TACLExceptionMessageDialog.Register;
-begin
-  ApplicationShowException := ShowException;
-end;
-
-class destructor TACLExceptionMessageDialog.Destroy;
-begin
-  ApplicationShowException := nil;
-end;
-
-class procedure TACLExceptionMessageDialog.ShowException(E: Exception);
-var
-  AMessage: string;
-  ASubException: Exception;
-  AWndHandle: THandle;
-begin
-  AMessage := E.Message;
-  while True do
-  begin
-    ASubException := E.GetBaseException;
-    if ASubException <> E then
-    begin
-      E := ASubException;
-      if E.Message <> '' then
-        AMessage := E.Message;
-    end
-    else
-      Break;
-  end;
-  AWndHandle := Application.ActiveFormHandle;
-  if AWndHandle = 0 then
-    AWndHandle := Application.MainFormHandle;
-  acMessageBox(AWndHandle, AMessage, Application.Title, MB_OK or MB_ICONSTOP);
-end;
-
-{ TACLMessageTaskDialog }
-
-constructor TACLMessageTaskDialog.Create(const AMessage, ACaption: UnicodeString; AFlags: Integer);
-var
-  AButton: TTaskDialogBaseButtonItem;
-  AButtons: TMsgDlgBtns;
-  ADefaultButton: TMsgDlgBtn;
-  ADialogType: TMsgDlgType;
-  I: Integer;
-begin
-  inherited Create(nil);
-
-  CommonButtons := [];
-  ADialogType := FlagsToDialogType(AFlags);
-  MainIcon := IconMap[ADialogType];
-  Caption := IfThenW(ACaption, TACLDialogsStrs.MsgDlgCaptions[ADialogType]);
-  Text := AMessage;
-
-  AButtons := FlagsToButtons(AFlags);
-  ADefaultButton := FlagsToDefaultButton(AFlags, AButtons);
-  for I := Low(AButtons) to High(AButtons) do
-  begin
-    AButton := Buttons.Add;
-    AButton.Caption := TACLDialogsStrs.MsgDlgButtons[AButtons[I]];
-    AButton.Default := AButtons[I] = ADefaultButton;
-    AButton.ModalResult := ModalResults[AButtons[I]];
-  end;
-end;
-
-function TACLMessageTaskDialog.FlagsToButtons(AFlags: Integer): TMsgDlgBtns;
-begin
-  if AFlags and MB_RETRYCANCEL = MB_RETRYCANCEL then
-    Result := [mbRetry, mbCancel]
-  else if AFlags and MB_YESNO = MB_YESNO then
-    Result := [mbYes, mbNo]
-  else if AFlags and MB_YESNOCANCEL = MB_YESNOCANCEL then
-    Result := [mbYes, mbNo, mbCancel]
-  else if AFlags and MB_ABORTRETRYIGNORE = MB_ABORTRETRYIGNORE then
-    Result := [mbAbort, mbRetry, mbIgnore]
-  else if AFlags and MB_OKCANCEL = MB_OKCANCEL then
-    Result := [mbOK, mbCancel]
-  else
-    Result := [mbOK];
-end;
-
-function TACLMessageTaskDialog.FlagsToDefaultButton(AFlags: Integer; AButtons: TMsgDlgBtns): TMsgDlgBtn;
-const
-  Masks: array[0..3] of Integer = (MB_DEFBUTTON1, MB_DEFBUTTON2, MB_DEFBUTTON3, MB_DEFBUTTON4);
-var
-  I: Integer;
-begin
-  for I := Min(High(Masks), High(AButtons)) downto 0 do
-  begin
-    if AFlags and Masks[I] <> 0 then
-      Exit(AButtons[I]);
-  end;
-  Result := AButtons[0];
-end;
-
-function TACLMessageTaskDialog.FlagsToDialogType(AFlags: Integer): TMsgDlgType;
-const
-  Map: array[TMsgDlgType] of Integer = (MB_ICONWARNING, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONQUESTION, 0);
-var
-  AIndex: TMsgDlgType;
-begin
-  for AIndex := Low(AIndex) to High(AIndex) do
-  begin
-    if AFlags and Map[AIndex] = Map[AIndex] then
-      Exit(AIndex);
-  end;
-  Result := mtCustom;
-end;
-
-initialization
-  if IsWinSevenOrLater then
-    TACLExceptionMessageDialog.Register;
-{$ENDIF}
 end.

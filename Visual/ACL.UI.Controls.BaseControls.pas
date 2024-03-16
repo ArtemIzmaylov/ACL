@@ -24,6 +24,7 @@ uses
   LCLIntf,
   LCLType,
   LMessages,
+  LResources,
 {$ELSE}
   Winapi.DwmApi,
   Winapi.Windows,
@@ -2835,6 +2836,10 @@ begin
 end;
 
 initialization
+{$IFDEF FPC}
+  RegisterPropertyToSkip(TControl, 'Margins', '', '');
+  RegisterPropertyToSkip(TControl, 'Padding', '', '');
+{$ENDIF}
 
 finalization
   FreeAndNil(FMouseTracker);

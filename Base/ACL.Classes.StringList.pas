@@ -423,9 +423,12 @@ begin
 end;
 
 procedure TACLStringList.Assign(Source: TPersistent);
+var
+  I: Integer;
 begin
-  if (Source is TACLStringList) and (Source <> Self) then
+  if Source is TACLStringList then
   begin
+    if Self = Source then Exit;
     BeginUpdate;
     try
       Clear;
@@ -433,7 +436,20 @@ begin
     finally
       EndUpdate;
     end;
-  end;
+  end
+  else
+    if Source is TStrings then
+    begin
+      BeginUpdate;
+      try
+        Clear;
+        EnsureCapacity(TStrings(Source).Count);
+        for I := 0 to TStrings(Source).Count - 1 do
+          Add(TStrings(Source).Strings[I], TStrings(Source).Objects[I]);
+      finally
+        EndUpdate;
+      end;
+    end;
 end;
 
 procedure TACLStringList.Insert(Index: Integer; const S: string;
