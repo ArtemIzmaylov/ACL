@@ -1,50 +1,73 @@
 ﻿{*********************************************}
 {*                                           *}
 {*     Artem's Visual Components Library     *}
-{*             TrayIcon Classes              *}
+{*          TrayIcon Implementation          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.TrayIcon;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:Partial
+
+{
+  FPC:ToDo:
+    OnBallonHintClick does not work
+
+  If tray-icon does not work on your Linux, try following:
+    UnityWSCtrls.GlobalUseAppInd := UseAppIndNo;
+}
 
 interface
 
 uses
+{$IFDEF MSWINDOWS}
   Winapi.Messages,
   Winapi.ShellApi,
   Winapi.Windows,
+{$ELSE}
+  LCLIntf,
+  LCLType,
+{$ENDIF}
   // System
-  System.Classes,
-  System.Generics.Collections,
-  System.SysUtils,
-  System.Types,
+  {System.}Classes,
+  {System.}SysUtils,
+  {System.}Types,
   // Vcl
-  Vcl.Controls,
-  Vcl.ExtCtrls,
-  Vcl.Forms,
-  Vcl.Graphics,
-  Vcl.Menus,
+  {Vcl.}Controls,
+  {Vcl.}ExtCtrls,
+  {Vcl.}Forms,
+  {Vcl.}Graphics,
+  {Vcl.}Menus,
   // ACL
   ACL.Classes,
-  ACL.Classes.StringList,
   ACL.Timers,
-  ACL.Geometry,
   ACL.Graphics,
   ACL.ObjectLinks,
-  ACL.Hashes,
   ACL.UI.Controls.BaseControls,
+  ACL.UI.HintWindow,
   ACL.Utils.Common,
-  ACL.Utils.DPIAware,
-  ACL.Utils.FileSystem;
+  ACL.Utils.DPIAware;
 
 type
+  TACLTrayIcon = class;
+  TACLTrayIconCommand = (ticAdd, ticUpdate, ticRemove);
   TACLTrayBalloonIcon = (bitNone, bitInfo, bitWarning, bitError);
+
+  { IACLTrayIconImpl }
+
+  TACLTrayIconImpl = class
+  strict private
+    FIcon: TACLTrayIcon;
+  public
+    constructor Create(AIcon: TACLTrayIcon); virtual;
+    procedure BalloonHint(const ATitle, AText: string; AIconType: TACLTrayBalloonIcon); virtual; abstract;
+    procedure Update(ACommand: TACLTrayIconCommand); virtual; abstract;
+    property Icon: TACLTrayIcon read FIcon;
+  end;
 
   { TACLTrayIcon }
 
@@ -54,12 +77,11 @@ type
   strict private
     FClickTimer: TACLTimer;
     FEnabled: Boolean;
-    FHandle: HWND;
-    FHint: UnicodeString;
+    FHint: string;
     FIcon: TIcon;
-    FIconData: TNotifyIconData;
+    FIconImpl: TACLTrayIconImpl;
     FIconVisible: Boolean;
-    FID: UnicodeString;
+    FID: string;
     FLastMousePos: TPoint;
     FPopupMenu: TPopupMenu;
     FVisible: Boolean;
@@ -74,18 +96,18 @@ type
     FOnMouseMove: TMouseMoveEvent;
     FOnMouseUp: TMouseEvent;
 
-    procedure BuildIconData;
     function IsClickTimerRequired: Boolean;
     procedure SetEnabled(AValue: Boolean);
-    procedure SetHint(const AValue: UnicodeString);
+    procedure SetHint(const AValue: string);
     procedure SetIcon(AValue: TIcon);
     procedure SetIconVisible(AValue: Boolean);
-    procedure SetID(const AValue: UnicodeString);
+    procedure SetID(const AValue: string);
     procedure SetVisible(AValue: Boolean);
-    //
+    // Handlers
     procedure HandlerClickTimer(Sender: TObject);
     procedure HandlerIconChanged(Sender: TObject);
   protected
+    procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     // Events
     procedure DoClick; dynamic;
     procedure DoDblClick; dynamic;
@@ -93,38 +115,34 @@ type
     procedure DoMouseMove(Shift: TShiftState; const P: TPoint); dynamic;
     procedure DoMouseUp(Button: TMouseButton; Shift: TShiftState; const P: TPoint); dynamic;
     // Mouse
-    procedure MouseDown(Button: TMouseButton; Shift: TShiftState; const P: TPoint);
-    procedure MouseMove(Shift: TShiftState; const P: TPoint);
-    procedure MouseUp(Button: TMouseButton; Shift: TShiftState; const P: TPoint);
+    procedure MouseDown(Nop: TObject; Button: TMouseButton; Shift: TShiftState; x, Y: Integer);
+    procedure MouseMove(Nop: TObject; Shift: TShiftState; X, Y: Integer);
+    procedure MouseUp(Nop: TObject; Button: TMouseButton; Shift: TShiftState; x, Y: Integer);
     // IACLCurrentDpi
     function GetCurrentDpi: Integer;
     // IACLMouseTracking
     function IsMouseAtControl: Boolean;
     procedure MouseEnter;
     procedure MouseLeave;
-    //
-    procedure Notification(AComponent: TComponent; Operation: TOperation); override;
-    procedure WndProc(var Message: TMessage);
-    //
+    // Update
     procedure Update;
-    procedure UpdateIconState(ACommand: Integer);
     procedure UpdateVisibility;
-    //
+    //# Properties
     property ClickTimer: TACLTimer read FClickTimer;
     property Visible: Boolean read FVisible write SetVisible;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    procedure BalloonHint(const ATitle, AText: UnicodeString; AIconType: TACLTrayBalloonIcon);
+    procedure BalloonHint(const ATitle, AText: string; AIconType: TACLTrayBalloonIcon);
     procedure PopupAtCursor;
-    //
+    //# Properties
     property WantDoubleClicks: Boolean read FWantDoubleClicks write FWantDoubleClicks;
   published
     property Enabled: Boolean read FEnabled write SetEnabled default False;
-    property Hint: UnicodeString read FHint write SetHint;
+    property Hint: string read FHint write SetHint;
     property Icon: TIcon read FIcon write SetIcon;
     property IconVisible: Boolean read FIconVisible write SetIconVisible default False;
-    property ID: UnicodeString read FID write SetID;
+    property ID: string read FID write SetID;
     property PopupMenu: TPopupMenu read FPopupMenu write FPopupMenu;
     // Events
     property OnBallonHintClick: TNotifyEvent read FOnBallonHintClick write FOnBallonHintClick;
@@ -141,29 +159,69 @@ function acTrayIconGetIsMouseAtIcon: Boolean;
 implementation
 
 uses
-  System.Math,
-  // ACL
+{$IFDEF MSWINDOWS}
+  ACL.Hashes,
+{$ENDIF}
   ACL.Utils.Messaging,
   ACL.Utils.Desktop,
   ACL.Utils.Strings;
 
-const
-  NIF_INFO             = $00000010;
-  NIIF_NONE            = $00000000;
-  NIIF_INFO            = $00000001;
-  NIIF_WARNING         = $00000002;
-  NIIF_ERROR           = $00000003;
+type
+{$IFDEF MSWINDOWS}
 
-const
-  WM_TRAYNOTIFY = WM_USER + 1024;
+  { TWinTrayIconImpl }
+
+  TWinTrayIconImpl = class(TACLTrayIconImpl)
+  strict private const
+    WM_TRAYNOTIFY = WM_USER + 1024;
+  strict private
+    class var WM_TASKBARCREATED: DWORD;
+  strict private
+    FHandle: HWND;
+    FIconData: TNotifyIconData;
+    procedure BuildIconData;
+    procedure WndProc(var Message: TMessage);
+  public
+    class constructor Create;
+    constructor Create(AIcon: TACLTrayIcon); override;
+    destructor Destroy; override;
+    procedure BalloonHint(const ATitle, AText: string; AIconType: TACLTrayBalloonIcon); override;
+    procedure Update(ACommand: TACLTrayIconCommand); override;
+  end;
+
+{$ELSE}
+
+  { TLCLTrayIconImpl }
+
+  TLCLTrayIconImpl = class(TACLTrayIconImpl)
+  strict private
+    FBalloon: TACLHintWindow;
+    FBalloonTimer: TACLTimer;
+    FTrayIcon: TTrayIcon;
+    procedure HandlerBalloonClick(Sender: TObject);
+    procedure HandlerBalloonTimeOut(Sender: TObject);
+  public
+    constructor Create(AIcon: TACLTrayIcon); override;
+    destructor Destroy; override;
+    procedure BalloonHint(const ATitle, AText: string; AIconType: TACLTrayBalloonIcon); override;
+    procedure Update(ACommand: TACLTrayIconCommand); override;
+  end;
+
+{$ENDIF}
 
 var
   FTrayIconIsMouseAtIcon: Integer;
-  WM_TASKBARCREATED: DWORD = 0;
 
 function acTrayIconGetIsMouseAtIcon: Boolean;
 begin
   Result := FTrayIconIsMouseAtIcon > 0;
+end;
+
+{ TACLTrayIconImpl }
+
+constructor TACLTrayIconImpl.Create(AIcon: TACLTrayIcon);
+begin
+  FIcon := AIcon;
 end;
 
 { TACLTrayIcon }
@@ -174,8 +232,13 @@ begin
   FIcon := TIcon.Create;
   FIcon.OnChange := HandlerIconChanged;
   FClickTimer := TACLTimer.CreateEx(HandlerClickTimer, GetDoubleClickTime);
-  FHandle := WndCreate(WndProc, ClassName);
-  WantDoubleClicks := True;
+  FWantDoubleClicks := True;
+  if not (csDesigning in ComponentState) then
+  {$IFDEF MSWINDOWS}
+    FIconImpl := TWinTrayIconImpl.Create(Self);
+  {$ELSE}
+    FIconImpl := TLCLTrayIconImpl.Create(Self);
+  {$ENDIF}
 end;
 
 destructor TACLTrayIcon.Destroy;
@@ -183,56 +246,16 @@ begin
   Enabled := False;
   ClickTimer.Enabled := False;
   MouseTracker.Remove(Self);
+  FreeAndNil(FIconImpl);
   FreeAndNil(FClickTimer);
   FreeAndNil(FIcon);
-  WndFree(FHandle);
   inherited Destroy;
 end;
 
-procedure TACLTrayIcon.BalloonHint(const ATitle, AText: UnicodeString; AIconType: TACLTrayBalloonIcon);
-const
-  BalloonIconTypes: array[TACLTrayBalloonIcon] of Integer = (NIIF_NONE, NIIF_INFO, NIIF_WARNING, NIIF_ERROR);
+procedure TACLTrayIcon.BalloonHint(const ATitle, AText: string; AIconType: TACLTrayBalloonIcon);
 begin
-  if Visible and not (csDesigning in ComponentState) then
-  begin
-    BuildIconData;
-    FIconData.uFlags := FIconData.uFlags or NIF_INFO;
-    acStrLCopy(FIconData.szInfo, AText, Length(FIconData.szInfo) - 1);
-    acStrLCopy(FIconData.szInfoTitle, ATitle, Length(FIconData.szInfoTitle) - 1);
-    FIconData.dwInfoFlags := BalloonIconTypes[AIconType];
-    Shell_NotifyIconW(NIM_MODIFY, @FIconData);
-  end;
-end;
-
-procedure TACLTrayIcon.BuildIconData;
-var
-  AState: Pointer;
-begin
-  ZeroMemory(@FIconData, SizeOf(FIconData));
-  FIconData.cbSize := TNotifyIconData.SizeOf;
-  FIconData.hIcon := Icon.Handle;
-  FIconData.Wnd := FHandle;
-  FIconData.uCallbackMessage := WM_TRAYNOTIFY;
-  FIconData.uFlags := NIF_ICON or NIF_MESSAGE or NIF_TIP;
-  FIconData.uVersion := IfThen(IsWinVistaOrLater, NOTIFYICON_VERSION_4, NOTIFYICON_VERSION);
-
-  if ID <> '' then
-  begin
-    if IsWinSevenOrLater then
-    begin
-      TACLHashMD5.Initialize(AState);
-      TACLHashMD5.Update(AState, ID);
-      TACLHashMD5.Finalize(AState, TMD5Byte16(FIconData.guidItem));
-      FIconData.uFlags := FIconData.uFlags or NIF_GUID;
-    end
-    else
-      FIconData.uID := TACLHashCRC32.Calculate(ID);
-  end;
-
-  if IsWin11OrLater then
-    acStrLCopy(FIconData.szTip, Hint, Length(FIconData.szTip) - 1)
-  else
-    acStrLCopy(FIconData.szTip, acStringReplace(Hint, '&', '&&&'), Length(FIconData.szTip) - 1);
+  if Visible and (FIconImpl <> nil) then
+    FIconImpl.BalloonHint(ATitle, AText, AIconType);
 end;
 
 function TACLTrayIcon.IsClickTimerRequired: Boolean;
@@ -266,12 +289,6 @@ begin
   if Assigned(OnMouseMove) then OnMouseMove(Self, Shift, P.X, P.Y);
 end;
 
-procedure TACLTrayIcon.Update;
-begin
-  if Visible then
-    UpdateIconState(NIM_MODIFY);
-end;
-
 function TACLTrayIcon.GetCurrentDpi: Integer;
 begin
   Result := acGetSystemDpi;
@@ -288,19 +305,21 @@ begin
   CallNotifyEvent(Self, OnMouseEnter);
 end;
 
-procedure TACLTrayIcon.MouseDown(Button: TMouseButton; Shift: TShiftState; const P: TPoint);
+procedure TACLTrayIcon.MouseDown(Nop: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
-  DoMouseDown(Button, Shift, P);
+  DoMouseDown(Button, Shift, Point(X, Y));
 end;
 
-procedure TACLTrayIcon.MouseMove(Shift: TShiftState; const P: TPoint);
+procedure TACLTrayIcon.MouseMove(Nop: TObject; Shift: TShiftState; X, Y: Integer);
 begin
-  FLastMousePos := P;
+  FLastMousePos := Point(X, Y);
   MouseTracker.Add(Self);
-  DoMouseMove(Shift, P);
+  DoMouseMove(Shift, FLastMousePos);
 end;
 
-procedure TACLTrayIcon.MouseUp(Button: TMouseButton; Shift: TShiftState; const P: TPoint);
+procedure TACLTrayIcon.MouseUp(Nop: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 var
   ALink: TObject;
 begin
@@ -322,9 +341,10 @@ begin
 
       mbRight:
         PopupAtCursor;
+    else;
     end;
     if ALink <> nil then
-      DoMouseUp(Button, Shift, P);
+      DoMouseUp(Button, Shift, Point(X, Y));
   finally
     TACLObjectLinks.UnregisterWeakReference(@ALink);
   end;
@@ -334,37 +354,6 @@ procedure TACLTrayIcon.MouseLeave;
 begin
   Dec(FTrayIconIsMouseAtIcon);
   CallNotifyEvent(Self, OnMouseExit);
-end;
-
-procedure TACLTrayIcon.WndProc(var Message: TMessage);
-begin
-  if Message.Msg = WM_TASKBARCREATED then
-  begin
-    FVisible := False;
-    UpdateVisibility;
-  end;
-  if Message.Msg = WM_TRAYNOTIFY then
-  begin
-    case Message.lParam of
-      WM_MOUSEMOVE:
-        MouseMove(acGetShiftState, MouseCursorPos);
-      WM_LBUTTONDOWN:
-        MouseDown(mbLeft, acGetShiftState, MouseCursorPos);
-      WM_RBUTTONDOWN:
-        MouseDown(mbRight, acGetShiftState, MouseCursorPos);
-      WM_MBUTTONDOWN:
-        MouseDown(mbMiddle, acGetShiftState, MouseCursorPos);
-      WM_LBUTTONUP:
-        MouseUp(mbLeft, acGetShiftState, MouseCursorPos);
-      WM_RBUTTONUP:
-        MouseUp(mbRight, acGetShiftState, MouseCursorPos);
-      WM_MBUTTONUP:
-        MouseUp(mbMiddle, acGetShiftState, MouseCursorPos);
-      NIN_BALLOONUSERCLICK:
-        CallNotifyEvent(Self, OnBallonHintClick);
-    end;
-  end;
-  WndDefaultProc(FHandle, Message);
 end;
 
 procedure TACLTrayIcon.Notification(AComponent: TComponent; Operation: TOperation);
@@ -381,9 +370,9 @@ procedure TACLTrayIcon.PopupAtCursor;
 var
   APoint: TPoint;
 begin
-  if Assigned(PopupMenu) and GetCursorPos(APoint) then
+  if Assigned(PopupMenu) and GetCursorPos(APoint{%H-}) then
   begin
-    SetForegroundWindow(Application.Handle);
+    SetForegroundWindow(Application.{%H-}Handle);
     Application.ProcessMessages;
     FPopupMenu.AutoPopup := False;
     FPopupMenu.PopupComponent := Self;
@@ -391,13 +380,10 @@ begin
   end;
 end;
 
-procedure TACLTrayIcon.UpdateIconState(ACommand: Integer);
+procedure TACLTrayIcon.Update;
 begin
-  if not (csDesigning in ComponentState) then
-  begin
-    BuildIconData;
-    Shell_NotifyIconW(ACommand, @FIconData);
-  end;
+  if Visible and (FIconImpl <> nil) then
+    FIconImpl.Update(ticUpdate);
 end;
 
 procedure TACLTrayIcon.UpdateVisibility;
@@ -414,7 +400,7 @@ begin
   end;
 end;
 
-procedure TACLTrayIcon.SetHint(const AValue: UnicodeString);
+procedure TACLTrayIcon.SetHint(const AValue: string);
 begin
   if FHint <> AValue then
   begin
@@ -437,7 +423,7 @@ begin
   end;
 end;
 
-procedure TACLTrayIcon.SetID(const AValue: UnicodeString);
+procedure TACLTrayIcon.SetID(const AValue: string);
 begin
   if FID <> AValue then
   begin
@@ -448,12 +434,13 @@ end;
 
 procedure TACLTrayIcon.SetVisible(AValue: Boolean);
 const
-  CommandMap: array[Boolean] of Integer = (NIM_DELETE, NIM_ADD);
+  CommandMap: array[Boolean] of TACLTrayIconCommand = (ticRemove, ticAdd);
 begin
   if Visible <> AValue then
   begin
     FVisible := AValue;
-    UpdateIconState(CommandMap[Visible]);
+    if FIconImpl <> nil then
+      FIconImpl.Update(CommandMap[Visible]);
   end;
 end;
 
@@ -471,6 +458,197 @@ begin
     DoDblClick;
 end;
 
-initialization
+{$IFDEF MSWINDOWS}
+
+{ TWinTrayIconImpl }
+
+class constructor TWinTrayIconImpl.Create;
+begin
   WM_TASKBARCREATED := RegisterWindowMessage('TaskbarCreated');
+end;
+
+constructor TWinTrayIconImpl.Create(AIcon: TACLTrayIcon);
+begin
+  inherited;
+  FHandle := WndCreate(WndProc, TACLTrayIcon.ClassName);
+end;
+
+destructor TWinTrayIconImpl.Destroy;
+begin
+  WndFree(FHandle);
+  inherited;
+end;
+
+procedure TWinTrayIconImpl.BalloonHint(const ATitle, AText: string; AIconType: TACLTrayBalloonIcon);
+const
+  BalloonIconTypes: array[TACLTrayBalloonIcon] of Integer = (NIIF_NONE, NIIF_INFO, NIIF_WARNING, NIIF_ERROR);
+begin
+  BuildIconData;
+  FIconData.uFlags := FIconData.uFlags or NIF_INFO;
+  acStrLCopy(FIconData.szInfo, AText, Length(FIconData.szInfo) - 1);
+  acStrLCopy(FIconData.szInfoTitle, ATitle, Length(FIconData.szInfoTitle) - 1);
+  FIconData.dwInfoFlags := BalloonIconTypes[AIconType];
+  Shell_NotifyIconW(NIM_MODIFY, @FIconData);
+end;
+
+procedure TWinTrayIconImpl.BuildIconData;
+var
+  AState: Pointer;
+begin
+  ZeroMemory(@FIconData, SizeOf(FIconData));
+  FIconData.cbSize := TNotifyIconData.SizeOf;
+  FIconData.hIcon := Icon.Icon.Handle;
+  FIconData.Wnd := FHandle;
+  FIconData.uCallbackMessage := WM_TRAYNOTIFY;
+  FIconData.uFlags := NIF_ICON or NIF_MESSAGE or NIF_TIP;
+  if IsWinVistaOrLater then
+    FIconData.uVersion := NOTIFYICON_VERSION_4
+  else
+    FIconData.uVersion := NOTIFYICON_VERSION;
+
+  if Icon.ID <> '' then
+  begin
+    if IsWinSevenOrLater then
+    begin
+      TACLHashMD5.Initialize(AState);
+      TACLHashMD5.Update(AState, Icon.ID);
+      TACLHashMD5.Finalize(AState, TMD5Byte16(FIconData.guidItem));
+      FIconData.uFlags := FIconData.uFlags or NIF_GUID;
+    end
+    else
+      FIconData.uID := TACLHashCRC32.Calculate(Icon.ID);
+  end;
+
+  if IsWin11OrLater then
+    acStrLCopy(FIconData.szTip, Icon.Hint, Length(FIconData.szTip) - 1)
+  else
+    acStrLCopy(FIconData.szTip, acStringReplace(Icon.Hint, '&', '&&&'), Length(FIconData.szTip) - 1);
+end;
+
+procedure TWinTrayIconImpl.Update(ACommand: TACLTrayIconCommand);
+const
+  Map: array[TACLTrayIconCommand] of Cardinal = (NIM_ADD, NIM_MODIFY, NIM_DELETE);
+begin
+  BuildIconData;
+  Shell_NotifyIconW(Map[ACommand], @FIconData);
+end;
+
+procedure TWinTrayIconImpl.WndProc(var Message: TMessage);
+var
+  LCurPos: TPoint;
+begin
+  if Message.Msg = WM_TASKBARCREATED then
+  begin
+    if Icon.Visible then
+      Update(ticAdd);
+  end;
+  if Message.Msg = WM_TRAYNOTIFY then
+  begin
+    LCurPos := MouseCursorPos;
+    case Message.lParam of
+      WM_MOUSEMOVE:
+        Icon.MouseMove(nil, acGetShiftState, LCurPos.X, LCurPos.Y);
+      WM_LBUTTONDOWN:
+        Icon.MouseDown(nil, mbLeft, acGetShiftState, LCurPos.X, LCurPos.Y);
+      WM_RBUTTONDOWN:
+        Icon.MouseDown(nil, mbRight, acGetShiftState, LCurPos.X, LCurPos.Y);
+      WM_MBUTTONDOWN:
+        Icon.MouseDown(nil, mbMiddle, acGetShiftState, LCurPos.X, LCurPos.Y);
+      WM_LBUTTONUP:
+        Icon.MouseUp(nil, mbLeft, acGetShiftState, LCurPos.X, LCurPos.Y);
+      WM_RBUTTONUP:
+        Icon.MouseUp(nil, mbRight, acGetShiftState, LCurPos.X, LCurPos.Y);
+      WM_MBUTTONUP:
+        Icon.MouseUp(nil, mbMiddle, acGetShiftState, LCurPos.X, LCurPos.Y);
+      NIN_BALLOONUSERCLICK:
+        CallNotifyEvent(Icon, Icon.OnBallonHintClick);
+    end;
+  end;
+  WndDefaultProc(FHandle, Message);
+end;
+
+{$ELSE}
+
+{ TLCLTrayIconImpl }
+
+constructor TLCLTrayIconImpl.Create(AIcon: TACLTrayIcon);
+begin
+  inherited Create(AIcon);
+  FTrayIcon := TTrayIcon.Create(nil);
+  FTrayIcon.OnMouseDown := Icon.MouseDown;
+  FTrayIcon.OnMouseMove := Icon.MouseMove;
+  FTrayIcon.OnMouseUp := Icon.MouseUp;
+  FBalloonTimer := TACLTimer.CreateEx(HandlerBalloonTimeOut, FTrayIcon.BalloonTimeout);
+end;
+
+destructor TLCLTrayIconImpl.Destroy;
+begin
+  FreeAndNil(FBalloonTimer);
+  FreeAndNil(FBalloon);
+  FreeAndNil(FTrayIcon);
+  inherited Destroy;
+end;
+
+procedure TLCLTrayIconImpl.BalloonHint(
+  const ATitle, AText: string; AIconType: TACLTrayBalloonIcon);
+var
+  LIconPos: TPoint;
+  LScreenRect: TRect;
+  LHorzAlignment: TACLHintWindowHorzAlignment;
+  LVertAlignment: TACLHintWindowVertAlignment;
+begin
+  if FBalloon = nil then
+  begin
+    FBalloon := TACLHintWindow.Create(nil);
+    FBalloon.OnClick := HandlerBalloonClick;
+    FBalloon.Clickable := True;
+  end;
+
+  LIconPos := FTrayIcon.GetPosition;
+  LScreenRect := MonitorGetBounds(LIconPos);
+
+  if LIconPos.X = LScreenRect.Left then
+    LHorzAlignment := hwhaLeft
+  else if LIconPos.X = LScreenRect.Right then
+    LHorzAlignment := hwhaRight
+  else
+    LHorzAlignment := hwhaCenter;
+
+  if LIconPos.Y < LScreenRect.CenterPoint.Y then
+    LVertAlignment := hwvaBelow
+  else
+    LVertAlignment := hwvaAbove;
+
+  FBalloon.ShowFloatHint(
+    Format('[big][b]%1:s[/b][/b]%0:s%0:s%2:s', [sLineBreak, ATitle, AText]),
+    TRect.Create(LIconPos, 0, 0), LHorzAlignment, LVertAlignment);
+  FBalloonTimer.Restart;
+end;
+
+procedure TLCLTrayIconImpl.HandlerBalloonClick(Sender: TObject);
+begin
+  HandlerBalloonTimeOut(Sender);
+  CallNotifyEvent(Icon, Icon.OnBallonHintClick);
+end;
+
+procedure TLCLTrayIconImpl.HandlerBalloonTimeOut(Sender: TObject);
+begin
+  FBalloonTimer.Enabled := False;
+  FBalloon.Hide;
+end;
+
+procedure TLCLTrayIconImpl.Update(ACommand: TACLTrayIconCommand);
+begin
+  FTrayIcon.Icon := Icon.Icon;
+  FTrayIcon.Hint := Icon.Hint;
+  case ACommand of
+    ticAdd:
+      FTrayIcon.Show;
+    ticRemove:
+      FTrayIcon.Hide;
+  else
+    FTrayIcon.InternalUpdate;
+  end;
+end;
+{$ENDIF}
 end.
