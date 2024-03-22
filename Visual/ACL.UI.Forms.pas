@@ -725,8 +725,8 @@ end;
 
 procedure TACLBasicForm.WndProc(var Message: TMessage);
 begin
+  TACLControls.WndProc(Self, Message);
   inherited WndProc(Message);
-  TACLControls.WndProc(Self, Message)
 end;
 
 function TACLBasicForm.GetCurrentDpi: Integer;

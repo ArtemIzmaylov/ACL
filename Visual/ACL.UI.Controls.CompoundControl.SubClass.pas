@@ -735,7 +735,6 @@ type
 
   { TACLCompoundControlSubClass }
 
-  TACLCompoundControlActionType = (ccatNone, ccatMouse, ccatGesture, ccatKeyboard);
   TACLCompoundControlGetCursorEvent = procedure (
     Sender: TObject; AHitTestInfo: TACLHitTestInfo) of object;
   TACLCompoundControlDropSourceDataEvent = procedure (
@@ -750,7 +749,7 @@ type
     IACLResourceCollection,
     IACLResourceChangeListener)
   strict private
-    FActionType: TACLCompoundControlActionType;
+    FActionType: TACLControlActionType;
     FBounds: TRect;
     FContainer: IACLCompoundControlSubClassContainer;
     FDragAndDropController: TACLCompoundControlDragAndDropController;
@@ -910,7 +909,7 @@ type
     function ClientToScreen(const R: TRect): TRect; overload;
     function ScreenToClient(const P: TPoint): TPoint;
     //
-    property ActionType: TACLCompoundControlActionType read FActionType;
+    property ActionType: TACLControlActionType read FActionType;
     property Bounds: TRect read FBounds write SetBounds;
     property Container: IACLCompoundControlSubClassContainer read FContainer;
     property CurrentDpi: Integer read GetCurrentDpi;

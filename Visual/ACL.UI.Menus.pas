@@ -76,13 +76,11 @@ uses
   ACL.Utils.Strings;
 
 const
-  CM_ENTERMENULOOP = CM_BASE + $0402;
-  CM_ITEMCLICKED   = CM_BASE + $0403;
-  CM_ITEMKEYED     = CM_BASE + $0404;
-  CM_ITEMSELECTED  = CM_BASE + $0402;
+  CM_ITEMCLICKED  = CM_BASE + $0401;
+  CM_ITEMSELECTED = CM_BASE + $0402;
 
-{$REGION ' General '}
 type
+{$REGION ' General '}
   TMenuItemClass = class of TMenuItem;
   TMenuItemEnumProc = reference to procedure (AMenuItem: TMenuItem);
 
@@ -206,6 +204,7 @@ type
     procedure DoDrawImage(ACanvas: TCanvas; const ARect: TRect;
       AImages: TCustomImageList; AImageIndex: TImageIndex;
       AEnabled, ASelected: Boolean); virtual;
+    procedure DoDrawText(ACanvas: TCanvas; ARect: TRect; const S: string); virtual;
     function GetTextIdent: Integer; inline;
     procedure InitializeResources; override;
   public
@@ -229,6 +228,41 @@ type
 
 {$ENDREGION}
 
+{$REGION ' Helpers '}
+
+  { TMenuItemHelper }
+
+  TMenuItemHelper = class helper for TMenuItem
+  strict private
+    function GetDefaultItem: TMenuItem;
+    function GetMenu: TMenu;
+  protected
+    procedure InitiateActions;
+    procedure PrepareForShowing;
+  public
+    function AddItem(const ACaption, AHint: string; ATag: NativeInt = 0;
+      AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem; overload;
+    function AddItem(const ACaption: string;
+      AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem; overload;
+    function AddItem(const ACaption: string; ATag: NativeInt;
+      AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem; overload;
+    function AddLink(const AMenuItemOrMenu: TComponent): TACLMenuItemLink;
+    function AddRadioItem(const ACaption, AHint: string; ATag: NativeInt = 0;
+      AEvent: TNotifyEvent = nil; AGroupIndex: Integer = 0;
+      AShortCut: TShortCut = 0): TMenuItem; overload;
+    function AddSeparator: TMenuItem;
+    function CanBeParent(AParent: TMenuItem): Boolean;
+    function FindByTag(const ATag: NativeInt): TMenuItem;
+    procedure DeleteWithTag(const ATag: NativeInt);
+    function HasVisibleSubItems: Boolean;
+    function IsCheckable: Boolean;
+
+    property DefaultItem: TMenuItem read GetDefaultItem;
+    property Menu: TMenu read GetMenu;
+  end;
+
+{$ENDREGION}
+
 {$REGION ' PopupMenu '}
 
   { TACLStylePopupMenu }
@@ -239,7 +273,6 @@ type
     function GetSeparatorHeight: Integer; inline;
   protected
     function CalculateItemHeight: Integer; override;
-    procedure DoDrawText(ACanvas: TCanvas; ARect: TRect; const S: string); virtual;
     procedure DoSplitRect(const R: TRect; AGutterWidth: Integer; out AGutterRect, AContentRect: TRect);
     procedure InitializeResources; override;
   public
@@ -283,8 +316,10 @@ type
     procedure AfterConstruction; override;
     procedure Assign(Source: TPersistent); override;
   published
-    property CloseMenuOnItemCheck: Boolean read FCloseMenuOnItemCheck write FCloseMenuOnItemCheck default True;
-    property ScrollMode: TACLPopupMenuScrollMode read FScrollMode write FScrollMode default smAuto;
+    property CloseMenuOnItemCheck: Boolean
+      read FCloseMenuOnItemCheck write FCloseMenuOnItemCheck default True;
+    property ScrollMode: TACLPopupMenuScrollMode
+      read FScrollMode write FScrollMode default smAuto;
   end;
 
   { TACLPopupMenuStyle }
@@ -297,7 +332,8 @@ type
     procedure DoDrawText(ACanvas: TCanvas; R: TRect; const S: string); override;
     procedure DoReset; override;
   published
-    property AllowTextFormatting: Boolean read FAllowTextFormatting write FAllowTextFormatting default False;
+    property AllowTextFormatting: Boolean read
+      FAllowTextFormatting write FAllowTextFormatting default False;
   end;
 
   { TACLPopupMenu }
@@ -355,228 +391,191 @@ type
 
 {$REGION ' Internal Classes '}
 
-{$IFDEF MSWINDOWS}
-  TACLMenuWindow = class;
   TACLMenuPopupWindow = class;
 
-  { TACLMenuItemControl }
-
-  TACLMenuItemControl = class(TGraphicControl)
+  TACLMenuWindow = class(TCustomControl, IACLMouseTracking)
+  {$REGION ' Internal Types '}
+  protected const
+    HitTestNoWhere  = -1;
+    HitTestScroller = -2;
+  protected type
+    TItemInfo = class
+    public
+      Item: TMenuItem;
+      Rect: TRect;
+      Size: TSize;
+    end;
+  {$ENDREGION}
   strict private
-    FMenuItem: TMenuItem;
-    FMouseSelected: Boolean;
-    FSelected: Boolean;
+    FItems: TACLObjectList<TItemInfo>;
+    FPrevMousePos: TPoint;
+    FSelectedItemIndex: Integer;
+    FTopIndex: Integer;
 
-    function GetIndex: Integer;
-    function GetMenu: TACLMenuWindow;
-    function GetStyle: TACLStylePopupMenu;
-    procedure CMHintShow(var Message: TCMHintShow); message CM_HINTSHOW;
-    procedure CMItemSelected(var Message: TMessage); message CM_ITEMSELECTED;
-    procedure CMMouseEnter(var Message: TMessage); message CM_MOUSEENTER;
+    function GetSelectedItemInfo: TItemInfo;
+    procedure SetTopIndex(AValue: Integer);
   protected
-    FSubMenu: TACLMenuWindow;
+    FPadding: TRect;
+    FVisibleItemCount: Integer;
 
-    procedure CheckAction(Action: TBasicAction);
-    function HasSubItems: Boolean;
-    procedure Keyed; virtual;
-    function MeasureSize(ACanvas: TCanvas): TSize; virtual;
-    procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
-    procedure Paint; override;
-    procedure SetSelected(ASelected: Boolean; AIsMouseAction: Boolean = False);
-    procedure UpdateSelection;
-    //
-    property Caption;
-    property Index: Integer read GetIndex;
-    property Menu: TACLMenuWindow read GetMenu;
-    property MenuItem: TMenuItem read FMenuItem;
-    property MouseSelected: Boolean read FMouseSelected;
-    property Selected: Boolean read FSelected;
-    property Style: TACLStylePopupMenu read GetStyle;
-    property SubMenu: TACLMenuWindow read FSubMenu;
-  public
-    constructor Create(AOwner: TComponent; AMenuItem: TMenuItem); reintroduce;
-    destructor Destroy; override;
-    procedure Click; override;
-  end;
-
-  { TACLMenuWindow }
-
-  TACLMenuWindow = class(TCustomControl)
-  strict private
-    FActionIdleTimer: TACLTimer;
-    FAnimatePopups: Boolean;
-    FDelayItem: TACLMenuItemControl;
-    FInMenuLoop: Boolean;
-    FItemKeyed: Boolean;
-    FParentControl: TACLMenuItemControl;
-    FRootMenu: TACLMenuWindow;
-    FVisibleIndex: Integer;
-
-    procedure DoActionIdle;
-    procedure DoActionIdleTimerProc(Sender: TObject);
-    procedure DoMenuDelay(Sender: TObject);
-
-    function GetStyle: TACLStylePopupMenu;
-    procedure SetParentMenu(AValue: TACLMenuWindow);
-    procedure SetVisibleIndex(AValue: Integer);
-
-    procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
-    procedure CMEnterMenuLoop(var Message: TMessage); message CM_ENTERMENULOOP;
-    procedure CMItemClicked(var Message: TMessage); message CM_ITEMCLICKED;
-    procedure CMItemKeyed(var Message: TMessage); message CM_ITEMKEYED;
-    procedure CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;
-    procedure WMKeyDown(var Message:  TWMKeyDown); message WM_KEYDOWN;
-    procedure WMMouseActivate(var Message: TWMMouseActivate); message WM_MOUSEACTIVATE;
-    procedure WMPaint(var Message: TWMPaint); message WM_PAINT;
-    procedure WMPrintClient(var Message: TWMPrintClient); message WM_PRINTCLIENT;
-  protected
-    FChildMenu: TACLMenuWindow;
-    FControlRect: TRect;
-    FItemNumberInDisplayArea: Integer;
-    FItems: TACLObjectList<TACLMenuItemControl>;
-    FMousePos: TPoint;
-    FParentMenu: TACLMenuWindow;
-    FPopupMenu: TACLPopupMenu;
-    FPopupStack: TObjectStack<TACLMenuWindow>;
-    FPopupTimer: TACLTimer;
-    FSelectedItem: TMenuItem;
-
-    function GetCurrentDpi: Integer; virtual;
-    function GetMenuDelayTime: Integer; virtual;
-    function IsDesigning: Boolean; virtual;
-
-    //# Parent
-    procedure Notification(AComponent: TComponent; Operation: TOperation); override;
-    procedure Resize; override;
-    procedure VisibleChanging; override;
-    procedure WndProc(var Message: TMessage); override;
-
-    //# Navigation
-    procedure EnsureNextItemVisible(var AItem: TACLMenuItemControl);
-    function FindAccelItem(const Accel: Word): TACLMenuItemControl;
-    function FindFirst: TACLMenuItemControl;
-    function FindFirstVisibleItem: TACLMenuItemControl;
-    function FindLast: TACLMenuItemControl;
-    function FindLastVisibleItem: TACLMenuItemControl;
-    function FindNext(AClient: TACLMenuItemControl; AWrap: Boolean = True): TACLMenuItemControl;
-    function FindNextVisibleItem(AClient: TACLMenuItemControl): TACLMenuItemControl;
-    function FindPrevious(AClient: TACLMenuItemControl; AWrap: Boolean = True): TACLMenuItemControl;
-    function FindPreviousVisibleItem(AClient: TACLMenuItemControl): TACLMenuItemControl;
-    function FindSelected(out AItem: TACLMenuItemControl): Boolean;
-    function TranslateCharCode(Code: Word): Word; virtual;
-
-    //# Creation
-    function CreateMenuItemControl(AMenuItem: TMenuItem): TACLMenuItemControl; virtual;
-    function CreatePopup(AOwner: TACLMenuWindow; AItem: TACLMenuItemControl): TACLMenuPopupWindow; virtual;
-
-    //# Calculation
-    procedure CalculateBounds; virtual;
+    function CalculateAutoSize: TSize; virtual; abstract;
     procedure CalculateLayout; virtual; abstract;
-    function CalculateMaxSize: TSize; virtual; abstract;
-    function CalculatePopupBounds(ASize: TSize; AChild: TACLMenuWindow = nil): TRect; virtual; abstract;
+    procedure CalculateMetrics; virtual;
+    function CalculatePopupBounds(ASize: TSize;
+      AChild: TACLMenuPopupWindow = nil): TRect; virtual; abstract;
+    function CalculateSize(ACanvas: TCanvas; AItem: TMenuItem): TSize; virtual; abstract;
 
-    //# Menu Message Loop
-    procedure DoneMenuLoop;
-    procedure InitMenuLoop;
-    procedure Idle(const Msg: TMsg);
-    procedure ProcessMenuLoop; virtual;
-    function ProcessMessage(var Msg: TMsg): Boolean;
-    procedure ProcessMessages;
-    procedure ProcessMouseMessage(var Msg: TMsg); virtual;
-    procedure ProcessMouseWheel(var Msg: TMsg); virtual;
+    // Keyboard
+    procedure KeyChar(var Key: Word);
+    procedure KeyDown(var Key: Word; Shift: TShiftState); override;
+    function TranslateKey(Key: Word; Shift: TShiftState): Word; virtual;
 
-    //# Tracking
-    procedure Animate(Show: Boolean = True);
-    procedure ClearSubMenus;
-    procedure CloseMenu;
-    procedure TrackMenu;
-    function TrackMenuOnSelect: Boolean; virtual;
+    // Mouse
+    function DoMouseWheel(Shift: TShiftState; Delta: Integer; P: TPoint): Boolean; override;
+    function HitTest(const P: TPoint): Integer;
+    function IsMouseAtControl: Boolean;
+    procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+    procedure MouseEnter;
+    procedure MouseLeave;
+    procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
+    procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+    procedure UpdateMouseMove;
 
-    //# Actions
-    function CanCloseMenuOnItemClick(AItem: TMenuItem): Boolean; virtual;
-    function DoItemClicked(AItem: TACLMenuItemControl): TMenuItem; virtual;
-    function DoItemKeyed(AItem: TACLMenuItemControl): TMenuItem; virtual;
-    procedure DoItemSelected(AItem: TACLMenuItemControl);
-    procedure DoSelect(Item: TMenuItem); virtual;
+    // Navigation
+    procedure ClickOnSelection(AActionType: TACLControlActionType); virtual;
+    procedure EnsureItemVisible(AItemIndex: Integer);
+    procedure SelectItem(AItemIndex: Integer; AActionType: TACLControlActionType);
+    procedure SelectItemOnMouseMove(AItemIndex: Integer); virtual;
+    procedure SelectNextItem(AGoForward: Boolean);
 
-    //# Populate
+    // Data
     procedure AddMenuItem(AMenuItem: TMenuItem);
-    procedure Clear; virtual;
-    procedure PopulateItems(AParentItem: TMenuItem);
+    function GetCurrentDpi: Integer; virtual;
+    function HasSelection: Boolean;
+    function HasSubItems(AItem: TMenuItem): Boolean;
+    procedure Init(ASource: TMenuItem);
 
-    procedure Select(AForward: Boolean);
-    procedure SelectItem(AItem: TACLMenuItemControl);
-
-    property InMenuLoop: Boolean read FInMenuLoop write FInMenuLoop;
-    property ParentControl: TACLMenuItemControl read FParentControl write FParentControl;
-    property ParentMenu: TACLMenuWindow read FParentMenu write SetParentMenu;
-    property PopupMenu: TACLPopupMenu read FPopupMenu;
-    property PopupStack: TObjectStack<TACLMenuWindow> read FPopupStack;
-    property RootMenu: TACLMenuWindow read FRootMenu write FRootMenu;
-    property Style: TACLStylePopupMenu read GetStyle;
-    property VisibleIndex: Integer read FVisibleIndex write SetVisibleIndex;
+    property Items: TACLObjectList<TItemInfo> read FItems;
+    property SelectedItemIndex: Integer read FSelectedItemIndex;
+    property SelectedItemInfo: TItemInfo read GetSelectedItemInfo;
+    property TopIndex: Integer read FTopIndex write SetTopIndex;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    property Caption;
-    property Color;
-    property Font;
+  end;
+
+  { TACLMenuPopupLooper }
+
+  TACLMenuPopupLooper = class
+  strict private
+    FActionIdleTimer: TACLTimer;
+    FDelayTimer: TACLTimer;
+    FDelayWnd: TACLMenuPopupWindow;
+    FDelayWndIndex: Integer;
+    FForm: TCustomForm;
+    FGrabbing: Boolean;
+    FInLoop: Boolean;
+    FInScrolling: Boolean;
+    FPopups: TObjectStack<TACLMenuPopupWindow>;
+    FWnd: TACLMenuPopupWindow;
+
+    procedure DoActionIdle;
+    procedure DoActionIdleTimerProc(Sender: TObject);
+    procedure DoIdle;
+    procedure DoShowPopupDelayed(Sender: TObject);
+    function DoShowPopup(AWnd: TACLMenuPopupWindow): Boolean;
+    function GetMenuHint(AItem: TMenuItem): string;
+    function IsInStack(const AInfo: TACLMenuWindow.TItemInfo): Boolean;
+    function IsMouseAtMenuWindow: Boolean;
+    procedure SetInScrolling(AValue: Boolean);
+    procedure UpdateMouseTracker;
+    procedure UpdateSelection(AWnd: TACLMenuPopupWindow);
+  protected
+    procedure CloseMenu(AWnd: TACLMenuPopupWindow = nil);
+    function IsPeek(AWnd: TACLMenuPopupWindow): Boolean;
+    function WndProc(AWnd: TACLMenuPopupWindow; var AMsg: TMessage): Boolean;
+  public
+    constructor Create(AOwner: TACLMenuPopupWindow);
+    destructor Destroy; override;
+    procedure Run;
+    //# Properties
+    property InGrabbing: Boolean read FGrabbing;
+    property InLoop: Boolean read FInLoop;
+    property InScrolling: Boolean read FInScrolling write SetInScrolling;
+    property Wnd: TACLMenuPopupWindow read FWnd;
   end;
 
   { TACLMenuPopupWindow }
 
   TACLMenuPopupWindow = class(TACLMenuWindow)
   strict private
+    FControlRect: TRect;
+    FLooper: TACLMenuPopupLooper;
+    FMainMenu: TACLMenuWindow;
+    FParent: TACLMenuPopupWindow;
+    FSource: TACLPopupMenu;
+    FSourceItem: TACLMenuWindow.TItemInfo;
+    // Scrollers
     FScrollBar: TACLScrollBar;
     FScrollButtonDown: TRect;
     FScrollButtonRestArea: TRect;
     FScrollButtonUp: TRect;
     FScrollTimer: TACLTimer;
 
-    function GetBorderWidths: TRect;
-    procedure WMNCCalcSize(var Message: TWMNCCalcSize); message WM_NCCALCSIZE;
-    procedure WMNCPaint(var Message: TWMNCPaint); message WM_NCPAINT;
-    procedure WMPrint(var Message: TWMPrint); message WM_PRINT;
+    function CanCloseMenuOnItemClick(AItem: TMenuItem): Boolean;
+    function GetStyle: TACLPopupMenuStyle;
+    //# Scrollers
+    procedure CheckScrollTimer(const P: TPoint);
+    function HasScrollers: Boolean;
+    procedure Scroll(Sender: TObject; ScrollCode: TScrollCode; var ScrollPos: Integer);
+    procedure ScrollTimer(Sender: TObject);
   protected
-    //# Calculation
-    procedure CalculateBounds; override;
+    function CalculateAutoSize: TSize; override;
+    procedure CalculateBounds;
     procedure CalculateLayout; override;
-    function CalculateMaxSize: TSize; override;
-    function CalculatePopupBounds(ASize: TSize; AChild: TACLMenuWindow = nil): TRect; override;
-    procedure CalculateScrollBar(var R: TRect);
-    //# Parent
+    procedure CalculateMetrics; override;
+    procedure CalculateScrollers(var R: TRect);
+    function CalculatePopupBounds(ASize: TSize;
+      AChild: TACLMenuPopupWindow = nil): TRect; override;
+    function CalculateSize(ACanvas: TCanvas; AItem: TMenuItem): TSize; override;
     procedure CreateParams(var Params: TCreateParams); override;
     procedure CreateWnd; override;
+    function GetCurrentDpi: Integer; override;
     procedure Resize; override;
-    //# Mouse
-    procedure MouseMove(Shift: TShiftState; X: Integer; Y: Integer); override;
-    //# Drawing
-    procedure NCPaint(DC: HDC);
-    procedure Paint; override;
-    //# Scrolling
-    function CreateScrollBar: TACLScrollBar;
-    procedure CheckAutoScrollTimer(const P: TPoint);
-    procedure DoScroll(Sender: TObject; ScrollCode: TScrollCode; var ScrollPos: Integer);
-    procedure DoScrollTimer(Sender: TObject);
-    procedure DrawScrollButton(ACanvas: TCanvas; const R: TRect; ATop, AEnabled: Boolean); virtual;
-    procedure DrawScrollButtons(ACanvas: TCanvas); virtual;
 
-    property ScrollBar: TACLScrollBar read FScrollBar;
-    property ScrollButtonDown: TRect read FScrollButtonDown;
-    property ScrollButtonUp: TRect read FScrollButtonUp;
-    property ScrollTimer: TACLTimer read FScrollTimer;
-  protected
-    procedure Popup(X, Y: Integer);
-    procedure PopupEx(AMenuItem: TMenuItem; const AControlRect: TRect);
+    //# Paint
+    procedure Paint; override;
+    procedure PaintScroller;
+
+    // Navigation
+    procedure KeyDown(var Key: Word; Shift: TShiftState); override;
+    procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
+    procedure SelectItemOnMouseMove(AItemIndex: Integer); override;
+
+    // # Messages
+    procedure CMItemClicked(var Message: TMessage); message CM_ITEMCLICKED;
+    procedure WMMouseActivate(var Message: TWMMouseActivate); message WM_MOUSEACTIVATE;
+    procedure WndProc(var Message: TMessage); override;
   public
-    constructor Create(AOwner: TComponent); overload; override;
-    constructor Create(AOwner: TACLMenuWindow); reintroduce; overload;
+    constructor Create(AMainMenu: TACLMenuWindow; ASource: TACLPopupMenu;
+      AItem: TACLMenuWindow.TItemInfo); reintroduce; overload;
+    constructor Create(AParent: TACLMenuPopupWindow;
+      AItem: TACLMenuWindow.TItemInfo); reintroduce; overload;
+    constructor Create(ASource: TACLPopupMenu); reintroduce; overload;
     destructor Destroy; override;
+    procedure Popup(const AControlRect: TRect);
+    //# Properties
+    property Looper: TACLMenuPopupLooper read FLooper;
+    property Parent: TACLMenuPopupWindow read FParent;
+    property MainMenu: TACLMenuWindow read FMainMenu;
+    property Source: TACLPopupMenu read FSource;
+    property SourceItem: TACLMenuWindow.TItemInfo read FSourceItem;
+    property Style: TACLPopupMenuStyle read GetStyle;
   end;
 
 {$ENDREGION}
 
-{$REGION ' MainMenu '}
+{$REGION ' Main Menu '}
 
   { TACLMainMenu }
 
@@ -584,98 +583,53 @@ type
   strict private
     FCancelMenu: Boolean;
     FMenu: TACLPopupMenu;
+    FPopupOnSelect: Boolean;
+    FPopupWnd: TACLMenuPopupWindow;
     FStyle: TACLStyleMenu;
 
-    procedure HandlerMenuChange(Sender: TObject; Source: TMenuItem; Rebuild: Boolean);
+    procedure DoMenuChange(Sender: TObject; Source: TMenuItem; Rebuild: Boolean);
+    function HasGlyph(AItem: TMenuItem): Boolean;
+    function IsInPopupMode: Boolean;
     procedure SetMenu(AValue: TACLPopupMenu);
     procedure SetStyle(AValue: TACLStyleMenu);
-    procedure WMSysCommand(var Message: TWMSysCommand); message WM_SYSCOMMAND;
-    procedure WMSysKeyDown(var Message: TWMSysKeyDown); message WM_SYSKEYDOWN;
-    procedure WMSysKeyUp(var Message: TWMSysKeyUp); message WM_SYSKEYUP;
   protected
-    function CreateMenuItemControl(AMenuItem: TMenuItem): TACLMenuItemControl; override;
-
     //# Calculate
+    function CalculateAutoSize: TSize; override;
     procedure CalculateLayout; override;
-    function CalculateMaxSize: TSize; override;
-    function CalculatePopupBounds(ASize: TSize; AChild: TACLMenuWindow = nil): TRect; override;
-
-    //# Capabilities
+    function CalculatePopupBounds(ASize: TSize;
+      AChild: TACLMenuPopupWindow = nil): TRect; override;
+    function CalculateSize(ACanvas: TCanvas; AItem: TMenuItem): TSize; override;
     function CanAutoSize(var NewWidth, NewHeight: Integer): Boolean; override;
-    function CanCloseMenuOnItemClick(AItem: TMenuItem): Boolean; override;
 
     //# Navigation
-    function TranslateCharCode(Code: Word): Word; override;
+    procedure KeyDown(var Key: Word; Shift: TShiftState); override;
+    procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+    procedure SelectItemOnMouseMove(AItemIndex: Integer); override;
+    function TranslateKey(Key: Word; Shift: TShiftState): Word; override;
 
-    //# Tracking
-    function TrackMenuOnSelect: Boolean; override;
-
-    // IACLLocalizableComponent
-    procedure Localize(const ASection: string);
-
-    function GetCurrentDpi: Integer; override;
-    function GetMenuDelayTime: Integer; override;
-    
+    //# General
     procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
     procedure Notification(AComponent: TComponent; AOperation: TOperation); override;
+    procedure Paint; override;
+    procedure PaintItem(AItem: TACLMenuWindow.TItemInfo; ASelected: Boolean);
+
+    //# Messages
+    procedure CMExit(var Message: TMessage); message CM_EXIT;
+    procedure CMItemClicked(var Message: TMessage); message CM_ITEMCLICKED;
+    procedure CMItemSelected(var Message: TMessage); message CM_ITEMSELECTED;
+    procedure WMGetDlgCode(var Message: TWMGetDlgCode); message WM_GETDLGCODE;
+    procedure WndProc(var Message: TMessage); override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure AdjustSize; override;
     procedure CheckShortCut(var Msg: TWMKey; var Handled: Boolean);
     procedure Rebuild;
+    // IACLLocalizableComponent
+    procedure Localize(const ASection: string);
   published
     property Menu: TACLPopupMenu read FMenu write SetMenu;
     property Style: TACLStyleMenu read FStyle write SetStyle;
-  end;
-
-  { TACLMainMenuItemControl }
-
-  TACLMainMenuItemControl = class(TACLMenuItemControl)
-  strict private
-    function HasGlyph: Boolean;
-    function Style: TACLStyleMenu; inline;
-  protected
-    function MeasureSize(ACanvas: TCanvas): TSize; override;
-    procedure Paint; override;
-  end;
-
-{$ENDREGION}
-
-{$ENDIF}
-
-{$REGION ' Helpers '}
-
-type
-
-  { TMenuItemHelper }
-
-  TMenuItemHelper = class helper for TMenuItem
-  strict private
-    function GetDefaultItem: TMenuItem;
-    function GetMenu: TMenu;
-  protected
-    procedure PrepareForShowing;
-  public
-    function AddItem(const ACaption, AHint: string; ATag: NativeInt = 0;
-      AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem; overload;
-    function AddItem(const ACaption: string;
-      AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem; overload;
-    function AddItem(const ACaption: string; ATag: NativeInt;
-      AEvent: TNotifyEvent = nil; AShortCut: TShortCut = 0): TMenuItem; overload;
-    function AddLink(const AMenuItemOrMenu: TComponent): TACLMenuItemLink;
-    function AddRadioItem(const ACaption, AHint: string; ATag: NativeInt = 0;
-      AEvent: TNotifyEvent = nil; AGroupIndex: Integer = 0;
-      AShortCut: TShortCut = 0): TMenuItem; overload;
-    function AddSeparator: TMenuItem;
-    function CanBeParent(AParent: TMenuItem): Boolean;
-    function FindByTag(const ATag: NativeInt): TMenuItem;
-    procedure DeleteWithTag(const ATag: NativeInt);
-    function HasVisibleSubItems: Boolean;
-    function IsCheckable: Boolean;
-
-    property DefaultItem: TMenuItem read GetDefaultItem;
-    property Menu: TMenu read GetMenu;
   end;
 
 {$ENDREGION}
@@ -683,42 +637,10 @@ type
 function acMenusHasActivePopup: Boolean;
 implementation
 
-{$IFNDEF MSWINDOWS}
-
 function acMenusHasActivePopup: Boolean;
 begin
-  Result := False;
+  Result := TACLControls.MenuLoopCount > 0;
 end;
-
-{$ELSE}
-
-type
-  TApplicationAccess = class(TApplication);
-  TControlActionLinkAccess = class(TControlActionLink);
-
-  { TACLMenuController }
-
-  TACLMenuController = class
-  private
-    class var FActiveMenu: TACLMenuWindow;
-    class var FHook: HHOOK;
-    class var FMenus: TList;
-
-    class function CallWindowHook(Code: Integer; wparam: WPARAM; Msg: PCWPStruct): Longint; stdcall; static;
-  protected
-    class function IsValid(AMenu: TACLMenuWindow): Boolean;
-  public
-    class procedure Register(ABar: TACLMenuWindow);
-    class procedure Unregister(ABar: TACLMenuWindow);
-    class property ActiveMenu: TACLMenuWindow read FActiveMenu write FActiveMenu;
-  end;
-
-function acMenusHasActivePopup: Boolean;
-begin
-  Result := TACLMenuController.ActiveMenu <> nil;
-end;
-
-{$ENDIF}
 
 {$REGION ' Helpers '}
 
@@ -817,6 +739,15 @@ begin
       Exit(True);
   end;
   Result := False;
+end;
+
+procedure TMenuItemHelper.InitiateActions;
+var
+  I: Integer;
+begin
+  InitiateAction;
+  for I := 0 to Count - 1 do
+    Items[I].InitiateAction;
 end;
 
 function TMenuItemHelper.IsCheckable: Boolean;
@@ -1132,6 +1063,11 @@ begin
   acDrawImage(ACanvas, ARect, AImages, AImageIndex, AEnabled);
 end;
 
+procedure TACLStyleMenu.DoDrawText(ACanvas: TCanvas; ARect: TRect; const S: string);
+begin
+  acSysDrawText(ACanvas, ARect, S, DT_LEFT or DT_SINGLELINE or DT_VCENTER);
+end;
+
 procedure TACLStyleMenu.DrawBackground(ACanvas: TCanvas; const R: TRect; ASelected: Boolean);
 begin
   if ASelected then
@@ -1220,7 +1156,7 @@ function TACLStyleMenu.MeasureWidth(ACanvas: TCanvas;
   const S: string; AShortCut: TShortCut; ADefault: Boolean): Integer;
 begin
   AssignFontParams(ACanvas, True, ADefault, True);
-  Result := 2 * GetTextIdent + acTextSize(ACanvas, S).Width;
+  Result := 2 * GetTextIdent + acTextSize(ACanvas, StripHotkey(S)).Width;
 end;
 
 {$ENDREGION}
@@ -1290,11 +1226,6 @@ begin
   finally
     acRestoreClipRegion(ACanvas.Handle, AClipRegion);
   end;
-end;
-
-procedure TACLStylePopupMenu.DoDrawText(ACanvas: TCanvas; ARect: TRect; const S: string);
-begin
-  acSysDrawText(ACanvas, ARect, S, DT_LEFT or DT_SINGLELINE or DT_VCENTER or DT_NOPREFIX);
 end;
 
 procedure TACLStylePopupMenu.DoSplitRect(const R: TRect;
@@ -1567,24 +1498,19 @@ end;
 
 procedure TACLPopupMenu.DoShow(const ControlRect: TRect);
 begin
-{$IFDEF FPC}
-  {$MESSAGE WARN 'NotImplemented'}
-  raise ENotImplemented.Create('TACLPopupMenu');
-{$ELSE}
   if not IsShown then
   try
     FPopupWindow := TACLMenuPopupWindow.Create(Self);
     try
-      TACLMenuPopupWindow(FPopupWindow).FPopupMenu := Self;
-      TACLMenuPopupWindow(FPopupWindow).PopupEx(Items, ControlRect);
+      TACLMenuPopupWindow(FPopupWindow).Init(Items);
+      TACLMenuPopupWindow(FPopupWindow).Popup(ControlRect);
     finally
       FreeAndNil(FPopupWindow);
-  //Lose Focus: MyRefreshStayOnTop;
+//  Lose Focus: MyRefreshStayOnTop;
     end;
   finally
     DoClose;
   end;
-{$ENDIF}
 end;
 
 function TACLPopupMenu.GetCurrentDpi: Integer;
@@ -1620,1038 +1546,334 @@ end;
 
 {$REGION ' Internal Classes '}
 
-{$IFDEF MSWINDOWS}
 { TACLMenuWindow }
 
 constructor TACLMenuWindow.Create(AOwner: TComponent);
 begin
-  inherited Create(AOwner);
-  ControlStyle := ControlStyle + [csClickEvents, csDoubleClicks, csSetCaption, csOpaque];
-  Align := alNone;
-  Height := 50;
-  Width := 150;
-  BorderWidth := 0;
+  inherited;
+  FSelectedItemIndex := -1;
+  FItems := TACLObjectList<TItemInfo>.Create;
   DoubleBuffered := True;
-  FAnimatePopups := True;
-  Font := Screen.MenuFont;
-  TACLMenuController.Register(Self);
-  FActionIdleTimer := TACLTimer.CreateEx(DoActionIdleTimerProc);
-  FItems := TACLObjectList<TACLMenuItemControl>.Create;
 end;
 
 destructor TACLMenuWindow.Destroy;
 begin
-  ClearSubMenus;
-  FChildMenu := nil;
-  Visible := False;
-  TACLMenuController.Unregister(Self);
-  if FParentControl <> nil then
-    FParentControl.FSubMenu := nil;
-  if FParentMenu <> nil then
-    FParentMenu.FChildMenu := nil;
-  FreeAndNil(FActionIdleTimer);
+  MouseTracker.Remove(Self);
   FreeAndNil(FItems);
-  inherited Destroy;
-end;
-
-procedure TACLMenuWindow.Notification(AComponent: TComponent; Operation: TOperation);
-begin
-  inherited Notification(AComponent, Operation);
-
-  if Operation = opRemove then
-  begin
-    if AComponent = FSelectedItem then
-      FSelectedItem := nil;
-  end;
-end;
-
-procedure TACLMenuWindow.Resize;
-begin
-  inherited Resize;
-  CalculateLayout;
-end;
-
-procedure TACLMenuWindow.VisibleChanging;
-
-  procedure UpdateSeparatorsVisibility;
-  var
-    AItem: TACLMenuItemControl;
-  begin
-    AItem := FindFirstVisibleItem;
-    if (AItem <> nil) and AItem.MenuItem.IsLine then
-      AItem.Visible := False;
-
-    AItem := FindLastVisibleItem;
-    if (AItem <> nil) and AItem.MenuItem.IsLine then
-      AItem.Visible := False;
-  end;
-
-begin
-  inherited VisibleChanging;
-
-  if csDesigning in ComponentState then
-    Exit;
-
-  if not Visible then
-  begin
-    UpdateSeparatorsVisibility;
-
-    for var I := 0 to FItems.Count - 1 do
-      FItems[I].MenuItem.InitiateAction;
-
-    DisableAlign;
-    try
-      CalculateBounds;
-      VisibleIndex := 0;
-      for var I := 0 to FItems.Count - 1 do
-      begin
-        if FItems[I].MenuItem.Default then
-        begin
-          VisibleIndex := I;
-          Break;
-        end;
-      end;
-    finally
-      EnableAlign;
-      Resize;
-    end;
-
-    if ParentMenu <> nil then
-      Animate(True);
-
-    if RootMenu <> nil then
-    begin
-      sndPlaySound(nil, SND_NODEFAULT);
-      sndPlaySound('MenuPopup', SND_NOSTOP or SND_ASYNC or SND_NODEFAULT);
-    end;
-  end;
-end;
-
-procedure TACLMenuWindow.WndProc(var Message: TMessage);
-begin
-  case Message.Msg of
-    WM_NCHITTEST:
-      Message.Result := HTCLIENT;
-    WM_ERASEBKGND:
-      if FDoubleBuffered and (TMessage(Message).wParam <> WPARAM(TMessage(Message).lParam)) then
-      begin
-        Message.Result := 1;
-        Exit;
-      end;
-  end;
-  inherited WndProc(Message);
-end;
-
-procedure TACLMenuWindow.EnsureNextItemVisible(var AItem: TACLMenuItemControl);
-var
-  AControlIndex: Integer;
-begin
-  AControlIndex := AItem.Index;
-  while (AControlIndex < VisibleIndex) or (AControlIndex >= VisibleIndex + FItemNumberInDisplayArea) do
-  begin
-    if AControlIndex < VisibleIndex then
-      VisibleIndex := AControlIndex
-    else
-      VisibleIndex := AControlIndex - FItemNumberInDisplayArea + 1;
-  end;
-end;
-
-function TACLMenuWindow.FindAccelItem(const Accel: Word): TACLMenuItemControl;
-begin
-  for var I := 0 to FItems.Count - 1 do
-  begin
-    Result := FItems[I];
-    if Result.Parent.Showing and Result.Visible and IsAccel(Accel, Result.Caption) then
-      Exit;
-  end;
-  Result := nil;
-end;
-
-function TACLMenuWindow.FindFirst: TACLMenuItemControl;
-begin
-  if FItems.Count > 0 then
-    Result := FItems[0]
-  else
-    Result := nil;
-end;
-
-function TACLMenuWindow.FindFirstVisibleItem: TACLMenuItemControl;
-begin
-  Result := FindFirst;
-  while Assigned(Result) and not Result.Visible do
-    Result := FindNext(Result, False);
-end;
-
-function TACLMenuWindow.FindLast: TACLMenuItemControl;
-begin
-  if FItems.Count > 0 then
-    Result := FItems.Last
-  else
-    Result := nil;
-end;
-
-function TACLMenuWindow.FindLastVisibleItem: TACLMenuItemControl;
-begin
-  Result := FindLast;
-  while Assigned(Result) and not Result.Visible do
-    Result := FindPrevious(Result, False);
-end;
-
-function TACLMenuWindow.FindNext(AClient: TACLMenuItemControl; AWrap: Boolean = True): TACLMenuItemControl;
-begin
-  Result := nil;
-  if Assigned(AClient) then
-  begin
-    if AClient.Index < FItems.Count - 1 then
-      Result := FItems[AClient.Index + 1]
-    else
-      if AWrap and (FItems.Count > 1) then
-        Result := FItems[0];
-  end
-  else
-    if AWrap then
-      Result := FindFirst;
-end;
-
-function TACLMenuWindow.FindNextVisibleitem(AClient: TACLMenuItemControl): TACLMenuItemControl;
-begin
-  Result := FindNext(AClient, False);
-  while Assigned(Result) and not Result.Visible do
-    Result := FindNext(Result, False);
-end;
-
-function TACLMenuWindow.FindPrevious(AClient: TACLMenuItemControl; AWrap: Boolean = True): TACLMenuItemControl;
-begin
-  Result := nil;
-  if Assigned(AClient) then
-  begin
-    if AClient.Index > 0 then
-      Result := FItems[AClient.Index - 1]
-    else
-      if AWrap and (FItems.Count > 1) then
-        Result := FItems.Last;
-  end
-  else
-    if AWrap then
-      Result := FindLast;
-end;
-
-function TACLMenuWindow.FindPreviousVisibleItem(AClient: TACLMenuItemControl): TACLMenuItemControl;
-begin
-  Result := FindPrevious(AClient, False);
-  while Assigned(Result) and not Result.Visible do
-    Result := FindPrevious(Result, False);
-end;
-
-function TACLMenuWindow.FindSelected(out AItem: TACLMenuItemControl): Boolean;
-begin
-  for var I := 0 to FItems.Count - 1 do
-  begin
-    AItem := FItems[I];
-    if (AItem <> nil) and AItem.Selected then
-      Exit(True);
-  end;
-  Result := False;
-end;
-
-function TACLMenuWindow.CreateMenuItemControl(AMenuItem: TMenuItem): TACLMenuItemControl;
-begin
-  Result := TACLMenuItemControl.Create(Self, AMenuItem);
-end;
-
-function TACLMenuWindow.CreatePopup(AOwner: TACLMenuWindow; AItem: TACLMenuItemControl): TACLMenuPopupWindow;
-begin
-  FDelayItem := nil;
-  if not InMenuLoop or (AOwner = nil) or (AItem = nil) then
-    Exit(nil);
-  if (FPopupStack.Count = 0) or (FPopupStack.Peek.ParentControl = AItem) then
-    Exit(nil);
-  if not AItem.HasSubItems then
-    Exit(nil);
-
-  AItem.MenuItem.Click;
-
-  Result := TACLMenuPopupWindow.Create(AOwner);
-  Result.DisableAlign;
-  Result.InMenuLoop := True;
-  Result.ParentControl := AItem;
-  Result.PopulateItems(AItem.MenuItem);
-  if Result.FItems.Count = 0 then
-  begin
-    FreeAndNil(Result);
-    Exit;
-  end;
-
-  AItem.FSubMenu := Result;
-  FPopupStack.Push(Result);
-  Result.EnableAlign;
-  Result.Show;
-end;
-
-procedure TACLMenuWindow.DoneMenuLoop;
-begin
-  ClearSubMenus;
-  TACLMenuController.ActiveMenu := nil;
-  FAnimatePopups := True;
-  ShowCaret(0);
-  FPopupStack.OwnsObjects := False;
-  FreeAndNil(FPopupTimer);
-  FreeAndNil(FPopupStack);
-end;
-
-procedure TACLMenuWindow.InitMenuLoop;
-begin
-  FMousePos := Mouse.CursorPos;
-  // Need to use FSelectedItem because it's possible for the item to be
-  // destroyed in designmode before TrackMenu gets an opportunity to execute
-  // the associated action
-  FSelectedItem := nil;
-  FDelayItem := nil;
-  acSafeSetFocus(GetParentForm(Self));
-  FPopupTimer := TACLTimer.CreateEx(DoMenuDelay, GetMenuDelayTime);
-  FPopupStack := TObjectStack<TACLMenuWindow>.Create;
-  FPopupStack.Push(Self);
-  FInMenuLoop := True;
-  HideCaret(0);
-  TACLMenuController.ActiveMenu := Self;
-end;
-
-procedure TACLMenuWindow.Idle(const Msg: TMsg);
-var
-  ADone: Boolean;
-  AHintInfo: THintInfo;
-  ASelected: TACLMenuItemControl;
-begin
-  if FindSelected(ASelected) then
-  begin
-    ZeroMemory(@AHintInfo, SizeOf(AHintInfo));
-    ASelected.Perform(CM_HINTSHOW, 0, LPARAM(@AHintInfo));
-    Application.Hint := GetLongHint(AHintInfo.HintStr);
-  end
-  else
-    Application.CancelHint;
-
-  ADone := True;
-  try
-    if Assigned(Application.OnIdle) then
-      Application.OnIdle(Self, ADone);
-
-    if ADone then
-    begin
-      if Application.ActionUpdateDelay <= 0 then
-        DoActionIdle
-      else
-        if not FActionIdleTimer.Enabled then
-        begin
-          FActionIdleTimer.Interval := Application.ActionUpdateDelay;
-          FActionIdleTimer.Enabled := True;
-        end;
-    end;
-  except
-    Application.HandleException(Self);
-  end;
-
-  if IsMainThread and CheckSynchronize then
-    ADone := False;
-  if ADone then
-    WaitMessage;
-end;
-
-procedure TACLMenuWindow.ProcessMenuLoop;
-var
-  Msg: TMsg;
-begin
-  if FInMenuLoop then
-    Exit;
-
-  InitMenuLoop;
-  try
-    repeat
-      if PeekMessage(Msg, 0, 0, 0, PM_REMOVE) then
-      begin
-        // Prevent multiple right click menus from appearing in form designer
-        if (Msg.message = WM_CONTEXTMENU) and (RootMenu is TACLMenuWindow) then
-          Continue;
-
-        case Msg.message of
-          CM_ITEMSELECTED:
-            DoItemSelected(TACLMenuItemControl(Msg.lParam));
-          CM_ITEMKEYED:
-            FSelectedItem := DoItemKeyed(TACLMenuItemControl(Msg.lParam));
-          CM_ITEMCLICKED:
-            FSelectedItem := DoItemClicked(TACLMenuItemControl(Msg.lParam));
-
-          WM_QUIT:
-            begin
-              FInMenuLoop := False;
-              PostQuitMessage(Msg.wParam);
-            end;
-
-          WM_NCLBUTTONDOWN:
-            begin
-              CloseMenu;
-              RootMenu.ProcessMessages;
-              DispatchMessage(Msg);
-            end;
-
-          WM_NCMBUTTONDOWN, WM_NCRBUTTONDOWN, CM_RELEASE, WM_CLOSE:
-            begin
-              CloseMenu;
-              RootMenu.ProcessMessages;
-              DispatchMessage(Msg);
-            end;
-
-          WM_KEYFIRST..WM_KEYLAST:
-            if (Msg.message = WM_SYSKEYDOWN) and (Msg.wParam = VK_MENU) then
-            begin
-              CloseMenu;
-              TranslateMessage(Msg);
-              DispatchMessage(Msg);
-            end
-            else
-              if (Msg.wParam <> VK_F1) or (KeyboardStateToShiftState = [ssCtrl]) then
-                FPopupStack.Peek.Dispatch(Msg.message);
-
-          WM_MOUSEFIRST..WM_MOUSELAST:
-            begin
-              if Msg.Message = WM_MOUSEWHEEL then
-              begin
-                ProcessMouseWheel(Msg);
-                Continue;
-              end;
-              if Msg.Message = WM_MOUSEMOVE then
-              begin
-                if PointsEqual(FMousePos, Mouse.CursorPos) then
-                  Continue;
-              end;
-              ProcessMouseMessage(Msg);
-            end;
-        else
-          TranslateMessage(Msg);
-          DispatchMessage(Msg);
-        end;
-        if Assigned(FPopupStack) and not FPopupStack.Peek.FInMenuLoop then
-          FPopupStack.Peek.CloseMenu;
-      end
-      else
-        Idle(Msg);
-    until not FInMenuLoop;
-  finally
-    DoneMenuLoop;
-  end;
-end;
-
-function TACLMenuWindow.ProcessMessage(var Msg: TMsg): Boolean;
-var
-  App: TApplicationAccess;
-begin
-  App := TApplicationAccess(Application);
-  Result := False;
-  if PeekMessage(Msg, 0, 0, 0, PM_REMOVE) then
-  begin
-    Result := True;
-    if Msg.Message <> WM_QUIT then
-      if not App.IsHintMsg(Msg) and not App.IsMDIMsg(Msg) then
-      begin
-        if (Msg.message >= WM_KEYFIRST) and (Msg.message <= WM_KEYLAST) then
-          Exit(False);
-        TranslateMessage(Msg);
-        DispatchMessage(Msg);
-      end;
-  end;
-end;
-
-procedure TACLMenuWindow.ProcessMessages;
-var
-  Msg: TMsg;
-begin
-  while ProcessMessage(Msg) do;
-end;
-
-procedure TACLMenuWindow.Animate(Show: Boolean = True);
-const
-  AnimateDuration = 150;
-  UnfoldAnimationStyle: array[Boolean] of Integer = (
-    AW_VER_POSITIVE or AW_HOR_POSITIVE or AW_SLIDE,
-    AW_VER_NEGATIVE or AW_HOR_POSITIVE or AW_SLIDE);
-  HideShow: array[Boolean] of Integer = (AW_HIDE, 0);
-var
-  LMenuAnimate: LongBool;
-  LMenuPoint: TPoint;
-begin
-  if not RootMenu.FItemKeyed and Assigned(AnimateWindowProc) then
-  begin
-    SystemParametersInfo(SPI_GETMENUANIMATION, 0, @LMenuAnimate, 0);
-    if (FParentMenu.FAnimatePopups or not Show) and LMenuAnimate and
-      (IsWin10OrLater or (Style.CornerRadius.Value = 0)) // на старых ОС меню фликает при анимации, если задана маска
-    then
-    begin
-      SystemParametersInfo(SPI_GETMENUFADE, 0, @LMenuAnimate, 0);
-      if LMenuAnimate then
-        AnimateWindowProc(Handle, AnimateDuration, AW_BLEND or HideShow[Show])
-      else
-      begin
-        LMenuPoint := ParentControl.Parent.ClientToScreen(ParentControl.BoundsRect.TopLeft);
-        AnimateWindowProc(Handle, AnimateDuration, UnfoldAnimationStyle[Top < LMenuPoint.Y - 5] or HideShow[Show]);
-      end;
-    end;
-  end;
-end;
-
-procedure TACLMenuWindow.ClearSubMenus;
-begin
-  if Assigned(FPopupStack) then
-  begin
-    while FPopupStack.Count > 1 do
-      FPopupStack.Peek.CloseMenu;   // CloseMenu pops the top menu off the stack
-  end;
-end;
-
-procedure TACLMenuWindow.CloseMenu;
-var
-  ASelected: TACLMenuItemControl;
-begin
-  if FChildMenu <> nil then
-    FChildMenu.CloseMenu;
-
-  if Self is TACLMenuPopupWindow then // TODO-срань
-    Visible := False;
-  if RootMenu <> nil then
-  begin
-    RootMenu.FMousePos := Mouse.CursorPos;
-    RootMenu.FDelayItem := nil;
-  end;
-
-  if ParentMenu <> nil then
-    ParentMenu.FAnimatePopups := False;
-
-  InMenuLoop := False;
-
-  if (RootMenu <> nil) and (RootMenu.PopupStack <> nil) then
-  begin
-    if RootMenu.PopupStack.Peek = RootMenu then
-    begin
-      InMenuLoop := False;
-      if FindSelected(ASelected) and (ASelected <> ControlAtPos(CalcCursorPos, True)) then
-        ASelected.SetSelected(False, False);
-    end
-    else
-      RootMenu.PopupStack.Pop;
-  end;
-end;
-
-procedure TACLMenuWindow.TrackMenu;
-begin
-  if not InMenuLoop then
-  begin
-    RootMenu := Self;
-    ProcessMenuLoop;
-    if FSelectedItem <> nil then
-    begin
-      Update;
-      if CanCloseMenuOnItemClick(FSelectedItem) then
-        DoSelect(FSelectedItem);
-    end;
-  end;
-end;
-
-function TACLMenuWindow.TrackMenuOnSelect: Boolean;
-begin
-  Result := False;
-end;
-
-function TACLMenuWindow.TranslateCharCode(Code: Word): Word;
-begin
-  Result := Code;
-end;
-
-procedure TACLMenuWindow.ProcessMouseMessage(var Msg: TMsg);
-var
-  AControl: TControl;
-begin
-  case Msg.message of
-    WM_MBUTTONDOWN, WM_RBUTTONDOWN, WM_RBUTTONDBLCLK, WM_LBUTTONDOWN, WM_LBUTTONDBLCLK:
-      begin
-        AControl := FindDragTarget(Msg.pt, True);
-        while (AControl <> nil) and (AControl.Parent <> nil) do
-          AControl := AControl.Parent;
-        while (PopupStack.Count > 1) and (PopupStack.Peek <> AControl) do
-          PopupStack.Pop;
-        if PopupStack.Peek <> AControl then
-          CloseMenu;
-      end;
-  end;
-  DispatchMessage(Msg);
-end;
-
-procedure TACLMenuWindow.ProcessMouseWheel(var Msg: TMsg);
-var
-  AMenu: TACLMenuWindow;
-  AMessage: TWMMouseWheel;
-begin
-  AMenu := PopupStack.Peek;
-  if AMenu <> nil then
-  begin
-    TMessage(AMessage).WParam := Msg.wParam;
-    TMessage(AMessage).LParam := Msg.lParam;
-    AMenu.VisibleIndex := AMenu.VisibleIndex + Signs[AMessage.WheelDelta < 0];
-  end;
-end;
-
-procedure TACLMenuWindow.CalculateBounds;
-begin
-  if ParentMenu <> nil then
-    BoundsRect := ParentMenu.CalculatePopupBounds(CalculateMaxSize, Self)
-  else
-    BoundsRect := CalculatePopupBounds(CalculateMaxSize, nil);
-  CalculateLayout;
-end;
-
-function TACLMenuWindow.CanCloseMenuOnItemClick(AItem: TMenuItem): Boolean;
-begin
-  if PopupMenu.Options.CloseMenuOnItemCheck then
-    Result := True
-  else
-    Result := not AItem.AutoCheck;
-end;
-
-function TACLMenuWindow.DoItemClicked(AItem: TACLMenuItemControl): TMenuItem;
-
-  function GetSelectedItem: TACLMenuItemControl;
-  begin
-    if not FindSelected(Result) then
-      Result := nil;
-  end;
-
-var
-  ASelectedItem: TACLMenuItemControl;
-begin
-  Result := nil;
-  if AItem.Owner = Self then
-    FDelayItem := nil;
-  if AItem.HasSubItems then
-  begin
-    if FDelayItem <> nil then
-    try
-      while FPopupStack.Peek <> FDelayItem.Parent do
-        RootMenu.PopupStack.Pop;
-    finally
-      FDelayItem := nil;
-    end;
-    ASelectedItem := GetSelectedItem;
-    RootMenu.ProcessMessages;
-    if GetSelectedItem <> ASelectedItem then
-      Exit;
-    if FPopupStack = nil then
-      Exit;
-    if AItem.Parent = RootMenu then
-      ClearSubMenus;
-    CreatePopup(FPopupStack.Peek, AItem);
-    FAnimatePopups := False;
-  end
-  else
-  begin
-    Result := AItem.MenuItem;
-    if CanCloseMenuOnItemClick(Result) then
-    begin
-      ClearSubMenus;
-      CloseMenu;
-    end
-    else
-    begin
-      DoSelect(Result);
-      AItem.Parent.Invalidate;
-    end;
-  end;
-end;
-
-function TACLMenuWindow.DoItemKeyed(AItem: TACLMenuItemControl): TMenuItem;
-begin
-  FItemKeyed := True;
-  try
-    Result := DoItemClicked(AItem);
-    if Result = nil then
-    begin
-      // if the keyboard was used to display the popup then automatically
-      // select the first item if the mouse was used no item is selected
-      SelectItem(FPopupStack.Peek.FindFirstVisibleItem);
-    end;
-  finally
-    FItemKeyed := False;
-  end;
-end;
-
-procedure TACLMenuWindow.DoItemSelected(AItem: TACLMenuItemControl);
-begin
-  if AItem <> nil then
-    RootMenu.FDelayItem := AItem
-  else
-    FDelayItem := nil;
-
-  if RootMenu.FPopupTimer <> nil then
-    RootMenu.FPopupTimer.Enabled := True;
-end;
-
-procedure TACLMenuWindow.DoSelect(Item: TMenuItem);
-begin
-  PopupMenu.DoSelect(Item);
+  inherited;
 end;
 
 procedure TACLMenuWindow.AddMenuItem(AMenuItem: TMenuItem);
 var
-  AControl: TACLMenuItemControl;
-  AContainer: TACLMenuContainerItem;
+  LContainer: TACLMenuContainerItem;
+  LItem: TItemInfo;
 begin
+  if csDesigning in ComponentState then
+    Exit;
   if not AMenuItem.Visible then
     Exit;
-  if AMenuItem.IsLine and ((FItems.Count = 0) or FItems.Last.MenuItem.IsLine) then
+  if AMenuItem.IsLine and ((Items.Count = 0) or Items.Last.Item.IsLine) then
     Exit;
-
-  if not IsDesigning and Safe.Cast(AMenuItem, TACLMenuContainerItem, AContainer) then
+  if Safe.Cast(AMenuItem, TACLMenuContainerItem, LContainer) then
   begin
-    if not AContainer.HasSubItems then
+    if not LContainer.HasSubItems then
       Exit;
-    if AContainer.ExpandMode = lemExpandInplace then
+    if LContainer.ExpandMode = lemExpandInplace then
     begin
-      if AContainer.Enabled then
-        AContainer.Expand(AddMenuItem);
+      if LContainer.Enabled then
+        LContainer.Expand(AddMenuItem);
       Exit;
     end;
   end;
-
-  AControl := CreateMenuItemControl(AMenuItem);
-  AControl.Parent := Self;
-  FItems.Add(AControl);
+  LItem := TItemInfo.Create;
+  LItem.Item := AMenuItem;
+  LItem.Rect := NullRect;
+  LItem.Size := NullSize;
+  FItems.Add(LItem);
 end;
 
-procedure TACLMenuWindow.Clear;
+procedure TACLMenuWindow.CalculateMetrics;
+var
+  I: Integer;
+  LItem: TItemInfo;
 begin
-  DisableAlign;
-  try
-    FItems.Clear;
-  finally
-    EnableAlign;
+  MeasureCanvas.Font := Font;
+  for I := 0 to Items.Count - 1 do
+  begin
+    LItem := Items.List[I];
+    LItem.Size := CalculateSize(MeasureCanvas, LItem.Item);
   end;
 end;
 
-procedure TACLMenuWindow.PopulateItems(AParentItem: TMenuItem);
+procedure TACLMenuWindow.ClickOnSelection(AActionType: TACLControlActionType);
 var
-  AContainer: TACLMenuContainerItem;
+  LAction: TCustomAction;
+  LItem: TItemInfo;
 begin
-  if AParentItem.Enabled then
+  LItem := SelectedItemInfo;
+  if LItem = nil then
+    Exit;
+  if LItem.Item.IsLine then
+    Exit;
+  if LItem.Item.Enabled = False then
+    Exit;
+  if LItem.Item.Action is TCustomAction then
   begin
-    AParentItem.PrepareForShowing;
-    if Safe.Cast(AParentItem, TACLMenuContainerItem, AContainer) and (AContainer.ExpandMode = lemExpandInSubMenu) then
-      AContainer.Expand(AddMenuItem)
+    LAction := TCustomAction(LItem.Item.Action);
+    if (LAction.GroupIndex > 0) and not LAction.AutoCheck then
+      LAction.Checked := True;
+  end;
+  PostMessage(Handle, CM_ITEMCLICKED, Ord(AActionType), LPARAM(LItem.Item));
+end;
+
+procedure TACLMenuWindow.EnsureItemVisible(AItemIndex: Integer);
+begin
+  if (AItemIndex < 0) or (AItemIndex >= Items.Count) then
+    Exit;
+  while (AItemIndex < TopIndex) or (AItemIndex >= TopIndex + FVisibleItemCount) do
+  begin
+    if AItemIndex < TopIndex then
+      TopIndex := AItemIndex
     else
-      for var I := 0 to AParentItem.Count - 1 do
-        AddMenuItem(AParentItem.Items[I]);
-
-    if (FItems.Count > 0) and FItems.Last.MenuItem.IsLine then
-      FItems.Delete(FItems.Count - 1);
+      TopIndex := TopIndex - FVisibleItemCount + 1;
   end;
 end;
 
-procedure TACLMenuWindow.CMEnabledchanged(var Message: TMessage);
-begin
-  inherited;
-  Broadcast(Message);
-end;
-
-procedure TACLMenuWindow.CMEnterMenuLoop(var Message: TMessage);
-begin
-  TrackMenu;
-end;
-
-procedure TACLMenuWindow.WMPaint(var Message: TWMPaint);
-begin
-  if not (csCustomPaint in ControlState) then
-  begin
-    ControlState := ControlState + [csCustomPaint];
-    inherited;
-    ControlState := ControlState - [csCustomPaint];
-  end;
-end;
-
-procedure TACLMenuWindow.CMItemClicked(var Message: TMessage);
+procedure TACLMenuWindow.Init(ASource: TMenuItem);
 var
-  ASelected: TACLMenuItemControl;
+  I: Integer;
 begin
-  if FInMenuLoop then
-    Exit;
-  ASelected := TACLMenuItemControl(Message.LParam);
-  if (ASelected <> nil) and ASelected.Selected then
+  Items.Clear;
+  ASource.InitiateActions;
+  if ASource.Enabled then
   begin
-    PostMessage(Handle, Message.Msg, 0, Message.LParam);
-    TrackMenu;
-  end;
-end;
-
-procedure TACLMenuWindow.CMItemKeyed(var Message: TMessage);
-begin
-  CMItemClicked(Message);
-end;
-
-procedure TACLMenuWindow.CMMouseLeave(var Message: TMessage);
-var
-  ASelected: TACLMenuItemControl;
-begin
-  inherited;
-  if FindSelected(ASelected) and (ASelected.SubMenu = nil) then
-    ASelected.SetSelected(False);
-end;
-
-procedure TACLMenuWindow.DoMenuDelay(Sender: TObject);
-var
-  P: TPoint;
-begin
-  FPopupTimer.Enabled := False;
-  if (FDelayItem = nil) or (FDelayItem.Parent = nil) or (FDelayItem.SubMenu <> nil) then
-    Exit;
-
-  while (RootMenu.PopupStack.Count > 1) and (RootMenu.PopupStack.Peek <> FDelayItem.Parent) do
-    RootMenu.PopupStack.Pop;
-
-  GetCursorPos(P);
-  if PtInRect(FDelayItem.BoundsRect, FPopupStack.Peek.ScreenToClient(P)) then
-    CreatePopup(FPopupStack.Peek, FDelayItem);
-end;
-
-procedure TACLMenuWindow.Select(AForward: Boolean);
-
-  function SkipItems(AForward: Boolean; out ANextItem: TACLMenuItemControl): Boolean;
-  var
-    ALoop: Boolean;
-  begin
-    ALoop := True;
-    if not FindSelected(ANextItem) then
-      ANextItem := nil;
-    while ALoop do
-    begin
-      if AForward then
-        ANextItem := FindNext(ANextItem)
-      else
-        ANextItem := FindPrevious(ANextItem);
-
-      if Assigned(ANextItem) then
-      begin
-        if not ANextItem.MenuItem.IsLine and ANextItem.Visible then
-          Break;
-      end;
-      ALoop := Assigned(ANextItem);
-    end;
-    Result := Assigned(ANextItem);
-  end;
-
-var
-  ANextItem: TACLMenuItemControl;
-begin
-  if SkipItems(AForward, ANextItem) then
-  begin
-    if FChildMenu <> nil then
-      FChildMenu.CloseMenu;
-    if RootMenu.PopupStack.Peek = Self then
-    begin
-      EnsureNextItemVisible(ANextItem);
-      if TrackMenuOnSelect then
-        ANextItem.Keyed
-      else
-        SelectItem(ANextItem);
-    end
+    ASource.PrepareForShowing;
+    if (ASource is TACLMenuContainerItem) and
+     (TACLMenuContainerItem(ASource).ExpandMode = lemExpandInSubMenu)
+    then
+      TACLMenuContainerItem(ASource).Expand(AddMenuItem)
     else
-      if (ANextItem.Parent = Self) and Assigned(ANextItem.Action) then
-      begin
-        RootMenu.PopupStack.Peek.FInMenuLoop := False;
-        RootMenu.FDelayItem := nil;
-        EnsureNextItemVisible(ANextItem);
-        SelectItem(ANextItem);
-      end
-      else
-        ANextItem.Keyed;
+      for I := 0 to ASource.Count - 1 do
+        AddMenuItem(ASource.Items[I]);
+
+    if (Items.Count > 0) and Items.Last.Item.IsLine then
+      Items.Delete(Items.Count - 1);
   end;
 end;
 
-procedure TACLMenuWindow.SelectItem(AItem: TACLMenuItemControl);
-begin
-  if AItem <> nil then
-    AItem.SetSelected(True);
-end;
-
-function TACLMenuWindow.GetStyle: TACLStylePopupMenu;
-begin
-  Result := PopupMenu.Style;
-end;
-
-procedure TACLMenuWindow.SetParentMenu(AValue: TACLMenuWindow);
-begin
-  if FParentMenu <> AValue then
-  begin
-    FParentMenu := AValue;
-    if FParentMenu <> nil then
-      FParentMenu.FChildMenu := Self;
-  end;
-end;
-
-procedure TACLMenuWindow.WMKeyDown(var Message: TWMKeyDown);
+procedure TACLMenuWindow.KeyChar(var Key: Word);
 var
-  ACharCode: Integer;
-  AItem: TACLMenuItemControl;
+  I: Integer;
 begin
-  case TranslateCharCode(Message.CharCode) of
-    VK_LEFT:
-      if Assigned(FChildMenu) then
-      begin
-        FChildMenu.FInMenuLoop := False;
-        FChildMenu := nil;
-        Message.Result := 0;
-      end
-      else
-        if ParentMenu <> nil then
-          ParentMenu.Dispatch(Message);
-
-    VK_RIGHT:
-      if FindSelected(AItem) then
-      begin
-        if AItem.HasSubItems and (AItem.SubMenu = nil) and AItem.Enabled then
-          AItem.Keyed
-        else
-          if FPopupStack = nil then
-            RootMenu.Dispatch(Message);
-      end
-      else
-        if RootMenu <> Self then
-          RootMenu.Dispatch(Message);
-  end;
-
-  if not TACLMenuController.IsValid(Self) then
-    Exit;
-
-  inherited;
-
-  if not FInMenuLoop then
-    Exit;
-
-  if (RootMenu <> nil) and (Message.CharCode in [Ord('0')..Ord('9'), Ord('A')..Ord('Z'), VK_NUMPAD0..VK_NUMPAD9]) then
+  for I := 0 to Items.Count - 1 do
   begin
-    if not (ssCtrl in KeyboardStateToShiftState) then
+    if IsAccel(Key, Items.List[I].Item.Caption) then
     begin
-      ACharCode := Message.CharCode;
-      if Message.CharCode in [VK_NUMPAD0..VK_NUMPAD9] then
-        ACharCode := Ord('0') + Message.CharCode - VK_NUMPAD0;
-      AItem := RootMenu.PopupStack.Peek.FindAccelItem(ACharCode);
-      if AItem <> nil then
-        AItem.Keyed;
+      SelectItem(I, ccatKeyboard);
+      if SelectedItemIndex = I then
+        ClickOnSelection(ccatKeyboard);
+      Key := 0;
+      Break;
     end;
   end;
+end;
 
-  case TranslateCharCode(Message.CharCode) of
+procedure TACLMenuWindow.KeyDown(var Key: Word; Shift: TShiftState);
+begin
+  case TranslateKey(Key, Shift) of
+    VK_HOME:
+      SelectItem(0, ccatKeyboard);
+    VK_END:
+      SelectItem(Items.Count - 1, ccatKeyboard);
     VK_UP:
-      Select(False);
+      SelectNextItem(False);
     VK_DOWN:
-      Select(True);
-    VK_ESCAPE:
-      CloseMenu;
-
+      SelectNextItem(True);
     VK_RETURN:
-      if FindSelected(AItem) then
-        AItem.Keyed;
-
-    VK_HOME, VK_END:
-      begin
-        if Message.CharCode = VK_HOME then
-          AItem := FindFirstVisibleItem
-        else
-          AItem := FindLastVisibleItem;
-
-        EnsureNextItemVisible(AItem);
-        SelectItem(AItem);
-      end;
-  end;
-end;
-
-procedure TACLMenuWindow.WMMouseActivate(var Message: TWMMouseActivate);
-begin
-  inherited;
-  if FInMenuLoop then
-    Message.Result := MA_NOACTIVATE;
-end;
-
-procedure TACLMenuWindow.WMPrintClient(var Message: TWMPrintClient);
-begin
-  inherited;
-  PaintTo(Message.DC, 0, 0);
-end;
-
-procedure TACLMenuWindow.DoActionIdle;
-var
-  AForm: TCustomForm;
-begin
-  for var I := 0 to Screen.CustomFormCount - 1 do
-  begin
-    AForm := Screen.CustomForms[I];
-    if AForm.HandleAllocated and IsWindowVisible(AForm.Handle) and IsWindowEnabled(AForm.Handle) then
-      AForm.Perform(CM_UPDATEACTIONS, 0, 0);
-  end;
-end;
-
-procedure TACLMenuWindow.DoActionIdleTimerProc(Sender: TObject);
-begin
-  try
-    FActionIdleTimer.Enabled := False;
-    DoActionIdle;
-  except
-    Application.HandleException(Application);
+      ClickOnSelection(ccatKeyboard);
   end;
 end;
 
 function TACLMenuWindow.GetCurrentDpi: Integer;
 begin
-  if ParentMenu <> nil then
-    Result := ParentMenu.GetCurrentDpi
+  Result := FCurrentPPI;
+end;
+
+function TACLMenuWindow.GetSelectedItemInfo: TItemInfo;
+begin
+  if HasSelection then
+    Result := Items[SelectedItemIndex]
   else
-    Result := PopupMenu.CurrentDpi;
+    Result := nil;
 end;
 
-function TACLMenuWindow.GetMenuDelayTime: Integer;
+function TACLMenuWindow.HasSelection: Boolean;
 begin
-  SystemParametersInfo(SPI_GETMENUSHOWDELAY, 0, @Result, 0);
-  if Result = 0 then
-    Result := 1;
+  Result := InRange(SelectedItemIndex, 0, Items.Count - 1);
 end;
 
-function TACLMenuWindow.IsDesigning: Boolean;
+function TACLMenuWindow.HasSubItems(AItem: TMenuItem): Boolean;
+var
+  LContainer: TACLMenuContainerItem;
 begin
-  Result := csDesigning in ComponentState;
+  Result := (AItem.Count > 0) or
+    (Safe.Cast(AItem, TACLMenuContainerItem, LContainer)) and
+    (LContainer.ExpandMode = lemExpandInSubMenu);
 end;
 
-procedure TACLMenuWindow.SetVisibleIndex(AValue: Integer);
+function TACLMenuWindow.IsMouseAtControl: Boolean;
 begin
-  AValue := MinMax(AValue, 0, FItems.Count - FItemNumberInDisplayArea);
-  if FVisibleIndex <> AValue then
+  Result := PtInRect(ClientRect, CalcCursorPos);
+end;
+
+function TACLMenuWindow.DoMouseWheel(Shift: TShiftState; Delta: Integer; P: TPoint): Boolean;
+begin
+  TopIndex := TopIndex + Signs[Delta < 0];
+  UpdateMouseMove;
+  Result := True;
+end;
+
+function TACLMenuWindow.HitTest(const P: TPoint): Integer;
+var
+  I: Integer;
+begin
+  for I := TopIndex to TopIndex + FVisibleItemCount - 1 do
   begin
-    FVisibleIndex := AValue;
+    if Items.List[I].Rect.Contains(P) then
+      Exit(I);
+  end;
+  Result := HitTestNoWhere;
+end;
+
+procedure TACLMenuWindow.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  SelectItem(HitTest(Point(X, Y)), ccatMouse);
+end;
+
+procedure TACLMenuWindow.MouseEnter;
+begin
+  // do nothing
+end;
+
+procedure TACLMenuWindow.MouseLeave;
+begin
+  FPrevMousePos := InvalidPoint;
+  SelectItemOnMouseMove(HitTestNoWhere);
+end;
+
+procedure TACLMenuWindow.MouseMove(Shift: TShiftState; X, Y: Integer);
+begin
+  MouseTracker.Add(Self);
+  if FPrevMousePos <> Point(X, Y) then
+  begin
+    FPrevMousePos := Point(X, Y);
+    if PtInRect(ClientRect, FPrevMousePos) then
+      SelectItemOnMouseMove(HitTest(FPrevMousePos));
+  end;
+end;
+
+procedure TACLMenuWindow.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  if HasSelection and (HitTest(Point(X, Y)) = SelectedItemIndex) then
+    ClickOnSelection(ccatMouse);
+end;
+
+procedure TACLMenuWindow.SelectItem(AItemIndex: Integer; AActionType: TACLControlActionType);
+begin
+  AItemIndex := EnsureRange(AItemIndex, -1, Items.Count - 1);
+  if AItemIndex <> FSelectedItemIndex then
+  begin
+    FSelectedItemIndex := AItemIndex;
+    EnsureItemVisible(SelectedItemIndex);
+    if AActionType <> ccatNone then
+      Perform(CM_ITEMSELECTED, Ord(AActionType), SelectedItemIndex);
+    Invalidate;
+  end;
+end;
+
+procedure TACLMenuWindow.SelectItemOnMouseMove(AItemIndex: Integer);
+begin
+  SelectItem(AItemIndex, ccatMouse);
+end;
+
+procedure TACLMenuWindow.SelectNextItem(AGoForward: Boolean);
+var
+  LIndex: Integer;
+  LLoop: Boolean;
+begin
+  LLoop := False;
+  LIndex := SelectedItemIndex;
+  repeat
+    Inc(LIndex, Signs[AGoForward]);
+    if not InRange(LIndex, 0, Items.Count - 1) then
+    begin
+      if LLoop then Break;
+      LLoop := True;
+      if LIndex >= Items.Count then
+        LIndex := 0;
+      if LIndex < 0 then
+        LIndex := Items.Count - 1;
+    end;
+    if not Items[LIndex].Item.IsLine then
+    begin
+      SelectItem(LIndex, ccatKeyboard);
+      Break;
+    end;
+  until False;
+end;
+
+procedure TACLMenuWindow.SetTopIndex(AValue: Integer);
+begin
+  AValue := MinMax(AValue, 0, Items.Count - FVisibleItemCount);
+  if FTopIndex <> AValue then
+  begin
+    FTopIndex := AValue;
     CalculateLayout;
     Invalidate;
   end;
 end;
 
+function TACLMenuWindow.TranslateKey(Key: Word; Shift: TShiftState): Word;
+begin
+  Result := Key;
+end;
+
+procedure TACLMenuWindow.UpdateMouseMove;
+begin
+  FPrevMousePos := InvalidPoint;
+  with CalcCursorPos do
+    MouseMove([], X, Y);
+end;
+
 { TACLMenuPopupWindow }
 
-constructor TACLMenuPopupWindow.Create(AOwner: TComponent);
+constructor TACLMenuPopupWindow.Create(ASource: TACLPopupMenu);
 begin
-  inherited Create(AOwner);
-  FScrollTimer := TACLTimer.CreateEx(DoScrollTimer, 125);
+  inherited Create(ASource);
+  ControlStyle := [];
+  FScrollTimer := TACLTimer.CreateEx(ScrollTimer, 125);
+  FSource := ASource;
   Visible := False;
 end;
 
-constructor TACLMenuPopupWindow.Create(AOwner: TACLMenuWindow);
+constructor TACLMenuPopupWindow.Create(
+  AMainMenu: TACLMenuWindow; ASource: TACLPopupMenu;
+  AItem: TACLMenuWindow.TItemInfo);
 begin
-  Create(TComponent(AOwner));
-  FPopupMenu := AOwner.FPopupMenu;
-  RootMenu := AOwner.RootMenu;
-  ParentWindow := AOwner.Handle;
-  ParentMenu := AOwner;
-  Font := AOwner.Font;
+  Create(ASource);
+  FMainMenu := AMainMenu;
+  FSourceItem := AItem;
+  Init(AItem.Item);
+end;
+
+constructor TACLMenuPopupWindow.Create(
+  AParent: TACLMenuPopupWindow; AItem: TACLMenuWindow.TItemInfo);
+begin
+  Create(AParent.Source);
+  FParent := AParent;
+  FLooper := AParent.Looper;
+  FSourceItem := AItem;
+  Init(AItem.Item);
 end;
 
 destructor TACLMenuPopupWindow.Destroy;
@@ -2661,117 +1883,88 @@ begin
   inherited;
 end;
 
+function TACLMenuPopupWindow.CalculateAutoSize: TSize;
+var
+  I: Integer;
+begin
+  Result := NullSize;
+  for I := 0 to Items.Count - 1 do
+  begin
+    with Items.List[I].Size do
+    begin
+      Result.cx := Max(Result.cx, cx);
+      Result.cy := Result.cy + cy;
+    end;
+  end;
+  if FScrollBar <> nil then
+    Inc(Result.cx, FScrollBar.Width);
+  Inc(Result.cx, FPadding.MarginsWidth);
+  Inc(Result.cy, FPadding.MarginsHeight);
+end;
+
 procedure TACLMenuPopupWindow.CalculateBounds;
 var
-  AHasScrollBar: Boolean;
+  LAutoSize: TSize;
+  LHasScrollers: Boolean;
 begin
+  CalculateMetrics;
   repeat
-    AHasScrollBar := ScrollBar <> nil;
-    inherited;
-  until AHasScrollBar = (ScrollBar <> nil);
+    LHasScrollers := HasScrollers;
+    LAutoSize := CalculateAutoSize;
+    if Parent <> nil then
+      BoundsRect := Parent.CalculatePopupBounds(LAutoSize, Self)
+    else if MainMenu <> nil then
+      BoundsRect := MainMenu.CalculatePopupBounds(LAutoSize, Self)
+    else
+      BoundsRect := CalculatePopupBounds(LAutoSize);
+    CalculateLayout;
+  until LHasScrollers = HasScrollers;
 end;
 
 procedure TACLMenuPopupWindow.CalculateLayout;
 var
-  AAlignRect: TRect;
-  AControl: TACLMenuItemControl;
-  AControlHeight: Integer;
+  LItem: TItemInfo;
+  LRect: TRect;
+  I: Integer;
 begin
-  AAlignRect := ClientRect;
-  CalculateScrollBar(AAlignRect);
+  LRect := ClientRect;
+  LRect.Content(FPadding);
+  CalculateScrollers(LRect);
+  for I := 0 to TopIndex - 1 do
+    Items.List[I].Rect := NullRect;
 
-  for var I := 0 to FItems.Count - 1 do
-    FItems[I].SetBounds(0, 0, 0, 0); // hide all controls
-
-  FItemNumberInDisplayArea := 0;
-  for var I := VisibleIndex to FItems.Count - 1 do
+  FVisibleItemCount := 0;
+  for I := TopIndex to Items.Count - 1 do
   begin
-    AControl := FItems[I];
-    if AControl.Visible then
+    LItem := Items.List[I];
+    LItem.Rect := LRect;
+    LItem.Rect.Height := LItem.Size.cy;
+    LRect.Top := LItem.Rect.Bottom;
+    if LRect.Top > LRect.Bottom then
     begin
-      AControlHeight := AControl.MeasureSize(MeasureCanvas).Height;
-      AControl.SetBounds(AAlignRect.Left, AAlignRect.Top, AAlignRect.Width, AControlHeight);
-      Inc(AAlignRect.Top, AControlHeight);
-      if AAlignRect.Top > AAlignRect.Bottom then
-      begin
-        Dec(AAlignRect.Top, AControlHeight);
-        Break;
-      end;
-      Inc(FItemNumberInDisplayArea);
+      Dec(LRect.Top, LItem.Size.cy);
+      Break;
     end;
+    Inc(FVisibleItemCount);
   end;
 
-  if AAlignRect.IsEmpty then
+  if LRect.IsEmpty then
     FScrollButtonRestArea := NullRect
   else
   begin
-    FScrollButtonRestArea := AAlignRect;
+    FScrollButtonRestArea := LRect;
     FScrollButtonRestArea.Height := Style.ItemHeight;
   end;
 end;
 
-function TACLMenuPopupWindow.CalculateMaxSize: TSize;
-var
-  ABorders: TRect;
-  AItem: TACLMenuItemControl;
-  AItemSize: TSize;
+procedure TACLMenuPopupWindow.CalculateMetrics;
 begin
-  Result := NullSize;
-  for var I := 0 to FItems.Count - 1 do
-  begin
-    AItem := FItems[I];
-    if AItem.Visible then
-    begin
-      AItemSize := AItem.MeasureSize(MeasureCanvas);
-      Result.cx := Max(Result.cx, AItemSize.cx);
-      Inc(Result.cy, AItemSize.cy);
-    end;
-  end;
-  if ScrollBar <> nil then
-    Inc(Result.cx, ScrollBar.Width);
-  ABorders := GetBorderWidths;
-  Inc(Result.cx, ABorders.MarginsWidth);
-  Inc(Result.cy, ABorders.MarginsHeight);
+  FPadding := dpiApply(Style.Borders.Value, GetCurrentDpi);
+  inherited;
 end;
 
-procedure TACLMenuPopupWindow.CalculateScrollBar(var R: TRect);
-var
-  AUseScrollButtons: Boolean;
-begin
-  if CalculateMaxSize.Height > Height then
-  begin
-    AUseScrollButtons :=
-      (PopupMenu.Options.ScrollMode = smScrollButtons) or
-      (PopupMenu.Options.ScrollMode = smAuto) and PopupMenu.Style.TextureScrollBar.Empty;
-
-    if AUseScrollButtons then
-    begin
-      FreeAndNil(FScrollBar);
-      FScrollButtonDown := R;
-      FScrollButtonDown.Height := Style.ItemHeight;
-      FScrollButtonUp := R;
-      FScrollButtonUp.Top := FScrollButtonUp.Bottom - Style.ItemHeight;
-      R.Top := FScrollButtonDown.Bottom;
-      R.Bottom := FScrollButtonUp.Top;
-    end
-    else
-    begin
-      if FScrollBar = nil then
-      begin
-        FScrollBar := CreateScrollBar;
-        FScrollBar.Parent := Self;
-        FScrollBar.OnScroll := DoScroll;
-      end;
-      ScrollBar.BoundsRect := R.Split(srRight, FScrollBar.Width);
-      ScrollBar.SetScrollParams(0, FItems.Count - 1, VisibleIndex, FItemNumberInDisplayArea);
-      Dec(R.Right, ScrollBar.Width);
-    end;
-  end
-  else
-    FreeAndNil(FScrollBar);
-end;
-
-function TACLMenuPopupWindow.CalculatePopupBounds(ASize: TSize; AChild: TACLMenuWindow): TRect;
+function TACLMenuPopupWindow.CalculatePopupBounds(
+  ASize: TSize; AChild: TACLMenuPopupWindow): TRect;
 const
   ShadowOffset = 4;
 var
@@ -2781,8 +1974,8 @@ begin
   AWorkArea := MonitorGetWorkArea(ClientOrigin);
   if AChild <> nil then
   begin
-    AParentRect := AChild.ParentControl.BoundsRect + ClientOrigin;
-    AParentRect.Offset(0, -GetBorderWidths.Top);
+    AParentRect := AChild.SourceItem.Rect + ClientOrigin;
+    AParentRect.Offset(0, -FPadding.Top);
     Result.Left := AParentRect.Right;
     Result.Top := AParentRect.Top;
     if Result.Left + ASize.Width > AWorkArea.Right then
@@ -2792,7 +1985,7 @@ begin
   end
   else
   begin
-    Result := acGetWindowRect(Handle);
+    Result := BoundsRect;
     if Result.Left + ASize.Width > AWorkArea.Right then
       Result.Left := AWorkArea.Right - ASize.Width;
     if Result.Top + ASize.Height > AWorkArea.Bottom then
@@ -2813,11 +2006,75 @@ begin
   Result.Right := Result.Left + ASize.Width;
 end;
 
-procedure TACLMenuPopupWindow.CheckAutoScrollTimer(const P: TPoint);
+procedure TACLMenuPopupWindow.CalculateScrollers(var R: TRect);
+var
+  AUseScrollButtons: Boolean;
 begin
-  if PtInRect(ScrollButtonUp, P) then
+  if CalculateAutoSize.Height > Height then
+  begin
+    AUseScrollButtons :=
+      (Source.Options.ScrollMode = smScrollButtons) or
+      (Source.Options.ScrollMode = smAuto) and Style.TextureScrollBar.Empty;
+
+    if AUseScrollButtons then
+    begin
+      FreeAndNil(FScrollBar);
+      FScrollButtonDown := R;
+      FScrollButtonDown.Height := Style.ItemHeight;
+      FScrollButtonUp := R;
+      FScrollButtonUp.Top := FScrollButtonUp.Bottom - Style.ItemHeight;
+      R.Top := FScrollButtonDown.Bottom;
+      R.Bottom := FScrollButtonUp.Top;
+    end
+    else
+    begin
+      if FScrollBar = nil then
+      begin
+        FScrollBar := TACLScrollBar.Create(nil);
+        FScrollBar.Kind := sbVertical;
+        FScrollBar.Style.BeginUpdate;
+        try
+          FScrollBar.Style.Collection := Style.Collection;
+          FScrollBar.Style.TextureBackgroundVert := Style.TextureScrollBar;
+          FScrollBar.Style.TextureButtonsVert := Style.TextureScrollBarButtons;
+          FScrollBar.Style.TextureThumbVert := Style.TextureScrollBarThumb;
+          FScrollBar.Style.TargetDPI := GetCurrentDpi;
+        finally
+          FScrollBar.Style.EndUpdate;
+        end;
+        FScrollBar.Parent := Self;
+        FScrollBar.OnScroll := Scroll;
+      end;
+      FScrollBar.BoundsRect := R.Split(srRight, FScrollBar.Width);
+      FScrollBar.SetScrollParams(0, Items.Count - 1, TopIndex, FVisibleItemCount);
+      Dec(R.Right, FScrollBar.Width);
+    end;
+  end
+  else
+    FreeAndNil(FScrollBar);
+end;
+
+function TACLMenuPopupWindow.CalculateSize(ACanvas: TCanvas; AItem: TMenuItem): TSize;
+begin
+  if AItem.IsLine then
+    Result := TSize.Create(0, Style.SeparatorHeight)
+  else
+  begin
+    Result.cx := Style.MeasureWidth(ACanvas, AItem.Caption, AItem.ShortCut, AItem.Default);
+    Result.cy := Style.ItemHeight;
+  end;
+end;
+
+function TACLMenuPopupWindow.CanCloseMenuOnItemClick(AItem: TMenuItem): Boolean;
+begin
+  Result := Source.Options.CloseMenuOnItemCheck or not AItem.AutoCheck;
+end;
+
+procedure TACLMenuPopupWindow.CheckScrollTimer(const P: TPoint);
+begin
+  if PtInRect(FScrollButtonUp, P) then
     FScrollTimer.Tag := 1
-  else if PtInRect(ScrollButtonDown, P) then
+  else if PtInRect(FScrollButtonDown, P) then
     FScrollTimer.Tag := -1
   else
     FScrollTimer.Tag := 0;
@@ -2825,33 +2082,30 @@ begin
   FScrollTimer.Enabled := FScrollTimer.Tag <> 0;
 end;
 
-procedure TACLMenuPopupWindow.CreateParams(var Params: TCreateParams);
+procedure TACLMenuPopupWindow.CMItemClicked(var Message: TMessage);
 var
-  ADisplayShadow: LongBool;
+  LItem: TMenuItem;
 begin
-  inherited;
-  if not (Parent is TCustomForm) then
-    Params.Style := Params.Style and not WS_CHILD or WS_POPUP or WS_CLIPSIBLINGS or WS_CLIPCHILDREN or WS_OVERLAPPED;
-  Params.WindowClass.Style := CS_SAVEBITS or CS_DBLCLKS or not (CS_HREDRAW or not CS_VREDRAW);
-  if CheckWin32Version(5, 1) and SystemParametersInfo(SPI_GETDROPSHADOW, 0, @ADisplayShadow, 0) and ADisplayShadow then
-    Params.WindowClass.Style := Params.WindowClass.Style or CS_DROPSHADOW;
-  Params.ExStyle := Params.ExStyle or WS_EX_TOPMOST;
+  LItem := TMenuItem(Message.LParam);
+  Source.DoSelect(LItem);
+  if CanCloseMenuOnItemClick(LItem) then
+  begin
+    if Looper <> nil then
+      Looper.CloseMenu;
+  end
+  else
+    Invalidate;
 end;
 
-function TACLMenuPopupWindow.CreateScrollBar: TACLScrollBar;
+procedure TACLMenuPopupWindow.CreateParams(var Params: TCreateParams);
+var
+  LDropShadow: LongBool;
 begin
-  Result := TACLScrollBar.Create(nil);
-  Result.Kind := sbVertical;
-  Result.Style.BeginUpdate;
-  try
-    Result.Style.Collection := PopupMenu.Style.Collection;
-    Result.Style.TextureBackgroundVert := PopupMenu.Style.TextureScrollBar;
-    Result.Style.TextureButtonsVert := PopupMenu.Style.TextureScrollBarButtons;
-    Result.Style.TextureThumbVert := PopupMenu.Style.TextureScrollBarThumb;
-    Result.Style.TargetDPI := GetCurrentDpi;
-  finally
-    Result.Style.EndUpdate;
-  end;
+  inherited;
+  Params.Style := WS_POPUP;
+  Params.ExStyle := Params.ExStyle or WS_EX_TOPMOST;
+  if SystemParametersInfo(SPI_GETDROPSHADOW, 0, @LDropShadow, 0) and LDropShadow then
+    Params.WindowClass.Style := Params.WindowClass.Style or CS_DROPSHADOW;
 end;
 
 procedure TACLMenuPopupWindow.CreateWnd;
@@ -2860,82 +2114,134 @@ begin
   FormSetCorners(Handle, afcRectangular);
 end;
 
-procedure TACLMenuPopupWindow.DoScroll(Sender: TObject; ScrollCode: TScrollCode; var ScrollPos: Integer);
+function TACLMenuPopupWindow.GetCurrentDpi: Integer;
 begin
-  VisibleIndex := ScrollPos;
-  ScrollPos := VisibleIndex;
+  if Parent <> nil then
+    Result := Parent.GetCurrentDpi
+  else
+    Result := inherited;
 end;
 
-procedure TACLMenuPopupWindow.DoScrollTimer(Sender: TObject);
+function TACLMenuPopupWindow.GetStyle: TACLPopupMenuStyle;
 begin
-  CheckAutoScrollTimer(CalcCursorPos);
-  if FScrollTimer.Enabled then
-    VisibleIndex := VisibleIndex + ScrollTimer.Tag;
+  Result := Source.Style;
 end;
 
-procedure TACLMenuPopupWindow.MouseMove(Shift: TShiftState; X: Integer; Y: Integer);
+function TACLMenuPopupWindow.HasScrollers: Boolean;
 begin
-  inherited MouseMove(Shift, X, Y);
-  CheckAutoScrollTimer(Point(X, Y));
+  Result := FScrollBar <> nil;
 end;
 
-function TACLMenuPopupWindow.GetBorderWidths: TRect;
-begin
-  Result := dpiApply(Style.Borders.Value, GetCurrentDpi);
-end;
-
-procedure TACLMenuPopupWindow.NCPaint(DC: HDC);
+procedure TACLMenuPopupWindow.KeyDown(var Key: Word; Shift: TShiftState);
 var
-  ACanvas: TCanvas;
-  ARect: TRect;
-  ASaveIndex: Integer;
+  LItem: TItemInfo;
 begin
-  ASaveIndex := SaveDC(DC);
-  try
-    ARect := Bounds(0, 0, Width, Height);
-    acExcludeFromClipRegion(DC, ARect.Split(GetBorderWidths));
+  case TranslateKey(Key, Shift) of
+    VK_MENU, VK_LMENU, VK_RMENU:
+      Looper.CloseMenu;
 
-    ACanvas := TCanvas.Create;
-    try
-      ACanvas.Lock;
-      try
-        ACanvas.Handle := DC;
-        Style.DrawBorder(ACanvas, ARect);
-        ACanvas.Handle := 0;
-      finally
-        ACanvas.Unlock;
+    VK_ESCAPE:
+      Looper.CloseMenu(Self);
+
+    VK_LEFT:
+      if Parent <> nil then
+        Looper.CloseMenu(Self)
+      else
+        if MainMenu <> nil then
+          MainMenu.KeyDown(Key, Shift);
+
+    VK_RIGHT:
+      begin
+        LItem := SelectedItemInfo;
+        if (LItem <> nil) and HasSubItems(LItem.Item) and LItem.Item.Enabled then
+          ClickOnSelection(ccatKeyboard)
+        else
+          if MainMenu <> nil then
+            MainMenu.KeyDown(Key, Shift);
       end;
-    finally
-      ACanvas.Free;
-    end;
-  finally
-    RestoreDC(DC, ASaveIndex);
+  else
+    inherited;
   end;
 end;
 
-procedure TACLMenuPopupWindow.Popup(X, Y: Integer);
+procedure TACLMenuPopupWindow.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
-  if FItems.Count > 0 then
+  inherited;
+  CheckScrollTimer(Point(X, Y));
+  if (MainMenu <> nil) and MainMenu.IsMouseAtControl then
+    MainMenu.UpdateMouseMove;
+end;
+
+procedure TACLMenuPopupWindow.Paint;
+var
+  LItem: TItemInfo;
+  LRect: TRect;
+  I: Integer;
+begin
+  LRect := ClientRect;
+  Style.DrawBorder(Canvas, LRect);
+  LRect.Content(FPadding);
+  acIntersectClipRegion(Canvas.Handle, LRect);
+  for I := TopIndex to TopIndex + FVisibleItemCount - 1 do
   begin
-    ParentWindow := TACLApplication.GetHandle;
-    RootMenu := Self;
-    SetBounds(X, Y, Width, Height);
-    Visible := True;
-    TrackMenu;
+    LItem := Items.List[I];
+    if LItem.Item.IsLine then
+      Style.DrawSeparator(Canvas, LItem.Rect)
+    else
+    begin
+      Style.DrawBackground(Canvas, LItem.Rect, I = SelectedItemIndex);
+      Style.DrawItem(Canvas, LItem.Rect,
+        LItem.Item.Caption, LItem.Item.ShortCut, I = SelectedItemIndex,
+        LItem.Item.Default, LItem.Item.Enabled, HasSubItems(LItem.Item));
+      Style.DrawItemImage(Canvas,
+        LItem.Rect.Split(srLeft, Style.ItemGutterWidth),
+        LItem.Item, I = SelectedItemIndex);
+    end;
+  end;
+  PaintScroller;
+end;
+
+procedure TACLMenuPopupWindow.PaintScroller;
+begin
+  if FScrollBar <> nil then
+    Style.DrawBackground(Canvas, FScrollBar.BoundsRect, False);
+  if not FScrollButtonRestArea.IsEmpty then
+    Style.DrawBackground(Canvas, FScrollButtonRestArea, False);
+  if not FScrollButtonDown.IsEmpty then
+  begin
+    Style.DrawBackground(Canvas, FScrollButtonDown, False);
+    Style.DrawScrollButton(Canvas, FScrollButtonDown, True, TopIndex > 0);
+  end;
+  if not FScrollButtonUp.IsEmpty then
+  begin
+    Style.DrawBackground(Canvas, FScrollButtonUp, False);
+    Style.DrawScrollButton(Canvas, FScrollButtonUp, False, TopIndex + FVisibleItemCount < Items.Count);
   end;
 end;
 
-procedure TACLMenuPopupWindow.PopupEx(AMenuItem: TMenuItem; const AControlRect: TRect);
+procedure TACLMenuPopupWindow.Popup(const AControlRect: TRect);
 begin
-  Clear;
-  FControlRect := MonitorAlignPopupWindow(AControlRect);
-  PopulateItems(AMenuItem);
-  Popup(FControlRect.Left, FControlRect.Bottom + 1);
+  if AControlRect <> NullRect then
+    FControlRect := MonitorAlignPopupWindow(AControlRect);
+  BoundsRect := AControlRect;
+  CalculateBounds;
+  Visible := True;
+  ShowWindow(Handle, SW_SHOWNOACTIVATE);
+
+  if Looper = nil then
+  begin
+    FLooper := TACLMenuPopupLooper.Create(Self);
+    try
+      Looper.Run;
+    finally
+      FreeAndNil(FLooper);
+    end;
+  end;
 end;
 
 procedure TACLMenuPopupWindow.Resize;
 var
-  LBitmap: TACLBitmapLayer;
+  LBitmap: TACLDib;
   LRadius: Integer;
   LRegion: HRGN;
 begin
@@ -2943,9 +2249,9 @@ begin
 
   LRegion := 0;
   LRadius := 2 * Style.CornerRadius.Value;
-  if LRadius > 0 then
+  if (LRadius > 0) and (Width > 0) and (Height > 0) then
   begin
-    LBitmap := TACLBitmapLayer.Create(BoundsRect);
+    LBitmap := TACLDib.Create(BoundsRect);
     try
       LBitmap.Canvas.Brush.Color := clFuchsia;
       LBitmap.Canvas.FillRect(LBitmap.ClientRect);
@@ -2960,288 +2266,339 @@ begin
   SetWindowRgn(Handle, LRegion, True);
 end;
 
-procedure TACLMenuPopupWindow.DrawScrollButton(ACanvas: TCanvas; const R: TRect; ATop, AEnabled: Boolean);
+procedure TACLMenuPopupWindow.Scroll(Sender: TObject; ScrollCode: TScrollCode; var ScrollPos: Integer);
 begin
-  Style.DrawBackground(ACanvas, R, False);
-  Style.DrawScrollButton(ACanvas, R, ATop, AEnabled);
+  if Looper <> nil then
+    Looper.InScrolling := ScrollCode <> scEndScroll;
+  TopIndex := ScrollPos;
+  ScrollPos := TopIndex;
 end;
 
-procedure TACLMenuPopupWindow.DrawScrollButtons(ACanvas: TCanvas);
+procedure TACLMenuPopupWindow.ScrollTimer(Sender: TObject);
 begin
-  if FScrollBar <> nil then
-    Style.DrawBackground(ACanvas, FScrollBar.BoundsRect, False);
-  if not FScrollButtonRestArea.IsEmpty then
-    Style.DrawBackground(ACanvas, FScrollButtonRestArea, False);
-  if not FScrollButtonDown.IsEmpty then
-    DrawScrollButton(ACanvas, FScrollButtonDown, True, VisibleIndex > 0);
-  if not FScrollButtonUp.IsEmpty then
-    DrawScrollButton(ACanvas, FScrollButtonUp, False, VisibleIndex + FItemNumberInDisplayArea < FItems.Count);
+  CheckScrollTimer(CalcCursorPos);
+  if FScrollTimer.Enabled then
+    TopIndex := TopIndex + FScrollTimer.Tag;
 end;
 
-procedure TACLMenuPopupWindow.Paint;
+procedure TACLMenuPopupWindow.SelectItemOnMouseMove(AItemIndex: Integer);
 begin
-  inherited Paint;
-  DrawScrollButtons(Canvas);
+  if (AItemIndex >= 0) or (Looper = nil) or Looper.IsPeek(Self) then
+    inherited;
 end;
 
-procedure TACLMenuPopupWindow.WMNCCalcSize(var Message: TWMNCCalcSize);
+procedure TACLMenuPopupWindow.WMMouseActivate(var Message: TWMMouseActivate);
 begin
-  Message.CalcSize_Params^.rgrc0.Content(GetBorderWidths);
+  Message.Result := MA_NOACTIVATE;
 end;
 
-procedure TACLMenuPopupWindow.WMNCPaint(var Message: TWMNCPaint);
+procedure TACLMenuPopupWindow.WndProc(var Message: TMessage);
+begin
+  if (Looper = nil) or not Looper.WndProc(Self, Message) then
+    inherited;
+end;
+
+{ TACLMenuPopupLooper }
+
+constructor TACLMenuPopupLooper.Create(AOwner: TACLMenuPopupWindow);
+
+  function GetMenuDelayTime: Integer;
+  begin
+    SystemParametersInfo(SPI_GETMENUSHOWDELAY, 0, @Result, 0);
+    if Result = 0 then
+      Result := 1;
+  end;
+
+begin
+  FWnd := AOwner;
+  Inc(TACLControls.MenuLoopCount);
+  FActionIdleTimer := TACLTimer.CreateEx(DoActionIdleTimerProc);
+  FDelayTimer := TACLTimer.CreateEx(DoShowPopupDelayed, GetMenuDelayTime);
+  FPopups := TObjectStack<TACLMenuPopupWindow>.Create;
+  FPopups.Push(Wnd);
+
+  FForm := Safe.CastOrNil<TCustomForm>(AOwner.Source.Owner);
+  if FForm = nil then
+    FForm := Screen.ActiveCustomForm;
+  if FForm <> nil then
+    SendMessage(FForm.Handle, WM_ENTERMENULOOP, 0, 0);
+end;
+
+destructor TACLMenuPopupLooper.Destroy;
+begin
+  CloseMenu(Wnd);
+  Dec(TACLControls.MenuLoopCount); // first
+  if FForm <> nil then
+    SendMessage(FForm.Handle, WM_EXITMENULOOP, 0, 0);
+  FreeAndNil(FActionIdleTimer);
+  FreeAndNil(FDelayTimer);
+  FPopups.OwnsObjects := False;
+  FreeAndNil(FPopups);
+  inherited;
+end;
+
+procedure TACLMenuPopupLooper.CloseMenu(AWnd: TACLMenuPopupWindow);
+begin
+  while (FPopups.Count > 1) and (FPopups.Peek <> AWnd) do
+    FPopups.Pop;
+  if FPopups.Count > 1 then
+    FPopups.Pop
+  else
+    FInLoop := False;
+  UpdateMouseTracker;
+end;
+
+procedure TACLMenuPopupLooper.DoActionIdle;
 var
-  DC: HDC;
+  LForm: TCustomForm;
+  I: Integer;
 begin
-  DC := GetWindowDC(Handle);
+  for I := 0 to Screen.CustomFormCount - 1 do
+  begin
+    LForm := Screen.CustomForms[I];
+    if LForm.HandleAllocated and IsWindowVisible(LForm.Handle) and IsWindowEnabled(LForm.Handle) then
+      LForm.Perform(CM_UPDATEACTIONS, 0, 0);
+  end;
+end;
+
+procedure TACLMenuPopupLooper.DoActionIdleTimerProc(Sender: TObject);
+begin
   try
-    NCPaint(DC);
-  finally
-    ReleaseDC(Handle, DC);
+    FActionIdleTimer.Enabled := False;
+    DoActionIdle;
+  except
+    Application.HandleException(Application);
   end;
 end;
 
-procedure TACLMenuPopupWindow.WMPrint(var Message: TWMPrint);
+procedure TACLMenuPopupLooper.DoIdle;
+var
+  LDone: Boolean;
+  LWnd: TACLMenuPopupWindow;
 begin
-  inherited;
-  NCPaint(Message.DC);
-end;
+  LWnd := FPopups.Peek;
+  if LWnd.HasSelection then
+    Application.Hint := GetMenuHint(LWnd.SelectedItemInfo.Item)
+  else
+    Application.CancelHint;
 
-{ TACLMenuItemControl }
+  LDone := True;
+  try
+    if Assigned(Application.OnIdle) then
+      Application.OnIdle(Self, LDone);
 
-constructor TACLMenuItemControl.Create;
-begin
-  inherited Create(AOwner);
-  ControlStyle := ControlStyle + [csActionClient] - [csCaptureMouse];
-  SetBounds(0, 0, 22, 22);
-  ParentShowHint := True;
-
-  FMenuItem := AMenuItem;
-  Action := AMenuItem.Action;
-  Caption := AMenuItem.Caption;
-end;
-
-destructor TACLMenuItemControl.Destroy;
-begin
-  if SubMenu <> nil then
-    SubMenu.CloseMenu;
-  inherited Destroy;
-end;
-
-procedure TACLMenuItemControl.Click;
-begin
-  acSafeSetFocus(GetParentForm(Menu.RootMenu));
-end;
-
-procedure TACLMenuItemControl.SetSelected(ASelected, AIsMouseAction: Boolean);
-begin
-  FMouseSelected := ASelected and AIsMouseAction;
-  if Selected <> ASelected then
-  begin
-    FSelected := ASelected;
-    if Selected then
+    if LDone then
     begin
-//      if Menu.ParentMenu <> nil then
-//      begin
-//        AParentItem := TACLMenuItemControl(Client.ParentItem);
-//        AParentItem.Control.Selected := True;
-//      end;
-      UpdateSelection;
-    end;
-
-    if Selected then
-    begin
-      if Action <> nil then
-        Application.Hint := GetLongHint(TCustomAction(Action).Hint)
+      if Application.ActionUpdateDelay <= 0 then
+        DoActionIdle
       else
-        Application.CancelHint;
+        if not FActionIdleTimer.Enabled then
+        begin
+          FActionIdleTimer.Interval := Application.ActionUpdateDelay;
+          FActionIdleTimer.Enabled := True;
+        end;
     end;
-
-    if Selected then
-      Menu.DoItemSelected(Self);
-
-    Invalidate;
+  except
+    Application.HandleException(Self);
   end;
+
+  if IsMainThread and CheckSynchronize then
+    LDone := False;
+  if LDone then
+    WaitMessage;
 end;
 
-procedure TACLMenuItemControl.UpdateSelection;
+function TACLMenuPopupLooper.DoShowPopup(AWnd: TACLMenuPopupWindow): Boolean;
 var
-  AMessage: TMessage;
+  LItem: TACLMenuWindow.TItemInfo;
+  LWnd: TACLMenuPopupWindow;
 begin
-  // MenuItems can be selected but they don't have to be enabled
-  if Parent <> nil then
+  // Всегда и первым!
+  FDelayTimer.Enabled := False;
+  FDelayWnd := nil;
+
+  // До того, как начнем схлопывать меню из стэка
+  if AWnd.HasSelection and IsInStack(AWnd.SelectedItemInfo) then
+    Exit(True);
+
+  // Дальше все стандартно
+  while (FPopups.Count > 1) and (FPopups.Peek <> AWnd) do
+    FPopups.Pop;
+
+  Result := False;
+  LItem := AWnd.SelectedItemInfo;
+  if (LItem <> nil) and (LItem.Item <> nil) and AWnd.HasSubItems(LItem.Item) then
   begin
-    AMessage.Msg := CM_ITEMSELECTED;
-    AMessage.WParam := 0;
-    AMessage.LParam := LPARAM(Self);
-    AMessage.Result := 0;
-    Parent.Broadcast(AMessage);
-  end;
-end;
-
-procedure TACLMenuItemControl.CMItemSelected(var Message: TMessage);
-begin
-  SetSelected(Message.LParam = NativeInt(Self));
-end;
-
-procedure TACLMenuItemControl.CMMouseEnter(var Message: TMessage);
-begin
-  inherited;
-  SetSelected(True, True);
-end;
-
-procedure TACLMenuItemControl.Keyed;
-begin
-  SetSelected(True, False);
-  CheckAction(Action);
-  if Parent <> nil then
-    PostMessage(Parent.Handle, CM_ITEMKEYED, 0, LPARAM(Self));
-end;
-
-function TACLMenuItemControl.MeasureSize(ACanvas: TCanvas): TSize;
-begin
-  if MenuItem.IsLine then
-  begin
-    Result.cx := 0;
-    Result.cy := Style.SeparatorHeight;
-  end
-  else
-  begin
-    Result.cx := Style.MeasureWidth(ACanvas, MenuItem.Caption, MenuItem.ShortCut, MenuItem.Default);
-    Result.cy := Style.ItemHeight;
-  end;
-end;
-
-procedure TACLMenuItemControl.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
-begin
-  inherited;
-
-  if (SubMenu = nil) and MenuItem.Enabled then
-  begin
-    CheckAction(Action);
-    if not MenuItem.IsLine then
-      PostMessage(Parent.Handle, CM_ITEMCLICKED, 0, LPARAM(Self));
-  end;
-end;
-
-procedure TACLMenuItemControl.Paint;
-var
-  R: TRect;
-begin
-  R := ClientRect;
-  if MenuItem.IsLine then
-    Style.DrawSeparator(Canvas, R)
-  else
-  begin
-    Style.DrawBackground(Canvas, R, Selected);
-    Style.DrawItem(Canvas, R, Caption, MenuItem.ShortCut,
-      Selected, MenuItem.Default, MenuItem.Enabled, HasSubItems);
-    R.Width := Style.ItemGutterWidth;
-    Style.DrawItemImage(Canvas, R, MenuItem, Selected);
-  end;
-end;
-
-procedure TACLMenuItemControl.CMHintShow(var Message: TCMHintShow);
-var
-  AHintInfo: PHintInfo;
-begin
-  AHintInfo := Message.HintInfo;
-  if ActionLink <> nil then
-  begin
-    if not TControlActionLinkAccess(ActionLink).DoShowHint(AHintInfo.HintStr) then
-      Message.Result := 1;
-  end
-  else
-  begin
-    AHintInfo.HintStr := MenuItem.Hint;
-    if Application.HintShortCuts and (MenuItem.ShortCut <> scNone) then
-      AHintInfo.HintStr := Format('%s (%s)', [AHintInfo.HintStr, ShortCutToText(MenuItem.ShortCut)]);
-  end;
-end;
-
-function TACLMenuItemControl.GetStyle: TACLStylePopupMenu;
-begin
-  Result := Menu.PopupMenu.Style;
-end;
-
-procedure TACLMenuItemControl.CheckAction(Action: TBasicAction);
-var
-  AAction: TCustomAction;
-begin
-  if Action is TCustomAction then
-  begin
-    AAction := TCustomAction(Action);
-    if (AAction.GroupIndex > 0) and not AAction.AutoCheck then
-      AAction.Checked := True;
-  end;
-end;
-
-function TACLMenuItemControl.GetMenu: TACLMenuWindow;
-begin
-  Result := Parent as TACLMenuWindow;
-end;
-
-function TACLMenuItemControl.GetIndex: Integer;
-begin
-  Result := Menu.FItems.IndexOf(Self)
-end;
-
-function TACLMenuItemControl.HasSubItems: Boolean;
-var
-  AContainer: TACLMenuContainerItem;
-begin
-  Result := (MenuItem.Count > 0) or
-    (Safe.Cast(MenuItem, TACLMenuContainerItem, AContainer)) and
-    (AContainer.ExpandMode = lemExpandInSubMenu);
-end;
-
-{ TACLMenuController }
-
-class function TACLMenuController.IsValid(AMenu: TACLMenuWindow): Boolean;
-begin
-  Result := (FMenus <> nil) and (FMenus.IndexOf(AMenu) >= 0);
-end;
-
-class procedure TACLMenuController.Register(ABar: TACLMenuWindow);
-begin
-  if FMenus = nil then
-  begin
-    FMenus := TList.Create;
-    FHook := SetWindowsHookEx(WH_CALLWNDPROC, @CallWindowHook, 0, GetCurrentThreadID);
-  end;
-  FMenus.Add(ABar);
-end;
-
-class procedure TACLMenuController.Unregister(ABar: TACLMenuWindow);
-begin
-  if FMenus <> nil then
-  begin
-    FMenus.Remove(ABar);
-    if FMenus.Count = 0 then
+    LItem.Item.Click;
+    LWnd := TACLMenuPopupWindow.Create(AWnd, LItem);
+    if LWnd.Items.Count > 0 then
     begin
-      UnHookWindowsHookEx(FHook);
-      FHook := 0;
-      FreeAndNil(FMenus);
+      FPopups.Push(LWnd);
+      LWnd.Popup(NullRect);
+      UpdateMouseTracker;
+      Result := True;
+    end
+    else
+      LWnd.Free;
+  end;
+end;
+
+procedure TACLMenuPopupLooper.DoShowPopupDelayed(Sender: TObject);
+begin
+  FDelayTimer.Enabled := False;
+  if (FDelayWnd <> nil) and FDelayWnd.HasSelection and
+     (FDelayWndIndex = FDelayWnd.SelectedItemIndex) and
+     (FDelayWnd.IsMouseAtControl)
+  then
+    DoShowPopup(FDelayWnd);
+  FDelayWnd := nil;
+end;
+
+function TACLMenuPopupLooper.GetMenuHint(AItem: TMenuItem): string;
+begin
+  Result := GetLongHint(AItem.Hint);
+  if Application.HintShortCuts and (AItem.ShortCut <> scNone) then
+    Result := Format('%s (%s)', [Result, ShortCutToText(AItem.ShortCut)]);
+end;
+
+function TACLMenuPopupLooper.IsInStack(const AInfo: TACLMenuWindow.TItemInfo): Boolean;
+var
+  LWnd: TACLMenuPopupWindow;
+begin
+  LWnd := FPopups.Peek;
+  while LWnd <> nil do
+  begin
+    if LWnd.SourceItem = AInfo then
+      Exit(True);
+    LWnd := LWnd.Parent;
+  end;
+  Result := False;
+end;
+
+function TACLMenuPopupLooper.IsMouseAtMenuWindow: Boolean;
+var
+  LControl: TWinControl;
+begin
+  LControl := FindControl(MouseCurrentWindow);
+  Result := (LControl is TACLMenuPopupWindow) and
+    (TACLMenuPopupWindow(LControl).Looper = Self);
+end;
+
+function TACLMenuPopupLooper.IsPeek(AWnd: TACLMenuPopupWindow): Boolean;
+begin
+  Result := FPopups.Peek = AWnd;
+end;
+
+procedure TACLMenuPopupLooper.Run;
+var
+  Cap: HWND;
+  Msg: TMsg;
+begin
+  UpdateMouseTracker;
+  FInLoop := True;
+  repeat
+    if PeekMessage(Msg, 0, 0, 0, PM_REMOVE) then
+    begin
+      case Msg.message of
+        CM_RELEASE, WM_CLOSE, WM_QUIT:
+          CloseMenu(Wnd);
+
+        WM_KEYFIRST..WM_KEYLAST:
+          begin
+            FPopups.Peek.Dispatch(Msg.Message);
+            Continue;
+          end;
+
+        WM_MOUSEMOVE, WM_MOUSELEAVE:
+          begin
+            Cap := GetCapture;
+            UpdateMouseTracker;
+            if (Cap = 0) and (GetCapture <> 0) then
+              Continue;
+          end;
+
+        WM_LBUTTONUP, WM_RBUTTONUP, WM_MBUTTONUP:
+          if not (InScrolling or IsMouseAtMenuWindow) then
+          begin
+            CloseMenu(Wnd);
+            Continue;
+          end;
+      end;
+      TranslateMessage(Msg);
+      DispatchMessage(Msg);
+    end
+    else
+      DoIdle;
+
+  until not (Wnd.Visible and InLoop);
+end;
+
+procedure TACLMenuPopupLooper.SetInScrolling(AValue: Boolean);
+begin
+  if AValue <> InScrolling then
+  begin
+    FInScrolling := AValue;
+    UpdateMouseTracker;
+  end;
+end;
+
+function TACLMenuPopupLooper.WndProc(AWnd: TACLMenuPopupWindow; var AMsg: TMessage): Boolean;
+begin
+  Result := False;
+  case AMsg.Msg of
+    CM_ITEMCLICKED:
+      Result := DoShowPopup(AWnd);
+
+    CM_ITEMSELECTED:
+      begin
+        UpdateSelection(AWnd); // first
+        FDelayTimer.Enabled := False;
+        FDelayWnd := AWnd;
+        FDelayWndIndex := AWnd.SelectedItemIndex;
+        FDelayTimer.Enabled := True;
+      end;
+
+    WM_MOUSELEAVE, WM_MOUSEMOVE:
+      UpdateMouseTracker;
+
+    WM_CAPTURECHANGED:
+      if not (InGrabbing or InScrolling) then
+        CloseMenu(Wnd);
+  end;
+end;
+
+procedure TACLMenuPopupLooper.UpdateMouseTracker;
+var
+  LWnd: TACLMenuWindow;
+begin
+  LWnd := FPopups.Peek;
+  if (LWnd <> nil) and not InScrolling then
+  begin
+    FGrabbing := True;
+    try
+      LWnd.MouseCapture := not IsMouseAtMenuWindow;
+    finally
+      FGrabbing := False;
     end;
   end;
 end;
 
-class function TACLMenuController.CallWindowHook(Code: Integer; wparam: WPARAM; Msg: PCWPStruct): Longint; stdcall;
+procedure TACLMenuPopupLooper.UpdateSelection(AWnd: TACLMenuPopupWindow);
+var
+  LIndex: Integer;
 begin
-  if Code = HC_ACTION then
+  while (AWnd.Parent <> nil) and (AWnd.SourceItem <> nil) do
   begin
-    if Msg.message = WM_ACTIVATE then
-    begin
-      if ActiveMenu <> nil then
-        ActiveMenu.CloseMenu;
-    end;
+    LIndex := AWnd.Parent.Items.IndexOf(AWnd.SourceItem);
+    if LIndex < 0 then Break;
+    AWnd.Parent.SelectItem(LIndex, ccatNone);
+    AWnd := AWnd.Parent;
   end;
-  Result := CallNextHookEx(FHook, Code, WParam, NativeInt(Msg));
 end;
 
 {$ENDREGION}
 
-{$REGION ' MainMenu '}
+{$REGION ' Main Menu '}
 
 { TACLMainMenu }
 
@@ -3251,13 +2608,13 @@ begin
   Align := alTop;
   ControlStyle := ControlStyle + [csMenuEvents];
   FStyle := TACLStyleMenu.Create(Self);
-  RootMenu := Self;
   AutoSize := True;
 end;
 
 destructor TACLMainMenu.Destroy;
 begin
   TACLMainThread.Unsubscribe(Self);
+  FreeAndNil(FPopupWnd);
   FreeAndNil(FStyle);
   inherited;
 end;
@@ -3266,56 +2623,69 @@ procedure TACLMainMenu.AdjustSize;
 begin
   if HandleAllocated then
   begin
-    Height := CalculateMaxSize.Height;
+    Height := CalculateAutoSize.Height;
     CalculateLayout;
   end;
 end;
 
-procedure TACLMainMenu.CalculateLayout;
-var
-  AAlignRect: TRect;
-  AControl: TACLMenuItemControl;
-  AControlWidth: Integer;
-begin
-  AAlignRect := ClientRect;
-  FItemNumberInDisplayArea := 0;
-  for var I := 0 to FItems.Count - 1 do
-  begin
-    AControl := FItems[I];
-    if AControl.Visible then
-    begin
-      AControlWidth := AControl.MeasureSize(MeasureCanvas).Width;
-      AControl.SetBounds(AAlignRect.Left, AAlignRect.Top, AControlWidth, AAlignRect.Height);
-      Inc(AAlignRect.Left, AControlWidth);
-      Inc(FItemNumberInDisplayArea);
-    end
-    else
-      AControl.SetBounds(0, 0, 0, 0);
-  end;
-end;
-
-function TACLMainMenu.CalculateMaxSize: TSize;
+function TACLMainMenu.CalculateAutoSize: TSize;
 begin
   Result := TSize.Create(1, Style.ItemHeight);
 end;
 
-function TACLMainMenu.CalculatePopupBounds(ASize: TSize; AChild: TACLMenuWindow): TRect;
+procedure TACLMainMenu.CalculateLayout;
+var
+  LItem: TItemInfo;
+  LRect: TRect;
+  I: Integer;
 begin
-  Result.TopLeft := ClientToScreen(Point(0, Height));
+  CalculateMetrics;
+  LRect := ClientRect;
+  LRect.Content(FPadding);
+  FVisibleItemCount := 0;
+  for I := 0 to Items.Count - 1 do
+  begin
+    LItem := Items.List[I];
+    LItem.Rect := LRect;
+    LItem.Rect.Width := LItem.Size.cx;
+    LRect.Left := LItem.Rect.Right;
+    Inc(FVisibleItemCount);
+  end;
+end;
+
+function TACLMainMenu.CalculatePopupBounds(ASize: TSize; AChild: TACLMenuPopupWindow): TRect;
+var
+  LWorkArea: TRect;
+begin
   if AChild <> nil then
-    Result.Left := AChild.ParentControl.ClientOrigin.X;
-  Result.Size := ASize;
+    Result.TopLeft := Point(AChild.SourceItem.Rect.Left, Height)
+  else
+    Result.TopLeft := Point(0, Height);
+
+  LWorkArea := MonitorGetWorkArea(ClientOrigin);
+  Result.TopLeft := ClientToScreen(Result.TopLeft);
+  Result.Bottom := Min(Result.Top + ASize.Height, LWorkArea.Bottom);
+  Result.Width := ASize.Width;
+  if Result.Right > LWorkArea.Right then
+    Result.Offset(LWorkArea.Right - Result.Right, 0);
+end;
+
+function TACLMainMenu.CalculateSize(ACanvas: TCanvas; AItem: TMenuItem): TSize;
+begin
+  Result.cx := Style.MeasureWidth(ACanvas, AItem.Caption);
+  Result.cy := Style.ItemHeight;
+  if HasGlyph(AItem) then
+  begin
+    Inc(Result.cx, dpiApply(TACLStyleMenu.GlyphSize, FCurrentPPI));
+    if AItem.Caption <> '' then
+      Inc(Result.cx, dpiApply(acTextIndent, FCurrentPPI));
+  end;
 end;
 
 function TACLMainMenu.CanAutoSize(var NewWidth, NewHeight: Integer): Boolean;
 begin
-  NewHeight := CalculateMaxSize.Height;
+  NewHeight := CalculateAutoSize.Height;
   Result := True;
-end;
-
-function TACLMainMenu.CanCloseMenuOnItemClick(AItem: TMenuItem): Boolean;
-begin
-  Result := AItem.Parent <> Menu.Items;
 end;
 
 procedure TACLMainMenu.ChangeScale(M, D: Integer; isDpiChange: Boolean);
@@ -3333,30 +2703,97 @@ begin
     Handled := True;
 end;
 
-function TACLMainMenu.CreateMenuItemControl(AMenuItem: TMenuItem): TACLMenuItemControl;
+procedure TACLMainMenu.CMExit(var Message: TMessage);
 begin
-  Result := TACLMainMenuItemControl.Create(Self, AMenuItem);
+  if FPopupWnd = nil then
+  begin
+    SelectItem(-1, ccatKeyboard);
+    FPopupOnSelect := False;
+  end;
 end;
 
-function TACLMainMenu.GetCurrentDpi: Integer;
+procedure TACLMainMenu.CMItemClicked(var Message: TMessage);
+var
+  LItem: TItemInfo;
+  LUpdateSelection: Boolean;
 begin
-  Result := FCurrentPPI;
+  if FPopupWnd <> nil then
+  begin
+    FPopupOnSelect := True;
+    FPopupWnd.Looper.CloseMenu;
+    PostMessage(Handle, Message.Msg, Message.WParam, Message.LParam);
+  end
+  else
+  begin
+    LItem := SelectedItemInfo;
+    if LItem = nil then
+    begin
+      FPopupOnSelect := False;
+      Exit;
+    end;
+    if HasSubItems(LItem.Item) then
+    begin
+      FPopupWnd := TACLMenuPopupWindow.Create(Self, Menu, LItem);
+      try
+        FPopupWnd.Popup(NullRect);
+        LUpdateSelection := FPopupWnd.SourceItem = SelectedItemInfo;
+      finally
+        FreeAndNil(FPopupWnd);
+      end;
+      if LUpdateSelection then
+      begin
+        FPopupOnSelect := False;
+        UpdateMouseMove;
+      end;
+    end
+    else
+      Menu.DoSelect(LItem.Item);
+  end;
 end;
 
-function TACLMainMenu.GetMenuDelayTime: Integer;
+procedure TACLMainMenu.CMItemSelected(var Message: TMessage);
 begin
-  Result := 1;
+  inherited;
+  if IsInPopupMode or (TACLControlActionType(Message.WParam) = ccatKeyboard) then
+    PostMessage(Handle, CM_ITEMCLICKED, Message.WParam, Message.LParam);
 end;
 
-procedure TACLMainMenu.HandlerMenuChange(Sender: TObject; Source: TMenuItem; Rebuild: Boolean);
+procedure TACLMainMenu.DoMenuChange(Sender: TObject; Source: TMenuItem; Rebuild: Boolean);
 begin
   Self.Rebuild;
+end;
+
+function TACLMainMenu.HasGlyph(AItem: TMenuItem): Boolean;
+var
+  AIntf: IACLGlyph;
+begin
+  Result := (AItem.ImageIndex >= 0) or not AItem.Bitmap.Empty or
+    Supports(AItem, IACLGlyph, AIntf) and not AIntf.GetGlyph.Empty;
+end;
+
+function TACLMainMenu.IsInPopupMode: Boolean;
+begin
+  Result := FPopupOnSelect or (FPopupWnd <> nil);
+end;
+
+procedure TACLMainMenu.KeyDown(var Key: Word; Shift: TShiftState);
+begin
+  if Key = VK_ESCAPE then
+    GetParentForm(Self).Perform(WM_NEXTDLGCTL, 0, 0)
+  else
+    inherited;
 end;
 
 procedure TACLMainMenu.Localize(const ASection: string);
 begin
   if Menu <> nil then
     TACLMainThread.RunPostponed(Rebuild, Self);
+end;
+
+procedure TACLMainMenu.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  inherited;
+  SetFocus;
 end;
 
 procedure TACLMainMenu.Notification(AComponent: TComponent; AOperation: TOperation);
@@ -3366,21 +2803,57 @@ begin
     Menu := nil;
 end;
 
-procedure TACLMainMenu.Rebuild;
+procedure TACLMainMenu.Paint;
+var
+  I: Integer;
 begin
-  DisableAlign;
-  try
-    Clear;
-    if not (csDestroying in ComponentState) and (Menu <> nil) then
+  for I := 0 to Items.Count - 1 do
+    PaintItem(Items.List[I], I = SelectedItemIndex);
+end;
+
+procedure TACLMainMenu.PaintItem(AItem: TACLMenuWindow.TItemInfo; ASelected: Boolean);
+var
+  LImageRect: TRect;
+  LRect: TRect;
+begin
+  LRect := AItem.Rect;
+  Style.DrawBackground(Canvas, LRect, ASelected);
+  LRect.Inflate(-Style.GetTextIdent, 0);
+
+  if AItem.Item.Caption <> '' then
+  begin
+    if HasGlyph(AItem.Item) then
     begin
-      Menu.ScaleForDpi(GetCurrentDpi);
-      for var I := 0 to Menu.Items.Count - 1 do
-        AddMenuItem(Menu.Items[I]);
+      LImageRect := LRect;
+      LImageRect.Width := dpiApply(TACLStyleMenu.GlyphSize, FCurrentPPI);
+      Style.DrawItemImage(Canvas, LImageRect, AItem.Item, ASelected);
+      LRect.Left := LImageRect.Right + dpiApply(acTextIndent, FCurrentPPI);
     end;
-    AdjustSize;
-  finally
-    EnableAlign;
+    Style.AssignFontParams(Canvas, ASelected, AItem.Item.Default, AItem.Item.Enabled);
+    Style.DoDrawText(Canvas, LRect, AItem.Item.Caption);
+  end
+  else
+    Style.DrawItemImage(Canvas, LRect, AItem.Item, ASelected);
+end;
+
+procedure TACLMainMenu.Rebuild;
+var
+  I: Integer;
+begin
+  Items.Clear;
+  if not (csDestroying in ComponentState) and (Menu <> nil) then
+  begin
+    Menu.ScaleForDpi(GetCurrentDpi);
+    for I := 0 to Menu.Items.Count - 1 do
+      AddMenuItem(Menu.Items[I]);
   end;
+  AdjustSize;
+end;
+
+procedure TACLMainMenu.SelectItemOnMouseMove(AItemIndex: Integer);
+begin
+  if (AItemIndex >= 0) or not IsInPopupMode then
+    inherited;
 end;
 
 procedure TACLMainMenu.SetMenu(AValue: TACLPopupMenu);
@@ -3397,9 +2870,8 @@ begin
     begin
       FMenu := AValue;
       FMenu.FreeNotification(Self);
-      FMenu.OnChange := HandlerMenuChange;
+      FMenu.OnChange := DoMenuChange;
     end;
-    FPopupMenu := Menu;
     Rebuild;
   end;
 end;
@@ -3409,14 +2881,9 @@ begin
   FStyle.Assign(AValue);
 end;
 
-function TACLMainMenu.TrackMenuOnSelect: Boolean;
+function TACLMainMenu.TranslateKey(Key: Word; Shift: TShiftState): Word;
 begin
-  Result := True;
-end;
-
-function TACLMainMenu.TranslateCharCode(Code: Word): Word;
-begin
-  case Code of
+  case Key of
     VK_LEFT:
       Result := VK_UP;
     VK_RIGHT:
@@ -3426,114 +2893,46 @@ begin
     VK_UP:
       Result := VK_LEFT;
   else
-    Result := Code;
+    Result := Key;
   end;
 end;
 
-procedure TACLMainMenu.WMSysCommand(var Message: TWMSysCommand);
-var
-  AItem: TACLMenuItemControl;
+procedure TACLMainMenu.WMGetDlgCode(var Message: TWMGetDlgCode);
 begin
-  if (GetParentForm(Self) <> Screen.FocusedForm) and (Application.ModalLevel <> 0) then
-    Exit;
+  Message.Result := DLGC_WANTARROWS or DLGC_WANTALLKEYS;
+end;
 
-  if not InMenuLoop and Enabled and Showing then
-  begin
-    if (Message.CmdType and $FFF0 = SC_KEYMENU) and
-      (Message.Key <> VK_SPACE) and
-      (Message.Key <> Word('-')) and
-      (GetCapture = 0) then
-    begin
-      if Message.Key <> 0 then
+procedure TACLMainMenu.WndProc(var Message: TMessage);
+begin
+  case Message.Msg of
+    WM_SYSKEYUP, WM_SYSKEYDOWN:
+      FCancelMenu := TWMKey(Message).CharCode = VK_MENU;
+    WM_SYSCOMMAND:
+      if (GetParentForm(Self) = Screen.FocusedForm) and
+         (Application.ModalLevel = 0) and Enabled and Showing then
       begin
-        AItem := FindAccelItem(Message.Key);
-        if AItem <> nil then
+        if (TWMSysCommand(Message).CmdType and $FFF0 = SC_KEYMENU) and
+           (TWMSysCommand(Message).Key <> VK_SPACE) and
+           (TWMSysCommand(Message).Key <> Word('-')) and
+           (GetCapture = 0)
+        then
         begin
-          AItem.Keyed;
+          if TWMSysCommand(Message).Key <> 0 then
+            KeyChar(TWMSysCommand(Message).Key)
+          else
+            if not FCancelMenu then
+              SelectItem(0, ccatKeyboard);
+
+          FCancelMenu := False;
           Message.Result := 1;
+          Exit;
         end;
-      end
-      else
-        if not FCancelMenu then
-        begin
-          AItem := FindFirstVisibleItem;
-          if AItem <> nil then
-            AItem.SetSelected(True);
-          PostMessage(Handle, CM_ENTERMENULOOP, 0, 0);
-        end;
-
-      FCancelMenu := False;
-      Message.Result := 1;
-    end;
+      end;
   end;
-end;
-
-procedure TACLMainMenu.WMSysKeyDown(var Message: TWMSysKeyDown);
-begin
-  FCancelMenu := Message.CharCode = VK_MENU;
   inherited;
 end;
-
-procedure TACLMainMenu.WMSysKeyUp(var Message: TWMSysKeyUp);
-begin
-  FCancelMenu := Message.CharCode = VK_MENU;
-  inherited;
-end;
-
-{ TACLMainMenuItemControl }
-
-function TACLMainMenuItemControl.HasGlyph: Boolean;
-var
-  AIntf: IACLGlyph;
-begin
-  Result := (MenuItem.ImageIndex >= 0) or not MenuItem.Bitmap.Empty or
-    Supports(MenuItem, IACLGlyph, AIntf) and not AIntf.GetGlyph.Empty;
-end;
-
-function TACLMainMenuItemControl.MeasureSize(ACanvas: TCanvas): TSize;
-begin
-  Result.cx := Style.MeasureWidth(ACanvas, Caption);
-  Result.cy := Style.ItemHeight;
-  if HasGlyph then
-  begin
-    Inc(Result.cx, dpiApply(TACLStyleMenu.GlyphSize, FCurrentPPI));
-    if Caption <> '' then
-      Inc(Result.cx, dpiApply(acTextIndent, FCurrentPPI));
-  end;
-end;
-
-procedure TACLMainMenuItemControl.Paint;
-var
-  LImageRect: TRect;
-  LRect: TRect;
-begin
-  LRect := ClientRect;
-  Style.DrawBackground(Canvas, LRect, Selected);
-  LRect.Inflate(-Style.GetTextIdent, 0);
-  if Caption <> '' then
-  begin
-    if HasGlyph then
-    begin
-      LImageRect := LRect;
-      LImageRect.Width := dpiApply(TACLStyleMenu.GlyphSize, FCurrentPPI);
-      Style.DrawItemImage(Canvas, LImageRect, MenuItem, Selected);
-      LRect.Left := LImageRect.Right + dpiApply(acTextIndent, FCurrentPPI);
-    end;
-    Style.AssignFontParams(Canvas, Selected, MenuItem.Default, MenuItem.Enabled);
-    acTextDraw(Canvas, Caption, LRect, taLeftJustify, taVerticalCenter, True);
-  end
-  else
-    Style.DrawItemImage(Canvas, LRect, MenuItem, Selected);
-end;
-
-function TACLMainMenuItemControl.Style: TACLStyleMenu;
-begin
-  Result := TACLMainMenu(Owner).Style;
-end;
-
 {$ENDREGION}
 
 initialization
   RegisterClasses([TACLMenuItem, TACLMenuItemLink, TACLMenuListItem]);
-{$ENDIF}
 end.

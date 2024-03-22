@@ -41,8 +41,8 @@ uses
   // Vcl
   {Vcl.}ActnList,
   {Vcl.}Controls,
-  {Vcl.}Forms,
   {Vcl.}ExtCtrls,
+  {Vcl.}Forms,
   {Vcl.}Graphics,
   {Vcl.}ImgList,
   {Vcl.}StdCtrls,
@@ -74,7 +74,7 @@ const
   WM_CONTEXTMENU = LM_CONTEXTMENU;
   WM_MOUSEWHEEL  = LM_MOUSEWHEEL;
   WM_MOUSEHWHEEL = LM_MOUSEHWHEEL;
-  WM_MOVE = LM_MOVE;
+  WM_MOVE        = LM_MOVE;
 {$ENDIF}
 
 const
@@ -108,6 +108,7 @@ type
   );
 
   TACLOrientation = (oHorizontal, oVertical);
+  TACLControlActionType = (ccatNone, ccatMouse, ccatGesture, ccatKeyboard);
   TACLSelectionMode = (smUnselect, smSelect, smInvert);
 
   TACLCustomDrawEvent = procedure (Sender: TObject;
@@ -658,12 +659,14 @@ type
   { TACLControls }
 
   TACLControls = class
+  strict private
+    class procedure WMSetCursor(ACaller: TWinControl; var Message: TWMSetCursor);
   public
+    class var MenuLoopCount: Integer;
     // Scaling
     class procedure ScaleChanging(AControl: TWinControl; var AState: TObject);
     class procedure ScaleChanged(AControl: TWinControl; var AState: TObject);
     // Messages
-    class function WMSetCursor(ACaller: TWinControl; var Message: TWMSetCursor): Boolean;
     class procedure WndProc(ACaller: TWinControl; var Message: TMessage);
   end;
 
@@ -1370,8 +1373,7 @@ begin
   TWinControlAccess(AControl).EnableAlign;
 end;
 
-class function TACLControls.WMSetCursor(
-  ACaller: TWinControl; var Message: TWMSetCursor): Boolean;
+class procedure TACLControls.WMSetCursor(ACaller: TWinControl; var Message: TWMSetCursor);
 
   function GetCursor(AControl: TControl): TCursor;
   var
@@ -1387,12 +1389,12 @@ var
   AControl: TControl;
   ACursor: TCursor;
 begin
-  Result := False;
-  if (Message.HitTest = HTCLIENT) and not (csDesigning in ACaller.ComponentState) and
-     (ACaller.HandleAllocated and (Message.CursorWnd = ACaller.Handle)) then
+  if csDesigning in ACaller.ComponentState then
+    Exit;
+  if ACaller.HandleAllocated and (Message.CursorWnd = ACaller.Handle) then
   begin
     ACursor := Screen.Cursor;
-    if ACursor = crDefault then
+    if (ACursor = crDefault) and (MenuLoopCount = 0) then
     begin
       AControl := GetCaptureControl;
       if AControl = nil then
@@ -1402,12 +1404,9 @@ begin
       if ACursor = crDefault then
         ACursor := GetCursor(ACaller);
     end;
-    if ACursor <> crDefault then
-    begin
-      SetCursor(Screen.Cursors[ACursor]);
-      Message.Result := 1;
-      Result := True;
-    end;
+    SetCursor(Screen.Cursors[ACursor]);
+    Message.CursorWnd := 0; //nop
+    Message.Result := 1;
   end;
 end;
 
@@ -2049,8 +2048,8 @@ end;
 
 procedure TACLCustomControl.WndProc(var Message: TMessage);
 begin
-  inherited WndProc(Message);
   TACLControls.WndProc(Self, Message);
+  inherited WndProc(Message);
 end;
 
 procedure TACLCustomControl.CMDialogChar(var Message: TCMDialogChar);

@@ -65,7 +65,7 @@ function MonitorGetTaskBarRect: TRect;
 function MonitorGetWorkArea(const P: TPoint): TRect;
 function MonitorIsFullScreenApplicationRunning(AMonitor: TACLMonitor = nil): Boolean;
 // Mouse
-function MouseCurrentWindow: THandle;
+function MouseCurrentWindow: HWND;
 function MouseCursorPos: TPoint;
 function MouseCursorSize: TSize;
 implementation
@@ -273,7 +273,7 @@ begin
     Result := NullRect;
 end;
 
-function MouseCurrentWindow: THandle;
+function MouseCurrentWindow: HWND;
 begin
   Result := WindowFromPoint(MouseCursorPos);
 end;
