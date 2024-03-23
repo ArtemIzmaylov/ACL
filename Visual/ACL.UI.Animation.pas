@@ -496,8 +496,11 @@ end;
 
 procedure TACLCustomBitmapAnimation.AllocateFrame1(const R: TRect; AProc: TACLAnimationDrawProc);
 begin
-  with AllocateFrame1(R) do
-    AProc(Canvas, ClientRect);
+  if not R.IsEmpty then
+  begin
+    with AllocateFrame1(R) do
+      AProc(Canvas, ClientRect);
+  end;
 end;
 
 function TACLCustomBitmapAnimation.AllocateFrame2(const R: TRect): TACLDib;
@@ -509,8 +512,11 @@ end;
 
 procedure TACLCustomBitmapAnimation.AllocateFrame2(const R: TRect; AProc: TACLAnimationDrawProc);
 begin
-  with AllocateFrame2(R) do
-    AProc(Canvas, ClientRect);
+  if not R.IsEmpty then
+  begin
+    with AllocateFrame2(R) do
+      AProc(Canvas, ClientRect);
+  end;
 end;
 
 procedure TACLCustomBitmapAnimation.Draw(ACanvas: TCanvas; const R: TRect);

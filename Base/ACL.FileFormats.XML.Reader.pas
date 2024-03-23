@@ -335,7 +335,6 @@ const
   SXmlDupAttributeName = '%s is a duplicate attribute name';
   SXmlEncodingSwitchAfterResetState = '''%s'' is an invalid value for the ''encoding'' attribute. ' +
     'The encoding cannot be switched after a call to ResetState';
-  SXmlEntityReferencesNotImplemented = 'Entity references are not implemented';
   SXmlExpectExternalOrClose = 'Expecting external ID, ''['' or ''&gt;''.';
   SXmlExpectSubOrClose = 'Expecting an internal subset or the end of the DOCTYPE declaration.';
   SXmlExpectingWhiteSpace = '''%s'' is an unexpected token. Expecting white space.';
@@ -344,7 +343,6 @@ const
   SXmlInvalidCommentChars = 'An XML comment cannot contain ''--'', and ''-'' cannot be the last character.';
   SXmlInvalidRootData = 'Data at the root level is invalid.';
   SXmlInvalidTextDecl = 'Invalid text declaration.';
-  SXmlInvalidVersionNumber = 'Version number ''%s'' is invalid.';
   SXmlInvalidXmlDecl = 'Syntax for an XML declaration is invalid.';
   SXmlInvalidXmlSpace = '''%s'' is an invalid xml:space value.';
   SXmlLimitExceeded = 'The input document has exceeded a limit set by %s.';
@@ -514,6 +512,7 @@ type
       AppendMode: Boolean;
       Stream: TStream;
       Decoder: TEncoding;
+      DecoderIsASCII: Boolean;
       Bytes: TBytes;
       BytePos: Integer;
       BytesUsed: Integer;
@@ -2436,14 +2435,11 @@ begin
       if FParsingState.CharsUsed - FParsingState.CharPos > 0 then
       begin
         if FParsingState.Chars[FParsingState.CharPos] <> #$000D then
-        begin
-          Assert(False, 'We should never get to this point.');
           Throw(SXmlUnexpectedEOF1);
-        end;
         Assert(FParsingState.IsEof);
       end
       else
-        Throw(SXmlEntityReferencesNotImplemented);
+        Throw(SXmlUnclosedQuote);
     end;
     APosition := FParsingState.CharPos;
   end;
@@ -4391,7 +4387,8 @@ begin
         end;
       'e':
         begin
-          if NameEqual(FParsingState.Chars, FParsingState.CharPos, ANameEndPos - FParsingState.CharPos, 'encoding') and ((AXmlDeclState = 1) or ((AIsTextDecl and (AXmlDeclState = 0)))) then
+          if NameEqual(FParsingState.Chars, FParsingState.CharPos, ANameEndPos - FParsingState.CharPos, 'encoding') and
+            ((AXmlDeclState = 1) or ((AIsTextDecl and (AXmlDeclState = 0)))) then
           begin
             if not AIsTextDecl then
               AAttr := AddAttributeNoChecks('encoding', 1);
@@ -4402,7 +4399,8 @@ begin
         end;
       's':
         begin
-          if NameEqual(FParsingState.Chars, FParsingState.CharPos, ANameEndPos - FParsingState.CharPos, 'standalone') and ((AXmlDeclState = 1) or (AXmlDeclState = 2)) and not AIsTextDecl then
+          if NameEqual(FParsingState.Chars, FParsingState.CharPos, ANameEndPos - FParsingState.CharPos, 'standalone') and
+            ((AXmlDeclState = 1) or (AXmlDeclState = 2)) and not AIsTextDecl then
           begin
             if not AIsTextDecl then
               AAttr := AddAttributeNoChecks('standalone', 1);
@@ -4455,17 +4453,11 @@ LblContinue:
       case AXmlDeclState of
         //# version
         0:
-          //# VersionNum  ::=  '1.0'        (XML Fourth Edition and earlier)
-          if NameEqual(FParsingState.Chars, FParsingState.CharPos, APosition - FParsingState.CharPos, '1.0') then
+          //# VersionNum  :=  '1.0'        (XML Fourth Edition and earlier)
           begin
             if not AIsTextDecl then
               AAttr.SetValue(FParsingState.Chars, FParsingState.CharPos, APosition - FParsingState.CharPos);
             AXmlDeclState := 1;
-          end
-          else
-          begin
-            SetString(ABadVersion, PWideChar(@FParsingState.Chars[FParsingState.CharPos]), APosition - FParsingState.CharPos);
-            Throw(SXmlInvalidVersionNumber, ABadVersion);
           end;
         1:
           begin
@@ -4477,16 +4469,8 @@ LblContinue:
           end;
         2:
           begin
-            if NameEqual(FParsingState.Chars, FParsingState.CharPos, APosition - FParsingState.CharPos, 'yes') then
-              FStandalone := True
-            else
-              if NameEqual(FParsingState.Chars, FParsingState.CharPos, APosition - FParsingState.CharPos, 'no') then
-                FStandalone := False
-              else
-              begin
-                Assert(not AIsTextDecl);
-                Throw(SXmlInvalidXmlDecl, FParsingState.LineNo, FParsingState.LinePos - 1);
-              end;
+            FStandalone := NameEqual(FParsingState.Chars,
+              FParsingState.CharPos, APosition - FParsingState.CharPos, 'yes');
             if not AIsTextDecl then
               AAttr.SetValue(FParsingState.Chars, FParsingState.CharPos, APosition - FParsingState.CharPos);
             AXmlDeclState := 3;
@@ -5110,22 +5094,30 @@ begin
   begin
     Assert(FParsingState.CharPos = 0);
     FParsingState.Encoding := TEncoding.UTF8;
-    FParsingState.Decoder := TEncoding.ASCII;
+    FParsingState.Decoder := TACLEncodings.ASCII;
+    FParsingState.DecoderIsASCII := True;
   end
   else
   begin
     FParsingState.Encoding := AEncoding;
-    if ContainsStr(TACLEncodings.WebName(AEncoding), 'utf-16') then
-      FParsingState.Decoder := TEncoding.Unicode
+    if TACLEncodings.WebName(AEncoding).Contains('utf-16') then
+    begin
+      FParsingState.Decoder := TEncoding.Unicode;
+      FParsingState.DecoderIsASCII := False;
+    end
     else
+    begin
       FParsingState.Decoder := AEncoding;
+      FParsingState.DecoderIsASCII := AEncoding = TACLEncodings.ASCII;
+    end;
   end;
 end;
 
 procedure TACLXMLTextReader.SwitchEncoding(ANewEncoding: TEncoding);
 begin
-  if (FParsingState.Decoder = TEncoding.ASCII) and not FAfterResetState or
-    (TACLEncodings.WebName(ANewEncoding) <> TACLEncodings.WebName(FParsingState.Encoding)) then
+  if FParsingState.DecoderIsASCII and not FAfterResetState or
+    (TACLEncodings.WebName(ANewEncoding) <>
+     TACLEncodings.WebName(FParsingState.Encoding)) then
   begin
     Assert(FParsingState.Stream <> nil);
     UnDecodeChars;
@@ -5142,12 +5134,17 @@ begin
   if FAfterResetState then
   begin
     AEncodingName := TACLEncodings.WebName(FParsingState.Encoding);
-    if (AEncodingName <> 'utf-8') and (AEncodingName <> 'utf-16') and (AEncodingName <> 'utf-16be') and
-      not (FParsingState.Encoding is TMBCSEncoding)
+    if (AEncodingName <> 'utf-8') and
+       (AEncodingName <> 'utf-16') and
+       (AEncodingName <> 'utf-16be') and not
+       (FParsingState.Encoding is TMBCSEncoding)
     then
-      Throw(SXmlEncodingSwitchAfterResetState, IfThen(FParsingState.Encoding.GetByteCount('A') = 1, 'UTF-8', 'UTF-16'));
+      if FParsingState.Encoding.GetByteCount('A') = 1 then
+        Throw(SXmlEncodingSwitchAfterResetState, 'UTF-8')
+      else
+        Throw(SXmlEncodingSwitchAfterResetState, 'UTF-16');
   end;
-  if FParsingState.Decoder = TEncoding.ASCII then
+  if FParsingState.DecoderIsASCII then
     SwitchEncodingToUTF8;
 end;
 
@@ -5500,6 +5497,7 @@ begin
   Encoding := nil;
   Stream := nil;
   Decoder := nil;
+  DecoderIsASCII := False;
   Bytes := nil;
   BytePos := 0;
   BytesUsed := 0;

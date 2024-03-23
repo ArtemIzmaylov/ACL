@@ -362,6 +362,7 @@ type
   public
     class constructor Create;
     class destructor Destroy;
+    class function ASCII: TEncoding;
     class function Default: TEncoding;
     class procedure EnumAnsiCodePages(const AProc: TProc<Integer, string>);
     class function Get(const CodePage: Integer): TEncoding; overload;
@@ -2055,6 +2056,16 @@ begin
   FreeAndNil(FCodePages);
   FreeAndNil(FMapLock);
   FreeAndNil(FMap);
+end;
+
+class function TACLEncodings.ASCII: TEncoding;
+begin
+  try
+    Result := TEncoding.ASCII;
+  except
+    // EEncodingError: Invalid code page
+    Result := TEncoding.ANSI;
+  end;
 end;
 
 class function TACLEncodings.Default: TEncoding;
