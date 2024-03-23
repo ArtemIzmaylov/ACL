@@ -4,7 +4,7 @@
 {*             ScrollBar Control             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -44,7 +44,8 @@ uses
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.Buttons,
   ACL.UI.Resources,
-  ACL.Utils.Common;
+  ACL.Utils.Common,
+  ACL.Utils.Desktop;
 
 const
   acScrollBarHitArea = 120;
@@ -53,28 +54,30 @@ const
 
 type
   TACLScrollBar = class;
-  TACLScrollBarViewInfo = class;
+  TACLScrollBarSubClass = class;
 
   TACLScrollBarPart = (sbpNone, sbpLineUp, sbpLineDown, sbpThumbnail, sbpPageUp, sbpPageDown);
 
+  { IACLScrollBarAppearance }
+
+  IACLScrollBarAppearance = interface
+  ['{2B8F4E80-397B-434C-82F6-F163FCA18CD7}']
+    function GetButtonDownSize(Kind: TScrollBarKind): Integer;
+    function GetButtonUpSize(Kind: TScrollBarKind): Integer;
+    function GetScrollBarSize(Kind: TScrollBarKind): Integer;
+    function GetThumbExtends(Kind: TScrollBarKind): TRect;
+    function GetThumbNominalSize(Kind: TScrollBarKind): Integer;
+    function IsThumbResizable(Kind: TScrollBarKind): Boolean;
+    procedure DrawBackground(ACanvas: TCanvas; const R: TRect; Kind: TScrollBarKind);
+    procedure DrawPart(ACanvas: TCanvas; const R: TRect;
+      APart: TACLScrollBarPart; AState: TACLButtonState; AKind: TScrollBarKind);
+  end;
+
   { IACLScrollBar }
 
-  IACLScrollBar = interface
+  IACLScrollBar = interface(IACLControl)
   ['{1C60D02A-9DA5-41B9-A616-C57075B728F9}']
     function AllowFading: Boolean;
-    function CalcCursorPos: TPoint;
-    function GetButtonDownSize: Integer;
-    function GetButtonUpSize: Integer;
-    function GetEnabled: Boolean;
-    function GetScrollBarSize: Integer;
-    function GetThumbExtends: TRect;
-    function GetThumbIsResizable: Boolean;
-    function GetThumbNominalSize: Integer;
-    function IsMouseCaptured: Boolean;
-    procedure DrawBackground(ACanvas: TCanvas; const R: TRect);
-    procedure DrawPart(ACanvas: TCanvas; const R: TRect;
-      APart: TACLScrollBarPart; AState: TACLButtonState);
-    procedure InvalidateRect(const R: TRect; AUpdateNow: Boolean = False);
     procedure Scroll(ACode: TScrollCode; var APosition: Integer);
   end;
 
@@ -91,18 +94,24 @@ type
 
   { TACLStyleScrollBox }
 
-  TACLStyleScrollBox = class(TACLStyle)
+  TACLStyleScrollBox = class(TACLStyle, IACLScrollBarAppearance)
   strict private
     function GetTextureBackground(Kind: TScrollBarKind): TACLResourceTexture;
     function GetTextureButtons(Kind: TScrollBarKind): TACLResourceTexture;
     function GetTextureThumb(Kind: TScrollBarKind): TACLResourceTexture;
   protected
     procedure InitializeResources; override;
+    // IACLScrollBarAppearance
+    function GetButtonDownSize(Kind: TScrollBarKind): Integer;
+    function GetButtonUpSize(Kind: TScrollBarKind): Integer;
+    function GetThumbExtends(Kind: TScrollBarKind): TRect;
+    function GetThumbNominalSize(Kind: TScrollBarKind): Integer;
   public
     procedure DrawBackground(ACanvas: TCanvas; const R: TRect; Kind: TScrollBarKind);
     procedure DrawPart(ACanvas: TCanvas; const R: TRect;
       Part: TACLScrollBarPart; State: TACLButtonState; Kind: TScrollBarKind);
     procedure DrawSizeGripArea(ACanvas: TCanvas; const R: TRect);
+    function GetScrollBarSize(Kind: TScrollBarKind): Integer;
     function IsThumbResizable(AKind: TScrollBarKind): Boolean;
     //# Properties
     property TextureBackground[Kind: TScrollBarKind]: TACLResourceTexture read GetTextureBackground;
@@ -123,7 +132,7 @@ type
   TACLScrollBarViewInfoItem = class(TACLUnknownObject, IACLAnimateControl)
   strict private
     FBounds: TRect;
-    FOwner: TACLScrollBarViewInfo;
+    FOwner: TACLScrollBarSubClass;
     FPart: TACLScrollBarPart;
     FState: TACLButtonState;
 
@@ -134,7 +143,7 @@ type
     // IACLAnimateControl
     procedure IACLAnimateControl.Animate = Invalidate;
   public
-    constructor Create(AOwner: TACLScrollBarViewInfo; APart: TACLScrollBarPart); virtual;
+    constructor Create(AOwner: TACLScrollBarSubClass; APart: TACLScrollBarPart); virtual;
     destructor Destroy; override;
     procedure Draw(ACanvas: TCanvas);
     procedure Invalidate;
@@ -142,83 +151,55 @@ type
     //# Properties
     property Bounds: TRect read FBounds write FBounds;
     property DisplayBounds: TRect read GetDisplayBounds;
-    property Owner: TACLScrollBarViewInfo read FOwner;
+    property Owner: TACLScrollBarSubClass read FOwner;
     property Part: TACLScrollBarPart read FPart;
     property State: TACLButtonState read FState write SetState;
   end;
 
-  { TACLScrollBarViewInfo }
+  { TACLScrollBarSubClass }
 
-  TACLScrollBarViewInfo = class(TACLUnknownObject)
-  protected
+  TACLScrollBarSubClass = class(TACLUnknownObject)
+  strict private
     FBounds: TRect;
     FButtonDown: TACLScrollBarViewInfoItem;
     FButtonUp: TACLScrollBarViewInfoItem;
     FHotPart: TACLScrollBarPart;
     FKind: TScrollBarKind;
     FOwner: IACLScrollBar;
+    FPressedMousePos: TPoint;
     FPressedPart: TACLScrollBarPart;
+    FSaveThumbnailPos: TPoint;
     FScrollInfo: TACLScrollInfo;
     FSmallChange: Word;
+    FStyle: IACLScrollBarAppearance;
     FThumbnail: TACLScrollBarViewInfoItem;
     FThumbnailSize: Integer;
+    FTimer: TACLTimer;
 
+    function CalculateButtonDownRect: TRect;
+    function CalculateButtonUpRect: TRect;
+    procedure CalculatePartStates;
+    function CalculatePositionFromThumbnail(ATotal: Integer): Integer;
+    procedure CalculateRects;
+    function CalculateThumbnailRect: TRect;
     function GetPageDownRect: TRect;
     function GetPageUpRect: TRect;
-    procedure SetHotPart(APart: TACLScrollBarPart);
-  protected
-    function CalculatePositionFromThumbnail(ATotal: Integer): Integer; virtual;
-    function CalculateButtonDownRect: TRect; virtual;
-    function CalculateButtonUpRect: TRect; virtual;
-    function CalculateThumbnailRect: TRect; virtual;
-    procedure CalculatePartStates;
-    procedure CalculateRects; virtual;
-    //
-    function InternalSetScrollParams(AMin, AMax, APosition, APageSize: Integer): Boolean;
-    procedure Tracking(X, Y: Integer; const ADownMousePos, ASaveThumbnailPos: TPoint); virtual;
-    procedure UpdateParts(AHotPart, APressedPart: TACLScrollBarPart);
-  public
-    constructor Create(AOwner: IACLScrollBar; AKind: TScrollBarKind); virtual;
-    destructor Destroy; override;
-    function HitTest(const P: TPoint): TACLScrollBarPart; virtual;
-    procedure Calculate(const ABounds: TRect); virtual;
-    procedure CheckScrollBarSizes(var AWidth, AHeight: Integer); virtual;
-    procedure Draw(ACanvas: TCanvas);
-    procedure Invalidate(AUpdateNow: Boolean);
-    function SetScrollParams(AMin, AMax, APosition, APageSize: Integer; ARedraw: Boolean = True): Boolean; overload;
-    procedure SetScrollParams(const AInfo: TScrollInfo; ARedraw: Boolean = True); overload;
-    //# Properties
-    property Bounds: TRect read FBounds;
-    property ButtonDown: TACLScrollBarViewInfoItem read FButtonDown;
-    property ButtonUp: TACLScrollBarViewInfoItem read FButtonUp;
-    property HotPart: TACLScrollBarPart read FHotPart write SetHotPart;
-    property Kind: TScrollBarKind read FKind;
-    property Owner: IACLScrollBar read FOwner;
-    property PageDownRect: TRect read GetPageDownRect;
-    property PageUpRect: TRect read GetPageUpRect;
-    property PressedPart: TACLScrollBarPart read FPressedPart;
-    property ScrollInfo: TACLScrollInfo read FScrollInfo;
-    property SmallChange: Word read FSmallChange write FSmallChange default 1;
-    property Thumbnail: TACLScrollBarViewInfoItem read FThumbnail;
-    property ThumbnailSize: Integer read FThumbnailSize;
-  end;
-
-  { TACLScrollBarController }
-
-  TACLScrollBarController = class(TObject)
-  strict private
-    FDownMousePos: TPoint;
-    FSaveThumbnailPos: TPoint;
-    FTimer: TACLTimer;
-    FViewInfo: TACLScrollBarViewInfo;
-
+    function GetPositionFromThumbnail: Integer;
     procedure MouseThumbTracking(X, Y: Integer);
     procedure ScrollTimerHandler(ASender: TObject);
+    procedure SetHotPart(APart: TACLScrollBarPart);
+    procedure UpdateParts(AHotPart, APressedPart: TACLScrollBarPart);
   public
-    constructor Create(AViewInfo: TACLScrollBarViewInfo); virtual;
+    constructor Create(AOwner: IACLScrollBar;
+      AStyle: IACLScrollBarAppearance; AKind: TScrollBarKind);
     destructor Destroy; override;
-    function GetPositionFromThumbnail: Integer;
-    procedure Cancel;
+    procedure Calculate(const ABounds: TRect);
+    procedure CheckScrollBarSizes(var AWidth, AHeight: Integer);
+    procedure Draw(ACanvas: TCanvas);
+    procedure Invalidate(AUpdateNow: Boolean);
+    function HitTest(const P: TPoint): TACLScrollBarPart;
+    //# Controller
+    procedure CancelDrag;
     procedure MouseDown(AButton: TMouseButton; AShift: TShiftState; X, Y: Integer);
     procedure MouseEnter;
     procedure MouseLeave;
@@ -226,21 +207,35 @@ type
     procedure MouseUp(AButton: TMouseButton; X, Y: Integer);
     procedure Scroll(AScrollCode: TScrollCode); overload;
     procedure Scroll(AScrollPart: TACLScrollBarPart); overload;
+    function SetScrollParams(AMin, AMax, APosition, APageSize: Integer;
+      ARedraw: Boolean = True): Boolean;
     //# Properties
-    property ViewInfo: TACLScrollBarViewInfo read FViewInfo;
+    property Bounds: TRect read FBounds;
+    property ButtonDown: TACLScrollBarViewInfoItem read FButtonDown;
+    property ButtonUp: TACLScrollBarViewInfoItem read FButtonUp;
+    property HotPart: TACLScrollBarPart read FHotPart write SetHotPart;
+    property Kind: TScrollBarKind read FKind write FKind;
+    property Owner: IACLScrollBar read FOwner;
+    property PageDownRect: TRect read GetPageDownRect;
+    property PageUpRect: TRect read GetPageUpRect;
+    property PressedPart: TACLScrollBarPart read FPressedPart;
+    property ScrollInfo: TACLScrollInfo read FScrollInfo;
+    property SmallChange: Word read FSmallChange write FSmallChange default 1;
+    property Style: IACLScrollBarAppearance read FStyle;
+    property Thumbnail: TACLScrollBarViewInfoItem read FThumbnail;
+    property ThumbnailSize: Integer read FThumbnailSize;
   end;
 
   { TACLScrollBar }
 
   TACLScrollBar = class(TACLGraphicControl, IACLScrollBar)
   strict private
-    FController: TACLScrollBarController;
-    FKind: TScrollBarKind;
     FStyle: TACLStyleScrollBox;
-    FViewInfo: TACLScrollBarViewInfo;
+    FSubClass: TACLScrollBarSubClass;
 
     FOnScroll: TScrollEvent;
 
+    function GetKind: TScrollBarKind;
     function GetScrollInfo: TACLScrollInfo;
     function GetSmallChange: Word;
     procedure SetKind(Value: TScrollBarKind);
@@ -252,16 +247,6 @@ type
 
     // IACLScrollBar
     function AllowFading: Boolean;
-    function CalcCursorPos: TPoint;
-    function GetButtonDownSize: Integer;
-    function GetButtonUpSize: Integer;
-    function GetScrollBarSize: Integer;
-    function GetThumbNominalSize: Integer;
-    function GetThumbIsResizable: Boolean;
-    function GetThumbExtends: TRect;
-    function IsMouseCaptured: Boolean;
-    procedure DrawBackground(ACanvas: TCanvas; const R: TRect);
-    procedure DrawPart(ACanvas: TCanvas; const R: TRect; APart: TACLScrollBarPart; AState: TACLButtonState);
     procedure Scroll(ScrollCode: TScrollCode; var ScrollPos: Integer); virtual;
 
     //# Mouse
@@ -283,13 +268,11 @@ type
     procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
 
     //# Properties
-    property Controller: TACLScrollBarController read FController;
-    property ViewInfo: TACLScrollBarViewInfo read FViewInfo;
+    property SubClass: TACLScrollBarSubClass read FSubClass;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure AfterConstruction; override;
-    procedure InvalidateRect(const R: TRect; AUpdateNow: Boolean = False); reintroduce;
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
     procedure SetScrollParams(AMin, AMax, APosition, APageSize: Integer; ARedraw: Boolean = True); overload;
     procedure SetScrollParams(const AInfo: TScrollInfo; ARedraw: Boolean = True); overload;
@@ -300,7 +283,7 @@ type
     property Anchors;
     property Constraints;
     property Enabled;
-    property Kind: TScrollBarKind read FKind write SetKind default sbHorizontal;
+    property Kind: TScrollBarKind read GetKind write SetKind default sbHorizontal;
     property ParentShowHint;
     property PopupMenu;
     property ShowHint;
@@ -382,6 +365,40 @@ begin
   TextureThumbVert.InitailizeDefaults('ScrollBox.Textures.Vert.Thumb');
 end;
 
+function TACLStyleScrollBox.GetButtonDownSize(Kind: TScrollBarKind): Integer;
+begin
+  if Kind = sbHorizontal then
+    Result := TextureButtonsHorz.FrameWidth
+  else
+    Result := TextureButtonsVert.FrameHeight;
+end;
+
+function TACLStyleScrollBox.GetButtonUpSize(Kind: TScrollBarKind): Integer;
+begin
+  Result := GetButtonDownSize(Kind);
+end;
+
+function TACLStyleScrollBox.GetScrollBarSize(Kind: TScrollBarKind): Integer;
+begin
+  if Kind = sbHorizontal then
+    Result := TextureBackgroundHorz.FrameHeight
+  else
+    Result := TextureBackgroundVert.FrameWidth;
+end;
+
+function TACLStyleScrollBox.GetThumbExtends(Kind: TScrollBarKind): TRect;
+begin
+  Result := NullRect;
+end;
+
+function TACLStyleScrollBox.GetThumbNominalSize(Kind: TScrollBarKind): Integer;
+begin
+  if Kind = sbHorizontal then
+    Result := TextureThumbHorz.FrameWidth
+  else
+    Result := TextureThumbVert.FrameHeight;
+end;
+
 function TACLStyleScrollBox.GetTextureBackground(Kind: TScrollBarKind): TACLResourceTexture;
 begin
   if Kind = sbHorizontal then
@@ -409,7 +426,7 @@ end;
 { TACLScrollBarViewInfoItem }
 
 constructor TACLScrollBarViewInfoItem.Create(
-  AOwner: TACLScrollBarViewInfo; APart: TACLScrollBarPart);
+  AOwner: TACLScrollBarSubClass; APart: TACLScrollBarPart);
 begin
   inherited Create;
   FOwner := AOwner;
@@ -435,7 +452,7 @@ end;
 
 procedure TACLScrollBarViewInfoItem.InternalDraw(ACanvas: TCanvas; const R: TRect);
 begin
-  Owner.Owner.DrawPart(ACanvas, R, Part, State);
+  Owner.Style.DrawPart(ACanvas, R, Part, State, Owner.Kind);
 end;
 
 procedure TACLScrollBarViewInfoItem.UpdateState;
@@ -461,7 +478,7 @@ function TACLScrollBarViewInfoItem.GetDisplayBounds: TRect;
 begin
   Result := Bounds;
   if Part = sbpThumbnail then
-    Result.Inflate(Owner.Owner.GetThumbExtends);
+    Result.Inflate(Owner.Style.GetThumbExtends(Owner.Kind));
 end;
 
 procedure TACLScrollBarViewInfoItem.SetState(AState: TACLButtonState);
@@ -483,37 +500,41 @@ begin
   end;
 end;
 
-{ TACLScrollBarViewInfo }
+{ TACLScrollBarSubClass }
 
-constructor TACLScrollBarViewInfo.Create(AOwner: IACLScrollBar; AKind: TScrollBarKind);
+constructor TACLScrollBarSubClass.Create(AOwner: IACLScrollBar;
+  AStyle: IACLScrollBarAppearance; AKind: TScrollBarKind);
 begin
   inherited Create;
   FKind := AKind;
   FOwner := AOwner;
+  FStyle := AStyle;
   FSmallChange := 1;
+  FScrollInfo.Max := 100;
   FButtonDown := TACLScrollBarViewInfoItem.Create(Self, sbpLineDown);
   FThumbnail := TACLScrollBarViewInfoItem.Create(Self, sbpThumbnail);
   FButtonUp := TACLScrollBarViewInfoItem.Create(Self, sbpLineUp);
-  FScrollInfo.Max := 100;
+  FTimer := TACLTimer.CreateEx(ScrollTimerHandler, acScrollBarTimerInitialDelay, False);
 end;
 
-destructor TACLScrollBarViewInfo.Destroy;
+destructor TACLScrollBarSubClass.Destroy;
 begin
+  FreeAndNil(FTimer);
   FreeAndNil(FButtonDown);
   FreeAndNil(FThumbnail);
   FreeAndNil(FButtonUp);
   inherited Destroy;
 end;
 
-procedure TACLScrollBarViewInfo.Calculate(const ABounds: TRect);
+procedure TACLScrollBarSubClass.Calculate(const ABounds: TRect);
 begin
   FBounds := ABounds;
-  FThumbnailSize := Owner.GetThumbNominalSize;
+  FThumbnailSize := Style.GetThumbNominalSize(Kind);
   CalculateRects;
   CalculatePartStates;
 end;
 
-function TACLScrollBarViewInfo.CalculatePositionFromThumbnail(ATotal: Integer): Integer;
+function TACLScrollBarSubClass.CalculatePositionFromThumbnail(ATotal: Integer): Integer;
 begin
   if Kind = sbHorizontal then
     Result := MulDiv(ATotal, Thumbnail.Bounds.Left - ButtonUp.Bounds.Right,
@@ -523,47 +544,47 @@ begin
       ButtonDown.Bounds.Top - ButtonUp.Bounds.Bottom - Thumbnail.Bounds.Height);
 end;
 
-procedure TACLScrollBarViewInfo.CheckScrollBarSizes(var AWidth, AHeight: Integer);
+procedure TACLScrollBarSubClass.CheckScrollBarSizes(var AWidth, AHeight: Integer);
 begin
   if Kind = sbHorizontal then
-    AHeight := Owner.GetScrollBarSize
+    AHeight := Style.GetScrollBarSize(Kind)
   else
-    AWidth := Owner.GetScrollBarSize;
+    AWidth := Style.GetScrollBarSize(Kind);
 end;
 
-procedure TACLScrollBarViewInfo.CalculatePartStates;
+procedure TACLScrollBarSubClass.CalculatePartStates;
 begin
   ButtonDown.UpdateState;
   Thumbnail.UpdateState;
   ButtonUp.UpdateState;
 end;
 
-procedure TACLScrollBarViewInfo.CalculateRects;
+procedure TACLScrollBarSubClass.CalculateRects;
 begin
   ButtonDown.Bounds := CalculateButtonDownRect;
   ButtonUp.Bounds := CalculateButtonUpRect;
   Thumbnail.Bounds := CalculateThumbnailRect; // last
 end;
 
-function TACLScrollBarViewInfo.CalculateButtonDownRect: TRect;
+function TACLScrollBarSubClass.CalculateButtonDownRect: TRect;
 begin
   Result := Bounds;
   if Kind = sbHorizontal then
-    Result.Left := Result.Right - Owner.GetButtonDownSize
+    Result.Left := Result.Right - Style.GetButtonDownSize(Kind)
   else
-    Result.Top := Result.Bottom - Owner.GetButtonDownSize;
+    Result.Top := Result.Bottom - Style.GetButtonDownSize(Kind);
 end;
 
-function TACLScrollBarViewInfo.CalculateButtonUpRect: TRect;
+function TACLScrollBarSubClass.CalculateButtonUpRect: TRect;
 begin
   Result := Bounds;
   if Kind = sbHorizontal then
-    Result.Width := Owner.GetButtonUpSize
+    Result.Width := Style.GetButtonUpSize(Kind)
   else
-    Result.Height := Owner.GetButtonUpSize;
+    Result.Height := Style.GetButtonUpSize(Kind);
 end;
 
-function TACLScrollBarViewInfo.CalculateThumbnailRect: TRect;
+function TACLScrollBarSubClass.CalculateThumbnailRect: TRect;
 var
   ADelta, ASize, ATempValue: Integer;
 begin
@@ -575,7 +596,7 @@ begin
       ADelta := ButtonDown.Bounds.Left - ButtonUp.Bounds.Right;
       if ScrollInfo.Page = 0 then
       begin
-        ASize := Owner.GetThumbNominalSize;
+        ASize := Style.GetThumbNominalSize(Kind);
         if ASize > ADelta then Exit;
         Dec(ADelta, ASize);
         ATempValue := ButtonUp.Bounds.Right + ScrollInfo.CalculateProgressOffset(ADelta);
@@ -597,7 +618,7 @@ begin
       ADelta := ButtonDown.Bounds.Top - ButtonUp.Bounds.Bottom;
       if ScrollInfo.Page = 0 then
       begin
-        ASize := Owner.GetThumbNominalSize;
+        ASize := Style.GetThumbNominalSize(Kind);
         if ASize > ADelta then Exit;
         Dec(ADelta, ASize);
         ATempValue := ButtonUp.Bounds.Bottom + ScrollInfo.CalculateProgressOffset(ADelta);
@@ -617,127 +638,39 @@ begin
   end;
 end;
 
-procedure TACLScrollBarViewInfo.Draw(ACanvas: TCanvas);
+procedure TACLScrollBarSubClass.CancelDrag;
 begin
-  Owner.DrawBackground(ACanvas, Bounds);
+  if PressedPart <> sbpNone then
+  begin
+    FTimer.Enabled := False;
+    if PressedPart = sbpThumbnail then
+    begin
+      FScrollInfo.Position := GetPositionFromThumbnail;
+      Scroll(scPosition);
+    end;
+    UpdateParts(sbpNone, sbpNone);
+    Scroll(scEndScroll);
+    CalculateRects;
+    Invalidate(False);
+  end;
+end;
+
+procedure TACLScrollBarSubClass.Draw(ACanvas: TCanvas);
+begin
+  Style.DrawBackground(ACanvas, Bounds, Kind);
   ButtonUp.Draw(ACanvas);
   ButtonDown.Draw(ACanvas);
   Thumbnail.Draw(ACanvas);
 end;
 
-procedure TACLScrollBarViewInfo.Invalidate(AUpdateNow: Boolean);
+procedure TACLScrollBarSubClass.Invalidate(AUpdateNow: Boolean);
 begin
-  Owner.InvalidateRect(Bounds, AUpdateNow);
+  Owner.InvalidateRect(Bounds);
+  if AUpdateNow then
+    Owner.Update;
 end;
 
-function TACLScrollBarViewInfo.InternalSetScrollParams(AMin, AMax, APosition, APageSize: Integer): Boolean;
-begin
-  Result := (ScrollInfo.Min <> AMin) or (ScrollInfo.Max <> AMax) or
-    (ScrollInfo.Page <> APageSize) or (ScrollInfo.Position <> APosition);
-  FScrollInfo.Page := APageSize;
-  FScrollInfo.Min := AMin;
-  FScrollInfo.Max := AMax;
-end;
-
-function TACLScrollBarViewInfo.SetScrollParams(AMin, AMax, APosition, APageSize: Integer; ARedraw: Boolean = True): Boolean;
-begin
-  if not Owner.GetThumbIsResizable then
-  begin
-    if APageSize > 1 then
-      Dec(AMax, APageSize);
-    APageSize := 0;
-  end;
-  AMax := Max(AMax, AMin);
-  APageSize := Min(APageSize, AMax - AMin);
-
-  APosition := MinMax(APosition, AMin, AMax - APageSize + 1);
-  ARedraw := ARedraw and InternalSetScrollParams(AMin, AMax, APosition, APageSize);
-  Result := ScrollInfo.Position <> APosition;
-  FScrollInfo.Position := APosition;
-  Calculate(Bounds);
-
-  if ARedraw then
-    Invalidate(PressedPart = sbpThumbnail);
-end;
-
-procedure TACLScrollBarViewInfo.SetScrollParams(const AInfo: TScrollInfo; ARedraw: Boolean);
-begin
-  SetScrollParams(AInfo.nMin, AInfo.nMax, AInfo.nPos, AInfo.nPage, ARedraw);
-end;
-
-function TACLScrollBarViewInfo.HitTest(const P: TPoint): TACLScrollBarPart;
-begin
-  if PtInRect(Thumbnail.DisplayBounds, P) then // first
-    Result := sbpThumbnail
-  else
-
-  if PtInRect(ButtonUp.DisplayBounds, P) then
-    Result := sbpLineUp
-  else
-
-  if PtInRect(ButtonDown.DisplayBounds, P) then
-    Result := sbpLineDown
-  else
-
-  if PtInRect(PageUpRect, P) then
-    Result := sbpPageUp
-  else
-
-  if PtInRect(PageDownRect, P) then
-    Result := sbpPageDown
-  else
-    Result := sbpNone;
-end;
-
-procedure TACLScrollBarViewInfo.Tracking(X, Y: Integer; const ADownMousePos, ASaveThumbnailPos: TPoint);
-var
-  ADelta, ASize: Integer;
-begin
-  if not PtInRect(Bounds.InflateTo(acScrollBarHitArea), Point(X, Y)) then
-  begin
-    Thumbnail.Bounds.Location := ASaveThumbnailPos;
-    Exit;
-  end;
-
-  if Kind = sbHorizontal then
-  begin
-    ADelta := X - ADownMousePos.X;
-    if ADelta <> 0 then
-    begin
-      ASize := Thumbnail.Bounds.Width;
-      if (ADelta < 0) and (ASaveThumbnailPos.X + ADelta < ButtonUp.Bounds.Right) then
-        ADelta := ButtonUp.Bounds.Right - ASaveThumbnailPos.X;
-      if (ADelta > 0) and (ASaveThumbnailPos.X + ASize + ADelta > ButtonDown.Bounds.Left) then
-        ADelta := ButtonDown.Bounds.Left - (ASaveThumbnailPos.X + ASize);
-      Thumbnail.Bounds.Offset(-Thumbnail.Bounds.Left + ASaveThumbnailPos.X + ADelta, 0)
-    end
-  end
-  else
-  begin
-    ADelta := Y - ADownMousePos.Y;
-    if ADelta <> 0 then
-    begin
-      ASize := Thumbnail.Bounds.Height;
-      if (ADelta < 0) and (ASaveThumbnailPos.Y + ADelta < ButtonUp.Bounds.Bottom) then
-        ADelta := ButtonUp.Bounds.Bottom - ASaveThumbnailPos.Y;
-      if (ADelta > 0) and (ASaveThumbnailPos.Y + ASize + ADelta > ButtonDown.Bounds.Top) then
-        ADelta := ButtonDown.Bounds.Top - (ASaveThumbnailPos.Y + ASize);
-      Thumbnail.Bounds.Offset(0, -Thumbnail.Bounds.Top + ASaveThumbnailPos.Y + ADelta);
-    end;
-  end;
-end;
-
-procedure TACLScrollBarViewInfo.UpdateParts(AHotPart, APressedPart: TACLScrollBarPart);
-begin
-  if (AHotPart <> FHotPart) or (APressedPart <> FPressedPart) then
-  begin
-    FPressedPart := APressedPart;
-    FHotPart := AHotPart;
-    CalculatePartStates;
-  end;
-end;
-
-function TACLScrollBarViewInfo.GetPageDownRect: TRect;
+function TACLScrollBarSubClass.GetPageDownRect: TRect;
 begin
   if Thumbnail.Bounds.IsEmpty then
     Exit(NullRect);
@@ -747,7 +680,7 @@ begin
     Result := Rect(Bounds.Left, Thumbnail.Bounds.Bottom, Bounds.Right, ButtonDown.Bounds.Top);
 end;
 
-function TACLScrollBarViewInfo.GetPageUpRect: TRect;
+function TACLScrollBarSubClass.GetPageUpRect: TRect;
 begin
   if Thumbnail.Bounds.IsEmpty then
     Exit(NullRect);
@@ -757,44 +690,29 @@ begin
     Result := Rect(Bounds.Left, ButtonUp.Bounds.Bottom, Bounds.Right, Thumbnail.Bounds.Top);
 end;
 
-procedure TACLScrollBarViewInfo.SetHotPart(APart: TACLScrollBarPart);
+function TACLScrollBarSubClass.GetPositionFromThumbnail: Integer;
 begin
-  UpdateParts(APart, PressedPart);
+  Result := ScrollInfo.Min + CalculatePositionFromThumbnail(
+    ScrollInfo.Max - ScrollInfo.Min + IfThen(ScrollInfo.Page > 0, - ScrollInfo.Page + 1));
 end;
 
-{ TACLScrollBarController }
-
-constructor TACLScrollBarController.Create(AViewInfo: TACLScrollBarViewInfo);
+function TACLScrollBarSubClass.HitTest(const P: TPoint): TACLScrollBarPart;
 begin
-  inherited Create;
-  FViewInfo := AViewInfo;
-  FTimer := TACLTimer.CreateEx(ScrollTimerHandler, acScrollBarTimerInitialDelay, False);
+  if PtInRect(Thumbnail.DisplayBounds, P) then // first
+    Result := sbpThumbnail
+  else if PtInRect(ButtonUp.DisplayBounds, P) then
+    Result := sbpLineUp
+  else if PtInRect(ButtonDown.DisplayBounds, P) then
+    Result := sbpLineDown
+  else if PtInRect(PageUpRect, P) then
+    Result := sbpPageUp
+  else if PtInRect(PageDownRect, P) then
+    Result := sbpPageDown
+  else
+    Result := sbpNone;
 end;
 
-destructor TACLScrollBarController.Destroy;
-begin
-  FreeAndNil(FTimer);
-  inherited Destroy;
-end;
-
-procedure TACLScrollBarController.Cancel;
-begin
-  if ViewInfo.PressedPart <> sbpNone then
-  begin
-    FTimer.Enabled := False;
-    if ViewInfo.PressedPart = sbpThumbnail then
-    begin
-      ViewInfo.FScrollInfo.Position := GetPositionFromThumbnail;
-      Scroll(scPosition);
-    end;
-    ViewInfo.UpdateParts(sbpNone, sbpNone);
-    Scroll(scEndScroll);
-    ViewInfo.CalculateRects;
-    ViewInfo.Invalidate(False);
-  end;
-end;
-
-procedure TACLScrollBarController.MouseDown(AButton: TMouseButton; AShift: TShiftState; X, Y: Integer);
+procedure TACLScrollBarSubClass.MouseDown(AButton: TMouseButton; AShift: TShiftState; X, Y: Integer);
 var
   APart: TACLScrollBarPart;
 begin
@@ -806,21 +724,21 @@ begin
 
   if AButton = mbLeft then
   begin
-    APart := ViewInfo.HitTest(Point(X, Y));
+    APart := HitTest(Point(X, Y));
     if APart <> sbpNone then
     begin
       if APart = sbpThumbnail then
       begin
-        FDownMousePos := Point(X, Y);
-        FSaveThumbnailPos := ViewInfo.Thumbnail.Bounds.TopLeft;
+        FPressedMousePos := Point(X, Y);
+        FSaveThumbnailPos := Thumbnail.Bounds.TopLeft;
         Scroll(scTrack);
       end;
       if APart in SCROLL_BAR_TIMER_PARTS then
       begin
         if ssShift in AShift then
         begin
-          FSaveThumbnailPos := ViewInfo.Thumbnail.Bounds.TopLeft;
-          FDownMousePos := ViewInfo.Thumbnail.Bounds.CenterPoint;
+          FSaveThumbnailPos := Thumbnail.Bounds.TopLeft;
+          FPressedMousePos := Thumbnail.Bounds.CenterPoint;
           Scroll(scTrack);
           MouseThumbTracking(X, Y);
           APart := sbpThumbnail;
@@ -832,80 +750,126 @@ begin
           FTimer.Enabled := True;
         end;
       end;
-      ViewInfo.UpdateParts(APart, APart);
-      ViewInfo.Invalidate(True);
+      UpdateParts(APart, APart);
+      Invalidate(True);
     end;
   end;
 end;
 
-procedure TACLScrollBarController.MouseEnter;
+procedure TACLScrollBarSubClass.MouseEnter;
 begin
-  ViewInfo.Owner.InvalidateRect(ViewInfo.Bounds);
+  Invalidate(False);
 end;
 
-procedure TACLScrollBarController.MouseLeave;
+procedure TACLScrollBarSubClass.MouseLeave;
 begin
-  if ViewInfo.PressedPart <> sbpThumbnail then
-    ViewInfo.HotPart := sbpNone;
+  if PressedPart <> sbpThumbnail then
+    HotPart := sbpNone;
 end;
 
-procedure TACLScrollBarController.MouseMove(X, Y: Integer);
+procedure TACLScrollBarSubClass.MouseMove(X, Y: Integer);
 var
-  APart: TACLScrollBarPart;
+  LPart: TACLScrollBarPart;
 begin
-  if ViewInfo.PressedPart = sbpThumbnail then
+  if PressedPart = sbpThumbnail then
     MouseThumbTracking(X, Y)
   else
   begin
-    APart := ViewInfo.HitTest(Point(X, Y));
-    if ViewInfo.PressedPart <> sbpNone then
-      FTimer.Enabled := ViewInfo.PressedPart = APart;
-    ViewInfo.HotPart := APart;
+    LPart := HitTest(Point(X, Y));
+    if PressedPart <> sbpNone then
+      FTimer.Enabled := PressedPart = LPart;
+    HotPart := LPart;
   end;
 end;
 
-procedure TACLScrollBarController.MouseUp(AButton: TMouseButton; X, Y: Integer);
+procedure TACLScrollBarSubClass.MouseThumbTracking(X, Y: Integer);
+var
+  ADelta, ASize: Integer;
+  ANewPos: Integer;
 begin
-  Cancel;
-  ViewInfo.HotPart := ViewInfo.HitTest(Point(X, Y));
+  if PtInRect(Bounds.InflateTo(acScrollBarHitArea), Point(X, Y)) then
+  begin
+    if Kind = sbHorizontal then
+    begin
+      ADelta := X - FPressedMousePos.X;
+      if ADelta <> 0 then
+      begin
+        ASize := Thumbnail.Bounds.Width;
+        if (ADelta < 0) and (FSaveThumbnailPos.X + ADelta < ButtonUp.Bounds.Right) then
+          ADelta := ButtonUp.Bounds.Right - FSaveThumbnailPos.X;
+        if (ADelta > 0) and (FSaveThumbnailPos.X + ASize + ADelta > ButtonDown.Bounds.Left) then
+          ADelta := ButtonDown.Bounds.Left - (FSaveThumbnailPos.X + ASize);
+        Thumbnail.Bounds.Offset(-Thumbnail.Bounds.Left + FSaveThumbnailPos.X + ADelta, 0)
+      end
+    end
+    else
+    begin
+      ADelta := Y - FPressedMousePos.Y;
+      if ADelta <> 0 then
+      begin
+        ASize := Thumbnail.Bounds.Height;
+        if (ADelta < 0) and (FSaveThumbnailPos.Y + ADelta < ButtonUp.Bounds.Bottom) then
+          ADelta := ButtonUp.Bounds.Bottom - FSaveThumbnailPos.Y;
+        if (ADelta > 0) and (FSaveThumbnailPos.Y + ASize + ADelta > ButtonDown.Bounds.Top) then
+          ADelta := ButtonDown.Bounds.Top - (FSaveThumbnailPos.Y + ASize);
+        Thumbnail.Bounds.Offset(0, -Thumbnail.Bounds.Top + FSaveThumbnailPos.Y + ADelta);
+      end;
+    end;
+  end
+  else
+    Thumbnail.Bounds.Location := FSaveThumbnailPos;
+
+  ANewPos := GetPositionFromThumbnail;
+  if ANewPos <> ScrollInfo.Position then
+  begin
+    FScrollInfo.Position := ANewPos;
+    Scroll(sbpThumbnail);
+  end;
+  Invalidate(False);
 end;
 
-procedure TACLScrollBarController.Scroll(AScrollCode: TScrollCode);
+procedure TACLScrollBarSubClass.MouseUp(AButton: TMouseButton; X, Y: Integer);
+begin
+  CancelDrag;
+  HotPart := HitTest(Point(X, Y));
+end;
+
+procedure TACLScrollBarSubClass.Scroll(AScrollCode: TScrollCode);
 var
   ANewPos: Integer;
 begin
-  ANewPos := ViewInfo.ScrollInfo.Position;
+  ANewPos := ScrollInfo.Position;
   case AScrollCode of
     scLineUp:
-      Dec(ANewPos, ViewInfo.SmallChange);
+      Dec(ANewPos, SmallChange);
     scLineDown:
-      Inc(ANewPos, ViewInfo.SmallChange);
+      Inc(ANewPos, SmallChange);
     scPageUp:
-      Dec(ANewPos, {System.}Math.Max(ViewInfo.SmallChange, ViewInfo.ScrollInfo.Page));
+      Dec(ANewPos, {System.}Math.Max(SmallChange, ScrollInfo.Page));
     scPageDown:
-      Inc(ANewPos, {System.}Math.Max(ViewInfo.SmallChange, ViewInfo.ScrollInfo.Page));
+      Inc(ANewPos, {System.}Math.Max(SmallChange, ScrollInfo.Page));
     scTop:
-      ANewPos := ViewInfo.ScrollInfo.Min;
+      ANewPos := ScrollInfo.Min;
     scBottom:
-      ANewPos := ViewInfo.ScrollInfo.Max;
+      ANewPos := ScrollInfo.Max;
   else;
   end;
-  ANewPos := MinMax(ANewPos, ViewInfo.ScrollInfo.Min, ViewInfo.ScrollInfo.Max);
-  ViewInfo.Owner.Scroll(AScrollCode, ANewPos);
-  ANewPos := MinMax(ANewPos, ViewInfo.ScrollInfo.Min, ViewInfo.ScrollInfo.Max);
-  if ANewPos <> ViewInfo.ScrollInfo.Position then
+  ANewPos := MinMax(ANewPos, ScrollInfo.Min, ScrollInfo.Max);
+  Owner.Scroll(AScrollCode, ANewPos);
+  ANewPos := MinMax(ANewPos, ScrollInfo.Min, ScrollInfo.Max);
+  if ANewPos <> ScrollInfo.Position then
   begin
     if AScrollCode = scTrack then
     begin
-      ViewInfo.FScrollInfo.Position := ANewPos;
-      ViewInfo.Invalidate(False);
+      FScrollInfo.Position := ANewPos;
+      Invalidate(False);
     end
     else
-      ViewInfo.SetScrollParams(ViewInfo.ScrollInfo.Min, ViewInfo.ScrollInfo.Max, ANewPos, ViewInfo.ScrollInfo.Page);
+      SetScrollParams(ScrollInfo.Min, ScrollInfo.Max, ANewPos, ScrollInfo.Page);
   end;
 end;
 
-procedure TACLScrollBarController.Scroll(AScrollPart: TACLScrollBarPart);
+procedure TACLScrollBarSubClass.Scroll(AScrollPart: TACLScrollBarPart);
 const
   ScrollCodeMap: array[TACLScrollBarPart] of TScrollCode = (
     scLineUp, scLineUp, scLineDown, scTrack, scPageUp, scPageDown
@@ -915,38 +879,62 @@ begin
     Scroll(ScrollCodeMap[AScrollPart]);
 end;
 
-procedure TACLScrollBarController.MouseThumbTracking(X, Y: Integer);
-var
-  ANewPos: Integer;
+function TACLScrollBarSubClass.SetScrollParams(
+  AMin, AMax, APosition, APageSize: Integer; ARedraw: Boolean = True): Boolean;
 begin
-  ViewInfo.Tracking(X, Y, FDownMousePos, FSaveThumbnailPos);
-  ANewPos := GetPositionFromThumbnail;
-  if ANewPos <> ViewInfo.ScrollInfo.Position then
+  if not Style.IsThumbResizable(Kind) then
   begin
-    ViewInfo.FScrollInfo.Position := ANewPos;
-    Scroll(sbpThumbnail);
+    if APageSize > 1 then
+      Dec(AMax, APageSize);
+    APageSize := 0;
   end;
-  ViewInfo.Invalidate(False);
+  AMax := Max(AMax, AMin);
+  APageSize := Min(APageSize, AMax - AMin);
+
+  APosition := MinMax(APosition, AMin, AMax - APageSize + 1);
+  if (ScrollInfo.Min = AMin) and (ScrollInfo.Max = AMax) and
+     (ScrollInfo.Page = APageSize) and (ScrollInfo.Position = APosition)
+  then
+    ARedraw := False;
+
+  FScrollInfo.Page := APageSize;
+  FScrollInfo.Min := AMin;
+  FScrollInfo.Max := AMax;
+
+  Result := ScrollInfo.Position <> APosition;
+  FScrollInfo.Position := APosition;
+  Calculate(Bounds);
+
+  if ARedraw then
+    Invalidate(PressedPart = sbpThumbnail);
 end;
 
-procedure TACLScrollBarController.ScrollTimerHandler(ASender: TObject);
+procedure TACLScrollBarSubClass.UpdateParts(AHotPart, APressedPart: TACLScrollBarPart);
 begin
-  if ViewInfo.Owner.IsMouseCaptured and (ViewInfo.PressedPart in SCROLL_BAR_TIMER_PARTS) then
+  if (AHotPart <> FHotPart) or (APressedPart <> FPressedPart) then
+  begin
+    FPressedPart := APressedPart;
+    FHotPart := AHotPart;
+    CalculatePartStates;
+  end;
+end;
+
+procedure TACLScrollBarSubClass.ScrollTimerHandler(ASender: TObject);
+begin
+  if PressedPart in SCROLL_BAR_TIMER_PARTS then
   begin
     FTimer.Interval := acScrollBarTimerScrollInterval;
-    FTimer.Enabled := ViewInfo.HitTest(ViewInfo.Owner.CalcCursorPos) = ViewInfo.PressedPart;
+    FTimer.Enabled := HitTest(Owner.ScreenToClient(MouseCursorPos)) = PressedPart;
     if FTimer.Enabled then
-      Scroll(ViewInfo.PressedPart);
+      Scroll(PressedPart);
   end
   else
-    Cancel;
+    CancelDrag;
 end;
 
-function TACLScrollBarController.GetPositionFromThumbnail: Integer;
+procedure TACLScrollBarSubClass.SetHotPart(APart: TACLScrollBarPart);
 begin
-  Result := ViewInfo.ScrollInfo.Min + ViewInfo.CalculatePositionFromThumbnail(
-    ViewInfo.ScrollInfo.Max - ViewInfo.ScrollInfo.Min +
-    IfThen(ViewInfo.ScrollInfo.Page > 0, - ViewInfo.ScrollInfo.Page + 1));
+  UpdateParts(APart, PressedPart);
 end;
 
 { TACLScrollBar }
@@ -955,76 +943,50 @@ constructor TACLScrollBar.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   ControlStyle := [csOpaque, csCaptureMouse];
-  FKind := sbHorizontal;
-  FViewInfo := TACLScrollBarViewInfo.Create(Self, Kind);
-  FController := TACLScrollBarController.Create(ViewInfo);
   FStyle := TACLStyleScrollBox.Create(Self);
+  FSubClass := TACLScrollBarSubClass.Create(Self, Style, sbHorizontal);
 end;
 
 destructor TACLScrollBar.Destroy;
 begin
+  FreeAndNil(FSubClass);
   FreeAndNil(FStyle);
-  FreeAndNil(FViewInfo);
-  FreeAndNil(FController);
   inherited Destroy;
-end;
-
-procedure TACLScrollBar.DrawPart(ACanvas: TCanvas;
-  const R: TRect; APart: TACLScrollBarPart; AState: TACLButtonState);
-begin
-  Style.DrawPart(ACanvas, R, APart, AState, Kind);
 end;
 
 procedure TACLScrollBar.Paint;
 begin
-  ViewInfo.Draw(Canvas);
-end;
-
-procedure TACLScrollBar.InvalidateRect(const R: TRect; AUpdateNow: Boolean = False);
-begin
-  inherited InvalidateRect(R);
-  if AUpdateNow then
-    Update;
-end;
-
-function TACLScrollBar.IsMouseCaptured: Boolean;
-begin
-  Result := GetCaptureControl = Self;
+  SubClass.Draw(Canvas);
 end;
 
 procedure TACLScrollBar.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   inherited MouseDown(Button, Shift, X, Y);
-  Controller.MouseDown(Button, Shift, X, Y);
+  SubClass.MouseDown(Button, Shift, X, Y);
 end;
 
 procedure TACLScrollBar.MouseEnter;
 begin
   inherited MouseEnter;
-  Controller.MouseEnter;
+  SubClass.MouseEnter;
 end;
 
 procedure TACLScrollBar.MouseLeave;
 begin
-  Controller.MouseLeave;
+  SubClass.MouseLeave;
   inherited MouseLeave;
 end;
 
 procedure TACLScrollBar.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
   inherited MouseMove(Shift, X, Y);
-  Controller.MouseMove(X, Y);
+  SubClass.MouseMove(X, Y);
 end;
 
 procedure TACLScrollBar.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   inherited MouseUp(Button, Shift, X, Y);
-  Controller.MouseUp(Button, X, Y);
-end;
-
-procedure TACLScrollBar.DrawBackground(ACanvas: TCanvas; const R: TRect);
-begin
-  Style.DrawBackground(ACanvas, R, Kind);
+  SubClass.MouseUp(Button, X, Y);
 end;
 
 procedure TACLScrollBar.Scroll(ScrollCode: TScrollCode; var ScrollPos: Integer);
@@ -1034,34 +996,32 @@ end;
 
 procedure TACLScrollBar.CMCancelMode(var Message: TCMCancelMode);
 begin
-  Controller.Cancel;
+  SubClass.CancelDrag;
   inherited;
 end;
 
 procedure TACLScrollBar.CMEnabledChanged(var Message: TMessage);
 begin
   inherited;
-  ViewInfo.Calculate(ClientRect);
-  if not Enabled then
-    Controller.Cancel;
+  SubClass.CancelDrag;
+  SubClass.Calculate(ClientRect);
   Invalidate;
 end;
 
 procedure TACLScrollBar.CNHScroll(var Message: TWMHScroll);
 begin
-  Controller.Scroll(TScrollCode(Message.ScrollCode));
+  SubClass.Scroll(TScrollCode(Message.ScrollCode));
 end;
 
 procedure TACLScrollBar.CMVisibleChanged(var Message: TMessage);
 begin
-  if not Visible then
-    Controller.Cancel;
+  SubClass.CancelDrag;
   inherited;
 end;
 
 procedure TACLScrollBar.CNVScroll(var Message: TWMVScroll);
 begin
-  Controller.Scroll(TScrollCode(Message.ScrollCode));
+  SubClass.Scroll(TScrollCode(Message.ScrollCode));
 end;
 
 procedure TACLScrollBar.WMEraseBkgnd(var Message: TWMEraseBkgnd);
@@ -1085,63 +1045,24 @@ begin
   Result := acUIFadingEnabled;
 end;
 
-function TACLScrollBar.CalcCursorPos: TPoint;
+function TACLScrollBar.GetKind: TScrollBarKind;
 begin
-  Result := ScreenToClient(Mouse.CursorPos);
-end;
-
-function TACLScrollBar.GetButtonDownSize: Integer;
-begin
-  Result := GetButtonUpSize;
-end;
-
-function TACLScrollBar.GetButtonUpSize: Integer;
-begin
-  if Kind = sbHorizontal then
-    Result := Style.TextureButtonsHorz.FrameWidth
-  else
-    Result := Style.TextureButtonsVert.FrameHeight;
-end;
-
-function TACLScrollBar.GetScrollBarSize: Integer;
-begin
-  if Kind = sbHorizontal then
-    Result := Style.TextureBackgroundHorz.FrameHeight
-  else
-    Result := Style.TextureBackgroundVert.FrameWidth;
+  Result := SubClass.Kind;
 end;
 
 function TACLScrollBar.GetScrollInfo: TACLScrollInfo;
 begin
-  Result := ViewInfo.ScrollInfo;
+  Result := SubClass.ScrollInfo;
 end;
 
 function TACLScrollBar.GetSmallChange: Word;
 begin
-  Result := ViewInfo.SmallChange;
-end;
-
-function TACLScrollBar.GetThumbNominalSize: Integer;
-begin
-  if Kind = sbHorizontal then
-    Result := Style.TextureThumbHorz.FrameWidth
-  else
-    Result := Style.TextureThumbVert.FrameHeight;
-end;
-
-function TACLScrollBar.GetThumbIsResizable: Boolean;
-begin
-  Result := Style.IsThumbResizable(Kind);
-end;
-
-function TACLScrollBar.GetThumbExtends: TRect;
-begin
-  Result := NullRect;
+  Result := SubClass.SmallChange;
 end;
 
 procedure TACLScrollBar.SetScrollParams(AMin, AMax, APosition, APageSize: Integer; ARedraw: Boolean = True);
 begin
-  ViewInfo.SetScrollParams(AMin, AMax, APosition, APageSize, ARedraw);
+  SubClass.SetScrollParams(AMin, AMax, APosition, APageSize, ARedraw);
 end;
 
 procedure TACLScrollBar.SetScrollParams(const AInfo: TScrollInfo; ARedraw: Boolean = True);
@@ -1151,15 +1072,14 @@ end;
 
 procedure TACLScrollBar.SetSmallChange(AValue: Word);
 begin
-  ViewInfo.SmallChange := Max(AValue, 1);
+  SubClass.SmallChange := Max(AValue, 1);
 end;
 
 procedure TACLScrollBar.SetKind(Value: TScrollBarKind);
 begin
-  if FKind <> Value then
+  if Kind <> Value then
   begin
-    FKind := Value;
-    ViewInfo.FKind := Value;
+    SubClass.Kind := Value;
     UpdateTransparency;
     AdjustSize;
     Invalidate;
@@ -1169,9 +1089,9 @@ end;
 procedure TACLScrollBar.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
 begin
   if not (csLoading in ComponentState) then
-    ViewInfo.CheckScrollBarSizes(AWidth, AHeight);
+    SubClass.CheckScrollBarSizes(AWidth, AHeight);
   inherited SetBounds(ALeft, ATop, AWidth, AHeight);
-  ViewInfo.Calculate(ClientRect);
+  SubClass.Calculate(ClientRect);
 end;
 
 procedure TACLScrollBar.SetStyle(const Value: TACLStyleScrollBox);

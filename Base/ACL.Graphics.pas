@@ -565,6 +565,7 @@ procedure acApplyColorSchema(AObject: TObject; const AColorSchema: TACLColorSche
 procedure acBuildColorPalette(ATargetList: TACLColorList; ABaseColor: TColor);
 function acGetActualColor(AColor, ADefaultColor: TAlphaColor): TAlphaColor; overload;
 function acGetActualColor(AColor, ADefaultColor: TColor): TColor; overload;
+function acGetActualColor(AFont: TFont; ADefaultColor: TColor = clBlack): TColor; overload;
 function ColorToString(AColor: TColor): string;
 function StringToColor(AColor: string): TColor;
 
@@ -627,8 +628,10 @@ uses
   ACL.Utils.DPIAware,
   ACL.Utils.Strings;
 
-{$IFNDEF FPC}
 type
+{$IFDEF FPC}
+  TFontAccess = class(TFont);
+{$ELSE}
   TBitmapAccess = class(TBitmap);
   TBitmapImageAccess = class(TBitmapImage);
 {$ENDIF}
@@ -684,6 +687,17 @@ begin
     Result := ADefaultColor
   else
     Result := AColor;
+end;
+
+function acGetActualColor(AFont: TFont; ADefaultColor: TColor): TColor;
+begin
+{$IFDEF FPC}
+  Result := TFontAccess(AFont).GetColor;
+{$ELSE}
+  Result := AFont.Color;
+{$ENDIF}
+  if Result = clDefault then
+    Result := ADefaultColor;
 end;
 
 function ColorToString(AColor: TColor): string;

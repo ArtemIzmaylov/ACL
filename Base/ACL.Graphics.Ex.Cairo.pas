@@ -180,7 +180,6 @@ const
   CairoTextStyleLines = [fsUnderline, fsStrikeOut];
 
 type
-  TFontAccess = class(TFont);
   TTextBlock = class(TACLTextLayoutBlockText);
 
   PCairoGlyphArray = ^TCairoGlyphArray;
@@ -515,7 +514,7 @@ end;
 
 class function TCairoColor.From(Font: TFont): TCairoColor;
 begin
-  Result := From(TFontAccess(Font).GetColor);
+  Result := From(acGetActualColor(Font));
 end;
 {$ENDREGION}
 

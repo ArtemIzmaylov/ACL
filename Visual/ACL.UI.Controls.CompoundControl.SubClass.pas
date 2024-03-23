@@ -182,7 +182,7 @@ type
   ['{BE88934C-23DB-4747-A804-54F883394E45}']
     function GetSelected: Boolean;
     procedure SetSelected(AValue: Boolean);
-    //
+    //# Selection
     property Selected: Boolean read GetSelected write SetSelected;
   end;
 
@@ -192,15 +192,11 @@ type
   ['{3A39F1D5-E2FA-4DAC-98C7-067C97DDF79E}']
     function CanFocus: Boolean;
     function GetControl: TWinControl;
-    function GetEnabled: Boolean;
     function GetFocused: Boolean;
     function GetFont: TFont;
     function GetMouseCapture: Boolean;
     procedure SetFocus;
     procedure SetMouseCapture(const AValue: Boolean);
-    //
-    function ClientToScreen(const P: TPoint): TPoint;
-    function ScreenToClient(const P: TPoint): TPoint;
     procedure UpdateCursor;
   end;
 
@@ -1426,14 +1422,14 @@ begin
   begin
     FDropSourceObject := ASourceObject;
     FDropSourceOperation := ASource;
-
-    {$MESSAGE WARN 'NotImplemented'}
   {$IFDEF MSWINDOWS}
     ADropSource := TACLDropSource.Create(TACLDropSourceOwnerProxy.Create(Self));
     ADropSource.AllowedActions := AActions;
     ADropSource.DataProviders.Add(TACLDragDropDataProviderConfig.Create(DropSourceConfig));
     SubClass.DoDropSourceGetData(ADropSource, DropSourceConfig);
     ADropSource.ExecuteInThread;
+  {$ELSE}
+    {$MESSAGE WARN 'NotImplemented'}
   {$ENDIF}
   end;
 end;

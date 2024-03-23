@@ -121,8 +121,13 @@ type
 
   IACLControl = interface(IACLCurrentDPI)
   ['{D41EBD0F-D2EE-4517-AD7E-EEE8FC0ACFD4}']
+    function GetEnabled: Boolean;
+
     procedure InvalidateRect(const R: TRect);
     procedure Update;
+
+    function ClientToScreen(const P: TPoint): TPoint;
+    function ScreenToClient(const P: TPoint): TPoint;
   end;
 
   { IACLFocusableControl }
@@ -662,7 +667,6 @@ type
   strict private
     class procedure WMSetCursor(ACaller: TWinControl; var Message: TWMSetCursor);
   public
-    class var MenuLoopCount: Integer;
     // Scaling
     class procedure ScaleChanging(AControl: TWinControl; var AState: TObject);
     class procedure ScaleChanged(AControl: TWinControl; var AState: TObject);
@@ -1394,7 +1398,7 @@ begin
   if ACaller.HandleAllocated and (Message.CursorWnd = ACaller.Handle) then
   begin
     ACursor := Screen.Cursor;
-    if (ACursor = crDefault) and (MenuLoopCount = 0) then
+    if ACursor = crDefault then
     begin
       AControl := GetCaptureControl;
       if AControl = nil then
