@@ -214,7 +214,6 @@ type
     FlashTimerId = 42;
   strict private
     FTimestamp: Cardinal;
-    procedure SetAlpha(AValue: Byte);
     procedure WMTimer(var Message: TWMTimer); message WM_TIMER;
   protected
     procedure CreateParams(var Params: TCreateParams); override;
@@ -593,15 +592,16 @@ end;
 procedure TACLUIInsightHighlightWindow.CreateParams(var Params: TCreateParams);
 begin
   inherited;
-  Params.ExStyle := WS_EX_TOPMOST or WS_EX_LAYERED;
+  Params.ExStyle := Params.ExStyle or WS_EX_TOPMOST;
   Params.WindowClass.style := Params.WindowClass.style and not CS_DROPSHADOW;
 end;
 
 procedure TACLUIInsightHighlightWindow.DoPopup;
 begin
+  AlphaBlend := True;
   Color := clRed;
   FTimestamp := GetTickCount;
-  SetAlpha(Alpha);
+  AlphaBlendValue := Alpha;
   SetTimer(Handle, FlashTimerId, GetCaretBlinkTime, nil);
   inherited;
 end;
@@ -618,18 +618,12 @@ begin
     ClosePopup;
 end;
 
-procedure TACLUIInsightHighlightWindow.SetAlpha(AValue: Byte);
-begin
-  if Assigned(SetLayeredWindowAttributes) then
-    SetLayeredWindowAttributes(Handle, 0, AValue, LWA_ALPHA);
-end;
-
 procedure TACLUIInsightHighlightWindow.WMTimer(var Message: TWMTimer);
 begin
   if Message.TimerID = FlashTimerId then
   begin
     Tag := (Tag + 1) mod 2;
-    SetAlpha(MulDiv(Tag + 1, Alpha, 2));
+    AlphaBlendValue := MulDiv(Tag + 1, Alpha, 2);
   end
   else
     inherited;
