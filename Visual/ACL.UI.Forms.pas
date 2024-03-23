@@ -768,7 +768,7 @@ begin
 
       Position := poDesigned;
       DefaultMonitor := dmDesktop;
-      if not BoundsRect.Contains(MonitorGetBounds(BoundsRect.TopLeft)) then
+      if not MonitorGetBounds(BoundsRect.TopLeft).Contains(BoundsRect) then
         MakeFullyVisible;
     end;
 
