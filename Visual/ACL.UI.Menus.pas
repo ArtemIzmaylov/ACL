@@ -11,10 +11,7 @@
 
 unit ACL.UI.Menus;
 
-{$I ACL.Config.inc} // FPC:Partical
-
-// FPC: (MainMenu)
-// DrawSeparator
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
@@ -29,9 +26,9 @@ uses
   Winapi.CommCtrl,
   Winapi.Messages,
   Winapi.MMSystem,
+  Winapi.OleAcc,
   Winapi.ShellApi,
   Winapi.Windows,
-  Winapi.OleAcc,
 {$ENDIF}
   // System
   {System.}Classes,
@@ -207,7 +204,6 @@ type
     procedure DoDrawImage(ACanvas: TCanvas; const ARect: TRect;
       AImages: TCustomImageList; AImageIndex: Integer;
       AEnabled, ASelected: Boolean); virtual;
-    procedure DoDrawText(ACanvas: TCanvas; ARect: TRect; const S: string); virtual;
     function GetTextIdent: Integer; inline;
     procedure InitializeResources; override;
   public
@@ -217,6 +213,7 @@ type
     procedure DrawBackground(ACanvas: TCanvas; const R: TRect; ASelected: Boolean); virtual;
     procedure DrawItemImage(ACanvas: TCanvas;
       ARect: TRect; AItem: TMenuItem; ASelected: Boolean); virtual;
+    procedure DrawText(ACanvas: TCanvas; ARect: TRect; const AText: string); virtual;
     function MeasureWidth(ACanvas: TCanvas; const S: string;
       AShortCut: TShortCut = scNone; ADefault: Boolean = False): Integer; virtual;
     property ItemHeight: Integer read GetItemHeight;
@@ -332,8 +329,9 @@ type
     FAllowTextFormatting: Boolean;
   protected
     procedure DoAssign(Source: TPersistent); override;
-    procedure DoDrawText(ACanvas: TCanvas; R: TRect; const S: string); override;
     procedure DoReset; override;
+  public
+    procedure DrawText(ACanvas: TCanvas; ARect: TRect; const AText: string); override;
   published
     property AllowTextFormatting: Boolean read
       FAllowTextFormatting write FAllowTextFormatting default False;
@@ -592,7 +590,6 @@ type
 
   TACLMainMenu = class(TACLMenuWindow, IACLLocalizableComponent)
   strict private
-    FCancelMenu: Boolean;
     FMenu: TACLPopupMenu;
     FPopupOnSelect: Boolean;
     FPopupWnd: TACLMenuPopupWindow;
@@ -629,7 +626,9 @@ type
     procedure CMMenuClicked(var Message: TMessage); message CM_MENUCLICKED;
     procedure CMMenuSelected(var Message: TMessage); message CM_MENUSELECTED;
     procedure WMGetDlgCode(var Message: TWMGetDlgCode); message WM_GETDLGCODE;
-    procedure WndProc(var Message: TMessage); override;
+  {$IFNDEF FPC}
+    procedure WMSysCommand(var Message: TWMSysCommand); message WM_SYSCOMMAND;
+  {$ENDIF}
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -1126,11 +1125,6 @@ begin
   acDrawImage(ACanvas, ARect, AImages, AImageIndex, AEnabled);
 end;
 
-procedure TACLStyleMenu.DoDrawText(ACanvas: TCanvas; ARect: TRect; const S: string);
-begin
-  acSysDrawText(ACanvas, ARect, S, DT_LEFT or DT_SINGLELINE or DT_VCENTER);
-end;
-
 procedure TACLStyleMenu.DrawBackground(ACanvas: TCanvas; const R: TRect; ASelected: Boolean);
 begin
   if ASelected then
@@ -1191,6 +1185,11 @@ begin
   finally
     acRestoreClipRegion(ACanvas.Handle, AClipRegion);
   end;
+end;
+
+procedure TACLStyleMenu.DrawText(ACanvas: TCanvas; ARect: TRect; const AText: string);
+begin
+  acSysDrawText(ACanvas, ARect, AText, DT_SINGLELINE or DT_VCENTER);
 end;
 
 function TACLStyleMenu.GetItemHeight: Integer;
@@ -1372,7 +1371,7 @@ begin
   Inc(R.Left, ItemGutterWidth);
   R.Inflate(-GetTextIdent, 0);
   AssignFontParams(ACanvas, ASelected, AIsDefault, AEnabled);
-  DoDrawText(ACanvas, R, S);
+  DrawText(ACanvas, R, S);
   if AHasSubItems then
     acDrawArrow(ACanvas, R.Split(srRight, R.Height), acGetActualColor(ACanvas.Font), makRight, TargetDPI)
   else
@@ -1447,12 +1446,12 @@ begin
     AllowTextFormatting := TACLPopupMenuStyle(Source).AllowTextFormatting;
 end;
 
-procedure TACLPopupMenuStyle.DoDrawText(ACanvas: TCanvas; R: TRect; const S: string);
+procedure TACLPopupMenuStyle.DrawText(ACanvas: TCanvas; ARect: TRect; const AText: string);
 begin
   if AllowTextFormatting then
-    acDrawFormattedText(ACanvas, StripHotkey(S), R, taLeftJustify, taVerticalCenter, False)
+    acDrawFormattedText(ACanvas, StripHotkey(AText), ARect, taLeftJustify, taVerticalCenter, False)
   else
-    inherited DoDrawText(ACanvas, R, S);
+    inherited;
 end;
 
 procedure TACLPopupMenuStyle.DoReset;
@@ -1973,8 +1972,15 @@ begin
   end;
   if FScrollBar <> nil then
     Inc(Result.cx, FScrollBar.Bounds.Width);
-  Inc(Result.cx, FPadding.MarginsWidth);
-  Inc(Result.cy, FPadding.MarginsHeight);
+  if not Result.IsEmpty then
+  begin
+    Inc(Result.cx, FPadding.MarginsWidth);
+    Inc(Result.cy, FPadding.MarginsHeight);
+  end;
+{$IFDEF FPC}
+  if Result.IsEmpty then
+    Result.cy := 1; // null-size = default-size
+{$ENDIF}
 end;
 
 procedure TACLMenuPopupWindow.CalculateBounds;
@@ -2801,8 +2807,17 @@ end;
 
 procedure TACLMainMenu.CheckShortCut(var Msg: TWMKey; var Handled: Boolean);
 begin
-  if (Menu <> nil) and Menu.IsShortCut(Msg) then
+  if (Msg.CharCode = VK_F10) and (KeyDataToShiftState(Msg.KeyData) = []) then
+  begin
     Handled := True;
+    if FPopupWnd <> nil then
+      FPopupWnd.Looper.CloseMenu
+    else
+      SelectItem(0, ccatKeyboard);
+  end
+  else
+    if (Menu <> nil) and Menu.IsShortCut(Msg) then
+      Handled := True;
 end;
 
 procedure TACLMainMenu.CMExit(var Message: TMessage);
@@ -2816,41 +2831,44 @@ end;
 
 procedure TACLMainMenu.CMMenuClicked(var Message: TMessage);
 var
-  LItem: TItemInfo;
+  LSelected: TItemInfo;
   LUpdateSelection: Boolean;
 begin
+  LSelected := SelectedItemInfo;
   if FPopupWnd <> nil then
   begin
+    if FPopupWnd.SourceItem = LSelected then
+      Exit;
     FPopupOnSelect := True;
     FPopupWnd.Looper.CloseMenu;
-    PostMessage(Handle, Message.Msg, Message.WParam, Message.LParam);
-  end
-  else
+    Exit;
+  end;
+
+  if LSelected = nil then
   begin
-    LItem := SelectedItemInfo;
-    if LItem = nil then
+    FPopupOnSelect := False;
+    Exit;
+  end;
+
+  if FPopupOnSelect or HasSubItems(LSelected.Item) then
+  begin
+    FPopupWnd := TACLMenuPopupWindow.Create(Self, Menu, LSelected);
+    try
+      FPopupWnd.Popup(NullRect);
+      LUpdateSelection := FPopupWnd.SourceItem = SelectedItemInfo;
+    finally
+      FreeAndNil(FPopupWnd);
+    end;
+    if LUpdateSelection then
     begin
       FPopupOnSelect := False;
-      Exit;
+      UpdateMouseMove;
     end;
-    if HasSubItems(LItem.Item) then
-    begin
-      FPopupWnd := TACLMenuPopupWindow.Create(Self, Menu, LItem);
-      try
-        FPopupWnd.Popup(NullRect);
-        LUpdateSelection := FPopupWnd.SourceItem = SelectedItemInfo;
-      finally
-        FreeAndNil(FPopupWnd);
-      end;
-      if LUpdateSelection then
-      begin
-        FPopupOnSelect := False;
-        UpdateMouseMove;
-      end;
-    end
-    else
-      Menu.DoSelect(LItem.Item);
-  end;
+    if FPopupOnSelect then
+      PostMessage(Handle, Message.Msg, Message.WParam, Message.LParam);
+  end
+  else
+    Menu.DoSelect(LSelected.Item);
 end;
 
 procedure TACLMainMenu.CMMenuSelected(var Message: TMessage);
@@ -2933,7 +2951,7 @@ begin
       LRect.Left := LImageRect.Right + dpiApply(acTextIndent, FCurrentPPI);
     end;
     Style.AssignFontParams(Canvas, ASelected, AItem.Item.Default, AItem.Item.Enabled);
-    Style.DoDrawText(Canvas, LRect, AItem.Item.Caption);
+    Style.DrawText(Canvas, LRect, AItem.Item.Caption);
   end
   else
     Style.DrawItemImage(Canvas, LRect, AItem.Item, ASelected);
@@ -3005,39 +3023,30 @@ begin
   Message.Result := DLGC_WANTARROWS or DLGC_WANTALLKEYS;
 end;
 
-procedure TACLMainMenu.WndProc(var Message: TMessage);
+{$IFNDEF FPC}
+procedure TACLMainMenu.WMSysCommand(var Message: TWMSysCommand);
 begin
-  case Message.Msg of
-    WM_SYSKEYUP, WM_SYSKEYDOWN:
-      FCancelMenu := TWMKey(Message).CharCode = VK_MENU;
-  {$IFDEF MSWINDOWS}
-    WM_SYSCOMMAND:
-      if (GetParentForm(Self) = Screen.FocusedForm) and
-         (Application.ModalLevel = 0) and Enabled and Showing then
-      begin
-        if (TWMSysCommand(Message).CmdType and $FFF0 = SC_KEYMENU) and
-           (TWMSysCommand(Message).Key <> VK_SPACE) and
-           (TWMSysCommand(Message).Key <> Word('-')) and
-           (GetCapture = 0)
-        then
-        begin
-          if TWMSysCommand(Message).Key <> 0 then
-            KeyChar(TWMSysCommand(Message).Key)
-          else
-            if not FCancelMenu then
-              SelectItem(0, ccatKeyboard);
+  if (GetParentForm(Self) = Screen.FocusedForm) and
+     (Application.ModalLevel = 0) and Enabled and Showing then
+  begin
+    if (TWMSysCommand(Message).CmdType and $FFF0 = SC_KEYMENU) and
+       (TWMSysCommand(Message).Key <> VK_SPACE) and
+       (TWMSysCommand(Message).Key <> Word('-')) and
+       (GetCapture = 0) then
+    begin
+      if TWMSysCommand(Message).Key <> 0 then
+        KeyChar(TWMSysCommand(Message).Key)
+      else
+        SelectItem(0, ccatKeyboard);
 
-          FCancelMenu := False;
-          Message.Result := 1;
-          Exit;
-        end;
-      end;
-  {$ELSE}
-    {$MESSAGE WARN 'NotImplemented'}
-  {$ENDIF}
+      Message.Result := 1;
+      Exit;
+    end;
   end;
   inherited;
 end;
+{$ENDIF}
+
 {$ENDREGION}
 
 {$REGION ' Looper Implementation '}
