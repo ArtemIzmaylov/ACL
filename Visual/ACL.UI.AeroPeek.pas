@@ -194,14 +194,16 @@ uses
   ACL.Utils.Desktop;
 
 const
+  sThumbButtonsAlreadyCreated = 'You cannot add or remove thumb buttons after aero peek initialization';
+
+{$IFNDEF FPC}
+const
   CLSID_CustomDestinationList: TGUID = '{77f10cf0-3db5-4966-b520-b7c54fd35ed6}';
   CLSID_TaskbarList: TGUID = '{56fdf344-fd6d-11d0-958a-006097c9a090}';
 
-const
-  sThumbButtonsAlreadyCreated = 'You cannot add or remove thumb buttons after aero peek initialization';
-
 var
   WM_TASKBARBUTTONCREATED: Cardinal = 0;
+{$ENDIF}
 
 { TACLAeroPeekButton }
 

@@ -1545,6 +1545,8 @@ begin
   LTargetW := ATargetRect.Width;
   X := ATargetRect.Left - Origin.X;
   Y := ATargetRect.Top - Origin.Y;
+  if (LSourceW = 0) or (LSourceH = 0) or (LTargetH = 0) or (LTargetW = 0) then
+    Exit;
 
   if ATileMode then
   begin

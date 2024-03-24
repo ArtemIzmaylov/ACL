@@ -645,6 +645,7 @@ type
 
 {$ENDREGION}
 
+function acMenuEscapeHotkeys(const ACaption: string): string;
 function acMenusHasActivePopup: Boolean;
 implementation
 
@@ -693,6 +694,11 @@ type
 
 var
   FMenuLoopCount: Integer;
+
+function acMenuEscapeHotkeys(const ACaption: string): string;
+begin
+  Result := acStringReplace(ACaption, cHotkeyPrefix, cHotkeyPrefix + cHotkeyPrefix);
+end;
 
 function acMenusHasActivePopup: Boolean;
 begin
@@ -1343,7 +1349,7 @@ begin
       TextureGutter.Image.Width + TextureSeparator.Image.Width,
       TextureSeparator.Image.Height);
     try
-      acFillRect(ALayer.Canvas, R, ColorItem.AsColor);
+      acFillRect(ALayer.Canvas, ALayer.ClientRect, ColorItem.AsColor);
       TextureSeparator.Draw(ALayer.Canvas, ALayer.ClientRect);
       DoSplitRect(ALayer.ClientRect, TextureGutter.Image.Width, ASrcG, ASrcC);
       DoSplitRect(R, ItemGutterWidth, ADstG, ADstC);
@@ -2903,6 +2909,7 @@ procedure TACLMainMenu.Paint;
 var
   I: Integer;
 begin
+  Style.DrawBackground(Canvas, ClientRect, False);
   for I := 0 to Items.Count - 1 do
     PaintItem(Items.List[I], I = SelectedItemIndex);
 end;

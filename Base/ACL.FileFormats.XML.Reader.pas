@@ -636,7 +636,7 @@ type
     procedure SkipDtd;
     procedure SkipPartialTextValue;
     procedure SkipPublicOrSystemIdLiteral;
-    procedure SkipUntil(AStoPWideChar: WideChar; ARecognizeLiterals: Boolean);
+    procedure SkipUntil(AStopChar: WideChar; ARecognizeLiterals: Boolean);
 
     function HandleEntityReference(out ACharRefEndPos: Integer): TEntityType;
     procedure ResetAttributes;
@@ -1793,7 +1793,7 @@ label
   ReturnPartial;
 var
   APosition, ARcount, ARpos: Integer;
-  AStoPWideChar, ACh: WideChar;
+  AStopChar, ACh: WideChar;
 begin
   if FParsingState.CharsUsed - FParsingState.CharPos < 3 then
   begin
@@ -1806,24 +1806,24 @@ begin
   ARcount := 0;
   ARpos := -1;
   if AType = TACLXMLNodeType.Comment then
-    AStoPWideChar := '-'
+    AStopChar := '-'
   else
-    AStoPWideChar := ']';
+    AStopChar := ']';
 
   while True do
   begin
     //# C# unsafe section
     ACh := FParsingState.Chars[APosition];
-    while (ACh <> AStoPWideChar) and ((TACLXMLCharType.CharProperties[ACh] and TACLXMLCharType.Text) <> 0) do
+    while (ACh <> AStopChar) and ((TACLXMLCharType.CharProperties[ACh] and TACLXMLCharType.Text) <> 0) do
     begin
       Inc(APosition);
       ACh := FParsingState.Chars[APosition];
     end;
 
-    if FParsingState.Chars[APosition] = AStoPWideChar then
+    if FParsingState.Chars[APosition] = AStopChar then
     begin
       //# possibly end of comment or cdata section
-      if FParsingState.Chars[APosition + 1] = AStoPWideChar then
+      if FParsingState.Chars[APosition + 1] = AStopChar then
       begin
         if FParsingState.Chars[APosition + 2] = '>' then
         begin
@@ -4387,8 +4387,7 @@ begin
         end;
       'e':
         begin
-          if NameEqual(FParsingState.Chars, FParsingState.CharPos, ANameEndPos - FParsingState.CharPos, 'encoding') and
-            ((AXmlDeclState = 1) or ((AIsTextDecl and (AXmlDeclState = 0)))) then
+          if NameEqual(FParsingState.Chars, FParsingState.CharPos, ANameEndPos - FParsingState.CharPos, 'encoding') and ((AXmlDeclState = 1) or ((AIsTextDecl and (AXmlDeclState = 0)))) then
           begin
             if not AIsTextDecl then
               AAttr := AddAttributeNoChecks('encoding', 1);
@@ -4399,8 +4398,7 @@ begin
         end;
       's':
         begin
-          if NameEqual(FParsingState.Chars, FParsingState.CharPos, ANameEndPos - FParsingState.CharPos, 'standalone') and
-            ((AXmlDeclState = 1) or (AXmlDeclState = 2)) and not AIsTextDecl then
+          if NameEqual(FParsingState.Chars, FParsingState.CharPos, ANameEndPos - FParsingState.CharPos, 'standalone') and ((AXmlDeclState = 1) or (AXmlDeclState = 2)) and not AIsTextDecl then
           begin
             if not AIsTextDecl then
               AAttr := AddAttributeNoChecks('standalone', 1);
@@ -4634,7 +4632,7 @@ begin
   SkipUntil(AQuoteChar, False);
 end;
 
-procedure TACLXMLTextReader.SkipUntil(AStoPWideChar: WideChar; ARecognizeLiterals: Boolean);
+procedure TACLXMLTextReader.SkipUntil(AStopChar: WideChar; ARecognizeLiterals: Boolean);
 label
   LblReadData;
 var
@@ -4658,7 +4656,7 @@ begin
       AChar := FParsingState.Chars[APosition];
       if not TACLXMLCharType.IsAttributeValueChar(AChar) then
         Break;
-      if AChar = AStoPWideChar then
+      if AChar = AStopChar then
         Break;
       if AChar = '-' then
         Break;
@@ -4668,7 +4666,7 @@ begin
     until False;
 
     // Closing stoPWideChar outside of literal and ignore/include sections -> save value & return
-    if (Ord(AChar) = Ord(AStoPWideChar)) and not AInLiteral then
+    if (Ord(AChar) = Ord(AStopChar)) and not AInLiteral then
     begin
       FParsingState.CharPos := APosition + 1;
       Exit;

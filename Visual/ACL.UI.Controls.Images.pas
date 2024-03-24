@@ -909,7 +909,10 @@ begin
   if not (ssLeft in Shift) then
   begin
     UpdateHitTest(X, Y);
-    Cursor := CursorsMap[CalculateDragMode(Shift)];
+    if PtInRect(DisplayImageRect, Point(X, Y)) then
+      Cursor := CursorsMap[CalculateDragMode(Shift)]
+    else
+      Cursor := crDefault;
     Exit;
   end;
 
