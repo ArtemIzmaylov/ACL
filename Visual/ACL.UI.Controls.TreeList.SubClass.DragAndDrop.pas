@@ -366,7 +366,10 @@ begin
     if CanChangeNodeLevel then
     begin
       NodeViewInfo.Initialize(ANode);
-      if HitTest.HitPoint.X > ACell.Bounds.Left + NodeViewInfo.CellTextExtends[nil].Left then
+      if HitTest.HitPoint.X >
+        ACell.Bounds.Left + 3 * ACell.Bounds.Height +
+        NodeViewInfo.CellTextExtends[nil].Left
+      then
         Exit(dtimInto);
     end;
 

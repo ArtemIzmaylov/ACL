@@ -2382,7 +2382,7 @@ begin
     dtimAfter:
       FBounds := FBounds.Split(srBottom, 0);
     dtimInto:
-      FBounds := Rect(FBounds.Left + 2 * Owner.GetLevelIndent, FBounds.Bottom, FBounds.Right, FBounds.Bottom);
+      FBounds := Rect(FBounds.Left + 4 * Owner.GetLevelIndent, FBounds.Bottom, FBounds.Right, FBounds.Bottom);
     dtimOver:
       Exit;
   end;

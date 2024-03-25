@@ -2968,7 +2968,9 @@ begin
     for I := 0 to Menu.Items.Count - 1 do
       AddMenuItem(Menu.Items[I]);
   end;
+  CalculateLayout;
   AdjustSize;
+  Invalidate;
 end;
 
 procedure TACLMainMenu.SelectItemOnMouseMove(AItemIndex: Integer);

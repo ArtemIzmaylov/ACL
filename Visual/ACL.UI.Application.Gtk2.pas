@@ -101,12 +101,11 @@ begin
 
   // Input-Redirection
   case event._type of
-    //Optional?
-    //GDK_MOTION_NOTIFY,
-    //GDK_BUTTON_RELEASE,
-    //GDK_BUTTON_PRESS,
-    //GDK_2BUTTON_PRESS,
-    //GDK_3BUTTON_PRESS,
+    GDK_MOTION_NOTIFY,
+    GDK_BUTTON_RELEASE,
+    GDK_BUTTON_PRESS,
+    GDK_2BUTTON_PRESS,
+    GDK_3BUTTON_PRESS,
     GDK_KEY_PRESS,
     GDK_KEY_RELEASE:
       if FInputTarget <> nil then
@@ -208,22 +207,8 @@ begin
 end;
 
 class procedure TGtk2App.ProcessMessages;
-var
-  I: Integer;
 begin
-  I := 100;
-  if not GTK2WidgetSet.GtkIsTerminated then
-  begin
-    while g_main_context_pending(g_main_context_default) and (I > 0) do
-    begin
-      if GTK2WidgetSet.GtkIsTerminated then
-        Break;
-      if not g_main_context_iteration(g_main_context_default, False) then
-        Break;
-      Dec(I);
-    end;
-    GTK2WidgetSet.AppProcessMessages;
-  end;
+  Gtk2WidgetSet.AppProcessMessages;
 end;
 
 class procedure TGtk2App.SetInputRedirection(AControl: TWinControl);
