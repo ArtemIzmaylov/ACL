@@ -13,10 +13,6 @@ unit ACL.UI.Controls.BaseControls;
 
 {$I ACL.Config.inc} // FPC: Partial
 
-{$IFDEF FPC}
-{$MESSAGE WARN 'TODO - AlignWithMargins'}
-{$ENDIF}
-
 interface
 
 uses
@@ -248,15 +244,6 @@ type
     DefaultValue = 3;
   end;
 
-{$IFNDEF FPC}
-  { TACLMarginsHelper }
-
-  TACLMarginsHelper = class helper for TMargins
-  public
-    procedure Assign(const S: TRect);
-  end;
-{$ENDIF}
-
   { TACLCheckBoxStateHelper }
 
   TACLCheckBoxStateHelper = record helper for TCheckBoxState
@@ -351,13 +338,16 @@ type
     procedure MarginsChangeHandler(Sender: TObject);
     procedure SetMargins(const Value: TACLMargins);
     procedure SetResourceCollection(AValue: TACLCustomResourceCollection);
-  protected
-    {$IFDEF FPC}{$MESSAGE WARN 'ChangeScale'}{$ENDIF}
-    procedure ChangeScale(M, D: Integer; isDpiChange: Boolean);{$IFNDEF FPC}override;{$ENDIF}
+  {$IFDEF FPC}
+  strict private
+    FAlignWithMargins: Boolean;
+    procedure SetAlignWithMargins(AValue: Boolean);
+  {$ENDIF}
   protected
   {$IFDEF FPC}
     procedure CalculatePreferredSize(var W, H: Integer; X: Boolean); override;
   {$ENDIF}
+    procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); {$IFDEF FPC}virtual;{$ELSE}override;{$ENDIF}
     procedure DoGetHint(const P: TPoint; var AHint: string); virtual;
     procedure Loaded; override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
@@ -365,21 +355,19 @@ type
     procedure SetTargetDPI(AValue: Integer); virtual;
     procedure UpdateTransparency; virtual;
 
-    // IACLResourcesChangeListener
-    procedure ResourceChanged(Sender: TObject; Resource: TACLResource = nil); overload;
-    procedure ResourceChanged; overload; virtual;
-    procedure ResourceCollectionChanged; virtual;
-    // IACLResourceCollection
-    function GetCollection: TACLCustomResourceCollection;
     // IACLCurrentDpi
     function GetCurrentDpi: Integer;
     // IACLMouseTracking
     function IsMouseAtControl: Boolean; virtual;
     procedure MouseEnter; reintroduce; virtual;
     procedure MouseLeave; reintroduce; virtual;
-
-    // Mouse
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
+    // IACLResourcesChangeListener
+    procedure ResourceChanged(Sender: TObject; Resource: TACLResource = nil); overload;
+    procedure ResourceChanged; overload; virtual;
+    procedure ResourceCollectionChanged; virtual;
+    // IACLResourceCollection
+    function GetCollection: TACLCustomResourceCollection;
 
     // Messages
     procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
@@ -408,6 +396,9 @@ type
     property Canvas;
   published
     property Align;
+  {$IFDEF FPC}
+    property AlignWithMargins: Boolean read FAlignWithMargins write SetAlignWithMargins default False;
+  {$ENDIF}
     property Anchors;
     property Enabled;
     property Hint;
@@ -468,6 +459,11 @@ type
     procedure WMPaint(var Message: TWMPaint); message WM_PAINT;
     procedure WMSetFocus(var Message: TWMSetFocus); message WM_SETFOCUS;
     procedure WMSize(var Message: TWMSize); message WM_SIZE;
+  {$IFDEF FPC}
+  strict private
+    FAlignWithMargins: Boolean;
+    procedure SetAlignWithMargins(AValue: Boolean);
+  {$ENDIF}
   protected
     procedure AdjustClientRect(var ARect: TRect); override;
     procedure BoundsChanged; {$IFDEF FPC}override;{$ELSE}virtual;{$ENDIF}
@@ -540,6 +536,9 @@ type
     procedure Localize(const ASection: string); overload; virtual;
   published
     property Align;
+  {$IFDEF FPC}
+    property AlignWithMargins: Boolean read FAlignWithMargins write SetAlignWithMargins default False;
+  {$ENDIF}
     property Anchors;
     property Constraints;
     property DoubleBuffered default False;
@@ -651,12 +650,9 @@ type
   public
   {$IFDEF FPC}
     procedure SendCancelMode(Sender: TControl);
-    function GetAlignWithMargins: Boolean;
     function FCurrentPPI: Integer;
     function ExplicitHeight: Integer;
     function ExplicitWidth: Integer;
-    procedure SetAlignWithMargins(AValue: Boolean);
-    property AlignWithMargins: Boolean read GetAlignWithMargins write SetAlignWithMargins;
   {$ENDIF}
     function CalcCursorPos: TPoint;
   end;
@@ -672,6 +668,9 @@ type
     class procedure ScaleChanged(AControl: TWinControl; var AState: TObject);
     // Messages
     class procedure WndProc(ACaller: TWinControl; var Message: TMessage);
+    // Margins
+    class procedure UpdateMargins(AControl: TControl;
+      AUseMargins: Boolean; AMargins: TACLPadding; ACurrentDpi: Integer);
   end;
 
   { TACLMouseTracking }
@@ -1326,17 +1325,6 @@ begin
   end;
 end;
 
-{ TACLMarginsHelper }
-{$IFNDEF FPC}
-procedure TACLMarginsHelper.Assign(const S: TRect);
-begin
-  Left := S.Left;
-  Bottom := S.Bottom;
-  Right := S.Right;
-  Top := S.Top;
-end;
-{$ENDIF}
-
 { TACLControls }
 
 class procedure TACLControls.ScaleChanging(AControl: TWinControl; var AState: TObject);
@@ -1428,6 +1416,29 @@ begin
 {$ENDIF}
   if Message.Msg = WM_SETCURSOR then
     WMSetCursor(ACaller, TWMSetCursor(Message));
+end;
+
+class procedure TACLControls.UpdateMargins(AControl: TControl;
+  AUseMargins: Boolean; AMargins: TACLPadding; ACurrentDpi: Integer);
+var
+  LMargins: TRect;
+begin
+  if AUseMargins then
+    LMargins := AMargins.GetScaledMargins(ACurrentDpi)
+  else
+    LMargins := NullRect;
+
+{$IFDEF FPC}
+  with TControlAccess(AControl).BorderSpacing do
+{$ELSE}
+  with TControlAccess(AControl).Margins do
+{$ENDIF}
+  begin
+    Left := LMargins.Left;
+    Top := LMargins.Top;
+    Right := LMargins.Right;
+    Bottom := LMargins.Bottom;
+  end;
 end;
 
 { TACLCheckBoxStateHelper }
@@ -1592,6 +1603,7 @@ procedure TACLGraphicControl.AfterConstruction;
 begin
   inherited;
   SetDefaultSize;
+  MarginsChangeHandler(nil);
   UpdateTransparency;
 end;
 
@@ -1772,12 +1784,19 @@ end;
 
 procedure TACLGraphicControl.MarginsChangeHandler(Sender: TObject);
 begin
-{$IFDEF FPC}
-  {$MESSAGE WARN 'Margins'}
-{$ELSE}
-  inherited Margins.Assign(Margins.GetScaledMargins(FCurrentPPI));
-{$ENDIF}
+  TACLControls.UpdateMargins(Self, AlignWithMargins, Margins, FCurrentPPI);
 end;
+
+{$IFDEF FPC}
+procedure TACLGraphicControl.SetAlignWithMargins(AValue: Boolean);
+begin
+  if FAlignWithMargins <> AValue then
+  begin
+    FAlignWithMargins := AValue;
+    MarginsChangeHandler(nil);
+  end;
+end;
+{$ENDIF}
 
 procedure TACLGraphicControl.SetMargins(const Value: TACLMargins);
 begin
@@ -1833,6 +1852,7 @@ procedure TACLCustomControl.AfterConstruction;
 begin
   inherited AfterConstruction;
   SetDefaultSize;
+  MarginsChangeHandler(nil);
   UpdateTransparency;
 end;
 
@@ -1965,8 +1985,8 @@ begin
   end;
 end;
 
-procedure TACLCustomControl.MouseDown(
-  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+procedure TACLCustomControl.MouseDown(Button: TMouseButton; Shift: TShiftState;
+  X: Integer; Y: Integer);
 begin
   if FocusOnClick then
     SetFocusOnClick;
@@ -2161,6 +2181,17 @@ begin
   end;
 end;
 
+{$IFDEF FPC}
+procedure TACLCustomControl.SetAlignWithMargins(AValue: Boolean);
+begin
+  if FAlignWithMargins <> AValue then
+  begin
+    FAlignWithMargins := AValue;
+    MarginsChangeHandler(nil);
+  end;
+end;
+{$ENDIF}
+
 procedure TACLCustomControl.CMScaleChanging(var Message: TMessage);
 begin
   Inc(FScaleChangeCount);
@@ -2329,11 +2360,7 @@ procedure TACLCustomControl.MarginsChangeHandler(Sender: TObject);
 begin
   DisableAlign;
   try
-  {$IFDEF FPC}
-    {$MESSAGE WARN 'Margins'}
-  {$ELSE}
-    inherited Margins.Assign(Margins.GetScaledMargins(FCurrentPPI));
-  {$ENDIF}
+    TACLControls.UpdateMargins(Self, AlignWithMargins, Margins, FCurrentPPI);
   finally
     EnableAlign;
   end;
@@ -2427,34 +2454,16 @@ end;
 
 function TACLControlHelper.ExplicitHeight: Integer;
 begin
-  //if AlignWithMargins and (Parent <> nil) then
-  //  Result := ExplicitHeight + FLeft + FRight
-  //else
-  //  Result := ExplicitHeight;
-  Result := Height;
+  Result := BorderSpacing.ControlHeight;
 end;
 
 function TACLControlHelper.ExplicitWidth: Integer;
 begin
-  //if AlignWithMargins and (Parent <> nil) then
-  //  Result := ExplicitWidth + FLeft + FRight
-  //else
-  //  Result := ExplicitWidth;
-  Result := Width;
-end;
-
-procedure TACLControlHelper.SetAlignWithMargins(AValue: Boolean);
-begin
-
+  Result := BorderSpacing.ControlWidth;
 end;
 
 procedure TACLControlHelper.SendCancelMode(Sender: TControl);
 begin
-end;
-
-function TACLControlHelper.GetAlignWithMargins: Boolean;
-begin
-  Result := False;
 end;
 {$ENDIF}
 
