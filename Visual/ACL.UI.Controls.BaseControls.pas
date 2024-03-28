@@ -688,7 +688,7 @@ type
     class procedure ScaleChanging(AControl: TWinControl; var AState: TObject);
     class procedure ScaleChanged(AControl: TWinControl; var AState: TObject);
     // Messages
-    class procedure WndProc(ACaller: TWinControl; var Message: TMessage);
+    class function WndProc(ACaller: TWinControl; var Message: TMessage): Boolean;
     // Margins
     class procedure UpdateMargins(AControl: TControl;
       AUseMargins: Boolean; AMargins: TACLPadding; ACurrentDpi: Integer); overload;
@@ -1412,6 +1412,8 @@ var
 begin
   if csDesigning in ACaller.ComponentState then
     Exit;
+  if Message.HitTest <> HTCLIENT then
+    Exit;
   if ACaller.HandleAllocated and (Message.CursorWnd = ACaller.Handle) then
   begin
     ACursor := Screen.Cursor;
@@ -1426,13 +1428,13 @@ begin
         ACursor := GetCursor(ACaller);
     end;
     SetCursor(Screen.Cursors[ACursor]);
-    Message.CursorWnd := 0; //nop
     Message.Result := 1;
   end;
 end;
 
-class procedure TACLControls.WndProc(ACaller: TWinControl; var Message: TMessage);
+class function TACLControls.WndProc(ACaller: TWinControl; var Message: TMessage): Boolean;
 begin
+  Result := False;
 {$IFDEF FPC}
   if (Message.Msg >= LM_MOUSEFIRST) and (Message.Msg <= LM_MOUSELAST) then
   begin
@@ -1444,7 +1446,10 @@ begin
   end;
 {$ENDIF}
   if Message.Msg = WM_SETCURSOR then
+  begin
     WMSetCursor(ACaller, TWMSetCursor(Message));
+    Result := Message.Result = 1;
+  end;
 end;
 
 class procedure TACLControls.UpdateMargins(AControl: TControl;
@@ -2202,8 +2207,8 @@ end;
 
 procedure TACLCustomControl.WndProc(var Message: TMessage);
 begin
-  TACLControls.WndProc(Self, Message);
-  inherited WndProc(Message);
+  if not TACLControls.WndProc(Self, Message) then
+    inherited WndProc(Message);
 end;
 
 procedure TACLCustomControl.CMDialogChar(var Message: TCMDialogChar);

@@ -104,6 +104,7 @@ type
     property DroppedDown: Boolean read GetDroppedDown write SetDroppedDown;
   published
     property DoubleBuffered default True;
+    property FocusOnClick default True;
     // Events
     property OnDropDown: TNotifyEvent read FOnDropDown write FOnDropDown;
   end;
@@ -153,7 +154,6 @@ type
   published
     property Caption: string read GetCaption write SetCaption;
     property Cursor default crHandPoint;
-    property FocusOnClick default True;
     property Glyph: TACLGlyph read FGlyph write SetGlyph stored IsGlyphStored;
     property ImageIndex: TImageIndex read GetImageIndex write SetImageIndex default -1;
     property Images: TCustomImageList read GetImages write SetImages;
@@ -392,7 +392,6 @@ begin
   FGlyph := TACLGlyph.Create(Self);
   Cursor := crHandPoint;
   AutoHeight := False;
-  FocusOnClick := True;
 end;
 
 destructor TACLCustomDropDown.Destroy;

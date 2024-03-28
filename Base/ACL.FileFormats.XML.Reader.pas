@@ -4295,7 +4295,6 @@ var
   AXmlDeclState, AOriginalSbLen, AWsCount, ANameEndPos, APosition: Integer;
   AEncoding: TEncoding;
   AEncodingName: string;
-  ABadVersion: string;
   AAttr: TACLXMLNodeData;
   AQuoteChar: WideChar;
 begin

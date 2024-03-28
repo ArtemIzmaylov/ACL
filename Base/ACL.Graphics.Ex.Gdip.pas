@@ -1094,7 +1094,6 @@ end;
 procedure TACLGdiplusRender.DrawEllipse(X1, Y1, X2, Y2: Single;
   Color: TAlphaColor; StrokeWidth: Single; StrokeStyle: TACL2DRenderStrokeStyle);
 begin
-  AdjustRectToGdiLikeAppearance(X2, Y2);
   if (X2 > X1) and (Y2 > Y1) and Color.IsValid and (StrokeWidth > 0) then
     GdipDrawEllipse(FGraphics,
       TACLGdiplusResourcesCache.PenGet(Color, StrokeWidth, StrokeStyle),

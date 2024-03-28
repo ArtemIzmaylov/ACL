@@ -278,6 +278,7 @@ type
     property OnGetNodeClass; // must be first!
     //# Properties
     property Columns;
+    property FocusOnClick default True;
     property OptionsBehavior;
     property OptionsCustomizing;
     property OptionsSelection;

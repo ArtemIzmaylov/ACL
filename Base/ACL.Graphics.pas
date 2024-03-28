@@ -190,6 +190,7 @@ type
     function GetCanvas: TCanvas;
     function GetClientRect: TRect; inline;
     function GetEmpty: Boolean; inline;
+    function GetSize: TSize; inline;
   {$IFDEF FPC}
   strict private
     FCanvasChanged: Boolean;
@@ -240,6 +241,9 @@ type
     procedure Resize(const R: TRect); overload;
 
     //# Draw
+  {$IFDEF MSWINDOWS}
+    procedure DrawBlend(DC: HDC; const R, SrcRect: TRect; AAlpha: Byte = MaxByte); overload;
+  {$ENDIF}
     procedure DrawBlend(ACanvas: TCanvas; const P: TPoint; AAlpha: Byte = MaxByte); overload;
     procedure DrawBlend(ACanvas: TCanvas; const R: TRect; AAlpha: Byte = MaxByte); overload;
     procedure DrawBlend(ACanvas: TCanvas; const R, SrcRect: TRect; AAlpha: Byte); overload;
@@ -248,12 +252,14 @@ type
 
     //# Properties
     property Canvas: TCanvas read GetCanvas;
-    property ClientRect: TRect read GetClientRect;
     property ColorCount: Integer read FColorCount;
     property Colors: PACLPixel32Array read {$IFDEF FPC}GetColors{$ELSE}FColors{$ENDIF};
     property Empty: Boolean read GetEmpty;
     property Handle: HDC read {$IFDEF FPC}GetDC{$ELSE}FHandle{$ENDIF};
+    //# Dimensions
+    property ClientRect: TRect read GetClientRect;
     property Height: Integer read FHeight;
+    property Size: TSize read GetSize;
     property Width: Integer read FWidth;
   end;
 
@@ -2717,15 +2723,8 @@ end;
 
 procedure TACLDib.DrawBlend(ACanvas: TCanvas; const R, SrcRect: TRect; AAlpha: Byte);
 {$IFDEF MSWINDOWS}
-var
-  ABlendFunc: TBlendFunction;
 begin
-  ABlendFunc.AlphaFormat := AC_SRC_ALPHA;
-  ABlendFunc.BlendOp := AC_SRC_OVER;
-  ABlendFunc.BlendFlags := 0;
-  ABlendFunc.SourceConstantAlpha := AAlpha;
-  AlphaBlend(ACanvas.Handle, R.Left, R.Top, R.Right - R.Left, R.Bottom - R.Top,
-    Handle, SrcRect.Left, SrcRect.Top, SrcRect.Width, SrcRect.Height, ABlendFunc);
+  DrawBlend(ACanvas.Handle, R, SrcRect, AAlpha);
 {$ELSE}
 var
   LSurface: Pcairo_surface_t;
@@ -2743,6 +2742,20 @@ begin
   end;
 {$ENDIF}
 end;
+
+{$IFDEF MSWINDOWS}
+procedure TACLDib.DrawBlend(DC: HDC; const R, SrcRect: TRect; AAlpha: Byte = MaxByte);
+var
+  ABlendFunc: TBlendFunction;
+begin
+  ABlendFunc.AlphaFormat := AC_SRC_ALPHA;
+  ABlendFunc.BlendOp := AC_SRC_OVER;
+  ABlendFunc.BlendFlags := 0;
+  ABlendFunc.SourceConstantAlpha := AAlpha;
+  AlphaBlend(DC, R.Left, R.Top, R.Right - R.Left, R.Bottom - R.Top,
+    Handle, SrcRect.Left, SrcRect.Top, SrcRect.Width, SrcRect.Height, ABlendFunc);
+end;
+{$ENDIF}
 
 procedure TACLDib.DrawCopy(DC: HDC; const P: TPoint);
 begin
@@ -2940,6 +2953,11 @@ end;
 function TACLDib.GetEmpty: Boolean;
 begin
   Result := FColorCount = 0;
+end;
+
+function TACLDib.GetSize: TSize;
+begin
+  Result := TSize.Create(Width, Height);
 end;
 
 {$IFDEF FPC}

@@ -2932,6 +2932,7 @@ procedure TACLDockPanel.Paint;
 var
   AClipRgn: HRGN;
 begin
+  inherited;
   if HasBorders then
   begin
     Style.DrawBorder(Canvas, ClientRect.Split(GetOuterPadding), acAllBorders);

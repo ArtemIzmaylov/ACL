@@ -18,6 +18,7 @@ interface
 uses
 {$IFDEF FPC}
   Cairo,
+  ClipBrd,
   LCLIntf,
   LCLType,
 {$ELSE}
@@ -28,7 +29,6 @@ uses
 {$ENDIF}
   // System
   {System.}Classes,
-  {System.}Clipbrd,
   {System.}Math,
   {System.}SysUtils,
   {System.}Types,

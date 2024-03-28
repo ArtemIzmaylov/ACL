@@ -1556,21 +1556,6 @@ begin
   begin
     GetFontInfo.AssignTo(TFont(Dest));
     TFont(Dest).Color := Color.ToColor;
-//    //#AI
-//    //# it lead to call the OnChange event even if font parameters are same
-//    //# TFont(Dest).Handle := 0;
-//    TFont(Dest).Name := Name;
-//    TFont(Dest).Style := Style;
-//    TFont(Dest).Color := Color.ToColor;
-//
-//    //# https://forums.embarcadero.com/thread.jspa?messageID=667590&tstart=0
-//    //# https://github.com/virtual-treeview/virtual-treeview/issues/465
-//    if Quality = fqClearTypeNatural then
-//      TFont(Dest).Quality := fqClearType
-//    else
-//      TFont(Dest).Quality := Quality;
-//
-//    acSetFontHeight(TFont(Dest), Height, TargetDPI);
   end
   else
     inherited AssignTo(Dest);

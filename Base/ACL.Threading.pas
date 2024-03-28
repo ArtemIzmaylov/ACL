@@ -764,7 +764,7 @@ begin
     for I := Count - 1 downto 0 do
     begin
       ASync := {$IFDEF FPC}Items{$ELSE}List{$ENDIF}[I];
-      if @ASync.Receiver = AReceiver then
+      if ASync.Receiver = AReceiver then
       begin
         Dispose(ASync);
         Delete(I);

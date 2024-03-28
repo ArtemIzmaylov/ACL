@@ -33,9 +33,7 @@ uses
   {System.}SysUtils,
   {System.}Generics.Collections,
   {System.}Types,
-{$IFNDEF ACL_BASE_NOVCL}
   System.UITypes,
-{$ENDIF}
   // ACL
   ACL.Threading,
   ACL.Utils.Common;
@@ -517,15 +515,15 @@ function acRemoveLineBreaks(const S: string): string;
 function acReplaceLineBreaks(const S, ReplaceBy: string): string;
 
 // Conversion
-{$IFNDEF ACL_BASE_NOVCL}
 function acFontStyleDecode(const Style: TFontStyles): Byte;
 function acFontStyleEncode(Style: Integer): TFontStyles;
+{$IFNDEF ACL_BASE_NOVCL}
 function acFontToString(AFont: TFont): string; overload;
 function acFontToString(const AName: string; AColor: TColor;
   AHeight: Integer; AStyle: TFontStyles): string; overload;
 procedure acStringToFont(const S: string; const Font: TFont);
-procedure acStringToFontData(const S: string; out AFontData: TACLFontData);
 {$ENDIF}
+procedure acStringToFontData(const S: string; out AFontData: TACLFontData);
 function acPointToString(const P: TPoint): string;
 function acRectToString(const R: TRect): string;
 function acSizeToString(const S: TSize): string;
@@ -659,30 +657,29 @@ begin
   Result := Format('%d,%d,%d,%d', [R.Left, R.Top, R.Right, R.Bottom]);
 end;
 
-{$IFNDEF ACL_BASE_NOVCL}
 function acFontStyleEncode(Style: Integer): TFontStyles;
 begin
   Result := [];
   if 1 and Style = 1 then
-    Result := Result + [fsItalic];
+    Result := Result + [TFontStyle.fsItalic];
   if 2 and Style = 2 then
-    Result := Result + [fsBold];
+    Result := Result + [TFontStyle.fsBold];
   if 4 and Style = 4 then
-    Result := Result + [fsUnderline];
+    Result := Result + [TFontStyle.fsUnderline];
   if 8 and Style = 8 then
-    Result := Result + [fsStrikeOut];
+    Result := Result + [TFontStyle.fsStrikeOut];
 end;
 
 function acFontStyleDecode(const Style: TFontStyles): Byte;
 begin
   Result := 0;
-  if fsItalic in Style then
+  if TFontStyle.fsItalic in Style then
     Result := 1;
-  if fsBold in Style then
+  if TFontStyle.fsBold in Style then
     Result := Result or 2;
-  if fsUnderline in Style then
+  if TFontStyle.fsUnderline in Style then
     Result := Result or 4;
-  if fsStrikeOut in Style then
+  if TFontStyle.fsStrikeOut in Style then
     Result := Result or 8;
 end;
 
@@ -692,6 +689,7 @@ begin
   Result := Format('%s,%d,%d,%d', [AName, AColor, AHeight, acFontStyleDecode(AStyle)]);
 end;
 
+{$IFNDEF ACL_BASE_NOVCL}
 function acFontToString(AFont: TFont): string; overload;
 begin
   Result := acFontToString(AFont.Name, AFont.Color, AFont.Height, AFont.Style);
@@ -707,6 +705,7 @@ begin
   Font.Height := StrToIntDef(AFontData[2], 0);
   Font.Style := acFontStyleEncode(StrToIntDef(AFontData[3], 0));
 end;
+{$ENDIF}
 
 procedure acStringToFontData(const S: string; out AFontData: TACLFontData);
 var
@@ -731,7 +730,6 @@ begin
     Inc(AScan);
   end;
 end;
-{$ENDIF}
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Formatting

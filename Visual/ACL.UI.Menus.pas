@@ -432,6 +432,7 @@ type
     function TranslateKey(Key: Word; Shift: TShiftState): Word; virtual;
 
     // Mouse
+    procedure DoContextPopup(MousePos: TPoint; var Handled: Boolean); override;
     function DoMouseWheel(Shift: TShiftState; Delta: Integer; P: TPoint): Boolean; override;
     function HitTest(const P: TPoint): Integer;
     function IsMouseAtControl: Boolean;
@@ -1515,8 +1516,10 @@ begin
   if not IsShown then
   begin
     ReleaseCapture;
-  {$MESSAGE WARN 'SetPopupPoint'}
-  {$IFNDEF FPC}
+    SetCursor(Screen.Cursors[crDefault]);
+  {$IFDEF FPC}
+    {$MESSAGE WARN 'SetPopupPoint'}
+  {$ELSE}
     SetPopupPoint(Point(ControlRect.Left, ControlRect.Bottom));
   {$ENDIF}
     DoInitialize;
@@ -1787,6 +1790,11 @@ end;
 function TACLMenuWindow.IsMouseAtControl: Boolean;
 begin
   Result := PtInRect(ClientRect, CalcCursorPos);
+end;
+
+procedure TACLMenuWindow.DoContextPopup(MousePos: TPoint; var Handled: Boolean);
+begin
+  Handled := True;
 end;
 
 function TACLMenuWindow.DoMouseWheel(Shift: TShiftState; Delta: Integer; P: TPoint): Boolean;
@@ -2388,8 +2396,12 @@ end;
 procedure TACLMenuPopupWindow.Popup(const AControlRect: TRect);
 begin
   if AControlRect <> NullRect then
-    FControlRect := MonitorAlignPopupWindow(AControlRect);
-  BoundsRect := AControlRect;
+  begin
+    FControlRect := AControlRect;
+    FControlRect.Offset(0, FControlRect.Height);
+    FControlRect := MonitorAlignPopupWindow(FControlRect);
+  end;
+  BoundsRect := FControlRect;
   CalculateBounds;
   Visible := True;
   ShowWindow(Handle, SW_SHOWNOACTIVATE);

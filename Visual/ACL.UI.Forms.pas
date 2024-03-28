@@ -48,6 +48,7 @@ uses
   ACL.FileFormats.INI,
   ACL.Geometry,
   ACL.Graphics,
+  ACL.Graphics.FontCache,
   ACL.MUI,
   ACL.ObjectLinks,
   ACL.Threading,
@@ -746,8 +747,8 @@ end;
 
 procedure TACLBasicForm.WndProc(var Message: TMessage);
 begin
-  TACLControls.WndProc(Self, Message);
-  inherited WndProc(Message);
+  if not TACLControls.WndProc(Self, Message) then
+    inherited WndProc(Message);
 end;
 
 function TACLBasicForm.GetCurrentDpi: Integer;
