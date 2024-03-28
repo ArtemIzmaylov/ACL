@@ -168,6 +168,13 @@ type
     procedure SetSize(ASize: Integer; ATargetDpi: Integer); overload;
   end;
 
+  { TCanvasHelper }
+
+  TCanvasHelper = class helper for TCanvas
+  public
+    procedure SetScaledFont(AFont: TFont);
+  end;
+
   { TACLDib }
 
   TACLDib = class
@@ -377,11 +384,18 @@ type
   TACLMeasureCanvas = class(TCanvas)
   strict private
     FBitmap: TBitmap;
+  {$IFDEF FPC}
+    function GetFont: TFont;
+    procedure SetFont(AValue: TFont);
+  {$ENDIF}
   protected
     procedure CreateHandle; override;
     procedure FreeHandle; {$IFDEF FPC}override;{$ENDIF}
   public
     destructor Destroy; override;
+  {$IFDEF FPC}
+    property Font: TFont read GetFont write SetFont;
+  {$ENDIF}
   end;
 
   { TACLColors }
@@ -1316,6 +1330,18 @@ begin
     FreeAndNil(FBitmap);
   end;
 end;
+
+{$IFDEF FPC}
+function TACLMeasureCanvas.GetFont: TFont;
+begin
+  Result := inherited Font;
+end;
+
+procedure TACLMeasureCanvas.SetFont(AValue: TFont);
+begin
+  SetScaledFont(AValue);
+end;
+{$ENDIF}
 
 //----------------------------------------------------------------------------------------------------------------------
 // Bitmaps
@@ -2429,6 +2455,7 @@ type
   TFontClass = class of TFont;
 begin
   Result := TFontClass(ClassType).Create;
+  Result.PixelsPerInch := PixelsPerInch;
   Result.Assign(Self);
 end;
 
@@ -2446,6 +2473,24 @@ end;
 procedure TFontHelper.SetSize(ASize, ATargetDpi: Integer);
 begin
   Size := MulDiv(ASize, ATargetDpi, PixelsPerInch);
+end;
+
+{ TCanvasHelper }
+
+procedure TCanvasHelper.SetScaledFont(AFont: TFont);
+begin
+{$IFDEF FPC}
+  Font.BeginUpdate;
+  try
+{$ENDIF}
+    Font.Assign(AFont);
+    if Font.PixelsPerInch <> AFont.PixelsPerInch then
+      Font.Height := AFont.Height;
+{$IFDEF FPC}
+  finally
+    Font.EndUpdate;
+  end;
+{$ENDIF}
 end;
 
 { TACLDib }

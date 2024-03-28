@@ -215,6 +215,11 @@ procedure acDrawLabelLine(ACanvas: TCanvas;
   const ALineRect, ATextRect: TRect; AColor1, AColor2: TAlphaColor);
 implementation
 
+{$IFNDEF FPC}
+uses
+  ACL.Graphics.SkinImageSet; // inlining
+{$ENDIF}
+
 procedure acDrawLabelLine(ACanvas: TCanvas;
   const ALineRect, ATextRect: TRect; AColor1, AColor2: TAlphaColor);
 var

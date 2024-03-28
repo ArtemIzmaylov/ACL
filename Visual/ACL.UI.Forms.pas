@@ -98,10 +98,15 @@ type
   {$ENDIF}
   protected
   {$IFDEF FPC}
+    FCurrentPPI: Integer;
+    FIScaling: Boolean;
     ScalingFlags: TScalingFlags;
-  {$ENDIF}
 
-    procedure ChangeScale(M, D: Integer{$IFNDEF FPC}; IsDpiChange: Boolean{$ENDIF}); override;
+    procedure DoAutoAdjustLayout(const AMode: TLayoutAdjustmentPolicy; const X, Y: Double); override;
+  {$ELSE}
+    procedure ChangeScale(M, D: Integer; IsDpiChange: Boolean); override; final;
+  {$ENDIF}
+  protected
     function DialogChar(var Message: TWMKey): Boolean; {$IFDEF FPC}override;{$ELSE}virtual;{$ENDIF}
     procedure DoShow; override;
     procedure DpiChanged; virtual;
@@ -122,7 +127,7 @@ type
     procedure ScaleForPPI(ATargetPPI: Integer); overload; {$IFNDEF FPC}override; final;{$ENDIF}
     procedure ScaleForPPI(ATargetPPI: Integer; AWindowRect: PRect); reintroduce; overload; virtual;
     //# Properties
-    property CurrentDpi: Integer read {$IFDEF FPC}GetCurrentDpi{$ELSE}FCurrentPPI{$ENDIF};
+    property CurrentDpi: Integer read FCurrentPPI;
   published
     property ClientHeight write SetClientHeight;
     property ClientWidth write SetClientWidth;
@@ -168,6 +173,7 @@ type
     function CanCloseByEscape: Boolean; virtual;
     procedure CreateHandle; override;
     procedure CreateParams(var Params: TCreateParams); override;
+    function DialogChar(var Message: TWMKey): Boolean; override;
     procedure DpiChanged; override;
     procedure UpdateImageLists; virtual;
 
@@ -189,9 +195,8 @@ type
     procedure ApplicationSettingsChanged(AChanges: TACLApplicationChanges); override;
 
     // Messages
-    procedure CMDialogKey(var Message: TCMDialogKey); message CM_DIALOGKEY;
     procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
-    procedure CMRecreateWnd(var Message: TMessage); message CM_RECREATEWND;
+    procedure CMRecreateWnd(var Message: TMessage); message {%H-}CM_RECREATEWND;
     procedure CMShowingChanged(var Message: TCMDialogKey); message CM_SHOWINGCHANGED;
     procedure WMEnterMenuLoop(var Msg: TMessage); message WM_ENTERMENULOOP;
     procedure WMExitMenuLoop(var Msg: TMessage); message WM_EXITMENULOOP;
@@ -510,6 +515,9 @@ end;
 
 constructor TACLBasicForm.CreateNew(AOwner: TComponent; ADummy: Integer);
 begin
+{$IFDEF FPC}
+  FCurrentPPI := acDefaultDpi;
+{$ENDIF}
   inherited CreateNew(AOwner, ADummy);
 {$IFDEF FPC}
   InitializeNewForm;
@@ -538,24 +546,32 @@ begin
     acApplyColorSchema(Components[I], TACLApplication.ColorSchema);
 end;
 
-procedure TACLBasicForm.ChangeScale(M, D: Integer{$IFNDEF FPC}; IsDpiChange: Boolean{$ENDIF});
+{$IFDEF FPC}
+procedure TACLBasicForm.DoAutoAdjustLayout(
+  const AMode: TLayoutAdjustmentPolicy; const X, Y: Double);
+begin
+  if FIScaling or (AMode <> lapAutoAdjustForDPI) then
+    inherited
+  else
+    ScaleForPPI(Round(X * FCurrentPPI));
+end;
+{$ELSE}
+procedure TACLBasicForm.ChangeScale(M, D: Integer; IsDpiChange: Boolean);
 begin
   ScaleForPPI(MulDiv(FCurrentPPI, M, D));
 end;
+{$ENDIF}
 
 procedure TACLBasicForm.ScaleForPPI(ATargetPPI: Integer; AWindowRect: PRect);
-{$IFDEF FPC}
-begin
-  {$MESSAGE WARN 'TACLBasicForm.ScaleForPPI'}
-end;
-{$ELSE}
 var
+  LScaling: TACLFormScaling;
   LPrevBounds: TRect;
   LPrevClientRect: TRect;
   LPrevDPI: Integer;
   LPrevParentFont: Boolean;
+{$IFNDEF FPC}
   LPrevScaled: Boolean;
-  LScaling: TACLFormScaling;
+{$ENDIF}
 begin
   if (ATargetPPI <> FCurrentPPI) and (ATargetPPI >= acMinDPI) and not FIScaling then
   begin
@@ -566,6 +582,11 @@ begin
       LPrevClientRect := ClientRect;
       LPrevParentFont := ParentFont;
 
+    {$IFDEF FPC}
+      FIScaling := True;
+      AutoAdjustLayout(lapAutoAdjustForDPI, FCurrentPPI, ATargetPPI, 0, 0);
+      FIScaling := False;
+    {$ELSE}
       LPrevScaled := Scaled;
       try
         Scaled := True; // for Delphi 11.0
@@ -573,6 +594,7 @@ begin
       finally
         Scaled := LPrevScaled;
       end;
+    {$ENDIF}
 
       FCurrentPPI := ATargetPPI;
       PixelsPerInch := ATargetPPI;
@@ -600,7 +622,6 @@ begin
     DpiChanged;
   end;
 end;
-{$ENDIF}
 
 procedure TACLBasicForm.ScaleForPPI(ATargetPPI: Integer);
 begin
@@ -1101,7 +1122,7 @@ begin
   end;
 end;
 
-procedure TACLForm.CMDialogKey(var Message: TCMDialogKey);
+function TACLForm.DialogChar(var Message: TWMKey): Boolean;
 begin
   case Message.CharCode of
     VK_RETURN:
@@ -1110,7 +1131,7 @@ begin
         if fsModal in FormState then
         begin
           ModalResult := mrOk;
-          Exit;
+          Exit(True);
         end;
       end;
 
@@ -1120,16 +1141,16 @@ begin
         if fsModal in FormState then
         begin
           ModalResult := mrCancel;
-          Exit;
+          Exit(True);
         end;
         if CanCloseByEscape then
         begin
           Close;
-          Exit;
+          Exit(True);
         end;
       end;
   end;
-  inherited;
+  Result := inherited;
 end;
 
 procedure TACLForm.CMFontChanged(var Message: TMessage);
@@ -1266,6 +1287,7 @@ begin
   KeyPreview := True;
   ShowInTaskBar := stNever;
 {$ENDIF}
+  Scaled := False; // manual control
   InitScaling;
 end;
 
@@ -1354,37 +1376,19 @@ end;
 
 procedure TACLPopupWindow.InitScaling;
 var
-  LSourceDPI: IACLCurrentDpi;
+  LSourceDPI: Integer;
 begin
-  Scaled := True;
-  if Supports(Owner, IACLCurrentDpi, LSourceDPI) then
-    ScaleForPPI(LSourceDPI.GetCurrentDpi);
+  LSourceDPI := acTryGetCurrentDpi(Owner);
+  if LSourceDPI <> 0 then
+    ScaleForPPI(LSourceDPI);
   if Owner is TControl then
-    Font := TWinControlAccess(Owner).Font;
-  Scaled := False; // manual control
+    acAssignFont(Font, TWinControlAccess(Owner).Font, CurrentDpi, LSourceDPI);
 end;
 
 function TACLPopupWindow.IsMouseInControl: Boolean;
 begin
   Result := PtInRect(Rect(0, 0, Width, Height), CalcCursorPos);
 end;
-
-{procedure TACLPopupWindow.MouseTracking;
-var
-  LCapture: TControl;
-begin
-  if IsMouseInControl then
-    MouseCapture := False
-  else
-  begin
-    LCapture := GetCaptureControl;
-    if LCapture = nil then
-      MouseCapture := True
-    else
-      if (LCapture <> Self) and not ContainsControl(LCapture) then
-        ClosePopup;
-  end;
-end;}
 
 procedure TACLPopupWindow.Popup(R: TRect);
 begin
@@ -1479,22 +1483,6 @@ begin
     case Message.Msg of
       WM_GETDLGCODE:
         Message.Result := DLGC_WANTARROWS or DLGC_WANTTAB or DLGC_WANTALLKEYS or DLGC_WANTCHARS;
-
-//      WM_MOUSEACTIVATE:
-//        begin
-//          Message.Result := MA_NOACTIVATE;
-//          Exit;
-//        end;
-//
-//      WM_LBUTTONDBLCLK, WM_MBUTTONDBLCLK, WM_RBUTTONDBLCLK,
-//      WM_LBUTTONDOWN, WM_MBUTTONDOWN, WM_RBUTTONDOWN:
-//        if not IsMouseInControl then
-//          ClosePopup;
-//
-//      WM_TIMER:
-//        if TWMTimer(Message).TimerID = MouseTrackerId then
-//          MouseTracking;
-
       WM_ACTIVATEAPP:
         ClosePopup;
       WM_CONTEXTMENU, WM_MOUSEWHEEL, WM_MOUSEHWHEEL, CM_MOUSEWHEEL:
@@ -1584,9 +1572,10 @@ begin
   end;
 end;
 
-class function TACLFormImageListReplacer.GetReplacement(AImageList: TCustomImageList; AForm: TCustomForm): TCustomImageList;
+class function TACLFormImageListReplacer.GetReplacement(
+  AImageList: TCustomImageList; AForm: TCustomForm): TCustomImageList;
 begin
-  Result := GetReplacement(AImageList, TCustomFormAccess(AForm).FCurrentPPI, TACLApplication.IsDarkMode);
+  Result := GetReplacement(AImageList, acGetCurrentDpi(AForm), TACLApplication.IsDarkMode);
 end;
 
 class function TACLFormImageListReplacer.GetReplacement(

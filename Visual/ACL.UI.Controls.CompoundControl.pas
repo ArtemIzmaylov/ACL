@@ -321,6 +321,7 @@ begin
   try
     inherited SetTargetDPI(AValue);
     SubClass.SetTargetDPI(AValue);
+    SubClass.FullRefresh;
   finally
     EndUpdate;
   end;

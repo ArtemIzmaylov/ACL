@@ -290,7 +290,7 @@ begin
     FTextBuffer := TACLDib.Create(W, H);
   end;
 
-  FTextBuffer.Canvas.Font := AFont;
+  FTextBuffer.Canvas.SetScaledFont(AFont);
   FTextBuffer.Canvas.Font.Color := clWhite;
   FTextBuffer.Canvas.Brush.Style := bsClear;
 
@@ -347,7 +347,7 @@ var
 begin
   if (AText <> '') and CanDraw(ACanvas, R, AFont) then
   begin
-    MeasureCanvas.Font := AFont;
+    MeasureCanvas.SetScaledFont(AFont);
     LTextExtends := AFont.TextExtends;
     LTextSize := acTextSize(MeasureCanvas, AText);
     if AEndEllipsis then

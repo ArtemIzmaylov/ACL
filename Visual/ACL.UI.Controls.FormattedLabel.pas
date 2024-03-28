@@ -173,7 +173,6 @@ type
     procedure Paint; override;
     procedure ResourceChanged; override;
     procedure SetDefaultSize; override;
-    procedure SetTargetDPI(AValue: Integer); override;
   public const
     DefaultOptions = [floAutoDetectURLs, floAutoDetectEmails];
   public
@@ -323,6 +322,7 @@ end;
 procedure TACLFormattedLabelSubClass.SetTargetDPI(AValue: Integer);
 begin
   inherited;
+  Style.TargetDpi := AValue;
   FormattedText.TargetDpi := AValue;
 end;
 
@@ -447,12 +447,6 @@ end;
 procedure TACLFormattedLabel.MakeVisible(ARow: Integer);
 begin
   SubClass.MakeVisible(ARow);
-end;
-
-procedure TACLFormattedLabel.SetTargetDPI(AValue: Integer);
-begin
-  inherited SetTargetDPI(AValue);
-  Style.TargetDPI := AValue;
 end;
 
 function TACLFormattedLabel.CreateSubClass: TACLCompoundControlSubClass;

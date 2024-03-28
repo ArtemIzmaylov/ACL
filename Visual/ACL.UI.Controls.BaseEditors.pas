@@ -327,6 +327,7 @@ type
       PreferredWidth, PreferredHeight: Integer;
       WithThemeSpace: Boolean); override;
   {$ENDIF}
+    function CanAutoSize(var NewWidth, NewHeight: Integer): Boolean; override;
     procedure DeleteNearWord(AStartPosition, ADirection: Integer);
     procedure DeleteWordFromLeftOfCursor;
     procedure DeleteWordFromRightOfCursor;
@@ -870,7 +871,9 @@ end;
 
 procedure TACLCustomEdit.CalculateAutoHeight(var ANewHeight: Integer);
 begin
-  ANewHeight := CalculateTextHeight + dpiApply(4, FCurrentPPI) + IfThen(Borders, 2 * EditorBorderSize);
+  ANewHeight := CalculateTextHeight + dpiApply(4, FCurrentPPI);
+  if Borders then
+    Inc(ANewHeight, 2 * EditorBorderSize);
 end;
 
 procedure TACLCustomEdit.CalculateButtons(var R: TRect);
@@ -916,8 +919,8 @@ end;
 procedure TACLCustomEdit.SetTargetDPI(AValue: Integer);
 begin
   inherited SetTargetDPI(AValue);
-  Style.SetTargetDPI(AValue);
-  StyleButton.TargetDPI := (AValue);
+  Style.TargetDPI := AValue;
+  StyleButton.TargetDPI := AValue;
 end;
 
 procedure TACLCustomEdit.CreateHandle;
@@ -1033,13 +1036,18 @@ end;
 procedure TACLCustomEdit.EditorUpdateBounds;
 var
   LTemp: TRect;
+  LTempHeight: Integer;
+  LTempWidth: Integer;
 begin
   if FEditor <> nil then
   begin
     LTemp := CalculateEditorPosition;
+    LTempHeight := LTemp.Height;
+    LTempWidth := LTemp.Width;
+    TWinControlAccess(FEditor).CanAutoSize(LTempWidth, LTempHeight);
+    if LTempHeight <> LTemp.Height then
+      LTemp.CenterVert(LTempHeight);
     FEditor.BoundsRect := LTemp;
-    if FEditor.Height <> LTemp.Height then
-      FEditor.BoundsRect := LTemp.CenterTo(LTemp.Width, FEditor.Height);
     if HandleAllocated then
     begin
       if FEditor.Height > LTemp.Height then
@@ -1312,6 +1320,12 @@ begin
   DeleteNearWord(SelStart, 1);
 end;
 
+function TACLInnerEdit.CanAutoSize(var NewWidth, NewHeight: Integer): Boolean;
+begin
+  NewHeight := acFontHeight(Font);
+  Result := True;
+end;
+
 function TACLInnerEdit.CanType(Key: WideChar): Boolean;
 var
   LTemp: string;
@@ -1497,7 +1511,7 @@ end;
 procedure TACLInnerEdit.CalculatePreferredSize(
   var PreferredWidth, PreferredHeight: Integer; WithThemeSpace: Boolean);
 begin
-  PreferredHeight := acFontHeight(Font);
+  CanAutoSize(PreferredWidth, PreferredHeight);
 end;
 {$ENDIF}
 

@@ -27,6 +27,7 @@ uses
   // System
   {System.}Classes,
   {System.}Generics.Defaults,
+  {System.}Math,
   {System.}SysUtils,
   {System.}TypInfo,
   System.UITypes,
@@ -231,7 +232,7 @@ end;
 
 procedure TACLSearchEdit.SetChangeDelay(AValue: Integer);
 begin
-  FWaitTimer.Interval := MinMax(AValue, 0, 5000);
+  FWaitTimer.Interval := EnsureRange(AValue, 0, 5000);
 end;
 
 procedure TACLSearchEdit.SetFocusControl(const Value: TWinControl);

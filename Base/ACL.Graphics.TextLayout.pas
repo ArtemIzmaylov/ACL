@@ -2626,7 +2626,7 @@ end;
 
 procedure TACLTextLayoutCanvasRender.SetFont(AFont: TFont);
 begin
-  FCanvas.Font := AFont;
+  FCanvas.SetScaledFont(AFont);
 end;
 
 procedure TACLTextLayoutCanvasRender.Shrink(ABlock: TACLTextLayoutBlockText; AMaxSize: Integer);

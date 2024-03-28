@@ -1709,7 +1709,7 @@ begin
       Result := TACLResourceFont(Master).Height
     else
       // У нас все размеры определяются для 100% масштаба
-      Result := MulDiv(DefFontData.Height, acDefaultDPI, acGetSystemDpi);
+      Result := MulDiv(TACLApplication.DefaultFont.Height, acDefaultDPI, acGetSystemDpi);
 end;
 
 function TACLResourceFont.GetSize: Integer;
@@ -2607,6 +2607,7 @@ begin
     try
       FTargetDPI := AValue;
       DoSetTargetDPI(FTargetDPI);
+      Changed([apcLayout]);
     finally
       EndUpdate;
     end;

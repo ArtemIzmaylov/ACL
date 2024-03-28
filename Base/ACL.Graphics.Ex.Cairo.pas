@@ -959,7 +959,7 @@ begin
   if AWidth <> nil then
   begin
     cairo_text_extents(LCairo, PChar(S), @LTextExtents);
-    AWidth^ := Round(LTextExtents.width);
+    AWidth^ := Round(LTextExtents.x_advance);
   end;
 end;
 

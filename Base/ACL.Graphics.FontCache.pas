@@ -126,11 +126,67 @@ type
     class property RemapFontProc: TACLFontRemapProc read FRemapFontProc write FRemapFontProc;
   end;
 
+procedure acAssignFont(ATargetFont, ASourceFont: TFont; ATargetDpi, ASourceDpi: Integer);
+procedure acSetFontHeight(AFont: TFont; AHeight, ATargetDpi: Integer);
 implementation
 
 uses
   ACL.Hashes,
   ACL.Utils.Strings;
+
+procedure acAssignFont(ATargetFont, ASourceFont: TFont; ATargetDpi, ASourceDpi: Integer);
+begin
+  ATargetFont.Assign(ASourceFont);
+  ATargetFont.Height := dpiApply(dpiRevert(ASourceFont.Height, ASourceDpi), ATargetDpi);
+end;
+
+procedure acSetFontHeight(AFont: TFont; AHeight, ATargetDpi: Integer);
+var
+  APrevPixelsPerInch: Integer;
+  ATextMetric: TTextMetric;
+begin
+  if (ATargetDpi > 0) and (ATargetDpi <> acDefaultDpi) then
+  begin
+    if AHeight > 0 then
+    begin
+      APrevPixelsPerInch := MeasureCanvas.Font.PixelsPerInch;
+      try
+        // AI:
+        // https://support.microsoft.com/en-us/help/74299/info-calculating-the-logical-height-and-point-size-of-a-font
+        // https://jeffpar.github.io/kbarchive/kb/074/Q74299/
+        //
+        //                   -(Point Size * LOGPIXELSY)
+        //          height = --------------------------
+        //                                72
+        //
+        //          ----------  <------------------------------
+        //          |        |           |- Internal Leading  |
+        //          | |   |  |  <---------                    |
+        //          | |   |  |        |                       |- Cell Height
+        //          | |---|  |        |- Character Height     |
+        //          | |   |  |        |                       |
+        //          | |   |  |        |                       |
+        //          ----------  <------------------------------
+        //
+        //        The following formula computes the point size of a font:
+        //
+        //                       (Height - Internal Leading) * 72
+        //          Point Size = --------------------------------
+        //                                  LOGPIXELSY
+        //
+        MeasureCanvas.Font := AFont;
+        MeasureCanvas.Font.PixelsPerInch := acDefaultDpi;
+        MeasureCanvas.Font.Height := AHeight;
+        GetTextMetrics(MeasureCanvas.Handle, ATextMetric{%H-});
+      finally
+        MeasureCanvas.Font.PixelsPerInch := APrevPixelsPerInch;
+      end;
+      AHeight := -(ATextMetric.tmHeight - ATextMetric.tmInternalLeading);
+    end;
+    AHeight := MulDiv(AHeight, ATargetDpi, acDefaultDpi)
+  end;
+  AFont.Height := AHeight;
+end;
 
 { TACLFontData }
 
@@ -196,7 +252,12 @@ end;
 procedure TACLFontInfo.AssignTo(AFont: TFont);
 begin
   if Handle <> AFont.Handle then // Why VCL does not check it?
+  begin
     AFont.Assign(Self);
+  {$IFDEF FPC}
+    AFont.Height := Height;
+  {$ENDIF}
+  end;
 end;
 
 { TACLFontCache }

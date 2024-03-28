@@ -13,7 +13,7 @@ unit ACL.UI.Controls.CompoundControl.SubClass;
 
 {$I ACL.Config.inc} // FPC:Partial
 
-interface {$MESSAGE 'TODO - remove empty RecreateSubCells from descendants'}
+interface
 
 // FPC-TODO: TACLDropSource
 
@@ -1046,7 +1046,7 @@ end;
 
 function TACLCompoundControlPersistent.GetCurrentDpi: Integer;
 begin
-  Result := SubClass.Container.GetCurrentDpi;
+  Result := SubClass.CurrentDpi;
 end;
 
 { TACLCompoundControlCustomViewInfo }
@@ -2682,7 +2682,7 @@ end;
 
 function TACLCompoundControlSubClass.GetCurrentDpi: Integer;
 begin
-  Result := Container.GetCurrentDpi;
+  Result := StyleScrollBox.TargetDPI;
 end;
 
 function TACLCompoundControlSubClass.GetCursor(const P: TPoint): TCursor;
@@ -2707,7 +2707,6 @@ procedure TACLCompoundControlSubClass.SetTargetDPI(AValue: Integer);
 begin
   StyleScrollBox.TargetDPI := AValue;
   StyleHint.TargetDPI := AValue;
-  FullRefresh;
 end;
 
 procedure TACLCompoundControlSubClass.SetFocus;

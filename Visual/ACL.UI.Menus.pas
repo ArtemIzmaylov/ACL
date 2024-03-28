@@ -394,7 +394,7 @@ type
 
   TACLMenuPopupWindow = class;
 
-  TACLMenuWindow = class(TCustomControl, IACLMouseTracking)
+  TACLMenuWindow = class(TCustomScalableControl, IACLMouseTracking)
   {$REGION ' Internal Types '}
   protected const
     HitTestNoWhere  = -1;
@@ -608,6 +608,7 @@ type
       AChild: TACLMenuPopupWindow = nil): TRect; override;
     function CalculateSize(ACanvas: TCanvas; AItem: TMenuItem): TSize; override;
     function CanAutoSize(var NewWidth, NewHeight: Integer): Boolean; override;
+    procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
 
     //# Navigation
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
@@ -616,7 +617,6 @@ type
     function TranslateKey(Key: Word; Shift: TShiftState): Word; override;
 
     //# General
-    procedure ChangeScale(M, D: Integer{$IFNDEF FPC}; isDpiChange: Boolean{$ENDIF}); override;
     procedure Notification(AComponent: TComponent; AOperation: TOperation); override;
     procedure Paint; override;
     procedure PaintItem(AItem: TACLMenuWindow.TItemInfo; ASelected: Boolean);
@@ -2244,11 +2244,7 @@ end;
 
 procedure TACLMenuPopupWindow.InvalidateRect(const R: TRect);
 begin
-{$IFDEF FPC}
-  LCLIntf.InvalidateRect(Handle, @R, True);
-{$ELSE}
-  Winapi.Windows.InvalidateRect(Handle, R, True);
-{$ENDIF}
+  acInvalidateRect(Self, R);
 end;
 
 procedure TACLMenuPopupWindow.KeyDown(var Key: Word; Shift: TShiftState);
@@ -2796,7 +2792,7 @@ begin
   Result := True;
 end;
 
-procedure TACLMainMenu.ChangeScale(M, D: Integer{$IFNDEF FPC}; isDpiChange: Boolean{$ENDIF});
+procedure TACLMainMenu.ChangeScale(M, D: Integer; isDpiChange: Boolean);
 begin
   inherited;
   if Menu <> nil then

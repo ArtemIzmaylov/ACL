@@ -1383,27 +1383,6 @@ begin
   inherited Destroy;
 end;
 
-function TACLSlider.IsPositionStored: Boolean;
-begin
-  Result := not IsZero(FPosition)
-end;
-
-procedure TACLSlider.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
-begin
-  if csLoading in ComponentState then
-    inherited SetBounds(ALeft, ATop, AWidth, AHeight)
-  else
-  begin
-    ViewInfo.AdjustSize(AWidth, AHeight);
-    inherited SetBounds(ALeft, ATop, AWidth, AHeight);
-  end;
-end;
-
-procedure TACLSlider.SetDefaultSize;
-begin
-  SetBounds(0, 0, 20, 100);
-end;
-
 procedure TACLSlider.Calculate;
 begin
   if not (csDestroying in ComponentState) then
@@ -1706,6 +1685,27 @@ begin
   DrawText(Canvas, ViewInfo.LabelCurrentValue);
   DrawText(Canvas, ViewInfo.LabelMinValue);
   DrawText(Canvas, ViewInfo.LabelMaxValue);
+end;
+
+function TACLSlider.IsPositionStored: Boolean;
+begin
+  Result := not IsZero(FPosition)
+end;
+
+procedure TACLSlider.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
+begin
+  if (csLoading in ComponentState) or IsInScaling then
+    inherited SetBounds(ALeft, ATop, AWidth, AHeight)
+  else
+  begin
+    ViewInfo.AdjustSize(AWidth, AHeight);
+    inherited SetBounds(ALeft, ATop, AWidth, AHeight);
+  end;
+end;
+
+procedure TACLSlider.SetDefaultSize;
+begin
+  SetBounds(0, 0, 20, 100);
 end;
 
 procedure TACLSlider.UpdateThumbState(const P: TPoint);

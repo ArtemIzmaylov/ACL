@@ -16,6 +16,12 @@ unit ACL.UI.Controls.BindingDiagram.Types;
 interface
 
 uses
+{$IFDEF FPC}
+  LCLType,
+{$ELSE}
+  Windows,
+{$ENDIF}
+  // System
   {System.}Classes,
   {System.}SysUtils,
   {System.}Types,
@@ -65,6 +71,7 @@ type
       AMode: TACLBindingDiagramObjectPinModes;
       ATag: NativeInt = 0): TACLBindingDiagramObjectPin;
     procedure Clear;
+    procedure ChangeScale(M, D: Integer);
     procedure Delete(Index: Integer);
     function Find(const ACaption: string): TACLBindingDiagramObjectPin;
     //# Properties
@@ -163,6 +170,7 @@ type
       AArrows: TACLBindingDiagramLinkArrows = []): TACLBindingDiagramLink;
     procedure Clear;
     procedure ClearLinks;
+    procedure ChangeScale(M, D: Integer);
     function ContainsLink(ASource, ATarget: TACLBindingDiagramObjectPin): Boolean;
     //# Properties
     property ObjectCount: Integer read GetObjectCount;
@@ -223,6 +231,11 @@ begin
   finally
     EndUpdate;
   end;
+end;
+
+procedure TACLBindingDiagramObject.ChangeScale(M, D: Integer);
+begin
+  Position := Point(MulDiv(Position.X, M, D), MulDiv(Position.Y, M, D));
 end;
 
 procedure TACLBindingDiagramObject.Delete(Index: Integer);
@@ -461,6 +474,19 @@ begin
   BeginUpdate;
   try
     FLinks.Clear;
+  finally
+    EndUpdate;
+  end;
+end;
+
+procedure TACLBindingDiagramData.ChangeScale(M, D: Integer);
+var
+  I: Integer;
+begin
+  BeginUpdate;
+  try
+    for I := 0 to ObjectCount - 1 do
+      Objects[I].ChangeScale(M, D);
   finally
     EndUpdate;
   end;

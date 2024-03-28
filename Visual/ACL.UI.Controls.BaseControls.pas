@@ -11,7 +11,7 @@
 
 unit ACL.UI.Controls.BaseControls;
 
-{$I ACL.Config.inc} // FPC: Partial
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
@@ -345,9 +345,13 @@ type
   {$ENDIF}
   protected
   {$IFDEF FPC}
+    FCurrentPPI: Integer;
+
     procedure CalculatePreferredSize(var W, H: Integer; X: Boolean); override;
+    procedure DoAutoAdjustLayout(const AMode: TLayoutAdjustmentPolicy; const X, Y: Double); override;
+  {$ELSE}
+    procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override; final;
   {$ENDIF}
-    procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); {$IFDEF FPC}virtual;{$ELSE}override;{$ENDIF}
     procedure DoGetHint(const P: TPoint; var AHint: string); virtual;
     procedure Loaded; override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
@@ -388,6 +392,7 @@ type
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
+    procedure SetParent(NewParent: TWinControl); override;
     // IACLColorSchema
     procedure ApplyColorSchema(const ASchema: TACLColorSchema); virtual;
     // IACLControl
@@ -409,13 +414,35 @@ type
     property OnGetHint: TACLGetHintEvent read FOnGetHint write FOnGetHint;
   end;
 
+  { TCustomScalableControl }
+
+  TCustomScalableControl = class(TCustomControl,
+    IACLCurrentDpi)
+  protected
+    // IACLCurrentDpi
+    function GetCurrentDpi: Integer;
+    // TControl
+    procedure SetParent(NewParent: TWinControl); override;
+  {$IFDEF FPC}
+  protected
+    FCurrentPPI: Integer;
+    procedure ChangeScale(M, D: Integer); overload; override; final;
+    procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); overload; virtual;
+    procedure DoAutoAdjustLayout(const AMode: TLayoutAdjustmentPolicy; const X, Y: Double); override;
+  public
+    constructor Create(AOwner: TComponent); override;
+  {$ENDIF}
+  public
+    procedure ScaleForPPI(NewPPI: Integer); {$IFNDEF FPC}override;{$ENDIF}
+    class procedure ScaleOnSetParent(ACaller: TControl);
+  end;
+
   { TACLCustomControl }
 
   TACLCustomControlClass = class of TACLCustomControl;
-  TACLCustomControl = class(TCustomControl,
+  TACLCustomControl = class(TCustomScalableControl,
     IACLColorSchema,
     IACLControl,
-    IACLCurrentDpi,
     IACLFocusableControl,
     IACLLocalizableComponent,
     IACLMouseTracking,
@@ -446,7 +473,7 @@ type
     procedure MarginsChangeHandler(Sender: TObject);
     procedure PaddingChangeHandler(Sender: TObject);
     //# Messages
-    procedure CMDialogChar(var Message: TCMDialogChar); message CM_DIALOGCHAR;
+    procedure CMDialogChar(var Message: TCMDialogChar); message {%H-}CM_DIALOGCHAR;
     procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
     procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
     procedure CMHintShow(var Message: TCMHintShow); message CM_HINTSHOW;
@@ -470,10 +497,10 @@ type
   {$IFDEF FPC}
     procedure CalculatePreferredSize(var W, H: Integer; X: Boolean); override;
   {$ENDIF}
-    {$IFDEF FPC}{$MESSAGE WARN 'ChangeScale'}{$ENDIF}
-    procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); {$IFNDEF FPC}override;{$ENDIF}
+    procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
     function CreatePadding: TACLPadding; virtual;
     function DialogChar(var Message: TWMKey): Boolean; {$IFDEF FPC}override;{$ELSE}virtual;{$ENDIF}
+    function IsInScaling: Boolean;
     function GetClientRect: TRect; override;
     function GetContentOffset: TRect; virtual;
     procedure DoFullRefresh; virtual;
@@ -492,9 +519,6 @@ type
     procedure UpdateCursor;
     procedure UpdateTransparency; virtual;
     procedure WndProc(var Message: TMessage); override;
-
-    // IACLCurrentDpi
-    function GetCurrentDpi: Integer;
 
     // IACLMouseTracking
     function IsMouseAtControl: Boolean; virtual;
@@ -525,8 +549,6 @@ type
     procedure BeforeDestruction; override;
     procedure FullRefresh;
     procedure Invalidate; override;
-    {$IFDEF FPC}{$MESSAGE WARN 'ChangeScale'}{$ENDIF}
-    procedure ScaleForPPI(NewPPI: Integer); {$IFNDEF FPC}override;{$ENDIF}
     // IACLControl
     procedure InvalidateRect(const R: TRect); virtual;
     // IACLColorSchema
@@ -648,13 +670,12 @@ type
 
   TACLControlHelper = class helper for TControl
   public
+    function CalcCursorPos: TPoint;
   {$IFDEF FPC}
-    procedure SendCancelMode(Sender: TControl);
-    function FCurrentPPI: Integer;
     function ExplicitHeight: Integer;
     function ExplicitWidth: Integer;
+    procedure SendCancelMode(Sender: TControl);
   {$ENDIF}
-    function CalcCursorPos: TPoint;
   end;
 
   { TACLControls }
@@ -670,7 +691,8 @@ type
     class procedure WndProc(ACaller: TWinControl; var Message: TMessage);
     // Margins
     class procedure UpdateMargins(AControl: TControl;
-      AUseMargins: Boolean; AMargins: TACLPadding; ACurrentDpi: Integer);
+      AUseMargins: Boolean; AMargins: TACLPadding; ACurrentDpi: Integer); overload;
+    class procedure UpdateMargins(AControl: TControl; const AMargins: TRect); overload;
   end;
 
   { TACLMouseTracking }
@@ -750,6 +772,7 @@ function acCalculateScrollToDelta(AObjectTopValue, AObjectBottomValue: Integer;
 
 procedure acDrawTransparentControlBackground(AControl: TWinControl;
   DC: HDC; R: TRect; APaintWithChildren: Boolean = True);
+procedure acInvalidateRect(AControl: TWinControl; const ARect: TRect; AErase: Boolean = True);
 
 function acCanStartDragging(const ADeltaX, ADeltaY, ATargetDpi: Integer): Boolean; overload;
 function acCanStartDragging(const P0, P1: TPoint; ATargetDpi: Integer): Boolean; overload;
@@ -833,7 +856,7 @@ begin
   Result := GetKeyState(VK_CONTROL) < 0;
 end;
 
-function acShiftStateToKeys(AShift: TShiftState): WORD;
+function acShiftStateToKeys(AShift: TShiftState): Word;
 begin
   Result := 0;
   if ssShift in AShift then Inc(Result, MK_SHIFT);
@@ -918,6 +941,12 @@ begin
       RestoreDC(DC, ASaveIndex);
     end;
   end;
+end;
+
+procedure acInvalidateRect(AControl: TWinControl; const ARect: TRect; AErase: Boolean);
+begin
+  if AControl.HandleAllocated then
+    InvalidateRect(AControl.Handle, {$IFDEF FPC}@{$ENDIF}ARect, AErase);
 end;
 
 procedure acDesignerSetModified(AInvoker: TPersistent);
@@ -1420,24 +1449,25 @@ end;
 
 class procedure TACLControls.UpdateMargins(AControl: TControl;
   AUseMargins: Boolean; AMargins: TACLPadding; ACurrentDpi: Integer);
-var
-  LMargins: TRect;
 begin
   if AUseMargins then
-    LMargins := AMargins.GetScaledMargins(ACurrentDpi)
+    UpdateMargins(AControl, AMargins.GetScaledMargins(ACurrentDpi))
   else
-    LMargins := NullRect;
+    UpdateMargins(AControl, NullRect);
+end;
 
+class procedure TACLControls.UpdateMargins(AControl: TControl; const AMargins: TRect);
+begin
 {$IFDEF FPC}
   with TControlAccess(AControl).BorderSpacing do
 {$ELSE}
   with TControlAccess(AControl).Margins do
 {$ENDIF}
   begin
-    Left := LMargins.Left;
-    Top := LMargins.Top;
-    Right := LMargins.Right;
-    Bottom := LMargins.Bottom;
+    Left := AMargins.Left;
+    Top := AMargins.Top;
+    Right := AMargins.Right;
+    Bottom := AMargins.Bottom;
   end;
 end;
 
@@ -1588,9 +1618,12 @@ end;
 constructor TACLGraphicControl.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+{$IFDEF FPC}
+  FCurrentPPI := acDefaultDpi;
+{$ENDIF}
+  ControlStyle := ControlStyle + [csCaptureMouse];
   FMargins := TACLMargins.Create(TACLMargins.DefaultValue);
   FMargins.OnChanged := MarginsChangeHandler;
-  ControlStyle := ControlStyle + [csCaptureMouse];
 end;
 
 destructor TACLGraphicControl.Destroy;
@@ -1623,6 +1656,12 @@ begin
   CallNotifyEvent(Self, OnBoundsChanged);
 end;
 
+procedure TACLGraphicControl.SetParent(NewParent: TWinControl);
+begin
+  inherited SetParent(NewParent);
+  TCustomScalableControl.ScaleOnSetParent(Self);
+end;
+
 procedure TACLGraphicControl.ApplyColorSchema(const ASchema: TACLColorSchema);
 begin
   acApplyColorSchemaForPublishedProperties(Self, ASchema);
@@ -1652,6 +1691,25 @@ procedure TACLGraphicControl.CalculatePreferredSize(var W, H: Integer; X: Boolea
 begin
   CanAutoSize(W, H);
 end;
+
+procedure TACLGraphicControl.DoAutoAdjustLayout(
+  const AMode: TLayoutAdjustmentPolicy; const X, Y: Double);
+begin
+  inherited;
+  if AMode = lapAutoAdjustForDPI then
+  begin
+    FCurrentPPI := Round(Y * FCurrentPPI);
+    SetTargetDPI(FCurrentPPI);
+    MarginsChangeHandler(nil);
+  end;
+end;
+{$ELSE}
+procedure TACLGraphicControl.ChangeScale(M, D: Integer; isDpiChange: Boolean);
+begin
+  inherited;
+  SetTargetDPI(FCurrentPPI);
+  MarginsChangeHandler(nil);
+end;
 {$ENDIF}
 
 procedure TACLGraphicControl.DoGetHint(const P: TPoint; var AHint: string);
@@ -1660,29 +1718,10 @@ begin
     OnGetHint(Self, P.X, P.Y, AHint);
 end;
 
-procedure TACLGraphicControl.ChangeScale(M, D: Integer; isDpiChange: Boolean);
-begin
-{$IFNDEF FPC}
-  inherited;
-{$ENDIF}
-  SetTargetDPI(FCurrentPPI);
-  MarginsChangeHandler(nil);
-end;
-
 procedure TACLGraphicControl.InvalidateRect(const R: TRect);
-var
-  LRect: TRect;
 begin
-  if (Parent <> nil) and Parent.HandleAllocated then
-  begin
-    LRect := R;
-    LRect.Offset(Left, Top);
-  {$IFDEF FPC}
-    LCLIntf.InvalidateRect(Parent.Handle, @LRect, True);
-  {$ELSE}
-    Winapi.Windows.InvalidateRect(Parent.Handle, LRect, True);
-  {$ENDIF}
-  end;
+  if Parent <> nil then
+    acInvalidateRect(Parent, R.OffsetTo(Left, Top));
 end;
 
 function TACLGraphicControl.GetCurrentDpi: Integer;
@@ -1830,6 +1869,101 @@ begin
   // do nothing
 end;
 
+{ TCustomScalableControl }
+
+{$IFDEF FPC}
+constructor TCustomScalableControl.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+  FCurrentPPI := acDefaultDpi;
+end;
+
+procedure TCustomScalableControl.ChangeScale(M, D: Integer);
+begin
+  ChangeScale(M, D, False);
+end;
+
+procedure TCustomScalableControl.ChangeScale(M, D: Integer; isDpiChange: Boolean);
+begin
+  if isDpiChange then
+    FCurrentPPI := M
+  else
+    inherited ChangeScale(M, D);
+end;
+
+procedure TCustomScalableControl.DoAutoAdjustLayout(
+  const AMode: TLayoutAdjustmentPolicy; const X, Y: Double);
+begin
+  if AMode = lapAutoAdjustForDPI then
+  begin
+    Perform(CM_SCALECHANGING, 0, 0);
+    try
+      inherited;
+      ChangeScale(Round(X * FCurrentPPI), FCurrentPPI, True);
+    finally
+      Perform(CM_SCALECHANGED, 0, 0);
+    end;
+  end
+  else
+    inherited;
+end;
+{$ENDIF}
+
+function TCustomScalableControl.GetCurrentDpi: Integer;
+begin
+  Result := FCurrentPPI;
+end;
+
+procedure TCustomScalableControl.ScaleForPPI(NewPPI: Integer);
+begin
+{$IFDEF FPC}
+  AutoAdjustLayout(lapAutoAdjustForDPI, FCurrentPPI, NewPPI, 0, 0);
+{$ELSE}
+  Perform(CM_SCALECHANGING, 0, 0);
+  try
+    inherited ScaleForPPI(NewPPI);
+  finally
+    Perform(CM_SCALECHANGED, 0, 0);
+  end;
+{$ENDIF}
+end;
+
+procedure TCustomScalableControl.SetParent(NewParent: TWinControl);
+begin
+  inherited SetParent(NewParent);
+  ScaleOnSetParent(Self);
+end;
+
+class procedure TCustomScalableControl.ScaleOnSetParent(ACaller: TControl);
+{$IFDEF FPC}
+var
+  ASrcDpi, ADstDpi: Integer;
+{$ENDIF}
+begin
+  if csDestroying in ACaller.ComponentState then
+    Exit;
+  if ACaller.Parent = nil then
+    Exit;
+{$IF DEFINED(FPC)}
+  ASrcDpi := acGetCurrentDpi(ACaller);
+  ADstDpi := acGetCurrentDpi(ACaller.Parent);
+  if ASrcDpi <> ADstDpi then
+    ACaller.AutoAdjustLayout(lapAutoAdjustForDPI, ASrcDpi, ADstDpi, 0, 0);
+{$ELSEIF NOT DEFINED(DELPHI110ALEXANDRIA)}
+  // AI, 14.06.2023 (Delphi 10.4)
+  // csFreeNotification:
+  //   VCL не скейлит контрол, если у него есть этот флаг, делаем сами
+  // csDesigning:
+  //   Если вызывать GetParentCurrentDpi, то мы доберемся до главной
+  //   формы IDE и возьмем ее DPI, а не DPI дизайнера (они отличаются)
+  // Оба бага пофикшены в Delphi 11.0
+  if csDesigning in ACaller.Parent.ComponentState then
+    ACaller.ScaleForPPI(TControlAccess(ACaller.Parent).FCurrentPPI)
+  else if csFreeNotification in ACaller.ComponentState then
+    ACaller.ScaleForPPI(TControlAccess(ACaller).GetParentCurrentDpi);
+{$IFEND}
+end;
+
 { TACLCustomControl }
 
 constructor TACLCustomControl.Create(AOwner: TComponent);
@@ -1894,12 +2028,8 @@ end;
 
 procedure TACLCustomControl.InvalidateRect(const R: TRect);
 begin
-  if HandleAllocated and not (csDestroying in ComponentState) then
-  {$IFDEF FPC}
-    LCLIntf.InvalidateRect(Handle, @R, True);
-  {$ELSE}
-    Winapi.Windows.InvalidateRect(Handle, R, True);
-  {$ENDIF}
+  if not (csDestroying in ComponentState) then
+    acInvalidateRect(Self, R);
 end;
 
 procedure TACLCustomControl.ApplyColorSchema(const ASchema: TACLColorSchema);
@@ -2266,25 +2396,11 @@ begin
 end;
 {$ENDIF}
 
-procedure TACLCustomControl.ScaleForPPI(NewPPI: Integer);
-begin
-{$IFNDEF FPC}
-  Perform(CM_SCALECHANGING, 0, 0);
-  try
-    inherited ScaleForPPI(NewPPI);
-  finally
-    Perform(CM_SCALECHANGED, 0, 0);
-  end;
-{$ENDIF}
-end;
-
 procedure TACLCustomControl.ChangeScale(M, D: Integer; isDpiChange: Boolean);
 begin
   Perform(CM_SCALECHANGING, 0, 0);
   try
-  {$IFNDEF FPC}
     inherited;
-  {$ENDIF}
     SetTargetDPI(FCurrentPPI);
     MarginsChangeHandler(nil);
   finally
@@ -2306,6 +2422,11 @@ begin
 {$ENDIF}
 end;
 
+function TACLCustomControl.IsInScaling: Boolean;
+begin
+  Result := (FScaleChangeCount > 0){$IFNDEF FPC} or FIScaling{$ENDIF};
+end;
+
 function TACLCustomControl.GetClientRect: TRect;
 begin
   if HandleAllocated then
@@ -2317,11 +2438,6 @@ end;
 function TACLCustomControl.GetContentOffset: TRect;
 begin
   Result := NullRect;
-end;
-
-function TACLCustomControl.GetCurrentDpi: Integer;
-begin
-  Result := FCurrentPPI;
 end;
 
 function TACLCustomControl.GetLangSection: string;
@@ -2447,11 +2563,6 @@ begin
 end;
 
 {$IFDEF FPC}
-function TACLControlHelper.FCurrentPPI: Integer;
-begin
-  Result := Scale96ToScreen(acDefaultDpi);
-end;
-
 function TACLControlHelper.ExplicitHeight: Integer;
 begin
   Result := BorderSpacing.ControlHeight;

@@ -526,11 +526,11 @@ end;
 
 procedure TACLCalendarViewCustomCell.PrepareCanvas(ACanvas: TCanvas);
 begin
-  ACanvas.Brush.Style := bsClear;
-  ACanvas.Font := SubClass.Font;
+  ACanvas.SetScaledFont(SubClass.Font);
   ACanvas.Font.Color := GetTextColor;
   ACanvas.Font.Style := GetTextStyle;
   ACanvas.Font.ResolveHeight;
+  ACanvas.Brush.Style := bsClear;
 end;
 
 procedure TACLCalendarViewCustomCell.OnHotTrack(Action: TACLHotTrackAction);
@@ -985,7 +985,7 @@ var
   AIndent: Integer;
   ATextSize: TSize;
 begin
-  MeasureCanvas.Font := SubClass.Font;
+  MeasureCanvas.SetScaledFont(SubClass.Font);
   ATextSize := MeasureCanvas.TextExtent('Qq');
   AIndent := (R.Width div 7 - ATextSize.cx) div 2;
 

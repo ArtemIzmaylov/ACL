@@ -24,7 +24,9 @@ uses
   LCLIntf,
   LCLType,
 {$ELSE}
-  Windows,
+  Winapi.MultiMon,
+  Winapi.ShellScaling,
+  Winapi.Windows,
 {$ENDIF}
   // System
   {System.}Classes,
@@ -64,14 +66,10 @@ function acGetSystemDpi: Integer;
 function acTryGetCurrentDpi(AObject: TObject): Integer; // returns 0 if failed
 
 // Fonts
-{$IFDEF USE_VCL}
-procedure acAssignFont(ATargetFont, ASourceFont: TFont; ATargetDpi, ASourceDpi: Integer);
-{$ENDIF}
 function acGetFontHeight(AFontSize: Integer; ATargetDpi: Integer = acDefaultDpi): Integer;
 function acGetTargetDPI(const APoint: TPoint): Integer; overload;
 {$IFDEF USE_VCL}
 function acGetTargetDPI(const AControl: TWinControl): Integer; overload;
-procedure acSetFontHeight(AFont: TFont; AHeight, ATargetDpi: Integer);
 {$ENDIF}
 
 function dpiApply(const AValue: Integer; ATargetDpi: Integer): Integer; overload; inline;
@@ -94,7 +92,6 @@ uses
 {$ENDIF}
 {$IFDEF MSWINDOWS}
   ACL.Utils.Common,
-  ACL.Utils.Desktop,
 {$ENDIF}
   {System.}SysUtils;
 
@@ -113,62 +110,6 @@ begin
   Result := EnsureRange(AValue, acMinDpi, acMaxDpi);
 end;
 
-{$IFDEF USE_VCL}
-procedure acAssignFont(ATargetFont, ASourceFont: TFont; ATargetDpi, ASourceDpi: Integer);
-begin
-  ATargetFont.Assign(ASourceFont);
-  ATargetFont.Height := dpiApply(dpiRevert(ASourceFont.Height, ASourceDpi), ATargetDpi);
-end;
-
-procedure acSetFontHeight(AFont: TFont; AHeight, ATargetDpi: Integer);
-var
-  APrevPixelsPerInch: Integer;
-  ATextMetric: TTextMetric;
-begin
-  if (ATargetDpi > 0) and (ATargetDpi <> acDefaultDpi) then
-  begin
-    if AHeight > 0 then
-    begin
-      APrevPixelsPerInch := MeasureCanvas.Font.PixelsPerInch;
-      try
-        // AI:
-        // https://support.microsoft.com/en-us/help/74299/info-calculating-the-logical-height-and-point-size-of-a-font
-        // https://jeffpar.github.io/kbarchive/kb/074/Q74299/
-        //
-        //                   -(Point Size * LOGPIXELSY)
-        //          height = --------------------------
-        //                                72
-        //
-        //          ----------  <------------------------------
-        //          |        |           |- Internal Leading  |
-        //          | |   |  |  <---------                    |
-        //          | |   |  |        |                       |- Cell Height
-        //          | |---|  |        |- Character Height     |
-        //          | |   |  |        |                       |
-        //          | |   |  |        |                       |
-        //          ----------  <------------------------------
-        //
-        //        The following formula computes the point size of a font:
-        //
-        //                       (Height - Internal Leading) * 72
-        //          Point Size = --------------------------------
-        //                                  LOGPIXELSY
-        //
-        MeasureCanvas.Font := AFont;
-        MeasureCanvas.Font.PixelsPerInch := acDefaultDpi;
-        MeasureCanvas.Font.Height := AHeight;
-        GetTextMetrics(MeasureCanvas.Handle, ATextMetric{%H-});
-      finally
-        MeasureCanvas.Font.PixelsPerInch := APrevPixelsPerInch;
-      end;
-      AHeight := -(ATextMetric.tmHeight - ATextMetric.tmInternalLeading);
-    end;
-    AHeight := MulDiv(AHeight, ATargetDpi, acDefaultDpi)
-  end;
-  AFont.Height := AHeight;
-end;
-{$ENDIF}
-
 function acGetCurrentDpi(AObject: TObject): Integer;
 begin
   Result := acTryGetCurrentDpi(AObject);
@@ -182,13 +123,21 @@ begin
 end;
 
 function acGetTargetDPI(const APoint: TPoint): Integer;
-begin
 {$IFDEF MSWINDOWS}
+var
+  LDpi: Cardinal;
+  LMon: HMONITOR;
+begin
   if IsWin8OrLater then
-    Result := MonitorGet(APoint).PixelsPerInch
-  else
+  begin
+    LMon := MonitorFromPoint(APoint, MONITOR_DEFAULTTOPRIMARY);
+    if GetDpiForMonitor(LMon, TMonitorDpiType.MDT_EFFECTIVE_DPI, LDpi, LDpi) = S_OK then
+      Exit(LDpi);
+  end;
+{$ELSE}
+begin
 {$ENDIF}
-    Result := acGetSystemDpi;
+  Result := acGetSystemDpi;
 end;
 
 {$IFDEF USE_VCL}
@@ -213,7 +162,7 @@ end;
 
 function acGetSystemDpi: Integer;
 var
-  DC: Integer;
+  DC: HDC;
 begin
   if FSystemDpiCache = 0 then
   begin

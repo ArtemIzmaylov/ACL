@@ -67,7 +67,9 @@ type
     class var FListeners: TACLListenerList;
     class var FTargetDPI: Integer;
 
+  {$IFDEF FPC}
     class procedure DefaultFontChanged(Sender: TObject);
+  {$ENDIF}
     class function DecodeColorScheme(const AValue: Word): TACLColorSchema;
     class function EncodeColorScheme(const AValue: TACLColorSchema): Word;
     class function GetDefaultFont: TFont; static;
@@ -134,8 +136,6 @@ uses
 
 class constructor TACLApplication.Create;
 begin
-  FDefaultFont := TFont.Create;
-  FDefaultFont.OnChange := DefaultFontChanged;
   UpdateColorSet;
 end;
 
@@ -176,6 +176,12 @@ end;
 class function TACLApplication.GetDefaultFont: TFont;
 begin
 {$IFDEF FPC}
+  if FDefaultFont = nil then
+  begin
+    FDefaultFont := TFont.Create;
+    FDefaultFont.ResolveHeight;
+    FDefaultFont.OnChange := DefaultFontChanged;
+  end;
   Result := FDefaultFont;
 {$ELSE}
   Result := Application.DefaultFont;
@@ -347,10 +353,12 @@ begin
   {$ENDIF}
 end;
 
+{$IFDEF FPC}
 class procedure TACLApplication.DefaultFontChanged(Sender: TObject);
 begin
   Changed([acDefaultFont]);
 end;
+{$ENDIF}
 
 class function TACLApplication.DecodeColorScheme(const AValue: Word): TACLColorSchema;
 begin

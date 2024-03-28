@@ -1867,8 +1867,9 @@ begin
   Result := acFontHeight(MeasureCanvas) + GetContentOffsets.MarginsHeight;
 end;
 
-function TACLTreeListNodeViewInfo.CalculateCellAutoWidth(ACanvas: TCanvas;
-  ANode: TACLTreeListNode; AColumnIndex: Integer; AColumnViewInfo: TACLTreeListColumnViewInfo = nil): Integer;
+function TACLTreeListNodeViewInfo.CalculateCellAutoWidth(
+  ACanvas: TCanvas; ANode: TACLTreeListNode; AColumnIndex: Integer;
+  AColumnViewInfo: TACLTreeListColumnViewInfo = nil): Integer;
 var
   AText: string;
   ATextAlign: TAlignment;
@@ -4095,13 +4096,14 @@ begin
   end;
 end;
 
-procedure TACLTreeListSubClass.StylePrepareFont(ACanvas: TCanvas; AFontIndex: Integer; ASuperscript: Boolean);
+procedure TACLTreeListSubClass.StylePrepareFont(
+  ACanvas: TCanvas; AFontIndex: Integer; ASuperscript: Boolean);
 begin
   ACanvas.Refresh;
   ACanvas.Brush.Style := bsSolid;
 
   if AFontIndex < 0 then
-    ACanvas.Font := Font
+    ACanvas.SetScaledFont(Font)
   else
     ACanvas.Font.Assign(Style.GetFont(AFontIndex));
 

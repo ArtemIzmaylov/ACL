@@ -619,12 +619,9 @@ end;
 
 procedure TACLHexViewCharacterSet.SetFont(AValue: TFont);
 begin
-  if FFont <> AValue then
-  begin
-    ReleaseViewInfo;
-    FFont := AValue;
-    CreateViewInfo;
-  end;
+  ReleaseViewInfo;
+  FFont := AValue;
+  CreateViewInfo;
 end;
 
 { TACLHexViewHexCharacterSet }
@@ -754,8 +751,8 @@ end;
 
 procedure TACLHexViewSubClass.SetTargetDPI(AValue: Integer);
 begin
-  Style.SetTargetDPI(AValue);
   inherited SetTargetDPI(AValue);
+  Style.TargetDPI := AValue;
 end;
 
 function TACLHexViewSubClass.CreateStyle: TACLHexViewStyle;
