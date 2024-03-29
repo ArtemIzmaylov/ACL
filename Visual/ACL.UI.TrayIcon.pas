@@ -90,11 +90,9 @@ type
     FOnBallonHintClick: TNotifyEvent;
     FOnClick: TNotifyEvent;
     FOnDblClick: TNotifyEvent;
-    FOnMouseDown: TMouseEvent;
+    FOnMidClick: TNotifyEvent;
     FOnMouseEnter: TNotifyEvent;
     FOnMouseExit: TNotifyEvent;
-    FOnMouseMove: TMouseMoveEvent;
-    FOnMouseUp: TMouseEvent;
 
     function IsClickTimerRequired: Boolean;
     procedure SetEnabled(AValue: Boolean);
@@ -111,11 +109,8 @@ type
     // Events
     procedure DoClick; dynamic;
     procedure DoDblClick; dynamic;
-    procedure DoMouseDown(Button: TMouseButton; Shift: TShiftState; const P: TPoint); dynamic;
-    procedure DoMouseMove(Shift: TShiftState; const P: TPoint); dynamic;
-    procedure DoMouseUp(Button: TMouseButton; Shift: TShiftState; const P: TPoint); dynamic;
+    procedure DoMidClick; dynamic;
     // Mouse
-    procedure MouseDown(Nop: TObject; Button: TMouseButton; Shift: TShiftState; x, Y: Integer);
     procedure MouseMove(Nop: TObject; Shift: TShiftState; X, Y: Integer);
     procedure MouseUp(Nop: TObject; Button: TMouseButton; Shift: TShiftState; x, Y: Integer);
     // IACLCurrentDpi
@@ -148,11 +143,9 @@ type
     property OnBallonHintClick: TNotifyEvent read FOnBallonHintClick write FOnBallonHintClick;
     property OnClick: TNotifyEvent read FOnClick write FOnClick;
     property OnDblClick: TNotifyEvent read FOnDblClick write FOnDblClick;
-    property OnMouseDown: TMouseEvent read FOnMouseDown write FOnMouseDown;
+    property OnMidClick: TNotifyEvent read FOnMidClick write FOnMidClick;
     property OnMouseEnter: TNotifyEvent read FOnMouseEnter write FOnMouseEnter;
     property OnMouseExit: TNotifyEvent read FOnMouseExit write FOnMouseExit;
-    property OnMouseMove: TMouseMoveEvent read FOnMouseMove write FOnMouseMove;
-    property OnMouseUp: TMouseEvent read FOnMouseUp write FOnMouseUp;
   end;
 
 function acTrayIconGetIsMouseAtIcon: Boolean;
@@ -274,19 +267,9 @@ begin
     CallNotifyEvent(Self, OnDblClick);
 end;
 
-procedure TACLTrayIcon.DoMouseDown(Button: TMouseButton; Shift: TShiftState; const P: TPoint);
+procedure TACLTrayIcon.DoMidClick;
 begin
-  if Assigned(OnMouseDown) then OnMouseDown(Self, Button, Shift, P.X, P.Y);
-end;
-
-procedure TACLTrayIcon.DoMouseUp(Button: TMouseButton; Shift: TShiftState; const P: TPoint);
-begin
-  if Assigned(OnMouseUp) then OnMouseUp(Self, Button, Shift, P.X, P.Y);
-end;
-
-procedure TACLTrayIcon.DoMouseMove(Shift: TShiftState; const P: TPoint);
-begin
-  if Assigned(OnMouseMove) then OnMouseMove(Self, Shift, P.X, P.Y);
+  CallNotifyEvent(Self, OnMidClick);
 end;
 
 function TACLTrayIcon.GetCurrentDpi: Integer;
@@ -305,48 +288,37 @@ begin
   CallNotifyEvent(Self, OnMouseEnter);
 end;
 
-procedure TACLTrayIcon.MouseDown(Nop: TObject;
-  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
-begin
-  DoMouseDown(Button, Shift, Point(X, Y));
-end;
-
 procedure TACLTrayIcon.MouseMove(Nop: TObject; Shift: TShiftState; X, Y: Integer);
 begin
-  FLastMousePos := Point(X, Y);
   MouseTracker.Add(Self);
-  DoMouseMove(Shift, FLastMousePos);
+  FLastMousePos := Point(X, Y);
 end;
 
 procedure TACLTrayIcon.MouseUp(Nop: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
-var
-  ALink: TObject;
 begin
-  TACLObjectLinks.RegisterWeakReference(Self, @ALink);
-  try
-    case Button of
-      mbLeft:
-        if IsClickTimerRequired then
+  case Button of
+    mbLeft:
+      if IsClickTimerRequired then
+      begin
+        if not ClickTimer.Enabled then
         begin
-          if not ClickTimer.Enabled then
-          begin
-            ClickTimer.Enabled := True;
-            ClickTimer.Tag := 0;
-          end;
-          ClickTimer.Tag := ClickTimer.Tag + 1;
-        end
-        else
-          DoClick;
+          ClickTimer.Enabled := True;
+          ClickTimer.Tag := 0;
+        end;
+        ClickTimer.Tag := ClickTimer.Tag + 1;
+        if ClickTimer.Tag > 1 then
+          HandlerClickTimer(nil);
+      end
+      else
+        DoClick;
 
-      mbRight:
-        PopupAtCursor;
-    else;
-    end;
-    if ALink <> nil then
-      DoMouseUp(Button, Shift, Point(X, Y));
-  finally
-    TACLObjectLinks.UnregisterWeakReference(@ALink);
+    mbRight:
+      PopupAtCursor;
+
+    mbMiddle:
+      DoMidClick;
+  else;
   end;
 end;
 
@@ -547,19 +519,13 @@ begin
     LCurPos := MouseCursorPos;
     case Message.lParam of
       WM_MOUSEMOVE:
-        Icon.MouseMove(nil, acGetShiftState, LCurPos.X, LCurPos.Y);
-      WM_LBUTTONDOWN:
-        Icon.MouseDown(nil, mbLeft, acGetShiftState, LCurPos.X, LCurPos.Y);
-      WM_RBUTTONDOWN:
-        Icon.MouseDown(nil, mbRight, acGetShiftState, LCurPos.X, LCurPos.Y);
-      WM_MBUTTONDOWN:
-        Icon.MouseDown(nil, mbMiddle, acGetShiftState, LCurPos.X, LCurPos.Y);
+        Icon.MouseMove(nil, [], LCurPos.X, LCurPos.Y);
       WM_LBUTTONUP:
-        Icon.MouseUp(nil, mbLeft, acGetShiftState, LCurPos.X, LCurPos.Y);
+        Icon.MouseUp(nil, mbLeft, [], LCurPos.X, LCurPos.Y);
       WM_RBUTTONUP:
-        Icon.MouseUp(nil, mbRight, acGetShiftState, LCurPos.X, LCurPos.Y);
+        Icon.MouseUp(nil, mbRight, [], LCurPos.X, LCurPos.Y);
       WM_MBUTTONUP:
-        Icon.MouseUp(nil, mbMiddle, acGetShiftState, LCurPos.X, LCurPos.Y);
+        Icon.MouseUp(nil, mbMiddle, [], LCurPos.X, LCurPos.Y);
       NIN_BALLOONUSERCLICK:
         CallNotifyEvent(Icon, Icon.OnBallonHintClick);
     end;
@@ -575,7 +541,6 @@ constructor TLCLTrayIconImpl.Create(AIcon: TACLTrayIcon);
 begin
   inherited Create(AIcon);
   FTrayIcon := TTrayIcon.Create(nil);
-  FTrayIcon.OnMouseDown := Icon.MouseDown;
   FTrayIcon.OnMouseMove := Icon.MouseMove;
   FTrayIcon.OnMouseUp := Icon.MouseUp;
   FBalloonTimer := TACLTimer.CreateEx(HandlerBalloonTimeOut, FTrayIcon.BalloonTimeout);
