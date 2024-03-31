@@ -169,18 +169,17 @@ type
 
   TACLTreeListColumnCustomDragObject = class(TACLCompoundControlDragObject)
   strict private
+    FColumn: TACLTreeListColumn;
     FColumnViewInfo: TACLTreeListColumnViewInfo;
-
-    function GetColumn: TACLTreeListColumn;
+    FSubClass: TACLTreeListSubClass;
     function GetColumnBarViewInfo: TACLTreeListColumnBarViewInfo;
-    function GetSubClass: TACLTreeListSubClass;
   public
     constructor Create(AColumnViewInfo: TACLTreeListColumnViewInfo); virtual;
     //# Properties
-    property Column: TACLTreeListColumn read GetColumn;
+    property Column: TACLTreeListColumn read FColumn;
     property ColumnBarViewInfo: TACLTreeListColumnBarViewInfo read GetColumnBarViewInfo;
     property ColumnViewInfo: TACLTreeListColumnViewInfo read FColumnViewInfo;
-    property SubClass: TACLTreeListSubClass read GetSubClass;
+    property SubClass: TACLTreeListSubClass read FSubClass;
   end;
 
   { TACLTreeListColumnDragMoveObject }
@@ -724,7 +723,8 @@ begin
   // do nothing
 end;
 
-procedure TACLTreeListCustomDragSortingObject.DropSourceEnd(AActions: TACLDropSourceActions; AShiftState: TShiftState);
+procedure TACLTreeListCustomDragSortingObject.DropSourceEnd(
+  AActions: TACLDropSourceActions; AShiftState: TShiftState);
 begin
   UpdateDropTarget(nil);
 end;
@@ -745,21 +745,13 @@ constructor TACLTreeListColumnCustomDragObject.Create(AColumnViewInfo: TACLTreeL
 begin
   inherited Create;
   FColumnViewInfo := AColumnViewInfo;
-end;
-
-function TACLTreeListColumnCustomDragObject.GetColumn: TACLTreeListColumn;
-begin
-  Result := ColumnViewInfo.Column;
+  FColumn := ColumnViewInfo.Column;
+  FSubClass := ColumnViewInfo.SubClass;
 end;
 
 function TACLTreeListColumnCustomDragObject.GetColumnBarViewInfo: TACLTreeListColumnBarViewInfo;
 begin
   Result := SubClass.ViewInfo.Content.ColumnBarViewInfo;
-end;
-
-function TACLTreeListColumnCustomDragObject.GetSubClass: TACLTreeListSubClass;
-begin
-  Result := ColumnViewInfo.SubClass;
 end;
 
 { TACLTreeListColumnDragMoveObject }

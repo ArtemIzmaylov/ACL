@@ -510,6 +510,7 @@ type
     procedure FocusChanged; virtual;
     procedure Loaded; override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
+    procedure Paint; override;
     procedure PaintWindow(DC: HDC); override;
   {$IFNDEF FPC}
     procedure Resize; override;
@@ -2127,6 +2128,12 @@ begin
   if FocusOnClick then
     SetFocusOnClick;
   inherited MouseDown(Button, Shift, X, Y);
+end;
+
+procedure TACLCustomControl.Paint;
+begin
+  Canvas.Brush.Color := Color;
+  Canvas.FillRect(ClientRect);
 end;
 
 procedure TACLCustomControl.PaintWindow(DC: HDC);

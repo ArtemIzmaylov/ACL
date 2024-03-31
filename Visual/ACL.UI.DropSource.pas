@@ -298,20 +298,31 @@ type
     property Owner: IUnknown read FOwner;
   end;
 
-  {$ELSE}
+{$ELSE}
 
+  { TACLDragDropDataProviderConfig }
+
+  TACLDragDropDataProviderConfig = class
+  public
+    constructor Create(AOwner: TObject);
+  end;
   TACLDropSource = class
-
+  public
+    AllowedActions: TACLDropSourceActions;
+    DataProviders: TACLObjectList;
+    constructor Create(AOwner: IUnknown);
+    procedure ExecuteInThread;
   end;
 
-  {$ENDIF}
+{$ENDIF}
 
   { TACLDropSourceOwnerProxy }
 
   TACLDropSourceOwnerProxy = class(TACLInterfacedObject)
   protected
     FOwner: TObject;
-    function QueryInterface({$IFDEF FPC}constref{$ELSE}const{$ENDIF} IID: TGUID; out Obj): HRESULT; override;
+    function QueryInterface({$IFDEF FPC}constref{$ELSE}const{$ENDIF}
+      IID: TGUID; out Obj): HRESULT; override;
   public
     constructor Create(AOwner: TObject);
     destructor Destroy; override;
@@ -1122,6 +1133,16 @@ begin
   except
     Terminate;
   end;
+end;
+{$ELSE}
+constructor TACLDragDropDataProviderConfig.Create(AOwner: TObject);
+begin
+end;
+constructor TACLDropSource.Create(AOwner: IUnknown);
+begin
+end;
+procedure TACLDropSource.ExecuteInThread;
+begin
 end;
 {$ENDIF}
 

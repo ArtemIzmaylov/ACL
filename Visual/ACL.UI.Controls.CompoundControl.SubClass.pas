@@ -11,11 +11,9 @@
 
 unit ACL.UI.Controls.CompoundControl.SubClass;
 
-{$I ACL.Config.inc} // FPC:Partial
+{$I ACL.Config.inc} // FPC:OK
 
 interface
-
-// FPC-TODO: TACLDropSource
 
 uses
 {$IFDEF FPC}
@@ -1415,22 +1413,18 @@ end;
 procedure TACLCompoundControlDragAndDropController.StartDropSource(
   AActions: TACLDropSourceActions; ASource: IACLDropSourceOperation; ASourceObject: TObject);
 var
-  ADropSource: TACLDropSource;
+  LDropSource: TACLDropSource;
 begin
   DropSourceConfig.Clear;
   if CanStartDropSource(AActions, ASourceObject) and (AActions <> []) then
   begin
     FDropSourceObject := ASourceObject;
     FDropSourceOperation := ASource;
-  {$IFDEF MSWINDOWS}
-    ADropSource := TACLDropSource.Create(TACLDropSourceOwnerProxy.Create(Self));
-    ADropSource.AllowedActions := AActions;
-    ADropSource.DataProviders.Add(TACLDragDropDataProviderConfig.Create(DropSourceConfig));
-    SubClass.DoDropSourceGetData(ADropSource, DropSourceConfig);
-    ADropSource.ExecuteInThread;
-  {$ELSE}
-    {$MESSAGE WARN 'NotImplemented'}
-  {$ENDIF}
+    LDropSource := TACLDropSource.Create(TACLDropSourceOwnerProxy.Create(Self));
+    LDropSource.AllowedActions := AActions;
+    LDropSource.DataProviders.Add(TACLDragDropDataProviderConfig.Create(DropSourceConfig));
+    SubClass.DoDropSourceGetData(LDropSource, DropSourceConfig);
+    LDropSource.ExecuteInThread;
   end;
 end;
 
@@ -1482,11 +1476,13 @@ begin
       if FDragObject.Preview <> nil then
       begin
         FDragWindow := TDragImageList.Create(nil);
+        FDragWindow.DragCursor := FDragObject.HitTest.Cursor;
         FDragWindow.Height := FDragObject.Preview.Height;
         FDragWindow.Width := FDragObject.Preview.Width;
         FDragWindow.Add(FDragObject.Preview, nil);
         with MouseCursorPos do
-          DragWindow.BeginDrag(SubClass.Container.GetControl.Handle, X, Y);
+          DragWindow.BeginDrag({$IFDEF FPC}0{$ELSE}GetDesktopWindow{$ENDIF}, X, Y);
+        FDragWindow.ShowDragImage;
         SetDragImageListOpacity(128);
       end;
   end;
@@ -1499,7 +1495,6 @@ begin
     FIsActive := False;
     FreeAndNil(FAutoScrollTimer);
     DragObject.DragFinished(ACanceled);
-    UpdateCursor(crDefault);
     if DragWindow <> nil then
     try
       DragWindow.EndDrag;
@@ -1508,6 +1503,7 @@ begin
     end;
   finally
     FreeAndNil(FDragObject);
+    UpdateCursor(crDefault);
   end;
 end;
 
