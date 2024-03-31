@@ -13,13 +13,6 @@ unit ACL.UI.Controls.ScrollBox;
 
 {$I ACL.Config.inc} // FPC:OK
 
-{$IFNDEF FPC}
-  // Для кроссплатформенной реализации, скроллбокс кладет все дочерние контролы
-  // на специальный контрол-подложку. Однако в Delphi в design-time этот подход
-  // не работает. Delphi "не видит" подложку и неправильно строит дерево Structure.
-  {$DEFINE SB_DT_WORKAROUND}
-{$ENDIF}
-
 interface
 
 uses
@@ -27,9 +20,9 @@ uses
   LCLIntf,
   LCLType,
 {$ELSE}
-  {Winapi.}Messages,
   {Winapi.}Windows,
 {$ENDIF}
+  {Winapi.}Messages,
   // System
   {System.}Classes,
   {System.}Math,
@@ -40,20 +33,17 @@ uses
   {Vcl.}Controls,
   {Vcl.}Graphics,
   {Vcl.}Forms,
+  {Vcl.}StdCtrls,
   // ACL
   ACL.Geometry,
-  ACL.Geometry.Utils,
   ACL.Graphics,
   ACL.Graphics.Ex,
   ACL.UI.Controls.BaseControls,
-  ACL.UI.Controls.CompoundControl,
-  ACL.UI.Controls.CompoundControl.SubClass,
   ACL.UI.Controls.ScrollBar,
   ACL.UI.Resources,
   ACL.Utils.Common;
 
 type
-  TACLScrollBoxViewInfo = class;
 
   { TACLScrollBoxStyle }
 
@@ -71,52 +61,68 @@ type
     property ColorContent2: TACLResourceColor index 3 read GetColor write SetColor stored IsColorStored;
   end;
 
-  { TACLCustomScrollBox }
+  { TACLCustomScrollingControl }
 
-  TACLCustomScrollBox = class(TACLCompoundControl)
+  TACLCustomScrollingControl = class(TACLCustomControl)
   strict private
-    FBorders: TACLBorders;
-    FContentHost: TWinControl;
+    FBorders: TBorderStyle;
+    FHorzScrollBar: TACLScrollBar;
+    FVertScrollBar: TACLScrollBar;
+    FSizeGrip: TACLCustomControl;
+    FStyle: TACLScrollBoxStyle;
 
     FOnCustomDraw: TACLCustomDrawEvent;
 
-    function GetBordersWidth: TRect;
-    function GetStyle: TACLScrollBoxStyle;
-    function GetViewInfo: TACLScrollBoxViewInfo;
-    function GetViewPoint: TPoint;
-    procedure SetBorders(AValue: TACLBorders);
+    function CreateScrollBar(AKind: TScrollBarKind): TACLScrollBar;
+    procedure SetBorders(AValue: TBorderStyle);
     procedure SetStyle(AValue: TACLScrollBoxStyle);
-    procedure SetViewPoint(const Value: TPoint);
   protected
-    procedure AlignControls(AControl: TControl; var Rect: TRect); override;
-    procedure BoundsChanged; override;
-    function CalculateRange(AContentHost: TWinControl): TSize; virtual;
-    function CreateSubClass: TACLCompoundControlSubClass; override;
+    procedure AdjustClientRect(var ARect: TRect); override;
+    procedure AlignControls(AControl: TControl; var ARect: TRect); override;
+    procedure AlignScrollBars(const ARect: TRect); virtual;
+    function CreateStyle: TACLScrollBoxStyle; virtual;
+    procedure CreateWnd; override;
+    function IsInternalControl(AControl: TControl): Boolean;
     procedure Paint; override;
+    procedure PaintWindow(DC: HDC); override;
+    procedure Scroll(Sender: TObject; ScrollCode: TScrollCode; var ScrollPos: Integer); virtual;
+    procedure ScrollContent(dX, dY: Integer); virtual;
+    procedure SetScrollParams(ABar: TACLScrollBar; AClientSize, AContentSize: Integer);
+    procedure SetTargetDPI(AValue: Integer); override;
+    procedure UpdateBorders(AJustCreated: Boolean = False);
     procedure UpdateTransparency; override;
-  {$IFNDEF FPC}
-    procedure WndProc(var Message: TMessage); override;
-  {$ENDIF}
-    //# Properties
-    property ContentHost: TWinControl read FContentHost;
-    property ViewInfo: TACLScrollBoxViewInfo read GetViewInfo;
+    //# Messages
+    procedure WMNCCalcSize(var Msg: TMessage); message WM_NCCALCSIZE;
+    procedure WMNCPaint(var Msg: TMessage); message WM_NCPAINT;
     //# Events
     property OnCustomDraw: TACLCustomDrawEvent read FOnCustomDraw write FOnCustomDraw;
   public
     constructor Create(AOwner: TComponent); override;
-  {$IFDEF FPC}
-    procedure InsertControl(AControl: TControl; Index: Integer); override;
-  {$ENDIF}
+    destructor Destroy; override;
+    procedure ScrollBy(dX, dY: Integer); {$IFDEF FPC}override; final;{$ENDIF}
+    //# Properties
+    property Borders: TBorderStyle read FBorders write SetBorders default bsSingle;
+    property HorzScrollBar: TACLScrollBar read FHorzScrollBar;
+    property VertScrollBar: TACLScrollBar read FVertScrollBar;
+    property Style: TACLScrollBoxStyle read FStyle write SetStyle;
+  end;
+
+  { TACLCustomScrollBox }
+
+  TACLCustomScrollBox = class(TACLCustomScrollingControl)
+  strict private
+    FAutoRangeLockCount: Integer;
+  protected
+    procedure AlignScrollBars(const ARect: TRect); override;
+    function CalculateRange: TSize; virtual;
+    procedure ScrollContent(dX, dY: Integer); override;
+    //# Messages
+    procedure CMFocusChanged(var Msg: TMessage); message CM_FOCUSCHANGED;
+  public
     procedure DisableAutoRange;
     procedure EnableAutoRange;
-    procedure GetChildren(Proc: TGetChildProc; Root: TComponent); override;
     procedure MakeVisible(AControl: TControl); overload;
     procedure MakeVisible(ARect: TRect); overload;
-    procedure ScrollBy(DeltaX, DeltaY: Integer); reintroduce;
-    //# Properties
-    property Borders: TACLBorders read FBorders write SetBorders default acAllBorders;
-    property Style: TACLScrollBoxStyle read GetStyle write SetStyle;
-    property ViewPoint: TPoint read GetViewPoint write SetViewPoint;
   end;
 
   { TACLScrollBox }
@@ -130,37 +136,33 @@ type
     property OnCustomDraw;
   end;
 
-  { TACLScrollBoxContentHost }
+implementation
 
-  TACLScrollBoxContentHost = class(TACLCustomControl)
-  protected
-    procedure AdjustClientRect(var ARect: TRect); override;
+{$IFDEF LCLGtk2}
+uses
+  ACL.UI.Application.Gtk2;
+{$ENDIF}
+
+type
+
+  { TACLSizeGrip }
+
+  TACLSizeGrip = class(TACLCustomControl)
+  public
     procedure Paint; override;
   end;
 
-  { TACLScrollBoxSubClass }
+{ TACLSizeGrip }
 
-  TACLScrollBoxSubClass = class(TACLCompoundControlSubClass)
-  protected
-    function CreateStyleScrollBox: TACLStyleScrollBox; override;
-    function CreateViewInfo: TACLCompoundControlCustomViewInfo; override;
-  end;
-
-  { TACLScrollBoxViewInfo }
-
-  TACLScrollBoxViewInfo = class(TACLCompoundControlScrollContainerViewInfo)
-  strict private
-    function GetControl: TACLCustomScrollBox;
-  protected
-    procedure CalculateContentLayout; override;
-    procedure ContentScrolled(ADeltaX: Integer; ADeltaY: Integer); override;
-  end;
-
-implementation
+procedure TACLSizeGrip.Paint;
+begin
+  TACLCustomScrollingControl(Parent).Style.DrawSizeGripArea(Canvas, ClientRect);
+end;
 
 { TACLScrollBoxStyle }
 
-procedure TACLScrollBoxStyle.DrawBorder(ACanvas: TCanvas; const R: TRect; const ABorders: TACLBorders);
+procedure TACLScrollBoxStyle.DrawBorder(
+  ACanvas: TCanvas; const R: TRect; const ABorders: TACLBorders);
 begin
   acDrawComplexFrame(ACanvas, R, ColorBorder1.Value, ColorBorder2.Value, ABorders);
 end;
@@ -184,42 +186,245 @@ begin
   ColorContent2.InitailizeDefaults('Common.Colors.Background2', True);
 end;
 
-{ TACLCustomScrollBox }
+{ TACLCustomScrollingControl }
 
-constructor TACLCustomScrollBox.Create(AOwner: TComponent);
+constructor TACLCustomScrollingControl.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   ControlStyle := ControlStyle + [csAcceptsControls];
-  FContentHost := TACLScrollBoxContentHost.Create(Self);
-{$IFDEF SB_DT_WORKAROUND}
-  FContentHost.ControlStyle := FContentHost.ControlStyle + [csNoDesignVisible];
-{$ENDIF}
-  FContentHost.SetSubComponent(True);
-  FContentHost.Parent := Self;
-  FBorders := acAllBorders;
+  FBorders := bsSingle;
+  FSizeGrip := TACLSizeGrip.Create(Self);
+  FSizeGrip.Visible := False;
+  FSizeGrip.Parent := Self;
+  FStyle := CreateStyle;
+  FHorzScrollBar := CreateScrollBar(sbHorizontal);
+  FVertScrollBar := CreateScrollBar(sbVertical);
 end;
 
-procedure TACLCustomScrollBox.AlignControls(AControl: TControl; var Rect: TRect);
+destructor TACLCustomScrollingControl.Destroy;
+begin
+  FreeAndNil(FHorzScrollBar);
+  FreeAndNil(FVertScrollBar);
+  FreeAndNil(FSizeGrip);
+  FreeAndNil(FStyle);
+  inherited Destroy;
+end;
+
+procedure TACLCustomScrollingControl.AdjustClientRect(var ARect: TRect);
+begin
+  if VertScrollBar.Visible then
+    Dec(ARect.Right, VertScrollBar.Width);
+  if HorzScrollBar.Visible then
+    Dec(ARect.Bottom, HorzScrollBar.Height);
+end;
+
+procedure TACLCustomScrollingControl.AlignControls(AControl: TControl; var ARect: TRect);
 var
   LStep: Boolean;
 begin
-{$IFDEF SB_DT_WORKAROUND}
-  if csDesigning in ComponentState then
-    inherited;
-{$ENDIF}
   for LStep := False to True do
   begin
-    SubClass.Changed([cccnLayout]);
-    ContentHost.BoundsRect := ViewInfo.ClientBounds;
+    ARect := ClientRect;
+    inherited AlignControls(AControl, ARect);
+    ARect := ClientRect;
+    AdjustClientRect(ARect);
+    AlignScrollBars(ARect);
   end;
 end;
 
-procedure TACLCustomScrollBox.BoundsChanged;
+procedure TACLCustomScrollingControl.AlignScrollBars(const ARect: TRect);
 begin
-  SubClass.Bounds := Bounds(0, 0, Width, Height).Split(GetBordersWidth);
+  HorzScrollBar.BringToFront;
+  HorzScrollBar.SetBounds(ARect.Left, ARect.Bottom, ARect.Width, HorzScrollBar.Height);
+  HorzScrollBar.Tag := HorzScrollBar.Position;
+
+  VertScrollBar.BringToFront;
+  VertScrollBar.SetBounds(ARect.Right, ARect.Top, VertScrollBar.Width, ARect.Height);
+  VertScrollBar.Tag := VertScrollBar.Position;
+
+  FSizeGrip.BringToFront;
+  FSizeGrip.SetBounds(ARect.Right, ARect.Bottom, VertScrollBar.Width, HorzScrollBar.Height);
+  FSizeGrip.Visible := VertScrollBar.Visible and HorzScrollBar.Visible;
 end;
 
-function TACLCustomScrollBox.CalculateRange(AContentHost: TWinControl): TSize;
+function TACLCustomScrollingControl.CreateScrollBar(AKind: TScrollBarKind): TACLScrollBar;
+begin
+  Result := TACLScrollBar.CreateEx(Self, AKind, Style, soReference);
+  Result.Align := alCustom;
+  Result.OnScroll := Scroll;
+  Result.Parent := Self;
+end;
+
+function TACLCustomScrollingControl.CreateStyle: TACLScrollBoxStyle;
+begin
+  Result := TACLScrollBoxStyle.Create(Self);
+end;
+
+procedure TACLCustomScrollingControl.CreateWnd;
+begin
+  inherited CreateWnd;
+  UpdateBorders(True);
+end;
+
+function TACLCustomScrollingControl.IsInternalControl(AControl: TControl): Boolean;
+begin
+  Result := (AControl = HorzScrollBar) or (AControl = VertScrollBar) or (AControl = FSizeGrip);
+end;
+
+procedure TACLCustomScrollingControl.Paint;
+var
+  LHandled: Boolean;
+begin
+  LHandled := False;
+  if Assigned(OnCustomDraw) then
+    OnCustomDraw(Self, Canvas, ClientRect, LHandled);
+  if not (LHandled or Transparent) then
+    Style.DrawContent(Canvas, ClientRect);
+end;
+
+procedure TACLCustomScrollingControl.PaintWindow(DC: HDC);
+begin
+  if FSizeGrip.Visible then
+    acExcludeFromClipRegion(DC, FSizeGrip.BoundsRect);
+  if HorzScrollBar.Visible then
+    acExcludeFromClipRegion(DC, HorzScrollBar.BoundsRect);
+  if VertScrollBar.Visible then
+    acExcludeFromClipRegion(DC, VertScrollBar.BoundsRect);
+  inherited;
+end;
+
+procedure TACLCustomScrollingControl.Scroll(
+  Sender: TObject; ScrollCode: TScrollCode; var ScrollPos: Integer);
+begin
+  if Sender = HorzScrollBar then
+    ScrollBy(HorzScrollBar.Tag - ScrollPos, 0);
+  if Sender = VertScrollBar then
+    ScrollBy(0, VertScrollBar.Tag - ScrollPos);
+  if ScrollCode = TScrollCode.scTrack then
+    Update;
+end;
+
+procedure TACLCustomScrollingControl.ScrollBy(dX, dY: Integer);
+begin
+  if (dX = 0) and (dY = 0) then Exit;
+
+  HorzScrollBar.Tag := HorzScrollBar.Tag - dX;
+  HorzScrollBar.Position := HorzScrollBar.Tag;
+  VertScrollBar.Tag := VertScrollBar.Tag - dY;
+  VertScrollBar.Position := VertScrollBar.Tag;
+
+  ScrollContent(dX, dY);
+end;
+
+procedure TACLCustomScrollingControl.ScrollContent(dX, dY: Integer);
+begin
+  // do nothing
+end;
+
+procedure TACLCustomScrollingControl.SetBorders(AValue: TBorderStyle);
+begin
+  if AValue <> FBorders then
+  begin
+    FBorders := AValue;
+    if HandleAllocated then
+      UpdateBorders;
+    Realign;
+  end;
+end;
+
+procedure TACLCustomScrollingControl.SetStyle(AValue: TACLScrollBoxStyle);
+begin
+  FStyle.Assign(AValue);
+end;
+
+procedure TACLCustomScrollingControl.SetScrollParams(
+  ABar: TACLScrollBar; AClientSize, AContentSize: Integer);
+var
+  LScrollPos: Integer;
+begin
+  ABar.Visible := AContentSize > AClientSize;
+  ABar.SetScrollParams(0, AContentSize, ABar.Position, AClientSize);
+  LScrollPos := ABar.Position;
+  if LScrollPos <> ABar.Tag then
+    Scroll(ABar, scEndScroll, LScrollPos);
+end;
+
+procedure TACLCustomScrollingControl.SetTargetDPI(AValue: Integer);
+begin
+  Style.TargetDPI := AValue;
+  inherited SetTargetDPI(AValue);
+end;
+
+procedure TACLCustomScrollingControl.UpdateBorders(AJustCreated: Boolean);
+begin
+{$IF DEFINED(LCLGtk2)}
+  TGtk2Controls.SetNonClientBorder(Self, IfThen(Borders = bsSingle, 2, 0));
+{$ELSEIF DEFINED(MSWINDOWS)}
+  if not AJustCreated then
+    SetWindowPos(Handle, 0, 0, 0, 0, 0, SWP_NOSIZE or SWP_NOMOVE or SWP_NOZORDER or SWP_FRAMECHANGED);
+{$IFEND}
+end;
+
+procedure TACLCustomScrollingControl.UpdateTransparency;
+begin
+  if Transparent or Style.IsTransparentBackground then
+    ControlStyle := ControlStyle - [csOpaque]
+  else
+    ControlStyle := ControlStyle + [csOpaque];
+end;
+
+procedure TACLCustomScrollingControl.WMNCCalcSize(var Msg: TMessage);
+begin
+{$IFDEF MSWINDOWS}
+  if Borders = bsSingle then
+    TWMNCCalcSize(Msg).CalcSize_Params.rgrc[0].Inflate(-2, -2);
+{$ENDIF}
+end;
+
+procedure TACLCustomScrollingControl.WMNCPaint(var Msg: TMessage);
+
+  procedure DoDrawBorder(DC: HDC);
+  begin
+    Canvas.Handle := DC;
+    try
+      Style.DrawBorder(Canvas, Rect(0, 0, Width, Height), acAllBorders);
+    finally
+      Canvas.Handle := 0;
+    end;
+  end;
+
+begin
+  if Borders = bsSingle then
+  begin
+  {$IF DEFINED(LCLGtk2)}
+    DoDrawBorder(Msg.LParam);
+  {$ELSEIF DEFINED(MSWINDOWS)}
+    var DC := GetWindowDC(Handle);
+    try
+      DoDrawBorder(DC);
+    finally
+      ReleaseDC(Handle, DC);
+    end;
+  {$IFEND}
+  end;
+end;
+
+{ TACLCustomScrollBox }
+
+procedure TACLCustomScrollBox.AlignScrollBars(const ARect: TRect);
+var
+  LSize: TSize;
+begin
+  if FAutoRangeLockCount = 0 then
+  begin
+    LSize := CalculateRange;
+    SetScrollParams(VertScrollBar, ARect.Height, LSize.Height);
+    SetScrollParams(HorzScrollBar, ARect.Width, LSize.Width);
+  end;
+  inherited;
+end;
+
+function TACLCustomScrollBox.CalculateRange: TSize;
 
   procedure AdjustHorzAutoRange(AControl: TControl; var ARange, AAlignMargin: Integer);
   begin
@@ -229,7 +434,7 @@ function TACLCustomScrollBox.CalculateRange(AContentHost: TWinControl): TSize;
       if (AControl.Align = alLeft) or
          (AControl.Align = alNone) and (AControl.Anchors * [akLeft, akRight] = [akLeft])
       then
-        ARange := Max(ARange, ViewInfo.ViewportX + AControl.BoundsRect.Right);
+        ARange := Max(ARange, HorzScrollBar.Position + AControl.BoundsRect.Right);
   end;
 
   procedure AdjustVertAutoRange(AControl: TControl; var ARange, AAlignMargin: Integer);
@@ -240,7 +445,7 @@ function TACLCustomScrollBox.CalculateRange(AContentHost: TWinControl): TSize;
       if (AControl.Align = alTop) or
          (AControl.Align = alNone) and (AControl.Anchors * [akTop, akBottom] = [akTop])
       then
-        ARange := Max(ARange, ViewInfo.ViewportY + AControl.BoundsRect.Bottom);
+        ARange := Max(ARange, VertScrollBar.Position + AControl.BoundsRect.Bottom);
   end;
 
 var
@@ -255,10 +460,10 @@ begin
   ARangeVert := 0;
   AAlignMarginHorz := 0;
   AAlignMarginVert := 0;
-  for I := 0 to AContentHost.ControlCount - 1 do
+  for I := 0 to ControlCount - 1 do
   begin
-    AControl := AContentHost.Controls[I];
-    if AControl.Visible then
+    AControl := Controls[I];
+    if AControl.Visible and not IsInternalControl(AControl) then
     begin
       AdjustHorzAutoRange(AControl, ARangeHorz, AAlignMarginHorz);
       AdjustVertAutoRange(AControl, ARangeVert, AAlignMarginVert);
@@ -267,61 +472,26 @@ begin
   Result := TSize.Create(ARangeHorz + AAlignMarginHorz, ARangeVert + AAlignMarginVert);
 end;
 
+procedure TACLCustomScrollBox.CMFocusChanged(var Msg: TMessage);
+begin
+  inherited;
 {$IFDEF FPC}
-procedure TACLCustomScrollBox.InsertControl(AControl: TControl; Index: Integer);
-begin
-  if AControl <> ContentHost then
-    AControl.Parent := ContentHost
-  else
-    inherited;
-end;
+  {$MESSAGE 'TODO - not implemented'}
+{$ELSE}
+  MakeVisible(TCMFocusChanged(Msg).Sender);
 {$ENDIF}
-
-function TACLCustomScrollBox.CreateSubClass: TACLCompoundControlSubClass;
-begin
-  Result := TACLScrollBoxSubClass.Create(Self);
 end;
 
 procedure TACLCustomScrollBox.DisableAutoRange;
 begin
-  BeginUpdate;
+  Inc(FAutoRangeLockCount)
 end;
 
 procedure TACLCustomScrollBox.EnableAutoRange;
 begin
-  EndUpdate;
-  if not IsUpdateLocked then
+  Dec(FAutoRangeLockCount);
+  if FAutoRangeLockCount = 0 then
     Realign;
-end;
-
-function TACLCustomScrollBox.GetBordersWidth: TRect;
-begin
-  Result := acBorderOffsets * Borders;
-end;
-
-procedure TACLCustomScrollBox.GetChildren(Proc: TGetChildProc; Root: TComponent);
-begin
-{$IFDEF SB_DT_WORKAROUND}
-  if csDesigning in ComponentState then
-    inherited
-  else
-{$ENDIF}
-    TACLScrollBoxContentHost(ContentHost).GetChildren(Proc, Root);
-end;
-
-function TACLCustomScrollBox.GetStyle: TACLScrollBoxStyle;
-begin
-  Result := TACLScrollBoxStyle(StyleScrollBox);
-end;
-
-function TACLCustomScrollBox.GetViewInfo: TACLScrollBoxViewInfo;
-begin
-  Result := TACLScrollBoxViewInfo(SubClass.ViewInfo);
-end;
-
-function TACLCustomScrollBox.GetViewPoint: TPoint;
-begin
-  Result := Point(ViewInfo.ViewportX, ViewInfo.ViewportY);
 end;
 
 procedure TACLCustomScrollBox.MakeVisible(AControl: TControl);
@@ -339,204 +509,68 @@ begin
       ARect := AControl.BoundsRect;
 
       AParent := AControl.Parent;
-      while (AParent <> nil) and (AParent <> ContentHost) do
+      while (AParent <> nil) and (AParent <> Self) do
       begin
         ARect.Offset(AParent.BoundsRect.TopLeft);
         AParent := AParent.Parent;
       end;
 
-      if AParent = ContentHost then
+      if AParent = Self then
         MakeVisible(ARect);
     end;
 end;
 
 procedure TACLCustomScrollBox.MakeVisible(ARect: TRect);
 var
-  AClientHeight: Integer;
-  AClientWidth: Integer;
+  AClientSize: Integer;
 begin
-  AClientWidth := ContentHost.Width;
-  if ARect.Width <= AClientWidth then
+  AClientSize := ClientWidth;
+  if ARect.Width <= AClientSize then
   begin
     if ARect.Left < 0 then
-      ViewInfo.ViewportX := ViewInfo.ViewportX + ARect.Left
+      ScrollBy(-ARect.Left, 0)
     else
-      if ARect.Right > AClientWidth then
+      if ARect.Right > AClientSize then
       begin
-        if ARect.Right - ARect.Left > AClientWidth then
-          ARect.Right := ARect.Left + AClientWidth;
-        ViewInfo.ViewportX := ViewInfo.ViewportX + ARect.Right - AClientWidth;
+        if ARect.Right - ARect.Left > AClientSize then
+          ARect.Right := ARect.Left + AClientSize;
+        ScrollBy(AClientSize - ARect.Right, 0);
       end;
   end;
 
-  AClientHeight := ContentHost.Height;
-  if ARect.Height <= AClientHeight then
+  AClientSize := ClientHeight;
+  if ARect.Height <= AClientSize then
   begin
     if ARect.Top < 0 then
-      ViewInfo.ViewportY := ViewInfo.ViewportY + ARect.Top
+      ScrollBy(-ARect.Top, 0)
     else
-      if ARect.Bottom > AClientHeight then
+      if ARect.Bottom > AClientSize then
       begin
-        if ARect.Bottom - ARect.Top > AClientHeight then
-          ARect.Bottom := ARect.Top + AClientHeight;
-        ViewInfo.ViewportY := ViewInfo.ViewportY + ARect.Bottom - AClientHeight;
+        if ARect.Bottom - ARect.Top > AClientSize then
+          ARect.Bottom := ARect.Top + AClientSize;
+        ScrollBy(AClientSize - ARect.Bottom, 0);
       end;
   end;
 end;
 
-procedure TACLCustomScrollBox.Paint;
+procedure TACLCustomScrollBox.ScrollContent(dX, dY: Integer);
+var
+  LControl: TControl;
+  LDeferUpdate: TACLDeferPlacementUpdate;
+  I: Integer;
 begin
-  inherited;
-{$IFDEF SB_DT_WORKAROUND}
-  if csDesigning in ComponentState then
-    Style.DrawContent(Canvas, ClientRect)
-  else
-{$ENDIF}
-    Style.DrawBorder(Canvas, ClientRect, Borders);
-end;
-
-procedure TACLCustomScrollBox.ScrollBy(DeltaX, DeltaY: Integer);
-begin
-  ContentHost.ScrollBy(DeltaX, DeltaY);
-  ContentHost.Update;
-end;
-
-procedure TACLCustomScrollBox.SetBorders(AValue: TACLBorders);
-begin
-  if AValue <> FBorders then
-  begin
-    FBorders := AValue;
-  {$IFDEF SB_DT_WORKAROUND}
-    if (csDesigning in ComponentState) and HandleAllocated then
-      SetWindowPos(Handle, 0, 0, 0, 0, 0, SWP_NOSIZE or SWP_NOMOVE or SWP_NOZORDER or SWP_FRAMECHANGED);
-  {$ENDIF}
-    BoundsChanged;
-    Realign;
+  LDeferUpdate := TACLDeferPlacementUpdate.Create;
+  try
+    for I := 0 to ControlCount - 1 do
+    begin
+      LControl := Controls[I];
+      if not IsInternalControl(LControl) then
+        LDeferUpdate.Add(LControl, LControl.BoundsRect.OffsetTo(dX, dY));
+    end;
+    LDeferUpdate.Apply;
+  finally
+    LDeferUpdate.Free;
   end;
-end;
-
-procedure TACLCustomScrollBox.SetStyle(AValue: TACLScrollBoxStyle);
-begin
-  StyleScrollBox.Assign(AValue);
-end;
-
-procedure TACLCustomScrollBox.SetViewPoint(const Value: TPoint);
-begin
-  ViewInfo.ViewportX := Value.X;
-  ViewInfo.ViewportY := Value.Y;
-end;
-
-procedure TACLCustomScrollBox.UpdateTransparency;
-begin
-  if Transparent or Style.IsTransparentBackground then
-    ContentHost.ControlStyle := ContentHost.ControlStyle - [csOpaque]
-  else
-    ContentHost.ControlStyle := ContentHost.ControlStyle + [csOpaque];
-end;
-
-{$IFNDEF FPC}
-procedure TACLCustomScrollBox.WndProc(var Message: TMessage);
-begin
-  case Message.Msg of
-    CM_FOCUSCHANGED:
-      MakeVisible(TCMFocusChanged(Message).Sender);
-
-    CM_CONTROLLISTCHANGING:
-    {$IFDEF SB_DT_WORKAROUND}
-      if not (csDesigning in ComponentState) then
-    {$ENDIF}
-      if TCMControlListChanging(Message).Inserting then
-      begin
-        if (TCMControlListChanging(Message).ControlListItem^.Parent = Self) and
-           (TCMControlListChanging(Message).ControlListItem^.Control <> ContentHost) then
-        begin
-          TCMControlListChanging(Message).ControlListItem^.Parent := ContentHost;
-          TCMControlListChanging(Message).ControlListItem^.Control.Parent := ContentHost;
-          Exit;
-        end;
-      end;
-
-  {$IFDEF SB_DT_WORKAROUND}
-    WM_NCCALCSIZE:
-      if csDesigning in ComponentState then
-      begin
-        TWMNCCalcSize(Message).CalcSize_Params.rgrc[0].Content(GetBordersWidth);
-        Exit;
-      end;
-
-    WM_NCPAINT:
-      if csDesigning in ComponentState then
-      begin
-        Canvas.Handle := GetWindowDC(Handle);
-        try
-          Style.DrawBorder(Canvas, Rect(0, 0, Width, Height), Borders);
-        finally
-          ReleaseDC(Handle, Canvas.Handle);
-          Canvas.Handle := 0;
-        end;
-        Exit;
-      end;
-  {$ENDIF}
-  end;
-  inherited;
-end;
-
-{$ENDIF}
-
-{ TACLScrollBoxContentHost }
-
-procedure TACLScrollBoxContentHost.AdjustClientRect(var ARect: TRect);
-var
-  LViewPoint: TPoint;
-begin
-  LViewPoint := TACLCustomScrollBox(Parent).ViewPoint;
-  ARect := Bounds(-LViewPoint.X, -LViewPoint.Y, ClientWidth, ClientHeight);
-  inherited AdjustClientRect(ARect);
-end;
-
-procedure TACLScrollBoxContentHost.Paint;
-var
-  LBox: TACLCustomScrollBox;
-  LHandled: Boolean;
-begin
-  LHandled := False;
-  LBox := TACLCustomScrollBox(Owner);
-  if Assigned(LBox.OnCustomDraw) then
-    LBox.OnCustomDraw(LBox, Canvas, ClientRect, LHandled);
-  if not LHandled and not LBox.Transparent then
-    LBox.Style.DrawContent(Canvas, ClientRect);
-end;
-
-{ TACLScrollBoxSubClass }
-
-function TACLScrollBoxSubClass.CreateStyleScrollBox: TACLStyleScrollBox;
-begin
-  Result := TACLScrollBoxStyle.Create(Self);
-end;
-
-function TACLScrollBoxSubClass.CreateViewInfo: TACLCompoundControlCustomViewInfo;
-begin
-  Result := TACLScrollBoxViewInfo.Create(Self);
-end;
-
-{ TACLScrollBoxViewInfo }
-
-procedure TACLScrollBoxViewInfo.CalculateContentLayout;
-var
-  LControl: TACLCustomScrollBox;
-begin
-  LControl := GetControl;
-  FContentSize := LControl.CalculateRange(LControl.ContentHost);
-end;
-
-procedure TACLScrollBoxViewInfo.ContentScrolled(ADeltaX, ADeltaY: Integer);
-begin
-  GetControl.ScrollBy(ADeltaX, ADeltaY);
-end;
-
-function TACLScrollBoxViewInfo.GetControl: TACLCustomScrollBox;
-begin
-  Result := SubClass.Container.GetControl as TACLCustomScrollBox;
 end;
 
 end.

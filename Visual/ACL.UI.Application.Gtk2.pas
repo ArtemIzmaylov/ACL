@@ -21,6 +21,7 @@ uses
   LCLIntf,
   LCLType,
   LMessages,
+  Messages,
   // Gtk
   Gtk2,
   Glib2,
@@ -34,6 +35,7 @@ uses
   WSLCLClasses,
   // System
   Classes,
+  Math,
   SysUtils,
   // VCL
   Controls;
@@ -60,6 +62,16 @@ type
 
     class procedure ProcessMessages;
     class procedure SetInputRedirection(AControl: TWinControl);
+  end;
+
+  { TGtk2Controls }
+
+  TGtk2Controls = class
+  strict private
+    class function DrawNonClientBorder(Widget: PGtkWidget;
+      Event: PGDKEventExpose; Data: gPointer): GBoolean; cdecl; static;
+  public
+    class procedure SetNonClientBorder(AControl: TWinControl; ASize: Integer);
   end;
 
   { TGtk2PopupControl }
@@ -107,7 +119,8 @@ begin
     GDK_2BUTTON_PRESS,
     GDK_3BUTTON_PRESS,
     GDK_KEY_PRESS,
-    GDK_KEY_RELEASE:
+    GDK_KEY_RELEASE,
+    GDK_SCROLL:
       if FInputTarget <> nil then
       begin
         gtk_widget_event(FInputTarget, event);
@@ -219,6 +232,51 @@ begin
     FInputTarget := nil;
 
   EnsureHandlerInit;
+end;
+
+{ TGtk2Controls }
+
+class function TGtk2Controls.DrawNonClientBorder(Widget: PGtkWidget;
+  Event: PGDKEventExpose; Data: gPointer): GBoolean; cdecl;
+var
+  LPrevClient: PGtkWidget;
+  LWidgetInfo: PWinWidgetInfo;
+  LWnd: HWND;
+  LWndDC: HDC;
+begin
+  if gtk_container_get_border_width(PGtkContainer(Widget)) > 0 then
+  begin
+    LWnd := {%H-}HWND(Widget);
+    LWidgetInfo := GetWidgetInfo(Widget);
+
+    // AI: делаем вот такой финт ушами, чтобы LCL-ая обвязка создала DC именно
+    // вокруг контейнер-виджета, а не вокруг его CoreWidget (как оно по есть)
+    LPrevClient := LWidgetInfo^.ClientWidget;
+    try
+      LWidgetInfo^.ClientWidget := Widget;
+      LWndDC := GetDC(LWnd);
+    finally
+      LWidgetInfo^.ClientWidget := LPrevClient;
+    end;
+
+    SetWindowOrgEx(LWndDC, -Widget^.Allocation.x, -Widget^.Allocation.y, nil);
+    SendMessage(LWnd, WM_NCPAINT, 0, LWndDC);
+    ReleaseDC(LWnd, LWndDC);
+  end;
+  Result := CallBackDefaultReturn;
+end;
+
+class procedure TGtk2Controls.SetNonClientBorder(AControl: TWinControl; ASize: Integer);
+var
+  LWidget: PGtkWidget;
+begin
+  LWidget := {%H-}PGtkWidget(AControl.Handle);
+  // Ref.to: GTKAPIWidget_new (Gtk2WinapiWindow.pp)
+  if GTK_IS_CONTAINER(LWidget) then
+  begin
+    gtk_container_set_border_width(GTK_CONTAINER(LWidget), ASize);
+    ConnectSignalAfter(GTK_OBJECT(LWidget), 'expose-event', @DrawNonClientBorder, AControl);
+  end;
 end;
 
 { TGtk2PopupControl }

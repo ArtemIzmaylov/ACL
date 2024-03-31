@@ -228,20 +228,24 @@ type
 
   { TACLScrollBar }
 
-  TACLScrollBar = class(TACLGraphicControl, IACLScrollBar)
+  TACLScrollBar = class(TACLCustomControl, IACLScrollBar)
   strict private
     FStyle: TACLStyleScrollBox;
+    FStyleOwnership: TStreamOwnership;
     FSubClass: TACLScrollBarSubClass;
 
     FOnScroll: TScrollEvent;
 
     function GetKind: TScrollBarKind;
+    function GetPosition: Integer;
     function GetScrollInfo: TACLScrollInfo;
     function GetSmallChange: Word;
     procedure SetKind(Value: TScrollBarKind);
+    procedure SetPosition(AValue: Integer);
     procedure SetSmallChange(AValue: Word);
-    procedure SetStyle(const Value: TACLStyleScrollBox);
+    procedure SetStyle(AValue: TACLStyleScrollBox);
   protected
+    procedure SetDefaultSize; override;
     procedure SetTargetDPI(AValue: Integer); override;
     procedure UpdateTransparency; override;
 
@@ -271,12 +275,14 @@ type
     property SubClass: TACLScrollBarSubClass read FSubClass;
   public
     constructor Create(AOwner: TComponent); override;
+    constructor CreateEx(AOwner: TComponent; AKind: TScrollBarKind;
+      AStyle: TACLStyleScrollBox; AStyleOwnership: TStreamOwnership);
     destructor Destroy; override;
-    procedure AfterConstruction; override;
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
     procedure SetScrollParams(AMin, AMax, APosition, APageSize: Integer; ARedraw: Boolean = True); overload;
     procedure SetScrollParams(const AInfo: TScrollInfo; ARedraw: Boolean = True); overload;
     //# Properties
+    property Position: Integer read GetPosition write SetPosition;
     property ScrollInfo: TACLScrollInfo read GetScrollInfo;
   published
     property Align;
@@ -854,19 +860,13 @@ begin
       ANewPos := ScrollInfo.Max;
   else;
   end;
-  ANewPos := MinMax(ANewPos, ScrollInfo.Min, ScrollInfo.Max);
+
+  ANewPos := MinMax(ANewPos, ScrollInfo.Min, ScrollInfo.Max - ScrollInfo.Page + 1);
   Owner.Scroll(AScrollCode, ANewPos);
-  ANewPos := MinMax(ANewPos, ScrollInfo.Min, ScrollInfo.Max);
+  ANewPos := MinMax(ANewPos, ScrollInfo.Min, ScrollInfo.Max - ScrollInfo.Page + 1);
+
   if ANewPos <> ScrollInfo.Position then
-  begin
-    if AScrollCode = scTrack then
-    begin
-      FScrollInfo.Position := ANewPos;
-      Invalidate(False);
-    end
-    else
-      SetScrollParams(ScrollInfo.Min, ScrollInfo.Max, ANewPos, ScrollInfo.Page);
-  end;
+    SetScrollParams(ScrollInfo.Min, ScrollInfo.Max, ANewPos, ScrollInfo.Page);
 end;
 
 procedure TACLScrollBarSubClass.Scroll(AScrollPart: TACLScrollBarPart);
@@ -880,7 +880,10 @@ begin
 end;
 
 function TACLScrollBarSubClass.SetScrollParams(
-  AMin, AMax, APosition, APageSize: Integer; ARedraw: Boolean = True): Boolean;
+  AMin, AMax, APosition, APageSize: Integer;
+  ARedraw: Boolean = True): Boolean;
+var
+  LBoundsChanged: Boolean;
 begin
   if not Style.IsThumbResizable(Kind) then
   begin
@@ -890,22 +893,22 @@ begin
   end;
   AMax := Max(AMax, AMin);
   APageSize := Min(APageSize, AMax - AMin);
-
   APosition := MinMax(APosition, AMin, AMax - APageSize + 1);
-  if (ScrollInfo.Min = AMin) and (ScrollInfo.Max = AMax) and
-     (ScrollInfo.Page = APageSize) and (ScrollInfo.Position = APosition)
-  then
-    ARedraw := False;
 
+  LBoundsChanged :=
+    (ScrollInfo.Min <> AMin) or
+    (ScrollInfo.Max <> AMax) or
+    (ScrollInfo.Page = APageSize);
+  Result := ScrollInfo.Position <> APosition;
+
+  FScrollInfo.Position := APosition;
   FScrollInfo.Page := APageSize;
   FScrollInfo.Min := AMin;
   FScrollInfo.Max := AMax;
 
-  Result := ScrollInfo.Position <> APosition;
-  FScrollInfo.Position := APosition;
-  Calculate(Bounds);
-
-  if ARedraw then
+  if (PressedPart <> sbpThumbnail) or LBoundsChanged then
+    Calculate(Bounds);
+  if ARedraw and (LBoundsChanged or Result) then
     Invalidate(PressedPart = sbpThumbnail);
 end;
 
@@ -941,16 +944,26 @@ end;
 
 constructor TACLScrollBar.Create(AOwner: TComponent);
 begin
+  CreateEx(AOwner, sbHorizontal, TACLStyleScrollBox.Create(Self), soOwned);
+end;
+
+constructor TACLScrollBar.CreateEx(AOwner: TComponent; AKind: TScrollBarKind;
+  AStyle: TACLStyleScrollBox; AStyleOwnership: TStreamOwnership);
+begin
   inherited Create(AOwner);
   ControlStyle := [csOpaque, csCaptureMouse];
-  FStyle := TACLStyleScrollBox.Create(Self);
-  FSubClass := TACLScrollBarSubClass.Create(Self, Style, sbHorizontal);
+  FocusOnClick := False;
+  DoubleBuffered := True;
+  FStyle := AStyle;
+  FStyleOwnership := AStyleOwnership;
+  FSubClass := TACLScrollBarSubClass.Create(Self, Style, AKind);
 end;
 
 destructor TACLScrollBar.Destroy;
 begin
   FreeAndNil(FSubClass);
-  FreeAndNil(FStyle);
+  if FStyleOwnership = soOwned then
+    FreeAndNil(FStyle);
   inherited Destroy;
 end;
 
@@ -1032,12 +1045,7 @@ end;
 procedure TACLScrollBar.SetTargetDPI(AValue: Integer);
 begin
   inherited SetTargetDPI(AValue);
-  Style.SetTargetDPI(AValue);
-end;
-
-procedure TACLScrollBar.AfterConstruction;
-begin
-  SetBounds(Left, Top, 200, 20);
+  Style.TargetDPI := AValue;
 end;
 
 function TACLScrollBar.AllowFading: Boolean;
@@ -1050,6 +1058,11 @@ begin
   Result := SubClass.Kind;
 end;
 
+function TACLScrollBar.GetPosition: Integer;
+begin
+  Result := SubClass.ScrollInfo.Position;
+end;
+
 function TACLScrollBar.GetScrollInfo: TACLScrollInfo;
 begin
   Result := SubClass.ScrollInfo;
@@ -1060,7 +1073,16 @@ begin
   Result := SubClass.SmallChange;
 end;
 
-procedure TACLScrollBar.SetScrollParams(AMin, AMax, APosition, APageSize: Integer; ARedraw: Boolean = True);
+procedure TACLScrollBar.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
+begin
+  if not (csLoading in ComponentState) then
+    SubClass.CheckScrollBarSizes(AWidth, AHeight);
+  inherited SetBounds(ALeft, ATop, AWidth, AHeight);
+  SubClass.Calculate(ClientRect);
+end;
+
+procedure TACLScrollBar.SetScrollParams(
+  AMin, AMax, APosition, APageSize: Integer; ARedraw: Boolean = True);
 begin
   SubClass.SetScrollParams(AMin, AMax, APosition, APageSize, ARedraw);
 end;
@@ -1086,17 +1108,22 @@ begin
   end;
 end;
 
-procedure TACLScrollBar.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
+procedure TACLScrollBar.SetPosition(AValue: Integer);
+var
+  LInfo: TACLScrollInfo;
 begin
-  if not (csLoading in ComponentState) then
-    SubClass.CheckScrollBarSizes(AWidth, AHeight);
-  inherited SetBounds(ALeft, ATop, AWidth, AHeight);
-  SubClass.Calculate(ClientRect);
+  LInfo := GetScrollInfo;
+  SetScrollParams(LInfo.Min, LInfo.Max, AValue, LInfo.Page);
 end;
 
-procedure TACLScrollBar.SetStyle(const Value: TACLStyleScrollBox);
+procedure TACLScrollBar.SetStyle(AValue: TACLStyleScrollBox);
 begin
-  FStyle.Assign(Value);
+  FStyle.Assign(AValue);
+end;
+
+procedure TACLScrollBar.SetDefaultSize;
+begin
+  SetBounds(Left, Top, 200, 20);
 end;
 
 procedure TACLScrollBar.UpdateTransparency;
