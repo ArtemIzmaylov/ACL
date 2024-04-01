@@ -68,7 +68,7 @@ type
     function GetOnCustomDrawColumnBar: TACLCustomDrawEvent;
     function GetOnCustomDrawNode: TACLTreeListCustomDrawNodeEvent;
     function GetOnCustomDrawNodeCell: TACLTreeListCustomDrawNodeCellEvent;
-    function GetOnCustomDrawNodeCellValue: TACLTreeListCustomDrawNodeCellValueEvent;
+    function GetOnCustomDrawNodeCellValue: TACLTreeListCustomDrawNodeCellEvent;
     function GetOnDragSorting: TNotifyEvent;
     function GetOnDragSortingNodeDrop: TACLTreeListDragSortingNodeDrop;
     function GetOnDragSortingNodeOver: TACLTreeListDragSortingNodeOver;
@@ -122,7 +122,7 @@ type
     procedure SetOnCustomDrawColumnBar(const AValue: TACLCustomDrawEvent);
     procedure SetOnCustomDrawNode(const AValue: TACLTreeListCustomDrawNodeEvent);
     procedure SetOnCustomDrawNodeCell(const AValue: TACLTreeListCustomDrawNodeCellEvent);
-    procedure SetOnCustomDrawNodeCellValue(const Value: TACLTreeListCustomDrawNodeCellValueEvent);
+    procedure SetOnCustomDrawNodeCellValue(const Value: TACLTreeListCustomDrawNodeCellEvent);
     procedure SetOnDragSorting(const Value: TNotifyEvent);
     procedure SetOnDragSortingNodeDrop(const Value: TACLTreeListDragSortingNodeDrop);
     procedure SetOnDragSortingNodeOver(const Value: TACLTreeListDragSortingNodeOver);
@@ -183,7 +183,7 @@ type
     property OnCustomDrawColumnBar: TACLCustomDrawEvent read GetOnCustomDrawColumnBar write SetOnCustomDrawColumnBar;
     property OnCustomDrawNode: TACLTreeListCustomDrawNodeEvent read GetOnCustomDrawNode write SetOnCustomDrawNode;
     property OnCustomDrawNodeCell: TACLTreeListCustomDrawNodeCellEvent read GetOnCustomDrawNodeCell write SetOnCustomDrawNodeCell;
-    property OnCustomDrawNodeCellValue: TACLTreeListCustomDrawNodeCellValueEvent read GetOnCustomDrawNodeCellValue write SetOnCustomDrawNodeCellValue;
+    property OnCustomDrawNodeCellValue: TACLTreeListCustomDrawNodeCellEvent read GetOnCustomDrawNodeCellValue write SetOnCustomDrawNodeCellValue;
     property OnDragSorting: TNotifyEvent read GetOnDragSorting write SetOnDragSorting;
     property OnDragSortingNodeDrop: TACLTreeListDragSortingNodeDrop read GetOnDragSortingNodeDrop write SetOnDragSortingNodeDrop;
     property OnDragSortingNodeOver: TACLTreeListDragSortingNodeOver read GetOnDragSortingNodeOver write SetOnDragSortingNodeOver;
@@ -590,7 +590,7 @@ begin
   Result := SubClass.OnCustomDrawNodeCell;
 end;
 
-function TACLCustomTreeList.GetOnCustomDrawNodeCellValue: TACLTreeListCustomDrawNodeCellValueEvent;
+function TACLCustomTreeList.GetOnCustomDrawNodeCellValue: TACLTreeListCustomDrawNodeCellEvent;
 begin
   Result := SubClass.OnCustomDrawNodeCellValue;
 end;
@@ -855,7 +855,7 @@ begin
   SubClass.OnCustomDrawNodeCell := AValue;
 end;
 
-procedure TACLCustomTreeList.SetOnCustomDrawNodeCellValue(const Value: TACLTreeListCustomDrawNodeCellValueEvent);
+procedure TACLCustomTreeList.SetOnCustomDrawNodeCellValue(const Value: TACLTreeListCustomDrawNodeCellEvent);
 begin
   SubClass.OnCustomDrawNodeCellValue := Value;
 end;

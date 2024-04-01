@@ -74,8 +74,8 @@ type
 
     procedure HandlerColorPickerClick(Sender: TObject);
     procedure HandlerFontModified(Sender: TObject);
-    procedure HandlerFontPreview(Sender: TObject; ACanvas: TCanvas; const R: TRect;
-      ANode: TACLTreeListNode; AColumn: TACLTreeListColumn; var AHandled: Boolean);
+    procedure HandlerFontPreview(Sender: TObject; ACanvas: TCanvas;
+      var AData: TACLTreeListNodeCustomDrawData; var AHandled: Boolean);
     procedure HandlerFontNameListChanged(Sender: TObject);
     procedure HandlerFontSizeListChanged(Sender: TObject);
     procedure HandlerPreviewPaint(Sender: TObject);
@@ -416,10 +416,13 @@ begin
     FontNameEdit.Text := FontName.FocusedNode.Caption;
 end;
 
-procedure TACLFontPickerDialog.HandlerFontPreview(Sender: TObject; ACanvas: TCanvas;
-  const R: TRect; ANode: TACLTreeListNode; AColumn: TACLTreeListColumn; var AHandled: Boolean);
+procedure TACLFontPickerDialog.HandlerFontPreview(
+  Sender: TObject; ACanvas: TCanvas;
+  var AData: TACLTreeListNodeCustomDrawData;
+  var AHandled: Boolean);
 begin
-  TACLFontCache.GetInfo(ANode.Caption, [], ACanvas.Font.Height, acDefaultDPI, fqDefault).AssignTo(ACanvas.Font);
+  TACLFontCache.GetInfo(AData.Node.Caption, [],
+    ACanvas.Font.Height, acDefaultDPI, fqDefault).AssignTo(ACanvas.Font);
   ACanvas.Font.Color := FFontName.Style.RowColorsText[True];
 end;
 
