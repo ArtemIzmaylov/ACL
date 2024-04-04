@@ -1,4 +1,4 @@
-{$R-} { Range-Checking }
+﻿{$R-} { Range-Checking }
 {$Q-} { Overflow checking }
 {$Z1} { Minumum enum size = 1}
 
