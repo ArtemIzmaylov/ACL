@@ -4,24 +4,23 @@
 {*               Web Services                *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
-unit ACL.WEB;
+unit ACL.Web;
 
-{$I ACL.Config.INC}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
   // System
-  System.Classes,
-  System.SysUtils,
-  System.Types,
-  System.Math,
+  {System.}Classes,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
   // ACL
   ACL.Classes.StringList,
   ACL.FileFormats.INI,
@@ -50,50 +49,51 @@ type
 
   TACLWebErrorInfo = packed record
     ErrorCode: Integer;
-    ErrorMessage: UnicodeString;
-
-    procedure Initialize(AErrorCode: Integer; const AErrorMessage: UnicodeString);
+    ErrorMessage: string;
+    procedure Initialize(AErrorCode: Integer; const AErrorMessage: string);
     procedure Reset;
-    function ToString: UnicodeString;
+    function Succeeded: Boolean;
+    function ToString: string;
   end;
 
   { EACLWebError }
 
   EACLWebError = class(Exception)
-  strict private
+  protected
     FInfo: TACLWebErrorInfo;
   public
     constructor Create(const AInfo: TACLWebErrorInfo); overload;
-    //
+    constructor Create(const AText: string; ACode: Integer); overload;
+    //# Properties
     property Info: TACLWebErrorInfo read FInfo;
   end;
 
   { TACLWebProxyInfo }
 
   TACLWebProxyInfo = packed record
-    Server: UnicodeString;
-    ServerPort: UnicodeString;
-    UserName: UnicodeString;
-    UserPass: UnicodeString;
+    Server: string;
+    ServerPort: string;
+    UserName: string;
+    UserPass: string;
 
-    class function Create(const Server, ServerPort, UserName, UserPass: UnicodeString): TACLWebProxyInfo; static;
+    class function Create(const Server, ServerPort, UserName, UserPass: string): TACLWebProxyInfo; static;
     procedure Reset;
   end;
 
   { TACLWebURL }
 
   TACLWebURL = record
-    CustomHeaders: UnicodeString;
-    Host: UnicodeString;
-    Path: UnicodeString;
+    CustomHeaders: string;
+    Host: string;
+    Path: string;
     Port: Integer;
     PortIsDefault: Boolean;
-    Protocol: UnicodeString;
+    Protocol: string;
     Secured: Boolean;
 
-    class function Parse(S: UnicodeString; const AProtocol: UnicodeString): TACLWebURL; static;
-    class function ParseHttp(S: UnicodeString): TACLWebURL; static;
-    function ToString: UnicodeString;
+    class function Parse(S: string; const AProtocol: string): TACLWebURL; static;
+    class function ParseHttp(S: string): TACLWebURL; static;
+    function ToString: string;
   end;
 
   { IACLWebRequestRange }
@@ -135,7 +135,7 @@ type
     class var FConnectionMode: TACLWebConnectionMode;
     class var FConnectionTimeOut: Integer;
     class var FProxyInfo: TACLWebProxyInfo;
-    class var FUserAgent: UnicodeString;
+    class var FUserAgent: string;
 
     class procedure SetConnectionTimeOut(AValue: Integer); static;
   public
@@ -146,38 +146,34 @@ type
     class property ConnectionMode: TACLWebConnectionMode read FConnectionMode write FConnectionMode;
     class property ConnectionTimeOut: Integer read FConnectionTimeOut write SetConnectionTimeOut;
     class property Proxy: TACLWebProxyInfo read FProxyInfo write FProxyInfo;
-    class property UserAgent: UnicodeString read FUserAgent write FUserAgent;
+    class property UserAgent: string read FUserAgent write FUserAgent;
   end;
 
   TACLDateTimeFormat = (RFC822, ISO8601);
 
-function acDecodeDateTime(const Value: UnicodeString; AFormat: TACLDateTimeFormat): TDateTime;
+function acDecodeDateTime(const Value: string; AFormat: TACLDateTimeFormat): TDateTime;
 
-function acURLDecode(const S: UnicodeString): UnicodeString;
-function acURLEncode(const B: TArray<Byte>): UnicodeString;
-function acURLEscape(const S: UnicodeString): UnicodeString;
+function acURLDecode(const S: string): string;
+function acURLEncode(const B: TArray<Byte>): string;
+function acURLEscape(const S: string): string;
 implementation
 
 uses
-  Winapi.WinInet,
-  // ACL
   ACL.Crypto,
   ACL.Math,
   ACL.Parsers,
   ACL.Utils.Common,
   ACL.Utils.Date,
-  ACL.Utils.Registry,
   ACL.Utils.Stream,
   ACL.Utils.Strings;
 
 const
   PROXY_SETTINGS_ID = $00505258; // PRX
-
   sWebConfigSection = 'Connection';
 
-function acURLEscape(const S: UnicodeString): UnicodeString;
+function acURLEscape(const S: string): string;
 const
-  ReservedChars: array[0..23] of WideChar = (
+  ReservedChars: array[0..23] of Char = (
     '%', ' ', '<', '>', '#', '{', '}', '|', '\', '^', '~', #13,
     '[', ']', '`', ';', '/', '?', ':', '@', '=', '&', '$', #10
   );
@@ -186,10 +182,11 @@ var
 begin
   Result := S;
   for I := 0 to Length(ReservedChars) - 1 do
-    Result := StringReplace(Result, ReservedChars[I], '%' + IntToHex(Byte(ReservedChars[I]), 2), [rfReplaceAll]);
+    Result := acStringReplace(Result, ReservedChars[I],
+      '%' + IntToHex(Byte(ReservedChars[I]), 2));
 end;
 
-function RFC822ToDateTime(const Value: UnicodeString): TDateTime;
+function RFC822ToDateTime(const Value: string): TDateTime;
 //Thu, 14 Jan 2016 15:58:12 +0300
 
   procedure Check(R: Boolean);
@@ -269,7 +266,7 @@ begin
   end;
 end;
 
-function acDecodeDateTime(const Value: UnicodeString; AFormat: TACLDateTimeFormat): TDateTime;
+function acDecodeDateTime(const Value: string; AFormat: TACLDateTimeFormat): TDateTime;
 begin
   Result := 0;
   if Value <> '' then
@@ -283,13 +280,14 @@ begin
   end;
 end;
 
-function acURLEncode(const B: TArray<Byte>): UnicodeString;
+function acURLEncode(const B: TArray<Byte>): string;
 var
+  I: Integer;
   S: TACLStringBuilder;
 begin
   S := TACLStringBuilder.Get(Length(B) * 3);
   try
-    for var I := Low(B) to High(B) do
+    for I := Low(B) to High(B) do
       S.Append('%').Append(IntToHex(B[I], 2));
     Result := S.ToString;
   finally
@@ -297,47 +295,43 @@ begin
   end;
 end;
 
-function acURLDecode(const S: UnicodeString): UnicodeString;
+function acURLDecode(const S: string): string;
 var
+  ABuffer: TACLStringBuilder;
   ACharCode: Byte;
-  ADest: PWideChar;
-  ADestCount: Integer;
   ALength: Integer;
-  ASrc: PWideChar;
+  ASrc: PChar;
 begin
+  ASrc := PChar(S);
   ALength := Length(S);
-
-  SetLength(Result, ALength);
-  ASrc := PWideChar(S);
-  ADest := PWideChar(Result);
-  ADestCount := 0;
-
-  while ALength > 0 do
-  begin
-    if (ASrc^ = '%') and (ALength > 2) and TACLHexcode.Decode((ASrc + 1)^, (ASrc + 2)^, ACharCode) then
+  ABuffer := TACLStringBuilder.Get(ALength);
+  try
+    while ALength > 0 do
     begin
-      Inc(ASrc, 2);
-      Dec(ALength, 2);
-      if ACharCode >= $7F then
-        Word(ADest^) := Word(acStringFromAnsiString(AnsiChar(ACharCode)))
+      if (ASrc^ = '%') and (ALength > 2) and TACLHexcode.Decode((ASrc + 1)^, (ASrc + 2)^, ACharCode) then
+      begin
+        Dec(ALength, 2);
+        Inc(ASrc, 2);
+        if ACharCode >= $7F then
+          ABuffer.Append(acStringFromAnsiString(AnsiChar(ACharCode)))
+        else
+          ABuffer.Append(ACharCode);
+      end
       else
-        Word(ADest^) := Word(ACharCode);
-    end
-    else
-      Word(ADest^) := Word(ASrc^);
+        ABuffer.Append(ASrc^);
 
-    Dec(ALength);
-    Inc(ADestCount);
-    Inc(ADest);
-    Inc(ASrc);
+      Dec(ALength);
+      Inc(ASrc);
+    end;
+    Result := ABuffer.ToString;
+  finally
+    ABuffer.Release;
   end;
-  if ADestCount <> ALength then
-    SetLength(Result, ADestCount);
 end;
 
 { TACLWebURL }
 
-class function TACLWebURL.Parse(S: UnicodeString; const AProtocol: UnicodeString): TACLWebURL;
+class function TACLWebURL.Parse(S: string; const AProtocol: string): TACLWebURL;
 var
   ADelimPos: Integer;
 begin
@@ -392,14 +386,14 @@ begin
   end;
 end;
 
-class function TACLWebURL.ParseHttp(S: UnicodeString): TACLWebURL;
+class function TACLWebURL.ParseHttp(S: string): TACLWebURL;
 begin
   Result := Parse(S, 'http');
   if Result.Port <= 0 then
-    Result.Port := IfThen(Result.Secured, INTERNET_DEFAULT_HTTPS_PORT, INTERNET_DEFAULT_HTTP_PORT);
+    Result.Port := IfThen(Result.Secured, 443, 80);
 end;
 
-function TACLWebURL.ToString: UnicodeString;
+function TACLWebURL.ToString: string;
 var
   B: TACLStringBuilder;
 begin
@@ -497,11 +491,14 @@ end;
 
 class procedure TACLWebSettings.ConfigLoad(AConfig: TACLIniFile);
 
-  function ReadString(AStream: TStream; ID: Integer): UnicodeString;
+  function ReadString(AStream: TStream; ID: Integer): string;
+  var
+    U: UnicodeString;
   begin
-    Result := AStream.ReadStringWithLength;
+    U := AStream.ReadStringWithLength;
     if ID = PROXY_SETTINGS_ID then
-      acCryptStringXOR(Result, 'ProxySettings');
+      acCryptStringXOR(U, 'ProxySettings');
+    Result := _S(U);
   end;
 
   procedure ReadProxyData;
@@ -513,7 +510,7 @@ class procedure TACLWebSettings.ConfigLoad(AConfig: TACLIniFile);
     try
       if AConfig.ReadStream(sWebConfigSection, 'Proxy', AStream) then
       begin
-        AStream.Read(ID, SizeOf(ID));
+        ID := AStream.ReadInt32;
         if ID <> PROXY_SETTINGS_ID then
           AStream.Position := 0;
         FProxyInfo.Server := ReadString(AStream, ID);
@@ -528,16 +525,20 @@ class procedure TACLWebSettings.ConfigLoad(AConfig: TACLIniFile);
 
 begin
   ReadProxyData;
-  ConnectionMode := AConfig.ReadEnum(sWebConfigSection, 'Mode', acWebDefaultConnectionMode);
+  ConnectionMode := AConfig.ReadEnum<TACLWebConnectionMode>(
+    sWebConfigSection, 'Mode', acWebDefaultConnectionMode);
   ConnectionTimeOut := AConfig.ReadInteger(sWebConfigSection, 'TimeOut', acWebTimeOutDefault);
 end;
 
 class procedure TACLWebSettings.ConfigSave(AConfig: TACLIniFile);
 
-  procedure WriteString(AStream: TStream; S: UnicodeString);
+  procedure WriteString(AStream: TStream; const S: string);
+  var
+    U: UnicodeString;
   begin
-    acCryptStringXOR(S, 'ProxySettings');
-    AStream.WriteStringWithLength(S);
+    U := _U(S);
+    acCryptStringXOR(U, 'ProxySettings');
+    AStream.WriteStringWithLength(U);
   end;
 
   procedure WriteProxyData;
@@ -548,7 +549,7 @@ class procedure TACLWebSettings.ConfigSave(AConfig: TACLIniFile);
     AStream := TMemoryStream.Create;
     try
       ID := PROXY_SETTINGS_ID;
-      AStream.WriteBuffer(ID, SizeOf(ID));
+      AStream.WriteInt32(ID);
       WriteString(AStream, FProxyInfo.Server);
       WriteString(AStream, FProxyInfo.ServerPort);
       WriteString(AStream, FProxyInfo.UserName);
@@ -562,7 +563,8 @@ class procedure TACLWebSettings.ConfigSave(AConfig: TACLIniFile);
 
 begin
   WriteProxyData;
-  AConfig.WriteEnum(sWebConfigSection, 'Mode', ConnectionMode, acWebDefaultConnectionMode);
+  AConfig.WriteEnum<TACLWebConnectionMode>(
+    sWebConfigSection, 'Mode', ConnectionMode, acWebDefaultConnectionMode);
   AConfig.WriteInteger(sWebConfigSection, 'TimeOut', ConnectionTimeOut, acWebTimeOutDefault);
 end;
 
@@ -573,7 +575,7 @@ end;
 
 { TACLWebErrorInfo }
 
-procedure TACLWebErrorInfo.Initialize(AErrorCode: Integer; const AErrorMessage: UnicodeString);
+procedure TACLWebErrorInfo.Initialize(AErrorCode: Integer; const AErrorMessage: string);
 begin
   ErrorCode := AErrorCode;
   ErrorMessage := AErrorMessage;
@@ -584,7 +586,12 @@ begin
   Initialize(0, '');
 end;
 
-function TACLWebErrorInfo.ToString: UnicodeString;
+function TACLWebErrorInfo.Succeeded: Boolean;
+begin
+  Result := ErrorCode = 0;
+end;
+
+function TACLWebErrorInfo.ToString: string;
 begin
   Result := Format('Error: %d %s%s', [ErrorCode, IFThenW(ErrorMessage <> '', acCRLF), ErrorMessage]);
 end;
@@ -594,12 +601,18 @@ end;
 constructor EACLWebError.Create(const AInfo: TACLWebErrorInfo);
 begin
   FInfo := AInfo;
-  Create(AInfo.ToString);
+  Create(Info.ToString);
+end;
+
+constructor EACLWebError.Create(const AText: string; ACode: Integer);
+begin
+  Info.Initialize(ACode, AText);
+  Create(Info.ToString);
 end;
 
 { TACLWebProxyInfo }
 
-class function TACLWebProxyInfo.Create(const Server, ServerPort, UserName, UserPass: UnicodeString): TACLWebProxyInfo;
+class function TACLWebProxyInfo.Create(const Server, ServerPort, UserName, UserPass: string): TACLWebProxyInfo;
 begin
   Result.Server := Server;
   Result.ServerPort := ServerPort;

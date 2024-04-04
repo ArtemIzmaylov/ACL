@@ -4,70 +4,48 @@
 {*        HTTP Client Implementation         *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.Web.Http;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
   Winapi.Windows,
   Winapi.WinInet,
+{$ENDIF}
   // System
-  System.Classes,
-  System.Types,
+  {System.}Classes,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Types,
   // ACL
   ACL.Classes,
   ACL.Classes.ByteBuffer,
   ACL.Classes.Collections,
-  ACL.FileFormats.INI,
   ACL.Threading,
   ACL.Threading.Pool,
   ACL.Utils.Common,
-  ACL.WEB;
+  ACL.Web;
 
 type
-  TACLHttpMethod = (hmGet, hmPost, hmPut, hmDelete, hmHead);
 
-  { IACLHttpClientHandler }
-
-  IACLHttpClientHandler = interface(IUnknown)
-  ['{004AB48B-233A-423E-BA95-E446A24F6E9E}']
-    function OnAccept(const AHeaders, AContentType: UnicodeString; const AContentSize: Int64): LongBool;
-    procedure OnComplete(const AErrorInfo: TACLWebErrorInfo; ACanceled: LongBool);
-    function OnData(Data: PByte; Count: Integer): Boolean;
-    procedure OnProgress(const AReadBytes, ATotalBytes: Int64);
-  end;
+{$REGION ' Http Basics '}
 
   { EHttpError }
 
-  EHttpError = class
-  strict private
-    FInfo: TACLWebErrorInfo;
+  EHttpError = class(EACLWebError)
   public
-    constructor Create(const Code: Integer; const Text: string); overload;
     constructor Create(const DefaultText: string = ''); overload;
-    //
-    property Info: TACLWebErrorInfo read FInfo;
-  end;
-
-  { EHttpCanceledError }
-
-  EHttpCanceledError = class(EHttpError)
-  public
-    constructor Create; reintroduce;
-  end;
-
-  { EHttpRangeError }
-
-  EHttpRangeError = class(EHttpError)
-  public
-    constructor Create; reintroduce;
   end;
 
   { EHttpWriteError }
@@ -77,27 +55,50 @@ type
     constructor Create; reintroduce;
   end;
 
+  { THttpResponse }
+
+  THttpResponse = record
+    ContentLength: Int64;
+    ContentRange: string;
+    ContentType: string;
+    RawHeaders: string;
+    StatusCode: Integer;
+    StatusText: string;
+    procedure Init;
+    function StatusIsOk: Boolean;
+  end;
+
   { THttpConnection }
+
+  THttpAcceptProc = reference to function (const AResponse: THttpResponse): Boolean;
+  THttpDataProc = reference to function (Data: PByte; Count: Integer): Boolean;
+  THttpProgressProc = reference to function (const APosition, ASize: Int64): Boolean;
 
   THttpConnection = class
   strict private
+  {$IFNDEF FPC}
     FHandle: HINTERNET;
-    FHost: string;
-    FSecured: Boolean;
     FSession: HINTERNET;
+  {$ENDIF}
+    FURL: TACLWebURL;
 
-    procedure CreateSession;
-  protected
-    property Handle: HINTERNET read FHandle;
-    property Host: string read FHost;
-    property Secured: Boolean read FSecured;
+    procedure RequestCore(
+      AMethod, AHeaders: string;
+      var AResponse: THttpResponse;
+      APostData: TStream = nil;
+      AOnAccept: THttpAcceptProc = nil;
+      AOnProgress: THttpProgressProc = nil;
+      AOnReceive: THttpDataProc = nil);
   public
-    constructor Create(const AHost: string; APort: Word; ASecured: Boolean);
+    constructor Create(const URL: TACLWebURL);
     destructor Destroy; override;
-    //
-    class procedure ReleaseHandle(var AHandle: HINTERNET);
-    class procedure SetOption(Handle: HINTERNET; Option, Value: Cardinal); overload;
-    class procedure SetOption(Handle: HINTERNET; Option: Cardinal; const Value: string); overload;
+    function Request(const AMethod: string;
+      ARange: IACLWebRequestRange = nil;
+      APostData: TStream = nil;
+      AOnAccept: THttpAcceptProc = nil;
+      AOnProgress: THttpProgressProc = nil;
+      AOnReceive: THttpDataProc = nil): THttpResponse;
+    property URL: TACLWebURL read FURL;
   end;
 
   { THttpHeaders }
@@ -106,109 +107,19 @@ type
   public const
     Delimiter = ': ';
   protected
-    class function Get(const AHeaders, AName: string; out AValue: string; out APosStart, APosFinish: Integer): Boolean; overload;
+    class function Get(const AHeaders, AName: string;
+      out AValue: string; out APosStart, APosFinish: Integer): Boolean; overload;
   public
     class function Contains(const AHeaders, AName: string): Boolean;
     class function Extract(var AHeaders: string; const AName: string; out AValue: string): Boolean;
     class function Get(const AHeaders, AName: string; out AValue: string): Boolean; overload;
   end;
 
-  { THttpRequest }
+{$ENDREGION}
 
-  THttpRequestDataProc = reference to function (Data: PByte; Count: Integer): Boolean;
-  THttpRequestProgressProc = function (const APosition, ASize: Int64): Boolean of object;
-
-  THttpRequest = class
-  strict private const
-    BufferSize = 64 * SIZE_ONE_KILOBYTE;
-  strict private
-    FCookieURL: string;
-    FHandle: HINTERNET;
-    FHost: string;
-    FMethod: string;
-  protected
-    function GetQueryValue(const ID: Integer): Integer;
-    function GetQueryValueAsString(const ID: Integer): string;
-    function HasData: Boolean;
-    function SendCore(const AHeaders: string; ADataStream: TStream = nil; AProgressProc: THttpRequestProgressProc = nil): Boolean;
-    procedure ProcessCookies(var AHeaders: string);
-    //
-    property Handle: HINTERNET read FHandle;
-  public
-    constructor Create(AConnection: THttpConnection; const Method, Path: string);
-    destructor Destroy; override;
-    procedure Receive(ADataProc: THttpRequestDataProc; AProgressProc: THttpRequestProgressProc = nil);
-    procedure Send(ACustomHeaders: string = ''; ARange: IACLWebRequestRange = nil;
-      ADataStream: TStream = nil; AProgressProc: THttpRequestProgressProc = nil);
-    function StatusIsOk: Boolean;
-    //
-    property ContentLength: Integer index HTTP_QUERY_CONTENT_LENGTH read GetQueryValue;
-    property ContentRange: string index HTTP_QUERY_CONTENT_RANGE read GetQueryValueAsString;
-    property ContentType: string index HTTP_QUERY_CONTENT_TYPE read GetQueryValueAsString;
-    property RawHeaders: string index HTTP_QUERY_RAW_HEADERS read GetQueryValueAsString;
-    property StatusCode: Integer index HTTP_QUERY_STATUS_CODE read GetQueryValue;
-    property StatusText: string index HTTP_QUERY_STATUS_TEXT read GetQueryValueAsString;
-  end;
-
-  { TACLHttpClient }
-
-  TACLHttpClientOption = (hcoThreading, hcoSyncEventAccept, hcoSyncEventProgress, hcoSyncEventComplete, hcoFreePostData);
-  TACLHttpClientOptions = set of TACLHttpClientOption;
-
-  TACLHttpClient = class
-  public const
-    MethodNames: array[TACLHttpMethod] of PWideChar = ('GET', 'POST', 'PUT', 'DELETE', 'HEAD');
-  public
-    // General
-    class function Request(AMethod: TACLHttpMethod; const ALink: UnicodeString;
-      AHandler: IACLHttpClientHandler; const APostData: TStream = nil; ARange: IACLWebRequestRange = nil;
-      AOptions: TACLHttpClientOptions = [hcoThreading]; AThreadPriority: TACLTaskPriority = atpNormal): THandle; overload;
-    class function Request(const AMethod, ALink: UnicodeString;
-      AHandler: IACLHttpClientHandler; const APostData: TStream = nil; ARange: IACLWebRequestRange = nil;
-      AOptions: TACLHttpClientOptions = [hcoThreading]; AThreadPriority: TACLTaskPriority = atpNormal): THandle; overload;
-    class function RequestNoThread(AMethod: TACLHttpMethod; const ALink: UnicodeString;
-      AResponseData: TStream; out AErrorInfo: TACLWebErrorInfo; APostData: TStream = nil;
-      ARange: IACLWebRequestRange = nil; AMaxAcceptSize: Int64 = 0): Boolean; overload;
-    class function RequestNoThread(const AMethod, ALink: UnicodeString;
-      AResponseData: TStream; out AErrorInfo: TACLWebErrorInfo; APostData: TStream = nil;
-      ARange: IACLWebRequestRange = nil; AMaxAcceptSize: Int64 = 0): Boolean; overload;
-
-    // Get
-    class function Get(const ALink: UnicodeString; AHandler: IACLHttpClientHandler;
-      ARange: IACLWebRequestRange = nil; AOptions: TACLHttpClientOptions = [hcoThreading]): THandle; overload;
-    class function GetNoThread(const ALink: UnicodeString; AStream: TStream;
-      out AErrorInfo: TACLWebErrorInfo; ARange: IACLWebRequestRange = nil; const AMaxAcceptSize: Int64 = 0): Boolean; overload;
-
-    // Post
-    class function PostNoThread(const ALink: UnicodeString;
-      const APostData: AnsiString; AResponseData: TStream; out AErrorInfo: TACLWebErrorInfo): Boolean; overload;
-
-    // Thread Utils
-    class procedure Cancel(ATaskHandle: THandle; AWaitFor: Boolean = False);
-    class function WaitFor(ATaskHandle: THandle): Boolean;
-  end;
-
-  { TACLHttpClientSyncTaskHandler }
-
-  TACLHttpClientSyncTaskHandler = class(TACLUnknownObject, IACLHttpClientHandler)
-  strict private
-    FErrorInfo: TACLWebErrorInfo;
-    FMaxAcceptSize: Int64;
-    FStream: TStream;
-  public
-    constructor Create(AStream: TStream; const AMaxAcceptSize: Int64 = 0);
-    // IACLHttpClientHandler
-    function OnAccept(const AHeaders, AContentType: UnicodeString; const AContentSize: Int64): LongBool; virtual;
-    function OnData(Data: PByte; Count: Integer): Boolean; virtual;
-    procedure OnComplete(const AErrorInfo: TACLWebErrorInfo; ACanceled: LongBool); virtual;
-    procedure OnProgress(const AReadBytes, ATotalBytes: Int64); virtual;
-    //
-    property ErrorInfo: TACLWebErrorInfo read FErrorInfo;
-  end;
+{$REGION ' Http Stream '}
 
   { TACLHttpInputStream }
-
-  TACLHttpInputStreamDownloadMode = (hisdmASAP, hisdmLazy);
 
   TACLHttpInputStream = class(TStream)
   protected const
@@ -223,7 +134,7 @@ type
     FFreeBlocks: TACLThreadList<Integer>;
     FFreeBlocksCursor: Integer;
     FFreeBlocksEvent: TACLEvent;
-    FMode: TACLHttpInputStreamDownloadMode;
+    FLoadOnRequest: Boolean;
     FPosition: Int64;
     FSize: Int64;
     FUpdateThread: TACLPauseableThread;
@@ -234,31 +145,114 @@ type
     function GetSize: Int64; override;
     procedure SetSize(const NewSize: Int64); override;
   public
-    constructor Create(const URL: TACLWebURL; const ACachedFileName: string = '';
-      AMode: TACLHttpInputStreamDownloadMode = hisdmASAP);
+    constructor Create(const URL: TACLWebURL;
+      const ACachedFileName: string = ''; ALoadOnRequest: Boolean = False);
     destructor Destroy; override;
     class function ValidateCacheStream(AStream: TStream): Boolean; overload;
     class procedure ValidateCacheStream(AStream: TStream; AFreeBlocks: TACLList<Integer>); overload;
     function Read(var Buffer; Count: Longint): Longint; override;
     function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; override;
     function Write(const Buffer; Count: Longint): Longint; override;
-    //
-    property Mode: TACLHttpInputStreamDownloadMode read FMode write FMode;
+    //# Properties
+    property LoadOnRequest: Boolean read FLoadOnRequest write FLoadOnRequest;
   end;
+
+{$ENDREGION}
+
+{$REGION ' Http Client '}
+
+  { IACLHttpRequest }
+
+  IACLHttpRequest = interface
+    // Setup
+    function OnAccept(AMaxSize: Int64): IACLHttpRequest; overload;
+    function OnAccept(AProc: THttpAcceptProc;
+      ACallInMainThread: Boolean = False): IACLHttpRequest; overload;
+    function OnComplete(AProc: TProc<TACLWebErrorInfo>;
+      ACallInMainThread: Boolean = False): IACLHttpRequest;
+    function OnData(AContainer: IACLDataContainer): IACLHttpRequest; overload;
+    function OnData(AProc: THttpDataProc): IACLHttpRequest; overload;
+    function OnData(AStream: TStream): IACLHttpRequest; overload;
+    function OnPost(AStream: TStream;
+      AOwnership: TStreamOwnership = soReference): IACLHttpRequest; overload;
+    function OnPost(const AStr: AnsiString): IACLHttpRequest; overload;
+    function OnProgress(AProc: THttpProgressProc;
+      ACallInMainThread: Boolean = False): IACLHttpRequest;
+    function SetRange(ARange: IACLWebRequestRange): IACLHttpRequest;
+    function SetPriority(APriority: TACLTaskPriority): IACLHttpRequest;
+    // Run
+    function Run: THandle;
+    function RunNoThread: TACLWebErrorInfo; overload;
+    function RunNoThread(ACheckCanceled: TACLTaskCancelCallback): TACLWebErrorInfo; overload;
+  end;
+
+  { TACLHttp }
+
+  TACLHttp = class(TInterfacedObject, IACLHttpRequest)
+  protected
+    FMethod: string;
+    FOnAccept: THttpAcceptProc;
+    FOnAcceptSync: Boolean;
+    FOnCheckCanceled: TACLTaskCancelCallback;
+    FOnComplete: TProc<TACLWebErrorInfo>;
+    FOnCompleteSync: Boolean;
+    FOnData: THttpDataProc;
+    FOnProgress: THttpProgressProc;
+    FOnProgressSync: Boolean;
+    FPostData: TStream;
+    FPostDataOwnership: TStreamOwnership;
+    FPriority: TACLTaskPriority;
+    FRange: IACLWebRequestRange;
+    FResult: TACLWebErrorInfo;
+    FUrl: TACLWebURL;
+
+    // IACLHttpRequest
+    function OnAccept(AMaxSize: Int64): IACLHttpRequest; overload;
+    function OnAccept(AProc: THttpAcceptProc;
+      ACallInMainThread: Boolean = False): IACLHttpRequest; overload;
+    function OnCheckCanceled(
+      ACheckCanceled: TACLTaskCancelCallback): IACLHttpRequest;
+    function OnComplete(AProc: TProc<TACLWebErrorInfo>;
+      ACallInMainThread: Boolean = False): IACLHttpRequest;
+    function OnData(AContainer: IACLDataContainer): IACLHttpRequest; overload;
+    function OnData(AProc: THttpDataProc): IACLHttpRequest; overload;
+    function OnData(AStream: TStream): IACLHttpRequest; overload;
+    function OnPost(AStream: TStream;
+      AOwnership: TStreamOwnership = soReference): IACLHttpRequest; overload;
+    function OnPost(const AStr: AnsiString): IACLHttpRequest; overload;
+    function OnProgress(AProc: THttpProgressProc;
+      ACallInMainThread: Boolean = False): IACLHttpRequest;
+    function SetRange(ARange: IACLWebRequestRange): IACLHttpRequest; overload;
+    function SetPriority(APriority: TACLTaskPriority): IACLHttpRequest;
+    // Run
+    function Run: THandle;
+    function RunNoThread: TACLWebErrorInfo; overload;
+    function RunNoThread(ACheckCanceled: TACLTaskCancelCallback): TACLWebErrorInfo; overload;
+  public
+    destructor Destroy; override;
+    class function Get(const AUrl: string): IACLHttpRequest;
+    class function Head(const AUrl: string): IACLHttpRequest;
+    class function Post(const AUrl: string): IACLHttpRequest;
+    class function Request(const AMethod: string; const AUrl: string): IACLHttpRequest;
+    //# Utils
+    class procedure RaiseOnError(const AInfo: TACLWebErrorInfo);
+  end;
+
+{$ENDREGION}
 
 implementation
 
 uses
-  System.StrUtils,
-  System.SysUtils,
-  System.Math,
-  // ACL
+{$IFDEF FPC}
+  FPHttpClient,
+  OpenSSLSockets,
+  URIParser,
+{$ENDIF}
   ACL.Classes.StringList,
   ACL.FastCode,
   ACL.Math,
   ACL.Parsers,
   ACL.Utils.FileSystem,
-  ACL.Utils.Registry,
   ACL.Utils.Stream,
   ACL.Utils.Strings;
 
@@ -268,78 +262,108 @@ const
   sErrorInternal = 'Internal connection error (%s)';
   sErrorRange = 'Range is not supported by Server';
   sErrorWrite = 'Cannot write data to the stream.';
+{$IFNDEF FPC}
+  sErrorWriteToServer = 'Cannot post data to the server.';
+{$ENDIF}
 
   IdentConnection = 'Connection';
+  IdentContentLength = 'Content-Length';
+  IdentContentRange = 'Content-Range';
   IdentContentType = 'Content-Type';
   IdentCookie = 'Cookie';
   IdentKeepAlive = 'Keep-Alive';
   IdentRange = 'Range';
   IdentUserAgent = 'User-Agent';
 
+{$REGION ' Http Basics '}
+{$IFDEF FPC}
+
 type
 
-  { TACLHttpClientTask }
+  { TLazHttpClient }
 
-  TACLHttpClientTask = class(TACLTask)
-  strict private
-    FError: TACLWebErrorInfo;
-    FHandler: IACLHttpClientHandler;
-    FMethod: string;
-    FOptions: TACLHttpClientOptions;
-    FPostData: TStream;
-    FPriority: TACLTaskPriority;
-    FRange: IACLWebRequestRange;
-    FURL: TACLWebURL;
-
-    function CheckContentType(ARequest: THttpRequest): Boolean;
-    function HandlerData(Data: PByte; Count: Integer): Boolean;
-    function HandlerProgress(const APosition, ASize: Int64): Boolean;
+  TLazHttpClient = class(TFPHTTPClient)
+  protected type
+    TStreamAdapter = class(TStream)
+    strict private
+      FOnData: THttpDataProc;
+    public
+      constructor Create(AOnData: THttpDataProc);
+      function Write(const Buffer; Count: Longint): Longint; override;
+    end;
   protected
-    function DoAccept(ARequest: THttpRequest): Boolean;
-    procedure DoComplete;
-
-    procedure Complete; override;
-    procedure Execute; override;
-    function GetPriority: TACLTaskPriority; override;
+    FOnAccept: THttpAcceptProc;
+    FOnProgress: THttpProgressProc;
+    procedure DoHeaders(Sender: TObject);
+    procedure DoReadResponse(var AResponse: THttpResponse);
+    procedure DoProgress(Sender : TObject; const Size, Pos: Int64);
   public
-    constructor Create(AHandler: IACLHttpClientHandler;
-      const AMethod, ARequest: UnicodeString; const APostData: TStream;
-      const ARange: IACLWebRequestRange; APriority: TACLTaskPriority; AOptions: TACLHttpClientOptions);
-    destructor Destroy; override;
-    //
-    property Method: string read FMethod;
-    property Options: TACLHttpClientOptions read FOptions;
-    property URL: TACLWebURL read FURL;
+    constructor Create(AOwner: TComponent); override;
   end;
 
-  { TACLHttpInputStreamUpdateThread }
-
-  TACLHttpInputStreamUpdateThread = class(TACLPauseableThread)
-  strict private
-    FBlockBuffer: TACLByteBuffer;
-    FStream: TACLHttpInputStream;
-
-    function GetNextBlockIndex(out ABlockIndex: Integer): Boolean;
-    procedure WriteBuffer(ABlockIndex: Integer);
-  protected
-    procedure Execute; override;
-    //
-    property BlockBuffer: TACLByteBuffer read FBlockBuffer;
-    property Stream: TACLHttpInputStream read FStream;
-  public
-    constructor Create(AStream: TACLHttpInputStream);
-    destructor Destroy; override;
-  end;
-
-procedure CallEvent(AProc: TProc; ASync: Boolean);
+constructor TLazHttpClient.Create(AOwner: TComponent);
 begin
-  if ASync then
-    RunInMainThread(AProc)
-  else
-    AProc();
+  inherited Create(AOwner);
+  AllowRedirect := True;
+  ConnectTimeout := TACLWebSettings.ConnectionTimeOut;
+  IOTimeout := TACLWebSettings.ConnectionTimeOut;
+  if TACLWebSettings.ConnectionMode = ncmUserDefined then
+  begin
+    Proxy.Host := TACLWebSettings.Proxy.Server;
+    Proxy.Port := StrToIntDef(TACLWebSettings.Proxy.ServerPort, 8080);
+    Proxy.UserName := TACLWebSettings.Proxy.UserName;
+    Proxy.Password := TACLWebSettings.Proxy.UserPass;
+  end;
+  OnHeaders := DoHeaders;
+  OnDataSent := DoProgress;
+  OnDataReceived := DoProgress;
 end;
 
-function HTTPQueryDWORD(AService: HINTERNET; ID: DWORD): DWORD;
+procedure TLazHttpClient.DoProgress(Sender : TObject; const Size, Pos: Int64);
+begin
+  if Assigned(FOnProgress) and not FOnProgress(Pos, Size) then Abort;
+end;
+
+procedure TLazHttpClient.DoHeaders(Sender: TObject);
+var
+  LResponse: THttpResponse;
+begin
+  if Assigned(FOnAccept) and not IsRedirect(ResponseStatusCode) then
+  begin
+    LResponse.Init;
+    DoReadResponse(LResponse);
+    FOnAccept(LResponse);
+  end;
+end;
+
+procedure TLazHttpClient.DoReadResponse(var AResponse: THttpResponse);
+begin
+  AResponse.ContentLength := StrToIntDef(GetHeader(ResponseHeaders, IdentContentLength), -1);
+  AResponse.ContentRange := GetHeader(ResponseHeaders, IdentContentRange);
+  AResponse.ContentType := GetHeader(ResponseHeaders, IdentContentType);
+  AResponse.RawHeaders := ResponseHeaders.Text;
+  AResponse.StatusCode := ResponseStatusCode;
+  AResponse.StatusText := ResponseStatusText;
+end;
+
+{ TLazHttpClient.TStreamAdapter }
+
+constructor TLazHttpClient.TStreamAdapter.Create(AOnData: THttpDataProc);
+begin
+  FOnData := AOnData;
+end;
+
+function TLazHttpClient.TStreamAdapter.Write(const Buffer; Count: Longint): Longint;
+begin
+  if FOnData(@Buffer, Count) then
+    Result := Count
+  else
+    Result := -1;
+end;
+
+{$ELSE}
+
+function HttpQueryDWORD(AService: HINTERNET; ID: DWORD): DWORD;
 var
   ABufferLength: DWORD;
   AReserved: DWORD;
@@ -350,7 +374,7 @@ begin
     Result := 0;
 end;
 
-function HTTPQueryString(AService: HINTERNET; ID: DWORD): UnicodeString;
+function HttpQueryString(AService: HINTERNET; ID: DWORD): UnicodeString;
 var
   ABufferLength: DWORD;
   AReserved: DWORD;
@@ -369,83 +393,7 @@ begin
     Result := EmptyStr;
 end;
 
-{ EHttpError }
-
-constructor EHttpError.Create(const DefaultText: string = '');
-var
-  ABuffer: array[Byte] of WideChar;
-  ABufferLength: DWORD;
-  AError: DWORD;
-begin
-  ABufferLength := Length(ABuffer);
-  if InternetGetLastResponseInfoW(AError, @ABuffer[0], ABufferLength) and (AError > 0) then
-  begin
-    SetString(FInfo.ErrorMessage, PWideChar(@ABuffer[0]), ABufferLength);
-    FInfo.ErrorCode := AError;
-  end
-  else
-    if GetLastError <> 0 then
-    begin
-      FInfo.ErrorCode := GetLastError;
-      FInfo.ErrorMessage := SysErrorMessage(FInfo.ErrorCode);
-    end
-    else
-      Info.Initialize(acWebErrorUnknown, Format(sErrorInternal, [DefaultText]));
-end;
-
-constructor EHttpError.Create(const Code: Integer; const Text: string);
-begin
-  Info.Initialize(Code, Text);
-end;
-
-{ EHttpCanceledError }
-
-constructor EHttpCanceledError.Create;
-begin
-  inherited Create(acWebErrorCanceled, sErrorCancel);
-end;
-
-{ EHttpRangeError }
-
-constructor EHttpRangeError.Create;
-begin
-  inherited Create(acWebErrorUnknown, sErrorRange);
-end;
-
-{ EHttpWriteError }
-
-constructor EHttpWriteError.Create;
-begin
-  inherited Create(acWebErrorUnknown, sErrorWrite);
-end;
-
-{ THttpConnection }
-
-constructor THttpConnection.Create(const AHost: string; APort: Word; ASecured: Boolean);
-begin
-  FHost := AHost;
-  FSecured := ASecured;
-  CreateSession;
-
-  FHandle := InternetConnectW(FSession, PWideChar(AHost), APort, nil, nil, INTERNET_SERVICE_HTTP, 0, 0);
-  if FHandle = nil then
-    raise EHttpError.Create('InternetConnectW failed');
-
-  if (TACLWebSettings.ConnectionMode = ncmUserDefined) and (TACLWebSettings.Proxy.UserName <> '') then
-  begin
-    THttpConnection.SetOption(FHandle, INTERNET_OPTION_PROXY_USERNAME, TACLWebSettings.Proxy.UserName);
-    THttpConnection.SetOption(FHandle, INTERNET_OPTION_PROXY_PASSWORD, TACLWebSettings.Proxy.UserPass);
-  end;
-end;
-
-destructor THttpConnection.Destroy;
-begin
-  ReleaseHandle(FHandle);
-  ReleaseHandle(FSession);
-  inherited;
-end;
-
-class procedure THttpConnection.ReleaseHandle(var AHandle: HINTERNET);
+procedure HttpReleaseHandle(var AHandle: HINTERNET);
 begin
   if AHandle <> nil then
   begin
@@ -454,43 +402,358 @@ begin
   end;
 end;
 
-class procedure THttpConnection.SetOption(Handle: HINTERNET; Option: Cardinal; const Value: string);
-begin
-  InternetSetOptionW(Handle, Option, PWideChar(Value), Length(Value));
-end;
+{$ENDIF}
 
-class procedure THttpConnection.SetOption(Handle: HINTERNET; Option, Value: Cardinal);
-begin
-  InternetSetOption(Handle, Option, @Value, SizeOf(Value));
-end;
+{ EHttpError }
 
-procedure THttpConnection.CreateSession;
+constructor EHttpError.Create(const DefaultText: string = '');
+{$IFDEF MSWINDOWS}
 var
-  AProxyServer: UnicodeString;
-  AValue: DWORD;
+  ABuffer: array[Byte] of WideChar;
+  ABufferLength: DWORD;
+  AError: DWORD;
 begin
+  ABufferLength := Length(ABuffer);
+  if InternetGetLastResponseInfoW(AError, @ABuffer[0], ABufferLength) and (AError > 0) then
+    inherited Create(acMakeString(PWideChar(@ABuffer[0]), ABufferLength), AError)
+  else
+  begin
+    AError := GetLastError;
+    if AError <> 0 then
+      inherited Create(SysErrorMessage(AError), AError)
+    else
+      inherited Create(Format(sErrorInternal, [DefaultText]), acWebErrorUnknown);
+  end;
+{$ELSE}
+begin
+  Create(Format(sErrorInternal, [DefaultText]), acWebErrorUnknown);
+{$ENDIF}
+end;
+
+{ EHttpWriteError }
+
+constructor EHttpWriteError.Create;
+begin
+  inherited Create(sErrorWrite, acWebErrorUnknown);
+end;
+
+{ THttpResponse }
+
+procedure THttpResponse.Init;
+begin
+  ContentLength := 0;
+  ContentRange := '';
+  ContentType := '';
+  RawHeaders := '';
+  StatusText := '';
+  StatusCode := 0;
+end;
+
+function THttpResponse.StatusIsOk: Boolean;
+begin
+  // https://developer.mozilla.org/ru/docs/Web/HTTP/Status
+  Result := InRange(StatusCode, 200, 299);
+end;
+
+{ THttpConnection }
+
+constructor THttpConnection.Create(const URL: TACLWebURL);
+{$IFNDEF FPC}
+
+  procedure SetOption(Handle: HINTERNET; Option: Cardinal; const Value: string); overload;
+  begin
+    InternetSetOptionW(Handle, Option, PWideChar(Value), Length(Value));
+  end;
+
+  procedure SetOption(Handle: HINTERNET; Option, Value: Cardinal); overload;
+  begin
+    InternetSetOption(Handle, Option, @Value, SizeOf(Value));
+  end;
+
+var
+  LProxyServer: string;
+{$ENDIF}
+begin
+  FURL := URL;
+{$IFNDEF FPC}
   case TACLWebSettings.ConnectionMode of
     ncmDirect:
       FSession := InternetOpenW(nil, INTERNET_OPEN_TYPE_DIRECT, nil, nil, 0);
-
     ncmUserDefined:
       begin
-        AProxyServer := Format('http=%s:%s', [TACLWebSettings.Proxy.Server, TACLWebSettings.Proxy.ServerPort]);
-        FSession := InternetOpenW(nil, INTERNET_OPEN_TYPE_PROXY, PWideChar(AProxyServer), nil, 0);
+        LProxyServer := Format('http=%s:%s', [TACLWebSettings.Proxy.Server, TACLWebSettings.Proxy.ServerPort]);
+        FSession := InternetOpenW(nil, INTERNET_OPEN_TYPE_PROXY, PWideChar(LProxyServer), nil, 0);
       end;
-
   else
     FSession := InternetOpenW(nil, INTERNET_OPEN_TYPE_PRECONFIG, nil, nil, 0);
   end;
-
   if FSession = nil then
     raise EHttpError.Create('InternetOpen failed');
 
-  AValue := TACLWebSettings.ConnectionTimeOut;
-  THttpConnection.SetOption(FSession, INTERNET_OPTION_DATA_SEND_TIMEOUT, AValue);
-  THttpConnection.SetOption(FSession, INTERNET_OPTION_DATA_RECEIVE_TIMEOUT, AValue);
-  THttpConnection.SetOption(FSession, INTERNET_OPTION_CONNECT_TIMEOUT, AValue);
+  SetOption(FSession, INTERNET_OPTION_DATA_SEND_TIMEOUT, TACLWebSettings.ConnectionTimeOut);
+  SetOption(FSession, INTERNET_OPTION_DATA_RECEIVE_TIMEOUT, TACLWebSettings.ConnectionTimeOut);
+  SetOption(FSession, INTERNET_OPTION_CONNECT_TIMEOUT, TACLWebSettings.ConnectionTimeOut);
+
+  FHandle := InternetConnectW(FSession, PWideChar(URL.Host), URL.Port, nil, nil, INTERNET_SERVICE_HTTP, 0, 0);
+  if FHandle = nil then
+    raise EHttpError.Create('InternetConnectW failed');
+
+  if (TACLWebSettings.ConnectionMode = ncmUserDefined) and (TACLWebSettings.Proxy.UserName <> '') then
+  begin
+    SetOption(FHandle, INTERNET_OPTION_PROXY_USERNAME, TACLWebSettings.Proxy.UserName);
+    SetOption(FHandle, INTERNET_OPTION_PROXY_PASSWORD, TACLWebSettings.Proxy.UserPass);
+  end;
+{$ENDIF}
 end;
+
+destructor THttpConnection.Destroy;
+begin
+{$IFNDEF FPC}
+  HTTPReleaseHandle(FHandle);
+  HTTPReleaseHandle(FSession);
+{$ENDIF}
+  inherited;
+end;
+
+function THttpConnection.Request(const AMethod: string;
+  ARange: IACLWebRequestRange = nil;
+  APostData: TStream = nil;
+  AOnAccept: THttpAcceptProc = nil;
+  AOnProgress: THttpProgressProc = nil;
+  AOnReceive: THttpDataProc = nil): THttpResponse;
+var
+  LCustomHeaders: string;
+
+  procedure AddHeaderValue(AHeaders: TACLStringList; const AName, ADefaultValue: string);
+  var
+    AValue: string;
+  begin
+    if not THttpHeaders.Extract(LCustomHeaders, AName, AValue) then
+      AValue := ADefaultValue;
+    if AValue <> '' then
+      AHeaders.Add(AName + THttpHeaders.Delimiter + AValue);
+  end;
+
+  function BuildRange: string;
+  begin
+    Result := 'bytes=' + IntToStr(ARange.GetOffset) + '-';
+    if ARange.GetSize >= 0 then
+      Result := Result + IntToStr(ARange.GetOffset + ARange.GetSize - 1);
+  end;
+
+  function BuildHeaders: string;
+  var
+    AHeaders: TACLStringList;
+  begin
+    AHeaders := TACLStringList.Create;
+    try
+    {$IFNDEF FPC}
+      AHeaders.Add('Host: ' + FUrl.Host);
+    {$ENDIF}
+      AddHeaderValue(AHeaders, IdentUserAgent, TACLWebSettings.UserAgent);
+      AddHeaderValue(AHeaders, IdentConnection, 'keep-alive');
+      AddHeaderValue(AHeaders, IdentKeepAlive, '300');
+      if acSameText(AMethod, 'POST') then
+        AddHeaderValue(AHeaders, IdentContentType, 'application/x-www-form-urlencoded');
+      if (ARange <> nil) and ((ARange.GetOffset > 0) or (ARange.GetSize > 0)) then
+        AddHeaderValue(AHeaders, IdentRange, BuildRange);
+      if LCustomHeaders <> '' then
+        AHeaders.Add(LCustomHeaders);
+      Result := Trim(AHeaders.Text);
+    finally
+      AHeaders.Free;
+    end;
+  end;
+
+var
+  LAcceptProc: THttpAcceptProc;
+begin
+  LCustomHeaders := FUrl.CustomHeaders;
+  LAcceptProc :=
+    function (const AResponse: THttpResponse): Boolean
+    begin
+      if (ARange <> nil) and (ARange.GetOffset > 0) then
+      begin
+        if AResponse.StatusCode <> 206{HTTP_STATUS_PARTIAL_CONTENT} then
+          raise EHttpError.Create(sErrorRange, acWebErrorNotAccepted);
+        if AResponse.ContentRange = '' then
+          raise EHttpError.Create(sErrorRange, acWebErrorNotAccepted);
+        if AResponse.ContentLength = 0 then
+          raise EHttpError.Create(sErrorRange, acWebErrorNotAccepted);
+      end;
+      if not AResponse.StatusIsOk then
+        raise EHttpError.Create(AResponse.StatusText, AResponse.StatusCode);
+      if Assigned(AOnAccept) and not AOnAccept(AResponse) then
+        raise EHttpError.Create(sErrorContentType, acWebErrorNotAccepted);
+      Result := True;
+    end;
+
+  Result.Init;
+  RequestCore(AMethod, BuildHeaders, Result, APostData, LAcceptProc, AOnProgress, AOnReceive);
+end;
+
+procedure THttpConnection.RequestCore(
+  AMethod, AHeaders: string;
+  var AResponse: THttpResponse;
+  APostData: TStream = nil;
+  AOnAccept: THttpAcceptProc = nil;
+  AOnProgress: THttpProgressProc = nil;
+  AOnReceive: THttpDataProc = nil);
+{$IFDEF FPC}
+var
+  LClient: TLazHttpClient;
+  LCookieValue: string;
+  LStream: TStream;
+begin
+  LClient := TLazHttpClient.Create(nil);
+  try
+    LClient.FOnAccept := AOnAccept;
+    LClient.FOnProgress := LClient.FOnProgress;
+    while THttpHeaders.Extract(AHeaders, IdentCookie, LCookieValue) do
+      LClient.Cookies.Add(LCookieValue);
+    try
+      LStream := LClient.TStreamAdapter.Create(AOnReceive);
+      try
+        LClient.RequestHeaders.Text := AHeaders;
+        LClient.RequestBody := APostData;
+        LClient.HttpMethod(AMethod, URL.ToString, LStream, []);
+      finally
+        LStream.Free;
+      end;
+    finally
+      LClient.DoReadResponse(AResponse);
+    end;
+  finally
+    LClient.Free;
+  end;
+end;
+{$ELSE}
+const
+  BufferSize = 256 * SIZE_ONE_KILOBYTE;
+
+  function SendRequest(ARequest: HINTERNET): Boolean;
+  var
+    ABuffer: TInternetBuffersW;
+    AContentPosition: Int64;
+    AContentSize: Int64;
+    AData: PByte;
+    ADataUsed: Integer;
+    ADataWritten: Cardinal;
+  begin
+    Result := False;
+    if APostData <> nil then
+    begin
+      ZeroMemory(@ABuffer, SizeOf(ABuffer));
+      ABuffer.dwStructSize := SizeOf(ABuffer);
+      ABuffer.lpcszHeader := PWideChar(AHeaders);
+      ABuffer.dwHeadersLength := Length(AHeaders);
+      ABuffer.dwHeadersTotal := Length(AHeaders);
+      ABuffer.dwBufferTotal := APostData.Size;
+
+      if HttpSendRequestEx(ARequest, @ABuffer, nil, HSR_INITIATE, 0) then
+      begin
+        AContentPosition := 0;
+        AContentSize := APostData.Size;
+        APostData.Position := 0;
+
+        AData := AllocMem(BufferSize);
+        try
+          repeat
+            ADataUsed := APostData.Read(AData^, BufferSize);
+            if ADataUsed > 0 then
+            begin
+              if not InternetWriteFile(ARequest, AData, ADataUsed, ADataWritten) then
+                raise EHttpError.Create(sErrorWriteToServer, acWebErrorUnknown);
+            end;
+
+            if Assigned(AOnProgress) then
+            begin
+              Inc(AContentPosition, ADataWritten);
+              if not AOnProgress(AContentPosition, AContentSize) then
+                raise EHttpError.Create(sErrorCancel, acWebErrorCanceled);
+            end;
+          until ADataUsed = 0;
+        finally
+          FreeMem(AData);
+        end;
+        Result := HttpEndRequest(ARequest, nil, 0, 0);
+      end;
+    end
+    else
+      Result := HttpSendRequest(ARequest, PWideChar(AHeaders), Length(AHeaders), nil, 0);
+  end;
+
+  procedure ReceiveData(ARequest: HINTERNET);
+  var
+    ABuffer: PByte;
+    ABytesRead: Cardinal;
+    AContentPosition: Int64;
+    AContentSize: Int64;
+    ARemaining: Cardinal;
+  begin
+    ABuffer := AllocMem(BufferSize);
+    try
+      AContentPosition := 0;
+      AContentSize := AResponse.ContentLength;
+      while InternetQueryDataAvailable(ARequest, ARemaining, 0, 0) and (ARemaining > 0) do
+      begin
+        if not InternetReadFile(ARequest, ABuffer, BufferSize, ABytesRead) then
+          raise EHttpError.Create('InternetReadFile failed');
+        if ABytesRead = 0 then
+          Break;
+        if not AOnReceive(ABuffer, ABytesRead) then
+          raise EHttpWriteError.Create;
+        if Assigned(AOnProgress) then
+        begin
+          Inc(AContentPosition, ABytesRead);
+          if not AOnProgress(AContentPosition, AContentSize) then
+            raise EHttpError.Create(sErrorCancel, acWebErrorCanceled);
+        end;
+      end;
+    finally
+      FreeMem(ABuffer);
+    end;
+  end;
+
+var
+  LCookieURL: string;
+  LCookieValue: string;
+  LFlags: Cardinal;
+  LRequest: HINTERNET;
+begin
+  LCookieURL := 'http' + IfThenW(URL.Secured, 's') + '://' + URL.Host;
+  while THttpHeaders.Extract(AHeaders, IdentCookie, LCookieValue) do
+    InternetSetCookie(PChar(LCookieURL), nil, PChar(LCookieValue));
+
+  LFlags := INTERNET_FLAG_RELOAD or INTERNET_SERVICE_HTTP;
+  if URL.Secured then
+    LFlags := LFlags or INTERNET_FLAG_SECURE or INTERNET_FLAG_KEEP_CONNECTION;
+
+  LRequest := HTTPOpenRequestW(FHandle, PWideChar(AMethod), PWideChar(FUrl.Path), nil, nil, nil, LFlags, 0);
+  try
+    if LRequest = nil then
+      raise EHttpError.Create('HttpOpenRequest failed');
+
+    if not SendRequest(LRequest) then
+      raise EHttpError.Create('HttpSendRequest failed');
+
+    AResponse.ContentRange := HTTPQueryString(LRequest, HTTP_QUERY_CONTENT_RANGE);
+    AResponse.ContentLength := HttpQueryDWORD(LRequest, HTTP_QUERY_CONTENT_LENGTH);
+    AResponse.ContentType := HTTPQueryString(LRequest, HTTP_QUERY_CONTENT_TYPE);
+    AResponse.StatusCode := HttpQueryDWORD(LRequest, HTTP_QUERY_STATUS_CODE);
+    AResponse.StatusText := HttpQueryString(LRequest, HTTP_QUERY_STATUS_TEXT);
+    AResponse.RawHeaders := HttpQueryString(LRequest, HTTP_QUERY_RAW_HEADERS);
+
+    if not Assigned(AOnAccept) or AOnAccept(AResponse) then
+    begin
+      if Assigned(AOnReceive) then
+        ReceiveData(LRequest);
+    end;
+  finally
+    HttpReleaseHandle(LRequest);
+  end;
+end;
+{$ENDIF}
 
 { THttpHeader }
 
@@ -501,7 +764,8 @@ begin
   Result := Get(AHeaders, AName, AValue);
 end;
 
-class function THttpHeaders.Extract(var AHeaders: string; const AName: string; out AValue: string): Boolean;
+class function THttpHeaders.Extract(var AHeaders: string;
+  const AName: string; out AValue: string): Boolean;
 var
   APosFinish: Integer;
   APosStart: Integer;
@@ -519,453 +783,43 @@ begin
   Result := Get(AHeaders, AName, AValue, APosStart, APosFinish);
 end;
 
-class function THttpHeaders.Get(const AHeaders, AName: string; out AValue: string; out APosStart, APosFinish: Integer): Boolean;
+class function THttpHeaders.Get(const AHeaders, AName: string;
+  out AValue: string; out APosStart, APosFinish: Integer): Boolean;
 begin
   AValue := acExtractString(AHeaders + acCRLF, AName + Delimiter, acCRLF, APosStart, APosFinish);
   Result := APosStart > 0;
 end;
 
-{ THttpRequest }
+{$ENDREGION}
 
-constructor THttpRequest.Create(AConnection: THttpConnection; const Method, Path: string);
+{$REGION ' Http Stream '}
+type
 
-  function BuildFlags: Cardinal;
-  begin
-    Result := INTERNET_FLAG_RELOAD or INTERNET_SERVICE_HTTP;
-    if AConnection.Secured then
-      Result := Result or INTERNET_FLAG_SECURE or INTERNET_FLAG_KEEP_CONNECTION;
+  { TACLHttpInputStreamUpdateThread }
+
+  TACLHttpInputStreamUpdateThread = class(TACLPauseableThread)
+  strict private
+    FBlockBuffer: TACLByteBuffer;
+    FStream: TACLHttpInputStream;
+    function GetNextBlockIndex(out ABlockIndex: Integer): Boolean;
+    procedure WriteBuffer(ABlockIndex: Integer);
+  protected
+    procedure Execute; override;
+  public
+    constructor Create(AStream: TACLHttpInputStream);
+    destructor Destroy; override;
   end;
-
-begin
-  FMethod := Method;
-  FHost := AConnection.Host;
-  FCookieURL := 'http' + IfThenW(AConnection.Secured, 's') + '://' + FHost;
-  FHandle := HTTPOpenRequestW(AConnection.Handle, PWideChar(Method), PWideChar(Path), nil, nil, nil, BuildFlags, 0);
-  if FHandle = nil then
-    raise EHttpError.Create('HTTPOpenRequest failed');
-end;
-
-destructor THttpRequest.Destroy;
-begin
-  THttpConnection.ReleaseHandle(FHandle);
-  inherited;
-end;
-
-procedure THttpRequest.Receive(ADataProc: THttpRequestDataProc; AProgressProc: THttpRequestProgressProc = nil);
-var
-  ABuffer: PByte;
-  ABytesRead: Cardinal;
-  AContentPosition: Int64;
-  AContentSize: Int64;
-begin
-  ABuffer := AllocMem(BufferSize);
-  try
-    AContentSize := ContentLength;
-    AContentPosition := 0;
-    while HasData do
-    begin
-      if not InternetReadFile(Handle, ABuffer, BufferSize, ABytesRead) then
-        raise EHttpError.Create('InternetReadFile failed');
-      if ABytesRead = 0 then
-        Break;
-      if not ADataProc(ABuffer, ABytesRead) then
-        raise EHttpWriteError.Create;
-      if Assigned(AProgressProc) then
-      begin
-        Inc(AContentPosition, ABytesRead);
-        if not AProgressProc(AContentPosition, AContentSize) then
-          raise EHttpCanceledError.Create;
-      end;
-    end;
-  finally
-    FreeMem(ABuffer);
-  end;
-end;
-
-procedure THttpRequest.Send(ACustomHeaders: string = '';
-  ARange: IACLWebRequestRange = nil; ADataStream: TStream = nil;
-  AProgressProc: THttpRequestProgressProc = nil);
-
-  procedure AddHeaderValue(AHeaders: TACLStringList; const AName, ADefaultValue: string);
-  var
-    AValue: string;
-  begin
-    if not THttpHeaders.Extract(ACustomHeaders, AName, AValue) then
-      AValue := ADefaultValue;
-    if AValue <> '' then
-      AHeaders.Add(AName + THttpHeaders.Delimiter + AValue);
-  end;
-
-  function BuildRange: UnicodeString;
-  begin
-    Result := 'bytes=' + IntToStr(ARange.GetOffset) + '-';
-    if ARange.GetSize >= 0 then
-      Result := Result + IntToStr(ARange.GetOffset + ARange.GetSize - 1);
-  end;
-
-  function BuildHeaders: UnicodeString;
-  var
-    AHeaders: TACLStringList;
-  begin
-    AHeaders := TACLStringList.Create;
-    try
-      AHeaders.Add('Host: ' + FHost);
-      AddHeaderValue(AHeaders, IdentUserAgent, TACLWebSettings.UserAgent);
-      AddHeaderValue(AHeaders, IdentConnection, 'keep-alive');
-      AddHeaderValue(AHeaders, IdentKeepAlive, '300');
-      if acSameText(FMethod, TACLHttpClient.MethodNames[hmPost]) then
-        AddHeaderValue(AHeaders, IdentContentType, 'application/x-www-form-urlencoded');
-      if (ARange <> nil) and ((ARange.GetOffset > 0) or (ARange.GetSize > 0)) then
-        AddHeaderValue(AHeaders, IdentRange, BuildRange);
-      if ACustomHeaders <> '' then
-        AHeaders.Add(ACustomHeaders);
-      Result := Trim(AHeaders.Text);
-    finally
-      AHeaders.Free;
-    end;
-  end;
-
-begin
-  ProcessCookies(ACustomHeaders);
-  if not SendCore(BuildHeaders, ADataStream, AProgressProc) then
-    raise EHttpError.Create('HttpSendRequest failed');
-
-  if (ARange <> nil) and (ARange.GetOffset > 0) then
-  begin
-    if StatusCode <> HTTP_STATUS_PARTIAL_CONTENT then
-      raise EHttpRangeError.Create;
-    if ContentRange = '' then
-      raise EHttpRangeError.Create;
-    if ContentLength = 0 then
-      raise EHttpRangeError.Create;
-  end;
-end;
-
-function THttpRequest.GetQueryValue(const ID: Integer): Integer;
-begin
-  Result := HTTPQueryDWORD(Handle, ID);
-end;
-
-function THttpRequest.GetQueryValueAsString(const ID: Integer): string;
-begin
-  Result := HTTPQueryString(Handle, ID);
-end;
-
-function THttpRequest.HasData: Boolean;
-var
-  X: DWORD;
-begin
-  Result := InternetQueryDataAvailable(Handle, X, 0, 0) and (X > 0);
-end;
-
-function THttpRequest.SendCore(const AHeaders: string;
-  ADataStream: TStream = nil; AProgressProc: THttpRequestProgressProc = nil): Boolean;
-var
-  ABuffer: TInternetBuffersW;
-  AContentPosition: Int64;
-  AContentSize: Int64;
-  AData: PByte;
-  ADataUsed: Integer;
-  ADataWritten: Cardinal;
-begin
-  Result := False;
-  if ADataStream <> nil then
-  begin
-    ZeroMemory(@ABuffer, SizeOf(ABuffer));
-    ABuffer.dwStructSize := SizeOf(ABuffer);
-    ABuffer.lpcszHeader := PWideChar(AHeaders);
-    ABuffer.dwHeadersLength := Length(AHeaders);
-    ABuffer.dwHeadersTotal := Length(AHeaders);
-    ABuffer.dwBufferTotal := ADataStream.Size;
-
-    if HttpSendRequestEx(Handle, @ABuffer, nil, HSR_INITIATE, 0) then
-    begin
-      AContentPosition := 0;
-      AContentSize := ADataStream.Size;
-      ADataStream.Position := 0;
-
-      AData := AllocMem(BufferSize);
-      try
-        repeat
-          ADataUsed := ADataStream.Read(AData^, BufferSize);
-          if ADataUsed > 0 then
-          begin
-            if not InternetWriteFile(Handle, AData, ADataUsed, ADataWritten) then
-              Exit(False);
-          end;
-
-          if Assigned(AProgressProc) then
-          begin
-            Inc(AContentPosition, ADataWritten);
-            if not AProgressProc(AContentPosition, AContentSize) then
-              raise EHttpError.Create(acWebErrorCanceled, sErrorCancel);
-          end;
-        until ADataUsed = 0;
-      finally
-        FreeMem(AData);
-      end;
-      Result := HttpEndRequest(Handle, nil, 0, 0);
-    end;
-  end
-  else
-    Result := HttpSendRequest(Handle, PWideChar(AHeaders), Length(AHeaders), nil, 0);
-end;
-
-function THttpRequest.StatusIsOk: Boolean;
-begin
-  // https://developer.mozilla.org/ru/docs/Web/HTTP/Status
-  Result := InRange(StatusCode, 200, 299);
-end;
-
-procedure THttpRequest.ProcessCookies(var AHeaders: string);
-var
-  AValue: string;
-begin
-  while THttpHeaders.Extract(AHeaders, IdentCookie, AValue) do
-    InternetSetCookie(PChar(FCookieURL), nil, PChar(AValue));
-end;
-
-{ TACLHttpClient }
-
-class function TACLHttpClient.Request(const AMethod, ALink: UnicodeString;
-  AHandler: IACLHttpClientHandler; const APostData: TStream = nil; ARange: IACLWebRequestRange = nil;
-  AOptions: TACLHttpClientOptions = [hcoThreading]; AThreadPriority: TACLTaskPriority = atpNormal): THandle;
-var
-  ATask: TACLHttpClientTask;
-begin
-  ATask := TACLHttpClientTask.Create(AHandler, AMethod, ALink, APostData, ARange, AThreadPriority, AOptions);
-  if hcoThreading in AOptions then
-    Result := TaskDispatcher.Run(ATask)
-  else
-    Result := TaskDispatcher.RunInCurrentThread(ATask);
-end;
-
-class function TACLHttpClient.Request(AMethod: TACLHttpMethod; const ALink: UnicodeString;
-  AHandler: IACLHttpClientHandler; const APostData: TStream = nil; ARange: IACLWebRequestRange = nil;
-  AOptions: TACLHttpClientOptions = [hcoThreading]; AThreadPriority: TACLTaskPriority = atpNormal): THandle;
-begin
-  Result := Request(MethodNames[AMethod], ALink, AHandler, APostData, ARange, AOptions, AThreadPriority);
-end;
-
-class function TACLHttpClient.RequestNoThread(
-  const AMethod, ALink: UnicodeString; AResponseData: TStream; out AErrorInfo: TACLWebErrorInfo;
-  APostData: TStream; ARange: IACLWebRequestRange; AMaxAcceptSize: Int64): Boolean;
-var
-  ATaskHandler: TACLHttpClientSyncTaskHandler;
-begin
-  ATaskHandler := TACLHttpClientSyncTaskHandler.Create(AResponseData, AMaxAcceptSize);
-  try
-    Request(AMethod, ALink, ATaskHandler, APostData, ARange, []);
-    AErrorInfo := ATaskHandler.ErrorInfo;
-    Result := AErrorInfo.ErrorCode = 0;
-  finally
-    ATaskHandler.Free;
-  end;
-end;
-
-class function TACLHttpClient.RequestNoThread(AMethod: TACLHttpMethod;
-  const ALink: UnicodeString; AResponseData: TStream; out AErrorInfo: TACLWebErrorInfo;
-  APostData: TStream; ARange: IACLWebRequestRange; AMaxAcceptSize: Int64): Boolean;
-begin
-  Result := RequestNoThread(MethodNames[AMethod], ALink, AResponseData, AErrorInfo, APostData, ARange, AMaxAcceptSize);
-end;
-
-class function TACLHttpClient.Get(const ALink: UnicodeString; AHandler: IACLHttpClientHandler;
-  ARange: IACLWebRequestRange = nil; AOptions: TACLHttpClientOptions = [hcoThreading]): THandle;
-begin
-  Result := Request(hmGet, ALink, AHandler, nil, ARange, AOptions);
-end;
-
-class function TACLHttpClient.GetNoThread(const ALink: UnicodeString; AStream: TStream;
-  out AErrorInfo: TACLWebErrorInfo; ARange: IACLWebRequestRange = nil; const AMaxAcceptSize: Int64 = 0): Boolean;
-begin
-  Result := RequestNoThread(hmGet, ALink, AStream, AErrorInfo, nil, ARange, AMaxAcceptSize);
-end;
-
-class function TACLHttpClient.PostNoThread(const ALink: UnicodeString;
-  const APostData: AnsiString; AResponseData: TStream; out AErrorInfo: TACLWebErrorInfo): Boolean;
-var
-  APostStream: TStream;
-begin
-  APostStream := TACLAnsiStringStream.Create(APostData);
-  try
-    Result := RequestNoThread(hmPost, ALink, AResponseData, AErrorInfo, APostStream);
-  finally
-    APostStream.Free;
-  end;
-end;
-
-class procedure TACLHttpClient.Cancel(ATaskHandle: THandle; AWaitFor: Boolean);
-begin
-  TaskDispatcher.Cancel(ATaskHandle, AWaitFor);
-end;
-
-class function TACLHttpClient.WaitFor(ATaskHandle: THandle): Boolean;
-begin
-  Result := TaskDispatcher.WaitFor(ATaskHandle);
-end;
-
-{ TACLHttpClientTask }
-
-constructor TACLHttpClientTask.Create(AHandler: IACLHttpClientHandler;
-  const AMethod, ARequest: UnicodeString; const APostData: TStream;
-  const ARange: IACLWebRequestRange; APriority: TACLTaskPriority; AOptions: TACLHttpClientOptions);
-begin
-  inherited Create;
-  FError.Reset;
-  FMethod := AMethod;
-  FHandler := AHandler;
-  FOptions := AOptions;
-  FRange := ARange;
-  FPostData := APostData;
-  FPriority := APriority;
-  FURL := TACLWebURL.ParseHttp(ARequest);
-end;
-
-destructor TACLHttpClientTask.Destroy;
-begin
-  if hcoFreePostData in FOptions then
-    FreeAndNil(FPostData);
-  inherited Destroy;
-end;
-
-function TACLHttpClientTask.DoAccept(ARequest: THttpRequest): Boolean;
-var
-  AResult: Boolean;
-begin
-  CallEvent(
-    procedure
-    begin
-      AResult := FHandler.OnAccept(ARequest.RawHeaders, ARequest.ContentType, ARequest.ContentLength);
-    end,
-    hcoSyncEventAccept in Options);
-
-  Result := AResult;
-end;
-
-procedure TACLHttpClientTask.DoComplete;
-begin
-  CallEvent(
-    procedure
-    begin
-      FHandler.OnComplete(FError, IsCanceled);
-    end,
-    hcoSyncEventComplete in Options);
-end;
-
-procedure TACLHttpClientTask.Complete;
-begin
-  inherited Complete;
-  if IsCanceled then
-    FError.Initialize(acWebErrorCanceled, sErrorCancel);
-  DoComplete;
-end;
-
-procedure TACLHttpClientTask.Execute;
-var
-  AConnection: THttpConnection;
-  ARequest: THttpRequest;
-begin
-  try
-    AConnection := THttpConnection.Create(URL.Host, URL.Port, URL.Secured);
-    try
-      if not IsCanceled then
-      begin
-        ARequest := THttpRequest.Create(AConnection, Method, URL.Path);
-        try
-          ARequest.Send(URL.CustomHeaders, FRange, FPostData, HandlerProgress);
-          if CheckContentType(ARequest) and not IsCanceled then
-            ARequest.Receive(HandlerData, HandlerProgress);
-        finally
-          ARequest.Free;
-        end;
-      end;
-    finally
-      AConnection.Free;
-    end;
-  except
-    on E: EHttpError do
-      FError := E.Info;
-  end;
-end;
-
-function TACLHttpClientTask.GetPriority: TACLTaskPriority;
-begin
-  Result := FPriority;
-end;
-
-function TACLHttpClientTask.CheckContentType(ARequest: THttpRequest): Boolean;
-begin
-  if not ARequest.StatusIsOk then
-  begin
-    FError.Initialize(ARequest.StatusCode, ARequest.StatusText);
-    Result := ARequest.ContentLength > 0;
-  end
-  else
-    if not DoAccept(ARequest) then
-    begin
-      FError.Initialize(acWebErrorNotAccepted, sErrorContentType);
-      Result := False;
-    end
-    else
-      Result := True;
-end;
-
-function TACLHttpClientTask.HandlerData(Data: PByte; Count: Integer): Boolean;
-begin
-  Result := FHandler.OnData(Data, Count);
-end;
-
-function TACLHttpClientTask.HandlerProgress(const APosition, ASize: Int64): Boolean;
-begin
-  Result := not IsCanceled;
-  CallEvent(
-    procedure
-    begin
-      FHandler.OnProgress(APosition, ASize);
-    end,
-    hcoSyncEventProgress in Options);
-end;
-
-{ TACLHttpClientSyncTaskHandler }
-
-constructor TACLHttpClientSyncTaskHandler.Create(AStream: TStream; const AMaxAcceptSize: Int64 = 0);
-begin
-  inherited Create;
-  FMaxAcceptSize := AMaxAcceptSize;
-  FStream := AStream;
-end;
-
-function TACLHttpClientSyncTaskHandler.OnAccept(const AHeaders, AContentType: UnicodeString; const AContentSize: Int64): LongBool;
-begin
-  Result := (FMaxAcceptSize = 0) or (AContentSize <= FMaxAcceptSize);
-end;
-
-function TACLHttpClientSyncTaskHandler.OnData(Data: PByte; Count: Integer): Boolean;
-begin
-  Result := (FStream <> nil) and (FStream.Write(Data^, Count) = Count);
-end;
-
-procedure TACLHttpClientSyncTaskHandler.OnComplete(const AErrorInfo: TACLWebErrorInfo; ACanceled: LongBool);
-begin
-  FErrorInfo := AErrorInfo;
-end;
-
-procedure TACLHttpClientSyncTaskHandler.OnProgress(const AReadBytes, ATotalBytes: Int64);
-begin
-  // do nothing
-end;
 
 { TACLHttpInputStream }
 
 constructor TACLHttpInputStream.Create(const URL: TACLWebURL;
-  const ACachedFileName: string = ''; AMode: TACLHttpInputStreamDownloadMode = hisdmASAP);
+  const ACachedFileName: string = ''; ALoadOnRequest: Boolean = False);
 var
   AList: TACLList<Integer>;
 begin
   inherited Create;
   FURL := URL;
-  FMode := AMode;
+  FLoadOnRequest := ALoadOnRequest;
   FFreeBlocks := TACLThreadList<Integer>.Create;
   FFreeBlocksEvent := TACLEvent.Create;
   FCacheStreamLock := TACLCriticalSection.Create(Self, 'Lock');
@@ -984,16 +838,8 @@ begin
 
   if (FCacheStream = nil) or (FFreeBlocks.Count > 0) then
   begin
-    FConnection := THttpConnection.Create(URL.Host, URL.Port, URL.Secured);
-
-    // Fetch the size
-    with THttpRequest.Create(FConnection, 'GET', URL.Path) do
-    try
-      Send(URL.CustomHeaders);
-      FSize := ContentLength;
-    finally
-      Free;
-    end;
+    FConnection := THttpConnection.Create(URL);
+    FSize := FConnection.Request('HEAD').ContentLength;
 
     // Was cached stream deprecated?
     if (FCacheStream <> nil) and (FCacheStream.Size <> FSize) then
@@ -1140,6 +986,9 @@ end;
 
 function TACLHttpInputStream.Write(const Buffer; Count: Integer): Longint;
 begin
+{$IFDEF FPC}
+  Result := -1;
+{$ENDIF}
   raise EInvalidOperation.Create(ClassName);
 end;
 
@@ -1195,49 +1044,43 @@ end;
 procedure TACLHttpInputStreamUpdateThread.Execute;
 var
   ABlockIndex: Integer;
-  ARequest: THttpRequest;
 begin
   while not Terminated do
   begin
-    if FStream.Mode = hisdmLazy then
+    if FStream.LoadOnRequest then
       CheckForPause;
     if GetNextBlockIndex(ABlockIndex) then
     try
-      ARequest := THttpRequest.Create(Stream.FConnection, 'GET', Stream.FURL.Path);
-      try
-        BlockBuffer.Used := 0;
-        ARequest.Send(Stream.FURL.CustomHeaders,
-          TACLWebRequestRange.Create(ABlockIndex * TACLHttpInputStream.BlockSize));
-        ARequest.Receive(
-          function (Data: PByte; Count: Integer): Boolean
-          var
-            ABytesToWrite: Integer;
-            ANextBlockIndex: Integer;
+      FBlockBuffer.Used := 0;
+      FStream.FConnection.Request('GET',
+        TACLWebRequestRange.Create(ABlockIndex * TACLHttpInputStream.BlockSize),
+        {post-data}nil, {onAccept}nil, {onProgress}nil,
+        function (Data: PByte; Count: Integer): Boolean
+        var
+          ABytesToWrite: Integer;
+          ANextBlockIndex: Integer;
+        begin
+          while Count > 0 do
           begin
-            while Count > 0 do
+            ABytesToWrite := Min(Count, FBlockBuffer.Unused);
+            FastMove(Data^, FBlockBuffer.DataArr^[FBlockBuffer.Used], ABytesToWrite);
+            FBlockBuffer.Used := FBlockBuffer.Used + ABytesToWrite;
+            Dec(Count, ABytesToWrite);
+            Inc(Data, ABytesToWrite);
+            if Terminated then
+              Exit(False);
+            if FBlockBuffer.Unused = 0 then
             begin
-              ABytesToWrite := Min(Count, BlockBuffer.Unused);
-              FastMove(Data^, BlockBuffer.DataArr^[FBlockBuffer.Used], ABytesToWrite);
-              BlockBuffer.Used := BlockBuffer.Used + ABytesToWrite;
-              Dec(Count, ABytesToWrite);
-              Inc(Data, ABytesToWrite);
-              if Terminated then
+              WriteBuffer(ABlockIndex);
+              if not GetNextBlockIndex(ANextBlockIndex) or (ANextBlockIndex <> ABlockIndex + 1) then
                 Exit(False);
-              if BlockBuffer.Unused = 0 then
-              begin
-                WriteBuffer(ABlockIndex);
-                if not GetNextBlockIndex(ANextBlockIndex) or (ANextBlockIndex <> ABlockIndex + 1) then
-                  Exit(False);
-                ABlockIndex := ANextBlockIndex;
-              end;
+              ABlockIndex := ANextBlockIndex;
             end;
-            Result := True;
-          end);
+          end;
+          Result := True;
+        end);
 
-        WriteBuffer(ABlockIndex);
-      finally
-        ARequest.Free;
-      end;
+      WriteBuffer(ABlockIndex);
     except
       on E: EHttpWriteError do
       begin
@@ -1247,8 +1090,8 @@ begin
       end;
       on E: EHttpError do
       begin
-        Stream.FFatalError := True;
-        Stream.FFreeBlocksEvent.Signal;
+        FStream.FFatalError := True;
+        FStream.FFreeBlocksEvent.Signal;
         Terminate;
       end;
     end
@@ -1259,43 +1102,315 @@ end;
 
 function TACLHttpInputStreamUpdateThread.GetNextBlockIndex(out ABlockIndex: Integer): Boolean;
 begin
-  with Stream.FFreeBlocks.LockList do
+  with FStream.FFreeBlocks.LockList do
   try
     if Count > 0 then
     begin
-      Stream.FFreeBlocksCursor := Min(Stream.FFreeBlocksCursor, Count - 1);
-      ABlockIndex := List[Stream.FFreeBlocksCursor];
+      FStream.FFreeBlocksCursor := Min(FStream.FFreeBlocksCursor, Count - 1);
+      ABlockIndex := List[FStream.FFreeBlocksCursor];
     end
     else
       ABlockIndex := -1;
   finally
-    Stream.FFreeBlocks.UnlockList;
+    FStream.FFreeBlocks.UnlockList;
   end;
   Result := ABlockIndex >= 0;
 end;
 
 procedure TACLHttpInputStreamUpdateThread.WriteBuffer(ABlockIndex: Integer);
 begin
-  if BlockBuffer.Used > 0 then
+  if FBlockBuffer.Used > 0 then
   try
-    Stream.FCacheStreamLock.Enter;
+    FStream.FCacheStreamLock.Enter;
     try
-      Stream.FCacheStream.Position := ABlockIndex * TACLHttpInputStream.BlockSize;
-      Stream.FCacheStream.WriteBuffer(BlockBuffer.Data^, BlockBuffer.Used);
+      FStream.FCacheStream.Position := ABlockIndex * TACLHttpInputStream.BlockSize;
+      FStream.FCacheStream.WriteBuffer(FBlockBuffer.Data^, FBlockBuffer.Used);
     finally
-      Stream.FCacheStreamLock.Leave;
+      FStream.FCacheStreamLock.Leave;
     end;
 
-    with Stream.FFreeBlocks.LockList do
+    with FStream.FFreeBlocks.LockList do
     try
       Remove(ABlockIndex);
-      Stream.FFreeBlocksEvent.Signal;
+      FStream.FFreeBlocksEvent.Signal;
     finally
-      Stream.FFreeBlocks.UnlockList;
+      FStream.FFreeBlocks.UnlockList;
     end;
   finally
-    BlockBuffer.Used := 0;
+    FBlockBuffer.Used := 0;
   end;
 end;
+
+{$ENDREGION}
+
+{$REGION ' Http Client '}
+type
+
+  { TACLHttpRequestTask }
+
+  TACLHttpRequestTask = class(TACLTask)
+  strict private
+    FRequest: TACLHttp;
+    FRequestIntf: IACLHttpRequest;
+    procedure CallEvent(AProc: TProc; ASync: Boolean);
+    function DoAccept(const AResponse: THttpResponse): Boolean;
+    function DoCanContinue: Boolean;
+    function DoProgess(const APosition, ASize: Int64): Boolean;
+  protected
+    procedure Complete; override;
+    procedure Execute; override;
+    function GetPriority: TACLTaskPriority; override;
+  public
+    constructor Create(ARequest: TACLHttp);
+  end;
+
+{ TACLHttp }
+
+destructor TACLHttp.Destroy;
+begin
+  if FPostDataOwnership = soOwned then
+    FreeAndNil(FPostData);
+  inherited;
+end;
+
+class function TACLHttp.Get(const AUrl: string): IACLHttpRequest;
+begin
+  Result := Request('GET', AUrl);
+end;
+
+class function TACLHttp.Head(const AUrl: string): IACLHttpRequest;
+begin
+  Result := Request('HEAD', AUrl);
+end;
+
+class procedure TACLHttp.RaiseOnError(const AInfo: TACLWebErrorInfo);
+begin
+  if not AInfo.Succeeded then
+    raise EACLWebError.Create(AInfo);
+end;
+
+class function TACLHttp.Post(const AUrl: string): IACLHttpRequest;
+begin
+  Result := Request('POST', AUrl);
+end;
+
+class function TACLHttp.Request(const AMethod, AUrl: string): IACLHttpRequest;
+var
+  LInst: TACLHttp;
+begin
+  LInst := TACLHttp.Create;
+  LInst.FMethod := AMethod;
+  LInst.FUrl := TACLWebURL.ParseHttp(AUrl);
+  Result := LInst;
+end;
+
+function TACLHttp.OnAccept(AProc: THttpAcceptProc;
+  ACallInMainThread: Boolean = False): IACLHttpRequest;
+begin
+  FOnAccept := AProc;
+  FOnAcceptSync := ACallInMainThread;
+  Result := Self;
+end;
+
+function TACLHttp.OnAccept(AMaxSize: Int64): IACLHttpRequest;
+begin
+  Result := Self;
+  if AMaxSize > 0 then
+    FOnAccept :=
+      function (const AResponse: THttpResponse): Boolean
+      begin
+        Result := AResponse.ContentLength <= AMaxSize;
+      end;
+end;
+
+function TACLHttp.OnCheckCanceled(
+  ACheckCanceled: TACLTaskCancelCallback): IACLHttpRequest;
+begin
+  FOnCheckCanceled := FOnCheckCanceled;
+  Result := Self;
+end;
+
+function TACLHttp.OnComplete(AProc: TProc<TACLWebErrorInfo>;
+  ACallInMainThread: Boolean = False): IACLHttpRequest;
+begin
+  FOnComplete := AProc;
+  FOnCompleteSync := ACallInMainThread;
+  Result := Self;
+end;
+
+function TACLHttp.OnData(AProc: THttpDataProc): IACLHttpRequest;
+begin
+  FOnData := AProc;
+  Result := Self;
+end;
+
+function TACLHttp.OnData(AContainer: IACLDataContainer): IACLHttpRequest;
+begin
+  Result := OnData(
+    function (Data: PByte; Count: Integer): Boolean
+    var
+      LStream: TStream;
+    begin
+      LStream := AContainer.LockData;
+      try
+        Result := LStream.Write(Data^, Count) = Count;
+      finally
+        AContainer.UnlockData;
+      end;
+    end);
+end;
+
+function TACLHttp.OnData(AStream: TStream): IACLHttpRequest;
+begin
+  Result := OnData(
+    function (Data: PByte; Count: Integer): Boolean
+    begin
+      Result := AStream.Write(Data^, Count) = Count;
+    end);
+end;
+
+function TACLHttp.OnPost(const AStr: AnsiString): IACLHttpRequest;
+begin
+  Result := OnPost(TACLAnsiStringStream.Create(AStr), soOwned);
+end;
+
+function TACLHttp.OnProgress(AProc: THttpProgressProc;
+  ACallInMainThread: Boolean = False): IACLHttpRequest;
+begin
+  FOnProgress := AProc;
+  FOnProgressSync := ACallInMainThread;
+  Result := Self;
+end;
+
+function TACLHttp.OnPost(AStream: TStream; AOwnership: TStreamOwnership): IACLHttpRequest;
+begin
+  FPostData := AStream;
+  FPostDataOwnership := AOwnership;
+  Result := Self;
+end;
+
+function TACLHttp.Run: THandle;
+begin
+  Result := TaskDispatcher.Run(TACLHttpRequestTask.Create(Self));
+end;
+
+function TACLHttp.RunNoThread(ACheckCanceled: TACLTaskCancelCallback): TACLWebErrorInfo;
+begin
+  FOnCheckCanceled := ACheckCanceled;
+  Result := RunNoThread;
+end;
+
+function TACLHttp.RunNoThread: TACLWebErrorInfo;
+begin
+  TaskDispatcher.RunInCurrentThread(TACLHttpRequestTask.Create(Self));
+  Result := FResult;
+end;
+
+function TACLHttp.SetPriority(APriority: TACLTaskPriority): IACLHttpRequest;
+begin
+  FPriority := APriority;
+  Result := Self;
+end;
+
+function TACLHttp.SetRange(ARange: IACLWebRequestRange): IACLHttpRequest;
+begin
+  FRange := ARange;
+  Result := Self;
+end;
+
+{ TACLHttpRequestTask }
+
+constructor TACLHttpRequestTask.Create(ARequest: TACLHttp);
+begin
+  inherited Create;
+  FRequest := ARequest;
+  FRequestIntf := ARequest;
+end;
+
+procedure TACLHttpRequestTask.CallEvent(AProc: TProc; ASync: Boolean);
+begin
+  if ASync then
+    RunInMainThread(AProc)
+  else
+    AProc();
+end;
+
+procedure TACLHttpRequestTask.Complete;
+begin
+  inherited;
+  if IsCanceled then
+    FRequest.FResult.Initialize(acWebErrorCanceled, sErrorCancel);
+  if Assigned(FRequest.FOnComplete) then
+  begin
+    CallEvent(
+      procedure
+      begin
+        FRequest.FOnComplete(FRequest.FResult)
+      end, FRequest.FOnCompleteSync);
+  end;
+end;
+
+function TACLHttpRequestTask.DoAccept(const AResponse: THttpResponse): Boolean;
+var
+  LResult: Boolean;
+begin
+  LResult := DoCanContinue;
+  if LResult and Assigned(FRequest.FOnAccept) then
+  begin
+    CallEvent(
+      procedure
+      begin
+        LResult := FRequest.FOnAccept(AResponse);
+      end, FRequest.FOnAcceptSync);
+  end;
+  Result := LResult;
+end;
+
+function TACLHttpRequestTask.DoCanContinue: Boolean;
+begin
+  Result := not (Assigned(FRequest.FOnCheckCanceled) and FRequest.FOnCheckCanceled);
+end;
+
+function TACLHttpRequestTask.DoProgess(const APosition, ASize: Int64): Boolean;
+var
+  LResult: Boolean;
+begin
+  LResult := DoCanContinue;
+  if LResult and Assigned(FRequest.FOnProgress) then
+  begin
+    CallEvent(
+      procedure
+      begin
+        LResult := FRequest.FOnProgress(APosition, ASize);
+      end, FRequest.FOnProgressSync);
+  end;
+  Result := LResult;
+end;
+
+procedure TACLHttpRequestTask.Execute;
+var
+  LConnection: THttpConnection;
+begin
+  try
+    LConnection := THttpConnection.Create(FRequest.FUrl);
+    try
+      if not IsCanceled then
+        LConnection.Request(FRequest.FMethod,
+          FRequest.FRange, FRequest.FPostData,
+          DoAccept, DoProgess, FRequest.FOnData);
+    finally
+      LConnection.Free;
+    end;
+  except
+    on E: EHttpError do
+      FRequest.FResult := E.Info;
+  end;
+end;
+
+function TACLHttpRequestTask.GetPriority: TACLTaskPriority;
+begin
+  Result := FRequest.FPriority;
+end;
+{$ENDREGION}
 
 end.
