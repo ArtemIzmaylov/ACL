@@ -121,6 +121,7 @@ type
     FOnDeleteItemObject: TACLComboBoxDeleteItemObjectEvent;
     FOnGetDisplayItemGroupName: TACLComboBoxGetDisplayTextEvent;
     FOnGetDisplayItemName: TACLComboBoxGetDisplayTextEvent;
+    FOnPrepareDropDownData: TNotifyEvent;
     FOnPrepareDropDownList: TACLComboBoxPrepareDropDownListEvent;
     FOnSelect: TNotifyEvent;
 
@@ -141,15 +142,18 @@ type
     procedure DoBeforeRemoveItem(AObject: TObject); virtual;
     procedure DoCustomDrawItem(ACanvas: TCanvas;
       const R: TRect; AIndex: Integer; var AHandled: Boolean); virtual;
+    procedure DoDropDown; override;
     procedure DoGetDisplayText(AIndex: Integer; var AText: string); virtual;
     procedure DoGetGroupName(AIndex: Integer; var AText: string); virtual;
-    procedure DoPrepareDropDown(AList: TACLTreeList); virtual;
+    procedure DoPrepareDropDownData;
+    procedure DoPrepareDropDownList(AList: TACLTreeList); virtual;
     procedure DoSelect; virtual;
   public
     constructor Create(AOwner: TComponent); override;
     constructor CreateInplace(const AParams: TACLInplaceInfo); override;
     procedure ChangeItemIndex(AValue: Integer); virtual;
-    function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean; override;
+    function DoMouseWheel(Shift: TShiftState;
+      WheelDelta: Integer; MousePos: TPoint): Boolean; override;
     procedure LockChanges(ALock: Boolean);
     //# Properties
     property Count: Integer read GetCount;
@@ -163,6 +167,8 @@ type
       read FOnGetDisplayItemGroupName write FOnGetDisplayItemGroupName;
     property OnGetDisplayItemName: TACLComboBoxGetDisplayTextEvent
       read FOnGetDisplayItemName write FOnGetDisplayItemName;
+    property OnPrepareDropDownData: TNotifyEvent
+      read FOnPrepareDropDownData write FOnPrepareDropDownData;
     property OnPrepareDropDownList: TACLComboBoxPrepareDropDownListEvent
       read FOnPrepareDropDownList write FOnPrepareDropDownList;
     property OnSelect: TNotifyEvent read FOnSelect write FOnSelect;
@@ -551,6 +557,7 @@ begin
     begin
       Inc(FTextChangeLockCount);
       try
+        DoPrepareDropDownData;
         LCurrText := InnerEdit.Text;
         FItemIndex := TACLComboBoxStrings(FItems).FindItemBeginsWith(LCurrText);
         if ItemIndex >= 0 then
@@ -610,17 +617,17 @@ end;
 
 procedure TACLComboBox.Localize(const ASection: string);
 var
-  ASavedItemIndex: Integer;
+  LPrevItemIndex: Integer;
 begin
   LockChanges(True);
   try
     inherited Localize(ASection);
 
-    ASavedItemIndex := FItemIndex;
+    LPrevItemIndex := FItemIndex;
     try
       LangApplyToItems(ASection, Items);
     finally
-      ItemIndex := ASavedItemIndex;
+      ItemIndex := LPrevItemIndex;
     end;
   finally
     LockChanges(False);
@@ -640,7 +647,10 @@ begin
     if AValue = cbmEdit then
       EditorOpen
     else
+    begin
+      DoPrepareDropDownData;
       EditorClose;
+    end;
   end;
 end;
 
@@ -722,17 +732,25 @@ begin
     Dec(FChangeLockCount);
 end;
 
-function TACLBasicComboBox.DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean;
+function TACLBasicComboBox.DoMouseWheel(Shift: TShiftState;
+  WheelDelta: Integer; MousePos: TPoint): Boolean;
 begin
   Result := inherited DoMouseWheel(Shift, WheelDelta, MousePos);
   if not Result then
   begin
+    DoPrepareDropDownData;
     ItemIndex := Max(0, ItemIndex - Signs[WheelDelta > 0]);
     Result := True;
   end;
 end;
 
-procedure TACLBasicComboBox.DoPrepareDropDown(AList: TACLTreeList);
+procedure TACLBasicComboBox.DoPrepareDropDownData;
+begin
+  if Count = 0 then
+    CallNotifyEvent(Self, OnPrepareDropDownData);
+end;
+
+procedure TACLBasicComboBox.DoPrepareDropDownList(AList: TACLTreeList);
 begin
   if Assigned(OnPrepareDropDownList) then
     OnPrepareDropDownList(Self, AList);
@@ -749,6 +767,12 @@ procedure TACLBasicComboBox.DoCustomDrawItem(ACanvas: TCanvas;
 begin
   if Assigned(OnCustomDrawItem) then
     OnCustomDrawItem(Self, ACanvas, R, AIndex, AHandled);
+end;
+
+procedure TACLBasicComboBox.DoDropDown;
+begin
+  DoPrepareDropDownData;
+  inherited;
 end;
 
 procedure TACLBasicComboBox.DoGetDisplayText(AIndex: Integer; var AText: string);
@@ -786,9 +810,15 @@ begin
   begin
     case Key of
       VK_UP:
-        AItemIndex := Max(0, ItemIndex - 1);
+        begin
+          DoPrepareDropDownData;
+          AItemIndex := Max(0, ItemIndex - 1);
+        end;
       VK_DOWN:
-        AItemIndex := Min(Count - 1, ItemIndex + 1);
+        begin
+          DoPrepareDropDownData;
+          AItemIndex := Min(Count - 1, ItemIndex + 1);
+        end;
     else
       Exit;
     end;
@@ -848,7 +878,7 @@ end;
 procedure TACLBasicComboBoxDropDown.AfterConstruction;
 begin
   inherited AfterConstruction;
-  Owner.DoPrepareDropDown(Control);
+  Owner.DoPrepareDropDownList(Control);
   SyncItemIndex;
 end;
 

@@ -59,8 +59,9 @@ type
   TACLCustomDropDownEdit = class(TACLCustomTextEdit)
   strict private
     FDropDownAlignment: TAlignment;
-    FDropDownClosedAt: Cardinal;
     FDropDownButton: TACLCustomDropDownEditButtonSubClass;
+    FDropDownButtonVisible: Boolean;
+    FDropDownClosedAt: Cardinal;
     FDropDownWindow: TACLPopupWindow;
 
     FOnDropDown: TNotifyEvent;
@@ -69,6 +70,7 @@ type
     procedure HandlerDropDownClose(Sender: TObject);
     //# Properties
     function GetDroppedDown: Boolean;
+    procedure SetDropDownButtonVisible(AValue: Boolean);
     procedure SetDroppedDown(AValue: Boolean);
     //# Messages
     procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
@@ -96,6 +98,7 @@ type
     //# Properties
     property DropDownAlignment: TAlignment read FDropDownAlignment write FDropDownAlignment default taLeftJustify;
     property DropDownButton: TACLCustomDropDownEditButtonSubClass read FDropDownButton;
+    property DropDownButtonVisible: Boolean read FDropDownButtonVisible write SetDropDownButtonVisible;
     property DropDownWindow: TACLPopupWindow read FDropDownWindow;
   public
     constructor Create(AOwner: TComponent); override;
@@ -208,6 +211,7 @@ constructor TACLCustomDropDownEdit.Create(AOwner: TComponent);
 begin
   FBorders := True;
   inherited Create(AOwner);
+  FDropDownButtonVisible := True;
   FDropDownButton := CreateDropDownButton;
   FDropDownButton.OnClick := HandlerButtonClick;
   DoubleBuffered := True;
@@ -229,10 +233,15 @@ begin
   inherited CalculateButtons(R);
   LRect := R;
   LRect.Inflate(-dpiApply(ButtonsIndent, FCurrentPPI));
-  DropDownButton.IsEnabled := Enabled;
+  DropDownButton.IsEnabled := Enabled and DropDownButtonVisible;
   DropDownButton.IsDown := DropDownWindow <> nil;
-  DropDownButton.Calculate(LRect.Split(srRight, LRect.Height));
-  R.Right := DropDownButton.Bounds.Left;
+  if DropDownButtonVisible then
+  begin
+    DropDownButton.Calculate(LRect.Split(srRight, LRect.Height));
+    R.Right := DropDownButton.Bounds.Left;
+  end
+  else
+    DropDownButton.Calculate(NullRect);
 end;
 
 function TACLCustomDropDownEdit.CanDropDown(X, Y: Integer): Boolean;
@@ -309,6 +318,15 @@ procedure TACLCustomDropDownEdit.SetDefaultSize;
 begin
   if not Inplace then
     SetBounds(Left, Top, 121, 21);
+end;
+
+procedure TACLCustomDropDownEdit.SetDropDownButtonVisible(AValue: Boolean);
+begin
+  if DropDownButtonVisible <> AValue then
+  begin
+    FDropDownButtonVisible := AValue;
+    FullRefresh;
+  end;
 end;
 
 procedure TACLCustomDropDownEdit.SetDroppedDown(AValue: Boolean);
