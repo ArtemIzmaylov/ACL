@@ -1919,6 +1919,8 @@ end;
 { TACLMenuPopupWindow }
 
 constructor TACLMenuPopupWindow.Create(ASource: TACLPopupMenu);
+var
+  LParentWnd: HWND;
 begin
   inherited Create(ASource);
   // Если у контрола нет флага csCaptureMouse - gtkMotionNotify не сгенерирует
@@ -1927,7 +1929,15 @@ begin
   FScrollTimer := TACLTimer.CreateEx(ScrollTimer, 125);
   FSource := ASource;
   Visible := False;
-  SetParent(Screen.FocusedForm);
+
+  if Screen.FocusedForm <> nil then
+    LParentWnd := Screen.FocusedForm.Handle
+  else if GetActiveWindow <> 0 then
+    LParentWnd := GetActiveWindow
+  else
+    LParentWnd := Application.MainFormHandle;
+
+  ParentWindow := LParentWnd;
 end;
 
 constructor TACLMenuPopupWindow.Create(
@@ -2396,12 +2406,8 @@ end;
 procedure TACLMenuPopupWindow.Popup(const AControlRect: TRect);
 begin
   if AControlRect <> NullRect then
-  begin
-    FControlRect := AControlRect;
-    FControlRect.Offset(0, FControlRect.Height);
-    FControlRect := MonitorAlignPopupWindow(FControlRect);
-  end;
-  BoundsRect := FControlRect;
+    FControlRect := MonitorAlignPopupWindow(AControlRect);
+  SetBounds(FControlRect.Left, FControlRect.Bottom, 0, 0);
   CalculateBounds;
   Visible := True;
   ShowWindow(Handle, SW_SHOWNOACTIVATE);

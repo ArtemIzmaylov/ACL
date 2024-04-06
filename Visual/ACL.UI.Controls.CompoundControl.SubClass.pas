@@ -372,22 +372,12 @@ type
     FSubClass: TACLCompoundControlSubClass;
   protected
     function CreateHintWindow: TACLHintWindow; override;
-    function GetOwnerForm: TCustomForm; override;
+    function GetOwnerControl: TWinControl; override;
   public
     constructor Create(ASubClass: TACLCompoundControlSubClass);
     procedure Update(AHitTest: TACLHitTestInfo);
     //# Properties
     property SubClass: TACLCompoundControlSubClass read FSubClass;
-  end;
-
-  { TACLCompoundControlHintControllerWindow }
-
-  TACLCompoundControlHintControllerWindow = class(TACLHintWindow)
-  protected
-    FController: TACLCompoundControlHintController;
-    procedure CreateParams(var Params: TCreateParams); override;
-  public
-    constructor Create(AController: TACLCompoundControlHintController); reintroduce;
   end;
 
 {$ENDREGION}
@@ -1539,39 +1529,19 @@ end;
 
 function TACLCompoundControlHintController.CreateHintWindow: TACLHintWindow;
 begin
-  Result := TACLCompoundControlHintControllerWindow.Create(Self);
+  Result := inherited;
+  Result.Font := SubClass.Font;
+  Result.Style := SubClass.StyleHint;
 end;
 
-function TACLCompoundControlHintController.GetOwnerForm: TCustomForm;
-var
-  AControl: TWinControl;
+function TACLCompoundControlHintController.GetOwnerControl: TWinControl;
 begin
-  AControl := SubClass.Container.GetControl;
-  if AControl <> nil then
-    Result := GetParentForm(AControl)
-  else
-    Result := nil;
+  Result := SubClass.Container.GetControl;
 end;
 
 procedure TACLCompoundControlHintController.Update(AHitTest: TACLHitTestInfo);
 begin
   inherited Update(AHitTest.HitObject, SubClass.ClientToScreen(AHitTest.HitPoint), AHitTest.HintData);
-end;
-
-{ TACLCompoundControlHintControllerWindow }
-
-constructor TACLCompoundControlHintControllerWindow.Create(AController: TACLCompoundControlHintController);
-begin
-  inherited Create(nil);
-  FController := AController;
-  Font := FController.SubClass.Font;
-  Style := FController.SubClass.StyleHint;
-end;
-
-procedure TACLCompoundControlHintControllerWindow.CreateParams(var Params: TCreateParams);
-begin
-  inherited CreateParams(Params);
-  Params.WndParent := FController.SubClass.Container.GetControl.Handle;
 end;
 {$ENDREGION}
 

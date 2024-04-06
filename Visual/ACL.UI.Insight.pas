@@ -232,6 +232,7 @@ type
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
   public
     constructor Create(AOwner: TComponent); override;
+    procedure DestroyWnd; override;
   end;
 
   { TACLUIInsightSearchBox }
@@ -614,6 +615,12 @@ begin
   inherited;
   Params.ExStyle := Params.ExStyle or WS_EX_TOPMOST;
   Params.WindowClass.style := Params.WindowClass.style and not CS_DROPSHADOW;
+end;
+
+procedure TACLUIInsightHighlightWindow.DestroyWnd;
+begin
+  KillTimer(Handle, FlashTimerId);
+  inherited DestroyWnd;
 end;
 
 procedure TACLUIInsightHighlightWindow.DoPopup;

@@ -51,7 +51,8 @@ type
   protected
     procedure InitializeResources; override;
   public
-    procedure DrawBorder(ACanvas: TCanvas; const R: TRect; const ABorders: TACLBorders);
+    procedure DrawBorder(ACanvas: TCanvas;
+      const R: TRect; const ABorders: TACLBorders); virtual;
     procedure DrawContent(ACanvas: TCanvas; const R: TRect);
     function IsTransparentBackground: Boolean;
   published
@@ -164,7 +165,8 @@ end;
 procedure TACLScrollBoxStyle.DrawBorder(
   ACanvas: TCanvas; const R: TRect; const ABorders: TACLBorders);
 begin
-  acDrawComplexFrame(ACanvas, R, ColorBorder1.Value, ColorBorder2.Value, ABorders);
+  acDrawComplexFrame(ACanvas, R,
+    ColorBorder1.AsColor, ColorBorder2.AsColor, ABorders);
 end;
 
 procedure TACLScrollBoxStyle.DrawContent(ACanvas: TCanvas; const R: TRect);

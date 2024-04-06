@@ -320,12 +320,12 @@ type
       RGN_OR, RGN_AND, RGN_XOR, RGN_DIFF, RGN_COPY
     );
   strict private
-    FHandle: THandle;
+    FHandle: HRGN;
 
     function GetBounds: TRect;
     function GetIsEmpty: Boolean;
     procedure FreeHandle;
-    procedure SetHandle(const Value: THandle);
+    procedure SetHandle(AValue: HRGN);
   public
     constructor Create; virtual;
     constructor CreateRect(const R: TRect);
@@ -333,7 +333,7 @@ type
     constructor CreateFromHandle(AHandle: HRGN);
     destructor Destroy; override;
     //# Methods
-    function Clone: THandle;
+    function Clone: HRGN;
     function Contains(const P: TPoint): Boolean; overload; inline;
     function Contains(const R: TRect): Boolean; overload; inline;
     procedure Combine(ARegion: TACLRegion;
@@ -346,7 +346,7 @@ type
     //# Properties
     property Bounds: TRect read GetBounds;
     property Empty: Boolean read GetIsEmpty;
-    property Handle: THandle read FHandle write SetHandle;
+    property Handle: HRGN read FHandle write SetHandle;
   end;
 
   { TACLRegionData }
@@ -2201,7 +2201,7 @@ begin
   Result := GetRgnBox(Handle, {$IFDEF FPC}@{$ENDIF}R) = NULLREGION;
 end;
 
-function TACLRegion.Clone: THandle;
+function TACLRegion.Clone: HRGN;
 begin
   Result := CreateRectRgnIndirect(NullRect);
   CombineRgn(Result, Result, Handle, RGN_OR);
@@ -2217,7 +2217,7 @@ end;
 
 procedure TACLRegion.Combine(const R: TRect; ACombineFunc: TACLRegionCombineFunc);
 var
-  ARgn: THandle;
+  ARgn: HRGN;
 begin
   ARgn := CreateRectRgnIndirect(R);
   if ACombineFunc <> rcmCopy then
@@ -2248,12 +2248,12 @@ begin
   SetRectRgn(Handle, 0, 0, 0, 0);
 end;
 
-procedure TACLRegion.SetHandle(const Value: THandle);
+procedure TACLRegion.SetHandle(AValue: HRGN);
 begin
-  if (Value <> 0) and (Value <> FHandle) then
+  if (AValue <> 0) and (AValue <> FHandle) then
   begin
     FreeHandle;
-    FHandle := Value;
+    FHandle := AValue;
   end;
 end;
 
@@ -3102,13 +3102,13 @@ begin
 end;
 
 procedure TACLBitmap.LoadFromStream(Stream: TStream);
-{$IFDEF FPC}
-begin
-{$ELSE}
+{$IFNDEF FPC}
 var
   AHack: TBitmapImageAccess;
+{$ENDIF}
 begin
   inherited LoadFromStream(Stream);
+{$IFNDEF FPC}
   if not Empty then
   begin
     //#AI: Workaround for bitmap that created via old version of delphies

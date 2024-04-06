@@ -187,7 +187,7 @@ end;
 function acIs32BitBitmap(ABitmap: TBitmap): Boolean;
 begin
   if ABitmap.PixelFormat = pfDevice then
-    Result := GetDeviceCaps(ScreenCanvas.Handle, NUMCOLORS) >= 32
+    Result := GetDeviceCaps(ScreenCanvas.Handle, BITSPIXEL) >= 32
   else
     Result := ABitmap.PixelFormat = pf32bit;
 end;

@@ -106,7 +106,7 @@ type
     procedure DrawHeader(ACanvas: TCanvas; const R: TRect; ABorders: TACLBorders);
     procedure DrawHeaderSortingArrow(ACanvas: TCanvas; const R: TRect; ADirection, AEnabled: Boolean);
     procedure DrawRowExpandButton(ACanvas: TCanvas; const R: TRect; AExpanded, ASelected: Boolean);
-    //
+    //# Colors
     property RowColors[Odd: Boolean]: TAlphaColor read GetRowColor;
     property RowColorsSelected[Focused: Boolean]: TAlphaColor read GetRowColorSelected;
     property RowColorsSelectedText[Focused: Boolean]: TColor read GetRowColorSelectedText;
@@ -1162,7 +1162,7 @@ end;
 procedure TACLStyleTreeList.DrawGridline(
   ACanvas: TCanvas; const R: TRect; ASide: TACLBorder);
 begin
-  acDrawFrameEx(ACanvas, R, GridColor.Value, [ASide]);
+  acDrawFrameEx(ACanvas, R, GridColor.AsColor, [ASide]);
 end;
 
 procedure TACLStyleTreeList.DrawGroupExpandButton(
@@ -2154,6 +2154,7 @@ begin
     end;
     LData.Bounds := R.Split(CellTextExtends[AColumnViewInfo]);
     LData.Value := Node.Values[LData.ValueIndex];
+    ACanvas.Brush.Style := bsClear;
     SubClass.DoGetNodeCellDisplayText(Node, LData.ValueIndex, LData.Value);
     SubClass.DoGetNodeCellStyle(ACanvas.Font, Node, LData.Column, LData.ValueAlignment);
     DoDrawCellValue(ACanvas, LData);

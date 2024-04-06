@@ -151,6 +151,7 @@ type
     FPauseTimer: TACLTimer;
 
     function CanShowHintOverOwner: Boolean;
+    function GetOwnerForm(out AForm: TCustomForm): Boolean;
     function IsFormActive(AForm: TCustomForm): Boolean;
     procedure DeactivateTimerHandler(Sender: TObject);
     procedure PauseTimerHandler(Sender: TObject);
@@ -158,7 +159,7 @@ type
     function CanShowHint(AHintOwner: TObject;
       const AHintData: TACLHintData): Boolean; virtual;
     function CreateHintWindow: TACLHintWindow; virtual;
-    function GetOwnerForm: TCustomForm; virtual;
+    function GetOwnerControl: TWinControl; virtual;
     //# Properties
     property HintData: TACLHintData read FHintData;
     property HintOwner: TObject read FHintOwner;
@@ -401,6 +402,8 @@ procedure TACLHintWindow.CreateParams(var Params: TCreateParams);
 begin
   inherited CreateParams(Params);
   Params.Style := WS_POPUP;
+  if Owner is TWinControl then
+    Params.WndParent := TWinControl(Owner).Handle;
 end;
 
 procedure TACLHintWindow.NCPaint(DC: HDC);
@@ -517,16 +520,13 @@ begin
   FHintData := AHintData;
 end;
 
-function TACLHintController.CanShowHint(AHintOwner: TObject; const AHintData: TACLHintData): Boolean;
+function TACLHintController.CanShowHint(
+  AHintOwner: TObject; const AHintData: TACLHintData): Boolean;
 var
-  AForm: TCustomForm;
+  LForm: TCustomForm;
 begin
-  Result := Application.ShowHint and (AHintOwner <> nil) and (AHintData.Text <> '');
-  if Result then
-  begin
-    AForm := GetOwnerForm;
-    Result := (AForm <> nil) and IsFormActive(AForm) and not acMenusHasActivePopup;
-  end;
+  Result := Application.ShowHint and (AHintOwner <> nil) and (AHintData.Text <> '') and
+    GetOwnerForm(LForm) and IsFormActive(LForm) and not acMenusHasActivePopup;
 end;
 
 function TACLHintController.CanShowHintOverOwner: Boolean;
@@ -542,12 +542,24 @@ end;
 
 function TACLHintController.CreateHintWindow: TACLHintWindow;
 begin
-  Result := TACLHintWindow.Create(nil);
+  Result := TACLHintWindow.Create(GetOwnerControl);
 end;
 
-function TACLHintController.GetOwnerForm: TCustomForm;
+function TACLHintController.GetOwnerControl: TWinControl;
 begin
   Result := nil;
+end;
+
+function TACLHintController.GetOwnerForm(out AForm: TCustomForm): Boolean;
+var
+  LCtrl: TWinControl;
+begin
+  LCtrl := GetOwnerControl;
+  if LCtrl <> nil then
+    AForm := GetParentForm(LCtrl)
+  else
+    AForm := nil;
+  Result := AForm <> nil;
 end;
 
 function TACLHintController.IsFormActive(AForm: TCustomForm): Boolean;
@@ -557,10 +569,11 @@ end;
 
 procedure TACLHintController.DeactivateTimerHandler(Sender: TObject);
 var
-  AForm: TCustomForm;
+  LForm: TCustomForm;
 begin
-  AForm := GetOwnerForm;
-  if (AForm <> nil) and not IsFormActive(AForm) or not ((HintWindow <> nil) and IsWindowVisible(HintWindow.Handle)) then
+  if GetOwnerForm(LForm) and not IsFormActive(LForm) or
+    not ((HintWindow <> nil) and IsWindowVisible(HintWindow.Handle))
+  then
     Hide;
 end;
 

@@ -19,6 +19,7 @@ uses
 {$IFDEF FPC}
   LCLIntf,
   LCLType,
+  LMessages,
 {$ELSE}
   Winapi.ActiveX,
   Winapi.CommDlg,
@@ -65,6 +66,7 @@ uses
 const
   WM_ENTERMENULOOP = $0211;
   WM_EXITMENULOOP  = $0212;
+  WM_NCACTIVATE    = LM_NCACTIVATE;
 {$ENDIF}
 
 type
@@ -245,7 +247,6 @@ type
     procedure CMCancelMode(var Message: TCMCancelMode); message CM_CANCELMODE;
   protected
     procedure CreateParams(var Params: TCreateParams); override;
-    procedure Deactivate; override;
   {$IFDEF FPC}
     procedure KeyDownBeforeInterface(var Key: Word; Shift: TShiftState); override;
   {$ENDIF}
@@ -1343,16 +1344,8 @@ procedure TACLPopupWindow.CreateParams(var Params: TCreateParams);
 begin
   inherited;
   if Owner is TWinControl then
-    Params.WndParent := TWinControl(Owner).Handle;
+    Params.WndParent := GetParentForm(TWinControl(Owner)).Handle;
   Params.WindowClass.Style := Params.WindowClass.Style or CS_HREDRAW or CS_VREDRAW or CS_DROPSHADOW;
-end;
-
-procedure TACLPopupWindow.Deactivate;
-begin
-{$IFDEF FPC}
-  TACLMainThread.RunPostponed(ClosePopup, Self);
-{$ENDIF}
-  inherited Deactivate;
 end;
 
 procedure TACLPopupWindow.DoPopup;
@@ -1453,7 +1446,6 @@ begin
   if FOwnerFormWnd <> 0 then
     SendMessage(FOwnerFormWnd, WM_ENTERMENULOOP, 0, 0);
 
-//  SetTimer(Handle, MouseTrackerId, 1, nil);
   Visible := True;
 end;
 
@@ -1488,7 +1480,6 @@ begin
         ClosePopup;
       WM_CONTEXTMENU, WM_MOUSEWHEEL, WM_MOUSEHWHEEL, CM_MOUSEWHEEL:
         Exit;
-    {$IFNDEF FPC}
       WM_ACTIVATE:
         with TWMActivate(Message) do
           if Active = WA_INACTIVE then
@@ -1496,6 +1487,7 @@ begin
           else // c нашей формой, по идее, это не нужно:
             SendMessage(ActiveWindow, WM_NCACTIVATE, WPARAM(True), 0);
 
+    {$IFNDEF FPC}
       WM_KEYDOWN, CM_DIALOGKEY, CM_WANTSPECIALKEY:
         if TWMKey(Message).CharCode = VK_ESCAPE then
         begin

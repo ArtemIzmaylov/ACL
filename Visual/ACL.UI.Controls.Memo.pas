@@ -41,6 +41,8 @@ uses
 {$ENDIF}
   // ACL
   ACL.Classes,
+  ACL.Geometry,
+  ACL.Graphics,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.ScrollBar,
@@ -48,21 +50,13 @@ uses
   ACL.UI.Resources;
 
 type
-  TACLMemo = class;
 
-  { TACLInnerMemo }
+  { TACLCustomEditContainerStyle }
 
-  TACLInnerMemo = class(TMemo, IACLInnerControl)
-  strict private
-    // IACLInnerControl
-    function GetInnerContainer: TWinControl;
-  protected
-    procedure Change; override;
-  {$IFDEF DELPHI110ALEXANDRIA}
-    procedure UpdateEditMargins; override;
-  {$ENDIF}
+  TACLCustomEditContainerStyle = class(TACLScrollBoxStyle)
   public
-    constructor Create(AOwner: TComponent); override;
+    procedure DrawBorder(ACanvas: TCanvas;
+      const R: TRect; const ABorders: TACLBorders); override;
   end;
 
   { TACLCustomEditContainer }
@@ -78,6 +72,7 @@ type
     procedure SetStyleScrollBox(AValue: TACLStyleScrollBox);
     //# Messages
     procedure CMChanged(var Message: TMessage); message CM_CHANGED;
+    procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
   {$IFNDEF FPC}
     procedure WMCommand(var Message: TWMCommand); message WM_COMMAND;
   {$ENDIF}
@@ -86,8 +81,10 @@ type
     FEditorWndProc: TWndMethod;
 
     function CreateEditor: TWinControl; virtual; abstract;
+    function CreateStyle: TACLScrollBoxStyle; override;
     procedure EditorWndProc(var Message: TMessage); virtual;
     procedure SetTargetDPI(AValue: Integer); override;
+    procedure ResourceChanged; override;
 
     // ScrollBars
     procedure AlignScrollBars(const ARect: TRect); override;
@@ -106,6 +103,22 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    function Focused: Boolean; override;
+    procedure SetFocus; override;
+  end;
+
+  { TACLInnerMemo }
+
+  TACLInnerMemo = class(TMemo, IACLInnerControl)
+  protected
+    procedure Change; override;
+    // IACLInnerControl
+    function GetInnerContainer: TWinControl;
+  {$IFDEF DELPHI110ALEXANDRIA}
+    procedure UpdateEditMargins; override;
+  {$ENDIF}
+  public
+    constructor Create(AOwner: TComponent); override;
   end;
 
   { TACLMemo }
@@ -170,34 +183,8 @@ uses
   ACL.MUI,
   ACL.Utils.Common;
 
-{ TACLInnerMemo }
-
-constructor TACLInnerMemo.Create(AOwner: TComponent);
-begin
-  inherited Create(AOwner);
-  BorderStyle := bsNone;
-end;
-
-procedure TACLInnerMemo.Change;
-var
-  LMemo: TACLMemo;
-begin
-  LMemo := TACLMemo(GetInnerContainer);
-  LMemo.Changed;
-  LMemo.UpdateScrollBars;
-end;
-
-function TACLInnerMemo.GetInnerContainer: TWinControl;
-begin
-  Result := TWinControl(Owner);
-end;
-
-{$IFDEF DELPHI110ALEXANDRIA}
-procedure TACLInnerMemo.UpdateEditMargins;
-begin
-  // do nothing
-end;
-{$ENDIF}
+type
+  TWinControlAccess = class(TWinControl);
 
 { TACLCustomEditContainer }
 
@@ -211,6 +198,11 @@ begin
   FEditor.WindowProc := EditorWndProc;
   FStyle := TACLStyleEdit.Create(Self);
   TabStop := True;
+end;
+
+function TACLCustomEditContainer.CreateStyle: TACLScrollBoxStyle;
+begin
+  Result := TACLCustomEditContainerStyle.Create(Self);
 end;
 
 destructor TACLCustomEditContainer.Destroy;
@@ -232,6 +224,12 @@ procedure TACLCustomEditContainer.CMChanged(var Message: TMessage);
 begin
   inherited;
   CallNotifyEvent(Self, OnChange)
+end;
+
+procedure TACLCustomEditContainer.CMEnabledChanged(var Message: TMessage);
+begin
+  inherited;
+  ResourceChanged;
 end;
 
 procedure TACLCustomEditContainer.EditorWndProc(var Message: TMessage);
@@ -263,10 +261,19 @@ begin
       begin
         FEditorWndProc(Message);
         UpdateScrollBars;
+        UpdateBorders;
         Exit;
       end;
+
+    WM_SETFOCUS, WM_KILLFOCUS:
+      UpdateBorders;
   end;
   FEditorWndProc(Message);
+end;
+
+function TACLCustomEditContainer.Focused: Boolean;
+begin
+  Result := inherited or FEditor.Focused;
 end;
 
 procedure TACLCustomEditContainer.SetTargetDPI(AValue: Integer);
@@ -319,6 +326,14 @@ begin
   Result := inherited Style;
 end;
 
+procedure TACLCustomEditContainer.ResourceChanged;
+begin
+  inherited;
+  TWinControlAccess(FEditor).Font := Font;
+  TWinControlAccess(FEditor).Font.Color := Style.ColorsText[Enabled];
+  TWinControlAccess(FEditor).Color := Style.ColorsContent[Enabled];
+end;
+
 procedure TACLCustomEditContainer.Scroll(
   Sender: TObject; ScrollCode: TScrollCode; var ScrollPos: Integer);
 
@@ -356,6 +371,11 @@ begin
   // do nothing
 end;
 
+procedure TACLCustomEditContainer.SetFocus;
+begin
+  FEditor.SetFocus;
+end;
+
 procedure TACLCustomEditContainer.SetStyle(AValue: TACLStyleEdit);
 begin
   FStyle.Assign(AValue);
@@ -374,6 +394,47 @@ begin
     EN_VSCROLL, EN_HSCROLL:
       UpdateScrollBars;
   end;
+end;
+{$ENDIF}
+
+{ TACLCustomEditContainerStyle }
+
+procedure TACLCustomEditContainerStyle.DrawBorder(
+  ACanvas: TCanvas; const R: TRect; const ABorders: TACLBorders);
+var
+  LEdit: TACLCustomEditContainer;
+begin
+  LEdit := TACLCustomEditContainer(Owner);
+  LEdit.Style.DrawBorders(ACanvas, R, LEdit.Focused);
+  acDrawFrame(ACanvas, R.InflateTo(-1), LEdit.Style.ColorContent.AsColor);
+end;
+
+{ TACLInnerMemo }
+
+constructor TACLInnerMemo.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+  BorderStyle := bsNone;
+end;
+
+procedure TACLInnerMemo.Change;
+var
+  LMemo: TACLMemo;
+begin
+  LMemo := TACLMemo(GetInnerContainer);
+  LMemo.Changed;
+  LMemo.UpdateScrollBars;
+end;
+
+function TACLInnerMemo.GetInnerContainer: TWinControl;
+begin
+  Result := TWinControl(Owner);
+end;
+
+{$IFDEF DELPHI110ALEXANDRIA}
+procedure TACLInnerMemo.UpdateEditMargins;
+begin
+  // do nothing
 end;
 {$ENDIF}
 

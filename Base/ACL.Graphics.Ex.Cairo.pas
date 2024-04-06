@@ -855,7 +855,15 @@ var
   LText: string;
 begin
   if S = '' then
+  begin
+    if AFlags and DT_CALCRECT <> 0 then
+    begin
+      CairoTextSize(ACanvas, S, @R.Right, @R.Bottom);
+      Inc(R.Bottom, R.Top);
+      Inc(R.Right, R.Left);
+    end;
     Exit;
+  end;
 
   LText := S;
   if AFlags and DT_NOPREFIX = 0 then

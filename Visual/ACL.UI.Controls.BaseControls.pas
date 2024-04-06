@@ -1135,7 +1135,8 @@ begin
   end;
 end;
 
-function CallCustomDrawEvent(Sender: TObject; AEvent: TACLCustomDrawEvent; ACanvas: TCanvas; const R: TRect): Boolean;
+function CallCustomDrawEvent(Sender: TObject; AEvent: TACLCustomDrawEvent;
+  ACanvas: TCanvas; const R: TRect): Boolean;
 begin
   Result := False;
   if Assigned(AEvent) then
@@ -1457,10 +1458,12 @@ end;
 class procedure TACLControls.UpdateMargins(AControl: TControl;
   AUseMargins: Boolean; AMargins: TACLPadding; ACurrentDpi: Integer);
 begin
-  if AUseMargins then
-    UpdateMargins(AControl, AMargins.GetScaledMargins(ACurrentDpi))
+{$IFDEF FPC}
+  if not AUseMargins then
+    UpdateMargins(AControl, NullRect)
   else
-    UpdateMargins(AControl, NullRect);
+{$ENDIF}
+    UpdateMargins(AControl, AMargins.GetScaledMargins(ACurrentDpi));
 end;
 
 class procedure TACLControls.UpdateMargins(AControl: TControl; const AMargins: TRect);
@@ -1554,9 +1557,10 @@ begin
   DrawBorder(ACanvas, R, ABorders);
 end;
 
-procedure TACLStyleBackground.DrawBorder(ACanvas: TCanvas; const R: TRect; ABorders: TACLBorders);
+procedure TACLStyleBackground.DrawBorder(
+  ACanvas: TCanvas; const R: TRect; ABorders: TACLBorders);
 begin
-  acDrawComplexFrame(ACanvas, R, ColorBorder1.Value, ColorBorder2.Value, ABorders);
+  acDrawComplexFrame(ACanvas, R, ColorBorder1.AsColor, ColorBorder2.AsColor, ABorders);
 end;
 
 procedure TACLStyleBackground.DrawContent(ACanvas: TCanvas; const R: TRect);
@@ -2587,7 +2591,21 @@ begin
 end;
 
 procedure TACLControlHelper.SendCancelMode(Sender: TControl);
+var
+  LControl: TControl;
 begin
+  LControl := Self;
+  while LControl <> nil do
+  begin
+    if LControl is TCustomForm then
+    begin
+      if TCustomForm(LControl).ActiveControl <> nil then
+        TCustomForm(LControl).ActiveControl.Perform(CM_CANCELMODE, 0, LPARAM(Sender));
+      if TCustomForm(LControl).ActiveDefaultControl <> nil then
+        TCustomForm(LControl).ActiveDefaultControl.Perform(CM_CANCELMODE, 0, LPARAM(Sender));
+    end;
+    LControl := LControl.Parent;
+  end;
 end;
 {$ENDIF}
 
@@ -2662,6 +2680,7 @@ begin
     procedure (const AControl: TControl; const R: TRect)
     begin
       AControl.SetBounds(R.Left, R.Top, R.Width, R.Height);
+      AControl.Invalidate;
     end);
 {$ELSE}
 var
