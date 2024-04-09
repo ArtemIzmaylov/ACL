@@ -197,6 +197,7 @@ function acGetWindowRect(AWnd: HWND): TRect;
 
 // System
 procedure MinimizeMemoryUsage;
+procedure ZeroMemory(Data: Pointer; Size: Integer);
 
 // Interfaces
 procedure acGetInterface(const Instance: IInterface; const IID: TGUID; out Intf); overload;
@@ -526,6 +527,11 @@ begin
 {$IFDEF MSWINDOWS}
   SetProcessWorkingSetSize(GetCurrentProcess, NativeUInt(-1), NativeUInt(-1));
 {$ENDIF}
+end;
+
+procedure ZeroMemory(Data: Pointer; Size: Integer);
+begin
+  FillChar(Data^, Size, 0);
 end;
 
 //==============================================================================
