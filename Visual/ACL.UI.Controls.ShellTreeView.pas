@@ -4,7 +4,7 @@
 {*             TreeList Control              *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -27,6 +27,7 @@ uses
   Vcl.Controls,
   // ACL
   ACL.Classes,
+  ACL.FileFormats.INI,
   ACL.Geometry,
   ACL.Graphics,
   ACL.UI.Application,
@@ -47,7 +48,6 @@ type
   TACLShellTreeViewCustomOptions = class(TACLCustomOptionsPersistent)
   protected
     FSource: TACLTreeListCustomOptions;
-
     procedure DoAssign(Source: TPersistent); override;
     procedure DoChanged(AChanges: TACLPersistentChanges); override;
   public
@@ -80,6 +80,7 @@ type
 
   TACLShellTreeViewOptionsView = class(TACLShellTreeViewCustomOptions)
   strict private
+    FShowFavorites: Boolean;
     FShowHidden: TACLBoolean;
 
     function GetActualShowHidden: Boolean;
@@ -87,37 +88,45 @@ type
     function GetCheckBoxes: Boolean;
     procedure SetBorders(AValue: TACLBorders);
     procedure SetCheckBoxes(AValue: Boolean);
+    procedure SetShowFavorites(AValue: Boolean);
     procedure SetShowHidden(AValue: TACLBoolean);
   protected
     procedure DoAssign(Source: TPersistent); override;
   public
     procedure AfterConstruction; override;
-    //
+    //# Properties
     property ActualShowHidden: Boolean read GetActualShowHidden;
   published
     property Borders: TACLBorders read GetBorders write SetBorders default acAllBorders;
     property CheckBoxes: Boolean read GetCheckBoxes write SetCheckBoxes default False;
+    property ShowFavorites: Boolean read FShowFavorites write SetShowFavorites default False;
     property ShowHidden: TACLBoolean read FShowHidden write SetShowHidden default TACLBoolean.Default;
   end;
 
   { TACLShellTreeViewSubClass }
 
   TACLShellTreeViewSubClass = class(TACLTreeListSubClass)
+  strict private const
+    DefaultQuickAccessNodeState = True;
   strict private
     FOptionsBehavior: TACLShellTreeViewOptionsBehavior;
     FOptionsView: TACLShellTreeViewOptionsView;
-    FSelectedPath: UnicodeString;
+    FQuickAccessNode: TACLTreeListNode;
+    FQuickAccessNodeState: Boolean;
+    FSelectedPath: string;
 
+    function GetQuickAccessNodeState: Boolean;
     function GetSelectedShellFolder: TACLShellFolder;
     procedure SetOptionsBehavior(AValue: TACLShellTreeViewOptionsBehavior);
     procedure SetOptionsView(AValue: TACLShellTreeViewOptionsView);
-    procedure SetSelectedPath(AValue: UnicodeString);
+    procedure SetQuickAccessNodeState(AValue: Boolean);
+    procedure SetSelectedPath(AValue: string);
   protected
     function CreateOptionsBehavior: TACLShellTreeViewOptionsBehavior; reintroduce; virtual;
     function CreateOptionsView: TACLShellTreeViewOptionsView; reintroduce; virtual;
     function CreateShellImageList: TCustomImageList;
 
-    procedure DoCreateDirectory(const AFolder: UnicodeString);
+    procedure DoCreateDirectory(const AFolder: string);
     procedure DoFocusedNodeChanged; override;
     procedure DoGetNodeChildren(ANode: TACLTreeListNode); override; final;
     procedure DoGetPathChildren(ANode: TACLTreeListNode); virtual;
@@ -134,13 +143,16 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    procedure CreateDirectory(AFolder: UnicodeString = '');
-    function GetFullPath(ANode: TACLTreeListNode): UnicodeString;
-    //
-    property SelectedPath: UnicodeString read FSelectedPath write SetSelectedPath;
-    property SelectedShellFolder: TACLShellFolder read GetSelectedShellFolder;
+    procedure ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: string); override;
+    procedure ConfigSave(AConfig: TACLIniFile; const ASection, AItem: string); override;
+    procedure CreateDirectory(AFolder: string = '');
+    function GetFullPath(ANode: TACLTreeListNode): string;
+    //# Properties
     property OptionsBehavior: TACLShellTreeViewOptionsBehavior read FOptionsBehavior write SetOptionsBehavior;
     property OptionsView: TACLShellTreeViewOptionsView read FOptionsView write SetOptionsView;
+    property QuickAccessNodeState: Boolean read GetQuickAccessNodeState write SetQuickAccessNodeState;
+    property SelectedPath: string read FSelectedPath write SetSelectedPath;
+    property SelectedShellFolder: TACLShellFolder read GetSelectedShellFolder;
   end;
 
   { TACLShellTreeView }
@@ -149,31 +161,31 @@ type
   strict private
     function GetOptionsBehavior: TACLShellTreeViewOptionsBehavior;
     function GetOptionsView: TACLShellTreeViewOptionsView;
-    function GetSelectedPath: UnicodeString;
+    function GetSelectedPath: string;
     function GetSubClass: TACLShellTreeViewSubClass;
     procedure SetOptionsBehavior(const Value: TACLShellTreeViewOptionsBehavior);
     procedure SetOptionsView(const Value: TACLShellTreeViewOptionsView);
-    procedure SetSelectedPath(const Value: UnicodeString);
+    procedure SetSelectedPath(const Value: string);
   protected
     function CreateSubClass: TACLCompoundControlSubClass; override;
   public
-    procedure CreateDirectory(const AFolder: UnicodeString = '');
-    function GetFullPath(ANode: TACLTreeListNode): UnicodeString;
-    //
-    property SelectedPath: UnicodeString read GetSelectedPath write SetSelectedPath;
+    procedure CreateDirectory(const AFolder: string = '');
+    function GetFullPath(ANode: TACLTreeListNode): string;
+    //# Properties
+    property SelectedPath: string read GetSelectedPath write SetSelectedPath;
     property SubClass: TACLShellTreeViewSubClass read GetSubClass;
   published
     property OptionsBehavior: TACLShellTreeViewOptionsBehavior read GetOptionsBehavior write SetOptionsBehavior;
     property OptionsView: TACLShellTreeViewOptionsView read GetOptionsView write SetOptionsView;
-    //
+    //# Styles
     property ResourceCollection;
     property Style;
     property StyleInplaceEdit;
     property StyleScrollBox;
-    //
+    //# CustomDraw
     property OnCustomDrawNode;
     property OnCustomDrawNodeCell;
-    //
+    //# Events
     property OnCalculated;
     property OnDrop;
     property OnFocusedNodeChanged;
@@ -182,7 +194,7 @@ type
     property OnGetNodeCellStyle;
     property OnNodeChecked;
     property OnSelectionChanged;
-    //
+    //# Inherted
     property OnClick;
     property OnDblClick;
     property OnDragDrop;
@@ -296,7 +308,10 @@ procedure TACLShellTreeViewOptionsView.DoAssign(Source: TPersistent);
 begin
   inherited DoAssign(Source);
   if Source is TACLShellTreeViewOptionsView then
+  begin
     ShowHidden := TACLShellTreeViewOptionsView(Source).ShowHidden;
+    ShowFavorites := TACLShellTreeViewOptionsView(Source).ShowFavorites;
+  end;
 end;
 
 function TACLShellTreeViewOptionsView.GetActualShowHidden: Boolean;
@@ -327,6 +342,15 @@ begin
   TACLTreeListOptionsView(FSource).CheckBoxes := AValue;
 end;
 
+procedure TACLShellTreeViewOptionsView.SetShowFavorites(AValue: Boolean);
+begin
+  if FShowFavorites <> AValue then
+  begin
+    FShowFavorites := AValue;
+    Changed([apcStruct]);
+  end;
+end;
+
 procedure TACLShellTreeViewOptionsView.SetShowHidden(AValue: TACLBoolean);
 begin
   if AValue <> FShowHidden then
@@ -343,6 +367,7 @@ begin
   inherited Create(AOwner);
   FOptionsView := CreateOptionsView;
   FOptionsBehavior := CreateOptionsBehavior;
+  FQuickAccessNodeState := DefaultQuickAccessNodeState;
 
   inherited OptionsBehavior.AutoBestFit := True;
   inherited OptionsBehavior.IncSearchColumnIndex := 0;
@@ -356,7 +381,27 @@ begin
   inherited Destroy;
 end;
 
-procedure TACLShellTreeViewSubClass.CreateDirectory(AFolder: UnicodeString = '');
+procedure TACLShellTreeViewSubClass.ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: string);
+begin
+  inherited;
+  if OptionsView.ShowFavorites then
+  begin
+    QuickAccessNodeState := AConfig.ReadBool(ASection,
+      AItem + '.QuickAccessExpanded', DefaultQuickAccessNodeState);
+  end;
+end;
+
+procedure TACLShellTreeViewSubClass.ConfigSave(AConfig: TACLIniFile; const ASection, AItem: string);
+begin
+  inherited;
+  if OptionsView.ShowFavorites then
+  begin
+    AConfig.WriteBool(ASection, AItem + '.QuickAccessExpanded',
+      QuickAccessNodeState, DefaultQuickAccessNodeState);
+  end;
+end;
+
+procedure TACLShellTreeViewSubClass.CreateDirectory(AFolder: string = '');
 begin
   if TACLInputQueryDialog.Execute(TACLDialogsStrs.FolderBrowserNewFolder, '', AFolder, Self) then
   begin
@@ -366,7 +411,7 @@ begin
   end;
 end;
 
-function TACLShellTreeViewSubClass.GetFullPath(ANode: TACLTreeListNode): UnicodeString;
+function TACLShellTreeViewSubClass.GetFullPath(ANode: TACLTreeListNode): string;
 var
   AFolder: TACLShellFolder;
 begin
@@ -382,6 +427,14 @@ begin
         Result := acIncludeTrailingPathDelimiter(AFolder.Path);
     end;
   end
+end;
+
+function TACLShellTreeViewSubClass.GetQuickAccessNodeState: Boolean;
+begin
+  if FQuickAccessNode <> nil then
+    Result := FQuickAccessNode.Expanded
+  else
+    Result := FQuickAccessNodeState;
 end;
 
 function TACLShellTreeViewSubClass.CreateOptionsBehavior: TACLShellTreeViewOptionsBehavior;
@@ -402,10 +455,10 @@ begin
   Result.DrawingStyle := dsTransparent;
 end;
 
-procedure TACLShellTreeViewSubClass.DoCreateDirectory(const AFolder: UnicodeString);
+procedure TACLShellTreeViewSubClass.DoCreateDirectory(const AFolder: string);
 var
   ACounter: Integer;
-  S: UnicodeString;
+  S: string;
   X: TACLTreeListNode;
 begin
   if FocusedNode <> nil then
@@ -461,7 +514,8 @@ var
   ID: PItemIDList;
 begin
   try
-    AResult := TACLShellFolder(ANode.Data).ShellFolder.EnumObjects(TACLApplication.GetHandle, GetObjectFlags, AEnumList);
+    AResult := TACLShellFolder(ANode.Data).ShellFolder.EnumObjects(
+      TACLApplication.GetHandle, GetObjectFlags, AEnumList);
     if AResult <> 0 then
       Exit;
   except
@@ -474,7 +528,35 @@ begin
 end;
 
 procedure TACLShellTreeViewSubClass.DoGetRootChildren(ANode: TACLTreeListNode);
+var
+  LFolder: TACLShellFolder;
+  LPIDL: PItemIDList;
 begin
+  if OptionsView.ShowFavorites then
+  try
+    LPIDL := TPIDLHelper.GetFolderPIDL(TACLApplication.GetHandle, TPIDLHelper.QuickAccessPath);
+    if LPIDL <> nil then
+    try
+      try
+        LFolder := TACLShellFolder.CreateSpecial(LPIDL);
+      except
+        LFolder := nil;
+      end;
+      if LFolder <> nil then
+      begin
+        FQuickAccessNode := RootNode.AddChild([LFolder.DisplayName]);
+        FQuickAccessNode.Data := LFolder;
+        FQuickAccessNode.ImageIndex := LFolder.ImageIndex;
+        FQuickAccessNode.HasChildren := LFolder.HasChildren;
+        FQuickAccessNode.Expanded := FQuickAccessNodeState;
+      end;
+    finally
+      TPIDLHelper.DisposePIDL(LPIDL);
+    end;
+  except
+    // do nothing
+  end;
+
   ANode := AddFolderNode(TACLShellFolder.Root.AbsoluteID, RootNode);
   if ANode <> nil then
     ANode.Expanded := True;
@@ -482,11 +564,16 @@ end;
 
 procedure TACLShellTreeViewSubClass.NodeRemoving(ANode: TACLTreeListNode);
 begin
+  if ANode = FQuickAccessNode then
+    FQuickAccessNode := nil;
   TACLShellFolder(ANode.Data).Free;
   inherited NodeRemoving(ANode);
 end;
 
-function TACLShellTreeViewSubClass.AddFolderNode(ID: PItemIDList; AParent: TACLTreeListNode): TACLTreeListNode;
+function TACLShellTreeViewSubClass.AddFolderNode(
+  ID: PItemIDList; AParent: TACLTreeListNode): TACLTreeListNode;
+const
+  Caps = [fscStream, fscFolder];
 var
   AFolder: TACLShellFolder;
 begin
@@ -494,7 +581,7 @@ begin
   if ID <> nil then
   begin
     AFolder := TACLShellFolder.Create(TACLShellFolder(AParent.Data), ID);
-    if AFolder.IsFileSystemPath and ([fscStream, fscFolder] * AFolder.StorageCapabilities <> [fscStream, fscFolder]) then
+    if AFolder.IsFileSystemPath and (Caps * AFolder.StorageCapabilities <> Caps) then
     begin
       Result := AParent.AddChild([AFolder.DisplayName]);
       Result.Data := AFolder;
@@ -506,7 +593,8 @@ begin
   end;
 end;
 
-function TACLShellTreeViewSubClass.FindNodeByPIDL(ID: PItemIDList; ANode: TACLTreeListNode): TACLTreeListNode;
+function TACLShellTreeViewSubClass.FindNodeByPIDL(
+  ID: PItemIDList; ANode: TACLTreeListNode): TACLTreeListNode;
 var
   AFolder: TACLShellFolder;
   I: Integer;
@@ -571,7 +659,14 @@ begin
   FOptionsView.Assign(AValue);
 end;
 
-procedure TACLShellTreeViewSubClass.SetSelectedPath(AValue: UnicodeString);
+procedure TACLShellTreeViewSubClass.SetQuickAccessNodeState(AValue: Boolean);
+begin
+  FQuickAccessNodeState := AValue;
+  if FQuickAccessNode <> nil then
+    FQuickAccessNode.Expanded := AValue;
+end;
+
+procedure TACLShellTreeViewSubClass.SetSelectedPath(AValue: string);
 var
   APIDL: PItemIDList;
 begin
@@ -642,7 +737,7 @@ begin
         if ACommand then
         begin
           CM.GetCommandString(LongInt(ACommand) - 1, GCS_VERBA, nil, ZVerb, SizeOf(ZVerb));
-          if acSameText(UnicodeString(System.AnsiStrings.StrPas(ZVerb)), sShellOpenVerb) then
+          if acSameText(string(System.AnsiStrings.StrPas(ZVerb)), sShellOpenVerb) then
           begin
             ANode.Expanded := True;
             Exit;
@@ -664,7 +759,7 @@ end;
 
 { TACLShellTreeView }
 
-procedure TACLShellTreeView.CreateDirectory(const AFolder: UnicodeString = '');
+procedure TACLShellTreeView.CreateDirectory(const AFolder: string = '');
 begin
   SubClass.CreateDirectory(AFolder);
 end;
@@ -674,7 +769,7 @@ begin
   Result := TACLShellTreeViewSubClass.Create(Self);
 end;
 
-function TACLShellTreeView.GetFullPath(ANode: TACLTreeListNode): UnicodeString;
+function TACLShellTreeView.GetFullPath(ANode: TACLTreeListNode): string;
 begin
   Result := SubClass.GetFullPath(ANode);
 end;
@@ -689,7 +784,7 @@ begin
   Result := SubClass.OptionsView;
 end;
 
-function TACLShellTreeView.GetSelectedPath: UnicodeString;
+function TACLShellTreeView.GetSelectedPath: string;
 begin
   Result := SubClass.SelectedPath;
 end;
@@ -709,7 +804,7 @@ begin
   SubClass.OptionsView := Value;
 end;
 
-procedure TACLShellTreeView.SetSelectedPath(const Value: UnicodeString);
+procedure TACLShellTreeView.SetSelectedPath(const Value: string);
 begin
   SubClass.SelectedPath := Value;
 end;
