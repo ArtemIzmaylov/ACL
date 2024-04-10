@@ -43,6 +43,14 @@ uses
 
 type
 
+  { TACLShellImageList }
+
+  TACLShellImageList = class(TCustomImageList)
+  public
+    constructor Create(AOwner: TComponent); override;
+    function GetImageIndex(AFolder: TACLShellFolder): Integer;
+  end;
+
   { TACLShellTreeViewCustomOptions }
 
   TACLShellTreeViewCustomOptions = class(TACLCustomOptionsPersistent)
@@ -109,6 +117,7 @@ type
   strict private const
     DefaultQuickAccessNodeState = True;
   strict private
+    FImages: TACLShellImageList;
     FOptionsBehavior: TACLShellTreeViewOptionsBehavior;
     FOptionsView: TACLShellTreeViewOptionsView;
     FQuickAccessNode: TACLTreeListNode;
@@ -116,15 +125,14 @@ type
     FSelectedPath: string;
 
     function GetQuickAccessNodeState: Boolean;
-    function GetSelectedShellFolder: TACLShellFolder;
     procedure SetOptionsBehavior(AValue: TACLShellTreeViewOptionsBehavior);
     procedure SetOptionsView(AValue: TACLShellTreeViewOptionsView);
     procedure SetQuickAccessNodeState(AValue: Boolean);
     procedure SetSelectedPath(AValue: string);
+    class function SortFolderNames(L, R: TACLTreeListNode): Integer; static;
   protected
     function CreateOptionsBehavior: TACLShellTreeViewOptionsBehavior; reintroduce; virtual;
     function CreateOptionsView: TACLShellTreeViewOptionsView; reintroduce; virtual;
-    function CreateShellImageList: TCustomImageList;
 
     procedure DoCreateDirectory(const AFolder: string);
     procedure DoFocusedNodeChanged; override;
@@ -152,7 +160,6 @@ type
     property OptionsView: TACLShellTreeViewOptionsView read FOptionsView write SetOptionsView;
     property QuickAccessNodeState: Boolean read GetQuickAccessNodeState write SetQuickAccessNodeState;
     property SelectedPath: string read FSelectedPath write SetSelectedPath;
-    property SelectedShellFolder: TACLShellFolder read GetSelectedShellFolder;
   end;
 
   { TACLShellTreeView }
@@ -161,6 +168,7 @@ type
   strict private
     function GetOptionsBehavior: TACLShellTreeViewOptionsBehavior;
     function GetOptionsView: TACLShellTreeViewOptionsView;
+    function GetSelectedFolder: TACLShellFolder;
     function GetSelectedPath: string;
     function GetSubClass: TACLShellTreeViewSubClass;
     procedure SetOptionsBehavior(const Value: TACLShellTreeViewOptionsBehavior);
@@ -172,6 +180,7 @@ type
     procedure CreateDirectory(const AFolder: string = '');
     function GetFullPath(ANode: TACLTreeListNode): string;
     //# Properties
+    property SelectedFolder: TACLShellFolder read GetSelectedFolder;
     property SelectedPath: string read GetSelectedPath write SetSelectedPath;
     property SubClass: TACLShellTreeViewSubClass read GetSubClass;
   published
@@ -217,16 +226,32 @@ uses
   ACL.Utils.FileSystem,
   ACL.Utils.Desktop;
 
-const
-  sShellOpenVerb = 'open';
-
 type
   TACLTreeListNodeAccess = class(TACLTreeListNode);
   TACLTreeListCustomOptionsAccess = class(TACLTreeListCustomOptions);
 
-function SortFolderNames(Item1, Item2: TACLTreeListNode): Integer;
+{ TACLShellImageList }
+
+constructor TACLShellImageList.Create(AOwner: TComponent);
+var
+  LFileInfo: TSHFileInfoW;
 begin
-  Result := TACLShellFolder(Item1.Data).Compare(TACLShellFolder(Item2.Data));
+  inherited Create(AOwner);
+  DrawingStyle := dsTransparent;
+  ShareImages := True;
+  ZeroMemory(@LFileInfo, SizeOf(LFileInfo));
+  Handle := SHGetFileInfoW('', 0, LFileInfo, SizeOf(LFileInfo),
+    SHGFI_USEFILEATTRIBUTES or SHGFI_SYSICONINDEX or SHGFI_SMALLICON);
+end;
+
+function TACLShellImageList.GetImageIndex(AFolder: TACLShellFolder): Integer;
+var
+  LFileInfo: TSHFileInfoW;
+begin
+  ZeroMemory(@LFileInfo, SizeOf(LFileInfo));
+  SHGetFileInfoW(PWideChar(AFolder.FullPIDL), 0, LFileInfo, SizeOf(LFileInfo),
+    SHGFI_PIDL or SHGFI_SYSICONINDEX or SHGFI_SMALLICON);
+  Result := LFileInfo.iIcon;
 end;
 
 { TACLShellTreeViewCustomOptions }
@@ -368,10 +393,11 @@ begin
   FOptionsView := CreateOptionsView;
   FOptionsBehavior := CreateOptionsBehavior;
   FQuickAccessNodeState := DefaultQuickAccessNodeState;
+  FImages := TACLShellImageList.Create(Self);
 
   inherited OptionsBehavior.AutoBestFit := True;
   inherited OptionsBehavior.IncSearchColumnIndex := 0;
-  inherited OptionsView.Nodes.Images := CreateShellImageList;
+  inherited OptionsView.Nodes.Images := FImages;
 end;
 
 destructor TACLShellTreeViewSubClass.Destroy;
@@ -445,14 +471,6 @@ end;
 function TACLShellTreeViewSubClass.CreateOptionsView: TACLShellTreeViewOptionsView;
 begin
   Result := TACLShellTreeViewOptionsView.Create(inherited OptionsView);
-end;
-
-function TACLShellTreeViewSubClass.CreateShellImageList: TCustomImageList;
-begin
-  Result := TImageList.Create(Self);
-  Result.ShareImages := True;
-  Result.Handle := ShellGetSystemImageList;
-  Result.DrawingStyle := dsTransparent;
 end;
 
 procedure TACLShellTreeViewSubClass.DoCreateDirectory(const AFolder: string);
@@ -546,7 +564,7 @@ begin
       begin
         FQuickAccessNode := RootNode.AddChild([LFolder.DisplayName]);
         FQuickAccessNode.Data := LFolder;
-        FQuickAccessNode.ImageIndex := LFolder.ImageIndex;
+        FQuickAccessNode.ImageIndex := FImages.GetImageIndex(LFolder);
         FQuickAccessNode.HasChildren := LFolder.HasChildren;
         FQuickAccessNode.Expanded := FQuickAccessNodeState;
       end;
@@ -585,8 +603,8 @@ begin
     begin
       Result := AParent.AddChild([AFolder.DisplayName]);
       Result.Data := AFolder;
-      Result.ImageIndex := AFolder.ImageIndex;
       Result.HasChildren := AFolder.HasChildren;
+      Result.ImageIndex := FImages.GetImageIndex(AFolder);
     end
     else
       FreeAndNil(AFolder);
@@ -641,14 +659,6 @@ begin
   end;
 end;
 
-function TACLShellTreeViewSubClass.GetSelectedShellFolder: TACLShellFolder;
-begin
-  if FocusedNode <> nil then
-    Result := TACLShellFolder(FocusedNode.Data)
-  else
-    Result := nil;
-end;
-
 procedure TACLShellTreeViewSubClass.SetOptionsBehavior(AValue: TACLShellTreeViewOptionsBehavior);
 begin
   FOptionsBehavior.Assign(AValue);
@@ -688,10 +698,15 @@ begin
   end;
 end;
 
+class function TACLShellTreeViewSubClass.SortFolderNames(L, R: TACLTreeListNode): Integer;
+begin
+  Result := TACLShellFolder(L.Data).Compare(TACLShellFolder(R.Data));
+end;
+
 procedure TACLShellTreeViewSubClass.ProcessContextPopup(var AHandled: Boolean);
 begin
   inherited ProcessContextPopup(AHandled);
-  if not AHandled and HitTest.HitAtNode then
+  if not AHandled and HitTest.HitAtNode and OptionsBehavior.SystemMenu then
     InvokeSystemMenu(Container.GetControl.Handle, HitTest.Node);
 end;
 
@@ -722,37 +737,36 @@ const
 var
   ACmdInfo: TCMInvokeCommandInfo;
   ACommand: LongBool;
+  AContextMenu: IContextMenu;
   AMenu: HMENU;
-  CM: IContextMenu;
-  ZVerb: array[0..255] of AnsiChar;
+  APoint: TPoint;
+  AVerb: array[0..255] of AnsiChar;
 begin
-  if OptionsBehavior.SystemMenu then
+  if TACLShellFolder(ANode.Data).GetUIObjectOf(AOwnerWindow, IID_IContextMenu, AContextMenu) then
   begin
-    if TACLShellFolder(ANode.Data).GetUIObjectOf(AOwnerWindow, IID_IContextMenu, CM) then
-    begin
-      AMenu := CreatePopupMenu;
-      try
-        CM.QueryContextMenu(AMenu, 0, 1, $7FFF, CMF_EXPLORE);
-        ACommand := TrackPopupMenu(AMenu, TRACKMENU_FLAGS, MouseCursorPos.X, MouseCursorPos.Y, 0, AOwnerWindow, nil);
-        if ACommand then
+    AMenu := CreatePopupMenu;
+    try
+      APoint := MouseCursorPos;
+      AContextMenu.QueryContextMenu(AMenu, 0, 1, $7FFF, CMF_EXPLORE);
+      ACommand := TrackPopupMenu(AMenu, TRACKMENU_FLAGS, APoint.X, APoint.Y, 0, AOwnerWindow, nil);
+      if ACommand then
+      begin
+        AContextMenu.GetCommandString(LongInt(ACommand) - 1, GCS_VERBA, nil, AVerb, SizeOf(AVerb));
+        if acSameText(string(System.AnsiStrings.StrPas(AVerb)), 'open') then
         begin
-          CM.GetCommandString(LongInt(ACommand) - 1, GCS_VERBA, nil, ZVerb, SizeOf(ZVerb));
-          if acSameText(string(System.AnsiStrings.StrPas(ZVerb)), sShellOpenVerb) then
-          begin
-            ANode.Expanded := True;
-            Exit;
-          end;
-          FillChar(ACmdInfo, SizeOf(ACmdInfo), #0);
-          ACmdInfo.cbSize := SizeOf(ACmdInfo);
-          ACmdInfo.hwnd := AOwnerWindow;
-          ACmdInfo.lpVerb := MakeIntResourceA(LongInt(ACommand) - 1);
-          ACmdInfo.nShow := SW_SHOWNORMAL;
-          CM.InvokeCommand(ACmdInfo);
-          ReloadData;
+          ANode.Expanded := True;
+          Exit;
         end;
-      finally
-        DestroyMenu(AMenu);
+        FillChar(ACmdInfo, SizeOf(ACmdInfo), #0);
+        ACmdInfo.cbSize := SizeOf(ACmdInfo);
+        ACmdInfo.hwnd := AOwnerWindow;
+        ACmdInfo.lpVerb := MakeIntResourceA(LongInt(ACommand) - 1);
+        ACmdInfo.nShow := SW_SHOWNORMAL;
+        AContextMenu.InvokeCommand(ACmdInfo);
+        ReloadData;
       end;
+    finally
+      DestroyMenu(AMenu);
     end;
   end;
 end;
@@ -782,6 +796,11 @@ end;
 function TACLShellTreeView.GetOptionsView: TACLShellTreeViewOptionsView;
 begin
   Result := SubClass.OptionsView;
+end;
+
+function TACLShellTreeView.GetSelectedFolder: TACLShellFolder;
+begin
+  Result := FocusedNodeData;
 end;
 
 function TACLShellTreeView.GetSelectedPath: string;
