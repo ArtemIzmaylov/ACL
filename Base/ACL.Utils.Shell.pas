@@ -4,7 +4,7 @@
 {*            Shell API Wrappers             *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
@@ -38,40 +38,12 @@ const
 
 {$IFDEF MSWINDOWS}
 type
-  TShellOperation = (soMove, soCopy, soDelete, soRename);
   TShellOperationFlag = (sofCanUndo, sofNoDialog, sofNoConfirmation);
   TShellOperationFlags = set of TShellOperationFlag;
 
   TShellShutdownMode = (sdPowerOff, sdLogOff, sdHibernate, sdSleep, sdReboot);
 
-  TACLShellPowerSource = (psACLine, psBattery);
-  TACLShellPowerStatus = record
-    BatteryLevel: Byte;
-    BatteryLifeTime: Cardinal;
-    PowerSavingMode: Boolean;
-    Source: TACLShellPowerSource;
-  end;
-
-  //#AI: do not change the order
-  TACLShellUserNotificationState = (
-    unsUnknown = 0,
-    unsAway = QUNS_NOT_PRESENT, // The user is not present.  Heuristic check for modes like: screen saver, locked machine, non-active FUS session
-    unsBusy = QUNS_BUSY, // The user is busy.  Heuristic check for modes like: full-screen app
-    unsPlaying = QUNS_RUNNING_D3D_FULL_SCREEN, // full-screen (exlusive-mode) D3D app
-    unsPresentation = QUNS_PRESENTATION_MODE, // Windows presentation mode (laptop feature) is turned on
-    unsNormal = QUNS_ACCEPTS_NOTIFICATIONS, // notifications can be freely sent
-    unsQuietTime = QUNS_QUIET_TIME, //  We are in OOBE quiet period
-    unsModernApp = 7 // The user runs Windows Store app (metro app)
-  );
-
   { TACLShellFolder }
-
-  TACLShellFolderCapability = (fcCanCopy, fcCanDelete, fcCanLink, fcCanMove, fcCanRename, fcDropTarget, fcHasPropSheet);
-  TACLShellFolderCapabilities = set of TACLShellFolderCapability;
-
-  TACLShellFolderStorageCapability = (fscStorage, fscLink, fscReadOnly,
-    fscStream, fscStorageAncestor, fscFileSystemAncestor, fscFolder, fscFileSystem);
-  TACLShellFolderStorageCapabilities = set of TACLShellFolderStorageCapability;
 
   TACLShellFolder = class
   strict private class var
@@ -83,15 +55,11 @@ type
     FPIDL: PItemIDList;
     FShellFolder: IShellFolder;
 
-    function GetCapabilities: TACLShellFolderCapabilities;
+    function GetAttributes: Cardinal;
     function GetDisplayName: UnicodeString;
-    function GetImageIndex: Integer;
-    function GetIsLibrary: Boolean;
-    function GetIsFileSystemPath: Boolean;
     function GetLibrarySources: TACLStringList;
     function GetPath: UnicodeString;
     function GetPathForParsing: UnicodeString;
-    function GetStorageCapabilities: TACLShellFolderStorageCapabilities;
   protected
     class destructor Destroy;
     function GetChild(ID: PItemIDList): IShellFolder;
@@ -103,26 +71,22 @@ type
     function Compare(AFolder: TACLShellFolder): Integer;
     function GetUIObjectOf(AOwner: HWND; const IID: TGUID; out AObject): Boolean;
     function HasChildren: Boolean;
-    function Rename(const NewName: UnicodeString): Boolean;
-    //
+    function IsFileSystemPath: Boolean;
+    function IsFolder: Boolean;
+    function IsLibrary: Boolean;
     class function Root: TACLShellFolder;
-    //
+    // Properties
     property DisplayName: UnicodeString read GetDisplayName;
-    property ImageIndex: Integer read GetImageIndex;
     property Parent: TACLShellFolder read FParent;
     property Path: UnicodeString read GetPath;
     property PathForParsing: UnicodeString read GetPathForParsing;
+    // Library
+    property LibrarySources: TACLStringList read GetLibrarySources;
     // ShellObjects
     property AbsoluteID: PItemIDLIst read FFullPIDL;
     property ID: PItemIDLIst read FPIDL;
+    property FullPIDL: PItemIDList read FFullPIDL;
     property ShellFolder: IShellFolder read FShellFolder;
-    // Capabilities
-    property Capabilities: TACLShellFolderCapabilities read GetCapabilities;
-    property StorageCapabilities: TACLShellFolderStorageCapabilities read GetStorageCapabilities;
-    // Library
-    property IsFileSystemPath: Boolean read GetIsFileSystemPath;
-    property IsLibrary: Boolean read GetIsLibrary;
-    property LibrarySources: TACLStringList read GetLibrarySources;
   end;
 
   { TACLShellSearchPaths }
@@ -159,18 +123,12 @@ type
     class procedure StripLastID(IDList: PItemIDList);
   end;
 
-// Shell - Copying
-function ShellCopyDirectory(const ASrcPath, ADestPath: UnicodeString; AOptions: TShellOperationFlags = [sofCanUndo]): Boolean;
-function ShellCopyFiles(AFileList: TACLStringList; const APath: UnicodeString; AOptions: TShellOperationFlags = [sofCanUndo]): Boolean;
-function ShellMoveDirectory(const ASrcPath, ADestPath: UnicodeString; AOptions: TShellOperationFlags = [sofCanUndo]): Boolean;
-function ShellMoveFiles(AFiles: TACLStringList; const APath: UnicodeString; AOptions: TShellOperationFlags = [sofCanUndo]): Boolean;
-function ShellRenameDirectory(const AOldPath, ANewPath: UnicodeString): Boolean;
-
 // Shell - Deleting
-function ShellDeleteDirectory(const APath: UnicodeString; AOptions: TShellOperationFlags = [sofCanUndo]): Boolean;
-function ShellDeleteFile(const AFile: UnicodeString): Boolean;
-function ShellDeleteFiles(AFiles: TACLStringList; AOptions: TShellOperationFlags = [sofCanUndo]): Boolean;
-function ShellUndelete(const AFileOrFolder: UnicodeString): HRESULT; // restores file or folder from Recycle Bin by it original path
+function ShellDelete(AFilesOrFolders: TACLStringList;
+  AOptions: TShellOperationFlags = [sofCanUndo]): Boolean; overload;
+function ShellDelete(const AFileOrFolder: string;
+  AOptions: TShellOperationFlags = [sofCanUndo, sofNoDialog, sofNoConfirmation]): Boolean; overload;
+function ShellUndelete(const AOriginalFileOrFolder: UnicodeString): HRESULT;
 
 // Shell - Executing
 function ShellExecute(const AFileName, AParameters: UnicodeString): Boolean; overload;
@@ -179,43 +137,28 @@ function ShellExecuteURL(const ALink: UnicodeString): Boolean;
 function ShellJumpToFile(const AFileName: UnicodeString): Boolean;
 
 // Shell - System Paths
-function ShellGetAppData: UnicodeString;
-function ShellGetDesktop: UnicodeString;
-function ShellGetMyDocuments: UnicodeString;
-function ShellGetMyMusic: UnicodeString;
-function ShellGetNetWork: UnicodeString;
-function ShellGetProgramsMenu: UnicodeString;
-function ShellGetSystemFolder(AFolder: Integer): UnicodeString;
-function ShellGetWindows: UnicodeString;
-function ShellSystem32Dir: UnicodeString;
+function ShellPathAppData: UnicodeString;
+function ShellPathDesktop: UnicodeString;
+function ShellPathMyDocuments: UnicodeString;
+function ShellPathMyMusic: UnicodeString;
+function ShellPathSystem32: UnicodeString;
 {$IFDEF CPUX64}
-function ShellSystemWow64Dir: UnicodeString;
+function ShellPathSystem32WOW64: UnicodeString;
 {$ENDIF}
-
-// Shell - System Settings
-function ShellGetPowerStatus: TACLShellPowerStatus;
-function ShellGetUserNotificationState: TACLShellUserNotificationState;
-function ShellIsPortableDevice: Boolean;
+function ShellPath(CLSID: Integer): UnicodeString;
 
 // Shell - Libraries
 procedure ShellExpandPath(const APath: UnicodeString; AReceiver: IStringReceiver);
 function ShellIsLibraryPath(const APath: UnicodeString): Boolean;
-function ShellReadLibrary(const APathForParsing: UnicodeString; AReceiver: IStringReceiver): Boolean;
 
 // Shell - Links
 function ShellCreateLink(const ALinkFileName, AFileName: UnicodeString): Boolean;
-function ShellParseLink(const ALink: UnicodeString): UnicodeString; overload;
-function ShellParseLink(const ALink: UnicodeString; out AFileName: UnicodeString): Boolean; overload;
+function ShellParseLink(const ALink: UnicodeString; out AFileName: UnicodeString): Boolean;
 
-function ShellDriveFree(const ADrive: WideChar): Int64; overload;
-function ShellDriveFree(const ADrive: WideChar; out AFreeSpace, ATotalSpace: Int64): LongBool; overload;
-function ShellShutdown(AMode: TShellShutdownMode): Boolean;
-
+function ShellGetFreeSpace(const AFileName: string): Int64;
 function ShellLastErrorCode: Integer;
-
-function ShellGetIconHandle(const AFileName: UnicodeString): HICON;
-function ShellGetSystemImageList: THandle;
 function ShellShowHiddenByDefault: Boolean;
+function ShellShutdown(AMode: TShellShutdownMode): Boolean;
 
 procedure UpdateShellCache;
 {$ELSE}
@@ -236,6 +179,28 @@ uses
 var
   FShellLastErrorCode: Integer;
 
+//------------------------------------------------------------------------------
+// Shell - General
+//------------------------------------------------------------------------------
+
+{$REGION ' General '}
+type
+  TShellOperation = (soMove, soCopy, soDelete, soRename);
+
+function ShellEncodePaths(const APaths: TACLStringList): string;
+var
+  LBuilder: TACLStringBuilder;
+begin
+  LBuilder := TACLStringBuilder.Create;
+  try
+    for var I := 0 to APaths.Count - 1 do
+      LBuilder.Append(ExcludeTrailingPathDelimiter(APaths[I])).Append(#0);
+    Result := LBuilder.ToString;
+  finally
+    LBuilder.Free;
+  end;
+end;
+
 function ShellOperation(const ASourceList, ADestList: UnicodeString;
   const AOperation: TShellOperation; const AFlags: TShellOperationFlags): Boolean;
 const
@@ -252,11 +217,73 @@ begin
   if sofNoConfirmation in AFlags then
     AStruct.fFlags := AStruct.fFlags or FOF_NOCONFIRMATION;
   if ASourceList <> '' then
-    AStruct.pFrom := PWideChar(acStringReplace(ASourceList + #0, #13#10, #0));
+    AStruct.pFrom := PWideChar(ASourceList);
   if ADestList <> '' then
-    AStruct.pTo := PWideChar(acStringReplace(ADestList + #0, #13#10, #0));
+    AStruct.pTo := PWideChar(ADestList);
   FShellLastErrorCode := SHFileOperationW(AStruct);
   Result := (FShellLastErrorCode = 0) and not AStruct.fAnyOperationsAborted;
+end;
+
+function ShellShutdown(AMode: TShellShutdownMode): Boolean;
+
+  function GetPrivileges: Boolean;
+  var
+    ALength: Cardinal;
+    ALuID: TLargeInteger;
+    ANewPriv, APrevPriv: TTokenPrivileges;
+    AToken: THandle;
+  begin
+    Result := False;
+    if OpenProcessToken(GetCurrentProcess, TOKEN_ADJUST_PRIVILEGES or TOKEN_QUERY, AToken) then
+    begin
+      if not GetTokenInformation(AToken, TokenPrivileges, nil, 0, ALength) then
+      begin
+        if (GetLastError = 122) and LookupPrivilegeValue(nil, 'SeShutdownPrivilege', ALuID) then
+        begin
+          ANewPriv.PrivilegeCount := 1;
+          ANewPriv.Privileges[0].Luid := ALuID;
+          ANewPriv.Privileges[0].Attributes := SE_PRIVILEGE_ENABLED;
+          Result := AdjustTokenPrivileges(AToken, False, ANewPriv, SizeOf(TTokenPrivileges), APrevPriv, ALength);
+        end;
+      end;
+    end;
+  end;
+
+var
+  Version: TOSVersionInfo;
+begin
+  Result := False;
+  Version.dwOSVersionInfoSize := SizeOf(TOSVersionInfo);
+  GetVersionEx(version);
+  if Version.dwPlatformId = VER_PLATFORM_WIN32_NT then
+  begin
+    if not GetPrivileges then
+      Exit;
+  end;
+  case AMode of
+    sdPowerOff:
+      Result := ExitWindowsEx(EWX_FORCEIFHUNG or EWX_POWEROFF, MaxInt);
+    sdLogOff:
+      Result := ExitWindowsEx(EWX_FORCEIFHUNG or EWX_LOGOFF, MaxInt);
+    sdReboot:
+      Result := ExitWindowsEx(EWX_FORCEIFHUNG or EWX_REBOOT, MaxInt);
+    sdHibernate, sdSleep:
+      Result := SetSystemPowerState(AMode = sdSleep, False);
+  end;
+end;
+
+function ShellLastErrorCode: Integer;
+begin
+  Result := FShellLastErrorCode;
+end;
+
+function ShellShowHiddenByDefault: Boolean;
+var
+  AKey: THandle;
+begin
+  AKey := acRegOpenRead(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced');
+  Result := acRegReadInt(AKey, 'Hidden') = 1;
+  acRegClose(AKey);
 end;
 
 procedure UpdateShellCache;
@@ -265,55 +292,34 @@ begin
   Sleep(1000);
 end;
 
-//----------------------------------------------------------------------------------------------------------------------
-// Shell - Copying
-//----------------------------------------------------------------------------------------------------------------------
+{$ENDREGION}
 
-function ShellCopyDirectory(const ASrcPath, ADestPath: UnicodeString; AOptions: TShellOperationFlags = [sofCanUndo]): Boolean;
-begin
-  Result := ShellOperation(ASrcPath, ADestPath, soCopy, AOptions);
-end;
-
-function ShellCopyFiles(AFileList: TACLStringList; const APath: UnicodeString; AOptions: TShellOperationFlags = [sofCanUndo]): Boolean;
-begin
-  Result := ShellOperation(AFileList.Text, APath, soCopy, AOptions);
-end;
-
-function ShellMoveDirectory(const ASrcPath, ADestPath: UnicodeString; AOptions: TShellOperationFlags = [sofCanUndo]): Boolean;
-begin
-  Result := ShellOperation(ASrcPath, ADestPath, soMove, AOptions);
-end;
-
-function ShellMoveFiles(AFiles: TACLStringList; const APath: UnicodeString; AOptions: TShellOperationFlags = [sofCanUndo]): Boolean;
-begin
-  Result := ShellOperation(AFiles.Text, APath, soMove, AOptions);
-end;
-
-function ShellRenameDirectory(const AOldPath, ANewPath: UnicodeString): Boolean;
-begin
-  Result := ShellOperation(ExcludeTrailingPathDelimiter(AOldPath), ExcludeTrailingPathDelimiter(ANewPath), soRename, [sofCanUndo]);
-end;
-
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // Shell - Deleting
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
-function ShellDeleteDirectory(const APath: UnicodeString; AOptions: TShellOperationFlags = [sofCanUndo]): Boolean;
+{$REGION ' Deleting '}
+
+function ShellDelete(AFilesOrFolders: TACLStringList;
+  AOptions: TShellOperationFlags = [sofCanUndo]): Boolean;
 begin
-  Result := ShellOperation(ExcludeTrailingPathDelimiter(APath), '', soDelete, AOptions);
+  Result := ShellOperation(ShellEncodePaths(AFilesOrFolders), '', soDelete, AOptions);
 end;
 
-function ShellDeleteFile(const AFile: UnicodeString): Boolean;
+function ShellDelete(const AFileOrFolder: string;
+  AOptions: TShellOperationFlags = [sofCanUndo, sofNoDialog, sofNoConfirmation]): Boolean;
+var
+  LList: TACLStringList;
 begin
-  Result := ShellOperation(AFile, '', soDelete, [sofCanUndo, sofNoDialog, sofNoConfirmation]);
+  LList := TACLStringList.Create(AFileOrFolder);
+  try
+    Result := ShellDelete(LList, AOptions);
+  finally
+    LList.Free;
+  end;
 end;
 
-function ShellDeleteFiles(AFiles: TACLStringList; AOptions: TShellOperationFlags = [sofCanUndo]): Boolean;
-begin
-  Result := ShellOperation(AFiles.Text, '', soDelete, AOptions);
-end;
-
-function ShellUndelete(const AFileOrFolder: UnicodeString): HRESULT;
+function ShellUndelete(const AOriginalFileOrFolder: UnicodeString): HRESULT;
 var
   ARecycleBin: IShellFolder2;
   ARecycleBinPIDL: PItemIDList;
@@ -368,7 +374,7 @@ begin
       AFetched := 0;
       while Succeeded(AItems.Next(1, AItem, AFetched)) and (AFetched = 1) do
       begin
-        if acSameText(AFileOrFolder, GetOriginalFileName(AItem)) then
+        if acSameText(AOriginalFileOrFolder, GetOriginalFileName(AItem)) then
           Exit(Undelete(AItem));
       end;
     end;
@@ -378,9 +384,13 @@ begin
   Result := E_INVALIDARG;
 end;
 
-//----------------------------------------------------------------------------------------------------------------------
+{$ENDREGION}
+
+//------------------------------------------------------------------------------
 // Shell - Executing
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+{$REGION ' Executing '}
 
 function ShellExecute(const AFileName: UnicodeString): Boolean;
 begin
@@ -431,60 +441,45 @@ begin
   end;
 end;
 
-//----------------------------------------------------------------------------------------------------------------------
+{$ENDREGION}
+
+//------------------------------------------------------------------------------
 // Shell - System Paths
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
-function ShellGetAppData: UnicodeString;
-begin
-  Result := ShellGetSystemFolder(CSIDL_APPDATA);
-end;
+{$REGION ' System Paths '}
 
-function ShellGetDesktop: UnicodeString;
-begin
-  Result := ShellGetSystemFolder(CSIDL_DESKTOP);
-end;
-
-function ShellGetMyDocuments: UnicodeString;
-begin
-  Result := ShellGetSystemFolder(CSIDL_PERSONAL);
-end;
-
-function ShellGetMyMusic: UnicodeString;
-begin
-  Result := ShellGetSystemFolder(CSIDL_MYMUSIC);
-end;
-
-function ShellGetNetWork: UnicodeString;
-begin
-  Result := ShellGetSystemFolder(CSIDL_NETHOOD);
-end;
-
-function ShellGetProgramsMenu: UnicodeString;
-begin
-  Result := ShellGetSystemFolder(CSIDL_STARTMENU);
-end;
-
-function ShellGetSystemFolder(AFolder: Integer): UnicodeString;
+function ShellPath(CLSID: Integer): UnicodeString;
 var
   ABuf: TFilePath;
 begin
-  if SHGetSpecialFolderPathW(0, @ABuf[0], AFolder, False) then
+  if SHGetSpecialFolderPathW(0, @ABuf[0], CLSID, False) then
     Result := acIncludeTrailingPathDelimiter(ABuf)
   else
     Result := acTempPath;
 end;
 
-function ShellGetWindows: UnicodeString;
-var
-  ABuf: TFilePath;
+function ShellPathAppData: UnicodeString;
 begin
-  acClearFilePath(ABuf);
-  GetWindowsDirectoryW(@ABuf[0], Length(ABuf));
-  Result := acIncludeTrailingPathDelimiter(ABuf);
+  Result := ShellPath(CSIDL_APPDATA);
 end;
 
-function ShellSystem32Dir: UnicodeString;
+function ShellPathDesktop: UnicodeString;
+begin
+  Result := ShellPath(CSIDL_DESKTOP);
+end;
+
+function ShellPathMyDocuments: UnicodeString;
+begin
+  Result := ShellPath(CSIDL_PERSONAL);
+end;
+
+function ShellPathMyMusic: UnicodeString;
+begin
+  Result := ShellPath(CSIDL_MYMUSIC);
+end;
+
+function ShellPathSystem32: UnicodeString;
 var
   ABuf: TFilePath;
 begin
@@ -494,7 +489,7 @@ begin
 end;
 
 {$IFDEF CPUX64}
-function ShellSystemWow64Dir: UnicodeString;
+function ShellPathSystem32WOW64: UnicodeString;
 type
   TGetSystemWow64Directory = function (lpBuffer: LPWSTR; uSize: UINT): UINT; stdcall;
 var
@@ -513,60 +508,17 @@ begin
 end;
 {$ENDIF}
 
-//----------------------------------------------------------------------------------------------------------------------
-// Shell - Notifications
-//----------------------------------------------------------------------------------------------------------------------
+{$ENDREGION}
 
-function ShellGetPowerStatus: TACLShellPowerStatus;
-var
-  AStatus: TSystemPowerStatus;
-begin
-  ZeroMemory(@Result, SizeOf(Result));
-  ZeroMemory(@AStatus, SizeOf(AStatus));
-  if GetSystemPowerStatus(AStatus) then
-  begin
-    Result.Source := TACLShellPowerSource(AStatus.ACLineStatus <> 1);
-    Result.BatteryLevel := AStatus.BatteryLifePercent;
-    Result.BatteryLifeTime := AStatus.BatteryLifeTime;
-    Result.PowerSavingMode := IsWin10OrLater and (AStatus.Reserved1 = 1) or (Result.BatteryLevel < 30);
-  end;
-end;
-
-function ShellGetUserNotificationState: TACLShellUserNotificationState;
-var
-  AState: Integer;
-begin
-  Result := unsUnknown;
-  if IsWinVistaOrLater and Succeeded(SHQueryUserNotificationState(AState)) then
-  begin
-    if InRange(AState, Ord(Low(Result)), Ord(High(Result))) then
-      Result := TACLShellUserNotificationState(AState)
-  end;
-end;
-
-function ShellIsPortableDevice: Boolean;
-begin
-  Result := InRange(ShellGetPowerStatus.BatteryLevel, 1, 100);
-end;
-
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // Shell - Libraries
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+{$REGION ' Libraries '}
 
 function ShellIsLibraryPath(const APath: UnicodeString): Boolean;
 begin
   Result := acBeginsWith(APath, '::');
-end;
-
-procedure ShellExpandPath(const APath: UnicodeString; AReceiver: IStringReceiver);
-begin
-  if APath <> '' then
-  begin
-    if ShellIsLibraryPath(APath) then
-      ShellReadLibrary(APath, AReceiver)
-    else
-      AReceiver.Add(APath);
-  end;
 end;
 
 function ShellReadLibrary(const APathForParsing: UnicodeString; AReceiver: IStringReceiver): Boolean;
@@ -598,9 +550,24 @@ begin
       end;
 end;
 
-//----------------------------------------------------------------------------------------------------------------------
+procedure ShellExpandPath(const APath: UnicodeString; AReceiver: IStringReceiver);
+begin
+  if APath <> '' then
+  begin
+    if ShellIsLibraryPath(APath) then
+      ShellReadLibrary(APath, AReceiver)
+    else
+      AReceiver.Add(APath);
+  end;
+end;
+
+{$ENDREGION}
+
+//------------------------------------------------------------------------------
 // Shell - Link
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+{$REGION ' Links '}
 
 function ShellCreateLinkObject(out AObject: IShellLinkW): Boolean;
 begin
@@ -670,119 +637,31 @@ begin
   end;
 end;
 
-function ShellParseLink(const ALink: UnicodeString): UnicodeString;
-begin
-  if not ShellParseLink(ALink, Result) then
-    Result := '';
-end;
+{$ENDREGION}
 
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // Shell - Drives
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
-function ShellDriveFree(const ADrive: WideChar): Int64;
-var
-  X: Int64;
-begin
-  if not ShellDriveFree(ADrive, Result, X) then
-    Result := -1;
-end;
+{$REGION ' Drives '}
 
-function ShellDriveFree(const ADrive: WideChar; out AFreeSpace, ATotalSpace: Int64): LongBool;
+function ShellGetFreeSpace(const AFileName: string): Int64;
 var
-  AErrorMode: Integer;
-  X: Int64;
+  LDrive: string;
+  LErrorMode: Integer;
+  LTemp: Int64;
 begin
-  AErrorMode := SetErrorMode(SEM_FailCriticalErrors);
+  LErrorMode := SetErrorMode(SEM_FailCriticalErrors);
   try
-    Result := GetDiskFreeSpaceExW(PWideChar(ADrive + ':'), X, ATotalSpace, @AFreeSpace);
+    LDrive := Copy(AFileName, 1, 2);
+    if not GetDiskFreeSpaceEx(PChar(LDrive), Result, LTemp, nil) then
+      Result := -1;
   finally
-    SetErrorMode(AErrorMode);
+    SetErrorMode(LErrorMode);
   end;
 end;
 
-function ShellShutdown(AMode: TShellShutdownMode): Boolean;
-
-  function GetPrivileges: Boolean;
-  var
-    ALength: Cardinal;
-    ALuID: TLargeInteger;
-    ANewPriv, APrevPriv: TTokenPrivileges;
-    AToken: THandle;
-  begin
-    Result := False;
-    if OpenProcessToken(GetCurrentProcess, TOKEN_ADJUST_PRIVILEGES or TOKEN_QUERY, AToken) then
-    begin
-      if not GetTokenInformation(AToken, TokenPrivileges, nil, 0, ALength) then
-      begin
-        if (GetLastError = 122) and LookupPrivilegeValue(nil, 'SeShutdownPrivilege', ALuID) then
-        begin
-          ANewPriv.PrivilegeCount := 1;
-          ANewPriv.Privileges[0].Luid := ALuID;
-          ANewPriv.Privileges[0].Attributes := SE_PRIVILEGE_ENABLED;
-          Result := AdjustTokenPrivileges(AToken, False, ANewPriv, SizeOf(TTokenPrivileges), APrevPriv, ALength);
-        end;
-      end;
-    end;
-  end;
-
-var
-  Version: TOSVersionInfo;
-begin
-  Result := False;
-  Version.dwOSVersionInfoSize := SizeOf(TOSVersionInfo);
-  GetVersionEx(version);
-  if Version.dwPlatformId = VER_PLATFORM_WIN32_NT then
-  begin
-    if not GetPrivileges then
-      Exit;
-  end;
-  case AMode of
-    sdPowerOff:
-      Result := ExitWindowsEx(EWX_FORCEIFHUNG or EWX_POWEROFF, MaxInt);
-    sdLogOff:
-      Result := ExitWindowsEx(EWX_FORCEIFHUNG or EWX_LOGOFF, MaxInt);
-    sdReboot:
-      Result := ExitWindowsEx(EWX_FORCEIFHUNG or EWX_REBOOT, MaxInt);
-    sdHibernate, sdSleep:
-      Result := SetSystemPowerState(AMode = sdSleep, False);
-  end;
-end;
-
-function ShellLastErrorCode: Integer;
-begin
-  Result := FShellLastErrorCode;
-end;
-
-//----------------------------------------------------------------------------------------------------------------------
-// Shell - Tools
-//----------------------------------------------------------------------------------------------------------------------
-
-function ShellGetIconHandle(const AFileName: UnicodeString): HICON;
-var
-  AFileInfo: TSHFileInfoW;
-begin
-  ZeroMemory(@AFileInfo, SizeOf(AFileInfo));
-  SHGetFileInfoW(PWideChar(AFileName), 0, AFileInfo, SizeOf(AFileInfo), SHGFI_ICON or SHGFI_SMALLICON);
-  Result := AFileInfo.hIcon;
-end;
-
-function ShellGetSystemImageList: THandle;
-var
-  AFileInfo: TSHFileInfoW;
-begin
-  ZeroMemory(@AFileInfo, SizeOf(AFileInfo));
-  Result := SHGetFileInfoW('', 0, AFileInfo, SizeOf(AFileInfo), SHGFI_USEFILEATTRIBUTES or SHGFI_SYSICONINDEX or SHGFI_SMALLICON);
-end;
-
-function ShellShowHiddenByDefault: Boolean;
-var
-  AKey: THandle;
-begin
-  AKey := acRegOpenRead(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced');
-  Result := acRegReadInt(AKey, 'Hidden') = 1;
-  acRegClose(AKey);
-end;
+{$ENDREGION}
 
 { TACLShellFolder }
 
@@ -845,26 +724,46 @@ begin
   Result := TPIDLHelper.GetHasChildren(ParentShellFolder, ID);
 end;
 
-function TACLShellFolder.Rename(const NewName: UnicodeString): boolean;
-var
-  ANewPIDL: PItemIDList;
+function TACLShellFolder.IsFileSystemPath: Boolean;
 begin
-  Result := False;
-  if fcCanRename in Capabilities then
-  begin
-    Result := ParentShellFolder.SetNameOf(0, FPIDL, PWideChar(NewName), SHGDN_NORMAL, ANewPIDL) = S_OK;
-    if Result then
-    begin
-      FPIDL := ANewPIDL;
-      TPIDLHelper.DisposePIDL(FPIDL);
-      TPIDLHelper.DisposePIDL(FFullPIDL);
-      if FParent = nil then
-        FFullPIDL := TPIDLHelper.CopyPIDL(ANewPIDL)
-      else
-        FFullPIDL := TPIDLHelper.ConcatPIDLs(FParent.FPIDL, ANewPIDL);
-    end
-  end;
+  Result := GetAttributes and (SFGAO_FILESYSANCESTOR or SFGAO_FILESYSTEM) <> 0;
 end;
+
+function TACLShellFolder.IsFolder: Boolean;
+var
+  LAttrs: Cardinal;
+begin
+  LAttrs := GetAttributes;
+  Result :=
+    (LAttrs and (SFGAO_FILESYSANCESTOR or SFGAO_FILESYSTEM) <> 0) and
+    (LAttrs and (SFGAO_STREAM or SFGAO_FOLDER) <> (SFGAO_STREAM or SFGAO_FOLDER));
+end;
+
+function TACLShellFolder.IsLibrary: Boolean;
+begin
+  Result := LibrarySources.Count > 0;
+end;
+
+//function TACLShellFolder.Rename(const NewName: UnicodeString): boolean;
+//var
+//  ANewPIDL: PItemIDList;
+//begin
+//  Result := False;
+//  if GetCapabilities and SFGAO_CANRENAME <> 0 then
+//  begin
+//    Result := ParentShellFolder.SetNameOf(0, FPIDL, PWideChar(NewName), SHGDN_NORMAL, ANewPIDL) = S_OK;
+//    if Result then
+//    begin
+//      FPIDL := ANewPIDL;
+//      TPIDLHelper.DisposePIDL(FPIDL);
+//      TPIDLHelper.DisposePIDL(FFullPIDL);
+//      if FParent = nil then
+//        FFullPIDL := TPIDLHelper.CopyPIDL(ANewPIDL)
+//      else
+//        FFullPIDL := TPIDLHelper.ConcatPIDLs(FParent.FPIDL, ANewPIDL);
+//    end
+//  end;
+//end;
 
 class function TACLShellFolder.Root: TACLShellFolder;
 var
@@ -904,24 +803,11 @@ begin
     OLECheck(SHGetDesktopFolder(Result));
 end;
 
-function TACLShellFolder.GetCapabilities: TACLShellFolderCapabilities;
-const
-  Map: array[TACLShellFolderCapability] of LongWord = (
-    SFGAO_CANCOPY, SFGAO_CANDELETE, SFGAO_CANLINK, SFGAO_CANMOVE,
-    SFGAO_CANRENAME, SFGAO_DROPTARGET, SFGAO_HASPROPSHEET
-  );
-var
-  AFlags: LongWord;
-  AProperty: TACLShellFolderCapability;
+function TACLShellFolder.GetAttributes: Cardinal;
 begin
-  Result := [];
-  AFlags := SFGAO_CAPABILITYMASK;
-  if Succeeded(ParentShellFolder.GetAttributesOf(1, FPIDL, AFlags)) then
-    for AProperty := Low(AProperty) to High(AProperty) do
-    begin
-      if AFlags and Map[AProperty] <> 0 then
-        Include(Result, AProperty);
-    end;
+  Result := SFGAO_STORAGECAPMASK;
+  if Failed(ParentShellFolder.GetAttributesOf(1, FPIDL, Result)) then
+    Result := 0;
 end;
 
 function TACLShellFolder.GetDisplayName: UnicodeString;
@@ -929,38 +815,23 @@ begin
   Result := TPIDLHelper.GetDisplayName(ParentShellFolder, ID, SHGDN_INFOLDER);
 end;
 
-function TACLShellFolder.GetImageIndex: Integer;
-var
-  AFileInfo: TSHFileInfoW;
-begin
-  SHGetFileInfoW(PWideChar(FFullPIDL), 0, AFileInfo, SizeOf(AFileInfo), SHGFI_PIDL or SHGFI_SYSICONINDEX or SHGFI_SMALLICON);
-  Result := AFileInfo.iIcon;
-end;
-
-function TACLShellFolder.GetIsFileSystemPath: Boolean;
-begin
-  Result := [fscFileSystemAncestor, fscFileSystem] * StorageCapabilities <> [];
-end;
-
-function TACLShellFolder.GetIsLibrary: Boolean;
-begin
-  Result := LibrarySources.Count > 0;
-end;
-
 function TACLShellFolder.GetLibrarySources: TACLStringList;
 begin
   if FLibrarySources = nil then
   begin
     FLibrarySources := TACLStringList.Create;
-    if (Parent <> nil) and ([fscFileSystemAncestor, fscFileSystem] * StorageCapabilities = [fscFileSystemAncestor]) then
-      ShellReadLibrary(PathForParsing, FLibrarySources);
+    if Parent <> nil then
+    begin
+      if GetAttributes and (SFGAO_FILESYSANCESTOR or SFGAO_FILESYSTEM) = SFGAO_FILESYSANCESTOR then
+        ShellReadLibrary(PathForParsing, FLibrarySources);
+    end;
   end;
   Result := FLibrarySources;
 end;
 
 function TACLShellFolder.GetPath: UnicodeString;
 begin
-  if fscFileSystem in StorageCapabilities then
+  if GetAttributes and SFGAO_FILESYSTEM <> 0 then
     Result := PathForParsing
   else
     Result := EmptyStr;
@@ -969,27 +840,6 @@ end;
 function TACLShellFolder.GetPathForParsing: UnicodeString;
 begin
   Result := TPIDLHelper.GetDisplayName(Root.ShellFolder, AbsoluteID, SHGDN_FORPARSING);
-end;
-
-function TACLShellFolder.GetStorageCapabilities: TACLShellFolderStorageCapabilities;
-const
-  Map: array[TACLShellFolderStorageCapability] of LongWord = (
-    SFGAO_STORAGE, SFGAO_LINK, SFGAO_READONLY, SFGAO_STREAM, SFGAO_STORAGEANCESTOR,
-    SFGAO_FILESYSANCESTOR, SFGAO_FOLDER, SFGAO_FILESYSTEM
-  );
-
-var
-  AFlags: LongWord;
-  AProperty: TACLShellFolderStorageCapability;
-begin
-  Result := [];
-  AFlags := SFGAO_STORAGECAPMASK;
-  if Succeeded(ParentShellFolder.GetAttributesOf(1, FPIDL, AFlags)) then
-    for AProperty := Low(AProperty) to High(AProperty) do
-    begin
-      if AFlags and Map[AProperty] <> 0 then
-        Include(Result, AProperty);
-    end;
 end;
 
 { TACLShellSearchPaths }
@@ -1020,7 +870,8 @@ begin
   end;
 end;
 
-class function TPIDLHelper.GetDisplayName(AParentFolder: IShellFolder; PIDL: PItemIDList; AFlags: DWORD): UnicodeString;
+class function TPIDLHelper.GetDisplayName(AParentFolder: IShellFolder;
+  PIDL: PItemIDList; AFlags: DWORD): UnicodeString;
 var
   AStrRet: TStrRet;
 begin

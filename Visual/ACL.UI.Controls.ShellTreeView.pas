@@ -590,24 +590,22 @@ end;
 
 function TACLShellTreeViewSubClass.AddFolderNode(
   ID: PItemIDList; AParent: TACLTreeListNode): TACLTreeListNode;
-const
-  Caps = [fscStream, fscFolder];
 var
-  AFolder: TACLShellFolder;
+  LFolder: TACLShellFolder;
 begin
   Result := nil;
   if ID <> nil then
   begin
-    AFolder := TACLShellFolder.Create(TACLShellFolder(AParent.Data), ID);
-    if AFolder.IsFileSystemPath and (Caps * AFolder.StorageCapabilities <> Caps) then
+    LFolder := TACLShellFolder.Create(TACLShellFolder(AParent.Data), ID);
+    if LFolder.IsFolder then
     begin
-      Result := AParent.AddChild([AFolder.DisplayName]);
-      Result.Data := AFolder;
-      Result.HasChildren := AFolder.HasChildren;
-      Result.ImageIndex := FImages.GetImageIndex(AFolder);
+      Result := AParent.AddChild([LFolder.DisplayName]);
+      Result.Data := LFolder;
+      Result.HasChildren := LFolder.HasChildren;
+      Result.ImageIndex := FImages.GetImageIndex(LFolder);
     end
     else
-      FreeAndNil(AFolder);
+      FreeAndNil(LFolder);
   end;
 end;
 
@@ -722,7 +720,7 @@ begin
 
       VK_DELETE:
         begin
-          if ShellDeleteDirectory(SelectedPath) then
+          if ShellDelete(SelectedPath, [sofCanUndo]) then
             ReloadData;
           Exit;
         end;

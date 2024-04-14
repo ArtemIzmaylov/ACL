@@ -191,7 +191,7 @@ begin
     try
       if FGeneralLogFileName = '' then
         FGeneralLogFileName :=
-          {$IFDEF MSWINDOWS}ShellGetMyDocuments{$ELSE}GetUserDir{$ENDIF} +
+          {$IFDEF MSWINDOWS}ShellPathMyDocuments{$ELSE}GetUserDir{$ENDIF} +
           acExtractFileNameWithoutExt(acSelfExeName) + '.debug.log';
     finally
       FGeneralLog.Leave;
