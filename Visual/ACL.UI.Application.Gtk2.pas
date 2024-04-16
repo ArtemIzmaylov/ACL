@@ -35,7 +35,6 @@ uses
   WSLCLClasses,
   // System
   Classes,
-  Math,
   SysUtils,
   // VCL
   Controls;

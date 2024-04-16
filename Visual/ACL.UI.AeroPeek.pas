@@ -494,17 +494,17 @@ end;
 
 procedure TACLAeroPeek.UnhookOwnerWindow;
 begin
-{$IFDEF MSWINDOWS}
   if FWindowProcOld <> nil then
   try
+  {$IFDEF MSWINDOWS}
     SetWindowAttribute(DWMWA_HAS_ICONIC_BITMAP, False);
     SetWindowLong(OwnerWindow, GWL_WNDPROC, NativeUInt(FWindowProcOld));
     FreeObjectInstance(FWindowProcPtr);
+  {$ENDIF}
   finally
     FWindowProcOld := nil;
     FWindowProcPtr := nil;
   end;
-{$ENDIF}
 end;
 
 function TACLAeroPeek.GetAvailable: Boolean;

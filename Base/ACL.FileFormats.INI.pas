@@ -12,6 +12,7 @@
 unit ACL.FileFormats.INI;
 
 {$I ACL.Config.inc} //FPC:OK
+{$POINTERMATH ON}
 
 interface
 
@@ -1307,10 +1308,6 @@ begin
 end;
 
 procedure TACLIniFile.LoadFromString(const AString: PChar; ACount: Integer);
-{$IFDEF FPC}
-  {$PUSH}
-  {$WARN 4055 off : Conversion between ordinals and pointers is not portable}
-{$ENDIF}
 
   procedure ParseLine(S, F: PChar; var ASection: TACLIniFileSection);
   var
@@ -1339,9 +1336,9 @@ begin
     S := P;
     F := S + ACount;
     ASection := nil;
-    while (NativeUInt(P) + SizeOf(Char) <= NativeUInt(F)) do
+    while P < F do
     begin
-      if (Ord(P^) <> Ord(#10)) and (Ord(P^) <> Ord(#13)){$IFDEF UNICODE}and (Ord(P^) <> Ord(acLineSeparator)){$ENDIF} then
+      if (P^ <> #10) and (P^ <> #13){$IFDEF UNICODE}and (Ord(P^) <> Ord(acLineSeparator)){$ENDIF} then
         Inc(P)
       else
       begin
@@ -1358,9 +1355,6 @@ begin
   finally
     EndUpdate;
   end;
-{$IFDEF FPC}
-  {$POP}
-{$ENDIF}
 end;
 
 function TACLIniFile.GetSectionCount: Integer;

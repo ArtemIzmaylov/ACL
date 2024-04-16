@@ -11,16 +11,8 @@
 
 unit ACL.Utils.Common;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} //FPC:OK
 {$WARN SYMBOL_PLATFORM OFF}
-
-{$IFDEF FPC}
-  {$MESSAGE WARN 'ACL.Utils.Common'}
-{$ENDIF}
-{%FPC: FIXME:
-   2) HMODULE's sections
-   3) WINDOW's section
-}
 
 interface
 

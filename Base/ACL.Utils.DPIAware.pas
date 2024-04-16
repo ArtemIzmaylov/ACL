@@ -87,9 +87,6 @@ uses
 {$IFDEF LCLGtk2}
   gdk2,
 {$ENDIF}
-{$IFDEF USE_VCL}
-  ACL.Graphics,
-{$ENDIF}
 {$IFDEF MSWINDOWS}
   ACL.Utils.Common,
 {$ENDIF}

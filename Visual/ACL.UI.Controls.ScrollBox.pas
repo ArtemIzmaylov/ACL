@@ -11,7 +11,7 @@
 
 unit ACL.UI.Controls.ScrollBox;
 
-{$I ACL.Config.inc} // FPC:OK
+{$I ACL.Config.inc} // FPC:Partial
 
 interface
 
@@ -478,7 +478,7 @@ procedure TACLCustomScrollBox.CMFocusChanged(var Msg: TMessage);
 begin
   inherited;
 {$IFDEF FPC}
-  {$MESSAGE 'TODO - not implemented'}
+  {$MESSAGE 'TODO - CMFocusChanged - not implemented'}
 {$ELSE}
   MakeVisible(TCMFocusChanged(Msg).Sender);
 {$ENDIF}

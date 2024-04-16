@@ -965,7 +965,7 @@ begin
   P := PAnsiChar(AString);
   R := acStrScan(P, Length(AString), ACharToSearch);
   if R <> nil then
-    Result := 1 + (NativeUInt(R) - NativeUInt(P))
+    Result := 1 + (R - P)
   else
     Result := 0
 end;
@@ -977,7 +977,7 @@ begin
   P := PWideChar(AString);
   R := acStrScan(P, Length(AString), ACharToSearch);
   if R <> nil then
-    Result := 1 + (NativeUInt(R) - NativeUInt(P)) div SizeOf(WideChar)
+    Result := 1 + (R - P)
   else
     Result := 0
 end;
@@ -1064,16 +1064,16 @@ end;
 
 function acStringLength(const AScanStart, AScanNext: PAnsiChar): Integer;
 begin
-  if NativeUInt(AScanNext) > NativeUInt(AScanStart) then
-    Result := NativeUInt(AScanNext) - NativeUInt(AScanStart)
+  if AScanNext > AScanStart then
+    Result := AScanNext - AScanStart
   else
     Result := 0;
 end;
 
 function acStringLength(const AScanStart, AScanNext: PWideChar): Integer;
 begin
-  if NativeUInt(AScanNext) > NativeUInt(AScanStart) then
-    Result := (NativeUInt(AScanNext) - NativeUInt(AScanStart)) div SizeOf(WideChar)
+  if AScanNext > AScanStart then
+    Result := AScanNext - AScanStart
   else
     Result := 0;
 end;

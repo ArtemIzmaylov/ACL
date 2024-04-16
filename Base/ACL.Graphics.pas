@@ -392,7 +392,7 @@ type
     FBitmap: TBitmap;
   {$IFDEF FPC}
     function GetFont: TFont;
-    procedure SetFont(AValue: TFont);
+    procedure SetFont(AValue: TFont); reintroduce;
   {$ENDIF}
   protected
     procedure CreateHandle; override;

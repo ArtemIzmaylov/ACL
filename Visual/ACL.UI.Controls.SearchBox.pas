@@ -39,7 +39,6 @@ uses
   ACL.Classes,
   ACL.Classes.Collections,
   ACL.Graphics,
-  ACL.Math,
   ACL.Timers,
   ACL.Threading,
   ACL.UI.Controls.BaseControls,

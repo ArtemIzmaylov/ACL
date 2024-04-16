@@ -66,6 +66,7 @@ const
   GetCaretBlinkTime = 500;
 
   CS_DROPSHADOW  = 0;
+  CM_CANCELMODE  = LMessages.{%H-}CM_CANCELMODE;
   WM_ACTIVATEAPP = $001C;
   WM_CONTEXTMENU = LM_CONTEXTMENU;
   WM_MOUSEWHEEL  = LM_MOUSEWHEEL;
@@ -223,14 +224,14 @@ type
   protected
     procedure Changed; virtual;
     function IsStored: Boolean; virtual;
-    // Events
-    property OnChanged: TNotifyEvent read FOnChanged write FOnChanged;
   public
     constructor Create(ADefaultValue: Integer);
     procedure Assign(Source: TPersistent); override;
     function GetScaledMargins(ATargetDpi: Integer): TRect;
     // Properties
     property Margins: TRect read GetMargins write SetMargins;
+    // Events
+    property OnChanged: TNotifyEvent read FOnChanged write FOnChanged;
   published
     property All: Integer read GetAll write SetAll stored IsAllStored;
     property Bottom: Integer index 0 read GetValue write SetValue stored IsValueStored;
