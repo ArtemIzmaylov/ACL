@@ -1071,7 +1071,9 @@ begin
       ACanvas.Font.Color := SubClass.Style.RowColorDisabledText.AsColor;
   end;
 
-  if Node.PropertyEditor.IsReadOnly or Node.PropertyEditor.IsNonStorable and OptionsView.HighlightNonStorableProperties then
+  if Node.PropertyEditor.IsReadOnly or
+    Node.PropertyEditor.IsNonStorable and OptionsView.HighlightNonStorableProperties
+  then
     ACanvas.Font.Color := SubClass.Style.RowColorDisabledText.AsColor;
 
   inherited DoDrawCellContent(ACanvas, R, AColumnViewInfo);

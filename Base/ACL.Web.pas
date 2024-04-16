@@ -312,10 +312,12 @@ begin
       begin
         Dec(ALength, 2);
         Inc(ASrc, 2);
+      {$IFDEF MSWINDOWS}
         if ACharCode >= $7F then
           ABuffer.Append(acStringFromAnsiString(AnsiChar(ACharCode)))
         else
-          ABuffer.Append(ACharCode);
+      {$ENDIF} // в противном случае у нас тут будет utf-8 последовательность
+          ABuffer.Append(AnsiChar(ACharCode));
       end
       else
         ABuffer.Append(ASrc^);

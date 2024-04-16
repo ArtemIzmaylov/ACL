@@ -235,10 +235,24 @@ end;
 procedure TACLCustomEditContainer.EditorWndProc(var Message: TMessage);
 begin
   case Message.Msg of
-  {$IFNDEF FPC}
-    WM_MOUSEFIRST..WM_MOUSELAST,
-  {$ENDIF}
-    CN_CHAR, CN_KEYDOWN, CN_KEYUP:
+    CN_CHAR:
+      if DoKeyPress(TWMKey(Message)) then Exit;
+
+    CN_KEYDOWN:
+    {$IFDEF FPC}
+      WMKeyDown(TWMKey(Message));
+    {$ELSE}
+      if DoKeyDown(TWMKey(Message)) then Exit;
+    {$ENDIF}
+
+    CN_KEYUP:
+    {$IFDEF FPC}
+      WMKeyUp(TWMKey(Message));
+    {$ELSE}
+      if DoKeyUp(TWMKey(Message)) then Exit;
+    {$ENDIF}
+
+    WM_MOUSEFIRST..WM_MOUSELAST:
       WindowProc(Message);
 
     WM_NCCALCSIZE, WM_NCPAINT:

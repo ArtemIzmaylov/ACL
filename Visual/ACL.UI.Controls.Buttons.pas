@@ -548,7 +548,6 @@ type
     procedure WMNCHitTest(var Message: TWMNCHitTest); message WM_NCHITTEST;
   protected
     procedure Calculate(R: TRect); override;
-    function CanAutoSize(var NewWidth, NewHeight: Integer): Boolean; override;
     function CreateStyle: TACLStyleButton; override;
     function CreateSubControlOptions: TACLCheckBoxSubControlOptions; virtual;
     function CreateSubClass: TACLCustomButtonSubClass; override;
@@ -557,7 +556,7 @@ type
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     procedure SetState(AValue: TCheckBoxState); virtual;
     procedure UpdateSubControlEnabled;
-    //
+    //# Properties
     property AllowGrayed: Boolean read FAllowGrayed write FAllowGrayed default False;
     property Checked: Boolean read GetChecked write SetChecked;
     property State: TCheckBoxState read GetState write SetState default cbUnchecked;
@@ -566,6 +565,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    function CanAutoSize(var NewWidth, NewHeight: Integer): Boolean; override;
     procedure Click; override;
     procedure ChangeState(AChecked: Boolean); overload;
     procedure ChangeState(AState: TCheckBoxState); overload;

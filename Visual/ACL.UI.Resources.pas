@@ -990,11 +990,14 @@ end;
 
 function TACLResource.EqualsValues(AResource: TACLResource): Boolean;
 begin
-  Result := (AResource <> nil) and (GetResourceClass = AResource.GetResourceClass) and EqualsValuesCore(AResource);
+  Result := (AResource <> nil) and
+    (GetResourceClass = AResource.GetResourceClass) and
+    (EqualsValuesCore(AResource));
 end;
 
 procedure TACLResource.DrawPreview(ACanvas: TCanvas; const R: TRect);
 begin
+  ACanvas.Brush.Style := bsClear;
   acTextDraw(ACanvas, ToString, R.InflateTo(-acTextIndent, 0), taLeftJustify, taVerticalCenter, True);
 end;
 

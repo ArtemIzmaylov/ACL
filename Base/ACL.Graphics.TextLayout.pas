@@ -2120,8 +2120,16 @@ end;
 
 function TACLTextLayoutCalculator.OnFontSize(ABlock: TACLTextLayoutBlockFontSize): Boolean;
 begin
-  inherited;
-  Result := AddBlock(ABlock);
+  if ABlock.Include then
+  begin
+    inherited;
+    Result := AddBlock(ABlock);
+  end
+  else
+  begin
+    Result := AddBlock(ABlock);
+    inherited;
+  end;
 end;
 
 function TACLTextLayoutCalculator.OnFontStyle(ABlock: TACLTextLayoutBlockFontStyle): Boolean;

@@ -2866,6 +2866,7 @@ begin
 
   if FPopupOnSelect or HasSubItems(LSelected.Item) then
   begin
+    LSelected.Item.Click;
     FPopupWnd := TACLMenuPopupWindow.Create(Self, Menu, LSelected);
     try
       FPopupWnd.Popup(NullRect);

@@ -243,6 +243,7 @@ function acGetCurrentDir: string;
 function acGetFreeFileName(const AFileName: string): string;
 function acGetMinimalCommonPath(var ACommonPath: string; const AFilePath: string): Boolean;
 function acGetShortFileName(const APath: string): string;
+function acExcludeTrailingPathDelimiter(const Path: string): string;
 function acIncludeTrailingPathDelimiter(const Path: string): string;
 function acIsDoubleExtFile(const AFileName: string): Boolean;
 function acIsLnkFileName(const AFileName: string): Boolean;
@@ -833,6 +834,11 @@ begin
   else
 {$ENDIF}
     Result := APath;
+end;
+
+function acExcludeTrailingPathDelimiter(const Path: string): string;
+begin
+  Result := SysUtils.ExcludeTrailingPathDelimiter(Path);
 end;
 
 function acIncludeTrailingPathDelimiter(const Path: string): string;

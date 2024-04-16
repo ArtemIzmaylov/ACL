@@ -30,6 +30,7 @@ uses
   ACL.Classes.Collections,
   ACL.Classes.StringList,
   ACL.Graphics,
+  ACL.Geometry,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.Buttons,
@@ -189,7 +190,7 @@ type
     procedure Edit; virtual;
   public
     function Attributes: TACLPropertyEditorAttributes; override;
-    //
+    //# Properties
     property ValueAsColor: TAlphaColor read GetValueAsColor write SetValueAsColor;
   end;
 
@@ -227,7 +228,6 @@ type
     procedure SetValue(const AValue: string); override;
     // IACLPropertyEditorCustomDraw
     procedure Draw(ACanvas: TCanvas; const R, ATextBounds: TRect); virtual;
-    procedure DrawPreview(ACanvas: TCanvas; const R: TRect); virtual;
     // IACLPropertyEditorDialog
     procedure Edit; virtual; abstract;
   public
@@ -565,9 +565,11 @@ var
 begin
   R1 := R;
   R1.Right := R1.Left + R1.Height;
+  ACanvas.Brush.Style := bsClear;
   acTextDraw(ACanvas, Value,
     Rect(R1.Right + acTextIndent, R.Top, R.Right, R.Bottom),
     taLeftJustify, taVerticalCenter);
+  R1.Inflate(-acTextIndent);
   FStyleSet.StyleHatch.DrawColorPreview(ACanvas, R1, ValueAsColor);
 end;
 
@@ -661,18 +663,16 @@ begin
     R1 := R;
     R1.Right := R1.Left + R1.Height;
     ACanvas.Font.Name := ATempFont.Name;
-    acTextDraw(ACanvas, Value, Rect(R1.Right + acTextIndent, R.Top, R.Right, R.Bottom), taLeftJustify, taVerticalCenter);
+    acTextDraw(ACanvas, Value,
+      Rect(R1.Right + acTextIndent, R.Top, R.Right, R.Bottom),
+      taLeftJustify, taVerticalCenter);
 
-    ACanvas.Font.Color := ATempFont.Color;
-    DrawPreview(ACanvas, R1);
+    R1.Inflate(-acTextIndent);
+    FStyleSet.StyleHatch.DrawColorPreview(
+      ACanvas, R1, TAlphaColor.FromColor(ATempFont.Color));
   finally
     ATempFont.Free;
   end;
-end;
-
-procedure TACLCustomFontPropertyEditor.DrawPreview(ACanvas: TCanvas; const R: TRect);
-begin
-  FStyleSet.StyleHatch.DrawColorPreview(ACanvas, R, TAlphaColor.FromColor(ACanvas.Font.Color));
 end;
 
 function TACLCustomFontPropertyEditor.GetFont: TPersistent;

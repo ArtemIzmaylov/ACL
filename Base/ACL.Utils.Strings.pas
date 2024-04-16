@@ -785,8 +785,11 @@ end;
 
 function acStringToAnsiString(const S: UnicodeString; CodePage: Integer): AnsiString; overload;
 {$IFDEF FPC}
+var
+  LData: TBytes;
 begin
-  Result := TACLEncodings.Get(CodePage).GetAnsiString(TEncoding.Unicode.GetBytes(S));
+  LData := TACLEncodings.Get(CodePage).GetBytes(S);
+  Result := acMakeString(PAnsiChar(@LData[0]), Length(LData));
 {$ELSE}
 var
   LLen: Integer;
@@ -825,7 +828,7 @@ end;
 function acStringFromAnsiString(const S: AnsiChar): WideChar;
 begin
 {$IFDEF FPC}
-  Result := PWideChar(acStringFromAnsiString(AnsiString(S)))^;
+  Result := PWideChar(acStringFromAnsiString(PAnsiChar(@S), 1, DefaultCodePage))^;
 {$ELSE}
   UnicodeFromLocaleChars(DefaultCodePage, 0, @S, 1, @Result, 1);
 {$ENDIF}
@@ -833,8 +836,15 @@ end;
 
 function acStringFromAnsiString(const S: PAnsiChar; Length, CodePage: Integer): UnicodeString;
 {$IFDEF FPC}
+var
+  LTxt: TBytes;
+  LUni: TUnicodeCharArray;
 begin
-  Result := acStringFromAnsiString(acMakeString(S, Length), CodePage);
+{$MESSAGE WARN 'OPTIMIZE'}
+  SetLength(LTxt{%H-}, Length);
+  Move(S^, LTxt[0], Length);
+  LUni := TACLEncodings.Get(CodePage).GetChars(LTxt);
+  Result := acMakeString(PWideChar(@LUni[0]), System.Length(LUni));
 {$ELSE}
 var
   LLen: Integer;
@@ -847,11 +857,7 @@ end;
 
 function acStringFromAnsiString(const S: AnsiString; CodePage: Integer): UnicodeString;
 begin
-{$IFDEF FPC}
-  Result := TEncoding.Unicode.GetString(TACLEncodings.Get(CodePage).GetAnsiBytes(S));
-{$ELSE}
   Result := acStringFromAnsiString(PAnsiChar(S), Length(S), CodePage);
-{$ENDIF}
 end;
 
 function acStringFromBytes(const Bytes: TBytes): UnicodeString;

@@ -764,19 +764,20 @@ end;
 
 procedure acFitFileName(ACanvas: TCanvas; ATargetWidth: Integer; var S: string);
 const
- CollapsedPath = '...';
+  CollapsedPath = '...';
 var
   APos: Integer;
+  APosNext: Integer;
   APosPrev: Integer;
 begin
   APosPrev := acPos(PathDelim, S);
+  APosNext := APosPrev;
   while ACanvas.TextWidth(S) > ATargetWidth do
   begin
-    APos := Pos(PathDelim, S, APosPrev + 1);
-    if APos = 0 then
-      Break;
+    APos := Pos(PathDelim, S, APosNext + 1);
+    if APos = 0 then Break;
     S := Copy(S, 1, APosPrev) + CollapsedPath + Copy(S, APos, MaxInt);
-    Inc(APosPrev, Length(CollapsedPath) + 1);
+    APosNext := APosPrev + Length(CollapsedPath) + 1;
   end;
 end;
 
@@ -2589,7 +2590,8 @@ var
   LBitmap: TBitmap;
 begin
   Resize(ASource.Description.Width, ASource.Description.Height);
-
+  if Empty then
+    Exit;
   if ASource.Description.BitsPerPixel = 32 then
   begin
     if ASource.DataSize <> ColorCount * SizeOf(TACLPixel32) then
@@ -2994,7 +2996,7 @@ begin
       Inc(LSrc);
     end;
   finally
-    g_object_unref(LBuf);
+    gdk_pixbuf_unref(LBuf);
   end;
 {$ELSE}
 begin
