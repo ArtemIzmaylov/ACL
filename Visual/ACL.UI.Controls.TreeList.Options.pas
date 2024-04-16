@@ -99,6 +99,7 @@ type
 
   TACLTreeListOptionsBehavior = class(TACLTreeListCustomOptions)
   strict private
+    FAllowDefocus: Boolean;
     FAutoBestFit: Boolean;
     FAutoCheckParents: Boolean;
     FAutoCheckChildren: Boolean;
@@ -139,9 +140,10 @@ type
   public
     constructor Create(const ATreeList: IACLTreeListOptionsListener); override;
   published
+    property AllowDefocus: Boolean read FAllowDefocus write FAllowDefocus default True;
     property AutoBestFit: Boolean read FAutoBestFit write SetAutoBestFit default False;
-    property AutoCheckParents: Boolean read FAutoCheckParents write SetAutoCheckParents default False;
     property AutoCheckChildren: Boolean read FAutoCheckChildren write SetAutoCheckChildren default False;
+    property AutoCheckParents: Boolean read FAutoCheckParents write SetAutoCheckParents default False;
     property CellHints: Boolean read FCellHints write FCellHints default True;
     property Deleting: Boolean read FDeleting write FDeleting default False;
     property DragSorting: Boolean read FDragSorting write FDragSorting default False;
@@ -350,6 +352,7 @@ end;
 constructor TACLTreeListOptionsBehavior.Create(const ATreeList: IACLTreeListOptionsListener);
 begin
   inherited Create(ATreeList);
+  FAllowDefocus := True;
   FIncSearchColumnIndex := -1;
   FSortingMode := tlsmMulti;
   FSortingUseMultithreading := True;
@@ -362,6 +365,7 @@ begin
   inherited DoAssign(Source);
   if Source is TACLTreeListOptionsBehavior then
   begin
+    AllowDefocus := TACLTreeListOptionsBehavior(Source).AllowDefocus;
     AutoBestFit := TACLTreeListOptionsBehavior(Source).AutoBestFit;
     AutoCheckParents := TACLTreeListOptionsBehavior(Source).AutoCheckParents;
     AutoCheckChildren := TACLTreeListOptionsBehavior(Source).AutoCheckChildren;

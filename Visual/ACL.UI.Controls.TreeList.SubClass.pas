@@ -1023,24 +1023,30 @@ type
       AResetPrevSortingParams: Boolean = False); overload;
 
     // Paths
-    function FindByPath(APath: string; AIgnoreCase: Boolean = True; AExactMatch: Boolean = False): TACLTreeListNode;
+    function FindByPath(APath: string; AIgnoreCase: Boolean = True;
+      AExactMatch: Boolean = False): TACLTreeListNode;
     function GetPath(ANode: TACLTreeListNode): string;
     procedure SetPath(const APath: string); virtual;
 
     // Selection
     procedure SelectAll; virtual;
-    procedure SelectInvert; virtual;
-    procedure SelectNone; virtual;
+    procedure SelectInvert;
+    procedure SelectNone;
     procedure SelectObject(AObject: TObject; AMode: TACLSelectionMode; AIsMedium: Boolean); virtual;
     procedure SelectOnMouseDown(AButton: TMouseButton; AShift: TShiftState); virtual;
-    procedure SelectRange(AFirstObject, ALastObject, AObjectToFocus: TObject; AMakeVisible, ADropSelection: Boolean; AMode: TACLSelectionMode); overload;
-    procedure SelectRange(AFirstObject, ALastObject: TObject; AMakeVisible, ADropSelection: Boolean; AMode: TACLSelectionMode); overload;
-    procedure SelectRange(AFirstObject, ALastObject: TObject; AShift: TShiftState); overload;
+    procedure SelectRange(AFirstObject, ALastObject, AObjectToFocus: TObject;
+      AMakeVisible, ADropSelection: Boolean; AMode: TACLSelectionMode); overload;
+    procedure SelectRange(AFirstObject, ALastObject: TObject;
+      AMakeVisible, ADropSelection: Boolean; AMode: TACLSelectionMode); overload;
+    procedure SelectRange(AFirstObject, ALastObject: TObject;
+      AShift: TShiftState); overload;
 
     // Styles
-    function StyleGetNodeBackgroundColor(AOdd: Boolean; ANode: TACLTreeListNode = nil): TAlphaColor; virtual;
+    function StyleGetNodeBackgroundColor(AOdd: Boolean;
+      ANode: TACLTreeListNode = nil): TAlphaColor; virtual;
     function StyleGetNodeTextColor(ANode: TACLTreeListNode = nil): TColor; virtual;
-    procedure StylePrepareFont(ACanvas: TCanvas; AFontIndex: Integer = -1; ASuperscript: Boolean = False); virtual;
+    procedure StylePrepareFont(ACanvas: TCanvas;
+      AFontIndex: Integer = -1; ASuperscript: Boolean = False); virtual;
 
     // Data Properties
     property AbsoluteVisibleNodes: TACLTreeListNodeList read GetAbsoluteVisibleNodes;
@@ -3930,7 +3936,8 @@ begin
     AObjectToFocus := FocusedObject;
     if AObjectToFocus = nil then
       AObjectToFocus := AbsoluteVisibleNodes.First;
-    SelectRange(AbsoluteVisibleNodes.First, AbsoluteVisibleNodes.Last, AObjectToFocus, True, False, smSelect);
+    SelectRange(AbsoluteVisibleNodes.First,
+      AbsoluteVisibleNodes.Last, AObjectToFocus, True, False, smSelect);
   end;
 end;
 
@@ -4047,7 +4054,8 @@ var
   ALastCell: TACLCompoundControlBaseContentCell;
   I: Integer;
 begin
-  if ContentViewInfo.ViewItems.Find(AFirstObject, AFirstCell) and ContentViewInfo.ViewItems.Find(ALastObject, ALastCell) then
+  if ContentViewInfo.ViewItems.Find(AFirstObject, AFirstCell) and
+     ContentViewInfo.ViewItems.Find(ALastObject, ALastCell) then
   begin
     AIndex1 := ContentViewInfo.ViewItems.IndexOf(AFirstCell);
     AIndex2 := ContentViewInfo.ViewItems.IndexOf(ALastCell);
@@ -5102,8 +5110,13 @@ begin
     if Supports(HitTest.HitObject, IACLSelectableObject) then
       SelectOnMouseDown(AButton, AShift)
     else
-      if HitTest.HitAtContentArea and (AButton = mbLeft) then
-        SelectNone;
+      if (AButton = mbLeft) and HitTest.HitAtContentArea then
+      begin
+        if OptionsBehavior.AllowDefocus then
+          SelectNone
+        else
+          SetFocusedObject(FocusedObject, True, False);
+      end;
   end;
 end;
 
