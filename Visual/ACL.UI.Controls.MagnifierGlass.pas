@@ -71,13 +71,13 @@ type
   protected
     procedure DoUpdate;
 
+    procedure BoundsChanged; override;
     function CreateStyle: TACLStyleBackground; override;
     procedure CreateWnd; override;
     procedure DestroyWnd; override;
     procedure Loaded; override;
     procedure Paint; override;
     procedure PrepareBuffer(const ACursorPos: TPoint);
-    procedure Resize; override;
     procedure SetTargetDPI(AValue: Integer); override;
     procedure UpdateSizes;
     //# Properties
@@ -152,9 +152,9 @@ begin
   if Assigned(OnUpdate) then OnUpdate(Self);
 end;
 
-procedure TACLMagnifierGlass.Resize;
+procedure TACLMagnifierGlass.BoundsChanged;
 begin
-  inherited Resize;
+  inherited;
   UpdateSizes;
 end;
 

@@ -477,7 +477,7 @@ type
     procedure AlignControl(var AClientRect: TRect); override;
     procedure Changed; override;
     procedure WindowProc(var Message: TMessage); override;
-    //
+    //# Properties
     property Enabled: Boolean read FEnabled write SetEnabled;
     property Owner: TACLCustomCheckBox read GetOwnerEx;
   end;
@@ -510,7 +510,7 @@ type
     constructor Create(AOwner: IACLButtonOwner); override;
     procedure Calculate(R: TRect); override;
     procedure CalculateAutoSize(var AWidth, AHeight: Integer); virtual;
-    //
+    //# Properties
     property CheckState: TCheckBoxState read FCheckState write SetCheckState;
     property LineRect: TRect read FLineRect;
     property ShowCheckMark: Boolean read FShowCheckMark write SetShowCheckMark;
@@ -577,6 +577,7 @@ type
     property ShowCheckMark: Boolean read GetShowCheckMark write SetShowCheckMark default True;
     property ShowLine: Boolean read GetShowLine write SetShowLine default False;
     property Style: TACLStyleCheckBox read GetStyle write SetStyle;
+    property Transparent;
     property WordWrap: Boolean read GetWordWrap write SetWordWrap default False;
   end;
 
@@ -1933,7 +1934,7 @@ begin
     // Always use acSysDrawText to make layout consistent between
     // singleline and multiline checkboxes
     acSysDrawText(ACanvas, FTextRect, Caption, DT_END_ELLIPSIS or DT_NOPREFIX or
-      acTextAlignHorz[Alignment] or IfThen(WordWrap, DT_WORDBREAK));
+      DT_VCENTER or acTextAlignHorz[Alignment] or IfThen(WordWrap, DT_WORDBREAK));
   end;
   if ShowLine then
     acDrawLabelLine(ACanvas, FLineRect, TextRect, Style.ColorLine1.Value, Style.ColorLine2.Value);

@@ -92,7 +92,9 @@ type
     // IACLCurrentDpi
     function GetCurrentDpi: Integer;
     //# Messages
-  {$IFNDEF FPC}
+  {$IFDEF FPC}
+    procedure WMEraseBkgnd(var Message: TMessage); message WM_ERASEBKGND;
+  {$ELSE}
     procedure CMDialogKey(var Message: TCMDialogKey); message CM_DIALOGKEY;
     procedure CMParentFontChanged(var Message: TCMParentFontChanged); message CM_PARENTFONTCHANGED;
     procedure WMAppCommand(var Message: TMessage); message WM_APPCOMMAND;
@@ -234,7 +236,7 @@ type
   TACLPopupWindowClass = class of TACLPopupWindow;
   TACLPopupWindow = class(TACLBasicForm)
   strict private
-    FOwnerFormWnd: THandle;
+    FOwnerFormWnd: HWND;
 
     FOnClosePopup: TNotifyEvent;
     FOnPopup: TNotifyEvent;
@@ -243,8 +245,6 @@ type
     procedure InitPopup;
     procedure InitScaling;
     procedure ShowPopup(const R: TRect);
-    //# Messages
-    procedure CMCancelMode(var Message: TCMCancelMode); message CM_CANCELMODE;
   protected
     procedure CreateParams(var Params: TCreateParams); override;
   {$IFDEF FPC}
@@ -364,7 +364,6 @@ type
   { TACLFormMouseWheelHelper }
 
 {$IFDEF MSWINDOWS}
-
   // The helper emulates the "Scrol inactive windows when
   // I hover over them" option from Window 10
   TACLFormMouseWheelHelper = class
@@ -424,11 +423,11 @@ var
 begin
   ZeroMemory(@AInput, SizeOf(AInput));
   SendInput(INPUT_KEYBOARD, AInput, SizeOf(AInput));
-  SetForegroundWindow(AHandle);
-  SetFocus(AHandle);
 {$ELSE}
 begin
 {$ENDIF}
+  SetForegroundWindow(AHandle);
+  SetFocus(AHandle);
 end;
 
 function acWantSpecialKey(AChild: TControl; ACharCode: Word; AShift: TShiftState): Boolean;
@@ -778,7 +777,22 @@ begin
   end;
 end;
 
-{$IFNDEF FPC}
+{$IFDEF FPC}
+procedure TACLBasicForm.WMEraseBkgnd(var Message: TMessage);
+begin
+  if (Message.WParam = Message.LParam) and (Message.LParam <> 0) then
+  begin
+    Canvas.Handle := Message.LParam;
+    try
+      acFillRect(Canvas, ClientRect, Color);
+    finally
+      Canvas.Handle := 0;
+    end;
+  end
+  else
+    inherited;
+end;
+{$ELSE}
 procedure TACLBasicForm.CMDialogKey(var Message: TCMDialogChar);
 begin
   if DialogChar(Message) then
@@ -830,7 +844,6 @@ begin
   if (Message.Section <> nil) and (Message.Section = 'ImmersiveColorSet') then
     TACLApplication.UpdateColorSet;
 end;
-
 {$ENDIF}
 
 { TACLWindowHooks }
@@ -1304,20 +1317,12 @@ procedure TACLPopupWindow.ClosePopup;
 begin
   if Visible then
   try
-//    KillTimer(WindowHandle, MouseTrackerId);
-//    MouseCapture := False;
     Hide;
     if FOwnerFormWnd <> 0 then
       SendMessage(FOwnerFormWnd, WM_EXITMENULOOP, 0, 0);
   finally
     DoPopupClosed;
   end;
-end;
-
-procedure TACLPopupWindow.CMCancelMode(var Message: TCMCancelMode);
-begin
-  if Visible and not ContainsControl(Message.Sender) then
-    ClosePopup;
 end;
 
 procedure TACLPopupWindow.ConstraintBounds(var R: TRect);
@@ -1480,6 +1485,9 @@ begin
         ClosePopup;
       WM_CONTEXTMENU, WM_MOUSEWHEEL, WM_MOUSEHWHEEL, CM_MOUSEWHEEL:
         Exit;
+      CM_CANCELMODE:
+        if not ContainsControl(TCMCancelMode(Message).Sender) then
+          ClosePopup;
       WM_ACTIVATE:
         with TWMActivate(Message) do
           if Active = WA_INACTIVE then

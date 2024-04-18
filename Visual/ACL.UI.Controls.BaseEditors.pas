@@ -208,7 +208,6 @@ type
     procedure HandlerEditorExit(Sender: TObject);
     procedure HandlerImageChange(Sender: TObject);
     //# Setters
-    procedure SetAutoHeight(AValue: Boolean);
     procedure SetBorders(AValue: Boolean);
     procedure SetButtons(AValue: TACLEditButtons);
     procedure SetButtonsImages(const AValue: TCustomImageList);
@@ -218,17 +217,17 @@ type
     procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
     procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
     procedure CMHintShow(var Message: TCMHintShow); message CM_HINTSHOW;
-    procedure WMKillFocus(var Message: TWMKillFocus); message WM_KILLFOCUS;
     procedure WMSetFocus(var Message: TWMSetFocus); message WM_SETFOCUS;
   protected
-    FAutoHeight: Boolean;
     FBorders: Boolean;
     FEditor: TWinControl;
 
-    function CreateStyleButton: TACLStyleButton; virtual;
     procedure AssignTextDrawParams(ACanvas: TCanvas); virtual;
+    procedure BoundsChanged; override;
+    function CanAutoSize(var NewWidth, NewHeight: Integer): Boolean; override;
     procedure Changed; virtual;
     procedure CreateHandle; override;
+    function CreateStyleButton: TACLStyleButton; virtual;
   {$IFDEF FPC}
     procedure DoAutoSize; override;
   {$ENDIF}
@@ -239,7 +238,6 @@ type
     procedure FocusChanged; override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     procedure Paint; override;
-    procedure Resize; override;
     procedure SetDefaultSize; override;
     procedure SetFocusToInnerEdit; virtual;
     procedure SetTargetDPI(AValue: Integer); override;
@@ -248,7 +246,6 @@ type
     // InnerEdit
     function CanOpenEditor: Boolean; virtual;
     function CreateEditor: TWinControl; virtual;
-    function HasEditor: Boolean; deprecated;
     procedure EditorClose; virtual;
     procedure EditorOpen;
     procedure EditorUpdateBounds;
@@ -262,7 +259,6 @@ type
     procedure CalculateAutoHeight(var ANewHeight: Integer); virtual;
     procedure CalculateButtons(var R: TRect); virtual;
     procedure CalculateContent(const R: TRect); virtual;
-    procedure Recalculate;
 
     // Drawing
     procedure DrawContent(ACanvas: TCanvas); virtual;
@@ -289,7 +285,6 @@ type
     function GetCursor(const P: TPoint): TCursor; reintroduce; virtual;
 
     // Properties
-    property AutoHeight: Boolean read FAutoHeight write SetAutoHeight default True;
     property Borders: Boolean read FBorders write SetBorders default True;
     property Buttons: TACLEditButtons read FButtons write SetButtons;
     property ButtonsImages: TCustomImageList read FButtonsImages write SetButtonsImages;
@@ -307,6 +302,7 @@ type
     procedure Localize(const ASection: string); override;
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
   published
+    property AutoSize default True;
     property FocusOnClick;
   end;
 
@@ -799,8 +795,8 @@ begin
   FButtons := TACLEditButtons.Create(Self);
   FButtonsImagesLink := TChangeLink.Create;
   FButtonsImagesLink.OnChange := HandlerImageChange;
-  FAutoHeight := True;
   FBorders := True;
+  AutoSize := True;
   TabStop := True;
 end;
 
@@ -831,6 +827,13 @@ begin
   ACanvas.Font := Font;
   ACanvas.Font.Color := Style.ColorsText[Enabled];
   ACanvas.Brush.Color := Style.ColorsContent[Enabled];
+end;
+
+function TACLCustomEdit.CanAutoSize(var NewWidth, NewHeight: Integer): Boolean;
+begin
+  if AutoSize then
+    CalculateAutoHeight(NewHeight);
+  Result := True;
 end;
 
 function TACLCustomEdit.ButtonsGetEnabled: Boolean;
@@ -926,7 +929,7 @@ end;
 procedure TACLCustomEdit.CreateHandle;
 begin
   inherited CreateHandle;
-  Recalculate;
+  BoundsChanged;
 end;
 
 {$IFDEF FPC}
@@ -955,10 +958,9 @@ end;
 
 procedure TACLCustomEdit.DoFullRefresh;
 begin
-  inherited;
   if FEditor <> nil then
     EditorUpdateParams;
-  Recalculate;
+  BoundsChanged;
 end;
 
 procedure TACLCustomEdit.FocusChanged;
@@ -980,11 +982,6 @@ end;
 function TACLCustomEdit.CreateEditor: TWinControl;
 begin
   Result := nil;
-end;
-
-function TACLCustomEdit.HasEditor: Boolean;
-begin
-  Result := FEditor <> nil;
 end;
 
 procedure TACLCustomEdit.SetDefaultSize;
@@ -1115,27 +1112,21 @@ begin
   Buttons.Draw(Canvas);
 end;
 
-procedure TACLCustomEdit.Recalculate;
-begin
-  if not (csDestroying in ComponentState) then
-    Calculate(ClientRect);
-end;
-
-procedure TACLCustomEdit.Resize;
+procedure TACLCustomEdit.BoundsChanged;
 begin
   inherited;
-  Recalculate;
+  if not (csDestroying in ComponentState) then
+    Calculate(ClientRect);
+{$IFDEF FPC}
+  // RedrawOnResize? TACLTextureEditorDialog
+  if (Parent <> nil) and (wcfAligningControls in TWinControlAccess(Parent).FWinControlFlags) then
+    Invalidate;
+{$ENDIF}
 end;
 
 procedure TACLCustomEdit.UpdateBordersColor;
 begin
   if HandleAllocated then Invalidate;
-end;
-
-procedure TACLCustomEdit.WMKillFocus(var Message: TWMKillFocus);
-begin
-  inherited;
-  Invalidate;
 end;
 
 procedure TACLCustomEdit.WMSetFocus(var Message: TWMSetFocus);
@@ -1151,12 +1142,9 @@ end;
 
 procedure TACLCustomEdit.CMEnabledChanged(var Message: TMessage);
 begin
+  EditorUpdateParams;
+  BoundsChanged;
   inherited;
-  if FEditor <> nil then
-    EditorUpdateParams;
-  if Buttons.Count > 0 then
-    Recalculate;
-  Invalidate;
 end;
 
 procedure TACLCustomEdit.CMFontChanged(var Message: TMessage);
@@ -1228,15 +1216,6 @@ begin
   FullRefresh;
 end;
 
-procedure TACLCustomEdit.SetAutoHeight(AValue: Boolean);
-begin
-  if AValue <> FAutoHeight then
-  begin
-    FAutoHeight := AValue;
-    AdjustSize;
-  end;
-end;
-
 procedure TACLCustomEdit.SetBorders(AValue: Boolean);
 begin
   if AValue <> FBorders then
@@ -1260,7 +1239,7 @@ end;
 
 procedure TACLCustomEdit.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
 begin
-  if AutoHeight and not (csLoading in ComponentState) then
+  if AutoSize and not (csLoading in ComponentState) then
     CalculateAutoHeight(AHeight);
   inherited SetBounds(ALeft, ATop, AWidth, AHeight);
 end;
@@ -1524,7 +1503,7 @@ begin
   FInplace := True;
   Create(nil);
   Borders := False;
-  AutoHeight := False;
+  AutoSize := False;
   OnKeyDown := AParams.OnKeyDown;
   OnExit := AParams.OnApply;
   Parent := AParams.Parent;

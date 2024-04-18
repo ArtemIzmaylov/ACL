@@ -75,6 +75,8 @@ const
   WM_NCCALCSIZE  = LM_NCCALCSIZE;
   WM_MOUSEFIRST  = LM_MOUSEFIRST;
   WM_MOUSELAST   = LM_MOUSELAST;
+
+  csAligning     = csCreating; // просто потому, что оно в LCL не используется
 {$ENDIF}
 
 const
@@ -499,7 +501,7 @@ type
     procedure AdjustClientRect(var ARect: TRect); override;
     procedure BoundsChanged; {$IFDEF FPC}override;{$ELSE}virtual;{$ENDIF}
   {$IFDEF FPC}
-    procedure CalculatePreferredSize(var W, H: Integer; X: Boolean); override;
+    procedure CalculatePreferredSize(var W, H: Integer; X: Boolean); override; final;
   {$ENDIF}
     procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
     function CreatePadding: TACLPadding; virtual;
@@ -515,9 +517,7 @@ type
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     procedure Paint; override;
     procedure PaintWindow(DC: HDC); override;
-  {$IFNDEF FPC}
-    procedure Resize; override;
-  {$ENDIF}
+    procedure Resize; override; final;
     procedure SetDefaultSize; virtual;
     procedure SetFocusOnClick; virtual;
     procedure SetTargetDPI(AValue: Integer); virtual;
@@ -610,9 +610,6 @@ type
   TACLSubControlOptions = class(TPersistent)
   strict private
     FAlign: TACLBoolean;
-  {$IFDEF FPC}
-    FAligning: Boolean;
-  {$ENDIF}
     FControl: TControl;
     FOwner: TControl;
     FPosition: TACLBorder;
@@ -2129,8 +2126,7 @@ begin
   end;
 end;
 
-procedure TACLCustomControl.MouseDown(Button: TMouseButton; Shift: TShiftState;
-  X: Integer; Y: Integer);
+procedure TACLCustomControl.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   if FocusOnClick then
     SetFocusOnClick;
@@ -2150,14 +2146,14 @@ begin
   inherited PaintWindow(DC);
 end;
 
-{$IFNDEF FPC}
 procedure TACLCustomControl.Resize;
 begin
   inherited Resize;
+{$IFNDEF FPC}
   if not (csDestroying in ComponentState) then
     BoundsChanged;
-end;
 {$ENDIF}
+end;
 
 procedure TACLCustomControl.SetDefaultSize;
 begin
@@ -2393,6 +2389,7 @@ end;
 
 procedure TACLCustomControl.AdjustSize;
 begin
+  if csAligning in ControlState then Exit;
 {$IFDEF FPC}
   SetBoundsKeepBase(Left, Top, Width, Height);
 {$ELSE}
@@ -2411,7 +2408,10 @@ end;
 {$IFDEF FPC}
 procedure TACLCustomControl.CalculatePreferredSize(var W, H: Integer; X: Boolean);
 begin
-  inherited;
+  // inherited должен быть вызван для паналей (иначе будет зависать на сложных макетах),
+  // но при этом не должен вызываться для инплейс-редакторов
+  if csAcceptsControls in ControlStyle then
+    inherited;
   CanAutoSize(W, H);
 end;
 {$ENDIF}
@@ -2683,6 +2683,10 @@ begin
     procedure (const AControl: TControl; const R: TRect)
     begin
       AControl.SetBounds(R.Left, R.Top, R.Width, R.Height);
+    end);
+  FBounds.Enum(
+    procedure (const AControl: TControl; const R: TRect)
+    begin
       AControl.Invalidate;
     end);
 {$ELSE}
@@ -2786,12 +2790,11 @@ begin
     AWindowPos := TWMWindowPosChanged(Message).WindowPos;
     if (AWindowPos = nil) or (AWindowPos^.flags and SWP_POS_CHANGE <> SWP_POS_CHANGE) then
     begin
+      if csAligning in Control.ControlState then Exit;
     {$IFDEF FPC}
-      if not (FAligning or Control.Parent.AutoSizeDelayed) then
-    {$ELSE}
-      if not (csAligning in Control.ControlState) then
+      if Control.Parent.AutoSizeDelayed then Exit;
     {$ENDIF}
-        TACLMainThread.RunPostponed(Changed, Self);
+      TACLMainThread.RunPostponed(Changed, Self);
     end;
   end;
   FPrevWndProc(Message);
@@ -2843,21 +2846,12 @@ begin
         end;
     end;
 
-  {$IFDEF FPC}
-    FAligning := True;
-    try
-      Control.BoundsRect := LBounds;
-    finally
-      FAligning := False;
-    end;
-  {$ELSE}
     Control.ControlState := Control.ControlState + [csAligning];
     try
       Control.BoundsRect := LBounds;
     finally
       Control.ControlState := Control.ControlState - [csAligning];
     end;
-  {$ENDIF}
   end;
 end;
 

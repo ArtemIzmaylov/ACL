@@ -343,7 +343,7 @@ begin
         begin
           DropDownWindow.OnClosePopup := HandlerDropDownClose;
           ShowDropDownWindow;
-          Recalculate;
+          BoundsChanged;
         end;
       end;
     end
@@ -362,7 +362,7 @@ begin
   if DropDownWindow <> nil then
   begin
     FreeAndNil(FDropDownWindow);
-    Recalculate;
+    BoundsChanged;
   end;
 end;
 
@@ -385,9 +385,8 @@ end;
 
 procedure TACLCustomDropDownEdit.CMEnabledChanged(var Message: TMessage);
 begin
-  inherited;
   FreeDropDownWindow;
-  Recalculate;
+  inherited;
 end;
 
 procedure TACLCustomDropDownEdit.HandlerButtonClick(Sender: TObject);
@@ -409,7 +408,7 @@ begin
   inherited Create(AOwner);
   FGlyph := TACLGlyph.Create(Self);
   Cursor := crHandPoint;
-  AutoHeight := False;
+  AutoSize := False;
 end;
 
 destructor TACLCustomDropDown.Destroy;

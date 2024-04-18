@@ -252,7 +252,7 @@ type
     property Value;
   published
     property AutoComplete: Boolean read FAutoComplete write FAutoComplete default True;
-    property AutoHeight;
+    property AutoSize;
     property Borders;
     property Buttons;
     property ButtonsImages;
@@ -441,6 +441,9 @@ procedure TACLCustomComboBoxDropDown.AdjustSize;
 begin
   if Control <> nil then
     Height := CalculateHeight;
+{$IFDEF FPC}
+  inherited;
+{$ENDIF}
 end;
 
 procedure TACLCustomComboBoxDropDown.DoClick(AHitTest: TACLTreeListHitTest);

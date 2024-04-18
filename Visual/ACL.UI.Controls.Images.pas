@@ -237,13 +237,13 @@ type
     procedure SetImageCrop(const Value: TRectF); overload;
     procedure SetImageSize(const Value: TSize);
   protected
+    procedure BoundsChanged; override;
     procedure Calculate;
     procedure Changed;
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
     procedure Paint; override;
-    procedure Resize; override;
     procedure SetTargetDPI(AValue: Integer); override;
     procedure UpdateHitTest(X, Y: Integer);
     procedure UpdateTransparency; override;
@@ -1031,9 +1031,9 @@ begin
   end;
 end;
 
-procedure TACLSubImageSelector.Resize;
+procedure TACLSubImageSelector.BoundsChanged;
 begin
-  inherited Resize;
+  inherited;
   Calculate;
 end;
 

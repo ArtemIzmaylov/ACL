@@ -89,7 +89,7 @@ type
     destructor Destroy; override;
     procedure CancelSearch;
   published
-    property AutoHeight;
+    property AutoSize;
     property Borders;
     property ChangeDelay: Integer read GetChangeDelay write SetChangeDelay default acSearchDelay;
     property FocusControl: TWinControl read FFocusControl write SetFocusControl;

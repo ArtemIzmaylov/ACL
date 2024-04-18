@@ -148,7 +148,7 @@ type
   public
     property Value;
   published
-    property AutoHeight;
+    property AutoSize;
     property Borders;
     property Buttons;
     property ButtonsImages;

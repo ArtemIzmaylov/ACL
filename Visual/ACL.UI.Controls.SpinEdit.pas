@@ -87,7 +87,7 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
   published
-    property AutoHeight;
+    property AutoSize;
     property Anchors;
     property Enabled;
     property ResourceCollection;
