@@ -11,7 +11,7 @@
 
 unit ACL.UI.Forms;
 
-{$I ACL.Config.inc} // FPC:Partial
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
@@ -159,20 +159,21 @@ type
   strict private
     FInCreation: TACLBoolean;
     FInMenuLoop: Integer;
+    FPadding: TACLPadding;
     FShowInTaskBar: TShowInTaskbar;
     FStayOnTop: Boolean;
     FWndProcHooks: array[TACLWindowHookMode] of TACLWindowHooks;
 
+    procedure SetPadding(AValue: TACLPadding);
     procedure SetShowInTaskBar(AValue: TShowInTaskbar);
     procedure SetStayOnTop(AValue: Boolean);
+    procedure PaddingChangeHandler(Sender: TObject);
     procedure UpdateNonClientColors;
   protected
     FOwnerHandle: HWND;
     FRecreateWndLockCount: Integer;
-  {$IFDEF FPC}
-    Padding: TRect; {$MESSAGE WARN 'Padding-Implement!'}
-  {$ENDIF}
 
+    procedure AdjustClientRect(var Rect: TRect); override;
     procedure AfterFormCreate; virtual;
     procedure BeforeFormCreate; virtual;
     function CanCloseByEscape: Boolean; virtual;
@@ -223,6 +224,7 @@ type
   published
     property Color stored False; // Color synchronizes with resources (ref. to ResourceChanged)
     property DoubleBuffered default True;
+    property Padding: TACLPadding read FPadding write SetPadding;
     property ShowInTaskBar: TShowInTaskbar read FShowInTaskBar write SetShowInTaskBar default stDefault;
     property StayOnTop: Boolean read FStayOnTop write SetStayOnTop default False;
   end;
@@ -875,6 +877,7 @@ begin
   inherited Destroy;
   FreeAndNil(FWndProcHooks[whmPostprocess]);
   FreeAndNil(FWndProcHooks[whmPreprocess]);
+  FreeAndNil(FPadding);
   MinimizeMemoryUsage;
 end;
 
@@ -898,6 +901,8 @@ end;
 procedure TACLForm.BeforeFormCreate;
 begin
   FInCreation := acTrue;
+  FPadding := TACLPadding.Create(0);
+  FPadding.OnChanged := PaddingChangeHandler;
 end;
 
 function TACLForm.CanCloseByEscape: Boolean;
@@ -1056,6 +1061,12 @@ begin
 {$ELSE}
 begin
 {$ENDIF}
+end;
+
+procedure TACLForm.AdjustClientRect(var Rect: TRect);
+begin
+  inherited AdjustClientRect(Rect);
+  Rect.Content(Padding.GetScaledMargins(FCurrentPPI));
 end;
 
 function TACLForm.ShouldBeStayOnTop: Boolean;
@@ -1229,6 +1240,11 @@ begin
     TACLStayOnTopHelper.Refresh;
     StayOnTopChanged;
   end;
+end;
+
+procedure TACLForm.PaddingChangeHandler(Sender: TObject);
+begin
+  Realign;
 end;
 
 { TACLPopupWindow }
