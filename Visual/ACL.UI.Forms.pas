@@ -73,6 +73,7 @@ type
 {$IFDEF FPC}
   TScalingFlags = set of (sfLeft, sfTop, sfWidth, sfHeight, sfFont, sfDesignSize);
   TWindowHook = function (var Message: TMessage): Boolean of object;
+  TWMNCActivate = TLMNCActivate;
 {$ENDIF}
 
   { TACLBasicForm }
@@ -167,7 +168,7 @@ type
     procedure SetStayOnTop(AValue: Boolean);
     procedure UpdateNonClientColors;
   protected
-    FOwnerHandle: THandle;
+    FOwnerHandle: HWND;
     FRecreateWndLockCount: Integer;
   {$IFDEF FPC}
     Padding: TRect; {$MESSAGE WARN 'Padding-Implement!'}
@@ -205,15 +206,11 @@ type
     procedure CMShowingChanged(var Message: TCMDialogKey); message CM_SHOWINGCHANGED;
     procedure WMEnterMenuLoop(var Msg: TMessage); message WM_ENTERMENULOOP;
     procedure WMExitMenuLoop(var Msg: TMessage); message WM_EXITMENULOOP;
-  {$IFNDEF FPC}
     procedure WMNCActivate(var Msg: TWMNCActivate); message WM_NCACTIVATE;
-    procedure WMShowWindow(var Message: TMessage); message WM_SHOWWINDOW;
-    procedure WMWindowPosChanged(var Message: TMessage); message WM_WINDOWPOSCHANGED;
-  {$ENDIF}
     procedure WndProc(var Message: TMessage); override;
   public
     constructor Create(AOwner: TComponent); override;
-    constructor CreateDialog(AOwnerHandle: THandle; ANew: Boolean = False); virtual;
+    constructor CreateDialog(AOwnerHandle: HWND; ANew: Boolean = False); virtual;
     constructor CreateNew(AOwner: TComponent; Dummy: Integer = 0); override;
     destructor Destroy; override;
     procedure AfterConstruction; override;
@@ -335,9 +332,8 @@ function acGetWindowText(AHandle: HWND): string;
 procedure acSetWindowText(AHandle: HWND; const AText: string);
 procedure acSwitchToWindow(AHandle: HWND);
 
-procedure FormDisableCloseButton(AHandle: HWND);
-function FormSetCorners(AHandle: THandle; ACorners: TACLFormCorners): Boolean;
-procedure TerminateOpenForms;
+procedure acFormsCloseAll;
+function acFormSetCorners(AHandle: HWND; ACorners: TACLFormCorners): Boolean;
 implementation
 
 {$IFNDEF FPC}
@@ -437,17 +433,26 @@ begin
     (AChild.Perform(WM_GETDLGCODE, 0, 0) and DLGC_WANTALLKEYS <> 0));
 end;
 
-procedure FormDisableCloseButton(AHandle: HWND);
+procedure acFormsCloseAll;
+var
+  AIndex: Integer;
+  APrevCount: Integer;
 begin
-{$IFDEF MSWINDOWS}
-  EnableMenuItem(GetSystemMenu(AHandle, False), SC_CLOSE, MF_BYCOMMAND or MF_DISABLED);
-{$ELSE}
-  {$MESSAGE WARN 'NotImplemented-FormDisableCloseButton'}
-  raise ENotImplemented.Create('FormDisableCloseButton');
-{$ENDIF}
+  AIndex := 0;
+  while AIndex < Screen.FormCount do
+  begin
+    APrevCount := Screen.FormCount;
+    if Application.MainForm <> Screen.Forms[AIndex] then
+    begin
+      Screen.Forms[AIndex].Close;
+      Application.ProcessMessages; // to process PostMessages;
+    end;
+    if APrevCount = Screen.FormCount then
+      Inc(AIndex);
+  end;
 end;
 
-function FormSetCorners(AHandle: THandle; ACorners: TACLFormCorners): Boolean;
+function acFormSetCorners(AHandle: HWND; ACorners: TACLFormCorners): Boolean;
 {$IFDEF MSWINDOWS}
 const
   // Windows 11
@@ -470,46 +475,6 @@ begin
 {$ELSE}
   Result := False;
 {$ENDIF}
-end;
-
-function ShiftStateToKeys(AShift: TShiftState): WORD;
-begin
-  Result := 0;
-  if ssShift in AShift then
-    Inc(Result, MK_SHIFT);
-  if ssCtrl in AShift then
-    Inc(Result, MK_CONTROL);
-  if ssLeft in AShift then
-    Inc(Result, MK_LBUTTON);
-  if ssRight in AShift then
-    Inc(Result, MK_RBUTTON);
-  if ssMiddle in AShift then
-    Inc(Result, MK_MBUTTON);
-end;
-
-procedure TerminateOpenForms;
-
-  procedure TerminateForm(AForm: TForm);
-  begin
-    if AForm <> Application.MainForm then
-    begin
-      AForm.Close;
-      Application.ProcessMessages; // to process PostMessages;
-    end;
-  end;
-
-var
-  AIndex: Integer;
-  APrevCount: Integer;
-begin
-  AIndex := 0;
-  while AIndex < Screen.FormCount do
-  begin
-    APrevCount := Screen.FormCount;
-    TerminateForm(Screen.Forms[AIndex]);
-    if APrevCount = Screen.FormCount then
-      Inc(AIndex);
-  end;
 end;
 
 { TACLBasicForm }
@@ -869,7 +834,7 @@ begin
   AfterFormCreate;
 end;
 
-constructor TACLForm.CreateDialog(AOwnerHandle: THandle; ANew: Boolean = False);
+constructor TACLForm.CreateDialog(AOwnerHandle: HWND; ANew: Boolean = False);
 var
   AOwner: TComponent;
 begin
@@ -979,85 +944,81 @@ begin
 end;
 
 procedure TACLForm.LoadPosition(AConfig: TACLIniFile);
-{$IFDEF FPC}
-begin
-  {$MESSAGE WARN 'NotImplemented-LoadPosition'}
-  raise ENotImplemented.Create('LoadPosition');
-end;
-{$ELSE}
 
   function IsFormResizable: Boolean;
   begin
     Result := BorderStyle in [bsSizeable, bsSizeToolWin];
   end;
 
-var
-  APlacement: TWindowPlacement;
+  procedure RestoreBounds(ABounds: TRect);
+  begin
+    if IsFormResizable then
+      ABounds.Size := dpiApply(ABounds.Size, FCurrentPPI)
+    else
+      ABounds.Size := TSize.Create(Width, Height);
+
+  {$IFDEF FPC}
+    BoundsRect := ABounds;
+  {$ELSE}
+    var LPlacement: TWindowPlacement;
+    ZeroMemory(@LPlacement, SizeOf(LPlacement));
+    LPlacement.Length := SizeOf(TWindowPlacement);
+    LPlacement.rcNormalPosition := ABounds;
+    SetWindowPlacement(Handle, LPlacement);
+  {$ENDIF}
+  end;
+
 begin
   Inc(FRecreateWndLockCount);
   try
     if AConfig.ExistsKey(GetConfigSection, 'WindowRect') then
     begin
-      ZeroMemory(@APlacement, SizeOf(APlacement));
-      APlacement.Length := SizeOf(TWindowPlacement);
-      APlacement.rcNormalPosition := AConfig.ReadRect(GetConfigSection, 'WindowRect');
-
-      if IsFormResizable then
-      begin
-        APlacement.rcNormalPosition.Height := dpiApply(APlacement.rcNormalPosition.Height, FCurrentPPI);
-        APlacement.rcNormalPosition.Width := dpiApply(APlacement.rcNormalPosition.Width, FCurrentPPI);
-      end
-      else
-      begin
-        APlacement.rcNormalPosition.Height := Height;
-        APlacement.rcNormalPosition.Width := Width;
-      end;
-
-      SetWindowPlacement(Handle, APlacement);
-
+      RestoreBounds(AConfig.ReadRect(GetConfigSection, 'WindowRect'));
       Position := poDesigned;
       DefaultMonitor := dmDesktop;
       if not MonitorGetBounds(BoundsRect.TopLeft).Contains(BoundsRect) then
         MakeFullyVisible;
     end;
-
     if IsFormResizable and AConfig.ReadBool(GetConfigSection, 'WindowMaximized') then
       WindowState := wsMaximized;
   finally
     Dec(FRecreateWndLockCount);
   end;
 end;
-{$ENDIF}
 
 procedure TACLForm.SavePosition(AConfig: TACLIniFile);
-{$IFDEF FPC}
-begin
-  {$MESSAGE WARN 'NotImplemented-SavePosition'}
-  raise ENotImplemented.Create('SavePosition');
-end;
-{$ELSE}
 var
-  AIsMaximized: Boolean;
-  APlacement: TWindowPlacement;
+  LBounds: TRect;
+  LIsMaximized: Boolean;
+{$IFNDEF FPC}
+  LPlacement: TWindowPlacement;
+{$ENDIF}
 begin
-  APlacement.Length := SizeOf(TWindowPlacement);
-  if HandleAllocated and GetWindowPlacement(Handle, APlacement) then
+  if HandleAllocated then
   begin
-    APlacement.rcNormalPosition.Height := dpiRevert(APlacement.rcNormalPosition.Height, FCurrentPPI);
-    APlacement.rcNormalPosition.Width := dpiRevert(APlacement.rcNormalPosition.Width, FCurrentPPI);
+  {$IFDEF FPC}
+    LBounds := BoundsRect;
+    LIsMaximized := WindowState = wsMaximized;
+  {$ELSE}
+    LPlacement.Length := SizeOf(TWindowPlacement);
+    if not GetWindowPlacement(Handle, LPlacement) then
+      Exit;
+    LBounds := LPlacement.rcNormalPosition;
     case WindowState of
       wsMaximized:
-        AIsMaximized := True;
+        LIsMaximized := True;
       wsMinimized:
-        AIsMaximized := APlacement.flags and WPF_RESTORETOMAXIMIZED = WPF_RESTORETOMAXIMIZED;
+        LIsMaximized := LPlacement.flags and WPF_RESTORETOMAXIMIZED = WPF_RESTORETOMAXIMIZED;
     else
-      AIsMaximized := False;
+      LIsMaximized := False;
     end;
-    AConfig.WriteBool(GetConfigSection, 'WindowMaximized', AIsMaximized);
-    AConfig.WriteRect(GetConfigSection, 'WindowRect', APlacement.rcNormalPosition);
+  {$ENDIF}
+    LBounds.Height := dpiRevert(LBounds.Height, FCurrentPPI);
+    LBounds.Width := dpiRevert(LBounds.Width, FCurrentPPI);
+    AConfig.WriteBool(GetConfigSection, 'WindowMaximized', LIsMaximized);
+    AConfig.WriteRect(GetConfigSection, 'WindowRect', LBounds);
   end;
 end;
-{$ENDIF}
 
 procedure TACLForm.ShowAndActivate;
 begin
@@ -1203,7 +1164,6 @@ begin
   Dec(FInMenuLoop);
 end;
 
-{$IFNDEF FPC}
 procedure TACLForm.WMNCActivate(var Msg: TWMNCActivate);
 begin
   // Чтобы не было промаргивания при фокусировке контрола внутри попапа.
@@ -1212,25 +1172,17 @@ begin
   inherited;
 end;
 
-procedure TACLForm.WMShowWindow(var Message: TMessage);
-begin
-  inherited;
-  TACLStayOnTopHelper.Refresh;
-end;
-
-procedure TACLForm.WMWindowPosChanged(var Message: TMessage);
-begin
-  inherited;
-  if Visible then
-    TACLStayOnTopHelper.Refresh(Self);
-end;
-{$ENDIF}
-
 procedure TACLForm.WndProc(var Message: TMessage);
 begin
   if not FWndProcHooks[whmPreprocess].Process(Message) then
   begin
     inherited WndProc(Message);
+  {$IFDEF MSWINDOWS}
+    if (Message.Msg = WM_SHOWWINDOW) or
+       (Message.Msg = WM_WINDOWPOSCHANGED) and Visible
+    then
+      TACLStayOnTopHelper.Refresh;
+  {$ENDIF}
     if Message.Msg <> CM_RELEASE then
       FWndProcHooks[whmPostprocess].Process(Message);
   end;
@@ -1887,6 +1839,21 @@ type
     wHitTestCode: UINT;
     dwExtraInfo: NativeUInt;
     mouseData: DWORD;
+  end;
+
+  function ShiftStateToKeys(AShift: TShiftState): WORD;
+  begin
+    Result := 0;
+    if ssShift in AShift then
+      Inc(Result, MK_SHIFT);
+    if ssCtrl in AShift then
+      Inc(Result, MK_CONTROL);
+    if ssLeft in AShift then
+      Inc(Result, MK_LBUTTON);
+    if ssRight in AShift then
+      Inc(Result, MK_RBUTTON);
+    if ssMiddle in AShift then
+      Inc(Result, MK_MBUTTON);
   end;
 
 var

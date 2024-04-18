@@ -2208,7 +2208,7 @@ end;
 procedure TACLMenuPopupWindow.CreateWnd;
 begin
   inherited;
-  FormSetCorners(Handle, afcRectangular);
+  acFormSetCorners(Handle, afcRectangular);
 end;
 
 function TACLMenuPopupWindow.GetCurrentDpi: Integer;

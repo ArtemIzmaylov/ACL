@@ -1298,7 +1298,7 @@ begin
   Caption := 'Select Language';
   Position := poScreenCenter;
   BorderStyle := bsDialog;
-  BorderIcons := [biSystemMenu];
+  BorderIcons := [];
   FormStyle := fsStayOnTop;
   DoubleBuffered := True;
 
@@ -1326,8 +1326,6 @@ begin
   FEditor.AlignWithMargins := True;
   FEditor.Images := FImages;
   FEditor.Margins.Margins := Rect(8, 8, 8, 8);
-
-  FormDisableCloseButton(Handle);
 end;
 
 procedure TACLCustomLanguageDialog.AfterConstruction;
