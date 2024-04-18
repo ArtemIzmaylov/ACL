@@ -74,6 +74,8 @@ type
   TScalingFlags = set of (sfLeft, sfTop, sfWidth, sfHeight, sfFont, sfDesignSize);
   TWindowHook = function (var Message: TMessage): Boolean of object;
   TWMNCActivate = TLMNCActivate;
+{$ELSE}
+  TShowInTaskbar = (stDefault, stAlways, stNever);
 {$ENDIF}
 
   { TACLBasicForm }
@@ -157,14 +159,11 @@ type
   strict private
     FInCreation: TACLBoolean;
     FInMenuLoop: Integer;
-  {$IFNDEF FPC}
-    FShowOnTaskBar: Boolean;
-  {$ENDIF}
+    FShowInTaskBar: TShowInTaskbar;
     FStayOnTop: Boolean;
     FWndProcHooks: array[TACLWindowHookMode] of TACLWindowHooks;
 
-    function GetShowOnTaskBar: Boolean;
-    procedure SetShowOnTaskBar(AValue: Boolean);
+    procedure SetShowInTaskBar(AValue: TShowInTaskbar);
     procedure SetStayOnTop(AValue: Boolean);
     procedure UpdateNonClientColors;
   protected
@@ -224,7 +223,7 @@ type
   published
     property Color stored False; // Color synchronizes with resources (ref. to ResourceChanged)
     property DoubleBuffered default True;
-    property ShowOnTaskBar: Boolean read GetShowOnTaskBar write SetShowOnTaskBar default False;
+    property ShowInTaskBar: TShowInTaskbar read FShowInTaskBar write SetShowInTaskBar default stDefault;
     property StayOnTop: Boolean read FStayOnTop write SetStayOnTop default False;
   end;
 
@@ -911,7 +910,7 @@ begin
   inherited CreateParams(Params);
   if (Parent = nil) and (ParentWindow = 0) then
   begin
-    if ShowOnTaskBar then
+    if ShowInTaskBar = stAlways then
       Params.ExStyle := Params.ExStyle or WS_EX_APPWINDOW;
     if (Application.MainForm <> nil) and Application.MainForm.HandleAllocated then
       Params.WndParent := Application.MainFormHandle;
@@ -1193,33 +1192,26 @@ begin
   Result := Name;
 end;
 
-function TACLForm.GetShowOnTaskBar: Boolean;
+procedure TACLForm.SetPadding(AValue: TACLPadding);
 begin
-{$IFDEF FPC}
-  Result := ShowInTaskBar = stAlways;
-{$ELSE}
-  Result := FShowOnTaskBar;
-{$ENDIF}
+  FPadding.Assign(AValue);
 end;
 
-procedure TACLForm.SetShowOnTaskBar(AValue: Boolean);
+procedure TACLForm.SetShowInTaskBar(AValue: TShowInTaskbar);
 {$IFDEF FPC}
 begin
-  if AValue then
-    ShowInTaskBar := stAlways
-  else
-    ShowInTaskBar := stDefault;
+  inherited ShowInTaskBar := AValue
 {$ELSE}
 var
   LExStyle: Cardinal;
 begin
-  if FShowOnTaskBar <> AValue then
+  if FShowInTaskBar <> AValue then
   begin
-    FShowOnTaskBar := AValue;
+    FShowInTaskBar := AValue;
     if HandleAllocated and not (csDesigning in ComponentState) then
     begin
       LExStyle := GetWindowLong(Handle, GWL_EXSTYLE);
-      if ShowOnTaskBar then
+      if ShowInTaskBar = stAlways then
         LExStyle := LExStyle or WS_EX_APPWINDOW
       else
         LExStyle := LExStyle and not WS_EX_APPWINDOW;

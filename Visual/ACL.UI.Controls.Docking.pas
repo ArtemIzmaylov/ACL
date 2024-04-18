@@ -3210,9 +3210,7 @@ begin
   FDockGroup := TACLDockGroup.Create(AOwner.Owner);
   FDockGroup.Align := alClient;
   FDockGroup.Parent := Self;
-{$IFDEF FPC}
   ShowInTaskBar := stNever;
-{$ENDIF}
 end;
 
 destructor TACLFloatDockForm.Destroy;

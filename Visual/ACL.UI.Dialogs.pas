@@ -1197,7 +1197,7 @@ end;
 procedure TACLProgressDialog.DoShow;
 begin
   Caption := TextCaption;
-  if ShowOnTaskBar then
+  if ShowInTaskBar = stAlways then
     FAeroPeak := TACLAeroPeek.Create(Handle);
   FCancelButton.Enabled := Assigned(OnCancel);
   inherited DoShow;
