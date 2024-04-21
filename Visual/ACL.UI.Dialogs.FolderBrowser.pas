@@ -11,33 +11,34 @@
 
 unit ACL.UI.Dialogs.FolderBrowser;
 
-{$I ACL.Config.Inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
   Winapi.ActiveX,
-  Winapi.Messages,
   Winapi.ShellApi,
   Winapi.ShlObj,
   Winapi.Windows,
+{$ENDIF}
+  {Winapi.}Messages,
   // System
   System.AnsiStrings,
-  System.Classes,
-  System.Math,
-  System.SysUtils,
-  System.Types,
-  System.Win.ComObj,
+  {System.}Classes,
+  {System.}SysUtils,
+  {System.}Types,
   // Vcl
-  Vcl.Controls,
-  Vcl.Dialogs,
-  Vcl.Forms,
-  Vcl.Graphics,
-  Vcl.ImgList,
-  Vcl.StdCtrls,
-  Vcl.Themes,
+  {Vcl.}Controls,
+  {Vcl.}Dialogs,
+  {Vcl.}Forms,
+  {Vcl.}Graphics,
+  {Vcl.}ImgList,
+  {Vcl.}Themes,
   // ACL
-  ACL.Classes,
   ACL.Classes.StringList,
   ACL.FileFormats.INI,
   ACL.Geometry,
@@ -50,12 +51,10 @@ uses
   ACL.UI.Controls.ShellTreeView,
   ACL.UI.Controls.TextEdit,
   ACL.UI.Controls.TreeList,
-  ACL.UI.Controls.TreeList.SubClass,
   ACL.UI.Controls.TreeList.Types,
   ACL.UI.Dialogs,
   ACL.UI.Forms,
   ACL.Utils.Common,
-  ACL.Utils.Desktop,
   ACL.Utils.DPIAware,
   ACL.Utils.FileSystem,
   ACL.Utils.Shell,
@@ -144,7 +143,7 @@ type
     ButtonWidth  = 90;
   protected
     procedure AdjustClientRect(var Rect: TRect); override;
-    procedure CreateControl(var AControl; AClass: TControlClass;
+    procedure CreateControl(out AControl; AClass: TACLCustomControlClass;
       AAlign: TAlign; AParent: TWinControl = nil);
     procedure CreateCustomControls; virtual;
     procedure CreateParams(var Params: TCreateParams); override;
@@ -173,6 +172,11 @@ type
   end;
 
 implementation
+
+{$IFNDEF FPC}
+uses
+  ACL.UI.Controls.TreeList.SubClass; // inlining
+{$ENDIF}
 
 type
   TACLFormAccess = class(TACLForm);
@@ -260,6 +264,7 @@ var
 begin
   APaths := TACLShellTreePaths.Create;
   try
+    ARecurse := False;
     Result := Execute(APath, AMruKey, APaths, ARecurse, [ssoCustomPath], AOwnerWndHandle, ACaption);
     if Result and (APaths.Count > 0) then
       APath := APaths[0];
@@ -357,16 +362,16 @@ begin
   Rect.Inflate(-dpiApply(ContentOffset, FCurrentPPI));
 end;
 
-procedure TACLFolderBrowserDialog.CreateControl(
-  var AControl; AClass: TControlClass; AAlign: TAlign; AParent: TWinControl);
+procedure TACLFolderBrowserDialog.CreateControl(out AControl;
+  AClass: TACLCustomControlClass; AAlign: TAlign; AParent: TWinControl);
 begin
   if AParent = nil then
     AParent := Self;
 
-  TControl(AControl) := AClass.Create(Self);
-  TControl(AControl).Parent := AParent;
-  TControl(AControl).AlignWithMargins := True;
-  TControl(AControl).Align := AAlign;
+  TACLCustomControl(AControl) := AClass.Create(Self);
+  TACLCustomControl(AControl).Parent := AParent;
+  TACLCustomControl(AControl).AlignWithMargins := True;
+  TACLCustomControl(AControl).Align := AAlign;
 end;
 
 procedure TACLFolderBrowserDialog.CreateCustomControls;
