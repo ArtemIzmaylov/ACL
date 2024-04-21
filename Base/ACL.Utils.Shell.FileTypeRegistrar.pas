@@ -604,7 +604,7 @@ begin
   if GetRegistered then
   begin
     RegisterApplication(Value);
-    UpdateShellCache;
+    ShellFlushCache;
   end;
 end;
 
@@ -617,7 +617,7 @@ begin
     else
       UnregisterApplication;
 
-    UpdateShellCache;
+    ShellFlushCache;
   end;
 end;
 

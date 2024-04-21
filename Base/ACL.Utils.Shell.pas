@@ -11,36 +11,66 @@
 
 unit ACL.Utils.Shell;
 
-{$I ACL.Config.inc} // FPC:NotImplemented
+{$I ACL.Config.inc} // FPC:Partial
+
+(*
+  TODO: g_file_monitor_file
+  FPC:
+    + ShellShutdown
+    + ShellDelete
+    + ShellUndelete
+    + ShellExecute
+    + ShellJumpToFile
+    + ShellGetFreeSpace
+*)
 
 interface
 
-{$IFDEF MSWINDOWS}
 uses
+{$IFDEF MSWINDOWS}
   Winapi.ActiveX,
   Winapi.ShellApi,
   Winapi.ShlObj,
   Winapi.Windows,
+  Win.ComObj,
+{$ELSE}
+  LCLIntf,
+  LCLType,
+{$ENDIF}
   // System
-  System.Classes,
-  System.Contnrs,
-  System.Generics.Collections,
+  {System.}Classes,
+  {System.}SysUtils,
   // ACL
-  ACL.Classes,
   ACL.Classes.StringList,
-  ACL.Geometry,
   ACL.Utils.Common,
   ACL.Utils.FileSystem;
-{$ENDIF}
 
 const
   acMailToPrefix = 'mailto:';
 
-{$IFDEF MSWINDOWS}
+{$IFDEF FPC}
+  CSIDL_DESKTOP  = 0; // G_USER_DIRECTORY_DESKTOP
+  CSIDL_MYMUSIC  = 3; // G_USER_DIRECTORY_MUSIC
+  CSIDL_PERSONAL = 1; // G_USER_DIRECTORY_DOCUMENTS
+  //G_USER_DIRECTORY_DOWNLOAD = 2,
+  //G_USER_DIRECTORY_PICTURES = 4,
+  //G_USER_DIRECTORY_PUBLIC_SHARE = 5,
+  //G_USER_DIRECTORY_TEMPLATES = 6,
+  //G_USER_DIRECTORY_VIDEOS = 7;
+{$ENDIF}
+
 type
+{$IFDEF FPC}
+  IShellFolder = Pointer;
+  PItemIDList = ^TItemIDList;
+  TItemIDList = record
+    Path: string;
+    Flags: Integer;
+  end;
+{$ENDIF}
+
   TShellOperationFlag = (sofCanUndo, sofNoDialog, sofNoConfirmation);
   TShellOperationFlags = set of TShellOperationFlag;
-
   TShellShutdownMode = (sdPowerOff, sdLogOff, sdHibernate, sdSleep, sdReboot);
 
   { TACLShellFolder }
@@ -56,36 +86,38 @@ type
     FShellFolder: IShellFolder;
 
     function GetAttributes: Cardinal;
-    function GetDisplayName: UnicodeString;
+    function GetDisplayName: string;
     function GetLibrarySources: TACLStringList;
-    function GetPath: UnicodeString;
-    function GetPathForParsing: UnicodeString;
+    function GetPath: string;
+    function GetPathForParsing: string;
   protected
     class destructor Destroy;
     function GetChild(ID: PItemIDList): IShellFolder;
     function ParentShellFolder: IShellFolder;
   public
-    constructor Create(AParent: TACLShellFolder; ID: PItemIDList);
+    constructor Create; overload;
+    constructor Create(AParent: TACLShellFolder; ID: PItemIDList); overload;
     constructor CreateSpecial(ID: PItemIDList);
     destructor Destroy; override;
-    function Compare(AFolder: TACLShellFolder): Integer;
-    function GetUIObjectOf(AOwner: HWND; const IID: TGUID; out AObject): Boolean;
+    function Compare(ID1, ID2: PItemIDList): Integer;
+    procedure Enum(AOwnerWnd: HWND; AShowHidden: Boolean; AProc: TProc<PItemIDLIst>);
+    function GetUIObjectOf(AOwnerWnd: HWND; const IID: TGUID; out AObject): Boolean;
     function HasChildren: Boolean;
+    function IsFileSystemFolder: Boolean;
     function IsFileSystemPath: Boolean;
-    function IsFolder: Boolean;
     function IsLibrary: Boolean;
     class function Root: TACLShellFolder;
+    class function ShowHidden: Boolean;
     // Properties
-    property DisplayName: UnicodeString read GetDisplayName;
+    property DisplayName: string read GetDisplayName;
     property Parent: TACLShellFolder read FParent;
-    property Path: UnicodeString read GetPath;
-    property PathForParsing: UnicodeString read GetPathForParsing;
+    property Path: string read GetPath;
+    property PathForParsing: string read GetPathForParsing;
     // Library
     property LibrarySources: TACLStringList read GetLibrarySources;
     // ShellObjects
     property AbsoluteID: PItemIDLIst read FFullPIDL;
     property ID: PItemIDLIst read FPIDL;
-    property FullPIDL: PItemIDList read FFullPIDL;
     property ShellFolder: IShellFolder read FShellFolder;
   end;
 
@@ -100,27 +132,26 @@ type
 
   TPIDLHelper = class
   public const
-    QuickAccessPath = 'shell:::{679F85CB-0220-4080-B29B-5540CC05AAB6}';
+    Favorites = 'shell:::{679F85CB-0220-4080-B29B-5540CC05AAB6}';
   public
-    class function CreatePIDLList(ID: PItemIDList): TList;
-    class function GetDisplayName(AParentFolder: IShellFolder; PIDL: PItemIDList; AFlags: DWORD): UnicodeString;
-    class function GetHasChildren(AParentfolder: IShellFolder; PIDL: PItemIDList): Boolean;
-    class function StrRetToString(PIDL: PItemIDList; AStrRet: TStrRet; AFlag: UnicodeString = ''): UnicodeString;
+    class function ConcatPIDLs(IDList1, IDList2: PItemIDList): PItemIDList;
+    class function CopyPIDL(IDList: PItemIDList): PItemIDList;
+    class function CreatePIDL(ASize: Integer): PItemIDList;
+    class procedure DisposePIDL(var PIDL: PItemIDList);
+    class function GetDesktopPIDL: PItemIDList;
+    class function GetDisplayName(AParentFolder: IShellFolder; PIDL: PItemIDList; AFlags: DWORD): string;
+    class function GetFolderPIDL(AOwnerWnd: HWND; APath: string): PItemIDList;
+    class function GetParentPIDL(IDList: PItemIDList): PItemIDList; {nullable}
+    class function GetPIDLSize(IDList: PItemIDList): Integer;
+
+  {$IFDEF MSWINDOWS}
+    class function GetNextPIDL(IDList: PItemIDList): PItemIDList;
+    class function StrRetToString(PIDL: PItemIDList; AStrRet: TStrRet; AFlag: string = ''): string;
 
     // https://docs.microsoft.com/en-us/windows/win32/shell/clipboard#cfstr_shellidlist
     class function FilesToShellListStream(AFiles: TACLStringList; out AStream: TMemoryStream): Boolean;
     class function ShellListStreamToFiles(AStream: TCustomMemoryStream; out AFiles: TACLStringList): Boolean;
-
-    class function ConcatPIDLs(IDList1, IDList2: PItemIDList): PItemIDList;
-    class function CopyPIDL(IDList: PItemIDList): PItemIDList;
-    class function CreatePIDL(ASize: Integer): PItemIDList;
-    class procedure DestroyPIDLList(var List: TList);
-    class procedure DisposePIDL(var PIDL: PItemIDList);
-    class function GetDesktopPIDL: PItemIDList;
-    class function GetFolderPIDL(Handle: HWND; const APath: UnicodeString): PItemIDList;
-    class function GetNextPIDL(IDList: PItemIDList): PItemIDList;
-    class function GetPIDLSize(IDList: PItemIDList): Integer;
-    class procedure StripLastID(IDList: PItemIDList);
+  {$ENDIF}
   end;
 
 // Shell - Deleting
@@ -128,80 +159,100 @@ function ShellDelete(AFilesOrFolders: TACLStringList;
   AOptions: TShellOperationFlags = [sofCanUndo]): Boolean; overload;
 function ShellDelete(const AFileOrFolder: string;
   AOptions: TShellOperationFlags = [sofCanUndo, sofNoDialog, sofNoConfirmation]): Boolean; overload;
-function ShellUndelete(const AOriginalFileOrFolder: UnicodeString): HRESULT;
+function ShellUndelete(const AOriginalFileOrFolder: string): HRESULT;
 
 // Shell - Executing
-function ShellExecute(const AFileName, AParameters: UnicodeString): Boolean; overload;
-function ShellExecute(const AFileName: UnicodeString): Boolean; overload;
-function ShellExecuteURL(const ALink: UnicodeString): Boolean;
-function ShellJumpToFile(const AFileName: UnicodeString): Boolean;
+function ShellExecute(const AFileName, AParameters: string): Boolean; overload;
+function ShellExecute(const AFileName: string): Boolean; overload;
+function ShellExecuteURL(const ALink: string): Boolean;
+function ShellJumpToFile(const AFileName: string): Boolean;
 
 // Shell - System Paths
-function ShellPathAppData: UnicodeString;
-function ShellPathDesktop: UnicodeString;
-function ShellPathMyDocuments: UnicodeString;
-function ShellPathMyMusic: UnicodeString;
-function ShellPathSystem32: UnicodeString;
+function ShellPath(CLSID: Integer): string;
+function ShellPathAppData: string;
+function ShellPathDesktop: string;
+function ShellPathMyDocuments: string;
+function ShellPathMyMusic: string;
+{$IFDEF MSWINDOWS}
+function ShellPathSystem32: string;
 {$IFDEF CPUX64}
-function ShellPathSystem32WOW64: UnicodeString;
-{$ENDIF}
-function ShellPath(CLSID: Integer): UnicodeString;
+function ShellPathSystem32WOW64: string;
+{$ENDIF}{$ENDIF}
 
 // Shell - Libraries
-procedure ShellExpandPath(const APath: UnicodeString; AReceiver: IStringReceiver);
-function ShellIsLibraryPath(const APath: UnicodeString): Boolean;
+procedure ShellExpandPath(const APath: string; AReceiver: IStringReceiver);
+function ShellIsLibraryPath(const APath: string): Boolean;
 
 // Shell - Links
-function ShellCreateLink(const ALinkFileName, AFileName: UnicodeString): Boolean;
-function ShellParseLink(const ALink: UnicodeString; out AFileName: UnicodeString): Boolean;
+{$IFDEF MSWINDOWS}
+function ShellCreateLink(const ALinkFileName, AFileName: string): Boolean;
+function ShellParseLink(const ALink: string; out AFileName: string): Boolean;
+{$ENDIF}
 
 function ShellGetFreeSpace(const AFileName: string): Int64;
 function ShellLastErrorCode: Integer;
-function ShellShowHiddenByDefault: Boolean;
 function ShellShutdown(AMode: TShellShutdownMode): Boolean;
-
-procedure UpdateShellCache;
-{$ELSE}
-function ShellExecute(const AFileName: string): Boolean;
-function ShellExecuteURL(const AFileName: string): Boolean;
-{$ENDIF}
+procedure ShellFlushCache;
 implementation
-{$IFDEF MSWINDOWS}
+
 uses
-  System.SysUtils,
-  System.Math,
-  System.Win.ComObj,
-  // ACL
-  ACL.Utils.Strings,
+{$IFDEF MSWINDOWS}
+  ACL.Utils.Registry,
   ACL.Utils.Stream,
-  ACL.Utils.Registry;
+{$ELSE}
+  ACL.Web,
+{$ENDIF}
+  ACL.Utils.Strings;
+
+{$IFNDEF MSWINDOWS}
+const
+  SHGDN_INFOLDER        = 0;
+
+  SFGAO_STREAM          = 1;
+  SFGAO_FILESYSTEM      = 2;
+  SFGAO_FILESYSANCESTOR = 4;
+  SFGAO_FOLDER          = 8;
+
+  PIDL_BOOKMARK = 1;
+  PIDL_SPECIAL  = 2;
+  PIDL_SPECIAL2 = 4;
+  PIDL_VIRTUAL  = 8;
+
+const
+  libGLib2 = 'libgobject-2.0.so.0';
+
+function g_get_user_special_dir(directory: DWORD): PChar; cdecl; external libGLib2;
+{$ENDIF}
 
 var
-  FShellLastErrorCode: Integer;
+  FShellLastErrorCode: Integer = 0;
 
 //------------------------------------------------------------------------------
 // Shell - General
 //------------------------------------------------------------------------------
 
 {$REGION ' General '}
+
+{$IFDEF MSWINDOWS}
 type
   TShellOperation = (soMove, soCopy, soDelete, soRename);
 
 function ShellEncodePaths(const APaths: TACLStringList): string;
 var
   LBuilder: TACLStringBuilder;
+  I: Integer;
 begin
   LBuilder := TACLStringBuilder.Create;
   try
-    for var I := 0 to APaths.Count - 1 do
-      LBuilder.Append(ExcludeTrailingPathDelimiter(APaths[I])).Append(#0);
+    for I := 0 to APaths.Count - 1 do
+      LBuilder.Append(acExcludeTrailingPathDelimiter(APaths[I])).Append(#0);
     Result := LBuilder.ToString;
   finally
     LBuilder.Free;
   end;
 end;
 
-function ShellOperation(const ASourceList, ADestList: UnicodeString;
+function ShellOperation(const ASourceList, ADestList: string;
   const AOperation: TShellOperation; const AFlags: TShellOperationFlags): Boolean;
 const
   OperationMap: array[TShellOperation] of Integer = (FO_MOVE, FO_COPY, FO_DELETE, FO_RENAME);
@@ -223,8 +274,15 @@ begin
   FShellLastErrorCode := SHFileOperationW(AStruct);
   Result := (FShellLastErrorCode = 0) and not AStruct.fAnyOperationsAborted;
 end;
+{$ENDIF}
+
+function ShellLastErrorCode: Integer;
+begin
+  Result := FShellLastErrorCode;
+end;
 
 function ShellShutdown(AMode: TShellShutdownMode): Boolean;
+{$IFDEF MSWINDOWS}
 
   function GetPrivileges: Boolean;
   var
@@ -270,26 +328,20 @@ begin
     sdHibernate, sdSleep:
       Result := SetSystemPowerState(AMode = sdSleep, False);
   end;
+{$ELSE}
+begin
+  {$MESSAGE WARN 'ShellShutdown - NOTIMPLEMENTED'}
+  Result := False;
+  raise ENotImplemented.Create('ShellShutdown');
+{$ENDIF}
 end;
 
-function ShellLastErrorCode: Integer;
+procedure ShellFlushCache;
 begin
-  Result := FShellLastErrorCode;
-end;
-
-function ShellShowHiddenByDefault: Boolean;
-var
-  AKey: THandle;
-begin
-  AKey := acRegOpenRead(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced');
-  Result := acRegReadInt(AKey, 'Hidden') = 1;
-  acRegClose(AKey);
-end;
-
-procedure UpdateShellCache;
-begin
+{$IFDEF MSWINDOWS}
   SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST or SHCNF_FLUSH, nil, nil);
   Sleep(1000);
+{$ENDIF}
 end;
 
 {$ENDREGION}
@@ -303,7 +355,12 @@ end;
 function ShellDelete(AFilesOrFolders: TACLStringList;
   AOptions: TShellOperationFlags = [sofCanUndo]): Boolean;
 begin
+{$IFDEF MSWINDOWS}
   Result := ShellOperation(ShellEncodePaths(AFilesOrFolders), '', soDelete, AOptions);
+{$ELSE}
+  Result := False; {$MESSAGE WARN 'NotImplemented'}
+  raise ENotImplemented.Create('ShellDelete');
+{$ENDIF}
 end;
 
 function ShellDelete(const AFileOrFolder: string;
@@ -319,7 +376,8 @@ begin
   end;
 end;
 
-function ShellUndelete(const AOriginalFileOrFolder: UnicodeString): HRESULT;
+function ShellUndelete(const AOriginalFileOrFolder: string): HRESULT;
+{$IFDEF MSWINDOWS}
 var
   ARecycleBin: IShellFolder2;
   ARecycleBinPIDL: PItemIDList;
@@ -382,6 +440,11 @@ begin
     TPIDLHelper.DisposePIDL(ARecycleBinPIDL);
   end;
   Result := E_INVALIDARG;
+{$ELSE}
+begin
+  Result := E_NOTIMPL; {$MESSAGE WARN 'NotImplemented'}
+  raise ENotImplemented.Create('ShellUndelete');
+{$ENDIF}
 end;
 
 {$ENDREGION}
@@ -392,35 +455,40 @@ end;
 
 {$REGION ' Executing '}
 
-function ShellExecute(const AFileName: UnicodeString): Boolean;
+function ShellExecute(const AFileName: string): Boolean;
 begin
   Result := ShellExecute(AFileName, '');
 end;
 
-function ShellExecute(const AFileName, AParameters: UnicodeString): Boolean; overload;
+function ShellExecute(const AFileName, AParameters: string): Boolean; overload;
 begin
   if AFileName = '' then
     Exit(False);
+{$IFDEF MSWINDOWS}
   if IsWine and (acIsUrlFileName(AFileName) or acBeginsWith(AFileName, acMailToPrefix)) then
     Result := ShellExecute('winebrowser', AFileName)
   else
     Result := ShellExecuteW(0, 'open', PWideChar(AFileName), PWideChar(AParameters), '', SW_SHOW) >= 32;
+{$ELSE}
+  Result := False; {$MESSAGE WARN 'NotImplemented'}
+  raise ENotImplemented.Create('ShellExecute');
+{$ENDIF}
 end;
 
-function ShellExecuteURL(const ALink: UnicodeString): Boolean;
+function ShellExecuteURL(const ALink: string): Boolean;
 begin
   if ALink = '' then
     Result := False
   else
-    if (Pos(UnicodeString('//'), ALink) = 0) and not acDirectoryExists(ALink) then
+    if (Pos('//', ALink) = 0) and not acDirectoryExists(ALink) then
       Result := ShellExecute('http://' + ALink)
     else
       Result := ShellExecute(ALink);
 end;
 
-function ShellJumpToFile(const AFileName: UnicodeString): Boolean;
+function ShellJumpToFile(const AFileName: string): Boolean;
 var
- IL: PItemIDList;
+  IL: PItemIDList;
 begin
   Result := False;
   if AFileName <> '' then
@@ -429,6 +497,7 @@ begin
       Result := ShellExecute(AFileName)
     else
     begin
+    {$IFDEF MSWINDOWS}
       IL := ILCreateFromPathW(PWideChar(AFileName));
       if IL <> nil then
       try
@@ -437,6 +506,10 @@ begin
       finally
         ILFree(IL);
       end;
+    {$ELSE}
+      Result := False; {$MESSAGE WARN 'NotImplemented'}
+      raise ENotImplemented.Create('ShellExecute');
+    {$ENDIF}
     end;
   end;
 end;
@@ -449,7 +522,8 @@ end;
 
 {$REGION ' System Paths '}
 
-function ShellPath(CLSID: Integer): UnicodeString;
+function ShellPath(CLSID: Integer): string;
+{$IF DEFINED(MSWINDOWS)}
 var
   ABuf: TFilePath;
 begin
@@ -458,28 +532,38 @@ begin
   else
     Result := acTempPath;
 end;
-
-function ShellPathAppData: UnicodeString;
+{$ELSE}
 begin
+  Result := g_get_user_special_dir(CLSID);
+end;
+{$ENDIF}
+
+function ShellPathAppData: string;
+begin
+{$IFDEF MSWINDOWS}
   Result := ShellPath(CSIDL_APPDATA);
+{$ELSE}
+  Result := acIncludeTrailingPathDelimiter(GetUserDir) + '/.config/';
+{$ENDIF}
 end;
 
-function ShellPathDesktop: UnicodeString;
+function ShellPathDesktop: string;
 begin
   Result := ShellPath(CSIDL_DESKTOP);
 end;
 
-function ShellPathMyDocuments: UnicodeString;
+function ShellPathMyDocuments: string;
 begin
   Result := ShellPath(CSIDL_PERSONAL);
 end;
 
-function ShellPathMyMusic: UnicodeString;
+function ShellPathMyMusic: string;
 begin
   Result := ShellPath(CSIDL_MYMUSIC);
 end;
 
-function ShellPathSystem32: UnicodeString;
+{$IFDEF MSWINDOWS}
+function ShellPathSystem32: string;
 var
   ABuf: TFilePath;
 begin
@@ -489,7 +573,7 @@ begin
 end;
 
 {$IFDEF CPUX64}
-function ShellPathSystem32WOW64: UnicodeString;
+function ShellPathSystem32WOW64: string;
 type
   TGetSystemWow64Directory = function (lpBuffer: LPWSTR; uSize: UINT): UINT; stdcall;
 var
@@ -506,7 +590,7 @@ begin
   else
     raise EInvalidOperation.Create('The GetSystemWow64Directory function is unavailable');
 end;
-{$ENDIF}
+{$ENDIF}{$ENDIF}
 
 {$ENDREGION}
 
@@ -516,12 +600,17 @@ end;
 
 {$REGION ' Libraries '}
 
-function ShellIsLibraryPath(const APath: UnicodeString): Boolean;
+function ShellIsLibraryPath(const APath: string): Boolean;
 begin
+{$IFDEF MSWINDOWS}
   Result := acBeginsWith(APath, '::');
+{$ELSE}
+  Result := False;
+{$ENDIF}
 end;
 
-function ShellReadLibrary(const APathForParsing: UnicodeString; AReceiver: IStringReceiver): Boolean;
+function ShellReadLibrary(const APathForParsing: string; AReceiver: IStringReceiver): Boolean;
+{$IFDEF MSWINDOWS}
 var
   ACount: Cardinal;
   ALibrary: IShellLibrary;
@@ -548,9 +637,13 @@ begin
           CoTaskMemFree(APath);
         end;
       end;
+{$ELSE}
+begin
+  Result := False;
+{$ENDIF}
 end;
 
-procedure ShellExpandPath(const APath: UnicodeString; AReceiver: IStringReceiver);
+procedure ShellExpandPath(const APath: string; AReceiver: IStringReceiver);
 begin
   if APath <> '' then
   begin
@@ -569,6 +662,7 @@ end;
 
 {$REGION ' Links '}
 
+{$IFDEF MSWINDOWS}
 function ShellCreateLinkObject(out AObject: IShellLinkW): Boolean;
 begin
   CoInitialize(nil);
@@ -576,11 +670,11 @@ begin
     CLSCTX_INPROC_SERVER or CLSCTX_LOCAL_SERVER, IShellLinkW, AObject));
 end;
 
-function ShellCreateLink(const ALinkFileName, AFileName: UnicodeString): Boolean;
+function ShellCreateLink(const ALinkFileName, AFileName: string): Boolean;
 var
   ALink: IShellLinkW;
   ALinkFile: IPersistFile;
-  ATempFileName: UnicodeString;
+  ATempFileName: string;
 begin
   Result := False;
   if acFileExists(AFileName) then
@@ -603,7 +697,7 @@ begin
   end;
 end;
 
-function ShellParseLink(const ALink: UnicodeString; out AFileName: UnicodeString): Boolean;
+function ShellParseLink(const ALink: string; out AFileName: string): Boolean;
 type
   TFileFindData = _WIN32_FIND_DATAW;
 var
@@ -636,7 +730,7 @@ begin
     Result := False;
   end;
 end;
-
+{$ENDIF}
 {$ENDREGION}
 
 //------------------------------------------------------------------------------
@@ -646,6 +740,7 @@ end;
 {$REGION ' Drives '}
 
 function ShellGetFreeSpace(const AFileName: string): Int64;
+{$IFDEF MSWINDOWS}
 var
   LDrive: string;
   LErrorMode: Integer;
@@ -659,41 +754,44 @@ begin
   finally
     SetErrorMode(LErrorMode);
   end;
+{$ELSE}
+begin
+  {$MESSAGE WARN 'NOTIMPLEMENTED'}
+  Result := -1;
+  raise ENotImplemented.Create('ShellGetFreeSpace');
+{$ENDIF}
 end;
 
 {$ENDREGION}
 
 { TACLShellFolder }
 
-constructor TACLShellFolder.Create(AParent: TACLShellFolder; ID: PItemIDList);
-var
-  ADesktopID: PItemIDList;
+constructor TACLShellFolder.Create;
 begin
-  inherited Create;
+  FPIDL := TPIDLHelper.GetDesktopPIDL;
+  FFullPIDL := TPIDLHelper.CopyPIDL(FPIDL);
+{$IFDEF MSWINDOWS}
+  OleCheck(SHGetDesktopFolder(FShellFolder));
+{$ENDIF}
+end;
+
+constructor TACLShellFolder.Create(AParent: TACLShellFolder; ID: PItemIDList);
+begin
+  FParent := AParent;
   FPIDL := TPIDLHelper.CopyPIDL(ID);
-  if AParent <> nil then
-  begin
-    FParent := AParent;
-    FShellFolder := AParent.GetChild(ID);
-    FFullPIDL := TPIDLHelper.ConcatPIDLs(AParent.AbsoluteID, ID);
-  end
-  else
-  begin
-    OleCheck(SHGetDesktopFolder(FShellFolder));
-    ADesktopID := TPIDLHelper.GetDesktopPIDL;
-    try
-      FFullPIDL := TPIDLHelper.ConcatPIDLs(ADesktopID, ID);
-    finally
-      TPIDLHelper.DisposePIDL(ADesktopID);
-    end;
-  end;
+  FFullPIDL := TPIDLHelper.ConcatPIDLs(AParent.AbsoluteID, ID);
+  FShellFolder := AParent.GetChild(ID);
 end;
 
 constructor TACLShellFolder.CreateSpecial(ID: PItemIDList);
 begin
   FPIDL := TPIDLHelper.CopyPIDL(ID);
   FFullPIDL := TPIDLHelper.CopyPIDL(ID);
+{$IFDEF MSWINDOWS}
   OleCheck(Root.ShellFolder.BindToObject(FPIDL, nil, IID_IShellFolder, FShellFolder));
+{$ELSE}
+  FPIDL^.Flags := PIDL_SPECIAL;
+{$ENDIF}
 end;
 
 class destructor TACLShellFolder.Destroy;
@@ -709,27 +807,117 @@ begin
   inherited Destroy;
 end;
 
-function TACLShellFolder.Compare(AFolder: TACLShellFolder): Integer;
+function TACLShellFolder.Compare(ID1, ID2: PItemIDList): Integer;
 begin
-  Result := SmallInt(ParentShellFolder.CompareIDs(0, ID, AFolder.ID));
+{$IFDEF MSWINDOWS}
+  Result := SmallInt(ParentShellFolder.CompareIDs(0, ID1, ID2));
+{$ELSE}
+  Result := acCompareStrings(ID1^.Path, ID2^.Path);
+{$ENDIF}
 end;
 
-function TACLShellFolder.GetUIObjectOf(AOwner: HWND; const IID: TGUID; out AObject): Boolean;
+procedure TACLShellFolder.Enum(AOwnerWnd: HWND; AShowHidden: Boolean; AProc: TProc<PItemIDLIst>);
+{$IFDEF MSWINDOWS}
+var
+  LFlags: LongWord;
+  LEnumList: IEnumIDList;
+  LItemID: PItemIDList;
+  LNumIDs: LongWord;
 begin
-  Result := Succeeded(ShellFolder.GetUIObjectOf(AOwner, 1, FPIDL, IID, nil, AObject));
+  try
+    LFlags := SHCONTF_FOLDERS;
+    if AShowHidden then
+      LFlags := LFlags or SHCONTF_INCLUDEHIDDEN;
+    if ShellFolder.EnumObjects(AOwnerWnd, LFlags, LEnumList) = 0 then
+      while LEnumList.Next(1, LItemID, LNumIDs) = S_OK do
+      begin
+        if LItemID <> nil then
+          AProc(LItemID);
+      end;
+  except
+    // do nothing
+  end;
+{$ELSE}
+var
+  LBookmarks: TACLStringList;
+  LHomeDir: string;
+  LInfo: TACLFindFileInfo;
+  LItem: TItemIDList;
+  I: Integer;
+begin
+  if ID^.Flags and PIDL_BOOKMARK <> 0 then
+    Exit;
+
+  ZeroMemory(@LItem, SizeOf(LItem));
+  if ID^.Flags and PIDL_SPECIAL <> 0 then
+    LItem.Flags := PIDL_SPECIAL2;
+  if ID^.Path = TPIDLHelper.Favorites then
+  begin
+    LHomeDir := acExcludeTrailingPathDelimiter(GetUserDir);
+    LItem.Flags := PIDL_BOOKMARK;
+    LItem.Path := LHomeDir;
+    AProc(@LItem);
+
+    LBookmarks := TACLStringList.Create;
+    try
+      if not LBookmarks.LoadFromFile(LHomeDir + '/.config/gtk-3.0/bookmarks') then // get_bookmarks_file
+        LBookmarks.LoadFromFile(LHomeDir + '/.gtk-bookmarks'); // get_legacy_bookmarks_file
+      for I := 0 to LBookmarks.Count - 1 do
+      begin
+        LHomeDir := LBookmarks[I];
+        if LHomeDir.StartsWith('file://', True) then
+        begin
+          LItem.Path := acURLDecode(Copy(LHomeDir, 8));
+          AProc(@LItem);
+        end;
+      end;
+    finally
+      LBookmarks.Free;
+    end;
+  end
+  else
+    if ID^.Flags and PIDL_VIRTUAL = 0 then
+    begin
+      if acFindFileFirst(acIncludeTrailingPathDelimiter(Path), [ffoFolder], LInfo) then
+      try
+        repeat
+          if AShowHidden or not LInfo.FileName.StartsWith('.') then
+          begin
+            LItem.Path := LInfo.FullFileName;
+            AProc(@LItem);
+          end;
+        until not acFindFileNext(LInfo);
+      finally
+        acFindFileClose(LInfo);
+      end;
+    end;
+{$ENDIF}
+end;
+
+function TACLShellFolder.GetUIObjectOf(AOwnerWnd: HWND; const IID: TGUID; out AObject): Boolean;
+begin
+{$IFDEF MSWINDOWS}
+  Result := Succeeded(ShellFolder.GetUIObjectOf(AOwnerWnd, 1, FPIDL, IID, nil, AObject));
+{$ELSE}
+  Result := False;
+{$ENDIF}
 end;
 
 function TACLShellFolder.HasChildren: Boolean;
+{$IFDEF MSWINDOWS}
+var
+  LFlags: LongWord;
 begin
-  Result := TPIDLHelper.GetHasChildren(ParentShellFolder, ID);
+  LFlags := SFGAO_CONTENTSMASK;
+  Result := Succeeded(ParentShellFolder.GetAttributesOf(1, FPIDL, LFlags)) and
+    (LFlags and SFGAO_HASSUBFOLDER <> 0);
+{$ELSE}
+begin
+  Result := ID^.Flags and PIDL_BOOKMARK = 0;
+{$ENDIF}
 end;
 
-function TACLShellFolder.IsFileSystemPath: Boolean;
-begin
-  Result := GetAttributes and (SFGAO_FILESYSANCESTOR or SFGAO_FILESYSTEM) <> 0;
-end;
-
-function TACLShellFolder.IsFolder: Boolean;
+function TACLShellFolder.IsFileSystemFolder: Boolean;
 var
   LAttrs: Cardinal;
 begin
@@ -739,12 +927,17 @@ begin
     (LAttrs and (SFGAO_STREAM or SFGAO_FOLDER) <> (SFGAO_STREAM or SFGAO_FOLDER));
 end;
 
+function TACLShellFolder.IsFileSystemPath: Boolean;
+begin
+  Result := GetAttributes and (SFGAO_FILESYSANCESTOR or SFGAO_FILESYSTEM) <> 0;
+end;
+
 function TACLShellFolder.IsLibrary: Boolean;
 begin
   Result := LibrarySources.Count > 0;
 end;
 
-//function TACLShellFolder.Rename(const NewName: UnicodeString): boolean;
+//function TACLShellFolder.Rename(const NewName: string): boolean;
 //var
 //  ANewPIDL: PItemIDList;
 //begin
@@ -766,23 +959,28 @@ end;
 //end;
 
 class function TACLShellFolder.Root: TACLShellFolder;
-var
-  ADesktopPIDL: PItemIDList;
 begin
   if FDesktopFolder = nil then
-  begin
-    ADesktopPIDL := TPIDLHelper.GetDesktopPIDL;
-    if ADesktopPIDL <> nil then
-    try
-      FDesktopFolder := TACLShellFolder.Create(nil, ADesktopPIDL);
-    finally
-      TPIDLHelper.DisposePIDL(ADesktopPIDL);
-    end;
-  end;
+    FDesktopFolder := TACLShellFolder.Create;
   Result := FDesktopFolder;
 end;
 
+class function TACLShellFolder.ShowHidden: Boolean;
+{$IFDEF MSWINDOWS}
+var
+  AKey: THandle;
+begin
+  AKey := acRegOpenRead(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced');
+  Result := acRegReadInt(AKey, 'Hidden') = 1;
+  acRegClose(AKey);
+{$ELSE}
+begin
+  Result := False;
+{$ENDIF}
+end;
+
 function TACLShellFolder.GetChild(ID: PItemIDList): IShellFolder;
+{$IFDEF MSWINDOWS}
 var
   HR: HRESULT;
 begin
@@ -793,6 +991,10 @@ begin
     ShellFolder.CreateViewObject(0, IID_IShellFolder, Pointer(Result));
   if Result = nil then
     Root.ShellFolder.BindToObject(ID, nil, IID_IShellFolder, Pointer(Result));
+{$ELSE}
+begin
+  Result := nil;
+{$ENDIF}
 end;
 
 function TACLShellFolder.ParentShellFolder: IShellFolder;
@@ -800,17 +1002,23 @@ begin
   if FParent <> nil then
     Result := FParent.ShellFolder
   else
-    OLECheck(SHGetDesktopFolder(Result));
+    Result := Root.ShellFolder;
 end;
 
 function TACLShellFolder.GetAttributes: Cardinal;
 begin
+{$IFDEF MSWINDOWS}
   Result := SFGAO_STORAGECAPMASK;
   if Failed(ParentShellFolder.GetAttributesOf(1, FPIDL, Result)) then
     Result := 0;
+{$ELSE}
+  Result := SFGAO_FILESYSANCESTOR;
+  if ID^.Flags and PIDL_VIRTUAL = 0 then
+    Result := Result or SFGAO_FILESYSTEM or SFGAO_FOLDER;
+{$ENDIF}
 end;
 
-function TACLShellFolder.GetDisplayName: UnicodeString;
+function TACLShellFolder.GetDisplayName: string;
 begin
   Result := TPIDLHelper.GetDisplayName(ParentShellFolder, ID, SHGDN_INFOLDER);
 end;
@@ -820,16 +1028,18 @@ begin
   if FLibrarySources = nil then
   begin
     FLibrarySources := TACLStringList.Create;
+  {$IFDEF MSWINDOWS}
     if Parent <> nil then
     begin
       if GetAttributes and (SFGAO_FILESYSANCESTOR or SFGAO_FILESYSTEM) = SFGAO_FILESYSANCESTOR then
         ShellReadLibrary(PathForParsing, FLibrarySources);
     end;
+  {$ENDIF}
   end;
   Result := FLibrarySources;
 end;
 
-function TACLShellFolder.GetPath: UnicodeString;
+function TACLShellFolder.GetPath: string;
 begin
   if GetAttributes and SFGAO_FILESYSTEM <> 0 then
     Result := PathForParsing
@@ -837,9 +1047,13 @@ begin
     Result := EmptyStr;
 end;
 
-function TACLShellFolder.GetPathForParsing: UnicodeString;
+function TACLShellFolder.GetPathForParsing: string;
 begin
+{$IFDEF MSWINDOWS}
   Result := TPIDLHelper.GetDisplayName(Root.ShellFolder, AbsoluteID, SHGDN_FORPARSING);
+{$ELSE}
+  Result := acIncludeTrailingPathDelimiter(ID^.Path);
+{$ENDIF}
 end;
 
 { TACLShellSearchPaths }
@@ -856,42 +1070,188 @@ end;
 
 { TPIDLHelper }
 
-class function TPIDLHelper.CreatePIDLList(ID: PItemIDList): TList;
-var
-  TempID: PItemIDList;
-begin
-  Result := TList.Create;
-  TempID := ID;
-  while TempID.mkid.cb <> 0 do
-  begin
-    TempID := TPIDLHelper.CopyPIDL(TempID);
-    Result.Insert(0, TempID); //0 = lowest level PIDL.
-    StripLastID(TempID);
-  end;
-end;
-
-class function TPIDLHelper.GetDisplayName(AParentFolder: IShellFolder;
-  PIDL: PItemIDList; AFlags: DWORD): UnicodeString;
+class function TPIDLHelper.GetDisplayName(
+  AParentFolder: IShellFolder; PIDL: PItemIDList; AFlags: DWORD): string;
+{$IFDEF MSWINDOWS}
 var
   AStrRet: TStrRet;
 begin
   FillChar(AStrRet, SizeOf(AStrRet), 0);
   AParentFolder.GetDisplayNameOf(PIDL, AFlags, AStrRet);
   Result := StrRetToString(PIDL, AStrRet);
-end;
-
-class function TPIDLHelper.GetHasChildren(AParentfolder: IShellFolder; PIDL: PItemIDList): Boolean;
-var
-  AFlags: LongWord;
+{$ELSE}
 begin
-  AFlags := SFGAO_CONTENTSMASK;
-  if Succeeded(AParentFolder.GetAttributesOf(1, PIDL, AFlags)) then
-    Result := AFlags and SFGAO_HASSUBFOLDER <> 0
-  else
-    Result := False;
+  if PIDL^.Path = Favorites then
+    Exit('Favorites');
+  if PIDL^.Path = PathDelim then
+    Exit('File System');
+
+  Result := acExtractFileName(PIDL^.Path);
+  if (Result <> '') and (Result[1] = '.') then
+    Result := Copy(Result, 2);
+{$ENDIF}
 end;
 
-class function TPIDLHelper.StrRetToString(PIDL: PItemIDList; AStrRet: TStrRet; AFlag: UnicodeString = ''): UnicodeString;
+class function TPIDLHelper.ConcatPIDLs(IDList1, IDList2: PItemIDList): PItemIDList;
+{$IFDEF MSWINDOWS}
+var
+  cb1, cb2: Integer;
+begin
+  cb1 := 0;
+  if Assigned(IDList1) then
+    cb1 := GetPIDLSize(IDList1) - SizeOf(IDList1^.mkid.cb);
+  cb2 := GetPIDLSize(IDList2);
+  Result := CreatePIDL(cb1 + cb2);
+  if Assigned(Result) then
+  begin
+    if Assigned(IDList1) then
+      CopyMemory(Result, IDList1, cb1);
+    CopyMemory(PByte(Result) + cb1, IDList2, cb2);
+  end;
+{$ELSE}
+begin
+  Result := CopyPIDL(IDList2);
+{$ENDIF}
+end;
+
+class function TPIDLHelper.CopyPIDL(IDList: PItemIDList): PItemIDList;
+var
+  Size: Integer;
+begin
+  Size := GetPIDLSize(IDList);
+  Result := CreatePIDL(Size);
+  if Result <> nil then
+  begin
+  {$IFDEF MSWINDOWS}
+    CopyMemory(Result, IDList, Size);
+  {$ELSE}
+    Result^ := IDList^;
+  {$ENDIF}
+  end;
+end;
+
+class function TPIDLHelper.CreatePIDL(ASize: Integer): PItemIDList;
+begin
+{$IFDEF MSWINDOWS}
+  var Malloc: IMalloc;
+  OleCheck(SHGetMalloc(Malloc));
+  Result := Malloc.Alloc(ASize);
+{$ELSE}
+  New(Result);
+{$ENDIF}
+  if Result <> nil then
+    FillChar(Result^, ASize, 0);
+end;
+
+class procedure TPIDLHelper.DisposePIDL(var PIDL: PItemIDList);
+begin
+  if PIDL <> nil then
+  begin
+  {$IFDEF MSWINDOWS}
+    CoTaskMemFree(PIDL);
+  {$ELSE}
+    Dispose(PIDL);
+  {$ENDIF}
+    PIDL := nil;
+  end;
+end;
+
+class function TPIDLHelper.GetDesktopPIDL: PItemIDList;
+begin
+{$IFDEF MSWINDOWS}
+  OleCheck(SHGetSpecialFolderLocation(0, CSIDL_DESKTOP, Result));
+{$ELSE}
+  Result := GetFolderPIDL(0, PathDelim);
+{$ENDIF}
+end;
+
+class function TPIDLHelper.GetFolderPIDL(AOwnerWnd: HWND; APath: string): PItemIDList;
+{$IFDEF MSWINDOWS}
+var
+  AEaten, AAttr: DWORD;
+begin
+  if not ShellIsLibraryPath(APath) then
+    APath := acIncludeTrailingPathDelimiter(APath);
+
+  if Failed(TACLShellFolder.Root.ShellFolder.ParseDisplayName(
+    AOwnerWnd, nil, PWideChar(APath), AEaten, Result, AAttr))
+  then
+    Result := nil;
+{$ELSE}
+begin
+  New(Result);
+  Result^.Flags := 0;
+  if not APath.StartsWith(PathDelim) then
+    Result^.Flags := PIDL_VIRTUAL;
+  if APath <> PathDelim then
+    Result^.Path := acExcludeTrailingPathDelimiter(APath)
+  else
+    Result^.Path := APath;
+{$ENDIF}
+end;
+
+class function TPIDLHelper.GetParentPIDL(IDList: PItemIDList): PItemIDList;
+{$IFDEF MSWINDOWS}
+
+  procedure StripLastID(IDList: PItemIDList);
+  var
+    MarkerID: PItemIDList;
+  begin
+    MarkerID := IDList;
+    if Assigned(IDList) then
+    begin
+      while IDList.mkid.cb <> 0 do
+      begin
+        MarkerID := IDList;
+        IDList := GetNextPIDL(IDList);
+      end;
+      MarkerID.mkid.cb := 0;
+    end;
+  end;
+
+begin
+  if (IDList <> nil) and (IDList.mkid.cb > 0) then
+  begin
+    Result := CopyPIDL(IDList);
+    StripLastID(Result);
+  end
+  else
+    Result := nil;
+{$ELSE}
+begin
+  if (IDList^.Flags = 0) and (IDList^.Path <> PathDelim) then
+    Result := GetFolderPIDL(0, acExtractFileDir(IDList^.Path))
+  else
+    Result := nil;
+{$ENDIF}
+end;
+
+class function TPIDLHelper.GetPIDLSize(IDList: PItemIDList): Integer;
+begin
+  Result := 0;
+  if IDList <> nil then
+  begin
+  {$IFDEF MSWINDOWS}
+    Result := SizeOf(IDList^.mkid.cb);
+    while IDList^.mkid.cb <> 0 do
+    begin
+      Result := Result + IDList^.mkid.cb;
+      IDList := GetNextPIDL(IDList);
+    end;
+  {$ELSE}
+    Result := SizeOf(TItemIDList);
+  {$ENDIF}
+  end;
+end;
+
+{$IFDEF MSWINDOWS}
+class function TPIDLHelper.GetNextPIDL(IDList: PItemIDList): PItemIDList;
+begin
+  Result := IDList;
+  Inc(PByte(Result), IDList^.mkid.cb);
+end;
+
+class function TPIDLHelper.StrRetToString(PIDL: PItemIDList; AStrRet: TStrRet; AFlag: string = ''): string;
 var
   P: PAnsiChar;
 begin
@@ -1031,129 +1391,5 @@ begin
 
   Result := AFiles <> nil;
 end;
-
-class function TPIDLHelper.ConcatPIDLs(IDList1, IDList2: PItemIDList): PItemIDList;
-var
-  cb1, cb2: Integer;
-begin
-  cb1 := 0;
-  if Assigned(IDList1) then
-    cb1 := GetPIDLSize(IDList1) - SizeOf(IDList1^.mkid.cb);
-  cb2 := GetPIDLSize(IDList2);
-  Result := CreatePIDL(cb1 + cb2);
-  if Assigned(Result) then
-  begin
-    if Assigned(IDList1) then
-      CopyMemory(Result, IDList1, cb1);
-    CopyMemory(PByte(Result) + cb1, IDList2, cb2);
-  end;
-end;
-
-class function TPIDLHelper.CopyPIDL(IDList: PItemIDList): PItemIDList;
-var
-  Size: Integer;
-begin
-  Size := GetPIDLSize(IDList);
-  Result := CreatePIDL(Size);
-  if Assigned(Result) then
-    CopyMemory(Result, IDList, Size);
-end;
-
-class function TPIDLHelper.CreatePIDL(ASize: Integer): PItemIDList;
-var
-  Malloc: IMalloc;
-begin
-  OleCheck(SHGetMalloc(Malloc));
-  Result := Malloc.Alloc(ASize);
-  if Result <> nil then
-    FillChar(Result^, ASize, 0);
-end;
-
-class procedure TPIDLHelper.DestroyPIDLList(var List: TList);
-var
-  I: Integer;
-begin
-  if Assigned(List) then
-  begin
-    for I := 0 to List.Count - 1 do
-      DisposePIDL(PItemIDList(List.List[I]));
-    FreeAndNil(List);
-  end;
-end;
-
-class procedure TPIDLHelper.DisposePIDL(var PIDL: PItemIDList);
-//var
-//  MAlloc: IMAlloc;
-begin
-  if Assigned(PIDL) then
-  begin
-//    OLECheck(SHGetMAlloc(MAlloc));
-//    MAlloc.Free(PIDL);
-    CoTaskMemFree(PIDL);
-    PIDL := nil;
-  end;
-end;
-
-class function TPIDLHelper.GetDesktopPIDL: PItemIDList;
-begin
-  OleCheck(SHGetSpecialFolderLocation(0, CSIDL_DESKTOP, Result));
-end;
-
-class function TPIDLHelper.GetFolderPIDL(Handle: HWND; const APath: UnicodeString): PItemIDList;
-var
-  AEaten, AAttr: DWORD;
-begin
-  if Failed(TACLShellFolder.Root.ShellFolder.ParseDisplayName(Handle, nil, PWideChar(APath), AEaten, Result, AAttr)) then
-    Result := nil;
-end;
-
-class function TPIDLHelper.GetNextPIDL(IDList: PItemIDList): PItemIDList;
-begin
-  Result := IDList;
-  Inc(PByte(Result), IDList^.mkid.cb);
-end;
-
-class function TPIDLHelper.GetPIDLSize(IDList: PItemIDList): Integer;
-begin
-  Result := 0;
-  if Assigned(IDList) then
-  begin
-    Result := SizeOf(IDList^.mkid.cb);
-    while IDList^.mkid.cb <> 0 do
-    begin
-      Result := Result + IDList^.mkid.cb;
-      IDList := GetNextPIDL(IDList);
-    end;
-  end;
-end;
-
-class procedure TPIDLHelper.StripLastID(IDList: PItemIDList);
-var
-  MarkerID: PItemIDList;
-begin
-  MarkerID := IDList;
-  if Assigned(IDList) then
-  begin
-    while IDList.mkid.cb <> 0 do
-    begin
-      MarkerID := IDList;
-      IDList := TPIDLHelper.GetNextPIDL(IDList);
-    end;
-    MarkerID.mkid.cb := 0;
-  end;
-end;
-{$ELSE}
-function ShellExecute(const AFileName: string): Boolean;
-begin
-  {$MESSAGE WARN 'Commented'}
-  Result := False;
-end;
-
-function ShellExecuteURL(const AFileName: string): Boolean;
-begin
-  {$MESSAGE WARN 'Commented'}
-  Result := False;
-end;
-
 {$ENDIF}
 end.

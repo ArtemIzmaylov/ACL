@@ -16,20 +16,29 @@ unit ACL.UI.Controls.ShellTreeView;
 interface
 
 uses
-  Winapi.Windows,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
   Winapi.ShellApi,
   Winapi.ShlObj,
+  Winapi.Windows,
+{$ENDIF}
   // System
-  System.Types,
-  System.Classes,
+  {System.}Classes,
+  {System.}SysUtils,
+  System.AnsiStrings,
   // Vcl
-  Vcl.ImgList,
-  Vcl.Controls,
+  {Vcl.}Controls,
+  {Vcl.}Graphics,
+  {Vcl.}ImgList,
   // ACL
   ACL.Classes,
+  ACL.Classes.Collections,
   ACL.FileFormats.INI,
   ACL.Geometry,
   ACL.Graphics,
+  ACL.Graphics.Images,
   ACL.UI.Application,
   ACL.UI.Controls.BaseControls,
   ACL.UI.Controls.CompoundControl.SubClass,
@@ -91,7 +100,6 @@ type
     FShowFavorites: Boolean;
     FShowHidden: TACLBoolean;
 
-    function GetActualShowHidden: Boolean;
     function GetBorders: TACLBorders;
     function GetCheckBoxes: Boolean;
     procedure SetBorders(AValue: TACLBorders);
@@ -102,8 +110,6 @@ type
     procedure DoAssign(Source: TPersistent); override;
   public
     procedure AfterConstruction; override;
-    //# Properties
-    property ActualShowHidden: Boolean read GetActualShowHidden;
   published
     property Borders: TACLBorders read GetBorders write SetBorders default acAllBorders;
     property CheckBoxes: Boolean read GetCheckBoxes write SetCheckBoxes default False;
@@ -124,6 +130,7 @@ type
     FQuickAccessNodeState: Boolean;
     FSelectedPath: string;
 
+    function AddNode(AFolder: TACLShellFolder; AParent: TACLTreeListNode): TACLTreeListNode;
     function GetQuickAccessNodeState: Boolean;
     procedure SetOptionsBehavior(AValue: TACLShellTreeViewOptionsBehavior);
     procedure SetOptionsView(AValue: TACLShellTreeViewOptionsView);
@@ -145,8 +152,7 @@ type
     procedure ProcessContextPopup(var AHandled: Boolean); override;
     procedure ProcessKeyDown(var AKey: Word; AShift: TShiftState); override;
 
-    function AddFolderNode(ID: PItemIDList; AParent: TACLTreeListNode): TACLTreeListNode;
-    function FindNodeByPIDL(ID: PItemIDList; ANode: TACLTreeListNode): TACLTreeListNode;
+    function FindNodeByPIDL(AAbsoluteID: PItemIDList; ANode: TACLTreeListNode): TACLTreeListNode;
     procedure SelectPathByPIDL(PIDL: PItemIDList);
   public
     constructor Create(AOwner: TComponent); override;
@@ -233,6 +239,7 @@ type
 { TACLShellImageList }
 
 constructor TACLShellImageList.Create(AOwner: TComponent);
+{$IFDEF MSWINDOWS}
 var
   LFileInfo: TSHFileInfoW;
 begin
@@ -242,16 +249,26 @@ begin
   ZeroMemory(@LFileInfo, SizeOf(LFileInfo));
   Handle := SHGetFileInfoW('', 0, LFileInfo, SizeOf(LFileInfo),
     SHGFI_USEFILEATTRIBUTES or SHGFI_SYSICONINDEX or SHGFI_SMALLICON);
+{$ELSE}
+begin
+  inherited Create(AOwner);
+{$ENDIF}
+end;
 end;
 
 function TACLShellImageList.GetImageIndex(AFolder: TACLShellFolder): Integer;
+{$IFDEF MSWINDOWS}
 var
   LFileInfo: TSHFileInfoW;
 begin
   ZeroMemory(@LFileInfo, SizeOf(LFileInfo));
-  SHGetFileInfoW(PWideChar(AFolder.FullPIDL), 0, LFileInfo, SizeOf(LFileInfo),
+  SHGetFileInfoW(PWideChar(AFolder.AbsoluteID), 0, LFileInfo, SizeOf(LFileInfo),
     SHGFI_PIDL or SHGFI_SYSICONINDEX or SHGFI_SMALLICON);
   Result := LFileInfo.iIcon;
+{$ELSE}
+begin
+  Result := -1;
+{$ENDIF}
 end;
 
 { TACLShellTreeViewCustomOptions }
@@ -337,14 +354,6 @@ begin
     ShowHidden := TACLShellTreeViewOptionsView(Source).ShowHidden;
     ShowFavorites := TACLShellTreeViewOptionsView(Source).ShowFavorites;
   end;
-end;
-
-function TACLShellTreeViewOptionsView.GetActualShowHidden: Boolean;
-begin
-  if ShowHidden = TACLBoolean.Default then
-    Result := ShellShowHiddenByDefault
-  else
-    Result := ShowHidden = TACLBoolean.True;
 end;
 
 function TACLShellTreeViewOptionsView.GetBorders: TACLBorders;
@@ -504,7 +513,7 @@ end;
 
 procedure TACLShellTreeViewSubClass.DoFocusedNodeChanged;
 begin
-  FSelectedPath := ExcludeTrailingPathDelimiter(GetFullPath(FocusedNode));
+  FSelectedPath := acExcludeTrailingPathDelimiter(GetFullPath(FocusedNode));
   inherited DoFocusedNodeChanged;
 end;
 
@@ -517,67 +526,59 @@ begin
 end;
 
 procedure TACLShellTreeViewSubClass.DoGetPathChildren(ANode: TACLTreeListNode);
-
-  function GetObjectFlags: Integer;
-  begin
-    Result := SHCONTF_FOLDERS;
-    if OptionsView.ActualShowHidden then
-      Inc(Result, SHCONTF_INCLUDEHIDDEN);
-  end;
-
 var
-  AEnumList: IEnumIDList;
-  ANumIDs: LongWord;
-  AResult: HRESULT;
-  ID: PItemIDList;
+  LFolderParent: TACLShellFolder;
 begin
-  try
-    AResult := TACLShellFolder(ANode.Data).ShellFolder.EnumObjects(
-      TACLApplication.GetHandle, GetObjectFlags, AEnumList);
-    if AResult <> 0 then
-      Exit;
-  except
-    on E: Exception do
-  end;
-  while AEnumList.Next(1, ID, ANumIDs) = S_OK do
-    AddFolderNode(ID, ANode);
+  LFolderParent := ANode.Data;
+  LFolderParent.Enum(TACLApplication.GetHandle,
+    OptionsView.ShowHidden.ActualValue(TACLShellFolder.ShowHidden),
+    procedure (ID: PItemIDList)
+    var
+      LFolder: TACLShellFolder;
+    begin
+      LFolder := TACLShellFolder.Create(LFolderParent, ID);
+      if LFolder.IsFileSystemFolder then
+        AddNode(LFolder, ANode)
+      else
+        LFolder.Free;
+    end);
   if ANode.ChildrenCount > 1 then
     TACLTreeListNodeAccess(ANode).FSubNodes.Sort(@SortFolderNames);
 end;
 
 procedure TACLShellTreeViewSubClass.DoGetRootChildren(ANode: TACLTreeListNode);
-var
-  LFolder: TACLShellFolder;
-  LPIDL: PItemIDList;
-begin
-  if OptionsView.ShowFavorites then
-  try
-    LPIDL := TPIDLHelper.GetFolderPIDL(TACLApplication.GetHandle, TPIDLHelper.QuickAccessPath);
-    if LPIDL <> nil then
+
+  function AddNodeSpecial(const Uri: string): TACLTreeListNode;
+  var
+    LPIDL: PItemIDList;
+  begin
+    Result := nil;
     try
+      LPIDL := TPIDLHelper.GetFolderPIDL(TACLApplication.GetHandle, Uri);
+      if LPIDL <> nil then
       try
-        LFolder := TACLShellFolder.CreateSpecial(LPIDL);
-      except
-        LFolder := nil;
+        Result := AddNode(TACLShellFolder.CreateSpecial(LPIDL), ANode);
+      finally
+        TPIDLHelper.DisposePIDL(LPIDL);
       end;
-      if LFolder <> nil then
-      begin
-        FQuickAccessNode := RootNode.AddChild([LFolder.DisplayName]);
-        FQuickAccessNode.Data := LFolder;
-        FQuickAccessNode.ImageIndex := FImages.GetImageIndex(LFolder);
-        FQuickAccessNode.HasChildren := LFolder.HasChildren;
-        FQuickAccessNode.Expanded := FQuickAccessNodeState;
-      end;
-    finally
-      TPIDLHelper.DisposePIDL(LPIDL);
+    except
+      Result := nil;
     end;
-  except
-    // do nothing
   end;
 
-  ANode := AddFolderNode(TACLShellFolder.Root.AbsoluteID, RootNode);
-  if ANode <> nil then
-    ANode.Expanded := True;
+begin
+  if OptionsView.ShowFavorites then
+  begin
+    FQuickAccessNode := AddNodeSpecial(TPIDLHelper.Favorites);
+    if FQuickAccessNode <> nil then
+      FQuickAccessNode.Expanded := FQuickAccessNodeState;
+  end;
+{$IFDEF MSWINDOWS}
+  AddNode(TACLShellFolder.Create, RootNode).Expanded := True;
+{$ELSE}
+  AddNodeSpecial(GetUserDir).Expanded := True;
+  AddNode(TACLShellFolder.Create, RootNode);
+{$ENDIF}
 end;
 
 procedure TACLShellTreeViewSubClass.NodeRemoving(ANode: TACLTreeListNode);
@@ -588,71 +589,79 @@ begin
   inherited NodeRemoving(ANode);
 end;
 
-function TACLShellTreeViewSubClass.AddFolderNode(
-  ID: PItemIDList; AParent: TACLTreeListNode): TACLTreeListNode;
-var
-  LFolder: TACLShellFolder;
+function TACLShellTreeViewSubClass.AddNode(
+  AFolder: TACLShellFolder; AParent: TACLTreeListNode): TACLTreeListNode;
 begin
-  Result := nil;
-  if ID <> nil then
-  begin
-    LFolder := TACLShellFolder.Create(TACLShellFolder(AParent.Data), ID);
-    if LFolder.IsFolder then
-    begin
-      Result := AParent.AddChild([LFolder.DisplayName]);
-      Result.Data := LFolder;
-      Result.HasChildren := LFolder.HasChildren;
-      Result.ImageIndex := FImages.GetImageIndex(LFolder);
-    end
-    else
-      FreeAndNil(LFolder);
-  end;
+  Result := AParent.AddChild([AFolder.DisplayName]);
+  Result.Data := AFolder;
+  Result.HasChildren := AFolder.HasChildren;
+  Result.ImageIndex := FImages.GetImageIndex(AFolder);
 end;
 
 function TACLShellTreeViewSubClass.FindNodeByPIDL(
-  ID: PItemIDList; ANode: TACLTreeListNode): TACLTreeListNode;
+  AAbsoluteID: PItemIDList; ANode: TACLTreeListNode): TACLTreeListNode;
 var
-  AFolder: TACLShellFolder;
+  LFolder: TACLShellFolder;
   I: Integer;
 begin
-  Result := nil;
   if ANode <> nil then
+  begin
     for I := 0 to ANode.ChildrenCount - 1 do
     begin
-      AFolder := TACLShellFolder(ANode.Children[I].Data);
-      if AFolder.Root.ShellFolder.CompareIDs(0, ID, AFolder.AbsoluteID) = 0 then
+      LFolder := ANode.Children[I].Data;
+      if TACLShellFolder.Root.Compare(AAbsoluteID, LFolder.AbsoluteID) = 0 then
         Exit(ANode.Children[I]);
     end;
+  end;
+  Result := nil;
 end;
 
 procedure TACLShellTreeViewSubClass.SelectPathByPIDL(PIDL: PItemIDList);
 var
-  ALast: TACLTreeListNode;
-  AList: TList;
-  I, R: Integer;
+  LCandidate: TACLTreeListNode;
+  LCurrPIDL: PItemIDList;
+  LLastNode: TACLTreeListNode;
+  LNextNode: TACLTreeListNode;
+  LStack: TList;
+  I: Integer;
 begin
-  if Assigned(PIDL) and (RootNode.ChildrenCount > 0) then
+  if (PIDL <> nil) and (RootNode.ChildrenCount > 0) then
   begin
-    AList := TPIDLHelper.CreatePIDLList(PIDL);
+    LStack := TList.Create;
     try
-      for R := 0 to RootNode.ChildrenCount - 1 do
+      LCandidate := nil;
+      LCurrPIDL := TPIDLHelper.CopyPIDL(PIDL);
+      repeat
+        LLastNode := FindNodeByPIDL(LCurrPIDL, RootNode);
+        if LLastNode <> nil then
+        begin
+          for I := LStack.Count - 1 downto 0 do
+          begin
+            LNextNode := FindNodeByPIDL(LStack.List[I], LLastNode);
+            if LNextNode = nil then Break;
+            LLastNode := LNextNode;
+          end;
+          // По этой ветке прошли глубже?
+          if (LCandidate = nil) or (LLastNode.Level > LCandidate.Level) then
+            LCandidate := LLastNode;
+          // Дошли до конца?
+          if TACLShellFolder.Root.Compare(PIDL, TACLShellFolder(LCandidate.Data).AbsoluteID) = 0 then
+            Break;
+        end;
+        LStack.Add(LCurrPIDL);
+        LCurrPIDL := TPIDLHelper.GetParentPIDL(LCurrPIDL);
+      until LCurrPIDL = nil;
+
+      if LCandidate <> nil then
       begin
-        ALast := RootNode.Children[R];
-        for I := 1 to AList.Count - 1 do
-        begin
-          ALast := FindNodeByPIDL(AList.Items[I], ALast);
-          if ALast = nil then Break;
-          ALast.Expanded := True;
-        end;
-        if ALast <> nil then
-        begin
-          FocusedNode := FindNodeByPIDL(PIDL, ALast);
-          MakeTop(FocusedNode);
-          Break;
-        end;
+        FocusedNode := LCandidate;
+        MakeTop(FocusedNode);
       end;
     finally
-      TPIDLHelper.DestroyPIDLList(AList);
+      TPIDLHelper.DisposePIDL(LCurrPIDL);
+      for I := LStack.Count - 1 downto 0 do
+        TPIDLHelper.DisposePIDL(PItemIDList(LStack.List[I]));
+      LStack.Free;
     end;
   end;
 end;
@@ -678,13 +687,10 @@ procedure TACLShellTreeViewSubClass.SetSelectedPath(AValue: string);
 var
   APIDL: PItemIDList;
 begin
-  AValue := ExcludeTrailingPathDelimiter(AValue);
+  AValue := acExcludeTrailingPathDelimiter(AValue);
   if not acSameText(SelectedPath, AValue) then
   try
     FSelectedPath := AValue;
-    if not ShellIsLibraryPath(AValue) then
-      AValue := acIncludeTrailingPathDelimiter(AValue);
-
     APIDL := TPIDLHelper.GetFolderPIDL(TACLApplication.GetHandle, AValue);
     try
       SelectPathByPIDL(APIDL);
@@ -698,7 +704,9 @@ end;
 
 class function TACLShellTreeViewSubClass.SortFolderNames(L, R: TACLTreeListNode): Integer;
 begin
-  Result := TACLShellFolder(L.Data).Compare(TACLShellFolder(R.Data));
+  Result := TACLShellFolder(L.Data).Compare(
+    TACLShellFolder(L.Data).ID,
+    TACLShellFolder(R.Data).ID);
 end;
 
 procedure TACLShellTreeViewSubClass.ProcessContextPopup(var AHandled: Boolean);
@@ -710,26 +718,14 @@ end;
 
 procedure TACLShellTreeViewSubClass.ProcessKeyDown(var AKey: Word; AShift: TShiftState);
 begin
-  if AShift * [ssShift, ssAlt, ssCtrl] = [] then
-    case AKey of
-      VK_F5:
-        begin
-          ReloadData;
-          Exit;
-        end;
-
-      VK_DELETE:
-        begin
-          if ShellDelete(SelectedPath, [sofCanUndo]) then
-            ReloadData;
-          Exit;
-        end;
-    end;
-
-  inherited ProcessKeyDown(AKey, AShift);
+  if AKey = VK_F5 then
+    ReloadData
+  else
+    inherited ProcessKeyDown(AKey, AShift);
 end;
 
 procedure TACLShellTreeViewSubClass.InvokeSystemMenu(AOwnerWindow: HWND; ANode: TACLTreeListNode);
+{$IFDEF MSWINDOWS}
 const
   TRACKMENU_FLAGS = TPM_LEFTALIGN or TPM_LEFTBUTTON or TPM_RIGHTBUTTON or TPM_RETURNCMD;
 var
@@ -767,6 +763,9 @@ begin
       DestroyMenu(AMenu);
     end;
   end;
+{$ELSE}
+begin
+{$ENDIF}
 end;
 
 { TACLShellTreeView }
