@@ -42,7 +42,6 @@ uses
   ACL.Graphics.SkinImage,
   ACL.MUI,
   ACL.ObjectLinks,
-  ACL.UI.Resources,
   ACL.Utils.Common;
 
 type
@@ -68,8 +67,10 @@ type
   {$ENDIF}
   public
     procedure AfterConstruction; override;
-    procedure AddBitmap(ABitmap: TBitmap);
-    procedure AddImage(AImage: TACLSkinImage);
+    function AddBitmap(ABitmap: TBitmap): Integer;
+    function AddImage(const AImageFileName: string): Integer; overload;
+    function AddImage(const AImage: TACLImage): Integer; overload;
+    function AddImage(const AImage: TACLSkinImage): Integer; overload;
     function AddIconFromResource(AInstance: HINST; const AName: string): Integer;
     procedure ReplaceBitmap(AIndex: Integer; ABitmap: TBitmap);
     //# Clear and Add the Image
@@ -228,37 +229,61 @@ begin
   Masked := False;
 end;
 
-procedure TACLImageList.AddBitmap(ABitmap: TBitmap);
+function TACLImageList.AddBitmap(ABitmap: TBitmap): Integer;
 var
   LTemp: TACLBitmap;
 begin
   if acIs32BitBitmap(ABitmap) then
   begin
   {$IFDEF FPC}
-    AddSliced(ABitmap, ABitmap.Width div Width, ABitmap.Height div Height);
+    Result := AddSliced(ABitmap, ABitmap.Width div Width, ABitmap.Height div Height);
   {$ELSE}
-    Add(ABitmap, nil);
+    Result := Add(ABitmap, nil);
   {$ENDIF}
   end
   else
   begin
     LTemp := ConvertTo32Bit(ABitmap);
     try
-      AddBitmap(LTemp);
+      Result := AddBitmap(LTemp);
     finally
       LTemp.Free;
     end;
   end;
 end;
 
-procedure TACLImageList.AddImage(AImage: TACLSkinImage);
+function TACLImageList.AddImage(const AImageFileName: string): Integer;
+var
+  LImage: TACLImage;
+begin
+  LImage := TACLImage.Create(AImageFileName);
+  try
+    Result := AddImage(LImage);
+  finally
+    LImage.Free;
+  end;
+end;
+
+function TACLImageList.AddImage(const AImage: TACLImage): Integer;
+var
+  LTemp: TACLBitmap;
+begin
+  LTemp := AImage.ToBitmap;
+  try
+    Result := AddBitmap(LTemp);
+  finally
+    LTemp.Free;
+  end;
+end;
+
+function TACLImageList.AddImage(const AImage: TACLSkinImage): Integer;
 var
   LTmp: TBitmap;
 begin
   LTmp := TBitmap.Create;
   try
     AImage.SaveToBitmap(LTmp);
-    AddBitmap(LTmp);
+    Result := AddBitmap(LTmp);
   finally
     LTmp.Free;
   end;

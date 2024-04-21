@@ -11,7 +11,7 @@
 
 unit ACL.UI.Controls.ShellTreeView;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
@@ -55,8 +55,11 @@ type
   { TACLShellImageList }
 
   TACLShellImageList = class(TCustomImageList)
+  strict private
+    FCache: TACLDictionary<string, Integer>;
   public
     constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
     function GetImageIndex(AFolder: TACLShellFolder): Integer;
   end;
 
@@ -225,16 +228,54 @@ type
 implementation
 
 uses
-  System.AnsiStrings,
-  System.SysUtils,
-  // ACL
+{$IFDEF FPC}
+  gtk2,
+  gtk2Def,
+  glib2,
+  GraphType,
+{$ELSE}
+  ACL.Utils.Desktop,
+{$ENDIF}
   ACL.UI.Dialogs,
-  ACL.Utils.FileSystem,
-  ACL.Utils.Desktop;
+  ACL.Utils.FileSystem;
 
 type
   TACLTreeListNodeAccess = class(TACLTreeListNode);
   TACLTreeListCustomOptionsAccess = class(TACLTreeListCustomOptions);
+
+{$IFDEF FPC}
+const
+  libGio2 = 'libgio-2.0.so.0';
+  libGtk2 = gtklib;
+
+type
+  PGIcon = Pointer;
+  PGFile = Pointer;
+  PGFileInfo = Pointer;
+  PGCancellable = Pointer;
+
+  TGtkIconLookupFlag = (
+    GTK_ICON_LOOKUP_NO_SVG = 0,
+    GTK_ICON_LOOKUP_FORCE_SVG = 1,
+    GTK_ICON_LOOKUP_USE_BUILTIN = 2,
+    GTK_ICON_LOOKUP_GENERIC_FALLBACK = 3,
+    GTK_ICON_LOOKUP_FORCE_SIZE = 4,
+    GTK_ICON_LOOKUP_FORCE_REGULAR = 5,
+    GTK_ICON_LOOKUP_FORCE_SYMBOLIC = 6,
+    GTK_ICON_LOOKUP_DIR_LTR = 7,
+    GTK_ICON_LOOKUP_DIR_RTL = 8,
+    TGtkIconLookupFlagsIdxMaxValue = 31
+  );
+  TGtkIconLookupFlags = set of TGtkIconLookupFlag;
+
+function g_file_query_info(file_: PGFile; attributes: Pgchar; flags: LongWord;
+  cancellable: PGCancellable; error: PPGError): PGFileInfo; cdecl; external libGio2 name 'g_file_query_info';
+function g_file_info_get_icon(info: PGFileInfo): PGIcon; cdecl; external libGio2 name 'g_file_info_get_icon';
+function g_file_new_for_path(path: Pgchar): PGFile; cdecl; external libGio2 name 'g_file_new_for_path';
+
+function gtk_icon_theme_lookup_by_gicon(icon_theme: PGtkIconTheme; icon: PGIcon;
+  size: gint; flags: TGtkIconLookupFlags): PGtkIconInfo; cdecl; external libGtk2;
+{$ENDIF}
 
 { TACLShellImageList }
 
@@ -252,8 +293,14 @@ begin
 {$ELSE}
 begin
   inherited Create(AOwner);
+  FCache := TACLDictionary<string, Integer>.Create;;
 {$ENDIF}
 end;
+
+destructor TACLShellImageList.Destroy;
+begin
+  FreeAndNil(FCache);
+  inherited Destroy;
 end;
 
 function TACLShellImageList.GetImageIndex(AFolder: TACLShellFolder): Integer;
@@ -266,8 +313,92 @@ begin
     SHGFI_PIDL or SHGFI_SYSICONINDEX or SHGFI_SMALLICON);
   Result := LFileInfo.iIcon;
 {$ELSE}
+const
+  RegularFolderImageIndex = 0;
+
+  function AddImageFile(const AFileName: string): Integer;
+  var
+    LBitmap: TBitmap;
+    LImage: TACLImage;
+  begin
+    if not FCache.TryGetValue(AFileName, Result) then
+    begin
+      try
+        LImage := TACLImage.Create(AFileName);
+        try
+          LBitmap := LImage.ToBitmap;
+          try
+            Result := Add(LBitmap, nil);
+          finally
+            LBitmap.Free;
+          end;
+        finally
+          LImage.Free;
+        end;
+      except
+        Result := RegularFolderImageIndex;
+      end;
+      FCache.Add(AFileName, Result);
+    end;
+  end;
+
+  function FetchIcon(const APath: string): Integer;
+  var
+    LError: PGError;
+    LFile: PGFile;
+    LFileName: Pgchar;
+    LInfo: PGFileInfo;
+    LIcon: PGIcon;
+    LIconInfo: PGtkIconInfo;
+  begin
+    Result := RegularFolderImageIndex;
+    try
+      LFile := g_file_new_for_path(PChar(APath));
+      if LFile <> nil then
+      try
+        LError := nil;
+        LInfo := g_file_query_info(LFile, 'standard::icon', 0, nil, @LError);
+        if LError <> nil then
+          g_error_free(LError);
+        if LInfo <> nil then
+        try
+          LIcon := g_file_info_get_icon(LInfo);
+          if LIcon <> nil then
+          begin
+            LIconInfo := gtk_icon_theme_lookup_by_gicon(gtk_icon_theme_get_default,
+              LIcon, Width, [GTK_ICON_LOOKUP_USE_BUILTIN, GTK_ICON_LOOKUP_FORCE_SIZE]);
+            if LIconInfo <> nil then
+            try
+              LFileName := gtk_icon_info_get_filename(LIconInfo);
+              if LFileName <> nil then
+                Result := AddImageFile(LFileName);
+            finally
+              gtk_icon_info_free(LIconInfo);
+            end;
+          end;
+        finally
+          g_object_unref(LInfo);
+        end;
+      finally
+        g_object_unref(LFile);
+      end;
+    except
+      // do nothing
+    end;
+  end;
+
 begin
-  Result := -1;
+  // IL еще не готов - форсируем иконку для обычной папки
+  if FCache.Count = 0 then
+  begin
+    FetchIcon(PathDelim);
+    if FCache.Count = 0 then // FetchIcon облажалась
+      FCache.Add('', RegularFolderImageIndex); // чтобы не было зацикливания
+  end;
+  if AFolder.ID^.Flags <> 0 then // спец.папка, для них спрашиваем свою иконку
+    Result := FetchIcon(AFolder.Path)
+  else
+    Result := RegularFolderImageIndex;
 {$ENDIF}
 end;
 
