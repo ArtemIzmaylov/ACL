@@ -19,8 +19,6 @@ unit ACL.Utils.Shell;
     + ShellShutdown
     + ShellDelete
     + ShellUndelete
-    + ShellExecute
-    + ShellJumpToFile
     + ShellGetFreeSpace
 *)
 
@@ -36,6 +34,7 @@ uses
 {$ELSE}
   LCLIntf,
   LCLType,
+  UTF8Process,
 {$ENDIF}
   // System
   {System.}Classes,
@@ -455,6 +454,36 @@ end;
 
 {$REGION ' Executing '}
 
+function ShellOpen(const AFileName, AParameters: string): Boolean;
+begin
+{$IFDEF FPC}
+  if AParameters <> '' then
+  try
+    RunCmdFromPath(AFileName, AParameters);
+    Result := True;
+  except
+    Result := False;
+  end
+  else
+    Result := OpenDocument(AFileName);
+{$ELSE}
+  Result := ShellExecuteW(0, 'open', PWideChar(AFileName),
+    PWideChar(AParameters), '', SW_SHOW) > HINSTANCE_ERROR;
+{$ENDIF}
+end;
+
+function ShellOpenUrl(const Url: string): Boolean;
+begin
+{$IFDEF FPC}
+  Result := OpenURL(Url);
+{$ELSE}
+  if IsWine then
+    Result := ShellOpen('winebrowser', Url)
+  else
+    Result := ShellOpen(Url, '');
+{$ENDIF}
+end;
+
 function ShellExecute(const AFileName: string): Boolean;
 begin
   Result := ShellExecute(AFileName, '');
@@ -464,15 +493,10 @@ function ShellExecute(const AFileName, AParameters: string): Boolean; overload;
 begin
   if AFileName = '' then
     Exit(False);
-{$IFDEF MSWINDOWS}
-  if IsWine and (acIsUrlFileName(AFileName) or acBeginsWith(AFileName, acMailToPrefix)) then
-    Result := ShellExecute('winebrowser', AFileName)
+  if acIsUrlFileName(AFileName) or acBeginsWith(AFileName, acMailToPrefix) then
+    Result := ShellOpenUrl(AFileName)
   else
-    Result := ShellExecuteW(0, 'open', PWideChar(AFileName), PWideChar(AParameters), '', SW_SHOW) >= 32;
-{$ELSE}
-  Result := False; {$MESSAGE WARN 'NotImplemented'}
-  raise ENotImplemented.Create('ShellExecute');
-{$ENDIF}
+    Result := ShellOpen(AFileName, AParameters);
 end;
 
 function ShellExecuteURL(const ALink: string): Boolean;
@@ -481,24 +505,22 @@ begin
     Result := False
   else
     if (Pos('//', ALink) = 0) and not acDirectoryExists(ALink) then
-      Result := ShellExecute('http://' + ALink)
+      Result := ShellOpenUrl('https://' + ALink)
     else
-      Result := ShellExecute(ALink);
+      Result := ShellOpenUrl(ALink);
 end;
 
 function ShellJumpToFile(const AFileName: string): Boolean;
-var
-  IL: PItemIDList;
 begin
   Result := False;
   if AFileName <> '' then
   begin
     if acIsUrlFileName(AFileName) then
-      Result := ShellExecute(AFileName)
+      Result := ShellOpenUrl(AFileName)
     else
     begin
     {$IFDEF MSWINDOWS}
-      IL := ILCreateFromPathW(PWideChar(AFileName));
+      var IL := ILCreateFromPathW(PWideChar(AFileName));
       if IL <> nil then
       try
         SHOpenFolderAndSelectItems(IL, 0, nil, 0);
@@ -507,13 +529,11 @@ begin
         ILFree(IL);
       end;
     {$ELSE}
-      Result := False; {$MESSAGE WARN 'NotImplemented'}
-      raise ENotImplemented.Create('ShellExecute');
+      Result := ShellExecute(acExtractFileDir(AFileName));
     {$ENDIF}
     end;
   end;
 end;
-
 {$ENDREGION}
 
 //------------------------------------------------------------------------------

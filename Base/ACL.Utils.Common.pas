@@ -79,6 +79,8 @@ type
   TACLBoolean = (Default, False, True);
 {$SCOPEDENUMS OFF}
 
+  TWndHandle = HWND; // to avoid direct references to Winapi
+
 const
   acDefault = TACLBoolean.Default;
   acFalse = TACLBoolean.False;
@@ -717,10 +719,6 @@ var
   LOutput: string;
   LProcess: TProcess;
 begin
-  if not (eoWaitForTerminate in AOptions) then
-    {$MESSAGE WARN 'not-implemented-eoWaitForTerminate'}
-    raise ENotImplemented.Create('eoWaitForTerminate');
-
   LProcess := DefaultTProcess.Create(nil);
   try
     LProcess.{%H-}CommandLine{%H-}:= ACmdLine;
@@ -729,13 +727,18 @@ begin
     else
       LProcess.ShowWindow := swoHide;
 
-    Result := LProcess.RunCommandLoop(LOutput, LError, LExitCode) = 0;
-    if AExitCode <> nil then
-      AExitCode^ := LExitCode;
-    if AErrorData <> nil then
-      AErrorData.Write(PChar(LError)^, Length(LError));
-    if AOutputData <> nil then
-      AOutputData.Write(PChar(LOutput)^, Length(LOutput));
+    if eoWaitForTerminate in AOptions then
+    begin
+      Result := LProcess.RunCommandLoop(LOutput, LError, LExitCode) = 0;
+      if AExitCode <> nil then
+        AExitCode^ := LExitCode;
+      if AErrorData <> nil then
+        AErrorData.Write(PChar(LError)^, Length(LError));
+      if AOutputData <> nil then
+        AOutputData.Write(PChar(LOutput)^, Length(LOutput));
+    end
+    else
+      LProcess.Execute;
   finally
     LProcess.Free;
   end;
