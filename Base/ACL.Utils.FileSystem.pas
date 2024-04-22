@@ -310,6 +310,7 @@ function acCopyFile(const ASourceFileName, ATargetFileName: string; AFailIfExist
 function acDeleteDirectory(const APath: string): Boolean;
 function acDeleteDirectoryFull(APath: string; ARecursive: Boolean = True): Boolean;
 function acDeleteFile(const AFileName: string): Boolean;
+function acDeleteFiles(AFiles: TACLStringList): Boolean;
 function acMakePath(const APath: string): Boolean;
 function acMakePathForFileName(const AFileName: string): Boolean;
 function acMoveFile(const ASourceFileName, ATargetFileName: string): Boolean;
@@ -1176,6 +1177,18 @@ begin
 {$ELSE}
   Result := {System.}SysUtils.DeleteFile(AFileName);
 {$ENDIF}
+end;
+
+function acDeleteFiles(AFiles: TACLStringList): Boolean;
+var
+  I: Integer;
+begin
+  Result := True;
+  for I := 0 to AFiles.Count - 1 do
+  begin
+    if not acDeleteFile(AFiles[I]) then
+      Result := False;
+  end;
 end;
 
 function acDeleteDirectory(const APath: string): Boolean;

@@ -16,10 +16,10 @@ unit ACL.Utils.Shell;
 (*
   TODO: g_file_monitor_file
   FPC:
-    + ShellShutdown
-    + ShellDelete
-    + ShellUndelete
     + ShellGetFreeSpace
+    + ShellCreateLink
+    + TACLRecycleBin
+    + ShellShutdown
 *)
 
 interface
@@ -68,8 +68,6 @@ type
   end;
 {$ENDIF}
 
-  TShellOperationFlag = (sofCanUndo, sofNoDialog, sofNoConfirmation);
-  TShellOperationFlags = set of TShellOperationFlag;
   TShellShutdownMode = (sdPowerOff, sdLogOff, sdHibernate, sdSleep, sdReboot);
 
   { TACLShellFolder }
@@ -153,12 +151,20 @@ type
   {$ENDIF}
   end;
 
-// Shell - Deleting
-function ShellDelete(AFilesOrFolders: TACLStringList;
-  AOptions: TShellOperationFlags = [sofCanUndo]): Boolean; overload;
-function ShellDelete(const AFileOrFolder: string;
-  AOptions: TShellOperationFlags = [sofCanUndo, sofNoDialog, sofNoConfirmation]): Boolean; overload;
-function ShellUndelete(const AOriginalFileOrFolder: string): HRESULT;
+  { TACLRecycleBin }
+
+  TACLRecycleBin = class
+  strict private
+    class var FLastError: HRESULT;
+  private
+    class function GetLastErrorText: string; static;
+  public
+    class function Delete(AFilesOrFolders: TACLStringList): HRESULT; overload;
+    class function Delete(const AFileOrFolder: string): HRESULT; overload;
+    class function Restore(const AFileOrFolder: string): HRESULT;
+    class property LastError: HRESULT read FLastError;
+    class property LastErrorText: string read GetLastErrorText;
+  end;
 
 // Shell - Executing
 function ShellExecute(const AFileName, AParameters: string): Boolean; overload;
@@ -189,7 +195,6 @@ function ShellParseLink(const ALink: string; out AFileName: string): Boolean;
 {$ENDIF}
 
 function ShellGetFreeSpace(const AFileName: string): Int64;
-function ShellLastErrorCode: Integer;
 function ShellShutdown(AMode: TShellShutdownMode): Boolean;
 procedure ShellFlushCache;
 implementation
@@ -223,9 +228,6 @@ const
 function g_get_user_special_dir(directory: DWORD): PChar; cdecl; external libGLib2;
 {$ENDIF}
 
-var
-  FShellLastErrorCode: Integer = 0;
-
 //------------------------------------------------------------------------------
 // Shell - General
 //------------------------------------------------------------------------------
@@ -235,6 +237,8 @@ var
 {$IFDEF MSWINDOWS}
 type
   TShellOperation = (soMove, soCopy, soDelete, soRename);
+  TShellOperationFlag = (sofCanUndo, sofNoDialog, sofNoConfirmation);
+  TShellOperationFlags = set of TShellOperationFlag;
 
 function ShellEncodePaths(const APaths: TACLStringList): string;
 var
@@ -252,10 +256,11 @@ begin
 end;
 
 function ShellOperation(const ASourceList, ADestList: string;
-  const AOperation: TShellOperation; const AFlags: TShellOperationFlags): Boolean;
+  const AOperation: TShellOperation; const AFlags: TShellOperationFlags): HRESULT;
 const
   OperationMap: array[TShellOperation] of Integer = (FO_MOVE, FO_COPY, FO_DELETE, FO_RENAME);
 var
+  AErrorCode: Integer;
   AStruct: TSHFileOpStructW;
 begin
   ZeroMemory(@AStruct, SizeOf(AStruct));
@@ -270,15 +275,16 @@ begin
     AStruct.pFrom := PWideChar(ASourceList);
   if ADestList <> '' then
     AStruct.pTo := PWideChar(ADestList);
-  FShellLastErrorCode := SHFileOperationW(AStruct);
-  Result := (FShellLastErrorCode = 0) and not AStruct.fAnyOperationsAborted;
+
+  AErrorCode := SHFileOperationW(AStruct);
+  if AErrorCode <> 0 then
+    Result := HResultFromWin32(AErrorCode)
+  else if AStruct.fAnyOperationsAborted then
+    Result := E_ABORT
+  else
+    REsult := S_OK;
 end;
 {$ENDIF}
-
-function ShellLastErrorCode: Integer;
-begin
-  Result := FShellLastErrorCode;
-end;
 
 function ShellShutdown(AMode: TShellShutdownMode): Boolean;
 {$IFDEF MSWINDOWS}
@@ -340,109 +346,6 @@ begin
 {$IFDEF MSWINDOWS}
   SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST or SHCNF_FLUSH, nil, nil);
   Sleep(1000);
-{$ENDIF}
-end;
-
-{$ENDREGION}
-
-//------------------------------------------------------------------------------
-// Shell - Deleting
-//------------------------------------------------------------------------------
-
-{$REGION ' Deleting '}
-
-function ShellDelete(AFilesOrFolders: TACLStringList;
-  AOptions: TShellOperationFlags = [sofCanUndo]): Boolean;
-begin
-{$IFDEF MSWINDOWS}
-  Result := ShellOperation(ShellEncodePaths(AFilesOrFolders), '', soDelete, AOptions);
-{$ELSE}
-  Result := False; {$MESSAGE WARN 'NotImplemented'}
-  raise ENotImplemented.Create('ShellDelete');
-{$ENDIF}
-end;
-
-function ShellDelete(const AFileOrFolder: string;
-  AOptions: TShellOperationFlags = [sofCanUndo, sofNoDialog, sofNoConfirmation]): Boolean;
-var
-  LList: TACLStringList;
-begin
-  LList := TACLStringList.Create(AFileOrFolder);
-  try
-    Result := ShellDelete(LList, AOptions);
-  finally
-    LList.Free;
-  end;
-end;
-
-function ShellUndelete(const AOriginalFileOrFolder: string): HRESULT;
-{$IFDEF MSWINDOWS}
-var
-  ARecycleBin: IShellFolder2;
-  ARecycleBinPIDL: PItemIDList;
-
-  function GetOriginalFileName(AItem: PItemIDList): string;
-  var
-    ADetails: TShellDetails;
-    AFileName: string;
-  begin
-    Result := acEmptyStr;
-    ZeroMemory(@ADetails, SizeOf(ADetails));
-    if Succeeded(ARecycleBin.GetDetailsOf(AItem, 0, ADetails)) then
-    begin
-      AFileName := TPIDLHelper.StrRetToString(AItem, ADetails.str);
-      if acExtractFileExt(AFileName) = '' then // когда отображение расширений отключено в Проводнике
-        AFileName := AFileName + acExtractFileExt(TPIDLHelper.GetDisplayName(ARecycleBin, AItem, SIGDN_FILESYSPATH));
-      if Succeeded(ARecycleBin.GetDetailsOf(AItem, 1, ADetails)) then
-        Result := IncludeTrailingPathDelimiter(TPIDLHelper.StrRetToString(AItem, ADetails.str)) + AFileName;
-    end;
-  end;
-
-  function Undelete(AItem: PItemIDList): HRESULT;
-  var
-    ACommandInfo: TCMInvokeCommandInfo;
-    AContextMenu: IContextMenu;
-  begin
-    Result := ARecycleBin.GetUIObjectOf(0, 1, AItem, IContextMenu, nil, AContextMenu);
-    if Succeeded(Result) then
-    begin
-      ZeroMemory(@ACommandInfo, SizeOf(ACommandInfo));
-      ACommandInfo.cbSize := SizeOf(ACommandInfo);
-      ACommandInfo.lpVerb := 'undelete';
-      ACommandInfo.nShow := SW_SHOWNORMAL;
-      Result := AContextMenu.InvokeCommand(ACommandInfo);
-    end;
-  end;
-
-var
-  ADesktop: IShellFolder;
-  AFetched: Cardinal;
-  AItem: PItemIDList;
-  AItems: IEnumIDList;
-begin
-  if Succeeded(SHGetSpecialFolderLocation(0, CSIDL_BITBUCKET, ARecycleBinPIDL)) then
-  try
-    if Failed(SHGetDesktopFolder(ADesktop)) then
-      Exit(E_NOINTERFACE);
-    if Failed(ADesktop.BindToObject(ARecycleBinPIDL, nil, IShellFolder2, ARecycleBin)) then
-      Exit(E_NOINTERFACE);
-    if Succeeded(ARecycleBin.EnumObjects(0, SHCONTF_FOLDERS or SHCONTF_NONFOLDERS or SHCONTF_INCLUDEHIDDEN, AItems)) then
-    begin
-      AFetched := 0;
-      while Succeeded(AItems.Next(1, AItem, AFetched)) and (AFetched = 1) do
-      begin
-        if acSameText(AOriginalFileOrFolder, GetOriginalFileName(AItem)) then
-          Exit(Undelete(AItem));
-      end;
-    end;
-  finally
-    TPIDLHelper.DisposePIDL(ARecycleBinPIDL);
-  end;
-  Result := E_INVALIDARG;
-{$ELSE}
-begin
-  Result := E_NOTIMPL; {$MESSAGE WARN 'NotImplemented'}
-  raise ENotImplemented.Create('ShellUndelete');
 {$ENDIF}
 end;
 
@@ -1412,4 +1315,119 @@ begin
   Result := AFiles <> nil;
 end;
 {$ENDIF}
+
+{ TACLRecycleBin }
+
+class function TACLRecycleBin.Delete(AFilesOrFolders: TACLStringList): HRESULT;
+{$IFDEF MSWINDOWS}
+begin
+  Result := ShellOperation(ShellEncodePaths(AFilesOrFolders),
+    acEmptyStr, soDelete, [sofCanUndo, sofNoConfirmation, sofNoDialog]);
+{$ELSE}
+  Result := E_NOTIMPL; {$MESSAGE WARN 'NotImplemented'}
+  raise ENotImplemented.Create('TACLRecycleBin.Delete');
+{$ENDIF}
+  FLastError := Result;
+end;
+
+class function TACLRecycleBin.Delete(const AFileOrFolder: string): HRESULT;
+var
+  LList: TACLStringList;
+begin
+  LList := TACLStringList.Create(AFileOrFolder);
+  try
+    Result := Delete(LList);
+  finally
+    LList.Free;
+  end;
+end;
+
+class function TACLRecycleBin.GetLastErrorText: string;
+begin
+  if HResultFacility(LastError) = FACILITY_WIN32 then
+    Result := SysErrorMessage(HResultCode(LastError))
+  else
+    Result := IntToHex(LastError);
+end;
+
+class function TACLRecycleBin.Restore(const AFileOrFolder: string): HRESULT;
+{$IFDEF MSWINDOWS}
+var
+  LRecycleBin: IShellFolder2;
+  LRecycleBinPIDL: PItemIDList;
+
+  function GetOriginalFileName(AItem: PItemIDList): string;
+  var
+    ADetails: TShellDetails;
+    AFileName: string;
+  begin
+    Result := acEmptyStr;
+    ZeroMemory(@ADetails, SizeOf(ADetails));
+    if Succeeded(LRecycleBin.GetDetailsOf(AItem, 0, ADetails)) then
+    begin
+      AFileName := TPIDLHelper.StrRetToString(AItem, ADetails.str);
+      if acExtractFileExt(AFileName) = '' then // когда отображение расширений отключено в Проводнике
+        AFileName := AFileName + acExtractFileExt(TPIDLHelper.GetDisplayName(LRecycleBin, AItem, SIGDN_FILESYSPATH));
+      if Succeeded(LRecycleBin.GetDetailsOf(AItem, 1, ADetails)) then
+        Result := IncludeTrailingPathDelimiter(TPIDLHelper.StrRetToString(AItem, ADetails.str)) + AFileName;
+    end;
+  end;
+
+  function Undelete(AItem: PItemIDList): HRESULT; overload;
+  var
+    ACommandInfo: TCMInvokeCommandInfo;
+    AContextMenu: IContextMenu;
+  begin
+    Result := LRecycleBin.GetUIObjectOf(0, 1, AItem, IContextMenu, nil, AContextMenu);
+    if Succeeded(Result) then
+    begin
+      ZeroMemory(@ACommandInfo, SizeOf(ACommandInfo));
+      ACommandInfo.cbSize := SizeOf(ACommandInfo);
+      ACommandInfo.lpVerb := 'undelete';
+      ACommandInfo.nShow := SW_SHOWNORMAL;
+      Result := AContextMenu.InvokeCommand(ACommandInfo);
+    end;
+  end;
+
+  function Undelete: HRESULT; overload;
+  const
+    SHCONTF_FLAGS = SHCONTF_FOLDERS or SHCONTF_NONFOLDERS or SHCONTF_INCLUDEHIDDEN;
+  var
+    ADesktop: IShellFolder;
+    AFetched: Cardinal;
+    AItem: PItemIDList;
+    AItems: IEnumIDList;
+  begin
+    Result := E_NOINTERFACE;
+    if Succeeded(SHGetSpecialFolderLocation(0, CSIDL_BITBUCKET, LRecycleBinPIDL)) then
+    try
+      if Failed(SHGetDesktopFolder(ADesktop)) then
+        Exit(E_NOINTERFACE);
+      if Failed(ADesktop.BindToObject(LRecycleBinPIDL, nil, IShellFolder2, LRecycleBin)) then
+        Exit(E_NOINTERFACE);
+      if Succeeded(LRecycleBin.EnumObjects(0, SHCONTF_FLAGS, AItems)) then
+      begin
+        AFetched := 0;
+        while Succeeded(AItems.Next(1, AItem, AFetched)) and (AFetched = 1) do
+        begin
+          if acSameText(AFileOrFolder, GetOriginalFileName(AItem)) then
+            Exit(Undelete(AItem));
+        end;
+      end;
+      Result := E_INVALIDARG;
+    finally
+      TPIDLHelper.DisposePIDL(LRecycleBinPIDL);
+    end;
+  end;
+
+begin
+  Result := Undelete;
+  FLastError := Result;
+{$ELSE}
+begin
+  Result := E_NOTIMPL; {$MESSAGE WARN 'NotImplemented'}
+  raise ENotImplemented.Create('TACLRecycleBin.Restore');
+{$ENDIF}
+end;
+
 end.
