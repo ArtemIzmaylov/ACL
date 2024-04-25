@@ -18,7 +18,6 @@ unit ACL.Utils.Shell;
   FPC:
     + ShellGetFreeSpace
     + ShellCreateLink
-    + TACLRecycleBin
     + ShellShutdown
 *)
 
@@ -156,7 +155,7 @@ type
   TACLRecycleBin = class
   strict private
     class var FLastError: HRESULT;
-  private
+    class var FLastErrorText: string;
     class function GetLastErrorText: string; static;
   public
     class function Delete(AFilesOrFolders: TACLStringList): HRESULT; overload;
@@ -204,6 +203,7 @@ uses
   ACL.Utils.Registry,
   ACL.Utils.Stream,
 {$ELSE}
+  ACL.Utils.FileSystem.GIO,
   ACL.Web,
 {$ENDIF}
   ACL.Utils.Strings;
@@ -1324,13 +1324,23 @@ begin
   Result := ShellOperation(ShellEncodePaths(AFilesOrFolders),
     acEmptyStr, soDelete, [sofCanUndo, sofNoConfirmation, sofNoDialog]);
 {$ELSE}
-  Result := E_NOTIMPL; {$MESSAGE WARN 'NotImplemented'}
-  raise ENotImplemented.Create('TACLRecycleBin.Delete');
+var
+  LResult: HRESULT;
+  I: Integer;
+begin
+  Result := S_OK;
+  for I := 0 to AFilesOrFolders.Count - 1 do
+  begin
+    LResult := Delete(AFilesOrFolders[I]);
+    if LResult <> S_OK then
+      Result := LResult;
+  end;
 {$ENDIF}
   FLastError := Result;
 end;
 
 class function TACLRecycleBin.Delete(const AFileOrFolder: string): HRESULT;
+{$IFDEF MSWINDOWS}
 var
   LList: TACLStringList;
 begin
@@ -1340,12 +1350,22 @@ begin
   finally
     LList.Free;
   end;
+{$ELSE}
+begin
+  Result := gioTrash(AFileOrFolder, FLastErrorText);
+  FLastError := Result;
+{$ENDIF}
 end;
 
 class function TACLRecycleBin.GetLastErrorText: string;
 begin
+{$IFDEF MSWINDOWS}
+  FLastErrorText := '';
   if HResultFacility(LastError) = FACILITY_WIN32 then
-    Result := SysErrorMessage(HResultCode(LastError))
+    FLastErrorText := SysErrorMessage(HResultCode(LastError));
+{$ENDIF}
+  if FLastErrorText <> '' then
+    Result := FLastErrorText
   else
     Result := IntToHex(LastError);
 end;
@@ -1422,12 +1442,11 @@ var
 
 begin
   Result := Undelete;
-  FLastError := Result;
 {$ELSE}
 begin
-  Result := E_NOTIMPL; {$MESSAGE WARN 'NotImplemented'}
-  raise ENotImplemented.Create('TACLRecycleBin.Restore');
+  Result := gioUntrash(acExcludeTrailingPathDelimiter(AFileOrFolder), FLastErrorText);
 {$ENDIF}
+  FLastError := Result;
 end;
 
 end.
