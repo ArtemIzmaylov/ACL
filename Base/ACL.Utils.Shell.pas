@@ -11,15 +11,7 @@
 
 unit ACL.Utils.Shell;
 
-{$I ACL.Config.inc} // FPC:Partial
-
-(*
-  TODO: g_file_monitor_file
-  FPC:
-    + ShellGetFreeSpace
-    + ShellCreateLink
-    + ShellShutdown
-*)
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
@@ -334,10 +326,29 @@ begin
       Result := SetSystemPowerState(AMode = sdSleep, False);
   end;
 {$ELSE}
+const
+  // https://www.computerhope.com/unix/ushutdow.htm
+  CmdMap: array[TShellShutdownMode] of string = (
+    '/sbin/shutdown -h now',
+    '/sbin/shutdown -h now',
+    'systemctl hibernate',
+    'systemctl suspend',
+    '/sbin/shutdown -r now'
+  );
 begin
-  {$MESSAGE WARN 'ShellShutdown - NOTIMPLEMENTED'}
-  Result := False;
-  raise ENotImplemented.Create('ShellShutdown');
+  with TProcessUTF8.Create(nil) do
+  try
+    InheritHandles := False;
+    CommandLine := CmdMap[AMode];
+    try
+      Execute;
+      Result := True;
+    except
+      Result := False;
+    end;
+  finally
+    Free;
+  end;
 {$ENDIF}
 end;
 
@@ -679,9 +690,7 @@ begin
   end;
 {$ELSE}
 begin
-  {$MESSAGE WARN 'NOTIMPLEMENTED'}
-  Result := -1;
-  raise ENotImplemented.Create('ShellGetFreeSpace');
+  Result := SysUtils.DiskFree(SysUtils.AddDisk(acExtractFileDir(AFileName)));
 {$ENDIF}
 end;
 

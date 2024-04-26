@@ -59,6 +59,7 @@ type
   PGFileProgressCallback = ^TGFileProgressCallback;
   TGFileProgressCallback = procedure(current_num_bytes, total_num_bytes: gint64; user_data: gpointer); cdecl;
 
+//g_file_monitor_file
 function g_file_new_for_path(path: Pgchar): PGFile; cdecl; external libGio2;
 function g_file_new_for_commandline_arg(arg: Pgchar): PGFile; cdecl; external libGio2;
 function g_file_new_for_uri(uri: Pgchar): PGFile; cdecl; external libGio2;
