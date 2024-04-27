@@ -76,12 +76,12 @@ type
     property TextColor[Enabled: Boolean]: TColor read GetTextColor;
   published
     property ColorContent: TACLResourceColor index 0 read GetColor write SetColor stored IsColorStored;
-    property ColorTextHyperlink: TACLResourceColor index 1 read GetColor write SetColor stored IsColorStored;
-    property ColorLine1: TACLResourceColor index 2 read GetColor write SetColor stored IsColorStored;
-    property ColorLine2: TACLResourceColor index 3 read GetColor write SetColor stored IsColorStored;
-    property ColorShadow: TACLResourceColor index 4 read GetColor write SetColor stored IsColorStored;
-    property ColorText: TACLResourceColor index 5 read GetColor write SetColor stored IsColorStored;
-    property ColorTextDisabled: TACLResourceColor index 6 read GetColor write SetColor stored IsColorStored;
+    property ColorLine1: TACLResourceColor index 1 read GetColor write SetColor stored IsColorStored;
+    property ColorLine2: TACLResourceColor index 2 read GetColor write SetColor stored IsColorStored;
+    property ColorShadow: TACLResourceColor index 3 read GetColor write SetColor stored IsColorStored;
+    property ColorText: TACLResourceColor index 4 read GetColor write SetColor stored IsColorStored;
+    property ColorTextDisabled: TACLResourceColor index 5 read GetColor write SetColor stored IsColorStored;
+    property ColorTextHyperlink: TACLResourceColor index 6 read GetColor write SetColor stored IsColorStored;
 
     property Effect: TACLLabelEffect read FEffect write SetEffect default sleNone;
     property EffectSize: Integer read FEffectSize write SetEffectSize default 1;
@@ -252,12 +252,12 @@ end;
 procedure TACLStyleLabel.InitializeResources;
 begin
   ColorContent.InitailizeDefaults('Labels.Colors.Background', True);
-  ColorTextHyperlink.InitailizeDefaults('Labels.Colors.TextHyperlink');
   ColorLine1.InitailizeDefaults('Labels.Colors.Line1', True);
   ColorLine2.InitailizeDefaults('Labels.Colors.Line2', True);
   ColorShadow.InitailizeDefaults('Labels.Colors.TextShadow');
   ColorText.InitailizeDefaults('Labels.Colors.Text');
   ColorTextDisabled.InitailizeDefaults('Labels.Colors.TextDisabled');
+  ColorTextHyperlink.InitailizeDefaults('Labels.Colors.TextHyperlink');
   FEffectSize := 1;
 end;
 

@@ -191,7 +191,7 @@ type
   end;
 
 procedure CheckIsMainThread;
-function IsMainThread: Boolean; inline;
+function IsMainThread: Boolean;
 
 {$IFDEF MSWINDOWS}
 function LockCompareExchange(const ACompareValue, ANewValue: Byte; AReturnAddress: PByte): Byte; // public to be inlined
@@ -218,7 +218,7 @@ begin
     raise Exception.Create('Must be called from main thread only');
 end;
 
-function IsMainThread: Boolean; inline;
+function IsMainThread: Boolean;
 begin
   Result := GetCurrentThreadId = MainThreadID;
 end;

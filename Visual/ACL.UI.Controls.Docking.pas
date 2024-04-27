@@ -3986,8 +3986,8 @@ end;
 destructor TACLDockSite.Destroy;
 begin
   FreeAndNil(FFloatForms);
-  FreeAndNil(FSideBars);
   inherited;
+  FreeAndNil(FSideBars); // after children destroy
 end;
 
 procedure TACLDockSite.AlignControls(AControl: TControl; var ARect: TRect);

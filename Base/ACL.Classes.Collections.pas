@@ -147,6 +147,7 @@ type
   protected
     procedure Notify(Ptr: Pointer; Action: TListNotification); override;
   public
+    procedure AddRange(AValue: TACLList);
     function ChangePlace(AOldIndex, ANewIndex: Integer): Boolean;
     procedure Exchange(Index1, Index2: Integer);
     //# Events
@@ -1040,6 +1041,15 @@ begin
 end;
 
 { TACLList }
+
+procedure TACLList.AddRange(AValue: TACLList);
+var
+  I: Integer;
+begin
+  EnsureCapacity(AValue.Count);
+  for I := 0 to AValue.Count - 1 do
+    Add(AValue.List[I]);
+end;
 
 function TACLList.ChangePlace(AOldIndex, ANewIndex: Integer): Boolean;
 var

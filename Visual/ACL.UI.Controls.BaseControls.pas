@@ -371,6 +371,7 @@ type
     function IsMouseAtControl: Boolean; virtual;
     procedure MouseEnter; reintroduce; virtual;
     procedure MouseLeave; reintroduce; virtual;
+    procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
     // IACLResourcesChangeListener
     procedure ResourceChanged(Sender: TObject; Resource: TACLResource = nil); overload;
@@ -1789,6 +1790,16 @@ begin
   end;
 end;
 
+procedure TACLGraphicControl.MouseDown(
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+{$IFDEF FPC}
+  if Button = mbLeft then
+    SendCancelMode(Self);
+{$ENDIF}
+  inherited;
+end;
+
 procedure TACLGraphicControl.MouseEnter;
 begin
   FMouseInControl := True;
@@ -2128,6 +2139,10 @@ end;
 
 procedure TACLCustomControl.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
+{$IFDEF FPC}
+  if Button = mbLeft then
+    SendCancelMode(Self);
+{$ENDIF}
   if FocusOnClick then
     SetFocusOnClick;
   inherited MouseDown(Button, Shift, X, Y);
@@ -2600,7 +2615,7 @@ begin
   LControl := Self;
   while LControl <> nil do
   begin
-    if LControl is TCustomForm then
+    if (LControl is TCustomForm) and TCustomForm(LControl).Active then
     begin
       if TCustomForm(LControl).ActiveControl <> nil then
         TCustomForm(LControl).ActiveControl.Perform(CM_CANCELMODE, 0, LPARAM(Sender));
@@ -2790,11 +2805,11 @@ begin
     AWindowPos := TWMWindowPosChanged(Message).WindowPos;
     if (AWindowPos = nil) or (AWindowPos^.flags and SWP_POS_CHANGE <> SWP_POS_CHANGE) then
     begin
-      if csAligning in Control.ControlState then Exit;
+      if not (csAligning in Control.ControlState) then
     {$IFDEF FPC}
-      if Control.Parent.AutoSizeDelayed then Exit;
+      if not Control.Parent.AutoSizeDelayed then
     {$ENDIF}
-      TACLMainThread.RunPostponed(Changed, Self);
+        TACLMainThread.RunPostponed(Changed, Self);
     end;
   end;
   FPrevWndProc(Message);

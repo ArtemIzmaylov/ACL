@@ -425,6 +425,7 @@ type
     FText: string;
     FVertAlignment: TVerticalAlignment;
 
+    function GetRowCount: Integer;
     procedure SetBounds(const ABounds: TRect);
     procedure SetHorzAlignment(AValue: TAlignment);
     procedure SetOptions(AValue: Integer);
@@ -472,6 +473,7 @@ type
     //# State
     property Font: TFont read FFont;
     property IsTruncated: Boolean read FTruncated;
+    property RowCount: Integer read GetRowCount;
     property Text: string read FText;
   end;
 
@@ -2864,6 +2866,13 @@ end;
 function TACLTextLayout.GetPadding: TRect;
 begin
   Result := NullRect;
+end;
+
+function TACLTextLayout.GetRowCount: Integer;
+begin
+  if FLayoutIsDirty then
+    raise EInvalidOperation.Create(ClassName + ' not calculated yet');
+  Result := FLayout.Count;
 end;
 
 function TACLTextLayout.MeasureSize: TSize;

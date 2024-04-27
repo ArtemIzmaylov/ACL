@@ -140,9 +140,7 @@ type
 procedure DrawText32(ACanvas: TCanvas; const R: TRect; AText: string;
   AFont: TACLFont; AAlignment: TAlignment = taLeftJustify;
   AVertAlignment: TVerticalAlignment = taVerticalCenter;
-  AEndEllipsis: Boolean = True); overload;
-procedure DrawText32(ACanvas: TCanvas; const R: TRect;
-  const AText: string; AFont: TACLFont); overload;
+  AEndEllipsis: Boolean = True); 
 procedure DrawText32Duplicated(ACanvas: TCanvas; const R: TRect;
   const AText: string; const ATextOffset: TPoint; ADuplicateOffset: Integer; AFont: TACLFont);
 implementation
@@ -331,12 +329,12 @@ begin
   end;
 end;
 
-procedure DrawText32(ACanvas: TCanvas;
-  const R: TRect; const AText: string; AFont: TACLFont);
-begin
-  if (AText <> '') and CanDraw(ACanvas, R, AFont) then
-    DrawText32Core(ACanvas, PChar(AText), Length(AText), AFont, R, AFont.TextExtends.TopLeft, 0);
-end;
+//procedure DrawText32(ACanvas: TCanvas;
+//  const R: TRect; const AText: string; AFont: TACLFont);
+//begin
+//  if (AText <> '') and CanDraw(ACanvas, R, AFont) then
+//    DrawText32Core(ACanvas, PChar(AText), Length(AText), AFont, R, AFont.TextExtends.TopLeft, 0);
+//end;
 
 procedure DrawText32(ACanvas: TCanvas; const R: TRect; AText: string; AFont: TACLFont;
   AAlignment: TAlignment; AVertAlignment: TVerticalAlignment; AEndEllipsis: Boolean);

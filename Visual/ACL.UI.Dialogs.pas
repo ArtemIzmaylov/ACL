@@ -1163,10 +1163,11 @@ begin
   Padding.Right := dpiApply(5, FCurrentPPI);
   Padding.Top := dpiApply(5, FCurrentPPI);
 
-  CreateControl(FTextLabel, TACLLabel, Self, dpiApply(Rect(0, 0, 0, 15), FCurrentPPI), alTop);
+  CreateControl(FTextLabel, TACLLabel, Self, dpiApply(Rect(0, 0, 0, 16), FCurrentPPI), alTop);
   FTextLabel.AlignWithMargins := True;
+  FTextLabel.AutoSize := True;
 
-  CreateControl(FProgressBar, TACLProgressBar, Self, dpiApply(Bounds(0, 15, 0, 18), FCurrentPPI), alTop);
+  CreateControl(FProgressBar, TACLProgressBar, Self, dpiApply(Bounds(0, 16, 0, 18), FCurrentPPI), alTop);
   FProgressBar.AlignWithMargins := True;
 
   CreateControl(FCancelButton, TACLButton, Self, dpiApply(Bounds(195, 54, 115, 25), FCurrentPPI), alNone);

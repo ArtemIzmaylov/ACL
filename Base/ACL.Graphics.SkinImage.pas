@@ -2329,8 +2329,9 @@ begin
 end;
 
 class procedure TACLSkinImageRenderer.Draw(const ATarget, ASource: TRect; AIsTileMode: Boolean);
-{$IFDEF MSWINDOWS}
 begin
+  if ATarget.IsEmpty then Exit;
+{$IFDEF MSWINDOWS}
   if FOpaque then
   begin
     if AIsTileMode then
@@ -2344,7 +2345,6 @@ begin
     else
       doAlphaBlend(ATarget, ASource);
 {$ELSE}
-begin
   FCairo.FillSurface(ATarget, ASource, FSourceSurface, FAlpha, AIsTileMode);
 {$ENDIF}
 end;

@@ -69,6 +69,7 @@ type
     class function Format(const ATimeInMilliSeconds: Int64;
       AParts: TACLFormatTimeParts = [ftpSeconds..ftpHours];
       ASuppressZeroValues: Boolean = True): string; inline;
+    class function FormatEx(ATimeInSeconds: Single): string; overload;
     class function FormatEx(ATimeInSeconds: Single; AParts: TACLFormatTimeParts;
       ASuppressZeroValues: Boolean): string; overload;
     class function FormatEx(ATimeInSeconds: Single; AParts: TACLFormatTimeParts;
@@ -2287,6 +2288,18 @@ begin
   acExplodeString(AFormatString, ';', AParts);
   Result := FormatEx(ATimeInSeconds, GetTimeParts(GetPartValue(AParts, 0)),
     GetPartValue(AParts, 1, ':'), acContains('Z', GetPartValue(AParts, 2)));
+end;
+
+class function TACLTimeFormat.FormatEx(ATimeInSeconds: Single): string;
+var
+  LParts: TACLFormatTimeParts;
+begin
+  LParts := [ftpSeconds, ftpMinutes];
+  if ATimeInSeconds >= 3600 then
+    Include(LParts, ftpHours);
+  if ATimeInSeconds >= 86400 then
+    Include(LParts, ftpDays);
+  Result := FormatEx(ATimeInSeconds, LParts, True);
 end;
 
 class function TACLTimeFormat.Parse(var Scan: PChar; out ATimeInSeconds: Single): Boolean;

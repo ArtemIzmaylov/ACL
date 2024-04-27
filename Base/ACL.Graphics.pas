@@ -1715,11 +1715,6 @@ end;
 
 procedure acTileBlt(DC, SourceDC: HDC; const ADest, ASource: TRect);
 var
-{$IFDEF MSWINDOWS}
-  ABrush: HBRUSH;
-  ABrushBitmap: TACLBitmap;
-  AOrigin: TPoint;
-{$ENDIF}
   AClipRgn: HRGN;
   R: TRect;
   W, H: Integer;
@@ -1734,47 +1729,24 @@ begin
     XCount := acCalcPatternCount(ADest.Right - ADest.Left, W);
     YCount := acCalcPatternCount(ADest.Bottom - ADest.Top, H);
 
-  {$IFDEF MSWINDOWS}
-    if XCount * YCount > 10 then
-    begin
-      ABrushBitmap := TACLBitmap.Create(W, H);
-      try
-        acBitBlt(ABrushBitmap.Handle, SourceDC, ABrushBitmap.ClientRect, ASource.TopLeft);
-
-        GetWindowOrgEx(DC, AOrigin);
-        SetBrushOrgEx(DC, ADest.Left - AOrigin.X, ADest.Top - AOrigin.Y, @AOrigin);
-
-        ABrush := CreatePatternBrush(ABrushBitmap.Handle);
-        FillRect(DC, ADest, ABrush);
-        DeleteObject(ABrush);
-
-        SetBrushOrgEx(DC, AOrigin.X, AOrigin.Y, nil);
-      finally
-        ABrushBitmap.Free;
-      end;
-    end
-    else
-  {$ENDIF}
-    begin
-      AClipRgn := acSaveClipRegion(DC);
-      try
-        acIntersectClipRegion(DC, ADest);
-        for Y := 1 to YCount do
+    AClipRgn := acSaveClipRegion(DC);
+    try
+      acIntersectClipRegion(DC, ADest);
+      for Y := 1 to YCount do
+      begin
+        R.Left := ADest.Left;
+        R.Right := ADest.Left + W;
+        for X := 1 to XCount do
         begin
-          R.Left := ADest.Left;
-          R.Right := ADest.Left + W;
-          for X := 1 to XCount do
-          begin
-            acBitBlt(DC, SourceDC, R, ASource.TopLeft);
-            Inc(R.Left, W);
-            Inc(R.Right, W);
-          end;
-          Inc(R.Top, H);
-          Inc(R.Bottom, H);
+          acBitBlt(DC, SourceDC, R, ASource.TopLeft);
+          Inc(R.Left, W);
+          Inc(R.Right, W);
         end;
-      finally
-        acRestoreClipRegion(DC, AClipRgn);
+        Inc(R.Top, H);
+        Inc(R.Bottom, H);
       end;
+    finally
+      acRestoreClipRegion(DC, AClipRgn);
     end;
   end;
 end;

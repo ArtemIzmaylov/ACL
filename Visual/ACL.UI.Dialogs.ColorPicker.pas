@@ -148,7 +148,8 @@ end;
 
 procedure TACLColorPickerDialog.CreateControls;
 begin
-  CreateControl(FPanel, TACLPanel, Self, NullRect, alCustom);
+  CreateControl(FPanel, TACLPanel, Self,
+    NullRect, {$IFDEF FPC}alCustom{$ELSE}alNone{$ENDIF});
   FPanel.Padding.All := 2;
 
   CreateControl(FPicker, TACLColorPicker, FPanel, NullRect, alTop);
