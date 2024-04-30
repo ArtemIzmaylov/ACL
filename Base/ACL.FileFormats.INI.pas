@@ -121,9 +121,10 @@ type
 
     FOnChanged: TNotifyEvent;
 
-    function GetSectionData(const ASection: string): string;
-    function GetSectionCount: Integer;
     function GetName(AIndex: Integer): string;
+    function GetSectionCount: Integer;
+    function GetSectionData(const ASection: string): string;
+    function GetSectionObj(Index: Integer): TACLIniFileSection;
     procedure SectionChangeHandler(Sender: TObject);
     procedure SetFileName(const AValue: string);
     procedure SetSectionData(const ASection, AData: string);
@@ -219,16 +220,17 @@ type
     procedure SaveToStream(AStream: TStream); overload;
     procedure SaveToStream(AStream: TStream; AEncoding: TEncoding); overload; virtual;
     function UpdateFile: Boolean; virtual;
-    //
+    //# Properties
     property AutoSave: Boolean read FAutoSave write FAutoSave;
     property Encoding: TEncoding read FEncoding write FEncoding;
     property FileName: string read FFileName write SetFileName;
     property Modified: Boolean read FModified write FModified;
-    //
+    //# Sections
     property SectionCount: Integer read GetSectionCount;
     property SectionData[const ASection: string]: string read GetSectionData write SetSectionData;
+    property SectionObjs[Index: Integer]: TACLIniFileSection read GetSectionObj;
     property Sections[Index: Integer]: string read GetName;
-    //
+    //# Events
     property OnChanged: TNotifyEvent read FOnChanged write FOnChanged;
   end;
 
@@ -1364,7 +1366,7 @@ end;
 
 function TACLIniFile.GetName(AIndex: Integer): string;
 begin
-  Result := FSections.Items[AIndex].Name;
+  Result := SectionObjs[AIndex].Name;
 end;
 
 function TACLIniFile.GetSectionData(const ASection: string): string;
@@ -1376,6 +1378,11 @@ begin
     Result := AList.Text
   else
     Result := EmptyStr;
+end;
+
+function TACLIniFile.GetSectionObj(Index: Integer): TACLIniFileSection;
+begin
+  Result := FSections.Items[Index];
 end;
 
 procedure TACLIniFile.SectionChangeHandler(Sender: TObject);

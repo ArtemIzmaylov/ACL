@@ -488,6 +488,7 @@ type
     procedure CMScaleChanging(var Message: TMessage); message CM_SCALECHANGING;
     procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
     procedure WMKillFocus(var Message: TWMKillFocus); message WM_KILLFOCUS;
+    procedure WMLButtonDown(var Message: TWMLButtonDown); message WM_LBUTTONDOWN;
     procedure WMMouseMove(var Message: TWMMouseMove); message WM_MOUSEMOVE;
     procedure WMMouseWheelHorz(var Message: TWMMouseWheel); message WM_MOUSEHWHEEL;
     procedure WMPaint(var Message: TWMPaint); message WM_PAINT;
@@ -2139,10 +2140,6 @@ end;
 
 procedure TACLCustomControl.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
-{$IFDEF FPC}
-  if Button = mbLeft then
-    SendCancelMode(Self);
-{$ENDIF}
   if FocusOnClick then
     SetFocusOnClick;
   inherited MouseDown(Button, Shift, X, Y);
@@ -2380,6 +2377,14 @@ procedure TACLCustomControl.WMKillFocus(var Message: TWMKillFocus);
 begin
   inherited;
   FocusChanged;
+end;
+
+procedure TACLCustomControl.WMLButtonDown(var Message: TWMLButtonDown);
+begin
+{$IFDEF FPC}
+  SendCancelMode(Self);
+{$ENDIF}
+  inherited;
 end;
 
 procedure TACLCustomControl.WMMouseMove(var Message: TWMMouseMove);

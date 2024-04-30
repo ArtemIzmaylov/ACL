@@ -635,8 +635,8 @@ uses
   gtk2Def,
   glib2,
 {$ENDIF}
-{$IFDEF MSWINDOWS}
   ACL.Graphics.Ex,
+{$IFDEF MSWINDOWS}
   ACL.Graphics.Ex.Gdip,
   ACL.Math,
 {$ELSE}

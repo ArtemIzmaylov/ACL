@@ -121,8 +121,7 @@ type
     function CanAutoSize(var ANewWidth, ANewHeight: Integer): Boolean; override;
     function CreateStyle: TACLStyleLabel; virtual;
     function CreateSubControlOptions: TACLLabelSubControlOptions; virtual;
-    function MeasureSize(AWidth: Integer = 0): TSize; virtual;
-    //
+
     procedure Calculate(const R: TRect); overload; virtual;
     procedure Calculate; overload;
     procedure Click; override;
@@ -147,6 +146,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    function MeasureSize(AWidth: Integer = 0): TSize; virtual;
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
   published
     property Alignment: TAlignment read FAlignment write SetAlignment default taLeftJustify;
@@ -201,9 +201,9 @@ type
     function CreateStyle: TACLStyleLabel; override;
     procedure DrawBackground(ACanvas: TCanvas); override;
     function GetTextOffset: Integer;
-    function MeasureSize(AWidth: Integer = 0): TSize; override;
   public
     constructor Create(AOwner: TComponent); override;
+    function MeasureSize(AWidth: Integer = 0): TSize; override;
     procedure SetCaption(const AValue: string; AIcon: TACLValidationLabelIcon);
   published
     property AutoSize default True;

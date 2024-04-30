@@ -91,7 +91,7 @@ type
     constructor Create;
     destructor Destroy; override;
     procedure Add(ATask: TACLTask);
-    procedure Cancel;
+    procedure Cancel(AWaitFor: Boolean = True);
     procedure Initialize;
     function IsActive: Boolean;
     procedure Run(AWaitFor: Boolean);
@@ -300,13 +300,14 @@ begin
   end;
 end;
 
-procedure TACLTaskGroup.Cancel;
+procedure TACLTaskGroup.Cancel(AWaitFor: Boolean = True);
 var
   I: Integer;
 begin
   for I := FTasks.Count - 1 downto 0 do
     TaskDispatcher.Cancel(FTasks.List[I], False);
-  FEvent.WaitFor;
+  if AWaitFor then
+    FEvent.WaitFor;
 end;
 
 procedure TACLTaskGroup.Initialize;

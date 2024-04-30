@@ -72,10 +72,10 @@ type
     procedure Calculate(const R: TRect); override;
     function CreateStyle: TACLStyleLabel; override;
     procedure DrawBackground(ACanvas: TCanvas); override;
-    function MeasureSize(AWidth: Integer = 0): TSize; override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    function MeasureSize(AWidth: Integer = 0): TSize; override;
   published
     property Align;
     property Active: Boolean read GetActive write SetActive default False;

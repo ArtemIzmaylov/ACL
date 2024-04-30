@@ -75,6 +75,8 @@ type
 {$ENDIF}
 
 type
+  TConsumerC<T> = reference to procedure (const Arg: T);
+  TPredicateC<T> = reference to function (const Arg: T): Boolean;
   TObjHashCode = {$IFDEF FPC}PtrInt{$ELSE}Integer{$ENDIF};
 
 {$SCOPEDENUMS ON}
@@ -207,6 +209,7 @@ procedure acExchangePointers(var AValue1, AValue2); inline;
 procedure acExchangeStrings(var AValue1, AValue2: string); inline;
 function acBoolToHRESULT(AValue: Boolean): HRESULT; inline;
 function acGenerateGUID: string;
+function acIsOK(Status: HRESULT): Boolean;
 function acLastSystemErrorMessage: string;
 function acObjectUID(AObject: TObject): string;
 {$IFDEF MSWINDOWS}
@@ -506,6 +509,11 @@ var
 begin
   CreateGUID(G);
   Result := GUIDToString(G);
+end;
+
+function acIsOK(Status: HRESULT): Boolean;
+begin
+  Result := Status and HRESULT($80000000) = 0;
 end;
 
 function acLastSystemErrorMessage: string;

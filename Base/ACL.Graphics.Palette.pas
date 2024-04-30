@@ -89,7 +89,7 @@ type
     QuantizeMaskL = (MaxByte shr QuantizeFactorL) shl QuantizeFactorL;
     QuantizeMaskS = (MaxByte shr QuantizeFactorS) shl QuantizeFactorS;
   strict private type
-    TFilterFunc = reference to function (const S: TACLPaletteSwatch): Boolean;
+    TFilterFunc = reference to function (const A: TACLPaletteSwatch): Boolean;
   {$REGION 'Private Types'}
     TTarget = record
       LMax: Byte;

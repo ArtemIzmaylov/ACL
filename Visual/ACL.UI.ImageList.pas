@@ -61,6 +61,7 @@ type
     procedure SetSourceDPI(AValue: Integer);
     procedure ReadDataWinIL(AStream: TStream);
   {$IFNDEF FPC}
+    procedure WriteDataCompressed(AStream: TStream);
   protected
     procedure DoDraw(Index: Integer; Canvas: TCanvas;
       X, Y: Integer; Style: Cardinal; Enabled: Boolean = True); override;
@@ -634,11 +635,21 @@ begin
 end;
 
 procedure TACLImageList.WriteData(Stream: TStream);
-{$IFDEF FPC}
 begin
+{$IFDEF FPC}
   Stream.WriteInt32(HeaderLCL);
-  inherited WriteData(Stream);
 {$ELSE}
+  // TImageList.Assign uses ReadData/WriteData.
+  // So, we MUST generate a compatible stream to make the IDE Designer works correctly
+  if csWriting in ComponentState then
+    WriteDataCompressed(Stream)
+  else
+{$ENDIF}
+    inherited;
+end;
+
+{$IFNDEF FPC}
+procedure TACLImageList.WriteDataCompressed(AStream: TStream);
 var
   LData: TMemoryStream;
   LPosition1: Int64;
@@ -647,27 +658,26 @@ begin
   LData := TMemoryStream.Create;
   try
     inherited WriteData(LData);
+    AStream.WriteInt32(HeaderZIP);
+    AStream.WriteInt32(LData.Size); // uncompressed size
+    AStream.WriteInt32(0); // compressed size
+    LPosition1 := AStream.Position;
 
-    Stream.WriteInt32(HeaderZIP);
-    Stream.WriteInt32(LData.Size); // uncompressed size
-    Stream.WriteInt32(0); // compressed size
-    LPosition1 := Stream.Position;
-
-    with TCompressionStream.Create(TCompressionLevel.clDefault, Stream) do
+    with TCompressionStream.Create(TCompressionLevel.clMax, AStream) do
     try
       WriteBuffer(LData.Memory^, LData.Size);
     finally
       Free;
     end;
 
-    LPosition2 := Stream.Position;
-    Stream.Position := LPosition1 - SizeOf(Integer);
-    Stream.WriteInt32(LPosition2 - LPosition1); // match the "compressed size"
-    Stream.Position := LPosition2;
+    LPosition2 := AStream.Position;
+    AStream.Position := LPosition1 - SizeOf(Integer);
+    AStream.WriteInt32(LPosition2 - LPosition1); // match the "compressed size"
+    AStream.Position := LPosition2;
   finally
     LData.Free;
   end;
-{$ENDIF}
 end;
+{$ENDIF}
 
 end.
