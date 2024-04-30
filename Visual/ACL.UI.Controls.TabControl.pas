@@ -56,7 +56,7 @@ type
 
   { TACLStyleTabControl }
 
-  TACLTabsStyle = (tsTab, tsHeader);
+  TACLTabsStyle = (tsTab, tsHeader, tsHeaderAlt);
 
   TACLStyleTabControl = class(TACLStyle)
   public const
@@ -99,7 +99,6 @@ type
   TACLTabsList = class(TCollection)
   strict private
     FControl: TACLCustomTabControl;
-
     function GetItem(Index: Integer): TACLTab;
   protected
     function GetOwner: TPersistent; override;
@@ -386,7 +385,14 @@ const
 procedure TACLStyleTabControl.DrawTab(ACanvas: TCanvas;
   const R: TRect; AActive, AFocused: Boolean; AStyle: TACLTabsStyle);
 begin
-  HeaderTexture.Draw(ACanvas, R, Ord(AStyle) * 2 + Ord(AActive));
+  case AStyle of
+    tsHeader:
+      HeaderTexture.Draw(ACanvas, R, IfThen(AActive, 3, 2));
+    tsHeaderAlt:
+      HeaderTexture.Draw(ACanvas, R, IfThen(AActive, 1, 2));
+  else
+    HeaderTexture.Draw(ACanvas, R, Ord(AActive));
+  end;
   if AActive and AFocused then
     acDrawFocusRect(ACanvas, R.Split(HeaderTexture.ContentOffsets));
 end;
@@ -652,6 +658,9 @@ begin
         AItem.TextTruncated := ATextSize.cx > AContentRect.Width;
         IntersectRect(AItem.TextRect, AItem.TextRect, AContentRect);
       end;
+
+      if AItem.Active and (OptionsView.Style = tsHeaderAlt) then
+        Inc(AItem.Bounds.Bottom, AIndentBetweenTabs + 1);
     end;
   finally
     ACalculator.Free;
@@ -997,19 +1006,19 @@ begin
   if ViewItems.Count > 0 then
   begin
     Result := CalculateTextSize('Wg').cy + GetTabMargins.MarginsHeight;
-    if OptionsView.Style = tsHeader then
-      Inc(Result, dpiApply(OptionsView.TabIndent, FCurrentPPI))
+    if OptionsView.Style = tsTab then
+      Inc(Result, dpiApply(TACLStyleTabControl.Offset, FCurrentPPI))
     else
-      Inc(Result, dpiApply(TACLStyleTabControl.Offset, FCurrentPPI));
+      Inc(Result, dpiApply(OptionsView.TabIndent, FCurrentPPI));
   end;
 end;
 
 function TACLCustomTabControl.GetTabMargins: TRect;
 begin
-  if OptionsView.Style = tsHeader then
-    Result := Rect(6, 6, 6, 6)
+  if OptionsView.Style = tsTab then
+    Result := Rect(4, 4, 4, 4)
   else
-    Result := Rect(4, 4, 4, 4);
+    Result := Rect(6, 6, 6, 6);
 
   Result := dpiApply(Result, FCurrentPPI);
 end;
