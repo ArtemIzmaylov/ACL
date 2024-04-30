@@ -11,12 +11,8 @@
 
 unit ACL.Utils.FileSystem;
 
-{$I ACL.Config.inc}//FPC:Partial
+{$I ACL.Config.inc} //FPC:OK
 {$WARN SYMBOL_PLATFORM OFF}
-
-//TODO: FPC
-//  1) TACLFileDateTimeHelper
-//  2) TACLFindFileInfo - date-time
 
 interface
 
@@ -28,6 +24,7 @@ uses
 {$ENDIF}
   // System
   {System.}Classes,
+  {System.}DateUtils,
   {System.}SysUtils,
   {System.}Types,
   // ACL
@@ -47,15 +44,30 @@ const
 
   sPathDelims: TSysCharSet = [sUnixPathDelim, sWindowPathDelim];
 
-{$IFNDEF MSWINDOWS}
-  INVALID_FILE_ATTRIBUTES = DWORD($FFFFFFFF);
-{$ENDIF}
-
+  INVALID_FILE_ATTRIBUTES = DWORD(-1);
   MAX_LONG_PATH = Word.MaxValue;
 
 type
   TFileLongPath = array [0..MAX_LONG_PATH - 1] of Char;
   TFilePath = array[0..MAX_PATH] of Char;
+
+  { TACLFileStat }
+
+  TACLFileStat = record
+    Attributes: Cardinal;
+    CreationTime: TDateTime;
+    LastAccessTime: TDateTime;
+    LastWriteTime: TDateTime;
+    Size: UInt64;
+    Reserved: UInt64;
+
+    class function Create(const AFileName: string): TACLFileStat; static;
+    function Init(const AFileName: string): Boolean; overload;
+  {$IFDEF MSWINDOWS}
+    function Init(const AData: WIN32_FIND_DATAW): Boolean; overload;
+  {$ENDIF}
+    procedure Reset;
+  end;
 
   { TACLFindFileInfo }
 
@@ -73,11 +85,13 @@ type
   {$ELSE}
     FFindData: TSearchRec;
   {$ENDIF}
+    FFileStat: TACLFileStat;
     FFindExts: string;
     FFindObjects: TACLFindFileObjects;
 
     function Check: Boolean;
     function GetFileSize: Int64;
+    function GetFileStat: TACLFileStat;
     function GetFullFileName: string;
     function IsInternal: Boolean; inline;
   public
@@ -86,15 +100,13 @@ type
     property FileName: string read FFileName;
     property FileObject: TACLFindFileObject read FFileObject;
     property FileSize: Int64 read GetFileSize;
-    property FullFileName: string read GetFullFileName;
   {$IFDEF MSWINDOWS}
     property FileAttrs: Cardinal read FFindData.dwFileAttributes;
-    property FileCreationTime: TFileTime read FFindData.ftCreationTime;
-    property FileLastAccessTime: TFileTime read FFindData.ftLastAccessTime;
-    property FileLastWriteTime: TFileTime read FFindData.ftLastWriteTime;
   {$ELSE}
     property FileAttrs: Integer read FFindData.Attr;
   {$ENDIF}
+    property FileStat: TACLFileStat read GetFileStat;
+    property FullFileName: string read GetFullFileName;
   end;
 
   TACLEnumFileProc = reference to procedure (const Info: TACLFindFileInfo);
@@ -180,7 +192,7 @@ type
     constructor Create(const AFileName: string; Mode: Word; Rights: Cardinal); overload;
     destructor Destroy; override;
     class function GetFileName(AStream: TStream; out AFileName: string): Boolean;
-    //
+    //# Properties
     property FileName: string read FFileName;
   end;
 
@@ -206,21 +218,6 @@ type
     constructor Create(const APrefix: string); reintroduce;
     destructor Destroy; override;
   end;
-
-{$IFDEF MSWINDOWS}
-
-  { TACLFileDateTimeHelper }
-
-  TACLFileDateTimeHelper = class
-  public
-    class function DecodeTime(const ATime: TFileTime): TDateTime;
-    class function GetCreationTime(const AFileName: string): TDateTime;
-    class function GetFileData(const AFileName: string; out AData: TWin32FindDataW): Boolean;
-    class function GetLastAccessTime(const AFileName: string): TDateTime;
-    class function GetLastEditingTime(const AFileName: string): TDateTime;
-  end;
-
-{$ENDIF}
 
 // Paths
 function acChangeFileExt(const FileName, Extension: string; ADoubleExt: Boolean = False): string;
@@ -291,9 +288,7 @@ function acFileCreate(const AFileName: string; AMode, ARights: LongWord): THandl
 function acFileExists(const FileName: string): Boolean;
 function acFileGetAttr(const FileName: string): Cardinal; overload;
 function acFileGetAttr(const FileName: string; out AAttrs: Cardinal): Boolean; overload;
-{$IFDEF MSWINDOWS}
 function acFileGetLastWriteTime(const FileName: string): Cardinal;
-{$ENDIF}
 function acFileSetAttr(const FileName: string; AAttr: Cardinal): Boolean;
 function acFileSize(const FileName: string): Int64;
 {$IFDEF MSWINDOWS}
@@ -326,6 +321,9 @@ procedure acClearFileLongPath(out W: TFileLongPath);
 implementation
 
 uses
+{$IFDEF LINUX}
+  Baseunix,
+{$ENDIF}
   {System.}RTLConsts,
   // ACL
 {$IFDEF MSWINDOWS}
@@ -1009,11 +1007,9 @@ begin
 end;
 
 function acFileGetAttr(const FileName: string): Cardinal;
-var
 {$IFDEF MSWINDOWS}
+var
   AErrorMode: Cardinal;
-{$ELSE}
-  AFileInfo: TACLFindFileInfo;
 {$ENDIF}
 begin
   Result := INVALID_FILE_ATTRIBUTES;
@@ -1027,12 +1023,7 @@ begin
       SetErrorMode(AErrorMode);
     end;
   {$ELSE}
-    if acFindFileFirst(FileName, [ffoFile, ffoFolder], AFileInfo) then
-    try
-      Result := AFileInfo.FileAttrs;
-    finally
-      acFindFileClose(AFileInfo);
-    end;
+    Result := FileGetAttr(FileName);
   {$ENDIF}
   end;
 end;
@@ -1043,12 +1034,10 @@ begin
   Result := AAttrs <> INVALID_FILE_ATTRIBUTES;
 end;
 
-{$IFDEF MSWINDOWS}
 function acFileGetLastWriteTime(const FileName: string): Cardinal;
 begin
-  Result := DateTimeToFileDate(TACLFileDateTimeHelper.GetLastEditingTime(FileName));
+  Result := DateTimeToFileDate(TACLFileStat.Create(FileName).LastWriteTime);
 end;
-{$ENDIF}
 
 function acFileSetAttr(const FileName: string; AAttr: Cardinal): Boolean;
 begin
@@ -1443,6 +1432,92 @@ begin
   FreeAndNil(AInfo);
 end;
 
+{ TACLFileStat }
+
+class function TACLFileStat.Create(const AFileName: string): TACLFileStat;
+begin
+  Result.Init(AFileName);
+end;
+
+procedure TACLFileStat.Reset;
+begin
+  ZeroMemory(@Self, SizeOf(Self));
+  Attributes := INVALID_FILE_ATTRIBUTES;
+end;
+
+{$IFDEF MSWINDOWS}
+function TACLFileStat.Init(const AData: WIN32_FIND_DATAW): Boolean;
+
+  function DecodeTime(const ATime: TFileTime): TDateTime;
+  var
+    L: TFileTime;
+    W1, W2: Word;
+  begin
+    FileTimeToLocalFileTime(ATime, L);
+    if FileTimeToDosDateTime(L, W2, W1) then
+      Result := FileDateToDateTime(MakeLong(W1, W2))
+    else
+      Result := 0;
+  end;
+
+begin
+  Attributes := AData.dwFileAttributes;
+  CreationTime := DecodeTime(AData.ftCreationTime);
+  LastAccessTime := DecodeTime(AData.ftLastAccessTime);
+  LastWriteTime := DecodeTime(AData.ftLastWriteTime);
+  Size := MakeInt64(AData.nFileSizeLow, AData.nFileSizeHigh);
+  Result := True;
+end;
+
+function TACLFileStat.Init(const AFileName: string): Boolean;
+var
+  LData: WIN32_FIND_DATAW;
+  LHandle: THandle;
+begin
+  Reset;
+  //#AI: W7x64, 13.05.2014: FindFirstFileW faster than GetFileAttributesExW
+  LHandle := FindFirstFileW(PWideChar(acPrepareFileName(AFileName)), LData);
+  Result := LHandle <> INVALID_HANDLE_VALUE;
+  if Result then
+  try
+    Init(LData);
+  finally
+    Winapi.Windows.FindClose(LHandle);
+  end;
+end;
+
+{$ELSE}
+
+function TACLFileStat.Init(const AFileName: string): Boolean;
+var
+  LStat: Stat;
+begin
+  Reset;
+  if fpstat(AFileName, LStat{%H-}) < 0 then
+    Exit(False);
+
+  CreationTime := UnixToDateTime(LStat.st_ctime);
+  LastAccessTime := UnixToDateTime(LStat.st_atime);
+  LastWriteTime := UnixToDateTime(LStat.st_mtime);
+  Size := LStat.st_size;
+
+  Attributes := 0;
+  if fpS_ISDIR(LStat.st_mode) then
+    Attributes := Attributes or faDirectory;
+  //if LStat.st_mode and S_IWUSR = 0 then
+  //  Attributes := Attributes or faReadOnly;
+  //if fpS_ISLNK(LStat.st_mode) then
+  //  Attributes := Attributes or faSymLink;
+  //if fpS_ISSOCK(LStat.st_mode) or fpS_ISBLK(LStat.st_mode) or
+  //   fpS_ISCHR(LStat.st_mode) or fpS_ISFIFO(LStat.st_mode)
+  //then
+  //  Attributes := Attributes or faSysFile;
+  //if acExtractFileName(AFileName).StartsWith('.') then
+  //  Attributes := Attributes or faHidden;
+  Result := True;
+end;
+{$ENDIF}
+
 { TACLFindFileInfo }
 
 destructor TACLFindFileInfo.Destroy;
@@ -1463,6 +1538,7 @@ function TACLFindFileInfo.Check: Boolean;
 const
   Map: array[Boolean] of TACLFindFileObject = (ffoFile, ffoFolder);
 begin
+  FFileStat.Reset;
 {$IFDEF MSWINDOWS}
   FFileName := FFindData.cFileName;
 {$ELSE}
@@ -1478,6 +1554,19 @@ begin
   end
   else
     Result := False;
+end;
+
+function TACLFindFileInfo.GetFileStat: TACLFileStat;
+begin
+  if FFileStat.Attributes = INVALID_FILE_ATTRIBUTES then
+  begin
+  {$IFDEF MSWINDOWS}
+    FFileStat.Init(FFindData);
+  {$ELSE}
+    FFileStat.Init(FullFileName);
+  {$ENDIF}
+  end;
+  Result := FFileStat;
 end;
 
 function TACLFindFileInfo.GetFileSize: Int64;
@@ -1826,66 +1915,4 @@ begin
   acDeleteFile(FileName);
 end;
 
-{$IFDEF MSWINDOWS}
-
-{ TACLFileDateTimeHelper }
-
-class function TACLFileDateTimeHelper.DecodeTime(const ATime: TFileTime): TDateTime;
-var
-  L: TFileTime;
-  W1, W2: Word;
-begin
-  FileTimeToLocalFileTime(ATime, L);
-  if FileTimeToDosDateTime(L, W2, W1) then
-    Result := FileDateToDateTime(MakeLong(W1, W2))
-  else
-    Result := 0;
-end;
-
-class function TACLFileDateTimeHelper.GetCreationTime(const AFileName: UnicodeString): TDateTime;
-var
-  AData: TWin32FindDataW;
-begin
-  if GetFileData(AFileName, AData) then
-    Result := DecodeTime(AData.ftCreationTime)
-  else
-    Result := 0;
-end;
-
-class function TACLFileDateTimeHelper.GetFileData(const AFileName: UnicodeString; out AData: TWin32FindDataW): Boolean;
-var
-  AHandle: THandle;
-begin
-  //#AI: W7x64, 13.05.2014: FindFirstFileW faster than GetFileAttributesExW
-  Result := False;
-  AHandle := FindFirstFileW(PWideChar(acPrepareFileName(AFileName)), AData);
-  if AHandle <> INVALID_HANDLE_VALUE then
-  try
-    Result := AData.dwFileAttributes and FILE_ATTRIBUTE_DIRECTORY = 0;
-  finally
-    Winapi.Windows.FindClose(AHandle);
-  end;
-end;
-
-class function TACLFileDateTimeHelper.GetLastAccessTime(const AFileName: UnicodeString): TDateTime;
-var
-  AData: TWin32FindDataW;
-begin
-  if GetFileData(AFileName, AData) then
-    Result := DecodeTime(AData.ftLastAccessTime)
-  else
-    Result := 0;
-end;
-
-class function TACLFileDateTimeHelper.GetLastEditingTime(const AFileName: UnicodeString): TDateTime;
-var
-  AData: TWin32FindDataW;
-begin
-  if GetFileData(AFileName, AData) then
-    Result := DecodeTime(AData.ftLastWriteTime)
-  else
-    Result := 0;
-end;
-
-{$ENDIF}
 end.

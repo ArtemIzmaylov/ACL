@@ -587,12 +587,12 @@ end;
 
 procedure TACLFileSystemWatcherFileTask.FetchFileInfo(out ASize: Int64; out ALastWriteTime: TDateTime);
 var
-  AFileData: TWin32FindData;
+  LStat: TACLFileStat;
 begin
-  if TACLFileDateTimeHelper.GetFileData(FFileName, AFileData) then
+  if LStat.Init(FFileName) then
   begin
-    ALastWriteTime := TACLFileDateTimeHelper.DecodeTime(AFileData.ftLastWriteTime);
-    ASize := MakeInt64(AFileData.nFileSizeLow, AFileData.nFileSizeHigh);
+    ALastWriteTime := LStat.LastWriteTime;
+    ASize := LStat.Size;
   end
   else
   begin
