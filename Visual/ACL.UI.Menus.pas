@@ -220,6 +220,7 @@ type
   published
     property ColorItem: TACLResourceColor index 0 read GetColor write SetColor stored IsColorStored;
     property ColorItemSelected: TACLResourceColor index 1 read GetColor write SetColor stored IsColorStored;
+    property CornerRadiusItem: TACLResourceInteger index 0 read GetInteger write SetInteger stored IsIntegerStored;
     property Font: TACLResourceFont index 0 read GetFont write SetFont stored IsFontStored;
     property FontDisabled: TACLResourceFont index 1 read GetFont write SetFont stored IsFontStored;
     property FontSelected: TACLResourceFont index 2 read GetFont write SetFont stored IsFontStored;
@@ -296,7 +297,7 @@ type
     property Borders: TACLResourceMargins index 0 read GetMargins write SetMargins stored IsMarginsStored;
     property ColorBorder1: TACLResourceColor index 2 read GetColor write SetColor stored IsColorStored;
     property ColorBorder2: TACLResourceColor index 3 read GetColor write SetColor stored IsColorStored;
-    property CornerRadius: TACLResourceInteger index 0 read GetInteger write SetInteger stored IsIntegerStored;
+    property CornerRadius: TACLResourceInteger index 1 read GetInteger write SetInteger stored IsIntegerStored;
     property TextureGutter: TACLResourceTexture index 1 read GetTexture write SetTexture stored IsTextureStored;
     property TextureScrollBar: TACLResourceTexture index 2 read GetTexture write SetTexture stored IsTextureStored;
     property TextureScrollBarButtons: TACLResourceTexture index 3 read GetTexture write SetTexture stored IsTextureStored;
@@ -1127,12 +1128,15 @@ begin
 end;
 
 procedure TACLStyleMenu.DrawBackground(ACanvas: TCanvas; const R: TRect; ASelected: Boolean);
+var
+  LColor: TAlphaColor;
 begin
   if ASelected then
-    acFillRect(ACanvas, R, ColorItemSelected.AsColor)
+    LColor := ColorItemSelected.Value
   else
-    acFillRect(ACanvas, R, ColorItem.AsColor);
+    LColor := ColorItem.Value;
 
+  acFillRect(ACanvas, R, LColor, CornerRadiusItem.Value);
   Texture.Draw(ACanvas, R, Ord(ASelected));
 end;
 
@@ -1209,6 +1213,7 @@ procedure TACLStyleMenu.InitializeResources;
 begin
   ColorItem.InitailizeDefaults('Popup.Colors.Item', TAlphaColor.None);
   ColorItemSelected.InitailizeDefaults('Popup.Colors.ItemSelected', TAlphaColor.None);
+  CornerRadiusItem.InitailizeDefaults('Popup.Margins.CornerRadiusItem', 0);
   Font.InitailizeDefaults('Popup.Fonts.Default');
   FontDisabled.InitailizeDefaults('Popup.Fonts.Disabled');
   FontSelected.InitailizeDefaults('Popup.Fonts.Selected');

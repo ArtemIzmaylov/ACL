@@ -539,6 +539,7 @@ procedure acDrawHueIntensityBar(ACanvas: TCanvas; const R: TRect; AHue: Byte = 0
 procedure acDrawSelectionRect(ACanvas: TCanvas; const R: TRect; AColor: TAlphaColor);
 procedure acDrawShadow(ACanvas: TCanvas; const ARect: TRect; ABKColor: TColor; AShadowSize: Integer = 5);
 procedure acFillRect(ACanvas: TCanvas; const ARect: TRect; AColor: TAlphaColor); overload;
+procedure acFillRect(ACanvas: TCanvas; const ARect: TRect; AColor: TAlphaColor; ARadius: Integer); overload;
 procedure acFillRect(ACanvas: TCanvas; const ARect: TRect; AColor: TColor); overload;
 procedure acFitFileName(ACanvas: TCanvas; ATargetWidth: Integer; var S: string);
 procedure acResetFont(AFont: TFont);
@@ -1863,6 +1864,35 @@ begin
     GpPaintCanvas.BeginPaint(ACanvas);
     GpPaintCanvas.FillRectangle(ARect.Left, ARect.Top, ARect.Right, ARect.Bottom, AColor);
     GpPaintCanvas.EndPaint;
+  end;
+end;
+
+procedure acFillRect(ACanvas: TCanvas; const ARect: TRect; AColor: TAlphaColor; ARadius: Integer); overload;
+var
+  LPath: TACL2DRenderPath;
+begin
+  if AColor.IsValid then
+  begin
+    GpPaintCanvas.BeginPaint(ACanvas);
+    try
+      if ARadius > 0 then
+      begin
+        LPath := GpPaintCanvas.CreatePath;
+        try
+          LPath.AddRoundRect(ARect, ARadius, ARadius);
+        {$IFDEF MSWINDOWS}
+          GpPaintCanvas.SmoothingMode := smHighQuality;
+        {$ENDIF}
+          GpPaintCanvas.FillPath(LPath, AColor);
+        finally
+          LPath.Free;
+        end;
+      end
+      else
+        GpPaintCanvas.FillRectangle(ARect.Left, ARect.Top, ARect.Right, ARect.Bottom, AColor);
+    finally
+      GpPaintCanvas.EndPaint;
+    end;
   end;
 end;
 

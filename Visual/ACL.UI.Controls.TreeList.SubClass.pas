@@ -145,6 +145,7 @@ type
     property RowColorDisabledText: TACLResourceColor index 20 read GetColor write SetColor stored IsColorStored;
     property RowColorText: TACLResourceColor index 21 read GetColor write SetColor stored IsColorStored;
     property RowContentOffsets: TACLResourceMargins index 1 read GetMargins write SetMargins stored IsMarginsStored;
+    property RowCornerRadius: TACLResourceInteger index 0 read GetInteger write SetInteger stored IsIntegerStored;
     property RowExpandButton: TACLResourceTexture index 4 read GetTexture write SetTexture stored IsTextureStored;
   end;
 
@@ -1240,6 +1241,7 @@ begin
   RowColorSelectedText.InitailizeDefaults('TreeList.Colors.RowSelectedText');
   RowColorSelectedTextInactive.InitailizeDefaults('TreeList.Colors.RowSelectedTextInactive');
   RowContentOffsets.InitailizeDefaults('TreeList.Margins.RowContentOffsets', Rect(4, 4, 4, 4));
+  RowCornerRadius.InitailizeDefaults('TreeList.Margins.RowCornerRadius', 0);
   RowExpandButton.InitailizeDefaults('TreeList.Textures.RowExpandButton');
 
   FocusRectColor.InitailizeDefaults('', clDefault);
@@ -2097,7 +2099,9 @@ procedure TACLTreeListNodeViewInfo.DoDraw(ACanvas: TCanvas);
 var
   I: Integer;
 begin
-  acFillRect(ACanvas, Bounds, SubClass.StyleGetNodeBackgroundColor(Odd(AbsoluteNodeIndex), Node));
+  acFillRect(ACanvas, Bounds,
+    SubClass.StyleGetNodeBackgroundColor(Odd(AbsoluteNodeIndex), Node),
+    SubClass.Style.RowCornerRadius.Value);
   if IsFocused and (SubClass.FocusedColumn <> nil) and SubClass.Focused then
     acFillRect(ACanvas, GetFocusRect, SubClass.Style.RowColorFocused.Value);
   if HasHorzSeparators then
