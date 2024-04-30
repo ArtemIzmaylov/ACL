@@ -4,22 +4,21 @@
 {*          Command Line Processor           *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.Utils.CommandLine;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
-  // System
-  System.SysUtils,
-  System.Generics.Collections,
+  {System.}Generics.Collections,
+  {System.}Math,
+  {System.}SysUtils,
   // ACL
   ACL.Classes.Collections,
   ACL.Classes.StringList,
@@ -125,22 +124,46 @@ type
     procedure Parse(ATarget: TACLCommandLineProcessor.TCommands);
   end;
 
-function FindSwitch(const ACmdLine, ASwitch: UnicodeString): Boolean; overload;
-function FindSwitch(const ACmdLine, ASwitch: UnicodeString; out ASwitchParam: UnicodeString): Boolean; overload;
+function FindSwitch(const ACmdLine, ASwitch: string): Boolean; overload;
+function FindSwitch(const ACmdLine, ASwitch: string; out ASwitchParam: string): Boolean; overload;
+function GetCommandLine: string;
 function GetCommandLineParams: string;
 implementation
 
+{$IFDEF MSWINDOWS}
 uses
-  System.Math;
+  Windows;
+{$ENDIF}
 
-function FindSwitch(const ACmdLine, ASwitch: UnicodeString): Boolean;
+{$IFNDEF MSWINDOWS}
+function CombineParams(ASkipAppName: Boolean): string;
 var
-  X: UnicodeString;
+  I: Integer;
+  S: TACLStringBuilder;
+begin
+  S := TACLStringBuilder.Create;
+  try
+    for I := Ord(ASkipAppName) to ParamCount do
+    begin
+      if S.Length > 0 then
+        S.Append(' ');
+      S.Append(ParamStr(I));
+    end;
+    Result := S.ToString;
+  finally
+    S.Free;
+  end;
+end;
+{$ENDIF}
+
+function FindSwitch(const ACmdLine, ASwitch: string): Boolean;
+var
+  X: string;
 begin
   Result := FindSwitch(ACmdLine, ASwitch, X);
 end;
 
-function FindSwitch(const ACmdLine, ASwitch: UnicodeString; out ASwitchParam: UnicodeString): Boolean;
+function FindSwitch(const ACmdLine, ASwitch: string; out ASwitchParam: string): Boolean;
 var
   ACommands: TACLCommandLineProcessor.TCommands;
   I: Integer;
@@ -159,7 +182,17 @@ begin
   end;
 end;
 
+function GetCommandLine: string;
+begin
+{$IFDEF MSWINDOWS}
+  Result := Windows.GetCommandLineW;
+{$ELSE}
+  Result := CombineParams(False);
+{$ENDIF}
+end;
+
 function GetCommandLineParams: string;
+{$IFDEF MSWINDOWS}
 var
   AParser: TACLParser;
   AToken: TACLParserToken;
@@ -182,6 +215,10 @@ begin
   finally
     AParser.Free;
   end;
+{$ELSE}
+begin
+  Result := CombineParams(True);
+{$ENDIF}
 end;
 
 { TACLCommandLineProcessor }
@@ -417,7 +454,7 @@ end;
 
 procedure TACLCommandLineParser.HandlerNone(const AToken: TACLParserToken);
 var
-  S: UnicodeString;
+  S: string;
 begin
   case AToken.TokenType of
     acTokenSpace:
@@ -473,7 +510,9 @@ begin
   if (AToken.TokenType = acTokenDelimiter) and (AToken.Data^ = '/') then
     FState := sWaitingForCommandName
   else
-    if (AToken.TokenType = acTokenDelimiter) and (AToken.Data^ = '-') and ((FTarget.Count > 0) or (FParamBuffer.Length = 0)) then
+    if (AToken.TokenType = acTokenDelimiter) and (AToken.Data^ = '-') and
+      ((FTarget.Count > 0) or (FParamBuffer.Length = 0))
+    then
       FState := sWaitingForCommandName
     else
     begin
