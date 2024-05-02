@@ -18,7 +18,6 @@ interface
 uses
 {$IFDEF FPC}
   Cairo,
-  ClipBrd,
   LCLIntf,
   LCLType,
 {$ELSE}
@@ -33,6 +32,7 @@ uses
   {System.}SysUtils,
   {System.}Types,
   // Vcl
+  {Vcl.}ClipBrd,
   {Vcl.}Graphics,
   // ACL
   ACL.Classes.ByteBuffer,
@@ -157,7 +157,8 @@ type
     procedure LoadFromFile(const AFileName: string);
     procedure LoadFromGraphic(AGraphic: TGraphic);
     procedure LoadFromResource(AInstance: HINST; const AResName: string; AResType: PChar);
-    procedure LoadFromStream(AStream: TStream);
+    procedure LoadFromStream(AStream: IACLDataContainer); overload;
+    procedure LoadFromStream(AStream: TStream); overload;
     procedure SaveToFile(const AFileName: string); overload;
     procedure SaveToFile(const AFileName: string; AFormat: TACLImageFormatClass); overload;
     procedure SaveToStream(AStream: TStream); overload; virtual;
@@ -331,6 +332,22 @@ type
     class function GetSize(AStream: TStream; out ASize: TSize): Boolean; override;
   end;
 
+  { TACLImageTools }
+
+  TACLImageTools = class
+  protected
+    class procedure CropAndResizeCore(const AImage: IACLDataContainer;
+      AWidth, AHeight: Integer; AScale: Single; ACropMargins: TRect);
+  public
+    class function CanPasteFromClipboard: Boolean;
+    class procedure CopyToClipboard(AImage: TACLImage);
+    class procedure CropAndResize(const AImage: IACLDataContainer;
+      AScale: Single; const ACropMargins: TRect);
+    class procedure Resize(const AImage: IACLDataContainer;
+      AWidth, AHeight: Integer);
+    class function PasteFromClipboard: IACLDataContainer;
+  end;
+
 implementation
 
 uses
@@ -338,6 +355,7 @@ uses
   ACL.FastCode,
   ACL.Math, // inlining
   ACL.Graphics.Ex.Gdip,
+  ACL.Utils.Clipboard,
 {$ELSE}
   ACL.Graphics.Ex.Cairo,
 {$ENDIF}
@@ -942,6 +960,18 @@ begin
     LoadFromStream(AStream);
   finally
     AStream.Free;
+  end;
+end;
+
+procedure TACLImage.LoadFromStream(AStream: IACLDataContainer);
+var
+  LStream: TStream;
+begin
+  LStream := AStream.LockData;
+  try
+    LoadFromStream(LStream);
+  finally
+    AStream.UnlockData;
   end;
 end;
 
@@ -1640,7 +1670,7 @@ end;
 class function TACLImageFormatPNG.ClipboardFormat: Word;
 begin
   if FClipboardFormat = 0 then
-    FClipboardFormat := RegisterClipboardFormat('PNG');
+    FClipboardFormat := RegisterClipboardFormat({$IFDEF FPC}MimeType{$ELSE}'PNG'{$ENDIF});
   Result := FClipboardFormat;
 end;
 
@@ -1807,6 +1837,192 @@ begin
     if LEncodedData <> nil then
       FFreeFunc(LEncodedData);
   end;
+end;
+
+{ TABLImageEditor }
+
+class procedure TACLImageTools.CropAndResize(
+  const AImage: IACLDataContainer; AScale: Single; const ACropMargins: TRect);
+begin
+  if (AImage <> nil) and (not SameValue(AScale, 1) or (ACropMargins <> NullRect)) then
+    CropAndResizeCore(AImage, -1, -1, AScale, ACropMargins);
+end;
+
+class procedure TACLImageTools.CropAndResizeCore(const AImage: IACLDataContainer;
+  AWidth, AHeight: Integer; AScale: Single; ACropMargins: TRect);
+var
+  LImage: TACLImage;
+  LImageData: TMemoryStream;
+begin
+  LImageData := AImage.LockData;
+  try
+    LImage := TACLImage.Create(LImageData);
+    try
+      if ACropMargins <> NullRect then
+        LImage.Crop(ACropMargins);
+      if (AWidth > 0) and (AHeight > 0) then
+        LImage.Resize(AWidth, AHeight)
+      else if AScale > 0 then
+        LImage.Scale(AScale);
+
+      LImageData.Position := 0;
+      LImage.SaveToStream(LImageData);
+      LImageData.Size := LImageData.Position;
+    finally
+      LImage.Free;
+    end;
+  finally
+    AImage.UnlockData;
+  end;
+end;
+
+class function TACLImageTools.CanPasteFromClipboard: Boolean;
+begin
+  Result :=
+    Clipboard.HasFormat(TACLImageFormatBMP.ClipboardFormat) or
+    Clipboard.HasFormat(TACLImageFormatPNG.ClipboardFormat);
+end;
+
+class procedure TACLImageTools.CopyToClipboard(AImage: TACLImage);
+
+  procedure Copy(AImage: TACLImage; AFormat: TACLImageFormatClass);
+  var
+    LStream: TMemoryStream;
+  begin
+    LStream := TMemoryStream.Create;
+    try
+      AImage.SaveToStream(LStream, AFormat);
+      LStream.Position := 0;
+    {$IFDEF FPC}
+      Clipboard.AddFormat(AFormat.ClipboardFormat, LStream);
+    {$ELSE}
+      Clipboard.SetAsHandle(AFormat.ClipboardFormat,
+        GlobalAllocFromData(LStream.Memory, LStream.Size));
+    {$ENDIF}
+    finally
+      LStream.Free;
+    end;
+  end;
+
+  procedure CopyAsBMP(AImage: TACLImage);
+  {$IFDEF MSWINDOWS}
+  var
+    ABitmap: TBitmap;
+    AData: THandle;
+    AFormat: Word;
+    APalette: HPALETTE;
+  {$ENDIF}
+  begin
+  {$IFDEF MSWINDOWS}
+    ABitmap := AImage.ToBitmap(afPremultiplied);
+    try
+      ABitmap.SaveToClipboardFormat(AFormat, AData, APalette);
+      Clipboard.SetAsHandle(AFormat, AData);
+    finally
+      ABitmap.Free;
+    end;
+  {$ELSE}
+    Copy(AImage, TACLImageFormatBMP);
+  {$ENDIF}
+  end;
+
+  procedure CopyAsPNG(AImage: TACLImage);
+  begin
+    Copy(AImage, TACLImageFormatPNG);
+  end;
+
+begin
+  Clipboard.Open;
+  try
+    Clipboard.Clear;
+    CopyAsBMP(AImage);
+    CopyAsPNG(AImage);
+  finally
+    Clipboard.Close;
+  end;
+end;
+
+class procedure TACLImageTools.Resize(const AImage: IACLDataContainer; AWidth, AHeight: Integer);
+begin
+  if (AImage <> nil) and (AWidth > 0) and (AHeight > 0) then
+    CropAndResizeCore(AImage, AWidth, AHeight, -1, NullRect);
+end;
+
+class function TACLImageTools.PasteFromClipboard: IACLDataContainer;
+{$IFDEF MSWINDOWS}
+
+  function CreateFromFormat(AFormat: Word): IACLDataContainer;
+  var
+    LHandle: THandle;
+  begin
+    LHandle := Clipboard.GetAsHandle(TACLImageFormatPNG.ClipboardFormat);
+    if LHandle <> 0 then
+    begin
+      Result := TACLDataContainer.Create;
+      Result.SetDataSize(GlobalSize(LHandle));
+      FastMove(GlobalLock(LHandle)^, Result.GetDataPtr^, Result.GetDataSize);
+      GlobalUnlock(LHandle);
+    end
+    else
+      Result := nil;
+  end;
+
+  function CreateFromBitmap: IACLDataContainer;
+  var
+    LBitmap: TACLBitmap;
+    LData: TMemoryStream;
+  begin
+    LBitmap := TACLBitmap.Create;
+    try
+      LBitmap.Assign(Clipboard);
+      Result := TACLDataContainer.Create;
+      with TACLImage.Create(LBitmap) do
+      try
+        LData := Result.LockData;
+        try
+          SaveToStream(LData, TACLImageFormatPNG);
+        finally
+          Result.UnlockData;
+        end;
+      finally
+        Free;
+      end;
+    finally
+      LBitmap.Free;
+    end;
+  end;
+
+{$ELSE}
+
+  function CreateFromFormat(AFormat: Word): IACLDataContainer;
+  var
+    LStream: TStream;
+  begin
+    LStream := TMemoryStream.Create;
+    try
+      if Clipboard.GetFormat(AFormat, LStream) then
+        Result := TACLDataContainer.Create(LStream)
+      else
+        Result := nil;
+    finally
+      LStream.Free;
+    end;
+  end;
+
+  function CreateFromBitmap: IACLDataContainer;
+  begin
+    Result := CreateFromFormat(TACLImageFormatBMP.ClipboardFormat);
+  end;
+
+{$ENDIF}
+
+begin
+  if Clipboard.HasFormat(TACLImageFormatPNG.ClipboardFormat) then
+    Result := CreateFromFormat(TACLImageFormatPNG.ClipboardFormat)
+  else if Clipboard.HasFormat(TACLImageFormatBMP.ClipboardFormat) then
+    Result := CreateFromBitmap
+  else
+    Result := nil;
 end;
 
 end.
