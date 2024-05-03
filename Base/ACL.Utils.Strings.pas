@@ -382,7 +382,6 @@ var
 // Special macros:
 // Delphi: just maps to acStringToAnsiString / acStringFromAnsiString
 // FPC: asumes that AnsiString is UTF8-encoded
-function _A(const S: string): AnsiString; overload; inline;
 function _S(const S: AnsiString): string; overload; inline;
 function _S(const S: UnicodeString): string; overload; inline;
 function _U(const S: string): UnicodeString; overload; inline;
@@ -401,12 +400,13 @@ function acStringLength(const AScanStart, AScanNext: PAnsiChar): Integer; overlo
 function acStringLength(const AScanStart, AScanNext: PWideChar): Integer; overload; inline;
 function acStringFromBytes(const Bytes: PByte; Count: Integer): UnicodeString; overload;
 function acStringFromBytes(const Bytes: TBytes): UnicodeString; overload;
-function acStringToBytes(W: PWideChar; ACount: Integer): RawByteString;
 function acStringIsRealUnicode(const S: UnicodeString): Boolean;
+function acStringToBytes(W: PWideChar; ACount: Integer): RawByteString;
+function acStringToAnsiString(const S: AnsiString; CodePage: Integer = -1): AnsiString; overload;
+function acStringToAnsiString(const S: UnicodeString; CodePage: Integer = -1): AnsiString; overload;
+function acStringToBytes(W: PWideChar; ACount: Integer): RawByteString;
 
 // Text Conversions
-function acStringToAnsiString(const S: UnicodeString): AnsiString; overload;
-function acStringToAnsiString(const S: UnicodeString; CodePage: Integer): AnsiString; overload;
 function acStringFromAnsiString(const S: AnsiChar): WideChar; overload;
 function acStringFromAnsiString(const S: AnsiString): UnicodeString; overload;
 function acStringFromAnsiString(const S: AnsiString; CodePage: Integer): UnicodeString; overload;
@@ -577,15 +577,6 @@ const
 // -----------------------------------------------------------------------------
 // Special Macros
 // -----------------------------------------------------------------------------
-
-function _A(const S: string): AnsiString;
-begin
-{$IFDEF UNICODE}
-  Result := acStringToAnsiString(S);
-{$ELSE}
-  Result := S;
-{$ENDIF}
-end;
 
 function _S(const S: AnsiString): string;
 begin
@@ -785,9 +776,9 @@ end;
 // Text Conversions
 // ---------------------------------------------------------------------------------------------------------------------
 
-function acStringToAnsiString(const S: UnicodeString): AnsiString; overload;
+function acStringToAnsiString(const S: AnsiString; CodePage: Integer = -1): AnsiString; overload;
 begin
-  Result := acStringToAnsiString(S, DefaultCodePage);
+  Result := acStringToAnsiString(acDecodeUtf8(S), CodePage);
 end;
 
 function acStringToAnsiString(const S: UnicodeString; CodePage: Integer): AnsiString; overload;
@@ -795,6 +786,7 @@ function acStringToAnsiString(const S: UnicodeString; CodePage: Integer): AnsiSt
 var
   LData: TBytes;
 begin
+  if CodePage < 0 then CodePage := DefaultCodePage;  
   LData := TACLEncodings.Get(CodePage).GetBytes(S);
   Result := acMakeString(PAnsiChar(@LData[0]), Length(LData));
 {$ELSE}
@@ -802,6 +794,7 @@ var
   LLen: Integer;
   LTmp: PWideChar;
 begin
+  if CodePage < 0 then CodePage := DefaultCodePage;
   LTmp := PWideChar(S);
   LLen := LocaleCharsFromUnicode(CodePage, 0, LTmp, Length(S), nil, 0, nil, nil);
   SetLength(Result, LLen);
