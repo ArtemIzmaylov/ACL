@@ -463,7 +463,7 @@ var
   I: Integer;
   U: UnicodeString;
 begin
-  U := _U(EditDateTimeFormatToString);
+  U := acUString(EditDateTimeFormatToString);
   for I := 1 to Length(U) do
   begin
     if U[I].IsLetter then
@@ -1271,7 +1271,7 @@ var
   LText: UnicodeString;
   LTextLen: Integer;
 begin
-  LText := _U(Text);
+  LText := acUString(Text);
   LTextLen := Length(LText);
   LPosition := AStartPosition + ADirection;
 
@@ -1315,7 +1315,7 @@ begin
   Result := True;
   if InputMask in [eimInteger, eimFloat] then
   begin
-    LText := _U(Text);
+    LText := acUString(Text);
     LTemp := _S(Copy(LText, 1, SelStart) + Key + Copy(LText, SelStart + SelLength + 1));
     if (LTemp <> '-') and (LTemp <> '+') then
     begin

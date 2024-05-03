@@ -481,7 +481,7 @@ end;
 
 procedure TACLCSVDocumentWriter.Write(const S: string);
 begin
-  FStream.WriteString(_U(S), FSettings.Encoding);
+  FStream.WriteString(S, FSettings.Encoding);
 end;
 
 procedure TACLCSVDocumentWriter.WriteSeparatorIfNecessary;

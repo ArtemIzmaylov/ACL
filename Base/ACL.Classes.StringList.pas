@@ -376,7 +376,7 @@ end;
 procedure TACLStringList.SaveToStream(AStream: TStream; AEncoding: TEncoding = nil);
 begin
   AStream.WriteBOM(AEncoding);
-  AStream.WriteString(_U(Text), AEncoding);
+  AStream.WriteString(Text, AEncoding);
 end;
 
 function TACLStringList.Add(const S: string; AObject: TObject; AInterface: IUnknown): Integer;

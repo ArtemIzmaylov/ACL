@@ -384,7 +384,6 @@ var
 // FPC: asumes that AnsiString is UTF8-encoded
 function _S(const S: AnsiString): string; overload; inline;
 function _S(const S: UnicodeString): string; overload; inline;
-function _U(const S: string): UnicodeString; overload; inline;
 
 // Helpers
 function StrToIntDef(const S: AnsiString; ADefault: Integer): Integer; overload;
@@ -401,10 +400,14 @@ function acStringLength(const AScanStart, AScanNext: PWideChar): Integer; overlo
 function acStringFromBytes(const Bytes: PByte; Count: Integer): UnicodeString; overload;
 function acStringFromBytes(const Bytes: TBytes): UnicodeString; overload;
 function acStringIsRealUnicode(const S: UnicodeString): Boolean;
-function acStringToBytes(W: PWideChar; ACount: Integer): RawByteString;
-function acStringToAnsiString(const S: AnsiString; CodePage: Integer = -1): AnsiString; overload;
 function acStringToAnsiString(const S: UnicodeString; CodePage: Integer = -1): AnsiString; overload;
 function acStringToBytes(W: PWideChar; ACount: Integer): RawByteString;
+// Delphi: just return S as it is
+// FPC: asumes that string is UTF8-encoded
+function acUString(const S: string): UnicodeString; inline;
+{$IFNDEF UNICODE}
+function acStringToAnsiString(const S: string; CodePage: Integer = -1): AnsiString; overload;
+{$ENDIF}
 
 // Text Conversions
 function acStringFromAnsiString(const S: AnsiChar): WideChar; overload;
@@ -776,10 +779,12 @@ end;
 // Text Conversions
 // ---------------------------------------------------------------------------------------------------------------------
 
-function acStringToAnsiString(const S: AnsiString; CodePage: Integer = -1): AnsiString; overload;
+{$IFNDEF UNICODE}
+function acStringToAnsiString(const S: string; CodePage: Integer = -1): AnsiString; overload;
 begin
-  Result := acStringToAnsiString(acDecodeUtf8(S), CodePage);
+  Result := acStringToAnsiString(acUString(S), CodePage);
 end;
+{$ENDIF}
 
 function acStringToAnsiString(const S: UnicodeString; CodePage: Integer): AnsiString; overload;
 {$IFDEF FPC}
@@ -906,6 +911,15 @@ begin
     Inc(P);
   end;
   Result := False;
+end;
+
+function acUString(const S: string): UnicodeString; inline;
+begin
+{$IF DEFINED(UNICODE)}
+  Result := S;
+{$ELSE}
+  Result := acDecodeUtf8(S);
+{$ENDIF}
 end;
 
 //==============================================================================

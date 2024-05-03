@@ -1532,7 +1532,7 @@ var
   LData: UnicodeString;
   LDataLength: Cardinal;
 begin
-  LData := _U(S);
+  LData := acUString(S);
   LDataLength := Length(LData);
   WriteValue(LDataLength);
   if LDataLength > 0 then

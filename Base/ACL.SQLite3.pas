@@ -325,7 +325,7 @@ end;
 function PrepareData(const AData: string): string; inline; overload;
 begin
   //# Surrogates does not supported by SQLite
-  Result := _S(acRemoveSurrogates(_U(AData), ' '));
+  Result := _S(acRemoveSurrogates(acUString(AData), ' '));
   Result := #39 + acStringReplace(Result, #39, #39#39) + #39;
 end;
 

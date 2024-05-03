@@ -416,7 +416,7 @@ begin
         S.Append(' ');
       S.Append(IntToHex(ABytes[I], 2));
     end;
-    Result := _U(S.ToString);
+    Result := acUString(S.ToString);
   finally
     S.Release;
   end;

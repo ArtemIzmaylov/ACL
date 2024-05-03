@@ -1233,11 +1233,11 @@ begin
     begin
       // We cannot use that because of SectionData[''] allow us to set raw data
       // LSection.SortLogical;
-      AStream.WriteString(_U('[' + LSection.Name + ']'), AEncoding);
+      AStream.WriteString('[' + LSection.Name + ']', AEncoding);
       AStream.WriteString(acCRLF, AEncoding);
       for J := 0 to LSection.Count - 1 do
       begin
-        AStream.WriteString(_U(LSection.Strings[J]), AEncoding);
+        AStream.WriteString(LSection.Strings[J], AEncoding);
         AStream.WriteString(acCRLF, AEncoding);
       end;
       AStream.WriteString(acCRLF, AEncoding);

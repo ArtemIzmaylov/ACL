@@ -216,7 +216,10 @@ type
     procedure WriteRect(const AValue: TRect); inline;
     procedure WriteSingle(const AValue: Single); inline;
     procedure WriteSize(const AValue: TSize); inline;
-    function WriteString(const S: UnicodeString; AEncoding: TEncoding = nil): Integer;
+  {$IFNDEF UNICODE}
+    function WriteString(const S: string; AEncoding: TEncoding = nil): Integer; overload;
+  {$ENDIF}
+    function WriteString(const S: UnicodeString; AEncoding: TEncoding = nil): Integer; overload;
     function WriteStringA(const S: AnsiString): Integer;
     function WriteStringWithLength(const S: UnicodeString): Word;
     function WriteStringWithLengthA(const S: AnsiString): Word;
@@ -1316,6 +1319,13 @@ procedure TACLStreamHelper.WriteSize(const AValue: TSize);
 begin
   WriteBuffer(AValue, SizeOf(AValue));
 end;
+
+{$IFNDEF UNICODE}
+function TACLStreamHelper.WriteString(const S: string; AEncoding: TEncoding = nil): Integer;
+begin
+  Result := WriteString(acUString(S), AEncoding);
+end;
+{$ENDIF}
 
 function TACLStreamHelper.WriteString(const S: UnicodeString; AEncoding: TEncoding): Integer;
 begin

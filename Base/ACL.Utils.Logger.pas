@@ -279,7 +279,7 @@ end;
 
 procedure TACLLog.Write(const AText: string);
 begin
-  Write(Encoding.GetBytes(_U(AText)));
+  Write(Encoding.GetBytes(acUString(AText)));
 end;
 
 procedure TACLLog.WriteHeader(const S: string);

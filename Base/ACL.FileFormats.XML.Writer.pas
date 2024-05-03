@@ -393,7 +393,7 @@ procedure TACLXMLWriter.WriteString(const AText: string);
 var
   LText: UnicodeString;
 begin
-  LText := _U(AText);
+  LText := acUString(AText);
   WriteString(PWideChar(LText), Length(LText));
 end;
 
@@ -751,7 +751,7 @@ var
 begin
   Assert(AText <> '');
   AdvanceState(TToken.Text);
-  LText := _U(AText);
+  LText := acUString(AText);
 
   //# Start a new cdata section
   FBufChars[FBufPos] := '<';
@@ -1023,7 +1023,7 @@ var
 begin
   Assert(AData <> '');
   AdvanceState(TToken.Text);
-  LData := _U(AData);
+  LData := acUString(AData);
   LStart := PWideChar(LData);
   WriteRawWithCharChecking(LStart, LStart + Length(LData));
 end;
@@ -1328,7 +1328,7 @@ var
   LStart: PWideChar;
 begin
   Assert(S <> '');
-  LData := _U(S);
+  LData := acUString(S);
   LStart := PWideChar(LData);
   RawText(LStart, LStart + Length(LData));
 end;
@@ -1462,7 +1462,7 @@ begin
     Exit;
   end;
 
-  LText := _U(AText);
+  LText := acUString(AText);
   LSrcBegin := PWideChar(LText);
   LDstBegin := @FBufChars[0];
   LSrc := LSrcBegin;

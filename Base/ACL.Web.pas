@@ -538,7 +538,7 @@ class procedure TACLWebSettings.ConfigSave(AConfig: TACLIniFile);
   var
     U: UnicodeString;
   begin
-    U := _U(S);
+    U := acUString(S);
     acCryptStringXOR(U, 'ProxySettings');
     AStream.WriteStringWithLength(U);
   end;
