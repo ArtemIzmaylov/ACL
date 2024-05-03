@@ -349,7 +349,7 @@ class procedure TACLCSVDocument.Read(const AStream: TStream;
   const OnRow: TACLCSVDocumentRowProc;
   const OnValue: TACLCSVDocumentValueProc);
 begin
-  ReadData(_S(acLoadString(AStream, ASettings.Encoding)), ASettings, OnRow, OnValue);
+  ReadData(acString(acLoadString(AStream, ASettings.Encoding)), ASettings, OnRow, OnValue);
 end;
 
 class procedure TACLCSVDocument.ReadData(const S: string;

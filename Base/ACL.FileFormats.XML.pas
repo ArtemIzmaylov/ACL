@@ -1316,7 +1316,7 @@ var
 begin
   AFlags := AStream.ReadByte;
   if AFlags and TACLBinaryXML.FlagsHasValue <> 0 then
-    ANode.NodeValue := _S(AStream.ReadString(ReadValue(AStream)));
+    ANode.NodeValue := acString(AStream.ReadString(ReadValue(AStream)));
 
   if AFlags and TACLBinaryXML.FlagsHasAttributes <> 0 then
   begin
@@ -1326,7 +1326,7 @@ begin
     begin
       AAttr := ANode.Attributes.Add;
       AAttr.FName := AStringTable[ReadValue(AStream)];
-      AAttr.Value := _S(AStream.ReadString(ReadValue(AStream)));
+      AAttr.Value := AStream.ReadString(ReadValue(AStream));
       Dec(ACount);
     end;
   end;
@@ -1362,7 +1362,7 @@ begin
   ACount := ReadValue(AStream);
   SetLength(AStringTable{%H-}, ACount);
   for AIndex := 0 to ACount - 1 do
-    AStringTable[AIndex] := _S(AStream.ReadStringA(ReadValue(AStream)));
+    AStringTable[AIndex] := acString(AStream.ReadStringA(ReadValue(AStream)));
 end;
 
 class function TACLBinaryXMLParser.ReadValue(AStream: TStream): Cardinal;
@@ -1416,8 +1416,8 @@ begin
     while ACount > 0 do
     begin
       AAttr := ANode.Attributes.Add;
-      AAttr.FName := _S(AStream.ReadStringWithLengthA);
-      AAttr.Value := _S(AStream.ReadStringWithLength);
+      AAttr.FName := acString(AStream.ReadStringWithLengthA);
+      AAttr.Value := acString(AStream.ReadStringWithLength);
       Dec(ACount);
     end;
   end;
@@ -1437,7 +1437,7 @@ begin
     AParent.FSubNodes.Capacity := ACount;
     while ACount > 0 do
     begin
-      ReadNode(AStream, AParent.Add(_S(AStream.ReadStringWithLengthA)));
+      ReadNode(AStream, AParent.Add(acString(AStream.ReadStringWithLengthA)));
       Dec(ACount);
     end;
   end;

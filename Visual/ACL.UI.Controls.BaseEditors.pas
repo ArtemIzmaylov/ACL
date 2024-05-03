@@ -469,7 +469,7 @@ begin
     if U[I].IsLetter then
       U[I] := '0';
   end;
-  Result := _S(U) + ';1;_';
+  Result := acString(U) + ';1;_';
 end;
 
 procedure SkipDefaultHandler(WndHandle: HWND; var Message: TMessage);
@@ -1283,7 +1283,7 @@ begin
   while InRange(LPosition, 1, LTextLen) and not acContains(LText[LPosition], Delims) do
     Inc(LPosition, ADirection);
     
-  Text := _S(
+  Text := acString(
     Copy(LText, 1, Min(AStartPosition, LPosition)) +
     Copy(LText, Max(AStartPosition, LPosition) + 1));
   SelStart := Min(AStartPosition, LPosition);
@@ -1316,7 +1316,7 @@ begin
   if InputMask in [eimInteger, eimFloat] then
   begin
     LText := acUString(Text);
-    LTemp := _S(Copy(LText, 1, SelStart) + Key + Copy(LText, SelStart + SelLength + 1));
+    LTemp := acString(Copy(LText, 1, SelStart) + Key + Copy(LText, SelStart + SelLength + 1));
     if (LTemp <> '-') and (LTemp <> '+') then
     begin
       if InputMask = eimFloat then
@@ -1548,7 +1548,7 @@ function TACLIncrementalSearch.ProcessKey(Key: WideChar): Boolean;
 begin
   Result := not Key.IsControl and (Key <> #8) and (Active or (Key <> ' '));
   if Result then
-    SetText(Text + _S(Key));
+    SetText(Text + acString(Key));
 end;
 
 function TACLIncrementalSearch.ProcessKey(Key: Word; Shift: TShiftState): Boolean;

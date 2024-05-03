@@ -205,7 +205,7 @@ begin
         CleanSelection;
       if FocusedSection = tesNone then
         Inc(LCursor, 1);
-      ValidateEdit(Replace(Text, _S(Key), LCursor, 1));
+      ValidateEdit(Replace(Text, acString(Key), LCursor, 1));
     finally
       SelStart := LCursor + 1;
     end;

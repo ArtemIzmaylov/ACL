@@ -240,7 +240,7 @@ begin
   if TACLXMLCharType.IsHighSurrogate(AInvChar) and (ANextChar <> #0) then
   begin
     LCombinedChar := TACLXMLCharType.CombineSurrogateChar(ANextChar, AInvChar);
-    Result[0] := _S(AInvChar + ANextChar);
+    Result[0] := acString(AInvChar + ANextChar);
     Result[1] := Format('0x%2x', [Ord(LCombinedChar)]);
   end
   else
@@ -249,7 +249,7 @@ begin
     if Integer(AInvChar) = 0 then
       Result[0] := '.'
     else
-      Result[0] := _S(AInvChar);
+      Result[0] := acString(AInvChar);
     Result[1] := Format('0x%2x', [Ord(AInvChar)]);
   end;
 end;

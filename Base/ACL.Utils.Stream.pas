@@ -194,8 +194,9 @@ type
     function ReadRect: TRect; inline;
     function ReadSingle: Single; inline;
     function ReadSize: TSize; inline;
-    function ReadString(ALength: Integer): UnicodeString;
+    function ReadString(ALength: Integer): string;
     function ReadStringA(ALength: Integer): AnsiString;
+    function ReadStringU(ALength: Integer): UnicodeString;
     function ReadStringWithLength: UnicodeString;
     function ReadStringWithLengthA: AnsiString;
     function ReadVariant: Variant;
@@ -900,15 +901,9 @@ begin
   ReadBuffer(Result{%H-}, SizeOf(Result));
 end;
 
-function TACLStreamHelper.ReadString(ALength: Integer): UnicodeString;
+function TACLStreamHelper.ReadString(ALength: Integer): string;
 begin
-  if ALength > 0 then
-  begin
-    SetLength(Result{%H-}, ALength);
-    ReadBuffer(Result[1], SizeOf(WideChar) * ALength);
-  end
-  else
-    Result := acEmptyStrU;
+  Result := acString(ReadStringU(ALength)); // Unicode-based, for backward compatibility
 end;
 
 function TACLStreamHelper.ReadStringA(ALength: Integer): AnsiString;
@@ -922,18 +917,20 @@ begin
     Result := acEmptyStrA;
 end;
 
-function TACLStreamHelper.ReadStringWithLength: UnicodeString;
-var
-  ALength: Word;
+function TACLStreamHelper.ReadStringU(ALength: Integer): UnicodeString;
 begin
-  ALength := ReadWord;
   if ALength > 0 then
   begin
     SetLength(Result{%H-}, ALength);
-    ReadBuffer(PWideChar(Result)^, 2 * ALength);
+    ReadBuffer(Result[1], SizeOf(WideChar) * ALength);
   end
   else
-    Result := acEmptyStrA;
+    Result := acEmptyStrU;
+end;
+
+function TACLStreamHelper.ReadStringWithLength: UnicodeString;
+begin
+  Result := ReadStringU(ReadWord);
 end;
 
 function TACLStreamHelper.ReadStringWithLengthA: AnsiString;
@@ -1320,13 +1317,6 @@ begin
   WriteBuffer(AValue, SizeOf(AValue));
 end;
 
-{$IFNDEF UNICODE}
-function TACLStreamHelper.WriteString(const S: string; AEncoding: TEncoding = nil): Integer;
-begin
-  Result := WriteString(acUString(S), AEncoding);
-end;
-{$ENDIF}
-
 function TACLStreamHelper.WriteString(const S: UnicodeString; AEncoding: TEncoding): Integer;
 begin
   if AEncoding <> nil then
@@ -1365,6 +1355,14 @@ begin
     WriteBuffer(S[1], Result);
   Inc(Result, SizeOf(Result));
 end;
+
+{$IFNDEF UNICODE}
+function TACLStreamHelper.WriteString(const S: string; AEncoding: TEncoding = nil): Integer;
+begin
+  {$MESSAGE 'TODO - Utf8 optimization'}
+  Result := WriteString(acUString(S), AEncoding);
+end;
+{$ENDIF}
 
 procedure TACLStreamHelper.WriteVariant(const AValue: Variant);
 

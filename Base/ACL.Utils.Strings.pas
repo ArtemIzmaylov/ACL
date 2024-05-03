@@ -379,12 +379,6 @@ var
   acLangSizeSuffixMB: string = 'MB';
   acLangSizeSuffixGB: string = 'GB';
 
-// Special macros:
-// Delphi: just maps to acStringToAnsiString / acStringFromAnsiString
-// FPC: asumes that AnsiString is UTF8-encoded
-function _S(const S: AnsiString): string; overload; inline;
-function _S(const S: UnicodeString): string; overload; inline;
-
 // Helpers
 function StrToIntDef(const S: AnsiString; ADefault: Integer): Integer; overload;
 
@@ -397,23 +391,27 @@ function acMakeString(const AScanStart, AScanNext: PAnsiChar): AnsiString; overl
 function acMakeString(const AScanStart, AScanNext: PWideChar): UnicodeString; overload;
 function acStringLength(const AScanStart, AScanNext: PAnsiChar): Integer; overload; inline;
 function acStringLength(const AScanStart, AScanNext: PWideChar): Integer; overload; inline;
-function acStringFromBytes(const Bytes: PByte; Count: Integer): UnicodeString; overload;
-function acStringFromBytes(const Bytes: TBytes): UnicodeString; overload;
-function acStringIsRealUnicode(const S: UnicodeString): Boolean;
-function acStringToAnsiString(const S: UnicodeString; CodePage: Integer = -1): AnsiString; overload;
-function acStringToBytes(W: PWideChar; ACount: Integer): RawByteString;
-// Delphi: just return S as it is
-// FPC: asumes that string is UTF8-encoded
-function acUString(const S: string): UnicodeString; inline;
-{$IFNDEF UNICODE}
-function acStringToAnsiString(const S: string; CodePage: Integer = -1): AnsiString; overload;
-{$ENDIF}
-
-// Text Conversions
 function acStringFromAnsiString(const S: AnsiChar): WideChar; overload;
 function acStringFromAnsiString(const S: AnsiString): UnicodeString; overload;
 function acStringFromAnsiString(const S: AnsiString; CodePage: Integer): UnicodeString; overload;
 function acStringFromAnsiString(const S: PAnsiChar; Length, CodePage: Integer): UnicodeString; overload;
+function acStringFromBytes(const Bytes: PByte; Count: Integer): UnicodeString; overload;
+function acStringFromBytes(const Bytes: TBytes): UnicodeString; overload;
+function acStringIsRealUnicode(const S: UnicodeString): Boolean;
+{$IFNDEF UNICODE}
+function acStringToAnsiString(const S: string; CodePage: Integer = -1): AnsiString; overload;
+{$ENDIF}
+function acStringToAnsiString(const S: UnicodeString; CodePage: Integer = -1): AnsiString; overload;
+function acStringToBytes(W: PWideChar; ACount: Integer): RawByteString;
+
+// Special conversion functions between Delphi and FreePascal
+// Delphi: maps to acStringToAnsiString
+// FPC: returns S as it is
+function acString(const S: AnsiString): string; overload; inline;
+// Delphi: returns S as it is
+// FPC: asumes that string is UTF8-encoded
+function acString(const S: UnicodeString): string; overload; inline;
+function acUString(const S: string): UnicodeString; inline;
 
 // UTF8
 // Unlike built-in to RTL and Windows OS versions of UTF8 Decoder
@@ -576,41 +574,6 @@ uses
 
 const
   MaxPreambleLength = 3;
-
-// -----------------------------------------------------------------------------
-// Special Macros
-// -----------------------------------------------------------------------------
-
-function _S(const S: AnsiString): string;
-begin
-{$IFDEF UNICODE}
-  Result := acStringFromAnsiString(S);
-{$ELSE}
-  Result := S;
-{$ENDIF}
-end;
-
-function _S(const S: UnicodeString): string;
-begin
-{$IF DEFINED(UNICODE)}
-  Result := S;
-{$ELSEIF DEFINED(FPC)}
-  Result := acEncodeUTF8(S);
-{$ELSE}
-  Result := acStringToAnsiString(S);
-{$IFEND}
-end;
-
-function _U(const S: string): UnicodeString;
-begin
-{$IF DEFINED(UNICODE)}
-  Result := S;
-{$ELSEIF DEFINED(FPC)}
-  Result := acDecodeUTF8(S);
-{$ELSE}
-  Result := acStringFromAnsiString(S);
-{$ENDIF}
-end;
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -913,12 +876,34 @@ begin
   Result := False;
 end;
 
+function acString(const S: AnsiString): string;
+begin
+{$IF DEFINED(UNICODE)}
+  Result := acStringFromAnsiString(S);
+{$ELSE}
+  Result := S;
+{$ENDIF}
+end;
+
+function acString(const S: UnicodeString): string; inline;
+begin
+{$IF DEFINED(UNICODE)}
+  Result := S;
+{$ELSEIF DEFINED(FPC)}
+  Result := acEncodeUtf8(S);
+{$ELSE}
+  Result := acStringToAnsiString(S);
+{$ENDIF}
+end;
+
 function acUString(const S: string): UnicodeString; inline;
 begin
 {$IF DEFINED(UNICODE)}
   Result := S;
-{$ELSE}
+{$ELSEIF DEFINED(FPC)}
   Result := acDecodeUtf8(S);
+{$ELSE}
+  Result := acStringFromAnsiString(S);
 {$ENDIF}
 end;
 
@@ -1746,10 +1731,11 @@ procedure acSaveString(const AStream: TStream; const AString: string;
 begin
   if AWriteBOM then
     AStream.WriteBOM(AEncoding);
+  {$MESSAGE 'TODO - Utf8 optimization'}
   if AEncoding = TEncoding.UTF8 then
     AStream.WriteStringA(AString)
   else
-    AStream.WriteString(_U(AString), AEncoding);
+    AStream.WriteString(AString, AEncoding);
 end;
 
 procedure acSaveString(const AFileName: string; const AString: string;
@@ -1852,7 +1838,7 @@ begin
           Inc(AScan);
         end;
       end;
-      Result := _U(ABuffer.ToString);
+      Result := acUString(ABuffer.ToString);
     finally
       ABuffer.Release;
     end;
@@ -2195,7 +2181,7 @@ class function TACLEncodings.WebName(const Encoding: TEncoding): string;
 var
   AStartPos: Integer;
 begin
-  Result := _S(Encoding.EncodingName);
+  Result := acString(Encoding.EncodingName);
   AStartPos := acPos('(', Result) + 1;
   if AStartPos > 1 then
     Result := Copy(Result, AStartPos, acPos(')', Result) - AStartPos);
@@ -2797,7 +2783,7 @@ begin
   Inc(FDataLength);
   Result := Self;
 {$ELSEIF DEFINED(FPC)}
-  Result := Append(_S(AValue));
+  Result := Append(acString(AValue));
 {$ELSE}
   Result := Append(AnsiChar(AValue));
 {$ENDIF}
@@ -3014,7 +3000,7 @@ begin
 {$IFDEF UNICODE}
   Result := Append(@AValue[AStartIndex], ACount);
 {$ELSE}
-  Result := Append(_S(acMakeString(PWideChar(@AValue[AStartIndex]), ACount)));
+  Result := Append(acString(acMakeString(PWideChar(@AValue[AStartIndex]), ACount)));
 {$ENDIF}
 end;
 
@@ -3437,7 +3423,7 @@ var
 begin
   AStream := Encode(PByteArray(ABytes), ACount);
   try
-    Result := _S(acLoadString(AStream));
+    Result := acString(acLoadString(AStream));
   finally
     AStream.Free;
   end;
@@ -3449,7 +3435,7 @@ var
 begin
   AStream := Encode(@ABytes[0], Length(ABytes));
   try
-    Result := _S(acLoadString(AStream));
+    Result := acString(acLoadString(AStream));
   finally
     AStream.Free;
   end;

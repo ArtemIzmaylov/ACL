@@ -500,7 +500,7 @@ class procedure TACLWebSettings.ConfigLoad(AConfig: TACLIniFile);
     U := AStream.ReadStringWithLength;
     if ID = PROXY_SETTINGS_ID then
       acCryptStringXOR(U, 'ProxySettings');
-    Result := _S(U);
+    Result := acString(U);
   end;
 
   procedure ReadProxyData;
