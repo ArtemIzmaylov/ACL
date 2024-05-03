@@ -666,15 +666,11 @@ end;
 
 procedure TACLHexViewSubClass.CopyToClipboard(AEncoding: TEncoding);
 begin
-{$IFDEF FPC}
   CopyToClipboard(
     function (const ABytes: TBytes): UnicodeString
     begin
       Result := AEncoding.GetString(ABytes);
-    end); // to prevent from linking error
-{$ELSE}
-  CopyToClipboard(AEncoding.GetString);
-{$ENDIF}
+    end); // to prevent from linking error in FPC
 end;
 
 procedure TACLHexViewSubClass.CopyToClipboard(AEncodeProc: TEncodeProc);

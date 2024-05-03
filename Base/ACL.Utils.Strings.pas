@@ -390,25 +390,39 @@ function _U(const S: string): UnicodeString; overload; inline;
 // Helpers
 function StrToIntDef(const S: AnsiString; ADefault: Integer): Integer; overload;
 
+// Allocation and TextConversion
+function acAllocStr(const S: string): PChar; overload;
+function acAllocStr(const S: string; out ALength: Integer): PChar; overload;
+function acMakeString(const P: PAnsiChar; L: Integer): AnsiString; overload; inline;
+function acMakeString(const P: PWideChar; L: Integer): UnicodeString; overload; inline;
+function acMakeString(const AScanStart, AScanNext: PAnsiChar): AnsiString; overload;
+function acMakeString(const AScanStart, AScanNext: PWideChar): UnicodeString; overload;
+function acStringLength(const AScanStart, AScanNext: PAnsiChar): Integer; overload; inline;
+function acStringLength(const AScanStart, AScanNext: PWideChar): Integer; overload; inline;
+function acStringFromBytes(const Bytes: PByte; Count: Integer): UnicodeString; overload;
+function acStringFromBytes(const Bytes: TBytes): UnicodeString; overload;
+function acStringToBytes(W: PWideChar; ACount: Integer): RawByteString;
+function acStringIsRealUnicode(const S: UnicodeString): Boolean;
+
 // Text Conversions
 function acStringToAnsiString(const S: UnicodeString): AnsiString; overload;
 function acStringToAnsiString(const S: UnicodeString; CodePage: Integer): AnsiString; overload;
-function acStringToBytes(W: PWideChar; ACount: Integer): RawByteString;
 function acStringFromAnsiString(const S: AnsiChar): WideChar; overload;
 function acStringFromAnsiString(const S: AnsiString): UnicodeString; overload;
 function acStringFromAnsiString(const S: AnsiString; CodePage: Integer): UnicodeString; overload;
 function acStringFromAnsiString(const S: PAnsiChar; Length, CodePage: Integer): UnicodeString; overload;
-function acStringFromBytes(const Bytes: TBytes): UnicodeString; overload;
-function acStringFromBytes(B: PByte; Count: Integer): UnicodeString; overload;
-function acStringIsRealUnicode(const S: UnicodeString): Boolean;
 
 // UTF8
 // Unlike built-in to RTL and Windows OS versions of UTF8 Decoder
-// The acDecodeUTF8 returns an empty string if UTF8 sequence is malformed
-function acDecodeUTF8(const Source: AnsiString): UnicodeString;
-function acEncodeUTF8(const Source: UnicodeString): AnsiString;
+// The acDecodeUtf8 returns an empty string if UTF8 sequence is malformed
+function acDecodeUtf8(const Source: AnsiString): UnicodeString;
+function acEncodeUtf8(const Source: UnicodeString): AnsiString;
 function acUtf8IsWellformed(Source: PAnsiChar; SourceBytes: Integer): Boolean;
 function acUtf8ToUnicode(Dest: PWideChar; MaxDestChars: Integer; Source: PAnsiChar; SourceBytes: Integer): Integer;
+// Delphi: just maps to acDecodeUtf8 / acEncodeUtf8
+// FPC: returns string as it is (we asume that AnsiString is already utf8-encoded);
+function acStringFromUtf8(const S: AnsiString): string;
+function acStringToUtf8(const S: string): AnsiString;
 
 // Search
 function acContains(const AChar: AnsiChar; const AString: AnsiString): Boolean; inline; overload;
@@ -425,21 +439,13 @@ function acPos(const ASubStr, AString: string;
 function acPos(const ASubStr, AString: string;
   AIgnoreCase, AWholeWords: Boolean; AOffset: Integer = 1): Integer; overload;
 
-// Allocation
-function acAllocStr(const S: string): PChar; overload;
-function acAllocStr(const S: string; out ALength: Integer): PChar; overload;
-function acMakeString(const P: PAnsiChar; L: Integer): AnsiString; overload; inline;
-function acMakeString(const P: PWideChar; L: Integer): UnicodeString; overload; inline;
-function acMakeString(const AScanStart, AScanNext: PAnsiChar): AnsiString; overload;
-function acMakeString(const AScanStart, AScanNext: PWideChar): UnicodeString; overload;
-function acStringLength(const AScanStart, AScanNext: PAnsiChar): Integer; overload; inline;
-function acStringLength(const AScanStart, AScanNext: PWideChar): Integer; overload; inline;
-
 // Explode
 function acExplodeString(AScan: PAnsiChar; AScanCount: Integer;
   const ADelimiters: AnsiString; AReceiveProc: TAnsiExplodeStringReceiveResultProc): Integer; overload;
 function acExplodeString(AScan: PWideChar; AScanCount: Integer;
   const ADelimiters: UnicodeString; AReceiveProc: TWideExplodeStringReceiveResultProc): Integer; overload;
+function acExplodeString(const S: AnsiString;
+  const ADelimiters: AnsiString; AReceiveProc: TAnsiExplodeStringReceiveResultProc): Integer; overload;
 function acExplodeString(const S: UnicodeString;
   const ADelimiters: UnicodeString; AReceiveProc: TWideExplodeStringReceiveResultProc): Integer; overload;
 function acExplodeString(const S, ADelimiters: string; out AParts: TStringDynArray): Integer; overload;
@@ -862,25 +868,33 @@ begin
 end;
 
 function acStringFromBytes(const Bytes: TBytes): UnicodeString;
+var
+  LCount: Integer;
 begin
-  Result := acStringFromBytes(@Bytes[0], Length(Bytes));
+  LCount := Length(Bytes);
+  if LCount > 0 then
+    Result := acStringFromBytes(@Bytes[0], LCount)
+  else
+    Result := acEmptyStrU;
 end;
 
-function acStringFromBytes(B: PByte; Count: Integer): UnicodeString;
+function acStringFromBytes(const Bytes: PByte; Count: Integer): UnicodeString;
 var
+  B: PByte;
   W: PWord;
 begin
+  if Count <= 0 then
+    Exit(acEmptyStrU);
+
   SetLength(Result{%H-}, Count);
-  if Count > 0 then
+  B := Bytes;
+  W := @Result[1];
+  while Count > 0 do
   begin
-    W := @Result[1];
-    while Count > 0 do
-    begin
-      W^ := B^;
-      Dec(Count);
-      Inc(W);
-      Inc(B);
-    end;
+    W^ := B^;
+    Dec(Count);
+    Inc(W);
+    Inc(B);
   end;
 end;
 
@@ -1164,7 +1178,7 @@ begin
   end;
 end;
 
-function acDecodeUTF8(const Source: AnsiString): UnicodeString;
+function acDecodeUtf8(const Source: AnsiString): UnicodeString;
 var
   L: Integer;
 begin
@@ -1180,7 +1194,7 @@ begin
     Result := '';
 end;
 
-function acEncodeUTF8(const Source: UnicodeString): AnsiString;
+function acEncodeUtf8(const Source: UnicodeString): AnsiString;
 var
   L: Integer;
 begin
@@ -1193,6 +1207,24 @@ begin
     if L > 0 then
       SetLength(Result, L - 1)
   end;
+end;
+
+function acStringToUtf8(const S: string): AnsiString;
+begin
+{$IFDEF FPC}
+  Result := S;
+{$ELSE}
+  Result := acEncodeUtf8(S);
+{$ENDIF}
+end;
+
+function acStringFromUtf8(const S: AnsiString): string;
+begin
+{$IFDEF FPC}
+  Result := S;
+{$ELSE}
+  Result := acDecodeUtf8(S);
+{$ENDIF}
 end;
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -1265,6 +1297,12 @@ begin
         ACanContinue := AArrayLength > 0;
       end);
   end;
+end;
+
+function acExplodeString(const S, ADelimiters: AnsiString;
+  AReceiveProc: TAnsiExplodeStringReceiveResultProc): Integer;
+begin
+  Result := acExplodeString(PAnsiChar(S), Length(S), ADelimiters, AReceiveProc);
 end;
 
 function acExplodeString(const S, ADelimiters: UnicodeString;
