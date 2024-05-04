@@ -344,7 +344,7 @@ end;
 
 procedure TACLStringList.LoadFromStream(AStream: TStream; AEncoding: TEncoding = nil);
 begin
-  Text := acString(acLoadString(AStream, AEncoding));
+  Text := acLoadString(AStream, AEncoding);
 end;
 
 procedure TACLStringList.LoadFromResource(AInstance: HModule; const AName: string; AType: PChar);

@@ -362,7 +362,7 @@ begin
   Lock.Enter;
   try
     Stream.Seek(0, soBeginning);
-    Result := acString(acLoadString(Stream, Encoding));
+    Result := acLoadString(Stream, Encoding);
     Stream.Seek(0, soEnd);
   finally
     Lock.Leave;

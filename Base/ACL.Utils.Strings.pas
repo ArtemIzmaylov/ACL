@@ -401,7 +401,7 @@ function acStringIsRealUnicode(const S: string): Boolean;
 {$IFNDEF UNICODE}
 function acStringToAnsiString(const S: string; CodePage: Integer = -1): AnsiString; overload;
 {$ENDIF}
-function acStringToAnsiString(const S: UnicodeString; CodePage: Integer = -1): AnsiString; overload;
+function acStringToAnsiString(const S: UnicodeString; CodePage: Integer = -1): AnsiString; overload;
 function acStringToBytes(W: PWideChar; ACount: Integer): RawByteString;
 
 // Special conversion functions between Delphi and FreePascal
@@ -484,14 +484,15 @@ function acDetectEncoding(ABuffer: TBytes;
   out AEncoding: TEncoding; ADefaultEncoding: TEncoding = nil): Integer; overload;
 function acDetectEncoding(AStream: TStream;
   ADefaultEncoding: TEncoding = nil): TEncoding; overload;
+function acIsNativeStringEncoding(AEncoding: TEncoding): Boolean;
 
 // Load/Save String
 function acLoadString(AStream: TStream;
-  ADefaultEncoding: TEncoding; out AEncoding: TEncoding): UnicodeString; overload;
+  ADefaultEncoding: TEncoding; out AEncoding: TEncoding): string; overload;
 function acLoadString(AStream: TStream;
-  AEncoding: TEncoding = nil): UnicodeString; overload;
+  AEncoding: TEncoding = nil): string; overload;
 function acLoadString(const AFileName: string;
-  AEncoding: TEncoding = nil): UnicodeString; overload;
+  AEncoding: TEncoding = nil): string; overload;
 procedure acSaveString(const AStream: TStream; const AString: UnicodeString;
   AEncoding: TEncoding = nil; AWriteBOM: Boolean = True); overload;
 procedure acSaveString(const AFileName: string; const AString: UnicodeString;
@@ -1650,58 +1651,66 @@ begin
   end;
 end;
 
+function acIsNativeStringEncoding(AEncoding: TEncoding): Boolean;
+begin
+{$IF DEFINED(UNICODE)}
+  Result := AEncoding = TEncoding.Unicode;
+{$ELSEIF DEFINED(FPC)}
+  Result := AEncoding = TEncoding.UTF8;
+{$ELSE}
+  Result := False;
+{$ENDIF}
+end;
+
 // ---------------------------------------------------------------------------------------------------------------------
 // Load/Save String
 // ---------------------------------------------------------------------------------------------------------------------
 
-function acLoadString(AStream: TStream; AEncoding: TEncoding = nil): UnicodeString;
+function acLoadString(AStream: TStream; AEncoding: TEncoding = nil): string;
 var
-  X: TEncoding;
+  LUnused: TEncoding;
 begin
-  Result := acLoadString(AStream, AEncoding, X);
+  Result := acLoadString(AStream, AEncoding, LUnused);
 end;
 
-function acLoadString(AStream: TStream; ADefaultEncoding: TEncoding; out AEncoding: TEncoding): UnicodeString;
+function acLoadString(AStream: TStream; ADefaultEncoding: TEncoding; out AEncoding: TEncoding): string;
 var
-  ABytes: TBytes;
-  ASize: Cardinal;
+  LBytes: TBytes;
+  LSize: Cardinal;
 begin
   AEncoding := acDetectEncoding(AStream, ADefaultEncoding);
-  ASize := AStream.Available;
-  if ASize <= 0 then
-    Result := ''
-  else
-    if AEncoding = TEncoding.Unicode then
-    begin
-      ASize := ASize div SizeOf(WideChar);
-      SetLength(Result{%H-}, ASize);
-      AStream.ReadBuffer(Result[1], ASize * SizeOf(WideChar));
-    end
-    else
-    begin
-      SetLength(ABytes{%H-}, ASize);
-      AStream.ReadBuffer(ABytes[0], ASize);
-      try
-        Result := AEncoding.GetString(ABytes);
-      except
-        Result := TACLEncodings.Default.GetString(ABytes);
-      end;
-    end;
-end;
-
-function acLoadString(const AFileName: string; AEncoding: TEncoding = nil): UnicodeString;
-var
-  AStream: TStream;
-begin
-  AStream := StreamCreateReader(AFileName);
-  if AStream <> nil then
-  try
-    Result := acLoadString(AStream, AEncoding);
-  finally
-    AStream.Free;
+  LSize := AStream.Available;
+  if LSize <= 0 then
+    Exit(acEmptyStr);
+  if acIsNativeStringEncoding(AEncoding) then
+  begin
+    SetLength(Result{%H-}, LSize div SizeOf(Char));
+    AStream.ReadBuffer(Result[1], LSize);
   end
   else
-    Result := '';
+  begin
+    SetLength(LBytes{%H-}, LSize);
+    AStream.ReadBuffer(LBytes[0], LSize);
+    try
+      Result := acString(AEncoding.GetString(LBytes));
+    except
+      Result := acString(TACLEncodings.Default.GetString(LBytes));
+    end;
+  end;
+end;
+
+function acLoadString(const AFileName: string; AEncoding: TEncoding = nil): string;
+var
+  LStream: TStream;
+begin
+  if StreamCreateReader(AFileName, LStream) then
+  try
+    Result := acLoadString(LStream, AEncoding);
+  finally
+    LStream.Free;
+  end
+  else
+    Result := acEmptyStr;
 end;
 
 procedure acSaveString(const AStream: TStream; const AString: UnicodeString;
@@ -3423,7 +3432,7 @@ var
 begin
   AStream := Encode(PByteArray(ABytes), ACount);
   try
-    Result := acString(acLoadString(AStream));
+    Result := acLoadString(AStream);
   finally
     AStream.Free;
   end;
@@ -3435,7 +3444,7 @@ var
 begin
   AStream := Encode(@ABytes[0], Length(ABytes));
   try
-    Result := acString(acLoadString(AStream));
+    Result := acLoadString(AStream);
   finally
     AStream.Free;
   end;

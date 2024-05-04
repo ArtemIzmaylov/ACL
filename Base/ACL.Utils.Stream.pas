@@ -1359,8 +1359,10 @@ end;
 {$IFNDEF UNICODE}
 function TACLStreamHelper.WriteString(const S: string; AEncoding: TEncoding = nil): Integer;
 begin
-  {$MESSAGE 'TODO - Utf8 optimization'}
-  Result := WriteString(acUString(S), AEncoding);
+  if acIsNativeStringEncoding(AEncoding) then
+    Result := WriteStringA(S)
+  else
+    Result := WriteString(acUString(S), AEncoding);
 end;
 {$ENDIF}
 

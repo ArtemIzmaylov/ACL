@@ -1190,7 +1190,7 @@ end;
 
 procedure TACLIniFile.LoadFromStream(AStream: TStream);
 begin
-  LoadFromString(acString(acLoadString(AStream, nil, FEncoding)));
+  LoadFromString(acLoadString(AStream, nil, FEncoding));
 end;
 
 procedure TACLIniFile.LoadFromString(const AString: string);
