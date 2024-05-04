@@ -397,7 +397,7 @@ function acStringFromAnsiString(const S: AnsiString; CodePage: Integer): Unicode
 function acStringFromAnsiString(const S: PAnsiChar; Length, CodePage: Integer): UnicodeString; overload;
 function acStringFromBytes(const Bytes: PByte; Count: Integer): UnicodeString; overload;
 function acStringFromBytes(const Bytes: TBytes): UnicodeString; overload;
-function acStringIsRealUnicode(const S: UnicodeString): Boolean;
+function acStringIsRealUnicode(const S: string): Boolean;
 {$IFNDEF UNICODE}
 function acStringToAnsiString(const S: string; CodePage: Integer = -1): AnsiString; overload;
 {$ENDIF}
@@ -859,18 +859,18 @@ begin
   end;
 end;
 
-function acStringIsRealUnicode(const S: UnicodeString): Boolean;
+function acStringIsRealUnicode(const S: string): Boolean;
 var
   I: Integer;
   L: Integer;
-  P: PWideChar;
+  P: PChar;
 begin
   L := Length(S);
-  P := PWideChar(S);
+  P := PChar(S);
   for I := 1 to L do
   begin
     if Ord(P^) >= $7F then
-      Exit(True); // Unicode or Extended ASCII
+      Exit(True); // Unicode (inc.UTF8) or Extended ASCII
     Inc(P);
   end;
   Result := False;
