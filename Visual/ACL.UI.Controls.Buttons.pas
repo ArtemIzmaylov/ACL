@@ -711,7 +711,7 @@ end;
 
 procedure TACLCustomButtonSubClass.Draw(ACanvas: TCanvas);
 var
-  AClipRgn: HRGN;
+  AClipRgn: TRegionHandle;
 begin
   if acRectVisible(ACanvas, Bounds) then
   begin

@@ -791,7 +791,7 @@ procedure TACLSelectionFrame.Draw(DC: HDC; ASelectedElement: TACLSelectionFrameH
   end;
 
 var
-  AClipRgn: HRGN;
+  AClipRgn: TRegionHandle;
   AElement: TACLSelectionFrameElement;
 begin
   AClipRgn := acSaveClipRegion(DC);

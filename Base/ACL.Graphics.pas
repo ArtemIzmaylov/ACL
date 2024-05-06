@@ -76,6 +76,7 @@ type
   TAlphaColorArray = array[0..0] of TAlphaColor;
 
 type
+  TRegionHandle = HRGN;
 
   { TACLColorSchema }
 
@@ -320,20 +321,20 @@ type
       RGN_OR, RGN_AND, RGN_XOR, RGN_DIFF, RGN_COPY
     );
   strict private
-    FHandle: HRGN;
+    FHandle: TRegionHandle;
 
     function GetBounds: TRect;
     function GetIsEmpty: Boolean;
     procedure FreeHandle;
-    procedure SetHandle(AValue: HRGN);
+    procedure SetHandle(AValue: TRegionHandle);
   public
     constructor Create; virtual;
     constructor CreateRect(const R: TRect);
     constructor CreateFromDC(DC: HDC);
-    constructor CreateFromHandle(AHandle: HRGN);
+    constructor CreateFromHandle(AHandle: TRegionHandle);
     destructor Destroy; override;
     //# Methods
-    function Clone: HRGN;
+    function Clone: TRegionHandle;
     function Contains(const P: TPoint): Boolean; overload; inline;
     function Contains(const R: TRect): Boolean; overload; inline;
     procedure Combine(ARegion: TACLRegion;
@@ -346,7 +347,7 @@ type
     //# Properties
     property Bounds: TRect read GetBounds;
     property Empty: Boolean read GetIsEmpty;
-    property Handle: HRGN read FHandle write SetHandle;
+    property Handle: TRegionHandle read FHandle write SetHandle;
   end;
 
   { TACLRegionData }
@@ -363,10 +364,10 @@ type
     procedure SetCount(AValue: Integer);
   public
     constructor Create(ACount: Integer);
-    constructor CreateFromHandle(ARgn: HRGN);
+    constructor CreateFromHandle(ARgn: TRegionHandle);
     destructor Destroy; override;
-    function CreateHandle: HRGN; overload;
-    function CreateHandle(const ARegionBounds: TRect): HRGN; overload;
+    function CreateHandle: TRegionHandle; overload;
+    function CreateHandle(const ARegionBounds: TRect): TRegionHandle; overload;
     //# Properties
     property Rects: PRectArray read FRects;
     property Count: Integer read FCount write SetCount;
@@ -483,11 +484,11 @@ type
   strict private const
     CacheSize = 8;
   strict private
-    class var Cache: array[0..Pred(CacheSize)] of HRGN;
+    class var Cache: array[0..Pred(CacheSize)] of TRegionHandle;
   public
     class destructor Finalize;
-    class function Get: HRGN; inline;
-    class procedure Release(var ARegion: HRGN); inline;
+    class function Get: TRegionHandle; inline;
+    class procedure Release(var ARegion: TRegionHandle); inline;
   end;
 
 {$IFDEF MSWINDOWS}
@@ -496,8 +497,8 @@ procedure acUpdateLayeredWindow(Wnd: THandle; SrcDC: HDC; const R: TRect; AAlpha
 {$ENDIF}
 
 // DoubleBuffer
-function acCreateMemDC(ASourceDC: HDC; const R: TRect; out AMemBmp: HBITMAP; out AClipRegion: HRGN): HDC;
-procedure acDeleteMemDC(AMemDC: HDC; AMemBmp: HBITMAP; AClipRegion: HRGN);
+function acCreateMemDC(ASourceDC: HDC; const R: TRect; out AMemBmp: HBITMAP; out AClipRegion: TRegionHandle): HDC;
+procedure acDeleteMemDC(AMemDC: HDC; AMemBmp: HBITMAP; AClipRegion: TRegionHandle);
 
 // GDI
 procedure acBitBlt(DC, SourceDC: HDC; const R: TRect; const APoint: TPoint); overload; inline;
@@ -550,24 +551,24 @@ procedure acTileBlt(DC, SourceDC: HDC; const ADest, ASource: TRect);
 function acHatchCreatePattern(ASize: Integer; AColor1, AColor2: TColor): TBitmap;
 
 // Clippping
-function acCombineWithClipRegion(DC: HDC; ARegion: HRGN;
+function acCombineWithClipRegion(DC: HDC; ARegion: TRegionHandle;
   AOperation: Integer; AConsiderWindowOrg: Boolean = True): Boolean;
-procedure acExcludeFromClipRegion(DC: HDC; const R: TRect); overload; inline;
-procedure acExcludeFromClipRegion(DC: HDC; ARegion: HRGN; AConsiderWindowOrg: Boolean = True); overload; inline;
-function acIntersectClipRegion(DC: HDC; const R: TRect): Boolean; overload; inline;
-function acIntersectClipRegion(DC: HDC; ARegion: HRGN; AConsiderWindowOrg: Boolean = True): Boolean; overload; inline;
-function acRectVisible(ACanvas: TCanvas; const R: TRect): Boolean; inline;
-procedure acRestoreClipRegion(DC: HDC; ARegion: HRGN); inline;
-function acSaveClipRegion(DC: HDC): HRGN; inline;
+procedure acExcludeFromClipRegion(DC: HDC; const R: TRect); overload;
+procedure acExcludeFromClipRegion(DC: HDC; ARegion: TRegionHandle; AConsiderWindowOrg: Boolean = True); overload;
+function acIntersectClipRegion(DC: HDC; const R: TRect): Boolean; overload;
+function acIntersectClipRegion(DC: HDC; ARegion: TRegionHandle; AConsiderWindowOrg: Boolean = True): Boolean; overload;
+function acRectVisible(ACanvas: TCanvas; const R: TRect): Boolean;
+procedure acRestoreClipRegion(DC: HDC; ARegion: TRegionHandle);
+function acSaveClipRegion(DC: HDC): TRegionHandle;
 
 // Regions
-function acRegionClone(ARegion: HRGN): HRGN;
-function acRegionCombine(ATarget, ASource: HRGN; AOperation: Integer): Integer; overload;
-function acRegionCombine(ATarget: HRGN; const ASource: TRect; AOperation: Integer): Integer; overload;
-procedure acRegionFree(var ARegion: HRGN); inline;
-function acRegionFromBitmap(ABitmap: TACLDib): HRGN; overload;
+function acRegionClone(ARegion: TRegionHandle): TRegionHandle;
+function acRegionCombine(ATarget, ASource: TRegionHandle; AOperation: Integer): Integer; overload;
+function acRegionCombine(ATarget: TRegionHandle; const ASource: TRect; AOperation: Integer): Integer; overload;
+procedure acRegionFree(var ARegion: TRegionHandle); inline;
+function acRegionFromBitmap(ABitmap: TACLDib): TRegionHandle; overload;
 function acRegionFromBitmap(AColors: PACLPixel32;
-  AWidth, AHeight: Integer; ATransparentColor: TColor): HRGN; overload;
+  AWidth, AHeight: Integer; ATransparentColor: TColor): TRegionHandle; overload;
 
 // WindowOrg
 function acMoveWindowOrg(DC: HDC; const P: TPoint): TPoint; overload; inline;
@@ -803,10 +804,10 @@ end;
 // Clipping
 //----------------------------------------------------------------------------------------------------------------------
 
-function acCombineWithClipRegion(DC: HDC; ARegion: HRGN;
+function acCombineWithClipRegion(DC: HDC; ARegion: TRegionHandle;
   AOperation: Integer; AConsiderWindowOrg: Boolean = True): Boolean;
 var
-  AClipRegion: HRGN;
+  AClipRegion: TRegionHandle;
   AOrigin: TPoint;
 begin
   AClipRegion := CreateRectRgnIndirect(NullRect);
@@ -834,7 +835,7 @@ begin
   ExcludeClipRect(DC, R.Left, R.Top, R.Right, R.Bottom);
 end;
 
-procedure acExcludeFromClipRegion(DC: HDC; ARegion: HRGN; AConsiderWindowOrg: Boolean = True);
+procedure acExcludeFromClipRegion(DC: HDC; ARegion: TRegionHandle; AConsiderWindowOrg: Boolean = True);
 begin
   acCombineWithClipRegion(DC, ARegion, RGN_DIFF, AConsiderWindowOrg);
 end;
@@ -844,7 +845,7 @@ begin
   Result := IntersectClipRect(DC, R.Left, R.Top, R.Right, R.Bottom) <> NULLREGION;
 end;
 
-function acIntersectClipRegion(DC: HDC; ARegion: HRGN; AConsiderWindowOrg: Boolean = True): Boolean;
+function acIntersectClipRegion(DC: HDC; ARegion: TRegionHandle; AConsiderWindowOrg: Boolean = True): Boolean;
 begin
   Result := acCombineWithClipRegion(DC, ARegion, RGN_AND, AConsiderWindowOrg);
 end;
@@ -860,13 +861,13 @@ begin
   Result := RectVisible(ACanvas.Handle, R);
 end;
 
-procedure acRestoreClipRegion(DC: HDC; ARegion: HRGN);
+procedure acRestoreClipRegion(DC: HDC; ARegion: TRegionHandle);
 begin
   SelectClipRgn(DC, ARegion);
   TACLRegionManager.Release(ARegion);
 end;
 
-function acSaveClipRegion(DC: HDC): HRGN;
+function acSaveClipRegion(DC: HDC): TRegionHandle;
 begin
   Result := TACLRegionManager.Get;
   if GetClipRgn(DC, Result) = 0 then
@@ -880,20 +881,20 @@ end;
 // Regions
 //----------------------------------------------------------------------------------------------------------------------
 
-function acRegionClone(ARegion: HRGN): HRGN;
+function acRegionClone(ARegion: TRegionHandle): TRegionHandle;
 begin
   Result := CreateRectRgnIndirect(NullRect);
   CombineRgn(Result, Result, ARegion, RGN_COPY);
 end;
 
-function acRegionCombine(ATarget, ASource: HRGN; AOperation: Integer): Integer;
+function acRegionCombine(ATarget, ASource: TRegionHandle; AOperation: Integer): Integer;
 begin
   Result := CombineRgn(ATarget, ATarget, ASource, AOperation);
 end;
 
-function acRegionCombine(ATarget: HRGN; const ASource: TRect; AOperation: Integer): Integer;
+function acRegionCombine(ATarget: TRegionHandle; const ASource: TRect; AOperation: Integer): Integer;
 var
-  ASourceRgn: HRGN;
+  ASourceRgn: TRegionHandle;
 begin
   ASourceRgn := CreateRectRgnIndirect(ASource);
   try
@@ -903,7 +904,7 @@ begin
   end;
 end;
 
-procedure acRegionFree(var ARegion: HRGN);
+procedure acRegionFree(var ARegion: TRegionHandle);
 begin
   if ARegion <> 0 then
   begin
@@ -912,16 +913,16 @@ begin
   end;
 end;
 
-function acRegionFromBitmap(ABitmap: TACLDib): HRGN;
+function acRegionFromBitmap(ABitmap: TACLDib): TRegionHandle;
 begin
   Result := acRegionFromBitmap(@ABitmap.Colors[0], ABitmap.Width, ABitmap.Height, clFuchsia);
 end;
 
-function acRegionFromBitmap(AColors: PACLPixel32; AWidth, AHeight: Integer; ATransparentColor: TColor): HRGN;
+function acRegionFromBitmap(AColors: PACLPixel32; AWidth, AHeight: Integer; ATransparentColor: TColor): TRegionHandle;
 
-  procedure FlushRegion(X, Y: Integer; var ACount: Integer; var ACombined: HRGN);
+  procedure FlushRegion(X, Y: Integer; var ACount: Integer; var ACombined: TRegionHandle);
   var
-    ARgn: HRGN;
+    ARgn: TRegionHandle;
   begin
     if ACount > 0 then
     begin
@@ -1128,7 +1129,7 @@ var
   LHighlightRect: TRect;
   LHighlightTextSize: TSize;
   LPrevTextColor: TColor;
-  LSaveRgn: HRGN;
+  LSaveRgn: TRegionHandle;
   LText: string;
   LTextOffset: TPoint;
   LTextPart: string;
@@ -1433,7 +1434,7 @@ end;
 // DoubleBuffer
 //----------------------------------------------------------------------------------------------------------------------
 
-function acCreateMemDC(ASourceDC: HDC; const R: TRect; out AMemBmp: HBITMAP; out AClipRegion: HRGN): HDC;
+function acCreateMemDC(ASourceDC: HDC; const R: TRect; out AMemBmp: HBITMAP; out AClipRegion: TRegionHandle): HDC;
 var
   AClipRect: TRect;
 begin
@@ -1446,7 +1447,7 @@ begin
     acIntersectClipRegion(Result, AClipRect);
 end;
 
-procedure acDeleteMemDC(AMemDC: HDC; AMemBmp: HBITMAP; AClipRegion: HRGN);
+procedure acDeleteMemDC(AMemDC: HDC; AMemBmp: HBITMAP; AClipRegion: TRegionHandle);
 begin
   DeleteDC(AMemDC);
   DeleteObject(AMemBmp);
@@ -1716,7 +1717,7 @@ end;
 
 procedure acTileBlt(DC, SourceDC: HDC; const ADest, ASource: TRect);
 var
-  AClipRgn: HRGN;
+  AClipRgn: TRegionHandle;
   R: TRect;
   W, H: Integer;
   X, Y, XCount, YCount: Integer;
@@ -1777,7 +1778,7 @@ procedure acDrawDropArrow(DC: HDC; const R: TRect; AColor: TColor; const AArrowS
 var
   ABrush: HBRUSH;
   APoints: array[0..2] of TPoint;
-  ARegion: HRGN;
+  ARegion: TRegionHandle;
   X, Y: Integer;
 begin
   if not R.IsEmpty then
@@ -1811,7 +1812,7 @@ end;
 procedure acDrawFrameEx(ACanvas: TCanvas; const ARect: TRect;
   AColor: TColor; ABorders: TACLBorders; AThickness: Integer = 1);
 var
-  LClipRegion: HRGN;
+  LClipRegion: TRegionHandle;
   LClipRect: TRect;
 begin
   if AColor <> clNone then
@@ -1831,7 +1832,7 @@ end;
 procedure acDrawFrameEx(ACanvas: TCanvas; const ARect: TRect;
   AColor: TAlphaColor; ABorders: TACLBorders; AThickness: Integer = 1);
 var
-  LClipRegion: HRGN;
+  LClipRegion: TRegionHandle;
   LClipRect: TRect;
 begin
   if AColor.IsValid then
@@ -2171,7 +2172,7 @@ begin
   end;
 end;
 
-constructor TACLRegion.CreateFromHandle(AHandle: HRGN);
+constructor TACLRegion.CreateFromHandle(AHandle: TRegionHandle);
 begin
   FHandle := AHandle;
 end;
@@ -2204,7 +2205,7 @@ begin
   Result := GetRgnBox(Handle, {$IFDEF FPC}@{$ENDIF}R) = NULLREGION;
 end;
 
-function TACLRegion.Clone: HRGN;
+function TACLRegion.Clone: TRegionHandle;
 begin
   Result := CreateRectRgnIndirect(NullRect);
   CombineRgn(Result, Result, Handle, RGN_OR);
@@ -2220,7 +2221,7 @@ end;
 
 procedure TACLRegion.Combine(const R: TRect; ACombineFunc: TACLRegionCombineFunc);
 var
-  ARgn: HRGN;
+  ARgn: TRegionHandle;
 begin
   ARgn := CreateRectRgnIndirect(R);
   if ACombineFunc <> rcmCopy then
@@ -2251,7 +2252,7 @@ begin
   SetRectRgn(Handle, 0, 0, 0, 0);
 end;
 
-procedure TACLRegion.SetHandle(AValue: HRGN);
+procedure TACLRegion.SetHandle(AValue: TRegionHandle);
 begin
   if (AValue <> 0) and (AValue <> FHandle) then
   begin
@@ -2273,7 +2274,7 @@ begin
   DataAllocate(ACount);
 end;
 
-constructor TACLRegionData.CreateFromHandle(ARgn: HRGN);
+constructor TACLRegionData.CreateFromHandle(ARgn: TRegionHandle);
 {$IFDEF LCLGtk2}
 type
   PGdkRectangleArray = ^TGdkRectangleArray;
@@ -2325,7 +2326,7 @@ begin
   inherited Destroy;
 end;
 
-function TACLRegionData.CreateHandle: HRGN;
+function TACLRegionData.CreateHandle: TRegionHandle;
 var
   I: Integer;
   LBounds: TRect;
@@ -2347,7 +2348,7 @@ begin
     Result := CreateRectRgnIndirect(NullRect);
 end;
 
-function TACLRegionData.CreateHandle(const ARegionBounds: TRect): HRGN;
+function TACLRegionData.CreateHandle(const ARegionBounds: TRect): TRegionHandle;
 {$IFNDEF MSWINDOWS}
 var
   I: Integer;
@@ -3864,7 +3865,7 @@ begin
     DeleteObject(Cache[I]);
 end;
 
-class function TACLRegionManager.Get: HRGN;
+class function TACLRegionManager.Get: TRegionHandle;
 var
   AIndex: Integer;
 begin
@@ -3879,7 +3880,7 @@ begin
     Result := CreateRectRgn(0, 0, 0, 0);
 end;
 
-class procedure TACLRegionManager.Release(var ARegion: HRGN);
+class procedure TACLRegionManager.Release(var ARegion: TRegionHandle);
 var
   AIndex: Integer;
 begin

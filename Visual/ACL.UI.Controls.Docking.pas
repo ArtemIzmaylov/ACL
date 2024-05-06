@@ -1962,7 +1962,7 @@ end;
 
 procedure TACLDockGroup.DrawTabs(ACanvas: TCanvas);
 var
-  AClipRgn: HRGN;
+  AClipRgn: TRegionHandle;
   ARect: TRect;
   ATab: TTab;
   I: Integer;
@@ -3103,7 +3103,7 @@ end;
 
 procedure TACLDockPanel.Paint;
 var
-  AClipRgn: HRGN;
+  AClipRgn: TRegionHandle;
   I: TCaptionButton;
 begin
   inherited;

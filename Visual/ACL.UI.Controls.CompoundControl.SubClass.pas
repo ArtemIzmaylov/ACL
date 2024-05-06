@@ -1730,7 +1730,7 @@ end;
 
 procedure TACLCompoundControlContentCellList<T>.Draw(ACanvas: TCanvas);
 var
-  ASaveIndex: HRGN;
+  ASaveIndex: TRegionHandle;
   I: Integer;
 begin
   ASaveIndex := acSaveClipRegion(ACanvas.Handle);

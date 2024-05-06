@@ -677,10 +677,10 @@ type
      LRI, // Isolate formatting characters new with 6.3
      RLI,
      FSI,
-     PDI,
+     PDI
 
      // resolved types, also resolved directions
-     NI = ON // alias, where ON, WS and S are treated the same
+     //NI = ON // alias, where ON, WS and S are treated the same
   );
 
 const
@@ -2760,7 +2760,7 @@ end;
 
 procedure TACLTextLayout.Draw(ACanvas: TCanvas; const AClipRect: TRect);
 var
-  LClipRegion: HRGN;
+  LClipRegion: TRegionHandle;
   LRender: TACLTextLayoutRender;
 begin
   if acRectVisible(ACanvas, AClipRect) then

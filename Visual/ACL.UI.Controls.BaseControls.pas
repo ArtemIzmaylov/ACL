@@ -2265,7 +2265,7 @@ end;
 
 procedure TACLCustomControl.WMPaint(var Message: TWMPaint);
 var
-  AClipRgn: HRGN;
+  AClipRgn: TRegionHandle;
   AMemBmp: HBITMAP;
   AMemDC: HDC;
   APaintStruct: TPaintStruct;

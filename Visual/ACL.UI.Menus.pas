@@ -1143,7 +1143,7 @@ end;
 procedure TACLStyleMenu.DrawItemImage(ACanvas: TCanvas;
   ARect: TRect; AItem: TMenuItem; ASelected: Boolean);
 var
-  AClipRegion: HRGN;
+  AClipRegion: TRegionHandle;
   AGlyph: TACLGlyph;
   AImages: TCustomImageList;
   AIntf: IACLGlyph;
@@ -1257,7 +1257,7 @@ const
   Indexes: array[Boolean, Boolean] of Integer = ((6, 2), (8, 4));
   NameMap: array[Boolean] of string = ('Buttons.Textures.CheckBox', 'Buttons.Textures.RadioBox');
 var
-  AClipRegion: HRGN;
+  AClipRegion: TRegionHandle;
   AImageIndex: Integer;
   APrevTargetDPI: Integer;
   ATexture: TACLResourceTexture;
@@ -2432,7 +2432,7 @@ procedure TACLMenuPopupWindow.Resize;
 var
   LBitmap: TACLDib;
   LRadius: Integer;
-  LRegion: HRGN;
+  LRegion: TRegionHandle;
 begin
   inherited;
 

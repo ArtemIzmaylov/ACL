@@ -36,6 +36,7 @@ uses
   // ACL
   ACL.Geometry,
   ACL.Geometry.Utils,
+  ACL.Graphics,
   ACL.Graphics.TextLayout,
   ACL.Timers,
   ACL.UI.Resources,
@@ -77,7 +78,7 @@ type
     procedure InitializeResources; override;
   public
     procedure AfterConstruction; override;
-    function CreateRegion(const R: TRect): HRGN;
+    function CreateRegion(const R: TRect): TRegionHandle;
     procedure Draw(ACanvas: TCanvas; const R: TRect);
     //# Properties
     property Radius: Integer read FRadius;
@@ -178,7 +179,6 @@ implementation
 
 uses
   ACL.Classes,
-  ACL.Graphics,
   ACL.UI.Menus,
   ACL.Utils.Common,
   ACL.Utils.Desktop;
@@ -219,7 +219,7 @@ begin
 {$ENDIF}
 end;
 
-function TACLStyleHint.CreateRegion(const R: TRect): HRGN;
+function TACLStyleHint.CreateRegion(const R: TRect): TRegionHandle;
 begin
   if Radius > 0 then
     Result := CreateRoundRectRgn(R.Left + 1, R.Top + 1, R.Right, R.Bottom, Radius, Radius)

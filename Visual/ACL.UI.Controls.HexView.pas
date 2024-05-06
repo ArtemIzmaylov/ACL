@@ -1396,7 +1396,7 @@ end;
 
 procedure TACLHexViewViewInfo.DoDraw(ACanvas: TCanvas);
 var
-  AClipRegion: HRGN;
+  AClipRegion: TRegionHandle;
   AData: PByte;
   ADataOffset: Integer;
   ADataSize: Integer;

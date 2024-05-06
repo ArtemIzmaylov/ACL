@@ -333,7 +333,7 @@ end;
 procedure TACLCustomSpinEdit.DrawContent(ACanvas: TCanvas);
 var
   LInnerBounds: TRect;
-  LPrevClip: HRGN;
+  LPrevClip: TRegionHandle;
 begin
   LPrevClip := acSaveClipRegion(ACanvas.Handle);
   try

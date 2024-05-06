@@ -223,7 +223,7 @@ uses
 procedure acDrawLabelLine(ACanvas: TCanvas;
   const ALineRect, ATextRect: TRect; AColor1, AColor2: TAlphaColor);
 var
-  LClipRgn: HRGN;
+  LClipRgn: TRegionHandle;
 begin
   LClipRgn := acSaveClipRegion(ACanvas.Handle);
   try

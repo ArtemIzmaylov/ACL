@@ -201,7 +201,7 @@ end;
 
 procedure TACLProgressBar.Paint;
 var
-  LClipRgn: HRGN;
+  LClipRgn: TRegionHandle;
   R1, R2: TRect;
 begin
   Style.DrawBackground(Canvas, ClientRect, Enabled);

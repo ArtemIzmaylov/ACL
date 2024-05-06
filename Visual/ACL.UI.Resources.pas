@@ -2086,7 +2086,7 @@ end;
 procedure TACLResourceTexture.DrawClipped(ACanvas: TCanvas;
   const AClipRect, R: TRect; AFrameIndex: Integer; AAlpha: Byte);
 var
-  AClipRegion: HRGN;
+  AClipRegion: TRegionHandle;
 begin
   AClipRegion := acSaveClipRegion(ACanvas.Handle);
   try

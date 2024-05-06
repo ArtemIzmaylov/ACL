@@ -521,7 +521,7 @@ end;
 
 procedure TACLCustomBitmapAnimation.Draw(ACanvas: TCanvas; const R: TRect);
 var
-  LSaveRgn: HRGN;
+  LSaveRgn: TRegionHandle;
 begin
   if CanAnimate(R) then
   begin

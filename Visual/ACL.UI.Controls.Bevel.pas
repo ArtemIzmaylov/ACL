@@ -105,7 +105,7 @@ end;
 
 procedure TACLStyleBevel.Draw(ACanvas: TCanvas; R: TRect);
 var
-  AClipRgn: HRGN;
+  AClipRgn: TRegionHandle;
 begin
   case BorderStyle of
     bbsSimple:

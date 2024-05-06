@@ -723,7 +723,7 @@ var
   ABounds: TRect;
   AButtonCenter: TPoint;
   AContentMargins: TRect;
-  ARegion: HRGN;
+  ARegion: TRegionHandle;
 begin
   ABounds := ClientRect;
   ABeakSize.cy := dpiApply(BeakSize, FCurrentPPI);

@@ -1451,7 +1451,7 @@ end;
 
 procedure TACLTreeListColumnViewInfo.DoDraw(ACanvas: TCanvas);
 var
-  ASavedClipRegion: HRGN;
+  ASavedClipRegion: TRegionHandle;
 begin
   ASavedClipRegion := acSaveClipRegion(ACanvas.Handle);
   try
@@ -2120,7 +2120,7 @@ end;
 procedure TACLTreeListNodeViewInfo.DoDrawCell(
   ACanvas: TCanvas; const R: TRect; AColumnViewInfo: TACLTreeListColumnViewInfo);
 var
-  ASaveIndex: HRGN;
+  ASaveIndex: TRegionHandle;
 begin
   if acRectVisible(ACanvas, R) then
   begin

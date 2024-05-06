@@ -976,7 +976,7 @@ end;
 procedure TACLSkinImage.DrawClipped(ACanvas: TCanvas;
   const AClipRect, R: TRect; AFrameIndex: Integer; AAlpha: Byte);
 var
-  LClipRegion: HRGN;
+  LClipRegion: TRegionHandle;
 begin
   LClipRegion := acSaveClipRegion(ACanvas.Handle);
   try

@@ -1119,7 +1119,7 @@ end;
 procedure TACLCalendarViewInfo.DoDraw(ACanvas: TCanvas);
 var
   AAnimation: TACLAnimation;
-  APrevRgn: HRGN;
+  APrevRgn: TRegionHandle;
 begin
   if AnimationManager.Find(Self, AAnimation) then
   begin
