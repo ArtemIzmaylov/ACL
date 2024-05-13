@@ -381,7 +381,7 @@ begin
   else
     Result := OpenDocument(AFileName);
 {$ELSE}
-  Result := ShellExecuteW(0, 'open', PWideChar(AFileName),
+  Result := ShellExecuteW(0, nil, PWideChar(AFileName),
     PWideChar(AParameters), '', SW_SHOW) > HINSTANCE_ERROR;
 {$ENDIF}
 end;
@@ -537,7 +537,7 @@ end;
 function ShellIsLibraryPath(const APath: string): Boolean;
 begin
 {$IFDEF MSWINDOWS}
-  Result := acBeginsWith(APath, '::');
+  Result := APath.Contains('::');
 {$ELSE}
   Result := False;
 {$ENDIF}

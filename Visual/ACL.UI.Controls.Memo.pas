@@ -191,6 +191,7 @@ type
 constructor TACLCustomEditContainer.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  ControlStyle := ControlStyle - [csAcceptsControls];
   FEditor := CreateEditor;
   FEditor.Align := alClient;
   FEditor.Parent := Self;
@@ -272,6 +273,7 @@ begin
       end;
 
     WM_VSCROLL, WM_HSCROLL, WM_WINDOWPOSCHANGED:
+      if not (csDestroying in ComponentState) then
       begin
         FEditorWndProc(Message);
         UpdateScrollBars;

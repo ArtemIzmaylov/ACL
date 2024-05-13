@@ -457,6 +457,7 @@ type
     IACLResourceChangeListener,
     IACLResourceCollection)
   strict private
+    FBoundsModified: Boolean;
     FFocusOnClick: Boolean;
     FLangSection: string;
     FMargins: TACLMargins;
@@ -563,6 +564,8 @@ type
     // IACLLocalizableComponent
     procedure Localize; overload;
     procedure Localize(const ASection: string); overload; virtual;
+    // SetBounds
+    procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
   published
     property Align;
   {$IFDEF FPC}
@@ -2008,7 +2011,8 @@ end;
 procedure TACLCustomControl.AfterConstruction;
 begin
   inherited AfterConstruction;
-  SetDefaultSize;
+  if not FBoundsModified then
+    SetDefaultSize;
   MarginsChangeHandler(nil);
   UpdateTransparency;
 end;
@@ -2165,6 +2169,12 @@ begin
   if not (csDestroying in ComponentState) then
     BoundsChanged;
 {$ENDIF}
+end;
+
+procedure TACLCustomControl.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
+begin
+  FBoundsModified := True;
+  inherited;
 end;
 
 procedure TACLCustomControl.SetDefaultSize;
