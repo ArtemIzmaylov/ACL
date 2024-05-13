@@ -4,51 +4,45 @@
 {*          Texture Property Editor          *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.UI.DesignTime.PropEditors.Texture;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:OK
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
-  // System
-  System.Types,
-  System.SysUtils,
-  System.Variants,
-  System.Classes,
-  System.ImageList,
+  {System.}Classes,
+  {System.}Math,
+  {System.}SysUtils,
+  {System.}Variants,
+  {System.}Types,
   // Vcl
-  Vcl.Graphics,
-  Vcl.Controls,
-  Vcl.Forms,
-  Vcl.Dialogs,
-  Vcl.StdCtrls,
-  Vcl.ExtCtrls,
-  Vcl.ImgList,
+  {Vcl.}Graphics,
+  {Vcl.}Controls,
+  {Vcl.}Forms,
+  {Vcl.}Dialogs,
+  {Vcl.}ExtCtrls,
+  {Vcl.}ImgList,
   // ACL
   ACL.Geometry,
+  ACL.Geometry.Utils,
   ACL.Graphics,
   ACL.Graphics.Images,
   ACL.Graphics.SkinImage,
   ACL.Graphics.SkinImageSet,
   ACL.UI.Controls.BaseControls,
-  ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.Buttons,
-  ACL.UI.Controls.Category,
   ACL.UI.Controls.ComboBox,
   ACL.UI.Controls.DropDown,
   ACL.UI.Controls.GroupBox,
   ACL.UI.Controls.Labels,
   ACL.UI.Controls.Panel,
   ACL.UI.Controls.SpinEdit,
-  ACL.UI.Controls.TextEdit,
   ACL.UI.Dialogs,
   ACL.UI.Forms,
   ACL.UI.ImageList,
@@ -94,7 +88,7 @@ type
     seMarginTop: TACLSpinEdit;
     seMax: TACLSpinEdit;
     TextureFileDialog: TACLFileDialog;
-
+    pnlDisplay: TACLPanel;
     procedure btnClearClick(Sender: TObject);
     procedure btnExportClick(Sender: TObject);
     procedure btnImportClick(Sender: TObject);
@@ -125,7 +119,7 @@ type
     procedure InitializeImageSettings;
     procedure TextureChanged(Sender: TObject);
     function GetImage: TACLSkinImage;
-    //
+    //# Properties
     property Image: TACLSkinImage read GetImage;
     property ImageSet: TACLSkinImageSet read FImageSet;
   public
@@ -135,9 +129,6 @@ type
   end;
 
 implementation
-
-uses
-  System.Math;
 
 {$R *.dfm}
 
@@ -287,6 +278,7 @@ procedure TACLTextureEditorDialog.cbSourceButtons0Click(Sender: TObject);
 var
   AValue: string;
 begin
+  AValue := '';
   if InputQuery(Caption, 'Enter the DPI:', AValue) then
   begin
     ImageSet.Add(StrToInt(AValue));

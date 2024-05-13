@@ -5,7 +5,6 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
   Caption = 'Texture Editor'
   ClientHeight = 466
   ClientWidth = 584
-  Color = clBtnFace
   Constraints.MinHeight = 500
   Constraints.MinWidth = 600
   Font.Charset = DEFAULT_CHARSET
@@ -13,8 +12,7 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
   Font.Height = -11
   Font.Name = 'Segoe UI'
   Font.Style = []
-  OldCreateOrder = False
-  PixelsPerInch = 96
+  Position = poScreenCenter
   TextHeight = 13
   object pnlPreview: TACLPanel
     AlignWithMargins = True
@@ -27,22 +25,6 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
     Margins.Top = 7
     Align = alClient
     TabOrder = 1
-    object pbDisplay: TPaintBox
-      AlignWithMargins = True
-      Left = 8
-      Top = 38
-      Width = 349
-      Height = 313
-      Margins.Left = 6
-      Margins.Top = 6
-      Margins.Right = 6
-      Margins.Bottom = 6
-      Align = alClient
-      OnMouseDown = pbDisplayMouseDown
-      OnMouseMove = pbDisplayMouseMove
-      OnMouseUp = pbDisplayMouseUp
-      OnPaint = pbDisplayPaint
-    end
     object pnlToolbar: TACLPanel
       AlignWithMargins = True
       Left = 5
@@ -114,7 +96,6 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
         Top = 3
         Width = 75
         Height = 25
-        Cursor = crHandPoint
         Align = alLeft
         TabOrder = 0
         OnClick = btnLoadClick
@@ -126,7 +107,6 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
         Top = 3
         Width = 75
         Height = 25
-        Cursor = crHandPoint
         Align = alLeft
         TabOrder = 1
         OnClick = btnSaveClick
@@ -142,6 +122,30 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
         TabOrder = 2
         OnClick = btnClearClick
         Caption = '&Clear'
+      end
+    end
+    object pnlDisplay: TACLPanel
+      AlignWithMargins = True
+      Left = 8
+      Top = 38
+      Width = 349
+      Height = 313
+      Margins.All = 6
+      Align = alClient
+      TabOrder = 2
+      Borders = []
+      object pbDisplay: TPaintBox
+        Left = 0
+        Top = 0
+        Width = 349
+        Height = 313
+        Align = alClient
+        OnMouseDown = pbDisplayMouseDown
+        OnMouseMove = pbDisplayMouseMove
+        OnMouseUp = pbDisplayMouseUp
+        OnPaint = pbDisplayPaint
+        ExplicitLeft = 8
+        ExplicitTop = -3
       end
     end
   end
@@ -163,7 +167,6 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
       Top = 3
       Width = 75
       Height = 25
-      Cursor = crHandPoint
       Align = alRight
       TabOrder = 1
       Caption = 'OK'
@@ -176,7 +179,6 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
       Top = 3
       Width = 75
       Height = 25
-      Cursor = crHandPoint
       Align = alRight
       TabOrder = 2
       Caption = 'Cancel'
@@ -188,7 +190,6 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
       Top = 3
       Width = 75
       Height = 25
-      Cursor = crHandPoint
       Align = alLeft
       TabOrder = 0
       OnClick = btnExportClick
@@ -200,7 +201,6 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
       Top = 3
       Width = 75
       Height = 25
-      Cursor = crHandPoint
       Align = alLeft
       TabOrder = 3
       OnClick = btnImportClick
@@ -225,64 +225,44 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
       Left = 3
       Top = 0
       Width = 194
-      Height = 102
+      Height = 94
       Margins.Top = 0
       Align = alTop
       TabOrder = 0
+      AutoSize = True
       Caption = ' Frames '
       DesignSize = (
         194
-        102)
+        94)
       object Label1: TACLLabel
-        Left = 16
-        Top = 21
-        Width = 74
-        Height = 13
+        AlignWithMargins = True
+        Left = 10
+        Top = 17
+        Width = 174
+        Height = 17
+        Align = alTop
+        SubControl.Control = seFrame
+        AutoSize = True
         Caption = 'Display Frame:'
       end
       object Label2: TACLLabel
-        Left = 16
-        Top = 44
-        Width = 74
-        Height = 13
+        AlignWithMargins = True
+        Left = 10
+        Top = 40
+        Width = 174
+        Height = 17
+        Align = alTop
+        SubControl.Control = seMax
+        AutoSize = True
         Caption = 'Frames Count:'
       end
-      object seFrame: TACLSpinEdit
-        Left = 96
-        Top = 21
-        Width = 82
-        Height = 17
-        Anchors = [akTop, akRight]
-        TabOrder = 0
-        OnChange = seFrameChange
-        OptionsValue.MaxValue = 10
-        OptionsValue.MinValue = 1
-        Value = 1
-        DesignSize = (
-          82
-          17)
-      end
-      object seMax: TACLSpinEdit
-        Left = 96
-        Top = 44
-        Width = 82
-        Height = 17
-        Anchors = [akTop, akRight]
-        TabOrder = 1
-        OnChange = seMaxChange
-        OptionsValue.MaxValue = 100
-        OptionsValue.MinValue = 1
-        Value = 1
-        DesignSize = (
-          82
-          17)
-      end
       object cbLayout: TACLComboBox
-        Left = 16
-        Top = 67
-        Width = 162
+        AlignWithMargins = True
+        Left = 10
+        Top = 63
+        Width = 174
         Height = 21
-        Anchors = [akLeft, akTop, akRight]
+        Align = alTop
         TabOrder = 2
         Buttons = <>
         Items.Strings = (
@@ -292,11 +272,33 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
         Text = ''
         OnSelect = cbLayoutSelect
       end
+      object seFrame: TACLSpinEdit
+        Left = 102
+        Top = 17
+        Width = 82
+        Height = 17
+        TabOrder = 0
+        OnChange = seFrameChange
+        OptionsValue.MaxValue = 10
+        OptionsValue.MinValue = 1
+        Value = 1
+      end
+      object seMax: TACLSpinEdit
+        Left = 102
+        Top = 40
+        Width = 82
+        Height = 17
+        TabOrder = 1
+        OnChange = seMaxChange
+        OptionsValue.MaxValue = 100
+        OptionsValue.MinValue = 1
+        Value = 1
+      end
     end
     object gbMargins: TACLGroupBox
       AlignWithMargins = True
       Left = 3
-      Top = 213
+      Top = 205
       Width = 194
       Height = 101
       Align = alTop
@@ -310,9 +312,6 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
         TabOrder = 0
         OnChange = seMarginLeftChange
         OptionsValue.MinValue = 0
-        DesignSize = (
-          75
-          17)
       end
       object seMarginBottom: TACLSpinEdit
         Left = 59
@@ -322,9 +321,6 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
         TabOrder = 3
         OnChange = seMarginLeftChange
         OptionsValue.MinValue = 0
-        DesignSize = (
-          75
-          17)
       end
       object seMarginLeft: TACLSpinEdit
         Left = 20
@@ -334,9 +330,6 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
         TabOrder = 1
         OnChange = seMarginLeftChange
         OptionsValue.MinValue = 0
-        DesignSize = (
-          75
-          17)
       end
       object seMarginRight: TACLSpinEdit
         Left = 101
@@ -346,15 +339,12 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
         TabOrder = 2
         OnChange = seMarginLeftChange
         OptionsValue.MinValue = 0
-        DesignSize = (
-          75
-          17)
       end
     end
     object gbContentOffsets: TACLGroupBox
       AlignWithMargins = True
       Left = 3
-      Top = 108
+      Top = 100
       Width = 194
       Height = 99
       Align = alTop
@@ -369,9 +359,6 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
         OnChange = seContentOffsetTopChange
         OptionsValue.MaxValue = 100
         OptionsValue.MinValue = 0
-        DesignSize = (
-          75
-          17)
       end
       object seContentOffsetBottom: TACLSpinEdit
         Left = 59
@@ -382,9 +369,6 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
         OnChange = seContentOffsetTopChange
         OptionsValue.MaxValue = 100
         OptionsValue.MinValue = 0
-        DesignSize = (
-          75
-          17)
       end
       object seContentOffsetLeft: TACLSpinEdit
         Left = 20
@@ -395,9 +379,6 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
         OnChange = seContentOffsetTopChange
         OptionsValue.MaxValue = 100
         OptionsValue.MinValue = 0
-        DesignSize = (
-          75
-          17)
       end
       object seContentOffsetRight: TACLSpinEdit
         Left = 101
@@ -408,9 +389,6 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
         OnChange = seContentOffsetTopChange
         OptionsValue.MaxValue = 100
         OptionsValue.MinValue = 0
-        DesignSize = (
-          75
-          17)
       end
     end
   end
@@ -420,7 +398,6 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
     Top = 8
     Width = 568
     Height = 15
-    Cursor = crHandPoint
     Margins.Bottom = 0
     Margins.Left = 8
     Margins.Right = 8
@@ -428,18 +405,22 @@ object ACLTextureEditorDialog: TACLTextureEditorDialog
     Align = alTop
     TabOrder = 0
     Caption = 'Override StyleSource Value'
+    Transparent = True
     State = cbChecked
   end
   object TextureFileDialog: TACLFileDialog
     Filter = 'PNG Images|*.png;'
-    Left = 544
+    Left = 328
+    Top = 424
   end
   object ImportExportDialog: TACLFileDialog
     Filter = 'Skinned Image Set (*.acl32) |*.acl32;'
-    Left = 512
+    Left = 280
+    Top = 424
   end
   object ilImages: TACLImageList
-    Left = 480
+    Left = 232
+    Top = 424
     Bitmap = {
       4C49435A261100008D000000789CF3F461646462E06060611000C2FF40A028F0
       1F0A9C7CCD182000446B00B103100B0031238302444280611490007634F9FC07
