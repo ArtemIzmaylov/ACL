@@ -123,7 +123,7 @@ type
     //# Properties
     property SelectedItem: TListItem read GetSelectedItem;
   public
-    class function Execute(AOwnerWndHandle: THandle; AImageList: TCustomImageList): Boolean;
+    class procedure Execute(AImageList: TCustomImageList);
   end;
 
 implementation
@@ -132,15 +132,13 @@ implementation
 
 { TfrmImageListEditor }
 
-class function TfrmImageListEditor.Execute(
-  AOwnerWndHandle: THandle; AImageList: TCustomImageList): Boolean;
+class procedure TfrmImageListEditor.Execute(AImageList: TCustomImageList);
 begin
-  with TfrmImageListEditor.CreateDialog(AOwnerWndHandle) do
+  with TfrmImageListEditor.Create(nil) do
   try
     EditingImageList.Assign(AImageList);
     PopulateImages;
-    Result := ShowModal = mrOk;
-    if Result then
+    if ShowModal = mrOk then
     begin
       AImageList.Assign(EditingImageList);
       acDesignerSetModified(AImageList);

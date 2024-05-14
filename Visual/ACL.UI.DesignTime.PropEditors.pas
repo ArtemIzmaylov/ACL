@@ -977,7 +977,7 @@ end;
 procedure TACLImageListEditor.ExecuteVerb(Index: Integer);
 begin
   case Index of
-    0: TfrmImageListEditor.Execute(GetActiveWindow, GetComponent as TCustomImageList);
+    0: TfrmImageListEditor.Execute(GetComponent as TCustomImageList);
   else
     inherited ExecuteVerb(Index - 1);
   end;
