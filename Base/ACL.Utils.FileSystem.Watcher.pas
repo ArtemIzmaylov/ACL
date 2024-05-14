@@ -39,8 +39,10 @@ uses
   ACL.Utils.Messaging,
   ACL.Utils.Strings;
 
+{$REGION ' FileSystem Watcher '}
 type
-  TACLFileSystemChange = (fscFiles, fscFolders, fscAttributes, fscSize, fscLastWriteTime, fscLastAccessTime);
+  TACLFileSystemChange = (fscFiles, fscFolders, fscAttributes,
+    fscSize, fscLastWriteTime, fscLastAccessTime);
   TACLFileSystemChanges = set of TACLFileSystemChange;
 
 const
@@ -64,37 +66,38 @@ type
   TACLFileSystemWatcherNotifyEvent = procedure (ATask: IACLFileSystemWatcherTask) of object;
   TACLFileSystemWatcher = class
   strict private
-    FActiveTasks: TACLList<IACLFileSystemWatcherTask>;
-    FActiveThreads: TACLObjectList<TACLThread>;
-    FLock: TACLCriticalSection;
-    FTasks: TACLList<IACLFileSystemWatcherTask>;
-
-    procedure SafeStartThreads;
+    class var FActiveTasks: TACLList<IACLFileSystemWatcherTask>;
+    class var FActiveThreads: TACLObjectList<TACLThread>;
+    class var FLock: TACLCriticalSection;
+    class var FTasks: TACLList<IACLFileSystemWatcherTask>;
+    class procedure SafeStartThreads;
   protected
-    procedure DoAsyncChangeNotify(ATaskIndex: Integer);
+    class procedure DoAsyncChangeNotify(ATaskIndex: Integer);
   public
-    constructor Create;
-    destructor Destroy; override;
-    function Add(const APath: UnicodeString;
+    class constructor Create;
+    class destructor Destroy;
+    class function Add(const APath: UnicodeString;
       AChangeEvent: TACLFileSystemWatcherNotifyEvent; ARecursive: Boolean = True;
       AChanges: TACLFileSystemChanges = AllFileSystemChanges): IACLFileSystemWatcherTask; overload;
-    function Add(const APaths: TACLSearchPaths;
+    class function Add(const APaths: TACLSearchPaths;
       AChangeEvent: TACLFileSystemWatcherNotifyEvent;
       AChanges: TACLFileSystemChanges = AllFileSystemChanges): IACLFileSystemWatcherTask; overload;
-    function Add(const APaths: TACLStringList;
+    class function Add(const APaths: TACLStringList;
       AChangeEvent: TACLFileSystemWatcherNotifyEvent; ARecursive: Boolean = True;
       AChanges: TACLFileSystemChanges = AllFileSystemChanges): IACLFileSystemWatcherTask; overload;
-    function AddFile(const AFileName: string;
+    class function AddFile(const AFileName: string;
       AChangeEvent: TACLFileSystemWatcherNotifyEvent): IACLFileSystemWatcherTask;
-
-    procedure Remove(var ATask: IACLFileSystemWatcherTask);
+    class procedure Remove(var ATask: IACLFileSystemWatcherTask);
   end;
 
-function FileSystemWatcher: TACLFileSystemWatcher;
+{$ENDREGION}
+
 implementation
 
 uses
   ACL.Math;
+
+{$REGION ' FileSystem Watcher '}
 
 type
 
@@ -155,69 +158,34 @@ type
   strict private
     FHandleCount: Integer;
     FHandles: array[0..MAXIMUM_WAIT_OBJECTS - 1] of THandle;
-    FWatcher: TACLFileSystemWatcher;
   protected
     procedure Execute; override;
     procedure TerminatedSet; override;
   public
-    constructor Create(AWatcher: TACLFileSystemWatcher; AActiveTasks: TACLList<IACLFileSystemWatcherTask>;
+    constructor Create(AActiveTasks: TACLList<IACLFileSystemWatcherTask>;
       ATasks: TACLList<TPair<Integer, IACLFileSystemWatcherTask>>; var AIndex: Integer);
   end;
 
-var
-  FFileSystemWatcher: TACLFileSystemWatcher;
-  FFileSystemWatcherFinalized: Boolean = False;
-
-function FileSystemWatcher: TACLFileSystemWatcher;
-begin
-  if (FFileSystemWatcher = nil) and not FFileSystemWatcherFinalized then
-    FFileSystemWatcher := TACLFileSystemWatcher.Create;
-  Result := FFileSystemWatcher;
-end;
-
-function BuildNotifyFilter(AChanges: TACLFileSystemChanges): Cardinal;
-const
-  Map: array[TACLFileSystemChange] of Cardinal = (
-    FILE_NOTIFY_CHANGE_FILE_NAME,
-    FILE_NOTIFY_CHANGE_DIR_NAME,
-    FILE_NOTIFY_CHANGE_ATTRIBUTES,
-    FILE_NOTIFY_CHANGE_SIZE,
-    FILE_NOTIFY_CHANGE_LAST_WRITE,
-    FILE_NOTIFY_CHANGE_LAST_ACCESS
-  );
-var
-  I: TACLFileSystemChange;
-begin
-  Result := 0;
-  for I := Low(TACLFileSystemChange) to High(TACLFileSystemChange) do
-  begin
-    if I in AChanges then
-      Result := Result or Map[I];
-  end;
-end;
-
 { TACLFileSystemWatcher }
 
-constructor TACLFileSystemWatcher.Create;
+class constructor TACLFileSystemWatcher.Create;
 begin
-  inherited Create;
   FActiveTasks := TACLList<IACLFileSystemWatcherTask>.Create;
   FActiveThreads := TACLObjectList<TACLThread>.Create;
   FTasks := TACLList<IACLFileSystemWatcherTask>.Create;
-  FLock := TACLCriticalSection.Create(Self);
+  FLock := TACLCriticalSection.Create(nil, 'FileSystemWatcher');
 end;
 
-destructor TACLFileSystemWatcher.Destroy;
+class destructor TACLFileSystemWatcher.Destroy;
 begin
   FActiveThreads.Clear;
   FreeAndNil(FLock);
   FreeAndNil(FTasks);
   FreeAndNil(FActiveTasks);
   FreeAndNil(FActiveThreads);
-  inherited Destroy;
 end;
 
-function TACLFileSystemWatcher.Add(const APath: UnicodeString;
+class function TACLFileSystemWatcher.Add(const APath: UnicodeString;
   AChangeEvent: TACLFileSystemWatcherNotifyEvent; ARecursive: Boolean;
   AChanges: TACLFileSystemChanges): IACLFileSystemWatcherTask;
 var
@@ -231,7 +199,7 @@ begin
   end;
 end;
 
-function TACLFileSystemWatcher.Add(const APaths: TACLSearchPaths;
+class function TACLFileSystemWatcher.Add(const APaths: TACLSearchPaths;
   AChangeEvent: TACLFileSystemWatcherNotifyEvent;
   AChanges: TACLFileSystemChanges): IACLFileSystemWatcherTask;
 begin
@@ -246,7 +214,7 @@ begin
   end;
 end;
 
-function TACLFileSystemWatcher.Add(const APaths: TACLStringList;
+class function TACLFileSystemWatcher.Add(const APaths: TACLStringList;
   AChangeEvent: TACLFileSystemWatcherNotifyEvent; ARecursive: Boolean;
   AChanges: TACLFileSystemChanges): IACLFileSystemWatcherTask;
 begin
@@ -261,7 +229,7 @@ begin
   end;
 end;
 
-function TACLFileSystemWatcher.AddFile(const AFileName: string;
+class function TACLFileSystemWatcher.AddFile(const AFileName: string;
   AChangeEvent: TACLFileSystemWatcherNotifyEvent): IACLFileSystemWatcherTask;
 begin
   FLock.Enter;
@@ -275,23 +243,27 @@ begin
   end;
 end;
 
-procedure TACLFileSystemWatcher.Remove(var ATask: IACLFileSystemWatcherTask);
+class procedure TACLFileSystemWatcher.Remove(var ATask: IACLFileSystemWatcherTask);
 begin
-  FLock.Enter;
-  try
-    if FTasks.IndexOf(ATask) >= 0 then
-    begin
-      FActiveThreads.Clear;
-      FTasks.Remove(ATask);
-      SafeStartThreads;
+  if FLock <> nil then
+  begin
+    FLock.Enter;
+    try
+      if FTasks.IndexOf(ATask) >= 0 then
+      begin
+        FActiveThreads.Clear;
+        FTasks.Remove(ATask);
+        SafeStartThreads;
+      end;
+      ATask := nil;
+    finally
+      FLock.Leave;
     end;
-    ATask := nil;
-  finally
-    FLock.Leave;
   end;
+  ATask := nil;
 end;
 
-procedure TACLFileSystemWatcher.DoAsyncChangeNotify(ATaskIndex: Integer);
+class procedure TACLFileSystemWatcher.DoAsyncChangeNotify(ATaskIndex: Integer);
 var
   ATask: IACLFileSystemWatcherTask;
 begin
@@ -309,7 +281,7 @@ begin
     ATask.Changed;
 end;
 
-procedure TACLFileSystemWatcher.SafeStartThreads;
+class procedure TACLFileSystemWatcher.SafeStartThreads;
 
   function PopulatePaths: TACLList<TPair<Integer, IACLFileSystemWatcherTask>>;
   var
@@ -335,7 +307,7 @@ begin
     FActiveTasks.Clear;
     while AIndex < APaths.Count do
     try
-      FActiveThreads.Add(TACLFileSystemWatcherThread.Create(Self, FActiveTasks, APaths, AIndex));
+      FActiveThreads.Add(TACLFileSystemWatcherThread.Create(FActiveTasks, APaths, AIndex));
     except
       // do nothing
     end;
@@ -407,7 +379,8 @@ end;
 
 { TACLFileSystemWatcherFileTask }
 
-constructor TACLFileSystemWatcherFileTask.Create(const AFileName: string; AEvent: TACLFileSystemWatcherNotifyEvent);
+constructor TACLFileSystemWatcherFileTask.Create(
+  const AFileName: string; AEvent: TACLFileSystemWatcherNotifyEvent);
 begin
   inherited Create([fscFiles, fscSize, fscLastWriteTime], AEvent);
   FFileName := AFileName;
@@ -471,8 +444,30 @@ end;
 { TACLFileSystemWatcherThread }
 
 constructor TACLFileSystemWatcherThread.Create(
-  AWatcher: TACLFileSystemWatcher; AActiveTasks: TACLList<IACLFileSystemWatcherTask>;
+  AActiveTasks: TACLList<IACLFileSystemWatcherTask>;
   ATasks: TACLList<TPair<Integer, IACLFileSystemWatcherTask>>; var AIndex: Integer);
+
+  function BuildNotifyFilter(AChanges: TACLFileSystemChanges): Cardinal;
+  const
+    Map: array[TACLFileSystemChange] of Cardinal = (
+      FILE_NOTIFY_CHANGE_FILE_NAME,
+      FILE_NOTIFY_CHANGE_DIR_NAME,
+      FILE_NOTIFY_CHANGE_ATTRIBUTES,
+      FILE_NOTIFY_CHANGE_SIZE,
+      FILE_NOTIFY_CHANGE_LAST_WRITE,
+      FILE_NOTIFY_CHANGE_LAST_ACCESS
+    );
+  var
+    I: TACLFileSystemChange;
+  begin
+    Result := 0;
+    for I := Low(TACLFileSystemChange) to High(TACLFileSystemChange) do
+    begin
+      if I in AChanges then
+        Result := Result or Map[I];
+    end;
+  end;
+
 var
   AChanges: TACLFileSystemChanges;
   AHandle: THandle;
@@ -481,7 +476,6 @@ var
   ARecursive: Boolean;
   ATask: IACLFileSystemWatcherTask;
 begin
-  FWatcher := AWatcher;
   FreeOnTerminate := False;
 
   AMode := acSetThreadErrorMode(SEM_FAILCRITICALERRORS);
@@ -499,7 +493,9 @@ begin
         Exclude(AChanges, fscLastWriteTime);
       end;
 
-      AHandle := FindFirstChangeNotification(PChar(ATask.GetPaths[APathIndex]), ARecursive, BuildNotifyFilter(AChanges));
+      AHandle := FindFirstChangeNotification(
+        PChar(ATask.GetPaths[APathIndex]), ARecursive,
+        BuildNotifyFilter(AChanges));
       if AHandle <> INVALID_HANDLE_VALUE then
       begin
         AActiveTasks.Add(ATask);
@@ -530,7 +526,7 @@ begin
         if not Terminated then
         begin
           AIndex := ACode - WAIT_OBJECT_0;
-          FWatcher.DoAsyncChangeNotify(AIndex);
+          TACLFileSystemWatcher.DoAsyncChangeNotify(AIndex);
           FindNextChangeNotification(FHandles[AIndex]);
         end;
     end;
@@ -549,9 +545,6 @@ begin
   end;
 end;
 
-initialization
+{$ENDREGION}
 
-finalization
-  FFileSystemWatcherFinalized := True;
-  FreeAndNil(FFileSystemWatcher);
 end.
