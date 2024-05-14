@@ -4,31 +4,39 @@
 {*        FileSystem Change Watchers         *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.Utils.FileSystem.Watcher;
 
-{$I ACL.Config.INC}
+{$I ACL.Config.inc}
 
 interface
 
 uses
+  Winapi.Messages,
   Winapi.Windows,
   // System
-  System.SysUtils,
   System.Classes,
+  System.DateUtils,
   System.Generics.Collections,
+  System.Math,
+  System.IOUtils,
   System.SyncObjs,
+  System.SysUtils,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
   ACL.Classes.StringList,
+  ACL.FileFormats.INI,
   ACL.Timers,
   ACL.Threading,
+  ACL.Threading.Pool,
+  ACL.Utils.Common,
   ACL.Utils.FileSystem,
+  ACL.Utils.Messaging,
   ACL.Utils.Strings;
 
 type
@@ -39,9 +47,6 @@ const
   AllFileSystemChanges = [fscFiles..fscLastAccessTime];
 
 type
-  IACLFileSystemWatcherTask = interface;
-
-  TACLFileSystemWatcherNotifyEvent = procedure (ATask: IACLFileSystemWatcherTask) of object;
 
   { IACLFileSystemWatcherTask }
 
@@ -56,6 +61,7 @@ type
 
   { TACLFileSystemWatcher }
 
+  TACLFileSystemWatcherNotifyEvent = procedure (ATask: IACLFileSystemWatcherTask) of object;
   TACLFileSystemWatcher = class
   strict private
     FActiveTasks: TACLList<IACLFileSystemWatcherTask>;
@@ -69,80 +75,34 @@ type
   public
     constructor Create;
     destructor Destroy; override;
-    function Add(const APath: UnicodeString; AChangeEvent: TACLFileSystemWatcherNotifyEvent;
-      ARecursive: Boolean = True; AChanges: TACLFileSystemChanges = AllFileSystemChanges;
-      ACombineSerialChanges: Boolean = True): IACLFileSystemWatcherTask; overload;
-    function Add(const APaths: TACLSearchPaths; AChangeEvent: TACLFileSystemWatcherNotifyEvent;
-      AChanges: TACLFileSystemChanges = AllFileSystemChanges; ACombineSerialChanges: Boolean = True): IACLFileSystemWatcherTask; overload;
-    function Add(const APaths: TACLStringList; AChangeEvent: TACLFileSystemWatcherNotifyEvent;
-      ARecursive: Boolean = True; AChanges: TACLFileSystemChanges = AllFileSystemChanges;
-      ACombineSerialChanges: Boolean = True): IACLFileSystemWatcherTask; overload;
-    function AddFile(const AFileName: string; AChangeEvent: TACLFileSystemWatcherNotifyEvent): IACLFileSystemWatcherTask;
+    function Add(const APath: UnicodeString;
+      AChangeEvent: TACLFileSystemWatcherNotifyEvent; ARecursive: Boolean = True;
+      AChanges: TACLFileSystemChanges = AllFileSystemChanges): IACLFileSystemWatcherTask; overload;
+    function Add(const APaths: TACLSearchPaths;
+      AChangeEvent: TACLFileSystemWatcherNotifyEvent;
+      AChanges: TACLFileSystemChanges = AllFileSystemChanges): IACLFileSystemWatcherTask; overload;
+    function Add(const APaths: TACLStringList;
+      AChangeEvent: TACLFileSystemWatcherNotifyEvent; ARecursive: Boolean = True;
+      AChanges: TACLFileSystemChanges = AllFileSystemChanges): IACLFileSystemWatcherTask; overload;
+    function AddFile(const AFileName: string;
+      AChangeEvent: TACLFileSystemWatcherNotifyEvent): IACLFileSystemWatcherTask;
+
     procedure Remove(var ATask: IACLFileSystemWatcherTask);
-  end;
-
-  { TACLFileSystemWatcherEx }
-
-  TACLFileSystemWatcherExFileRenameEvent = procedure (const AOldFileName, ANewFileName: UnicodeString) of object;
-  TACLFileSystemWatcherExFileChangeEvent = procedure (const AFileName: UnicodeString) of object;
-
-  TACLFileSystemWatcherEx = class(TACLThread)
-  strict private
-    FHandle: THandle;
-    FNotifyFilter: Cardinal;
-    FPath: UnicodeString;
-    FWatchSubTree: Boolean;
-
-    FOnAsyncFileAdded: TACLFileSystemWatcherExFileChangeEvent;
-    FOnAsyncFileChanged: TACLFileSystemWatcherExFileChangeEvent;
-    FOnAsyncFileRemoved: TACLFileSystemWatcherExFileChangeEvent;
-    FOnAsyncFileRenamed: TACLFileSystemWatcherExFileRenameEvent;
-  protected
-    procedure DoAsyncFileAdded(const AFileName: UnicodeString);
-    procedure DoAsyncFileChanged(const AFileName: UnicodeString);
-    procedure DoAsyncFileRemoved(const AFileName: UnicodeString);
-    procedure DoAsyncFileRenamed(const AOldFileName, ANewFileName: UnicodeString);
-    procedure Execute; override;
-  public
-    constructor Create(const APath: UnicodeString; AChanges: TACLFileSystemChanges; AWatchSubTree: Boolean);
-    destructor Destroy; override;
-    //
-    property OnAsyncFileAdded: TACLFileSystemWatcherExFileChangeEvent read FOnAsyncFileAdded write FOnAsyncFileAdded;
-    property OnAsyncFileChanged: TACLFileSystemWatcherExFileChangeEvent read FOnAsyncFileChanged write FOnAsyncFileChanged;
-    property OnAsyncFileRemoved: TACLFileSystemWatcherExFileChangeEvent read FOnAsyncFileRemoved write FOnAsyncFileRemoved;
-    property OnAsyncFileRenamed: TACLFileSystemWatcherExFileRenameEvent read FOnAsyncFileRenamed write FOnAsyncFileRenamed;
   end;
 
 function FileSystemWatcher: TACLFileSystemWatcher;
 implementation
 
 uses
-  System.Math,
-  System.DateUtils,
-  // ACL
-  ACL.Math,
-  ACL.Utils.Common;
+  ACL.Math;
 
 type
-  { TFileNotifyInformation }
-
-  PFileNotifyInformation = ^TFileNotifyInformation;
-  TFileNotifyInformation = record
-    NextEntryOffset: DWORD;
-    Action: DWORD;
-    FileNameLength: DWORD;
-    FileName: array[0..0] of WideChar;
-
-    function GetFileName: UnicodeString;
-    function NextEntry: PFileNotifyInformation;
-  end;
 
   { TACLFileSystemWatcherCustomTask }
 
   TACLFileSystemWatcherCustomTask = class(TInterfacedObject, IACLFileSystemWatcherTask)
   strict private
     FChanges: TACLFileSystemChanges;
-    FCombineSerialChanges: Boolean;
     FDelayTimer: TACLTimer;
     FEvent: TACLFileSystemWatcherNotifyEvent;
     FLockCount: Integer;
@@ -151,7 +111,6 @@ type
     procedure SafeChanged;
   protected
     FPaths: TACLSearchPaths;
-
     procedure DoChanged; virtual;
     // IACLFileSystemWatcherTask
     procedure Changed;
@@ -160,8 +119,7 @@ type
     procedure LockChanges;
     procedure UnlockChanges;
   public
-    constructor Create(AChanges: TACLFileSystemChanges;
-      AEvent: TACLFileSystemWatcherNotifyEvent; ACombineSerialChanges: Boolean = True);
+    constructor Create(AChanges: TACLFileSystemChanges; AEvent: TACLFileSystemWatcherNotifyEvent);
     destructor Destroy; override;
   end;
 
@@ -184,9 +142,10 @@ type
 
   TACLFileSystemWatcherTask = class(TACLFileSystemWatcherCustomTask)
   public
-    constructor Create(const APaths: TACLSearchPaths; AChangeEvent: TACLFileSystemWatcherNotifyEvent;
-      ACombineSerialChanges: Boolean = True; AChanges: TACLFileSystemChanges = AllFileSystemChanges); overload;
-    constructor Create(const APaths: TACLStringList; ARecursive, ACombineSerialChanges: Boolean;
+    constructor Create(const APaths: TACLSearchPaths;
+      AChangeEvent: TACLFileSystemWatcherNotifyEvent;
+      AChanges: TACLFileSystemChanges); overload;
+    constructor Create(const APaths: TACLStringList; ARecursive: Boolean;
       AChanges: TACLFileSystemChanges; AEvent: TACLFileSystemWatcherNotifyEvent); overload;
   end;
 
@@ -258,27 +217,28 @@ begin
   inherited Destroy;
 end;
 
-function TACLFileSystemWatcher.Add(const APath: UnicodeString; AChangeEvent: TACLFileSystemWatcherNotifyEvent;
-  ARecursive: Boolean = True; AChanges: TACLFileSystemChanges = AllFileSystemChanges;
-  ACombineSerialChanges: Boolean = True): IACLFileSystemWatcherTask;
+function TACLFileSystemWatcher.Add(const APath: UnicodeString;
+  AChangeEvent: TACLFileSystemWatcherNotifyEvent; ARecursive: Boolean;
+  AChanges: TACLFileSystemChanges): IACLFileSystemWatcherTask;
 var
   APaths: TACLStringList;
 begin
   APaths := TACLStringList.Create(APath);
   try
-    Result := Add(APaths, AChangeEvent, ARecursive, AChanges, ACombineSerialChanges);
+    Result := Add(APaths, AChangeEvent, ARecursive, AChanges);
   finally
     APaths.Free;
   end;
 end;
 
-function TACLFileSystemWatcher.Add(const APaths: TACLSearchPaths; AChangeEvent: TACLFileSystemWatcherNotifyEvent;
-  AChanges: TACLFileSystemChanges = AllFileSystemChanges; ACombineSerialChanges: Boolean = True): IACLFileSystemWatcherTask;
+function TACLFileSystemWatcher.Add(const APaths: TACLSearchPaths;
+  AChangeEvent: TACLFileSystemWatcherNotifyEvent;
+  AChanges: TACLFileSystemChanges): IACLFileSystemWatcherTask;
 begin
   FLock.Enter;
   try
     FActiveThreads.Clear;
-    Result := TACLFileSystemWatcherTask.Create(APaths, AChangeEvent, ACombineSerialChanges, AChanges);
+    Result := TACLFileSystemWatcherTask.Create(APaths, AChangeEvent, AChanges);
     FTasks.Add(Result);
     SafeStartThreads;
   finally
@@ -286,14 +246,14 @@ begin
   end;
 end;
 
-function TACLFileSystemWatcher.Add(const APaths: TACLStringList; AChangeEvent: TACLFileSystemWatcherNotifyEvent;
-  ARecursive: Boolean = True; AChanges: TACLFileSystemChanges = AllFileSystemChanges;
-  ACombineSerialChanges: Boolean = True): IACLFileSystemWatcherTask;
+function TACLFileSystemWatcher.Add(const APaths: TACLStringList;
+  AChangeEvent: TACLFileSystemWatcherNotifyEvent; ARecursive: Boolean;
+  AChanges: TACLFileSystemChanges): IACLFileSystemWatcherTask;
 begin
   FLock.Enter;
   try
     FActiveThreads.Clear;
-    Result := TACLFileSystemWatcherTask.Create(APaths, ARecursive, ACombineSerialChanges, AChanges, AChangeEvent);
+    Result := TACLFileSystemWatcherTask.Create(APaths, ARecursive, AChanges, AChangeEvent);
     FTasks.Add(Result);
     SafeStartThreads;
   finally
@@ -384,125 +344,14 @@ begin
   end;
 end;
 
-{ TACLFileSystemWatcherEx }
-
-constructor TACLFileSystemWatcherEx.Create(const APath: UnicodeString;
-  AChanges: TACLFileSystemChanges; AWatchSubTree: Boolean);
-begin
-  FWatchSubTree := AWatchSubTree;
-  FNotifyFilter := BuildNotifyFilter(AChanges);
-  FPath := acIncludeTrailingPathDelimiter(APath);
-  FHandle := CreateFile(PChar(FPath), FILE_LIST_DIRECTORY,
-    FILE_SHARE_READ or FILE_SHARE_DELETE or FILE_SHARE_WRITE, nil, OPEN_EXISTING,
-    FILE_FLAG_BACKUP_SEMANTICS or FILE_FLAG_OVERLAPPED, 0);
-  if FHandle = INVALID_HANDLE_VALUE then
-    RaiseLastOSError;
-  inherited Create(False);
-end;
-
-destructor TACLFileSystemWatcherEx.Destroy;
-begin
-  CloseHandle(FHandle);
-  inherited Destroy;
-end;
-
-procedure TACLFileSystemWatcherEx.DoAsyncFileAdded(const AFileName: UnicodeString);
-begin
-  if Assigned(OnAsyncFileAdded) then
-    OnAsyncFileAdded(AFileName);
-end;
-
-procedure TACLFileSystemWatcherEx.DoAsyncFileChanged(const AFileName: UnicodeString);
-begin
-  if Assigned(OnAsyncFileChanged) then
-    OnAsyncFileChanged(AFileName);
-end;
-
-procedure TACLFileSystemWatcherEx.DoAsyncFileRemoved(const AFileName: UnicodeString);
-begin
-  if Assigned(OnAsyncFileRemoved) then
-    OnAsyncFileRemoved(AFileName);
-end;
-
-procedure TACLFileSystemWatcherEx.DoAsyncFileRenamed(const AOldFileName, ANewFileName: UnicodeString);
-begin
-  if Assigned(OnAsyncFileRenamed) then
-    OnAsyncFileRenamed(AOldFileName, ANewFileName);
-end;
-
-procedure TACLFileSystemWatcherEx.Execute;
-const
-  BufferSize = SizeOf(TFileNotifyInformation) + MAX_LONG_PATH;
-var
-  ABuffer: PByte;
-  AEvent: TEvent;
-  AInfo: PFileNotifyInformation;
-  AOverlapped: TOverlapped;
-  AResult: TWaitResult;
-  ASize: DWORD;
-begin
-  AEvent := TEvent.Create;
-  ABuffer := AllocMem(BufferSize);
-  try
-    ZeroMemory(@AOverlapped, SizeOf(AOverlapped));
-    AOverlapped.hEvent := AEvent.Handle;
-
-    while not Terminated do
-    begin
-      AEvent.ResetEvent;
-      if ReadDirectoryChangesW(FHandle, ABuffer, BufferSize, FWatchSubTree, FNotifyFilter, @ASize, @AOverlapped, nil) then
-      repeat
-        AResult := AEvent.WaitFor(1000);
-        if (AResult = wrSignaled) and GetOverlappedResult(FHandle, AOverlapped, ASize, True) and (ASize > 0) then
-        begin
-          AInfo := PFileNotifyInformation(ABuffer);
-          repeat
-            case AInfo.Action of
-              FILE_ACTION_ADDED:
-                DoAsyncFileAdded(FPath + AInfo.GetFileName);
-              FILE_ACTION_REMOVED:
-                DoAsyncFileRemoved(FPath + AInfo.GetFileName);
-              FILE_ACTION_MODIFIED:
-                DoAsyncFileChanged(FPath + AInfo.GetFileName);
-              FILE_ACTION_RENAMED_OLD_NAME:
-                if AInfo.NextEntry.Action = FILE_ACTION_RENAMED_NEW_NAME then
-                begin
-                  DoAsyncFileRenamed(FPath + AInfo.GetFileName, FPath + AInfo.NextEntry.GetFileName);
-                  AInfo := AInfo.NextEntry;
-                end;
-            end;
-            AInfo := AInfo.NextEntry;
-          until AInfo.NextEntryOffset = 0;
-        end;
-      until Terminated or (AResult <> wrTimeout);
-    end;
-  finally
-    FreeMem(ABuffer, BufferSize);
-    AEvent.Free;
-  end;
-end;
-
-{ TFileNotifyInformation }
-
-function TFileNotifyInformation.GetFileName: UnicodeString;
-begin
-  SetString(Result, PWideChar(@FileName[0]), FileNameLength div SizeOf(WideChar));
-end;
-
-function TFileNotifyInformation.NextEntry: PFileNotifyInformation;
-begin
-  Result := PFileNotifyInformation(NativeUInt(@Self) + NextEntryOffset);
-end;
-
 { TACLFileSystemWatcherCustomTask }
 
-constructor TACLFileSystemWatcherCustomTask.Create(AChanges: TACLFileSystemChanges;
-  AEvent: TACLFileSystemWatcherNotifyEvent; ACombineSerialChanges: Boolean = True);
+constructor TACLFileSystemWatcherCustomTask.Create(
+  AChanges: TACLFileSystemChanges; AEvent: TACLFileSystemWatcherNotifyEvent);
 begin
   FEvent := AEvent;
   FChanges := AChanges;
   FPaths := TACLSearchPaths.Create;
-  FCombineSerialChanges := ACombineSerialChanges;
 end;
 
 destructor TACLFileSystemWatcherCustomTask.Destroy;
@@ -551,14 +400,9 @@ end;
 
 procedure TACLFileSystemWatcherCustomTask.SafeChanged;
 begin
-  if FCombineSerialChanges then
-  begin
-    if FDelayTimer = nil then
-      FDelayTimer := TACLTimer.CreateEx(DelayTimerHandler, 2000);
-    FDelayTimer.Restart;
-  end
-  else
-    DoChanged;
+  if FDelayTimer = nil then
+    FDelayTimer := TACLTimer.CreateEx(DelayTimerHandler, 2000);
+  FDelayTimer.Restart;
 end;
 
 { TACLFileSystemWatcherFileTask }
@@ -604,23 +448,22 @@ end;
 { TACLFileSystemWatcherTask }
 
 constructor TACLFileSystemWatcherTask.Create(const APaths: TACLSearchPaths;
-  AChangeEvent: TACLFileSystemWatcherNotifyEvent; ACombineSerialChanges: Boolean = True;
-  AChanges: TACLFileSystemChanges = AllFileSystemChanges);
+  AChangeEvent: TACLFileSystemWatcherNotifyEvent; AChanges: TACLFileSystemChanges);
 var
   I: Integer;
 begin
-  Create(AChanges, AChangeEvent, ACombineSerialChanges);
+  Create(AChanges, AChangeEvent);
   for I := 0 to APaths.Count - 1 do
     FPaths.Add(acIncludeTrailingPathDelimiter(APaths[I]), APaths.Recursive[I]);
 end;
 
-constructor TACLFileSystemWatcherTask.Create(const APaths: TACLStringList;
-  ARecursive, ACombineSerialChanges: Boolean; AChanges: TACLFileSystemChanges;
-  AEvent: TACLFileSystemWatcherNotifyEvent);
+constructor TACLFileSystemWatcherTask.Create(
+  const APaths: TACLStringList; ARecursive: Boolean;
+  AChanges: TACLFileSystemChanges; AEvent: TACLFileSystemWatcherNotifyEvent);
 var
   I: Integer;
 begin
-  Create(AChanges, AEvent, ACombineSerialChanges);
+  Create(AChanges, AEvent);
   for I := 0 to APaths.Count - 1 do
     FPaths.Add(acIncludeTrailingPathDelimiter(APaths[I]), ARecursive);
 end;
