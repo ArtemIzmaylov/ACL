@@ -29,6 +29,7 @@ type
   PGFile = Pointer;
   PGFileInfo = Pointer;
   PGFileEnumerator = Pointer;
+  PGFileMonitor = Pointer;
   PGCancellable = Pointer;
 
   TGtkIconLookupFlag = (
@@ -54,10 +55,33 @@ const
   G_FILE_COPY_NO_FALLBACK_FOR_MOVE = 8;
   G_FILE_COPY_TARGET_DEFAULT_PERMS = 16;
 
+  // TGFileMonitorFlags
+  G_FILE_MONITOR_WATCH_MOUNTS = 1;
+  G_FILE_MONITOR_SEND_MOVED   = 2;
+  G_FILE_MONITOR_WATCH_HARD_LINKS = 4;
+  G_FILE_MONITOR_WATCH_MOVES  = 8;
+
 type
   PPGFileProgressCallback = ^PGFileProgressCallback;
   PGFileProgressCallback = ^TGFileProgressCallback;
   TGFileProgressCallback = procedure(current_num_bytes, total_num_bytes: gint64; user_data: gpointer); cdecl;
+  TGFileMonitorFlags = LongWord;
+
+  TGFileMonitorEvent = (
+    TGFileMonitorEventMinValue = -$7FFFFFFF,
+    G_FILE_MONITOR_EVENT_CHANGED = 0,
+    G_FILE_MONITOR_EVENT_CHANGES_DONE_HINT = 1,
+    G_FILE_MONITOR_EVENT_DELETED = 2,
+    G_FILE_MONITOR_EVENT_CREATED = 3,
+    G_FILE_MONITOR_EVENT_ATTRIBUTE_CHANGED = 4,
+    G_FILE_MONITOR_EVENT_PRE_UNMOUNT = 5,
+    G_FILE_MONITOR_EVENT_UNMOUNTED = 6,
+    G_FILE_MONITOR_EVENT_MOVED = 7,
+    G_FILE_MONITOR_EVENT_RENAMED = 8,
+    G_FILE_MONITOR_EVENT_MOVED_IN = 9,
+    G_FILE_MONITOR_EVENT_MOVED_OUT = 10,
+    TGFileMonitorEventMaxValue = $7FFFFFFF
+  );
 
 //g_file_monitor_file
 function g_file_new_for_path(path: Pgchar): PGFile; cdecl; external libGio2;
@@ -87,6 +111,15 @@ function g_file_move(source: PGFile; destination: PGFile; flags: LongWord;
   progress_callback_data: gpointer; error: PPGError): gboolean; cdecl; external libGio2;
 function g_file_trash(file_: PGFile; cancellable: PGCancellable;
   error: PPGError): gboolean; cdecl; external libGio2;
+
+function g_file_monitor(file_: PGFile; flags: TGFileMonitorFlags;
+  cancellable: PGCancellable; error: PPGError): PGFileMonitor; cdecl; external libGio2;
+function g_file_monitor_directory(file_: PGFile; flags: TGFileMonitorFlags;
+  cancellable: PGCancellable; error: PPGError): PGFileMonitor; cdecl; external libGio2;
+function g_file_monitor_file(file_: PGFile; flags: TGFileMonitorFlags;
+  cancellable: PGCancellable; error: PPGError): PGFileMonitor; cdecl; external libGio2;
+function g_file_monitor_cancel(monitor: PGFileMonitor): gboolean; cdecl; external libGio2;
+
 
 function gioErrorToString(Error: PGError): string;
 function gioGetIconFileNameForUri(const FileOrFolder: string; Size: Integer): string;

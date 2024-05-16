@@ -11,26 +11,30 @@
 
 unit ACL.Utils.FileSystem.Watcher;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:Partial
+
+// WARNING!
+//   Linux: recursive monitoring does not supported by current gio api
 
 interface
 
 uses
+{$IFDEF FPC}
+  glib2,
+{$ELSE}
   Winapi.Messages,
   Winapi.Windows,
+{$ENDIF}
   // System
-  System.Classes,
-  System.DateUtils,
-  System.Generics.Collections,
-  System.Math,
-  System.IOUtils,
-  System.SyncObjs,
-  System.SysUtils,
+  {System.}Classes,
+  {System.}DateUtils,
+  {System.}Generics.Collections,
+  {System.}Math,
+  {System.}SysUtils,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
   ACL.Classes.StringList,
-  ACL.FileFormats.INI,
   ACL.Timers,
   ACL.Threading,
   ACL.Threading.Pool,
@@ -99,10 +103,12 @@ type
 implementation
 
 uses
-  ACL.Math;
+{$IFDEF FPC}
+  ACL.Utils.FileSystem.GIO,
+{$ENDIF}
+  System.IOUtils;
 
 {$REGION ' FileSystem Watcher '}
-
 type
   TTaskIndexedPair = TPair<Integer, IACLFileSystemWatcherTask>;
   TTaskIndexedPairList = TACLList<TTaskIndexedPair>;
@@ -160,6 +166,26 @@ type
 
   { TACLFileSystemWatcherMonitor }
 
+{$IFDEF FPC}
+
+  TACLFileSystemWatcherMonitor = class
+  strict private
+    FFile: PGFile;
+    FFileMonitor: PGFileMonitor;
+    FTask: IACLFileSystemWatcherTask;
+
+    class procedure ChangeNotify(AMonitor: PGFileMonitor;
+      AFile, AOtherFile: PGFile; AEvent: TGFileMonitorEvent;
+      AData: TACLFileSystemWatcherMonitor); cdecl; static;
+  public
+    constructor Create(
+      AActiveTasks: TACLList<IACLFileSystemWatcherTask>;
+      ATasks: TTaskIndexedPairList; var AIndex: Integer);
+    destructor Destroy; override;
+  end;
+
+{$ELSE}
+
   TACLFileSystemWatcherMonitor = class(TACLThread)
   strict private
     FHandleCount: Integer;
@@ -172,7 +198,65 @@ type
       AActiveTasks: TACLList<IACLFileSystemWatcherTask>;
       ATasks: TTaskIndexedPairList; var AIndex: Integer);
   end;
-  
+{$ENDIF}
+
+{$IFDEF FPC}
+
+{ TACLFileSystemWatcherMonitor }
+
+constructor TACLFileSystemWatcherMonitor.Create(
+  AActiveTasks: TACLList<IACLFileSystemWatcherTask>;
+  ATasks: TTaskIndexedPairList; var AIndex: Integer);
+var
+  LFlags: TGFileMonitorFlags;
+  LPathIndex: Integer;
+begin
+  // https://github.com/frida/glib/blob/main/gio/tests/testfilemonitor.c
+  FTask := ATasks.List[AIndex].Value;
+  LPathIndex := ATasks.List[AIndex].Key;
+  LFlags := G_FILE_MONITOR_WATCH_HARD_LINKS or G_FILE_MONITOR_WATCH_MOUNTS;
+  FFile := g_file_new_for_path(PChar(FTask.GetPaths.Paths[LPathIndex]));
+  FFileMonitor := g_file_monitor(FFile, LFlags, nil, nil);
+  g_signal_connect(FFileMonitor, 'changed', @ChangeNotify, Self);
+  Inc(AIndex);
+end;
+
+destructor TACLFileSystemWatcherMonitor.Destroy;
+begin
+  g_file_monitor_cancel(FFileMonitor);
+  g_object_unref(FFileMonitor);
+  g_object_unref(FFile);
+  inherited Destroy;
+end;
+
+class procedure TACLFileSystemWatcherMonitor.ChangeNotify(
+  AMonitor: PGFileMonitor; AFile, AOtherFile: PGFile; AEvent: TGFileMonitorEvent;
+  AData: TACLFileSystemWatcherMonitor); cdecl;
+var
+  LChanges: TACLFileSystemChanges;
+begin
+  LChanges := [];
+  case AEvent of // https://docs.gtk.org/gio/enum.FileMonitorEvent.html
+    G_FILE_MONITOR_EVENT_ATTRIBUTE_CHANGED:
+      LChanges := [fscAttributes];
+    G_FILE_MONITOR_EVENT_CHANGED:
+      LChanges := [fscContent];
+    G_FILE_MONITOR_EVENT_MOVED,
+    G_FILE_MONITOR_EVENT_MOVED_IN,
+    G_FILE_MONITOR_EVENT_MOVED_OUT,
+    G_FILE_MONITOR_EVENT_CREATED,
+    G_FILE_MONITOR_EVENT_DELETED,
+    G_FILE_MONITOR_EVENT_UNMOUNTED:
+      LChanges := [fscSubElements];
+  else
+    LChanges := [];
+  end;
+  if LChanges * AData.FTask.GetChanges <> [] then
+    AData.FTask.Changed;
+end;
+
+{$ELSE}
+
 { TACLFileSystemWatcherMonitor }
 
 constructor TACLFileSystemWatcherMonitor.Create(
@@ -260,7 +344,8 @@ begin
     FindCloseChangeNotification(FHandles[I]);
     FHandles[I] := 0;
   end;
-end;  
+end;
+{$ENDIF}
 
 { TACLFileSystemWatcher }
 
