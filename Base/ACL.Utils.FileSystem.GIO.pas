@@ -31,6 +31,9 @@ type
   PGFileEnumerator = Pointer;
   PGFileMonitor = Pointer;
   PGCancellable = Pointer;
+  PGUnixMountMonitor = Pointer;
+  PGUnixMountPoint = Pointer;
+  PGUnixMountEntry = Pointer;
 
   TGtkIconLookupFlag = (
     GTK_ICON_LOOKUP_NO_SVG = 0,
@@ -120,6 +123,22 @@ function g_file_monitor_file(file_: PGFile; flags: TGFileMonitorFlags;
   cancellable: PGCancellable; error: PPGError): PGFileMonitor; cdecl; external libGio2;
 function g_file_monitor_cancel(monitor: PGFileMonitor): gboolean; cdecl; external libGio2;
 
+function g_unix_mount_monitor_get: PGUnixMountMonitor; cdecl; external libGio2;
+function g_unix_mount_for(file_path: Pgchar; time_read: Pguint64): PGUnixMountEntry; cdecl; external libGio2;
+function g_unix_mount_get_device_path(mount_entry: PGUnixMountEntry): Pgchar; cdecl; external libGio2;
+function g_unix_mount_get_fs_type(mount_entry: PGUnixMountEntry): Pgchar; cdecl; external libGio2;
+function g_unix_mount_get_mount_path(mount_entry: PGUnixMountEntry): Pgchar; cdecl; external libGio2;
+function g_unix_mount_get_options(mount_entry: PGUnixMountEntry): Pgchar; cdecl; external libGio2;
+function g_unix_mount_get_root_path(mount_entry: PGUnixMountEntry): Pgchar; cdecl; external libGio2;
+function g_unix_mount_guess_can_eject(mount_entry: PGUnixMountEntry): gboolean; cdecl; external libGio2;
+function g_unix_mount_guess_icon(mount_entry: PGUnixMountEntry): PGIcon; cdecl; external libGio2;
+function g_unix_mount_guess_name(mount_entry: PGUnixMountEntry): Pgchar; cdecl; external libGio2;
+function g_unix_mount_guess_should_display(mount_entry: PGUnixMountEntry): gboolean; cdecl; external libGio2;
+function g_unix_mount_guess_symbolic_icon(mount_entry: PGUnixMountEntry): PGIcon; cdecl; external libGio2;
+function g_unix_mount_is_readonly(mount_entry: PGUnixMountEntry): gboolean; cdecl; external libGio2;
+function g_unix_mount_is_system_internal(mount_entry: PGUnixMountEntry): gboolean; cdecl; external libGio2;
+function g_unix_mounts_changed_since(time: guint64): gboolean; cdecl; external libGio2;
+function g_unix_mounts_get(time_read: Pguint64): PGList; cdecl; external libGio2;
 
 function gioErrorToString(Error: PGError): string;
 function gioGetIconFileNameForUri(const FileOrFolder: string; Size: Integer): string;

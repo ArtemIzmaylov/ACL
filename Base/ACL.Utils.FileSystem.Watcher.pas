@@ -100,11 +100,63 @@ type
 
 {$ENDREGION}
 
+{$REGION ' Drive Manager '}
+
+  TACLDriveType = (dtUnknown, dtFixed, dtRemovable, dtOther);
+  TACLDriveTypes = set of TACLDriveType;
+
+  { TACLDriveInfo }
+
+  PACLDriveInfo = ^TACLDriveInfo;
+  TACLDriveInfo = record
+  private
+    FSerial: Cardinal;
+    FTitle: string;
+    FType: TACLDriveType;
+    function FetchDriveType: TACLDriveType;
+    function FetchTitle: string;
+  public
+    Path: string;
+    procedure Flush;
+    function GetSerial: Cardinal;
+    function GetTitle(const ADefault: string = ''): string;
+    function GetType: TACLDriveType;
+  end;
+
+  { TACLDriveManager }
+
+  TACLDriveManager = class
+  public type
+    TCallback = reference to procedure (const Drive: TACLDriveInfo; Mounted: Boolean);
+  strict private
+    class var FList: TACLList<TACLDriveInfo>;
+    class var FListeners: TACLList<TCallback>;
+    class var FLock: TACLCriticalSection;
+    class var FMonitor: TObject;
+    class function SafeFind(const ADrive: string; out AIndex: Integer): Boolean;
+  protected
+    class procedure Changed(const ADrive: string;
+      AMounted: Boolean; AInfo: PACLDriveInfo = nil);
+    class function CheckDrivePath(const ADrive: string): string;
+  public
+    class constructor Create;
+    class destructor Destroy;
+    class procedure EnsureReady;
+    class procedure Enum(AProc: TCallback);
+    class function GetInfo(const ADrive: string): TACLDriveInfo;
+    class procedure ListenerAdd(AListener: TCallback);
+    class procedure ListenerRemove(AListener: TCallback);
+  end;
+
+{$ENDREGION}
+
 implementation
 
 uses
 {$IFDEF FPC}
   ACL.Utils.FileSystem.GIO,
+{$ELSE}
+  ACL.FileFormats.INI,
 {$ENDIF}
   System.IOUtils;
 
@@ -629,4 +681,449 @@ end;
 
 {$ENDREGION}
 
+{$REGION ' Drive Manager '}
+type
+{$IFDEF FPC}
+
+  { TACLDriveMonitor }
+
+  TACLDriveMonitor = class
+  strict private
+    FCurrent: TACLStringList;
+    FMonitor: PGUnixMountMonitor;
+    procedure Changed;
+    class procedure Notify(Monitor: PGUnixMountMonitor; Data: TACLDriveMonitor); cdecl; static;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure WaitFor;
+  end;
+
+{$ELSE}
+
+  TACLDriveMonitor = class(TACLTaskGroup)
+  strict private type
+  {$REGION ' Internals '}
+    TCheckTask = class(TACLTask)
+    strict private
+      FDrive: string;
+    protected
+      procedure Execute; override;
+    public
+      constructor Create(const ADrive: string);
+    end;
+  {$ENDREGION}
+  strict private
+    FWndHandle: TWndHandle;
+    procedure WndProc(var Message: TMessage);
+  public
+    constructor Create;
+    destructor Destroy; override;
+  end;
+
+{$ENDIF}
+
+{ TACLDriveInfo }
+
+function TACLDriveInfo.FetchDriveType: TACLDriveType;
+begin
+  Result := dtUnknown;
+{$IFDEF MSWINDOWS}
+  case GetDriveType(PChar(Path)) of
+    DRIVE_FIXED:
+      Result := dtFixed;
+    DRIVE_REMOVABLE:
+      Result := dtRemovable;
+    DRIVE_REMOTE, DRIVE_CDROM, DRIVE_RAMDISK:
+      Result := dtOther;
+  end;
+{$ENDIF}
+end;
+
+function TACLDriveInfo.FetchTitle: string;
+{$IFDEF MSWINDOWS}
+var
+  LBuff: array[Byte] of WideChar;
+  LTemp: Cardinal;
+{$ENDIF}
+begin
+  Result := acEmptyStr;
+{$IFDEF MSWINDOWS}
+  if GetVolumeInformation(PChar(Path), @LBuff[0], High(LBuff), @FSerial, LTemp, LTemp, nil, 0) then
+  begin
+    Result := LBuff;
+    if Result = '' then
+      with TACLIniFile.Create(Path + 'autorun.inf', False) do
+      try
+        Result := ReadString('Autorun', 'Label');
+      finally
+        Free;
+      end;
+  end;
+{$ENDIF}
+end;
+
+procedure TACLDriveInfo.Flush;
+begin
+  FSerial := DWORD(-1);
+  FTitle := '';
+  FType := dtUnknown;
+end;
+
+function TACLDriveInfo.GetSerial: Cardinal;
+begin
+  if FSerial = DWORD(-1) then
+    FetchTitle; //
+  Result := FSerial;
+end;
+
+function TACLDriveInfo.GetTitle(const ADefault: string): string;
+begin
+  if FTitle = '' then
+  begin
+    FTitle := FetchTitle;
+    if FTitle = '' then
+      FTitle := ADefault;
+    if FTitle = '' then
+      FTitle := 'Drive';
+    FTitle := Format('%s (%s)', [FTitle, Path]);
+  end;
+  Result := FTitle;
+end;
+
+function TACLDriveInfo.GetType: TACLDriveType;
+begin
+  if FType = dtUnknown then
+    FType := FetchDriveType;
+  Result := FType;
+end;
+
+{ TACLDriveMonitor }
+
+{$IFDEF FPC}
+
+constructor TACLDriveMonitor.Create;
+begin
+  FCurrent := TACLStringList.Create;
+  FMonitor := g_unix_mount_monitor_get();
+  g_signal_connect(FMonitor, 'mounts-changed', @Notify, Self);
+  Changed;
+end;
+
+destructor TACLDriveMonitor.Destroy;
+begin
+  g_object_unref(FMonitor);
+  FreeAndNil(FCurrent);
+  inherited Destroy;
+end;
+
+procedure TACLDriveMonitor.Changed;
+var
+  LDrive: TACLDriveInfo;
+  LPrevState: TACLStringList;
+  LItem: PGList;
+  LList: PGList;
+  I: Integer;
+begin
+  LList := g_unix_mounts_get(nil);
+  if LList <> nil then
+  try
+    LPrevState := FCurrent.Clone;
+    try
+      FCurrent.Clear;
+      LItem := LList;
+      while LItem <> nil do
+      begin
+        if not g_unix_mount_is_system_internal(LItem.data) then
+        begin
+          LDrive.Flush;
+          LDrive.Path := g_unix_mount_get_mount_path(LItem.data);
+          LDrive.Path := TACLDriveManager.CheckDrivePath(LDrive.Path);
+          if LPrevState.Remove(LDrive.Path) < 0 then
+          begin
+            LDrive.FTitle := g_unix_mount_guess_name(LItem.data);
+//            LDrive.FExtra :=
+//              g_unix_mount_get_fs_type(LItem.data) + ';' +
+//              g_unix_mount_get_device_path(LItem.data) + ';' +
+//              g_unix_mount_get_options(LItem.data);
+
+            // g_unix_mount_guess_type() is a private function =(
+            if g_unix_mount_is_readonly(LItem.data) then
+              LDrive.FType := dtOther // CD-ROM?
+            else
+              LDrive.FType := dtRemovable;
+
+            TACLDriveManager.Changed(LDrive.Path, True, @LDrive);
+          end;
+          FCurrent.Add(LDrive.Path);
+        end;
+        LItem := LItem.next;
+      end;
+      for I := 0 to LPrevState.Count - 1 do
+        TACLDriveManager.Changed(LPrevState.Strings[I], False, nil);
+    finally
+      LPrevState.Free;
+    end;
+  finally
+    g_list_free(LList);
+  end;
+end;
+
+class procedure TACLDriveMonitor.Notify(Monitor: PGUnixMountMonitor; Data: TACLDriveMonitor);
+begin
+  Data.Changed;
+end;
+
+procedure TACLDriveMonitor.WaitFor;
+begin
+  // do nothing
+end;
+
+{$ELSE}
+
+constructor TACLDriveMonitor.Create;
+var
+  LDrive: string;
+  LDriveInfo: TACLDriveInfo;
+begin
+  inherited;
+  FWndHandle := WndCreate(WndProc, ClassName, False);
+
+  Initialize;
+  for LDrive in TDirectory.GetLogicalDrives do
+  begin
+    LDriveInfo := TACLDriveManager.GetInfo(LDrive);
+    if LDriveInfo.GetType = dtFixed then
+      TACLDriveManager.Changed(LDriveInfo.Path, True, @LDriveInfo)
+    else
+      Add(TCheckTask.Create(LDriveInfo.Path));
+  end;
+  Run(False);
+end;
+
+destructor TACLDriveMonitor.Destroy;
+begin
+  WndFree(FWndHandle);
+  inherited;
+end;
+
+procedure TACLDriveMonitor.WndProc(var Message: TMessage);
+const
+  DBT_EVENT_DEVICEARRIVAL = $8000;
+  DBT_EVENT_DEVICEREMOVED = $8004;
+  DBT_FORMAT_NET   = $0002;
+  DBT_TYPE_VOLUME  = $0002;
+type
+  PDeviceBroadcastVolume = ^TDeviceBroadcastVolume;
+  TDeviceBroadcastVolume = packed record
+    Size: DWORD;
+    DeviceType: DWORD;
+    Reserved: DWORD;
+    UnitMask: DWORD;
+    Flags: Word;
+  end;
+
+  function DecodeDrive(AVolume: PDeviceBroadcastVolume): string;
+  var
+    AIndex: Integer;
+    AMask: DWORD;
+  begin
+    AIndex := 0;
+    Result := '';
+    AMask := AVolume^.UnitMask;
+    while AMask > 0 do
+    begin
+      if AMask and 1 = 1 then
+        Result := TACLDriveManager.CheckDrivePath(WideChar(AIndex + Ord('A')));
+      AMask := AMask shr 1;
+      Inc(AIndex);
+    end;
+  end;
+
+var
+  AVolume: PDeviceBroadcastVolume;
+begin
+  if Message.Msg = WM_DEVICECHANGE then
+    case Message.WParam of
+      DBT_EVENT_DEVICEARRIVAL, DBT_EVENT_DEVICEREMOVED:
+        begin
+          AVolume := PDeviceBroadcastVolume(Message.LParam);
+          if (AVolume^.DeviceType = DBT_TYPE_VOLUME) and (AVolume^.Flags and DBT_FORMAT_NET = 0) then
+            TACLDriveManager.Changed(DecodeDrive(AVolume), Message.WParam = DBT_EVENT_DEVICEARRIVAL);
+        end;
+    end;
+  WndDefaultProc(FWndHandle, Message);
+end;
+
+{ TACLDriveMonitor.TCheckTask }
+
+constructor TACLDriveMonitor.TCheckTask.Create(const ADrive: string);
+begin
+  inherited Create;
+  FDrive := ADrive;
+end;
+
+procedure TACLDriveMonitor.TCheckTask.Execute;
+var
+  LHandle: THandle;
+  LReturn: Cardinal;
+begin
+  LHandle := CreateFile(PChar('\\.\' + FDrive[1] + ':'), 0, FILE_SHARE_READ, nil, OPEN_EXISTING, 0, 0);
+  if LHandle <> INVALID_HANDLE_VALUE then
+  try
+    LReturn := 0;
+    if DeviceIoControl(LHandle, IOCTL_STORAGE_CHECK_VERIFY2, nil, 0, nil, 0, LReturn, nil) then
+    begin
+      TACLMainThread.RunImmediately(
+        procedure
+        begin
+          TACLDriveManager.Changed(FDrive, True);
+        end);
+    end;
+  finally
+    CloseHandle(LHandle);
+  end;
+end;
+{$ENDIF}
+
+{ TACLDriveManager }
+
+class constructor TACLDriveManager.Create;
+begin
+  FLock := TACLCriticalSection.Create;
+  FList := TACLList<TACLDriveInfo>.Create;
+  FListeners := TACLList<TCallback>.Create;
+  FMonitor := TACLDriveMonitor.Create;
+end;
+
+class destructor TACLDriveManager.Destroy;
+begin
+  FreeAndNil(FMonitor);
+  FreeAndNil(FListeners);
+  FreeAndNil(FList);
+  FreeAndNil(FLock);
+end;
+
+class procedure TACLDriveManager.Changed(const ADrive: string;
+  AMounted: Boolean; AInfo: PACLDriveInfo = nil);
+var
+  LIndex: Integer;
+  LInfo: TACLDriveInfo;
+begin
+  FLock.Enter;
+  try
+    if AInfo <> nil then
+      LInfo := AInfo^
+    else
+      LInfo := GetInfo(ADrive);
+
+    if SafeFind(ADrive, LIndex) then
+      FList.Delete(LIndex);
+    if AMounted then
+    begin
+      FList.Add(LInfo);
+      FList.Sort(
+        function (const Item1, Item2: TACLDriveInfo): Integer
+        begin
+          Result := acCompareStrings(Item1.Path, Item2.Path);
+        end);
+    end;
+
+    for LIndex := FListeners.Count - 1 downto 0 do
+      FListeners.List[LIndex](LInfo, AMounted);
+  finally
+    FLock.Leave;
+  end;
+end;
+
+class function TACLDriveManager.CheckDrivePath(const ADrive: string): string;
+{$IFDEF MSWINDOWS}
+var
+  LLength: Integer;
+begin
+  LLength := Length(ADrive);
+  if LLength = 1 then
+    Result := ADrive + ':\'
+  else if LLength = 2 then
+    Result := ADrive + '\'
+  else if LLength > 3 then
+    Result := Copy(ADrive, 1, 3)
+  else
+    Result := ADrive;
+{$ELSE}
+begin
+  Result := acIncludeTrailingPathDelimiter(ADrive);
+{$ENDIF}
+end;
+
+class procedure TACLDriveManager.EnsureReady;
+begin
+  TACLDriveMonitor(FMonitor).WaitFor;
+end;
+
+class procedure TACLDriveManager.Enum(AProc: TCallback);
+var
+  I: Integer;
+begin
+  FLock.Enter;
+  try
+    for I := 0 to FList.Count - 1 do
+      AProc(FList.List[I], True);
+  finally
+    FLock.Leave;
+  end;
+end;
+
+class function TACLDriveManager.GetInfo(const ADrive: string): TACLDriveInfo;
+var
+  LIndex: Integer;
+begin
+  FLock.Enter;
+  try
+    Result.Flush;
+    Result.Path := CheckDrivePath(ADrive);
+    if SafeFind(Result.Path, LIndex) then
+      Result := FList.List[LIndex];
+  finally
+    FLock.Leave;
+  end;
+end;
+
+class procedure TACLDriveManager.ListenerAdd(AListener: TCallback);
+begin
+  FLock.Enter;
+  try
+    FListeners.Add(AListener);
+  finally
+    FLock.Leave;
+  end;
+end;
+
+class procedure TACLDriveManager.ListenerRemove(AListener: TCallback);
+begin
+  FLock.Enter;
+  try
+    FListeners.Remove(AListener);
+  finally
+    FLock.Leave;
+  end;
+end;
+
+class function TACLDriveManager.SafeFind(
+  const ADrive: string; out AIndex: Integer): Boolean;
+var
+  I: Integer;
+begin
+  for I := 0 to FList.Count - 1 do
+  begin
+    if acSameText(FList.List[I].Path, ADrive) then
+    begin
+      AIndex := I;
+      Exit(True);
+    end;
+  end;
+  Result := False;
+end;
+
+{$ENDREGION}
 end.
