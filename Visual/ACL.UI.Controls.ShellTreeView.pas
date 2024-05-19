@@ -47,6 +47,8 @@ uses
   ACL.UI.Controls.TreeList.SubClass,
   ACL.UI.Controls.TreeList.Types,
   ACL.Utils.Common,
+  ACL.Utils.FileSystem,
+  ACL.Utils.FileSystem.Watcher,
   ACL.Utils.Shell,
   ACL.Utils.Strings;
 
@@ -134,6 +136,7 @@ type
     FSelectedPath: string;
 
     function AddNode(AFolder: TACLShellFolder; AParent: TACLTreeListNode): TACLTreeListNode;
+    function AddNodeSpecial(const Uri: string): TACLTreeListNode;
     function GetQuickAccessNodeState: Boolean;
     procedure SetOptionsBehavior(AValue: TACLShellTreeViewOptionsBehavior);
     procedure SetOptionsView(AValue: TACLShellTreeViewOptionsView);
@@ -145,6 +148,7 @@ type
     function CreateOptionsView: TACLShellTreeViewOptionsView; reintroduce; virtual;
 
     procedure DoCreateDirectory(const AFolder: string);
+    procedure DoDriveNotify(const ADrive: TACLDriveInfo; AMount: Boolean);
     procedure DoFocusedNodeChanged; override;
     procedure DoGetNodeChildren(ANode: TACLTreeListNode); override; final;
     procedure DoGetPathChildren(ANode: TACLTreeListNode); virtual;
@@ -233,7 +237,6 @@ uses
 {$ELSE}
   ACL.Utils.FileSystem.GIO,
 {$ENDIF}
-  ACL.Utils.FileSystem,
   ACL.UI.Dialogs;
 
 type
@@ -463,17 +466,36 @@ begin
   FOptionsBehavior := CreateOptionsBehavior;
   FQuickAccessNodeState := DefaultQuickAccessNodeState;
   FImages := TACLShellImageList.Create(Self);
-
   inherited OptionsBehavior.AutoBestFit := True;
   inherited OptionsBehavior.IncSearchColumnIndex := 0;
   inherited OptionsView.Nodes.Images := FImages;
+  TACLDriveManager.ListenerAdd(DoDriveNotify);
 end;
 
 destructor TACLShellTreeViewSubClass.Destroy;
 begin
+  TACLDriveManager.ListenerRemove(DoDriveNotify);
   FreeAndNil(FOptionsBehavior);
   FreeAndNil(FOptionsView);
   inherited Destroy;
+end;
+
+function TACLShellTreeViewSubClass.AddNodeSpecial(const Uri: string): TACLTreeListNode;
+var
+  LPIDL: PItemIDList;
+begin
+  Result := nil;
+  try
+    LPIDL := TPIDLHelper.GetFolderPIDL(TACLApplication.GetHandle, Uri);
+    if LPIDL <> nil then
+    try
+      Result := AddNode(TACLShellFolder.CreateSpecial(LPIDL), RootNode);
+    finally
+      TPIDLHelper.DisposePIDL(LPIDL);
+    end;
+  except
+    Result := nil;
+  end;
 end;
 
 procedure TACLShellTreeViewSubClass.ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: string);
@@ -571,6 +593,11 @@ begin
   end;
 end;
 
+procedure TACLShellTreeViewSubClass.DoDriveNotify(const ADrive: TACLDriveInfo; AMount: Boolean);
+begin
+  ReloadData;
+end;
+
 procedure TACLShellTreeViewSubClass.DoFocusedNodeChanged;
 begin
   FSelectedPath := acExcludeTrailingPathDelimiter(GetFullPath(FocusedNode));
@@ -607,25 +634,6 @@ begin
 end;
 
 procedure TACLShellTreeViewSubClass.DoGetRootChildren(ANode: TACLTreeListNode);
-
-  function AddNodeSpecial(const Uri: string): TACLTreeListNode;
-  var
-    LPIDL: PItemIDList;
-  begin
-    Result := nil;
-    try
-      LPIDL := TPIDLHelper.GetFolderPIDL(TACLApplication.GetHandle, Uri);
-      if LPIDL <> nil then
-      try
-        Result := AddNode(TACLShellFolder.CreateSpecial(LPIDL), ANode);
-      finally
-        TPIDLHelper.DisposePIDL(LPIDL);
-      end;
-    except
-      Result := nil;
-    end;
-  end;
-
 begin
   if OptionsView.ShowFavorites then
   begin
@@ -637,6 +645,13 @@ begin
   AddNode(TACLShellFolder.Create, RootNode).Expanded := True;
 {$ELSE}
   AddNodeSpecial(GetUserDir).Expanded := True;
+  // В Windows, removable-устройства уже есть на уровне "рабочего стола".
+  TACLDriveManager.Enum(
+    procedure (const ADrive: TACLDriveInfo; AMount: Boolean)
+    begin
+      if ADrive.GetType = dtRemovable then
+        AddNodeSpecial(ADrive.Path);
+    end);
   AddNode(TACLShellFolder.Create, RootNode);
 {$ENDIF}
 end;
