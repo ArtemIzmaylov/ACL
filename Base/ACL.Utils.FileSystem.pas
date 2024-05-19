@@ -291,12 +291,6 @@ function acFileGetAttr(const FileName: string; out AAttrs: Cardinal): Boolean; o
 function acFileGetLastWriteTime(const FileName: string): Cardinal;
 function acFileSetAttr(const FileName: string; AAttr: Cardinal): Boolean;
 function acFileSize(const FileName: string): Int64;
-{$IFDEF MSWINDOWS}
-function acVolumeGetSerial(const ADrive: WideChar; out ASerialNumber: Cardinal): Boolean;
-function acVolumeGetTitle(const ADrive, ADefaultTitle: string): string; overload;
-function acVolumeGetTitle(const ADrive: string): string; overload;
-function acVolumeGetType(const ADrive: WideChar): Cardinal;
-{$ENDIF}
 
 // Removing, Copying, Renaming
 function acCopyDirectory(const ASourcePath, ATargetPath: string; const AExts: string = ''; ARecursive: Boolean = True): Boolean;
@@ -1062,49 +1056,6 @@ begin
   if not acFindFile(FileName, nil, @Result) then
     Result := 0;
 end;
-
-{$IFDEF MSWINDOWS}
-function acVolumeGetSerial(const ADrive: WideChar; out ASerialNumber: Cardinal): Boolean;
-var
-  X: Cardinal;
-begin
-  Result := GetVolumeInformationW(PWideChar(ADrive + ':\'), nil, 0, @ASerialNumber, X, X, nil, 0);
-end;
-
-function acVolumeGetTitle(const ADrive: string): string;
-begin
-  Result := acVolumeGetTitle(ADrive, ADrive);
-end;
-
-function acVolumeGetTitle(const ADrive, ADefaultTitle: string): string;
-const
-  sAutoRunFile = ':\autorun.inf';
-var
-  B: array[Byte] of WideChar;
-  X: Cardinal;
-begin
-  Result := '';
-  if ADrive <> '' then
-    if GetVolumeInformationW(PWideChar(ADrive[1] + ':\'), @B[0], High(B), nil, X, X, nil, 0) then
-    begin
-      Result := B;
-      if (Result = '') and acFileExists(ADrive[1] + sAutoRunFile) then
-        with TACLIniFile.Create(ADrive[1] + sAutoRunFile, False) do
-        try
-          Result := ReadString('Autorun', 'Label');
-        finally
-          Free;
-        end;
-    end;
-
-  Result := Format('%s (%s)', [IfThenW(Result, ADefaultTitle), ADrive]);
-end;
-
-function acVolumeGetType(const ADrive: Char): Cardinal;
-begin
-  Result := GetDriveTypeW(PChar(ADrive + ':'));
-end;
-{$ENDIF}
 
 //==============================================================================
 // Removing, Copying, Renaming
