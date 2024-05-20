@@ -83,6 +83,7 @@ type
     FIconVisible: Boolean;
     FID: string;
     FLastMousePos: TPoint;
+    FMousePressed: set of TMouseButton;
     FPopupMenu: TPopupMenu;
     FVisible: Boolean;
     FWantDoubleClicks: Boolean;
@@ -111,8 +112,9 @@ type
     procedure DoDblClick; dynamic;
     procedure DoMidClick; dynamic;
     // Mouse
+    procedure MouseDown(Nop: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
     procedure MouseMove(Nop: TObject; Shift: TShiftState; X, Y: Integer);
-    procedure MouseUp(Nop: TObject; Button: TMouseButton; Shift: TShiftState; x, Y: Integer);
+    procedure MouseUp(Nop: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
     // IACLCurrentDpi
     function GetCurrentDpi: Integer;
     // IACLMouseTracking
@@ -282,6 +284,12 @@ begin
   Result := FLastMousePos = MouseCursorPos;
 end;
 
+procedure TACLTrayIcon.MouseDown(Nop: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  Include(FMousePressed, Button);
+end;
+
 procedure TACLTrayIcon.MouseEnter;
 begin
   Inc(FTrayIconIsMouseAtIcon);
@@ -297,6 +305,14 @@ end;
 procedure TACLTrayIcon.MouseUp(Nop: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
+  // #AI: 20.05.2024, Special for ExplorerPatcher
+  // Если в момент Down изменится лейаут области уведомлений, то Up запросто
+  // может придти другому приложению. Поэтому реагируем на Up только в случае
+  // согласованного состояния.
+  if not (Button in FMousePressed) then
+    Exit;
+
+  Exclude(FMousePressed, Button);
   case Button of
     mbLeft:
       if IsClickTimerRequired then
@@ -518,6 +534,12 @@ begin
   begin
     LCurPos := MouseCursorPos;
     case Message.lParam of
+      WM_LBUTTONDOWN:
+        Icon.MouseDown(nil, mbLeft, [], LCurPos.X, LCurPos.Y);
+      WM_RBUTTONDOWN:
+        Icon.MouseDown(nil, mbRight, [], LCurPos.X, LCurPos.Y);
+      WM_MBUTTONDOWN:
+        Icon.MouseDown(nil, mbMiddle, [], LCurPos.X, LCurPos.Y);
       WM_MOUSEMOVE:
         Icon.MouseMove(nil, [], LCurPos.X, LCurPos.Y);
       WM_LBUTTONUP:
@@ -541,6 +563,7 @@ constructor TLCLTrayIconImpl.Create(AIcon: TACLTrayIcon);
 begin
   inherited Create(AIcon);
   FTrayIcon := TTrayIcon.Create(nil);
+  FTrayIcon.OnMouseDown := Icon.MouseDown;
   FTrayIcon.OnMouseMove := Icon.MouseMove;
   FTrayIcon.OnMouseUp := Icon.MouseUp;
   FBalloonTimer := TACLTimer.CreateEx(HandlerBalloonTimeOut, FTrayIcon.BalloonTimeout);
