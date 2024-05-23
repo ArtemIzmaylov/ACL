@@ -40,6 +40,7 @@ uses
   ACL.Graphics,
   ACL.Threading,
   ACL.Utils.Common,
+  ACL.Utils.Clipboard,
   ACL.Utils.Strings;
 
 type
@@ -355,7 +356,6 @@ uses
   ACL.FastCode,
   ACL.Math, // inlining
   ACL.Graphics.Ex.Gdip,
-  ACL.Utils.Clipboard,
 {$ELSE}
   ACL.Graphics.Ex.Cairo,
 {$ENDIF}

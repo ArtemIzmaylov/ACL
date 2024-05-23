@@ -11,7 +11,12 @@
 
 unit ACL.Utils.Clipboard;
 
-{$I ACL.Config.inc} // FPC:NotImplemented
+{$I ACL.Config.inc} // FPC:Partial
+
+{
+   FPC: TODO
+     + Clipboard.AsFiles
+}
 
 interface
 
