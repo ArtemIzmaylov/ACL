@@ -31,8 +31,9 @@ uses
   System.AnsiStrings,
   System.UITypes,
   // Vcl
-  {Vcl.}Graphics,
+  {Vcl.}Clipbrd,
   {Vcl.}Controls,
+  {Vcl.}Graphics,
   {Vcl.}Forms,
   // ACL
   ACL.Classes,
@@ -50,7 +51,6 @@ uses
   ACL.UI.Resources,
   ACL.Utils.Common,
   ACL.Utils.DPIAware,
-  ACL.Utils.Clipboard,
   ACL.Utils.Strings;
 
 const
@@ -688,7 +688,7 @@ procedure TACLHexViewSubClass.CopyToClipboard(AEncodeProc: TEncodeProc);
   end;
 
 begin
-  acCopyStringToClipboard(BytesToString(GetSelectedBytes));
+  Clipboard.AsText := acString(BytesToString(GetSelectedBytes));
 end;
 
 function TACLHexViewSubClass.GetSelectedBytes: TBytes;

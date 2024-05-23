@@ -247,8 +247,9 @@ type
     class function DecodeString(const ACode: string): UnicodeString; overload;
 
     class function Encode(ABuffer: PByte; ACount: Integer): string; overload;
-    class function Encode(AByte: Byte): string; overload; static;
-    class function Encode(AChar: WideChar): string; overload; static;
+    class function Encode(AByte: Byte): string; overload; static; inline;
+    class function Encode(AChar: AnsiChar): string; overload; static; inline;
+    class function Encode(AChar: WideChar): string; overload; static; inline;
     class function Encode(AChar: WideChar; ABuffer: PWideChar): PWideChar; overload; static;
     class function Encode(AStream: TStream): string; overload;
     class function EncodeFile(const AFileName: string): string; overload;
@@ -3234,6 +3235,11 @@ begin
   AScan^ := PCardinal(FByteToHexMap[Ord(AChar) and $FF])^;
   Inc(AScan);
   Result := ABuffer;
+end;
+
+class function TACLHexcode.Encode(AChar: AnsiChar): string;
+begin
+  Result := FByteToHexMap[Ord(AChar)];
 end;
 
 class function TACLHexcode.EncodeFile(const AFileName: string): string;

@@ -1893,12 +1893,7 @@ class procedure TACLImageTools.CopyToClipboard(AImage: TACLImage);
     try
       AImage.SaveToStream(LStream, AFormat);
       LStream.Position := 0;
-    {$IFDEF FPC}
-      Clipboard.AddFormat(AFormat.ClipboardFormat, LStream);
-    {$ELSE}
-      Clipboard.SetAsHandle(AFormat.ClipboardFormat,
-        GlobalAllocFromData(LStream.Memory, LStream.Size));
-    {$ENDIF}
+      Clipboard.AsStream[AFormat.ClipboardFormat] := LStream;
     finally
       LStream.Free;
     end;

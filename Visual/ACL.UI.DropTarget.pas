@@ -39,6 +39,7 @@ uses
   ACL.Utils.Desktop,
   ACL.Utils.FileSystem,
   ACL.Utils.Shell,
+  ACL.Utils.Stream,
   ACL.Utils.Strings;
 
 type
@@ -271,6 +272,7 @@ end;
 
 function TACLDropTargetHook.GetDataAsString(AFormat: Word; out AString: string): Boolean;
 var
+  AFiles: TACLStringList;
   AMedium: TStgMedium;
 begin
   Result := GetData(AFormat, AMedium);
@@ -278,11 +280,21 @@ begin
   try
     case AFormat of
       CF_UNICODETEXT:
-        AString := acTextFromHGLOBAL(AMedium.hGlobal, True);
+        AString := TACLGlobalMemory.ToString(AMedium.hGlobal, True);
+
       CF_HDROP:
-        AString := acFilesFromHGLOBAL(AMedium.hGlobal);
+        begin
+          AFiles := TACLGlobalMemory.ToFiles(AMedium.hGlobal);
+          if AFiles <> nil then
+          try
+            AString := AFiles.Text;
+          finally
+            AFiles.Free;
+          end;
+        end;
+
     else
-      AString := acTextFromHGLOBAL(AMedium.hGlobal, False);
+      AString := TACLGlobalMemory.ToString(AMedium.hGlobal, False);
     end;
   finally
     ReleaseStgMedium(AMedium);
@@ -300,7 +312,7 @@ begin
   begin
     FDataSetFormat := MakeFormat(CF_CONFIG);
     FDataSetMedium.tymed := TYMED_HGLOBAL;
-    FDataSetMedium.hGlobal := acConfigToHGLOBAL(AConfig);
+    FDataSetMedium.hGlobal := TACLGlobalMemory.Alloc(AConfig);
     DataObject.SetData(FDataSetFormat, FDataSetMedium, True);
   end;
 end;
@@ -537,20 +549,22 @@ end;
 
 function TACLDropTarget.GetConfig(out AConfig: TACLIniFile): Boolean;
 var
-  AMedium: TStgMedium;
+  LConfig: TACLIniFile;
+  LMedium: TStgMedium;
 begin
   Result := False;
 {$IFDEF MSWINDOWS}
-  if GetData(CF_CONFIG, AMedium) then
+  if GetData(CF_CONFIG, LMedium) then
   try
-    if AMedium.tymed = TYMED_HGLOBAL then
+    if LMedium.tymed = TYMED_HGLOBAL then
     begin
-      AConfig := TACLIniFile.Create;
-      acConfigFromHGLOBAL(AMedium.hGlobal, AConfig);
+      LConfig := TACLIniFile.Create;
+      StreamLoad(LConfig.LoadFromStream, TACLGlobalMemoryStream.Create(LMedium.hGlobal));
+      AConfig := LConfig;
       Result := True;
     end;
   finally
-    ReleaseStgMedium(AMedium);
+    ReleaseStgMedium(LMedium);
   end
 {$ENDIF}
 end;
@@ -584,12 +598,13 @@ begin
   Result := False;
   if GetData(CF_FILEURIS, AMedium) or GetData(CF_HDROP, AMedium) then
   try
-    AFiles := TACLStringList.Create;
-    Result := (AMedium.tymed = TYMED_HGLOBAL) and acFilesFromHGLOBAL(AMedium.hGlobal, AFiles);
-    if Result then
-      ValidateFiles(AFiles)
-    else
-      FreeAndNil(AFiles);
+    if AMedium.tymed = TYMED_HGLOBAL then
+    begin
+      AFiles := TACLGlobalMemory.ToFiles(AMedium.hGlobal);
+      Result := AFiles <> nil;
+      if Result then
+        ValidateFiles(AFiles);
+    end;
   finally
     ReleaseStgMedium(AMedium);
   end

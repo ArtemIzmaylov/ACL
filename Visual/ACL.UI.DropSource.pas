@@ -567,7 +567,7 @@ function TACLDragDropDataProviderConfig.Store(var AMedium: TStgMedium;
   const AFormat: TFormatEtc; ATargetConfig: TACLIniFile = nil): Boolean;
 begin
   AMedium.tymed := TYMED_HGLOBAL;
-  AMedium.hGlobal := acConfigToHGLOBAL(Config);
+  AMedium.hGlobal := TACLGlobalMemory.Alloc(Config);
   Result := True;
 end;
 
@@ -616,7 +616,7 @@ end;
 
 function TACLDragDropDataProviderFiles.FilesToHGLOBAL(AFiles: TACLStringList): HGLOBAL;
 begin
-  Result := acMakeDropHandle(AFiles);
+  Result := TACLGlobalMemory.Alloc(AFiles);
 end;
 
 { TACLDragDropDataProviderPIDL }
@@ -628,7 +628,7 @@ begin
   Result := 0;
   if TPIDLHelper.FilesToShellListStream(AFiles, AStream) then
   try
-    Result := GlobalAllocFromData(AStream.Memory, AStream.Size);
+    Result := TACLGlobalMemory.Alloc(AStream);
   finally
     AStream.Free;
   end;
@@ -661,7 +661,7 @@ function TACLDragDropDataProviderText.Store(var AMedium: TStgMedium;
   const AFormat: TFormatEtc; ATargetConfig: TACLIniFile = nil): Boolean;
 begin
   AMedium.tymed := TYMED_HGLOBAL;
-  AMedium.hGlobal := acTextToHGLOBAL(Text);
+  AMedium.hGlobal := TACLGlobalMemory.Alloc(Text);
   Result := True;
 end;
 
@@ -727,7 +727,7 @@ begin
       AFileDescriptor.nFileSizeLow := LoInteger(AFileSize);
     end;
     AMedium.tymed := TYMED_HGLOBAL;
-    AMedium.hGlobal := GlobalAllocFromData(PByte(ADescriptor), ADescriptorSize);
+    AMedium.hGlobal := TACLGlobalMemory.Alloc(PByte(ADescriptor), ADescriptorSize);
     Result := True;
   finally
     FreeMem(ADescriptor);
@@ -752,7 +752,7 @@ function TACLDragDropDataProviderTextAnsi.Store(var AMedium: TStgMedium;
   const AFormat: TFormatEtc; ATargetConfig: TACLIniFile): Boolean;
 begin
   AMedium.tymed := TYMED_HGLOBAL;
-  AMedium.hGlobal := acTextToHGLOBAL(acStringToAnsiString(Text));
+  AMedium.hGlobal := TACLGlobalMemory.Alloc(acStringToAnsiString(Text));
   Result := True;
 end;
 
@@ -1021,7 +1021,7 @@ begin
   try
     if (Format.tymed = TYMED_HGLOBAL) and (Format.cfFormat = CF_CONFIG) then
     begin
-      acConfigFromHGLOBAL(Medium.hGlobal, FTargetConfig);
+      StreamLoad(FTargetConfig.LoadFromStream, TACLGlobalMemoryStream.Create(Medium.hGlobal));
       Result := S_OK;
     end;
   finally
