@@ -318,20 +318,11 @@ var
   AFlags: Cardinal;
   AHandle: THandle;
   AMode: DWORD;
-  APathFlags: Cardinal;
   APathIndex: Integer;
   ARecursive: Boolean;
   ATask: IACLFileSystemWatcherTask;
 begin
   FreeOnTerminate := False;
-
-  AFlags := 0;
-  if fscContent in ATask.GetChanges then
-    AFlags := AFlags or FILE_NOTIFY_CHANGE_SIZE or FILE_NOTIFY_CHANGE_LAST_WRITE;
-  if fscAttributes in ATask.GetChanges then
-    AFlags := AFlags or FILE_NOTIFY_CHANGE_ATTRIBUTES;
-  if fscSubElements in ATask.GetChanges then
-    AFlags := AFlags or FILE_NOTIFY_CHANGE_FILE_NAME or FILE_NOTIFY_CHANGE_DIR_NAME;
 
   AMode := acSetThreadErrorMode(SEM_FAILCRITICALERRORS);
   try
@@ -341,14 +332,20 @@ begin
       APathIndex := ATasks.List[AIndex].Key;
       ARecursive := ATask.GetPaths.Recursive[APathIndex];
 
-      APathFlags := AFlags;
+      AFlags := 0;
+      if fscContent in ATask.GetChanges then
+        AFlags := AFlags or FILE_NOTIFY_CHANGE_SIZE or FILE_NOTIFY_CHANGE_LAST_WRITE;
+      if fscAttributes in ATask.GetChanges then
+        AFlags := AFlags or FILE_NOTIFY_CHANGE_ATTRIBUTES;
+      if fscSubElements in ATask.GetChanges then
+        AFlags := AFlags or FILE_NOTIFY_CHANGE_FILE_NAME or FILE_NOTIFY_CHANGE_DIR_NAME;
       if not ARecursive then
       begin
-        APathFlags := APathFlags and not FILE_NOTIFY_CHANGE_DIR_NAME;
-        APathFlags := APathFlags and not FILE_NOTIFY_CHANGE_LAST_WRITE;
+        AFlags := AFlags and not FILE_NOTIFY_CHANGE_DIR_NAME;
+        AFlags := AFlags and not FILE_NOTIFY_CHANGE_LAST_WRITE;
       end;
 
-      AHandle := FindFirstChangeNotification(PChar(ATask.GetPaths[APathIndex]), ARecursive, APathFlags);
+      AHandle := FindFirstChangeNotification(PChar(ATask.GetPaths[APathIndex]), ARecursive, AFlags);
       if AHandle <> INVALID_HANDLE_VALUE then
       begin
         AActiveTasks.Add(ATask);

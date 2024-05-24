@@ -3276,7 +3276,8 @@ end;
 
 { TACLTreeListHintController }
 
-function TACLTreeListHintController.CanShowHint(AHintOwner: TObject; const AHintData: TACLHintData): Boolean;
+function TACLTreeListHintController.CanShowHint(
+  AHintOwner: TObject; const AHintData: TACLHintData): Boolean;
 begin
   Result := inherited CanShowHint(AHintOwner, AHintData);
   if Result then
@@ -3288,10 +3289,11 @@ end;
 
 { TACLTreeListSortByList }
 
-procedure TACLTreeListSortByList.Notify(const Item: TACLTreeListColumn; Action: TCollectionNotification);
+procedure TACLTreeListSortByList.Notify(
+  const Item: TACLTreeListColumn; Action: TCollectionNotification);
 begin
   if Action = cnRemoved then
-    TACLTreeListColumnAccess(Item).FSortDirection := sdAscending;
+    TACLTreeListColumnAccess(Item).FSortDirection := sdDefault;
 end;
 
 { TACLTreeListSorter }
@@ -3839,7 +3841,8 @@ begin
   OnCompare := nil;
 end;
 
-procedure TACLTreeListSubClass.SortBy(AColumn: TACLTreeListColumn; ADirection: TACLSortDirection; AResetPrevSortingParams: Boolean);
+procedure TACLTreeListSubClass.SortBy(AColumn: TACLTreeListColumn;
+  ADirection: TACLSortDirection; AResetPrevSortingParams: Boolean);
 var
   ASortByList: TACLTreeListColumnList;
 begin

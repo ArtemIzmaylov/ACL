@@ -1204,6 +1204,7 @@ begin
     AStream.Seek(-SizeOf(Integer), soCurrent);
 
     AReaderSettings := TACLXMLReaderSettings.Default;
+    AReaderSettings.CheckCharacters := False;
     AReaderSettings.DefaultEncoding := AEncoding;
     AReaderSettings.IgnoreComments := True;
     AReaderSettings.IgnoreWhitespace := True;

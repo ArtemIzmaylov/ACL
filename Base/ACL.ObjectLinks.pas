@@ -139,6 +139,7 @@ class procedure TACLObjectLinks.Release(AObject: TObject);
 var
   APair: TPair<TObject, TObject>;
 begin
+  if FLinks = nil then Exit;
   FLock.Enter;
   try
     APair := FLinks.ExtractPair(AObject);

@@ -175,7 +175,7 @@ type
     constructor Create(Collection: TCollection); override;
     procedure ApplyBestFit;
     procedure Assign(Source: TPersistent); override;
-    //
+    //# Properties
     property Columns: TACLTreeListColumns read GetColumns;
     property GroupByIndex: Integer read GetGroupByIndex;
     property NextSibling: TACLTreeListColumn read GetNextSibling;
@@ -570,7 +570,7 @@ type
 
   TACLTreeListColumnInfo = packed record
     Position: Byte;
-    SortDirection: Byte;
+    SortDirection: ShortInt;
     SortByIndex: SmallInt;
     Visible: Boolean;
     Width: Word;
@@ -990,8 +990,8 @@ begin
   begin
     AColumn := Items[I];
     AInfo.Position := AColumn.DrawIndex;
-    AInfo.SortDirection := Ord(AColumn.FSortDirection) - 1;
     AInfo.SortByIndex := AColumn.SortByIndex;
+    AInfo.SortDirection := IfThen(AInfo.SortByIndex >= 0, Ord(AColumn.FSortDirection)) - 1;
     AInfo.Visible := AColumn.Visible;
     AInfo.Width := AColumn.Width;
     AStream.WriteBuffer(AInfo, SizeOf(AInfo));

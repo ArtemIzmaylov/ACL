@@ -16,6 +16,10 @@ unit ACL.Classes.ByteBuffer;
 interface
 
 uses
+{$IFDEF MSWINDOWS}
+  Windows, // inlining
+{$ENDIF}
+  // System
   {System.}Classes,
   {System.}SysUtils,
   // ACL
@@ -567,3 +571,4 @@ begin
 end;
 
 end.
+

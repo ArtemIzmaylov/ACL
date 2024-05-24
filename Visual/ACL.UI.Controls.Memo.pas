@@ -199,6 +199,7 @@ begin
   FEditor.WindowProc := EditorWndProc;
   FStyle := TACLStyleEdit.Create(Self);
   TabStop := True;
+  ResourceChanged;
 end;
 
 function TACLCustomEditContainer.CreateStyle: TACLScrollBoxStyle;
@@ -253,8 +254,9 @@ begin
       if DoKeyUp(TWMKey(Message)) then Exit;
     {$ENDIF}
 
-    WM_MOUSEFIRST..WM_MOUSELAST:
-      WindowProc(Message);
+// ломается WM_CONTEXTMENU, пробрасывать OnMouseXXX надо иначе
+//    WM_MOUSEFIRST..WM_MOUSELAST:
+//      Dispatch(Message);
 
     WM_NCCALCSIZE, WM_NCPAINT:
       Exit;
@@ -344,10 +346,10 @@ end;
 
 procedure TACLCustomEditContainer.ResourceChanged;
 begin
-  inherited;
   TWinControlAccess(FEditor).Font := Font;
   TWinControlAccess(FEditor).Font.Color := Style.ColorsText[Enabled];
   TWinControlAccess(FEditor).Color := Style.ColorsContent[Enabled];
+  inherited;
 end;
 
 procedure TACLCustomEditContainer.Scroll(

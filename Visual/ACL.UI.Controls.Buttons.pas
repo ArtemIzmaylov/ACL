@@ -2283,7 +2283,10 @@ begin
           if (AControl is TACLRadioBox) and (AControl <> Self) then
           begin
             if TACLRadioBox(AControl).GroupIndex = GroupIndex then
+            begin
               TACLRadioBox(AControl).SubClass.CheckState := cbUnchecked;
+              TACLRadioBox(AControl).UpdateSubControlEnabled;
+            end;
           end;
         end;
     end;
