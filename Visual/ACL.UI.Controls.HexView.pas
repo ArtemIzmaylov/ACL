@@ -966,7 +966,7 @@ begin
       ATextViewInfo := FCharacterSet.View[AData^];
       ACanvas.Font.Color := ATextColor1;
       ARender.SetFont(ACanvas.Font);
-      ARender.TextOut(ATextViewInfo, X + (ASize.cx - ATextViewInfo.TextWidth) div 2, Y);
+      ARender.DrawText(ATextViewInfo, X + (ASize.cx - ATextViewInfo.TextWidth) div 2, Y);
       acExchangeIntegers(ATextColor1, ATextColor2);
       Inc(X, ASize.cx + IndentBetweenCharacters);
       Dec(ADataSize);

@@ -737,14 +737,14 @@ begin
       for I := -FShadowSize to FShadowSize do
       for J := -FShadowSize to FShadowSize do
         if I <> J then
-          Render.TextOut(ABlock,
+          Render.DrawText(ABlock,
             ABlock.Position.X + I - FBufferOrigin.X,
             ABlock.Position.Y + J - FBufferOrigin.Y);
     end
     else
       for I := 1 to FShadowSize do
       begin
-        Render.TextOut(ABlock,
+        Render.DrawText(ABlock,
           ABlock.Position.X + I * FShadowDirection.X - FBufferOrigin.X,
           ABlock.Position.Y + I * FShadowDirection.Y - FBufferOrigin.Y);
       end;

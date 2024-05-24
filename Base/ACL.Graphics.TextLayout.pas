@@ -242,12 +242,13 @@ type
 
   TACLTextLayoutRender = class
   public
+    procedure DrawText(ABlock: TACLTextLayoutBlockText; X, Y: Integer); virtual; abstract;
+    procedure DrawUnderline(const R: TRect); virtual; abstract;
     procedure GetMetrics(out ABaseline, ALineHeight, ASpaceWidth: Integer); virtual; abstract;
     procedure Measure(ABlock: TACLTextLayoutBlockText); virtual; abstract;
     procedure SetFill(AValue: TColor); virtual; abstract;
     procedure SetFont(AFont: TFont); virtual; abstract;
     procedure Shrink(ABlock: TACLTextLayoutBlockText; AMaxSize: Integer); virtual; abstract;
-    procedure TextOut(ABlock: TACLTextLayoutBlockText; X, Y: Integer); virtual; abstract;
   end;
 
   { TACLTextLayoutValueStack<T> }
@@ -356,6 +357,7 @@ type
     function OnFillColor(ABlock: TACLTextLayoutBlockFillColor): Boolean; override;
     function OnFontColor(ABlock: TACLTextLayoutBlockFontColor): Boolean; override;
     function OnHyperlink(ABlock: TACLTextLayoutBlockHyperlink): Boolean; override;
+    function OnSpace(ABlock: TACLTextLayoutBlockSpace): Boolean; override;
     function OnText(AText: TACLTextLayoutBlockText): Boolean; override;
   public
     constructor Create(AOwner: TACLTextLayout; ARender: TACLTextLayoutRender); override;
@@ -372,12 +374,13 @@ type
     FCanvas: TCanvas;
   public
     constructor Create(ACanvas: TCanvas); virtual;
+    procedure DrawText(ABlock: TACLTextLayoutBlockText; X, Y: Integer); override;
+    procedure DrawUnderline(const R: TRect); override;
     procedure GetMetrics(out ABaseline, ALineHeight, ASpaceWidth: Integer); override;
     procedure Measure(ABlock: TACLTextLayoutBlockText); override;
     procedure SetFill(AValue: TColor); override;
     procedure SetFont(AFont: TFont); override;
     procedure Shrink(ABlock: TACLTextLayoutBlockText; AMaxSize: Integer); override;
-    procedure TextOut(ABlock: TACLTextLayoutBlockText; X, Y: Integer); override;
     property Canvas: TCanvas read FCanvas;
   end;
 
@@ -1889,10 +1892,17 @@ begin
   Result := True;
 end;
 
+function TACLTextLayoutPainter.OnSpace(ABlock: TACLTextLayoutBlockSpace): Boolean;
+begin
+  if (ABlock.FWidth > 0) and (fsUnderline in Font.Style) then
+    Render.DrawUnderline(ABlock.Bounds);
+  Result := True;
+end;
+
 function TACLTextLayoutPainter.OnText(AText: TACLTextLayoutBlockText): Boolean;
 begin
   if AText.TextLengthVisible > 0 then
-    Render.TextOut(AText, AText.FPosition.X, AText.FPosition.Y);
+    Render.DrawText(AText, AText.FPosition.X, AText.FPosition.Y);
   Result := True;
 end;
 
@@ -2616,6 +2626,16 @@ begin
   end;
 end;
 
+procedure TACLTextLayoutCanvasRender.DrawUnderline(const R: TRect);
+var
+  LRect: TRect;
+  LSize: Integer;
+begin
+  LRect := R;
+  LSize := R.Width;
+  ExtTextOut(FCanvas.Handle, LRect.Left, LRect.Top, ETO_CLIPPED, @LRect, ' ', 1, @LSize);
+end;
+
 procedure TACLTextLayoutCanvasRender.GetMetrics(out ABaseline, ALineHeight, ASpaceWidth: Integer);
 var
   LMetric: TTextMetric;
@@ -2662,10 +2682,11 @@ begin
 {$ENDIF}
 end;
 
-procedure TACLTextLayoutCanvasRender.TextOut(ABlock: TACLTextLayoutBlockText; X, Y: Integer);
+procedure TACLTextLayoutCanvasRender.DrawText(ABlock: TACLTextLayoutBlockText; X, Y: Integer);
 begin
   ExtTextOut(FCanvas.Handle, X, Y, 0, nil,
-    ABlock.Text, ABlock.TextLengthVisible, @PIntegerArray(ABlock.FMetrics)^[1]);
+    ABlock.Text, ABlock.TextLengthVisible,
+    @PIntegerArray(ABlock.FMetrics)^[1]);
 end;
 
 {$ENDREGION}

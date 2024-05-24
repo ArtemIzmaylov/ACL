@@ -1094,7 +1094,7 @@ var
 begin
   if (S <> '') and acRectVisible(ACanvas, R) then
   begin
-    LMultiLine := acPos(#13, S) > 0;
+    LMultiLine := acContains(#13, S);
     if AWordWrap or LMultiLine then
     begin
       LTextRect := R;

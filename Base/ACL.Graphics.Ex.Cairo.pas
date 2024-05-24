@@ -258,12 +258,13 @@ type
   public
     constructor Create(ACanvas: TCanvas); override;
     destructor Destroy; override;
+    procedure DrawText(ABlock: TACLTextLayoutBlockText; X, Y: Integer); override;
+    procedure DrawUnderline(const R: TRect); override;
     procedure GetMetrics(out ABaseline, ALineHeight, ASpaceWidth: Integer); override;
     procedure Measure(ABlock: TACLTextLayoutBlockText); override;
     procedure SetFill(AValue: TColor); override;
     procedure SetFont(AFont: TFont); override;
     procedure Shrink(ABlock: TACLTextLayoutBlockText; AMaxSize: Integer); override;
-    procedure TextOut(ABlock: TACLTextLayoutBlockText; X, Y: Integer); override;
   end;
 
 {$ENDREGION}
@@ -1136,6 +1137,40 @@ begin
   inherited Destroy;
 end;
 
+procedure TACLTextLayoutCairoRender.DrawUnderline(const R: TRect);
+begin
+  if FFontHasLines then
+    CairoDrawTextStyleLines(FHandle, Canvas.Font.Style, R.Left, R.Top, R.Width, FFontMetrics);
+end;
+
+procedure TACLTextLayoutCairoRender.DrawText(ABlock: TACLTextLayoutBlockText; X, Y: Integer);
+var
+  LBlock: TTextBlock absolute ABlock;
+  LMetrics: PCairoTextLayoutMetrics;
+begin
+  LMetrics := PCairoTextLayoutMetrics(LBlock.FMetrics);
+  if (LMetrics <> nil) and (LMetrics^.Count > 0) then
+  begin
+    Dec(X, FOrigin.X);
+    Dec(Y, FOrigin.Y);
+
+    if FFillColorAssigned then
+    begin
+      cairo_set_source_color(FHandle, FFillColor);
+      cairo_rectangle(FHandle, X, Y, LBlock.TextWidth, LBlock.TextHeight);
+      cairo_fill(FHandle);
+      cairo_set_source_color(FHandle, FFontColor);
+    end;
+
+    OffsetGlyphs(@LMetrics^.Glyphs[0], LMetrics^.Count,  X,  Y + FFontMetrics.baseline);
+    cairo_show_glyphs(FHandle, @LMetrics^.Glyphs[0], LMetrics^.Count);
+    OffsetGlyphs(@LMetrics^.Glyphs[0], LMetrics^.Count, -X, -Y - FFontMetrics.baseline);
+
+    if FFontHasLines then
+      CairoDrawTextStyleLines(FHandle, Canvas.Font.Style, X, Y, ABlock.TextWidth, FFontMetrics);
+  end;
+end;
+
 procedure TACLTextLayoutCairoRender.GetMetrics(
   out ABaseline, ALineHeight, ASpaceWidth: Integer);
 var
@@ -1208,34 +1243,6 @@ begin
   end;
   LBlock.FWidth := Round(LWidth);
   LBlock.FLengthVisible := UTF8CodepointToByteIndex(LBlock.Text, LBlock.TextLength, LMetrics^.Count);
-end;
-
-procedure TACLTextLayoutCairoRender.TextOut(ABlock: TACLTextLayoutBlockText; X, Y: Integer);
-var
-  LBlock: TTextBlock absolute ABlock;
-  LMetrics: PCairoTextLayoutMetrics;
-begin
-  LMetrics := PCairoTextLayoutMetrics(LBlock.FMetrics);
-  if (LMetrics <> nil) and (LMetrics^.Count > 0) then
-  begin
-    Dec(X, FOrigin.X);
-    Dec(Y, FOrigin.Y);
-
-    if FFillColorAssigned then
-    begin
-      cairo_set_source_color(FHandle, FFillColor);
-      cairo_rectangle(FHandle, X, Y, LBlock.TextWidth, LBlock.TextHeight);
-      cairo_fill(FHandle);
-      cairo_set_source_color(FHandle, FFontColor);
-    end;
-
-    OffsetGlyphs(@LMetrics^.Glyphs[0], LMetrics^.Count,  X,  Y + FFontMetrics.baseline);
-    cairo_show_glyphs(FHandle, @LMetrics^.Glyphs[0], LMetrics^.Count);
-    OffsetGlyphs(@LMetrics^.Glyphs[0], LMetrics^.Count, -X, -Y - FFontMetrics.baseline);
-
-    if FFontHasLines then
-      CairoDrawTextStyleLines(FHandle, Canvas.Font.Style, X, Y, ABlock.TextWidth, FFontMetrics);
-  end;
 end;
 {$ENDREGION}
 
