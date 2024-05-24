@@ -13,14 +13,10 @@ unit ACL.Math.Complex;
 
 {$I ACL.Config.inc} // FPC:OK
 
-// [!] Warning:
-// Don't mix usage of TFastFourierTransform and TFastFourierTransformUniversal
-// functions for same data (TFastFourierTransformUniversal doesn't reorder data)
-
 interface
 
 const
-  PowerOfTwoMax = 15; // supported by FFT Engine
+  MaxPowerOfTwo = 15; // supported by FFT Engine
 
 type
   TComplexArgument = type Single;
@@ -28,26 +24,32 @@ type
   { TComplex }
 
   PComplexArray = ^TComplexArray;
-
   PComplex = ^TComplex;
   TComplex = record
     Re, Im: TComplexArgument;
-
     class function AllocArray(const ACount: Integer): PComplexArray; static;
+    //# Operators
+    class operator Add(const C1, C2: TComplex): TComplex; static; inline;
+    class operator Equal(const C1, C2: TComplex): Boolean; static; inline;
+    class operator NotEqual(const C1, C2: TComplex): Boolean; static; inline;
+    class operator Multiply(const C1, C2: TComplex): TComplex; static; inline;
+    class operator Multiply(const C1: TComplex; const S: TComplexArgument): TComplex; static; inline;
+    class operator Subtract(const C1, C2: TComplex): TComplex; static; inline;
+    //# Self-functions
     function Module: TComplexArgument; inline;
+    procedure Scale(S: TComplexArgument); inline;
   end;
-
-  TComplexArray = array[0..0] of TComplex;
+  TComplexArray = array[0..MaxInt div SizeOf(TComplex) - 1] of TComplex;
 
   TFFTSize = (fs4, fs8, fs16, fs32, fs64, fs128, fs256, fs512, fs1024, fs2048, fs4096, fs8192, fs16384);
 
   PFFTTablesMap = ^TFFTTablesMap;
-  TFFTTablesMap = array[0..PowerOfTwoMax] of PComplex;
+  TFFTTablesMap = array[0..MaxPowerOfTwo] of PComplex;
 
   { TFastFourierTransform }
 
-  TFastFourierTransform = class(TObject)
-  private
+  TFastFourierTransform = class
+  strict private
     FBuffer: PComplexArray;
     FBufferLength: Integer;
     FCount: Integer;
@@ -58,7 +60,7 @@ type
   protected
     procedure Initialize(APowerOfTwo, ABufferLength: Integer); virtual;
     procedure TransformStep(AData: PComplexArray; AInverse: Boolean);
-    //
+    //# Properties
     property Count: Integer read FCount;
     property PowerOfTwo: Integer read FPowerOfTwo;
   public
@@ -66,28 +68,9 @@ type
     destructor Destroy; override;
     procedure Flush;
     procedure Transform(AInverse: Boolean); virtual;
-    //
+    //# Properties
     property Buffer: PComplexArray read FBuffer;
     property BufferLength: Integer read FBufferLength;
-  end;
-
-  { TFastFourierTransformUniversal }
-
-  TFastFourierTransformUniversal = class(TFastFourierTransform)
-  private
-    FK: array [Boolean] of TComplexArgument;
-    FOperatorV: array [Boolean] of PComplexArray;
-    FOperatorW: array [Boolean] of PComplexArray;
-    FTempBuffer: PComplexArray;
-    FTempBufferOffset: Integer;
-    function CalculateV(AInverse: Boolean): PComplexArray;
-    function CalculateW(AInverse: Boolean): PComplexArray;
-  protected
-    procedure Initialize(APowerOfTwo: Integer; ABufferLength: Integer); override;
-  public
-    constructor Create(ASize: Cardinal); virtual;
-    destructor Destroy; override;
-    procedure Transform(AInverse: Boolean); override;
   end;
 
 const
@@ -101,42 +84,51 @@ const
 implementation
 
 uses
+  Math,
   SysUtils,
   // ACL
   ACL.FastCode,
   ACL.Utils.Common;
 
 const
-  TwoPower: array[0..PowerOfTwoMax] of Integer = (
+  TwoPower: array[0..MaxPowerOfTwo] of Integer = (
     1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768
   );
 
 type
-  TFFTReorderDataMap = array[0..PowerOfTwoMax] of PIntegerArray;
+  TFFTReorderDataMap = array[0..MaxPowerOfTwo] of PIntegerArray;
 
   { TFastFourierTransformHelper }
 
-  TFastFourierTransformHelper = class(TObject)
-  private
-    FReorderDataMap: TFFTReorderDataMap;
-    FRotateOperatorMapForward: TFFTTablesMap;
-    FRotateOperatorMapInverse: TFFTTablesMap;
-    function CalculateReorderMap(APower: Integer): PIntegerArray;
-    function CalculateRotateOperator(APower: Integer; AForward: Boolean): PComplex;
+  TFastFourierTransformHelper = class
+  strict private
+    class var FReorderDataMap: TFFTReorderDataMap;
+    class var FRotateOperatorMapForward: TFFTTablesMap;
+    class var FRotateOperatorMapInverse: TFFTTablesMap;
+    class function CalculateReorderMap(APower: Integer): PIntegerArray;
+    class function CalculateRotateOperator(APower: Integer; AForward: Boolean): PComplex;
   public
-    destructor Destroy; override;
-    function GetReorderMap(APower: Integer): PIntegerArray;
-    function GetRotateOperator(APower: Integer; AInverse: Boolean): PFFTTablesMap;
+    class destructor Destroy;
+    class function GetReorderMap(APower: Integer): PIntegerArray;
+    class function GetRotateOperator(APower: Integer; AInverse: Boolean): PFFTTablesMap;
   end;
 
-var
-  FFastFourierTransformHelper: TFastFourierTransformHelper;
-
 { TComplex }
+
+class operator TComplex.Add(const C1, C2: TComplex): TComplex;
+begin
+  Result.Re := C1.Re + C2.Re;
+  Result.Im := C1.Im + C2.Im;
+end;
 
 class function TComplex.AllocArray(const ACount: Integer): PComplexArray;
 begin
   Result := AllocMem(ACount * SizeOf(TComplex))
+end;
+
+class operator TComplex.Equal(const C1, C2: TComplex): Boolean;
+begin
+  Result := SameValue(C1.Re, C2.Re) and SameValue(C1.Im, C2.Im);
 end;
 
 function TComplex.Module: TComplexArgument;
@@ -144,9 +136,38 @@ begin
   Result := Sqrt(Sqr(Re) + Sqr(Im));
 end;
 
+class operator TComplex.Multiply(const C1: TComplex; const S: TComplexArgument): TComplex;
+begin
+  Result.Re := C1.Re * S;
+  Result.Im := C1.Im * S;
+end;
+
+class operator TComplex.Multiply(const C1, C2: TComplex): TComplex;
+begin
+  Result.Re := C1.Re * C2.Re - C1.Im * C2.Im;
+  Result.Im := C1.Re * C2.Im + C1.Im * C2.Re;
+end;
+
+class operator TComplex.NotEqual(const C1, C2: TComplex): Boolean;
+begin
+  Result := not (C1 = C2);
+end;
+
+procedure TComplex.Scale(S: TComplexArgument);
+begin
+  Re := Re * S;
+  Im := Im * S;
+end;
+
+class operator TComplex.Subtract(const C1, C2: TComplex): TComplex;
+begin
+  Result.Re := C1.Re - C2.Re;
+  Result.Im := C1.Im - C2.Im;
+end;
+
 { TFastFourierTransformHelper }
 
-destructor TFastFourierTransformHelper.Destroy;
+class destructor TFastFourierTransformHelper.Destroy;
 var
   I: Integer;
 begin
@@ -156,10 +177,9 @@ begin
     FreeMemAndNil(Pointer(FRotateOperatorMapInverse[I]));
   for I := 0 to Length(FReorderDataMap) - 1 do
     FreeMemAndNil(Pointer(FReorderDataMap[I]));
-  inherited Destroy;
 end;
 
-function TFastFourierTransformHelper.CalculateReorderMap(APower: Integer): PIntegerArray;
+class function TFastFourierTransformHelper.CalculateReorderMap(APower: Integer): PIntegerArray;
 var
   ACount: Integer;
   AHalf: Integer;
@@ -183,7 +203,7 @@ begin
   end;
 end;
 
-function TFastFourierTransformHelper.CalculateRotateOperator(APower: Integer; AForward: Boolean): PComplex;
+class function TFastFourierTransformHelper.CalculateRotateOperator(APower: Integer; AForward: Boolean): PComplex;
 var
   AScan: PComplex;
   CS, SN: Double;
@@ -208,7 +228,7 @@ begin
   end;
 end;
 
-function TFastFourierTransformHelper.GetRotateOperator(APower: Integer; AInverse: Boolean): PFFTTablesMap;
+class function TFastFourierTransformHelper.GetRotateOperator(APower: Integer; AInverse: Boolean): PFFTTablesMap;
 var
   I: Integer;
 begin
@@ -227,7 +247,7 @@ begin
     end;
 end;
 
-function TFastFourierTransformHelper.GetReorderMap(APower: Integer): PIntegerArray;
+class function TFastFourierTransformHelper.GetReorderMap(APower: Integer): PIntegerArray;
 begin
   if FReorderDataMap[APower] = nil then
     FReorderDataMap[APower] := CalculateReorderMap(APower);
@@ -259,7 +279,6 @@ var
   K: TComplexArgument;
 begin
   TransformStep(Buffer, AInverse);
-
   if AInverse then
   begin
     C := @Buffer^[0];
@@ -275,7 +294,7 @@ end;
 
 procedure TFastFourierTransform.Initialize(APowerOfTwo, ABufferLength: Integer);
 begin
-  if APowerOfTwo > PowerOfTwoMax then
+  if APowerOfTwo > MaxPowerOfTwo then
     raise Exception.Create('Buffer length too long');
 
   FPowerOfTwo := APowerOfTwo;
@@ -283,11 +302,9 @@ begin
   FBuffer := TComplex.AllocArray(BufferLength);
   FCount := TwoPower[PowerOfTwo];
 
-  if FFastFourierTransformHelper = nil then
-    FFastFourierTransformHelper := TFastFourierTransformHelper.Create;
-  FRotateMap := FFastFourierTransformHelper.GetReorderMap(PowerOfTwo);
-  FRotateOperator := FFastFourierTransformHelper.GetRotateOperator(PowerOfTwo, False);
-  FRotateOperatorInv := FFastFourierTransformHelper.GetRotateOperator(PowerOfTwo, True);
+  FRotateMap := TFastFourierTransformHelper.GetReorderMap(PowerOfTwo);
+  FRotateOperator := TFastFourierTransformHelper.GetRotateOperator(PowerOfTwo, False);
+  FRotateOperatorInv := TFastFourierTransformHelper.GetRotateOperator(PowerOfTwo, True);
 end;
 
 procedure TFastFourierTransform.TransformStep(AData: PComplexArray; AInverse: Boolean);
@@ -341,148 +358,4 @@ begin
   end;
 end;
 
-{ TFastFourierTransformUniversal }
-
-constructor TFastFourierTransformUniversal.Create(ASize: Cardinal);
-var
-  N1, N2, APowerOfTwo: Integer;
-begin
-  N1 := 1;
-  N2 := ASize shl 1;
-  APowerOfTwo := 0;
-  while N1 < N2 do
-  begin
-    Inc(N1, N1);
-    Inc(APowerOfTwo);
-  end;
-  Initialize(APowerOfTwo, ASize);
-end;
-
-destructor TFastFourierTransformUniversal.Destroy;
-var
-  B: Boolean;
-begin
-  for B := Low(B) to High(B) do
-  begin
-    FreeMemAndNil(Pointer(FOperatorV[B]));
-    FreeMemAndNil(Pointer(FOperatorW[B]));
-  end;
-  inherited Destroy;
-end;
-
-procedure TFastFourierTransformUniversal.Initialize(APowerOfTwo, ABufferLength: Integer);
-var
-  B: Boolean;
-begin
-  inherited Initialize(APowerOfTwo, ABufferLength);
-
-  for B := Low(B) to High(B) do
-  begin
-    FOperatorV[B] := CalculateV(B);
-    FOperatorW[B] := CalculateW(B);
-  end;
-
-  FK[False] := 1 / Count;
-  FK[True]  := FK[False] / BufferLength;
-
-  FTempBuffer := TComplex.AllocArray(Count);
-  FTempBufferOffset := 2 * (BufferLength - 1);
-end;
-
-procedure TFastFourierTransformUniversal.Transform(AInverse: Boolean);
-var
-  B, T, O: PComplex;
-  I: Integer;
-  K: TComplexArgument;
-begin
-  // Input data
-  B := @Buffer^[0];
-  O := @FOperatorV[AInverse]^[0];
-  T := @FTempBuffer^[0];
-  for I := 0 to BufferLength - 1 do
-  begin
-    T^.Re := B^.Re * O^.Re - B^.Im * O^.Im;
-    T^.Im := B^.Re * O^.Im + B^.Im * O^.Re;
-    Inc(B);
-    Inc(O);
-    Inc(T);
-  end;
-  FastZeroMem(T, (Count - BufferLength) * SizeOf(TComplex));
-
-  // Transform
-  TransformStep(FTempBuffer, False);
-
-  O := @FOperatorW[AInverse]^[0];
-  T := @FTempBuffer^[0];
-  for I := 0 to Count - 1 do
-  begin
-    K := T^.Re * O^.Re - T^.Im * O^.Im;
-    T^.Im := T^.Re * O^.Im + T^.Im * O^.Re;
-    T^.Re := K;
-    Inc(T);
-    Inc(O);
-  end;
-
-  TransformStep(FTempBuffer, True);
-
-  // Output Data
-  K := FK[AInverse];
-  B := @FBuffer^[0];
-  O := @FOperatorV[AInverse]^[0];
-  T := @FTempBuffer^[FTempBufferOffset];
-  for I := 0 to BufferLength - 1 do
-  begin
-    B^.Re := K * (T^.Re * O^.Re - T^.Im * O^.Im);
-    B^.Im := K * (T^.Re * O^.Im + T^.Im * O^.Re);
-    Dec(T);
-    Inc(O);
-    Inc(B);
-  end;
-end;
-
-function TFastFourierTransformUniversal.CalculateV(AInverse: Boolean): PComplexArray;
-var
-  AArg, PiN: TComplexArgument;
-  I: Integer;
-begin
-  PiN := Pi / BufferLength;
-  if AInverse then
-    PiN := -PiN;
-
-  Result := TComplex.AllocArray(BufferLength);
-  for I := 0 to BufferLength - 1 do
-  begin
-    AArg := PiN * I * I;
-    Result[I].Re := Cos(AArg);
-    Result[I].Im := Sin(AArg);
-  end;
-end;
-
-function TFastFourierTransformUniversal.CalculateW(AInverse: Boolean): PComplexArray;
-var
-  AArg, PiN: TComplexArgument;
-  I, N22: Integer;
-begin
-  PiN := Pi / BufferLength;
-  if AInverse then
-    PiN := -PiN;
-
-  Result := TComplex.AllocArray(Count);
-  N22 := 2 * (BufferLength - 1);
-  for I := 0 to Count - 1 do
-  begin
-    AArg := -PiN * N22 * N22;
-    Result[I].Re := Cos(AArg);
-    Result[I].Im := Sin(AArg);
-    Dec(N22);
-  end;
-
-  TransformStep(Result, False);
-end;
-
-initialization
-
-finalization
-  FreeAndNil(FFastFourierTransformHelper);
 end.
-
