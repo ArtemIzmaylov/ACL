@@ -120,10 +120,10 @@ type
 
   TACLWebParams = class(TACLStringList)
   public
-    function Add(const AName, AValue: string): TACLWebParams; reintroduce; overload;
     function Add(const AName: string; const AValue: Integer): TACLWebParams; reintroduce; overload;
-    function Add(const AName: string; const AValue: TBytes): TACLWebParams; reintroduce; overload;
+    function Add(const AName: string; const AValue: string): TACLWebParams; reintroduce; overload;
     function AddIfNonEmpty(const AName, AValue: string): TACLWebParams; reintroduce;
+    function AddPlain(const AName: string; const AValue: string): TACLWebParams; reintroduce; overload;
     class function New: TACLWebParams;
     function ToString: string; override;
   end;
@@ -136,13 +136,12 @@ type
     class var FConnectionTimeOut: Integer;
     class var FProxyInfo: TACLWebProxyInfo;
     class var FUserAgent: string;
-
     class procedure SetConnectionTimeOut(AValue: Integer); static;
   public
     class constructor Create;
     class procedure ConfigLoad(AConfig: TACLIniFile);
     class procedure ConfigSave(AConfig: TACLIniFile);
-    //
+    //# Properties
     class property ConnectionMode: TACLWebConnectionMode read FConnectionMode write FConnectionMode;
     class property ConnectionTimeOut: Integer read FConnectionTimeOut write SetConnectionTimeOut;
     class property Proxy: TACLWebProxyInfo read FProxyInfo write FProxyInfo;
@@ -154,7 +153,7 @@ type
 function acDecodeDateTime(const Value: string; AFormat: TACLDateTimeFormat): TDateTime;
 
 function acURLDecode(const S: string): string;
-function acURLEncode(const B: TArray<Byte>): string;
+function acURLEncode(const S: string): string;
 function acURLEscape(const S: string): string;
 implementation
 
@@ -170,21 +169,6 @@ uses
 const
   PROXY_SETTINGS_ID = $00505258; // PRX
   sWebConfigSection = 'Connection';
-
-function acURLEscape(const S: string): string;
-const
-  ReservedChars: array[0..23] of Char = (
-    '%', ' ', '<', '>', '#', '{', '}', '|', '\', '^', '~', #13,
-    '[', ']', '`', ';', '/', '?', ':', '@', '=', '&', '$', #10
-  );
-var
-  I: Integer;
-begin
-  Result := S;
-  for I := 0 to Length(ReservedChars) - 1 do
-    Result := acStringReplace(Result, ReservedChars[I],
-      '%' + IntToHex(Byte(ReservedChars[I]), 2));
-end;
 
 function RFC822ToDateTime(const Value: string): TDateTime;
 //Thu, 14 Jan 2016 15:58:12 +0300
@@ -280,54 +264,94 @@ begin
   end;
 end;
 
-function acURLEncode(const B: TArray<Byte>): string;
+function acURLDecode(const S: string): string;
 var
-  I: Integer;
-  S: TACLStringBuilder;
+  LAsumeUtf8: TACLBoolean;
+  LBuffer: TACLStringBuilder;
+  LCode: Byte;
+  LLen: Integer;
+  LSrc: PChar;
 begin
-  S := TACLStringBuilder.Get(Length(B) * 3);
+  LSrc := PChar(S);
+  LLen := Length(S);
+  LAsumeUtf8 := TACLBoolean.Default;
+  LBuffer := TACLStringBuilder.Get(LLen);
   try
-    for I := Low(B) to High(B) do
-      S.Append('%').Append(IntToHex(B[I], 2));
-    Result := S.ToString;
+    while LLen > 0 do
+    begin
+      if (LSrc^ = '%') and (LLen > 2) and TACLHexcode.Decode((LSrc + 1)^, (LSrc + 2)^, LCode) then
+      begin
+        if (LCode > $7F) and (LAsumeUtf8 = TACLBoolean.Default) then
+          LAsumeUtf8 := TACLBoolean.True;
+        LBuffer.Append(AnsiChar(LCode));
+        Dec(LLen, 3);
+        Inc(LSrc, 3);
+      end
+      else
+      begin
+      {$IFDEF UNICODE}
+        if Ord(LSrc^) > $FF then
+          LAsumeUtf8 := TACLBoolean.False;
+      {$ENDIF}
+        LBuffer.Append(LSrc^);
+        Dec(LLen);
+        Inc(LSrc);
+      end;
+    end;
+  {$IFDEF UNICODE}
+    if LAsumeUtf8 = TACLBoolean.True then
+    begin
+      Result := acDecodeUtf8(acStringToBytes(@LBuffer.Chars[0], LBuffer.Length));
+      if Result <> '' then Exit;
+    end;
+  {$ENDIF}
+    Result := LBuffer.ToString;
   finally
-    S.Release;
+    LBuffer.Release;
   end;
 end;
 
-function acURLDecode(const S: string): string;
+function acURLEncode(const S: string): string;
 var
-  ABuffer: TACLStringBuilder;
-  ACharCode: Byte;
-  ALength: Integer;
-  ASrc: PChar;
+	A: AnsiString;
+  B: TACLStringBuilder;
+  C: AnsiChar;
 begin
-  ASrc := PChar(S);
-  ALength := Length(S);
-  ABuffer := TACLStringBuilder.Get(ALength);
+	A := acStringToUtf8(S);
+	B := TACLStringBuilder.Get(Length(A) * 3);
   try
-    while ALength > 0 do
+    for C in A do
     begin
-      if (ASrc^ = '%') and (ALength > 2) and TACLHexcode.Decode((ASrc + 1)^, (ASrc + 2)^, ACharCode) then
-      begin
-        Dec(ALength, 2);
-        Inc(ASrc, 2);
-      {$IFDEF MSWINDOWS}
-        if ACharCode >= $7F then
-          ABuffer.Append(acStringFromAnsiString(AnsiChar(ACharCode)))
-        else
-      {$ENDIF} // в противном случае у нас тут будет utf-8 последовательность
-          ABuffer.Append(AnsiChar(ACharCode));
-      end
+      if (Ord(C) > $20) and (Ord(C) < $7F) then
+        B.Append(C)
       else
-        ABuffer.Append(ASrc^);
-
-      Dec(ALength);
-      Inc(ASrc);
+        B.Append('%').Append(TACLHexcode.Encode(C));
     end;
-    Result := ABuffer.ToString;
+    Result := B.ToString;
   finally
-    ABuffer.Release;
+    B.Release;
+  end;
+end;
+
+function acURLEscape(const S: string): string;
+const
+  ReservedChars = '% <>#{}|\^~'#13#10'[]`;/?:@=&$';
+var
+  B: TACLStringBuilder;
+  C: Char;
+begin
+	B := TACLStringBuilder.Get(Length(S));
+  try
+    for C in S do
+    begin
+      if acContains(C, ReservedChars) then
+        B.Append('%').Append(TACLHexcode.Encode(Byte(C)))
+      else
+        B.Append(C);
+    end;
+    Result := B.ToString;
+  finally
+    B.Release;
   end;
 end;
 
@@ -439,29 +463,14 @@ end;
 
 { TACLWebParams }
 
-function TACLWebParams.Add(const AName: string; const AValue: TBytes): TACLWebParams;
-begin
-  if Self <> nil then
-    Result := Self
-  else
-    Result := TACLWebParams.New;
-
-  Result.AddEx(AName + '=' + acURLEncode(AValue));
-end;
-
 function TACLWebParams.Add(const AName, AValue: string): TACLWebParams;
 begin
-  if Self <> nil then
-    Result := Self
-  else
-    Result := TACLWebParams.New;
-
-  Result.AddEx(AName + '=' + acURLEscape(AValue));
+  Result := AddPlain(AName, acURLEncode(acURLEscape(AValue)));
 end;
 
 function TACLWebParams.Add(const AName: string; const AValue: Integer): TACLWebParams;
 begin
-  Result := Add(AName, IntToStr(AValue));
+  Result := AddPlain(AName, IntToStr(AValue));
 end;
 
 function TACLWebParams.AddIfNonEmpty(const AName, AValue: string): TACLWebParams;
@@ -470,6 +479,16 @@ begin
     Result := Add(AName, AValue)
   else
     Result := Self;
+end;
+
+function TACLWebParams.AddPlain(const AName, AValue: string): TACLWebParams;
+begin
+  if Self <> nil then
+    Result := Self
+  else
+    Result := TACLWebParams.New;
+
+  Result.AddPair(AName, AValue);
 end;
 
 class function TACLWebParams.New: TACLWebParams;

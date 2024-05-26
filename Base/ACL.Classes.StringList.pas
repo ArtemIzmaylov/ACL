@@ -109,6 +109,8 @@ type
     // Inserting
     function Add(const S: string; AObject: NativeInt): Integer; overload;
     function Add(const S: string; AObject: TObject = nil; AInterface: IUnknown = nil): Integer; overload;
+    function AddPair(const Name, Value: string;
+      AObject: TObject = nil; AInterface: IUnknown = nil): Integer;
     procedure AddEx(const S: string);
     procedure Append(const ASource: TACLStringList); overload;
     procedure Append(const ASource: string); overload;
@@ -379,15 +381,21 @@ begin
   AStream.WriteString(Text, AEncoding);
 end;
 
+function TACLStringList.Add(const S: string; AObject: NativeInt): Integer;
+begin
+  Result := Add(S, TObject(AObject));
+end;
+
 function TACLStringList.Add(const S: string; AObject: TObject; AInterface: IUnknown): Integer;
 begin
   Result := Count;
   Insert(Count, S, AObject, AInterface);
 end;
 
-function TACLStringList.Add(const S: string; AObject: NativeInt): Integer;
+function TACLStringList.AddPair(const Name, Value: string;
+  AObject: TObject = nil; AInterface: IUnknown = nil): Integer;
 begin
-  Result := Add(S, TObject(AObject));
+  Result := Add(Name + Delimiter + Value, AObject, AInterface);
 end;
 
 procedure TACLStringList.AddEx(const S: string);
