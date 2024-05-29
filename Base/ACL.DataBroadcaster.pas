@@ -4,22 +4,31 @@
 {*   Data Exchanging Between Applications    *}
 {*                                           *}
 {*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
+{*                 2006-2024                 *}
 {*                www.aimp.ru                *}
 {*                                           *}
 {*********************************************}
 
 unit ACL.DataBroadcaster;
 
-{$I ACL.Config.inc}
+{$I ACL.Config.inc} // FPC:NotImplemented
+
+// FPC: для передачи данных между приложениями WM_COPYDATA
+// уже не прокатит, нужно нативное решение
 
 interface
 
 uses
-  Winapi.Windows,
-  Winapi.Messages,
-  System.Classes,
-  System.Generics.Collections,
+{$IFDEF MSWINDOWS}
+  Windows,
+{$ELSE}
+  LCLIntf,
+  LCLType,
+{$ENDIF}
+  Messages,
+  // System
+  {System.}Classes,
+  {System.}Generics.Collections,
   // ACL
   ACL.Classes.Collections,
   ACL.Threading,
@@ -30,11 +39,15 @@ uses
   ACL.Utils.Stream;
 
 type
+{$IFDEF FPC}
+  PCopyDataStruct = Pointer; // stub
+{$ENDIF}
+
   { IACLDataBroadcasterClient }
 
   IACLDataBroadcasterClient = interface
   ['{C6098A78-4334-4911-89A4-236CBAA601F5}']
-    procedure Receive(ID: Cardinal; const AData: UnicodeString);
+    procedure Receive(ID: Cardinal; const AData: string);
   end;
 
   { TACLDataBroadcaster }
@@ -48,30 +61,30 @@ type
 
     procedure CreateHandle;
   protected
-    procedure Receive(ID: Cardinal; const AData: UnicodeString);
+    procedure Receive(ID: Cardinal; const AData: string);
     procedure WndProc(var AMessage: TMessage);
   public
     constructor Create;
     destructor Destroy; override;
-    function RegisterID(const AName: UnicodeString): Cardinal;
+    function RegisterID(const AName: string): Cardinal;
     // Send
-    procedure Send(ID: Cardinal; const AData: UnicodeString = '');
-    procedure SendLocal(ID: Cardinal; const AData: UnicodeString = '');
+    procedure Send(ID: Cardinal; const AData: string = '');
+    procedure SendLocal(ID: Cardinal; const AData: string = '');
     // Listeners
     procedure ListenerRegister(const AListener: IACLDataBroadcasterClient);
     procedure ListenerUnregister(const AListener: IACLDataBroadcasterClient);
   end;
 
 function DataBroadcaster: TACLDataBroadcaster;
-function SendDataGetData(const AMessage: TMessage): UnicodeString; overload;
-function SendDataGetData(const AStruct: PCopyDataStruct): UnicodeString; overload;
-function SendDataToApplication(const AApplicationFileName, AWindowClass, AData: UnicodeString): Boolean;
-function SendDataToHandle(AHandle: HWND; const AData: UnicodeString): Boolean; overload;
-function SendDataToHandle(AHandle: HWND; const AData: UnicodeString; ID: Cardinal): Boolean; overload;
+function SendDataGetData(const AMessage: TMessage): string; overload;
+function SendDataGetData(const AStruct: PCopyDataStruct): string; overload;
+function SendDataToApplication(const AApplicationFileName, AWindowClass, AData: string): Boolean;
+function SendDataToHandle(AHandle: HWND; const AData: string): Boolean; overload;
+function SendDataToHandle(AHandle: HWND; const AData: string; ID: Cardinal): Boolean; overload;
 implementation
 
 uses
-  System.SysUtils;
+  SysUtils;
 
 const
   SendDataID = 753;
@@ -86,40 +99,44 @@ begin
   Result := FDataBroadcaster;
 end;
 
-function SendDataGetTempFileName(ID: Integer): UnicodeString;
+function SendDataGetTempFileName(ID: Integer): string;
 begin
   Result := acTempPath + IntToHex(ID, 8) + '.tmp';
 end;
 
-function SendDataGetData(const AMessage: TMessage): UnicodeString;
+function SendDataGetData(const AMessage: TMessage): string;
 var
   M: PCopyDataStruct;
 begin
   Result := '';
+{$IFDEF MSWINDOWS}
   if AMessage.Msg = WM_COPYDATA then
   begin
     M := PCopyDataStruct(AMessage.LParam);
     if Assigned(M) and (M^.dwData = SendDataID) then
       Result := SendDataGetData(M);
   end;
+{$ENDIF}
 end;
 
-function SendDataGetData(const AStruct: PCopyDataStruct): UnicodeString;
+function SendDataGetData(const AStruct: PCopyDataStruct): string;
 begin
   Result := '';
   if AStruct <> nil then
   try
+  {$IFDEF MSWINDOWS}
     if (AStruct^.lpData = nil) and (AStruct^.cbData <> 0) then
       Result := acLoadString(SendDataGetTempFileName(AStruct^.cbData))
     else
       if not IsBadReadPtr(AStruct^.lpData, AStruct^.cbData) then
         Result := acMakeString(PWideChar(AStruct^.lpData), AStruct^.cbData div SizeOf(WideChar));
+  {$ENDIF}
   except
     Result := '';
   end;
 end;
 
-function SendDataToApplication(const AApplicationFileName, AWindowClass, AData: UnicodeString): Boolean;
+function SendDataToApplication(const AApplicationFileName, AWindowClass, AData: string): Boolean;
 var
   AHandle: HWND;
   AWaitCount: Integer;
@@ -143,15 +160,16 @@ begin
   Result := SendDataToHandle(AHandle, AData);
 end;
 
-function SendDataToHandle(AHandle: HWND; const AData: UnicodeString): Boolean;
+function SendDataToHandle(AHandle: HWND; const AData: string): Boolean;
 begin
   Result := SendDataToHandle(AHandle, AData, SendDataID);
 end;
 
-function SendDataToHandle(AHandle: HWND; const AData: UnicodeString; ID: Cardinal): Boolean;
+function SendDataToHandle(AHandle: HWND; const AData: string; ID: Cardinal): Boolean;
+{$IFDEF MSWINDOWS}
 var
   ACopyData: TCopyDataStruct;
-  ATempFileName: UnicodeString;
+  ATempFileName: string;
   ATempFileNameUsed: Boolean;
 begin
   Result := AHandle <> 0;
@@ -175,6 +193,10 @@ begin
     if ATempFileNameUsed then
       acDeleteFile(ATempFileName);
   end;
+{$ELSE}
+begin
+  Result := False;
+{$ENDIF}
 end;
 
 { TACLDataBroadcaster }
@@ -206,7 +228,7 @@ begin
   FListeners.Remove(AListener);
 end;
 
-procedure TACLDataBroadcaster.Receive(ID: Cardinal; const AData: UnicodeString);
+procedure TACLDataBroadcaster.Receive(ID: Cardinal; const AData: string);
 var
   I: Integer;
 begin
@@ -222,12 +244,16 @@ begin
   end;
 end;
 
-function TACLDataBroadcaster.RegisterID(const AName: UnicodeString): Cardinal;
+function TACLDataBroadcaster.RegisterID(const AName: string): Cardinal;
 begin
+{$IFDEF MSWINDOWS}
   Result := RegisterWindowMessageW(PWideChar(AName));
+{$ELSE}
+  Result := 0;
+{$ENDIF}
 end;
 
-procedure TACLDataBroadcaster.Send(ID: Cardinal; const AData: UnicodeString);
+procedure TACLDataBroadcaster.Send(ID: Cardinal; const AData: string);
 var
   AHandle: HWND;
   AIndex: Integer;
@@ -247,7 +273,7 @@ begin
   end;
 end;
 
-procedure TACLDataBroadcaster.SendLocal(ID: Cardinal; const AData: UnicodeString);
+procedure TACLDataBroadcaster.SendLocal(ID: Cardinal; const AData: string);
 begin
   if IsMainThread then
     Receive(ID, AData)
@@ -262,6 +288,7 @@ begin
   if AMessage.Msg = FHelloMessage then
     FClients.Add(AMessage.LParam)
   else
+  {$IFDEF MSWINDOWS}
     if AMessage.Msg = WM_COPYDATA then
     begin
       AStruct := PCopyDataStruct(AMessage.LParam);
@@ -269,6 +296,7 @@ begin
         Receive(AStruct^.dwData, SendDataGetData(AStruct));
     end
     else
+  {$ENDIF}
       WndDefaultProc(FHandle, AMessage);
 end;
 
@@ -277,7 +305,7 @@ var
   AClientHandle: HWND;
 begin
   FHandle := WndCreate(WndProc, ClassName);
-
+{$IFDEF MSWINDOWS}
   AClientHandle := 0;
   repeat
     AClientHandle := FindWindowExW(0, AClientHandle, PWideChar(ClassName), nil);
@@ -287,6 +315,7 @@ begin
       PostMessage(AClientHandle, FHelloMessage, 0, FHandle);
     end;
   until AClientHandle = 0;
+{$ENDIF}
 end;
 
 initialization
