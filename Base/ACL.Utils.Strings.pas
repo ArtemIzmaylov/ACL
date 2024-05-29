@@ -102,6 +102,7 @@ type
     FLock: TACLCriticalSection;
     FEmpty: Boolean;
     FIgnoreCase: Boolean;
+    FIgnoreDiacritic: Boolean;
     FMask: TStringDynArray;
     FMaskResult: array of Boolean;
     FSeparator: Char;
@@ -123,6 +124,7 @@ type
 
     property Empty: Boolean read FEmpty;
     property IgnoreCase: Boolean read FIgnoreCase write SetIgnoreCase;
+    property IgnoreDiacritic: Boolean read FIgnoreDiacritic write FIgnoreDiacritic;
     property Separator: Char read FSeparator write FSeparator;
     property Value: string read FValue write SetValue;
     property ValueIsNumeric: Boolean read GetValueIsNumeric;
@@ -507,6 +509,7 @@ procedure acSaveString(const AFileName: string; const AString: string;
 
 // Replacing
 function acRemoveChar(const S: string; ACharToRemove: Char): string;
+function acRemoveDiacritic(const S: string): string;
 function acRemoveSurrogates(const S: UnicodeString; AReplaceBy: WideChar = #0): UnicodeString;
 function acReplaceChar(const S: string; ACharToReplace, AReplaceBy: Char): string;
 function acReplaceChars(const S, ACharsToReplace: string; AReplaceBy: Char = '_'): string;
@@ -1811,6 +1814,40 @@ begin
     Result := S;
 end;
 
+function acRemoveDiacritic(const S: string): string;
+var
+  B: TACLStringBuilder;
+  C: WideChar;
+  U: UnicodeString;
+begin
+  B := TACLStringBuilder.Get(Length(S));
+  try
+    U := acUString(S);
+    for C in U do
+    begin
+      case Word(C) of
+        $C0..$C6: B.Append('A');
+        $C8..$CB: B.Append('E');
+        $CC..$CF: B.Append('I');
+        $D2..$D6: B.Append('O');
+        $D9..$DC: B.Append('U');
+        $E0..$E6: B.Append('a');
+        $E8..$EB: B.Append('e');
+        $EC..$EF: B.Append('I');
+        $F2..$F6: B.Append('o');
+        $F9..$FC: B.Append('u');
+        $0000401: B.Append('Е'); // Ё
+        $0000451: B.Append('е'); // ё
+      else
+        B.Append(C);
+      end;
+    end;
+    Result := B.ToString;
+  finally
+    B.Release;
+  end;
+end;
+
 function acRemoveSurrogates(const S: UnicodeString; AReplaceBy: WideChar = #0): UnicodeString;
 var
   ABuffer: TACLStringBuilder;
@@ -2429,6 +2466,7 @@ begin
   FLock := TACLCriticalSection.Create;
   FEmpty := True;
   FIgnoreCase := True;
+  FIgnoreDiacritic := True;
   FSeparator := ' ';
 end;
 
@@ -2512,10 +2550,11 @@ end;
 
 function TACLSearchString.PrepareString(const AValue: string): string;
 begin
+  Result := AValue;
+  if IgnoreDiacritic then
+    Result := acRemoveDiacritic(Result);
   if IgnoreCase then
-    Result := acUpperCase(AValue)
-  else
-    Result := AValue;
+    Result := acUpperCase(Result);
 end;
 
 procedure TACLSearchString.SetIgnoreCase(const AValue: Boolean);
