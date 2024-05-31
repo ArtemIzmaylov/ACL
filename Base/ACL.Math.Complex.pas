@@ -29,12 +29,12 @@ type
     Re, Im: TComplexArgument;
     class function AllocArray(const ACount: Integer): PComplexArray; static;
     //# Operators
-    class operator Add(const C1, C2: TComplex): TComplex; static; inline;
-    class operator Equal(const C1, C2: TComplex): Boolean; static; inline;
-    class operator NotEqual(const C1, C2: TComplex): Boolean; static; inline;
-    class operator Multiply(const C1, C2: TComplex): TComplex; static; inline;
-    class operator Multiply(const C1: TComplex; const S: TComplexArgument): TComplex; static; inline;
-    class operator Subtract(const C1, C2: TComplex): TComplex; static; inline;
+    class operator Add(const C1, C2: TComplex): TComplex; inline;
+    class operator Equal(const C1, C2: TComplex): Boolean; inline;
+    class operator NotEqual(const C1, C2: TComplex): Boolean; inline;
+    class operator Multiply(const C1, C2: TComplex): TComplex; inline;
+    class operator Multiply(const C1: TComplex; const S: TComplexArgument): TComplex; inline;
+    class operator Subtract(const C1, C2: TComplex): TComplex; inline;
     //# Self-functions
     function Module: TComplexArgument; inline;
     procedure Scale(S: TComplexArgument); inline;
