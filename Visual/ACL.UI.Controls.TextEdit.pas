@@ -90,7 +90,6 @@ type
     procedure DrawText(ACanvas: TCanvas; const R: TRect);
     procedure Loaded; override;
     procedure Paint; override;
-    procedure SetDefaultSize; override;
     procedure SetFocusToInnerEdit; override;
     procedure SetTextCore(const AValue: string); virtual;
 
@@ -234,12 +233,6 @@ procedure TACLCustomTextEdit.SelectAll;
 begin
   if InnerEdit <> nil then
     InnerEdit.SelectAll;
-end;
-
-procedure TACLCustomTextEdit.SetDefaultSize;
-begin
-  if not Inplace then
-    inherited SetDefaultSize;
 end;
 
 procedure TACLCustomTextEdit.SetFocusToInnerEdit;

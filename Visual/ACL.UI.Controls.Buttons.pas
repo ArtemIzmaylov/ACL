@@ -216,7 +216,6 @@ type
     procedure FocusChanged; override;
     procedure Paint; override;
     procedure ResourceChanged; override;
-    procedure SetDefaultSize; override;
     procedure SetTargetDPI(AValue: Integer); override;
     procedure UpdateCaption;
     procedure UpdateTransparency; override;
@@ -597,8 +596,6 @@ type
   strict private
     procedure CMHitTest(var Message: TWMNCHitTest); message CM_HITTEST;
   protected
-    procedure SetDefaultSize; override;
-
     // IACLInplaceControl
     function InplaceGetValue: string;
     function IACLInplaceControl.InplaceIsFocused = Focused;
@@ -951,6 +948,7 @@ begin
   DoubleBuffered := True;
   TabStop := True;
   ControlStyle := ControlStyle - [csDoubleClicks, csClickEvents];
+  FDefaultSize := TSize.Create(DefaultButtonWidth, DefaultButtonHeight);
   FSubClass := CreateSubClass;
   FSubClass.OnClick := ButtonClickHandler;
   FShowCaption := True;
@@ -1145,11 +1143,6 @@ end;
 procedure TACLCustomButton.SetAlignment(AValue: TAlignment);
 begin
   SubClass.Alignment := AValue;
-end;
-
-procedure TACLCustomButton.SetDefaultSize;
-begin
-  SetBounds(Left, Top, DefaultButtonWidth, DefaultButtonHeight);
 end;
 
 procedure TACLCustomButton.SetShowCaption(AValue: Boolean);
@@ -2231,11 +2224,6 @@ procedure TACLInplaceCheckBox.InplaceSetValue(const AValue: string);
 begin
   Checked := (AValue = BoolToStr(True, True)) or (StrToIntDef(AValue, 0) <> 0);
   Caption := InplaceGetValue;
-end;
-
-procedure TACLInplaceCheckBox.SetDefaultSize;
-begin
-  // do nothing
 end;
 
 procedure TACLInplaceCheckBox.CMHitTest(var Message: TWMNCHitTest);

@@ -174,7 +174,6 @@ type
     function CreateEditor: TWinControl; override;
     procedure EditorUpdateParamsCore; override;
     procedure DoSpinEditChanged(Sender: TObject);
-    procedure SetDefaultSize; override;
     procedure UpdateDisplayValue; virtual;
     // Inplace
     function InplaceGetValue: string;
@@ -528,6 +527,7 @@ end;
 constructor TACLSpinEdit.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  FDefaultSize := TSize.Create(100, 20);
   FOptionsValue := TACLSpinEditOptionsValue.Create(Self);
   FValue := 0;
 end;
@@ -682,11 +682,6 @@ begin
   Result := Format(OptionsValue.DisplayFormat, [AValue]);
   if Assigned(OnGetDisplayText) then
     OnGetDisplayText(Self, AValue, Result);
-end;
-
-procedure TACLSpinEdit.SetDefaultSize;
-begin
-  SetBounds(Left, Top, 100, 20);
 end;
 
 procedure TACLSpinEdit.SetOnGetDisplayText(const Value: TACLEditGetDisplayTextEvent);

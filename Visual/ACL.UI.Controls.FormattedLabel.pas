@@ -172,7 +172,6 @@ type
     function GetContentOffset: TRect; override;
     procedure Paint; override;
     procedure ResourceChanged; override;
-    procedure SetDefaultSize; override;
   public const
     DefaultOptions = [floAutoDetectURLs, floAutoDetectEmails];
   public
@@ -441,6 +440,7 @@ constructor TACLFormattedLabel.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   FBorders := [];
+  FDefaultSize := TSize.Create(75, 15);
   FocusOnClick := True;
 end;
 
@@ -534,11 +534,6 @@ begin
     FBorders := AValue;
     ResourceChanged;
   end;
-end;
-
-procedure TACLFormattedLabel.SetDefaultSize;
-begin
-  SetBounds(Left, Top, 75, 15);
 end;
 
 procedure TACLFormattedLabel.SetOnLinkExecute(AValue: TACLFormattedLabelLinkExecuteEvent);

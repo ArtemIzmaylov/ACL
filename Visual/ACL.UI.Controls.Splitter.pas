@@ -150,10 +150,9 @@ begin
   inherited Create(AOwner);
   Align := alLeft;
   ControlStyle := [csCaptureMouse, csClickEvents, csDoubleClicks];
+  FDefaultSize := TSize.Create(5, 5);
   FCanToggle := True;
   RecreateViewInfo;
-  Height := 5;
-  Width := 5;
 end;
 
 destructor TACLSplitter.Destroy;

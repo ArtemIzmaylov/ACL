@@ -245,7 +245,6 @@ type
     procedure SetSmallChange(AValue: Word);
     procedure SetStyle(AValue: TACLStyleScrollBox);
   protected
-    procedure SetDefaultSize; override;
     procedure SetTargetDPI(AValue: Integer); override;
     procedure UpdateTransparency; override;
 
@@ -956,6 +955,7 @@ begin
   DoubleBuffered := True;
   FStyle := AStyle;
   FStyleOwnership := AStyleOwnership;
+  FDefaultSize := TSize.Create(200, 20);
   FSubClass := TACLScrollBarSubClass.Create(Self, Style, AKind);
 end;
 
@@ -1119,11 +1119,6 @@ end;
 procedure TACLScrollBar.SetStyle(AValue: TACLStyleScrollBox);
 begin
   FStyle.Assign(AValue);
-end;
-
-procedure TACLScrollBar.SetDefaultSize;
-begin
-  SetBounds(Left, Top, 200, 20);
 end;
 
 procedure TACLScrollBar.UpdateTransparency;

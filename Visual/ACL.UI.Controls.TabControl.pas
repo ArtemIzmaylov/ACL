@@ -199,7 +199,6 @@ type
     function IsTabVisible(AIndex: Integer): Boolean;
     procedure AdjustClientRect(var Rect: TRect); override;
     procedure BoundsChanged; override;
-    procedure SetDefaultSize; override;
     procedure SetTargetDPI(AValue: Integer); override;
     procedure CreateWnd; override;
     procedure ValidateActiveTab;
@@ -510,6 +509,7 @@ begin
   FTabs := TACLTabsList.Create(Self);
   FViewItems := TACLTabViewItemList.Create;
   FOptionsView := TACLTabsOptionsView.Create(Self);
+  FDefaultSize := TSize.Create(400, 300);
 end;
 
 destructor TACLCustomTabControl.Destroy;
@@ -1062,11 +1062,6 @@ begin
     FBorders := AValue;
     FullRefresh;
   end;
-end;
-
-procedure TACLCustomTabControl.SetDefaultSize;
-begin
-  SetBounds(Left, Top, 400, 300);
 end;
 
 procedure TACLCustomTabControl.SetHoverTab(AValue: TACLTab);

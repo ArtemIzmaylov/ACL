@@ -238,7 +238,6 @@ type
     procedure FocusChanged; override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     procedure Paint; override;
-    procedure SetDefaultSize; override;
     procedure SetFocusToInnerEdit; virtual;
     procedure SetTargetDPI(AValue: Integer); override;
     procedure UpdateBordersColor;
@@ -328,7 +327,7 @@ type
     procedure DeleteWordFromLeftOfCursor;
     procedure DeleteWordFromRightOfCursor;
 
-    // Numberic
+    // Numeric
     function CanType(Key: WideChar): Boolean; virtual;
     // Keyboard
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
@@ -795,6 +794,7 @@ begin
   FButtons := TACLEditButtons.Create(Self);
   FButtonsImagesLink := TChangeLink.Create;
   FButtonsImagesLink.OnChange := HandlerImageChange;
+  FDefaultSize := TSize.Create(121, 21);
   FBorders := True;
   AutoSize := True;
   TabStop := True;
@@ -982,11 +982,6 @@ end;
 function TACLCustomEdit.CreateEditor: TWinControl;
 begin
   Result := nil;
-end;
-
-procedure TACLCustomEdit.SetDefaultSize;
-begin
-  SetBounds(Left, Top, 121, 21);
 end;
 
 procedure TACLCustomEdit.SetFocusToInnerEdit;

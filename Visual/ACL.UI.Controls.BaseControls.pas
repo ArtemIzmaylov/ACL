@@ -350,6 +350,7 @@ type
     procedure SetAlignWithMargins(AValue: Boolean);
   {$ENDIF}
   protected
+    FDefaultSize: TSize;
   {$IFDEF FPC}
     FCurrentPPI: Integer;
 
@@ -361,7 +362,6 @@ type
     procedure DoGetHint(const P: TPoint; var AHint: string); virtual;
     procedure Loaded; override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
-    procedure SetDefaultSize; virtual;
     procedure SetTargetDPI(AValue: Integer); virtual;
     procedure UpdateTransparency; virtual;
 
@@ -457,7 +457,6 @@ type
     IACLResourceChangeListener,
     IACLResourceCollection)
   strict private
-    FBoundsModified: Boolean;
     FFocusOnClick: Boolean;
     FLangSection: string;
     FMargins: TACLMargins;
@@ -501,6 +500,8 @@ type
     procedure SetAlignWithMargins(AValue: Boolean);
   {$ENDIF}
   protected
+    FDefaultSize: TSize;
+
     procedure AdjustClientRect(var ARect: TRect); override;
     procedure BoundsChanged; {$IFDEF FPC}override;{$ELSE}virtual;{$ENDIF}
   {$IFDEF FPC}
@@ -521,7 +522,6 @@ type
     procedure Paint; override;
     procedure PaintWindow(DC: HDC); override;
     procedure Resize; override; final;
-    procedure SetDefaultSize; virtual;
     procedure SetFocusOnClick; virtual;
     procedure SetTargetDPI(AValue: Integer); virtual;
     procedure UpdateCursor;
@@ -564,8 +564,6 @@ type
     // IACLLocalizableComponent
     procedure Localize; overload;
     procedure Localize(const ASection: string); overload; virtual;
-    // SetBounds
-    procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
   published
     property Align;
   {$IFDEF FPC}
@@ -1638,6 +1636,7 @@ begin
   FCurrentPPI := acDefaultDpi;
 {$ENDIF}
   ControlStyle := ControlStyle + [csCaptureMouse];
+  FDefaultSize := TSize.Create(200, 30);
   FMargins := TACLMargins.Create(TACLMargins.DefaultValue);
   FMargins.OnChanged := MarginsChangeHandler;
 end;
@@ -1651,7 +1650,8 @@ end;
 procedure TACLGraphicControl.AfterConstruction;
 begin
   inherited;
-  SetDefaultSize;
+  if (Width = 0) or (Height = 0) then
+    SetBounds(Left, Top, FDefaultSize.cx, FDefaultSize.cy);
   MarginsChangeHandler(nil);
   UpdateTransparency;
 end;
@@ -1765,11 +1765,6 @@ procedure TACLGraphicControl.SetResourceCollection(AValue: TACLCustomResourceCol
 begin
   if acResourceCollectionFieldSet(FResourceCollection, Self, Self, AValue) then
     ResourceChanged(ResourceCollection);
-end;
-
-procedure TACLGraphicControl.SetDefaultSize;
-begin
-  SetBounds(Left, Top, 200, 30);
 end;
 
 procedure TACLGraphicControl.SetTargetDPI(AValue: Integer);
@@ -1999,6 +1994,7 @@ begin
   FMargins.OnChanged := MarginsChangeHandler;
   FPadding := CreatePadding;
   FPadding.OnChanged := PaddingChangeHandler;
+  FDefaultSize := TSize.Create(200, 150);
 end;
 
 destructor TACLCustomControl.Destroy;
@@ -2011,8 +2007,8 @@ end;
 procedure TACLCustomControl.AfterConstruction;
 begin
   inherited AfterConstruction;
-  if not FBoundsModified then
-    SetDefaultSize;
+  if (Width = 0) or (Height = 0) then
+    SetBounds(Left, Top, FDefaultSize.cx, FDefaultSize.cy);
   MarginsChangeHandler(nil);
   UpdateTransparency;
 end;
@@ -2142,7 +2138,8 @@ begin
   end;
 end;
 
-procedure TACLCustomControl.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+procedure TACLCustomControl.MouseDown(
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   if FocusOnClick then
     SetFocusOnClick;
@@ -2169,17 +2166,6 @@ begin
   if not (csDestroying in ComponentState) then
     BoundsChanged;
 {$ENDIF}
-end;
-
-procedure TACLCustomControl.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
-begin
-  FBoundsModified := True;
-  inherited;
-end;
-
-procedure TACLCustomControl.SetDefaultSize;
-begin
-  SetBounds(Left, Top, 200, 150);
 end;
 
 procedure TACLCustomControl.SetFocusOnClick;
@@ -2580,9 +2566,12 @@ begin
   if AValue <> FBorders then
   begin
     FBorders := AValue;
-    AdjustSize;
-    Realign;
-    Invalidate;
+    if HandleAllocated then
+    begin
+      AdjustSize;
+      Realign;
+      Invalidate;
+    end;
   end;
 end;
 

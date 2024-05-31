@@ -104,7 +104,6 @@ type
     procedure CalculateControlsPosition;
     procedure CalculateLineRects(const R: TRect; const S1, S2: string; out L1, L2: TRect);
     procedure CreateControls;
-    procedure SetDefaultSize; override;
     procedure SetTargetDPI(AValue: Integer); override;
 
     procedure DoCancel;
@@ -188,6 +187,7 @@ begin
   inherited Create(AOwner);
   FText[1] := sTextCancel;
   FText[2] := sTextReady;
+  FDefaultSize := TSize.Create(330, 140);
   FStyle := TACLStyleProgressBox.Create(Self);
   FEnabledControls := TList.Create;
   FOptions := [pboAllowCancel];
@@ -503,11 +503,6 @@ procedure TACLProgressBox.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
 begin
   inherited SetBounds(ALeft, ATop, AWidth, AHeight);
   CalculateControlsPosition;
-end;
-
-procedure TACLProgressBox.SetDefaultSize;
-begin
-  SetBounds(Left, Top, 330, 140);
 end;
 
 procedure TACLProgressBox.SetStyle(const Value: TACLStyleProgressBox);

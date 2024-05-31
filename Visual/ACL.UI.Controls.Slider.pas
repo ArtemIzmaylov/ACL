@@ -356,7 +356,6 @@ type
     procedure DoGetHint(const P: TPoint; var AHint: string); override;
     procedure FocusChanged; override;
     procedure NextPage(ADirection: Integer; APageSize: Single);
-    procedure SetDefaultSize; override;
 
     // Keyboard
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
@@ -1364,6 +1363,7 @@ begin
   FOptions := CreateOptions;
   FOptionsValue := CreateOptionsValue;
   FOptionsLabels := CreateOptionsLabels;
+  FDefaultSize := TSize.Create(20, 100);
   FViewInfo := CreateViewInfo;
   FocusOnClick := True;
   ParentDoubleBuffered := False;
@@ -1701,11 +1701,6 @@ begin
     ViewInfo.AdjustSize(AWidth, AHeight);
     inherited SetBounds(ALeft, ATop, AWidth, AHeight);
   end;
-end;
-
-procedure TACLSlider.SetDefaultSize;
-begin
-  SetBounds(0, 0, 20, 100);
 end;
 
 procedure TACLSlider.UpdateThumbState(const P: TPoint);

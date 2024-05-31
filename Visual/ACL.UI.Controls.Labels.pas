@@ -130,7 +130,6 @@ type
     procedure MouseEnter; override;
     procedure MouseLeave; override;
     procedure Resize; override;
-    procedure SetDefaultSize; override;
     procedure SetTargetDPI(AValue: Integer); override;
     procedure UpdateTransparency; override;
 
@@ -315,6 +314,7 @@ end;
 constructor TACLLabel.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  FDefaultSize := TSize.Create(75, 15);
   FTransparent := True;
   FStyle := CreateStyle;
   FSubControl := CreateSubControlOptions;
@@ -403,11 +403,6 @@ begin
   FLineRect.CenterVert(2);
   FLineRect.Left := R.Left;
   FLineRect.Right := R.Right;
-end;
-
-procedure TACLLabel.SetDefaultSize;
-begin
-  SetBounds(Left, Top, 75, 15);
 end;
 
 procedure TACLLabel.SetTargetDPI(AValue: Integer);

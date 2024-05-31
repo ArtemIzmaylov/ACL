@@ -139,7 +139,6 @@ type
     procedure DoGetHint(const P: TPoint; var AHint: string); override;
     procedure PopulateCandidates(ACandidates: TACLUIInsightCandidates); virtual;
     procedure SelectCandidate(ACandidate: TACLUIInsightCandidate); virtual;
-    procedure SetDefaultSize; override;
     procedure SetTargetDPI(AValue: Integer); override;
     procedure ShowDropDownWindow; override;
   public
@@ -541,11 +540,6 @@ begin
     dpiApply(TACLUIInsightSearchPopupWindow.BeakSize, FCurrentPPI) div 2,
     dpiApply(acTextIndent, FCurrentPPI));
   DropDownWindow.PopupUnderControl(LBounds, LAlignment);
-end;
-
-procedure TACLUIInsightButton.SetDefaultSize;
-begin
-  SetBounds(Left, Top, DefaultButtonHeight, DefaultButtonHeight);
 end;
 
 procedure TACLUIInsightButton.SetShortCut(AValue: TShortCut);

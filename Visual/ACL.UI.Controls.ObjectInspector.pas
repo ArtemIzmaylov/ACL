@@ -351,7 +351,6 @@ type
   protected
     procedure AlignControls(AControl: TControl; var Rect: TRect); override;
     procedure ResourceCollectionChanged; override;
-    procedure SetDefaultSize; override;
     //# Messages
     procedure CMChildKey(var Message: TCMChildKey); message CM_CHILDKEY;
   public
@@ -1201,6 +1200,7 @@ begin
   FSearchEdit.OnChange := SearchBoxChangeHandler;
   FSearchEdit.Visible := False;
 
+  FDefaultSize := TSize.Create(200, 400);
   Borders := [];
 end;
 
@@ -1209,11 +1209,6 @@ begin
   FInnerControl.ResourceCollection := ResourceCollection;
   FSearchEdit.ResourceCollection := ResourceCollection;
   inherited;
-end;
-
-procedure TACLObjectInspector.SetDefaultSize;
-begin
-  SetBounds(0, 0, 200, 400);
 end;
 
 procedure TACLObjectInspector.AlignControls(AControl: TControl; var Rect: TRect);

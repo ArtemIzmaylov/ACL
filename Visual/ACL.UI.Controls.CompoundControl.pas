@@ -86,7 +86,6 @@ type
     procedure FocusChanged; override;
     procedure Loaded; override;
     procedure Paint; override;
-    procedure SetDefaultSize; override;
     procedure SetTargetDPI(AValue: Integer); override;
 
     // Keyboard
@@ -170,6 +169,7 @@ constructor TACLCompoundControl.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   FSubClass := CreateSubClass;
+  FDefaultSize := TSize.Create(320, 240);
   DoubleBuffered := True;
 end;
 
@@ -308,11 +308,6 @@ begin
     Inc(NewHeight, -ARect.Height);
     Inc(NewWidth, -ARect.Width);
   end;
-end;
-
-procedure TACLCompoundControl.SetDefaultSize;
-begin
-  SetBounds(Left, Top, 320, 240);
 end;
 
 procedure TACLCompoundControl.SetTargetDPI(AValue: Integer);

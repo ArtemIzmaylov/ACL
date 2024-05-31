@@ -80,7 +80,6 @@ type
     procedure CalculateButtons(var R: TRect); override;
     procedure DrawContent(ACanvas: TCanvas); override;
     function GetCursor(const P: TPoint): TCursor; override;
-    procedure SetDefaultSize; override;
 
     //# DropDown
     function CreateDropDownButton: TACLCustomDropDownEditButtonSubClass; virtual;
@@ -138,7 +137,6 @@ type
   protected
     procedure Calculate(R: TRect); override;
     procedure FocusChanged; override;
-    procedure SetDefaultSize; override;
     // Accelerators
     function DialogChar(var Message: TWMKey): Boolean; override;
     // keyboard
@@ -211,6 +209,7 @@ constructor TACLCustomDropDownEdit.Create(AOwner: TComponent);
 begin
   FBorders := True;
   inherited Create(AOwner);
+  FDefaultSize := TSize.Create(320, 240);
   FDropDownButtonVisible := True;
   FDropDownButton := CreateDropDownButton;
   FDropDownButton.OnClick := HandlerButtonClick;
@@ -314,12 +313,6 @@ begin
   inherited MouseUp(Button, Shift, X, Y);
 end;
 
-procedure TACLCustomDropDownEdit.SetDefaultSize;
-begin
-  if not Inplace then
-    SetBounds(Left, Top, 121, 21);
-end;
-
 procedure TACLCustomDropDownEdit.SetDropDownButtonVisible(AValue: Boolean);
 begin
   if DropDownButtonVisible <> AValue then
@@ -406,6 +399,7 @@ end;
 constructor TACLCustomDropDown.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  FDefaultSize := TSize.Create(DefaultButtonHeight, DefaultButtonHeight);
   FGlyph := TACLGlyph.Create(Self);
   Cursor := crHandPoint;
   AutoSize := False;
@@ -472,11 +466,6 @@ procedure TACLCustomDropDown.KeyUp(var Key: Word; Shift: TShiftState);
 begin
   DropDownButton.KeyUp(Key, Shift);
   inherited KeyUp(Key, Shift);
-end;
-
-procedure TACLCustomDropDown.SetDefaultSize;
-begin
-  SetBounds(Left, Top, DefaultButtonWidth, DefaultButtonHeight);
 end;
 
 procedure TACLCustomDropDown.Paint;
