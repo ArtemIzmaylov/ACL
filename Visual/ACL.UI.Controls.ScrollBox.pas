@@ -524,35 +524,40 @@ end;
 
 procedure TACLCustomScrollBox.MakeVisible(ARect: TRect);
 var
-  AClientSize: Integer;
+  LClientRect: TRect;
+  LScrollBy: TPoint;
 begin
-  AClientSize := ClientWidth;
-  if ARect.Width <= AClientSize then
+  LScrollBy := NullPoint;
+  LClientRect := ClientRect;
+  AdjustClientRect(LClientRect);
+
+  if ARect.Width <= LClientRect.Width then
   begin
-    if ARect.Left < 0 then
-      ScrollBy(-ARect.Left, 0)
+    if ARect.Left < LClientRect.Left then
+      LScrollBy.X := -ARect.Left
     else
-      if ARect.Right > AClientSize then
+      if ARect.Right > LClientRect.Right then
       begin
-        if ARect.Right - ARect.Left > AClientSize then
-          ARect.Right := ARect.Left + AClientSize;
-        ScrollBy(AClientSize - ARect.Right, 0);
+        if ARect.Right - ARect.Left > LClientRect.Right then
+          ARect.Right := ARect.Left + LClientRect.Right;
+        LScrollBy.X := LClientRect.Right - ARect.Right;
       end;
   end;
 
-  AClientSize := ClientHeight;
-  if ARect.Height <= AClientSize then
+  if ARect.Height <= LClientRect.Height then
   begin
-    if ARect.Top < 0 then
-      ScrollBy(-ARect.Top, 0)
+    if ARect.Top < LClientRect.Top then
+      LScrollBy.Y := -ARect.Top
     else
-      if ARect.Bottom > AClientSize then
+      if ARect.Bottom > LClientRect.Bottom then
       begin
-        if ARect.Bottom - ARect.Top > AClientSize then
-          ARect.Bottom := ARect.Top + AClientSize;
-        ScrollBy(AClientSize - ARect.Bottom, 0);
+        if ARect.Bottom - ARect.Top > LClientRect.Bottom then
+          ARect.Bottom := ARect.Top + LClientRect.Bottom;
+        LScrollBy.Y := LClientRect.Bottom - ARect.Bottom;
       end;
   end;
+
+  ScrollBy(LScrollBy.X, LScrollBy.Y);
 end;
 
 procedure TACLCustomScrollBox.ScrollContent(dX, dY: Integer);
