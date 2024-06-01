@@ -534,11 +534,11 @@ begin
   begin
     LCurPos := MouseCursorPos;
     case Message.lParam of
-      WM_LBUTTONDOWN:
+      WM_LBUTTONDOWN, WM_LBUTTONDBLCLK:
         Icon.MouseDown(nil, mbLeft, [], LCurPos.X, LCurPos.Y);
-      WM_RBUTTONDOWN:
+      WM_RBUTTONDOWN, WM_RBUTTONDBLCLK:
         Icon.MouseDown(nil, mbRight, [], LCurPos.X, LCurPos.Y);
-      WM_MBUTTONDOWN:
+      WM_MBUTTONDOWN, WM_MBUTTONDBLCLK:
         Icon.MouseDown(nil, mbMiddle, [], LCurPos.X, LCurPos.Y);
       WM_MOUSEMOVE:
         Icon.MouseMove(nil, [], LCurPos.X, LCurPos.Y);
