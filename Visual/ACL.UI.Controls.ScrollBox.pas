@@ -39,6 +39,7 @@ uses
   ACL.Graphics,
   ACL.Graphics.Ex,
   ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.ScrollBar,
   ACL.UI.Resources,
   ACL.Utils.Common;
@@ -64,7 +65,7 @@ type
 
   { TACLCustomScrollingControl }
 
-  TACLCustomScrollingControl = class(TACLCustomControl)
+  TACLCustomScrollingControl = class(TACLCustomInplaceContainer)
   strict private
     FBorders: TBorderStyle;
     FHorzScrollBar: TACLScrollBar;

@@ -52,7 +52,7 @@ type
   TACLTextEditCustomDrawEvent = procedure (Sender: TObject;
     ACanvas: TCanvas; const R: TRect; var AHandled: Boolean) of object;
 
-  TACLCustomTextEdit = class(TACLCustomInplaceEdit)
+  TACLCustomTextEdit = class(TACLCustomEdit, IACLInplaceControl)
   strict private
     FInputMask: TACLEditInputMask;
     FMaxLength: Integer;
@@ -105,16 +105,14 @@ type
     procedure EditorValidateText;
     procedure RetriveValueFromInnerEdit;
 
-    // Inplace
-    function InplaceGetValue: string; override;
-    procedure InplaceSetFocus; override;
-    procedure InplaceSetValue(const AValue: string); override;
+    // IACLInplaceControl
+    function IACLInplaceControl.InplaceIsFocused = Focused;
+    function InplaceGetValue: string;
+    procedure InplaceSetFocus;
+    procedure InplaceSetValue(const AValue: string);
 
     // Events
     function DoCustomDraw(ACanvas: TCanvas): Boolean; virtual;
-
-    // Messages
-    procedure CMWantSpecialKey(var Message: TMessage); message CM_WANTSPECIALKEY;
 
     property InputMask: TACLEditInputMask read FInputMask write SetInputMask default eimText;
     property MaxLength: Integer read FMaxLength write SetMaxLength default 0;
@@ -237,17 +235,14 @@ end;
 
 procedure TACLCustomTextEdit.SetFocusToInnerEdit;
 var
-  ASelection: TPoint;
+  LSelection: TPoint;
 begin
-  if InnerEdit <> nil then
+  LSelection := Point(SelStart, SelLength);
+  InnerEdit.SetFocus;
+  if LSelection.Y > 0 then
   begin
-    ASelection := Point(SelStart, SelLength);
-    InnerEdit.SetFocus;
-    if ASelection.Y > 0 then
-    begin
-      SelStart := ASelection.X;
-      SelLength := ASelection.Y;
-    end;
+    SelStart := LSelection.X;
+    SelLength := LSelection.Y;
   end;
   Invalidate;
 end;
@@ -347,14 +342,6 @@ begin
   Result := False;
   if Assigned(OnCustomDraw) then
     OnCustomDraw(Self, ACanvas, FContentRect, Result);
-end;
-
-procedure TACLCustomTextEdit.CMWantSpecialKey(var Message: TMessage);
-begin
-  if Inplace then
-    Message.Result := 1
-  else
-    inherited;
 end;
 
 procedure TACLCustomTextEdit.HandlerInnerEditChanged(Sender: TObject);

@@ -60,11 +60,61 @@ uses
   ACL.Utils.Strings;
 
 type
-  TACLEditButtons = class;
-
-  TACLEditInputMask = (eimText, eimInteger, eimFloat, eimDateAndTime);
   TACLEditGetDisplayTextEvent = procedure (Sender: TObject;
     const AValue: Variant; var ADisplayText: string) of object;
+
+{$REGION ' In-place Container '}
+
+  { TACLCustomInplaceContainer }
+
+  TACLCustomInplaceContainer = class(TACLCustomControl)
+  strict private
+    FOnChange: TNotifyEvent;
+
+    procedure HandlerEditorMouseDown(Sender: TObject;
+      Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+    procedure HandlerEditorMouseUp(Sender: TObject;
+      Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+    procedure HandlerEditorMouseMove(Sender: TObject;
+      Shift: TShiftState; X, Y: Integer);
+  {$IFDEF FPC}
+    procedure HandlerEditorUtf8KeyPress(Sender: TObject; var UTF8Key: TUTF8Char);
+  {$ENDIF}
+    // Messages
+    procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
+    procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
+    procedure WMSetFocus(var Message: TWMSetFocus); message WM_SETFOCUS;
+  protected
+    FEditor: TWinControl;
+    FEditorOrigWndProc: TWndMethod;
+
+    function CalculateEditorPosition: TRect; virtual;
+    procedure EditorHook(ASet: Boolean);
+    procedure EditorUpdateBounds; virtual;
+    procedure EditorUpdateParams; inline;
+    procedure EditorUpdateParamsCore; virtual;
+    procedure EditorWndProc(var Message: TMessage); virtual;
+    procedure SetFocusToInnerEdit; virtual;
+  protected
+    procedure BoundsChanged; override;
+    procedure Changed; virtual;
+    procedure CreateHandle; override;
+    // Events
+    procedure DoChange; virtual;
+    procedure DoEnter; override;
+    procedure DoExit; override;
+    procedure DoFullRefresh; override;
+    // Events
+    property OnChange: TNotifyEvent read FOnChange write FOnChange;
+  public
+    function Focused: Boolean; override;
+    procedure GetTabOrderList(List: TTabOrderList); override;
+    procedure SetFocus; override;
+  end;
+
+{$ENDREGION}
+
+{$REGION ' Basic Edit '}
 
   { IACLButtonEdit }
 
@@ -108,6 +158,7 @@ type
 
   { TACLEditButton }
 
+  TACLEditButtons = class;
   TACLEditButton = class(TACLCollectionItem)
   strict private
     FCaption: string;
@@ -166,7 +217,6 @@ type
   TACLEditButtons = class(TCollection)
   strict private
     FButtonEdit: IACLButtonEdit;
-
     function GetItem(AIndex: Integer): TACLEditButton;
   protected
     function GetHint(const P: TPoint): string;
@@ -189,7 +239,7 @@ type
 
   { TACLCustomEdit }
 
-  TACLCustomEdit = class(TACLCustomControl,
+  TACLCustomEdit = class(TACLCustomInplaceContainer,
     IACLButtonOwner,
     IACLButtonEdit,
     IACLCursorProvider)
@@ -199,13 +249,10 @@ type
     FButtons: TACLEditButtons;
     FButtonsImages: TCustomImageList;
     FButtonsImagesLink: TChangeLink;
+    FInplace: Boolean;
     FStyle: TACLStyleEdit;
     FStyleButton: TACLStyleButton;
 
-    FOnChange: TNotifyEvent;
-
-    procedure HandlerEditorEnter(Sender: TObject);
-    procedure HandlerEditorExit(Sender: TObject);
     procedure HandlerImageChange(Sender: TObject);
     //# Setters
     procedure SetBorders(AValue: Boolean);
@@ -214,31 +261,21 @@ type
     procedure SetStyle(AValue: TACLStyleEdit);
     procedure SetStyleButton(AValue: TACLStyleButton);
     //# Messages
-    procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
-    procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
     procedure CMHintShow(var Message: TCMHintShow); message CM_HINTSHOW;
-    procedure WMSetFocus(var Message: TWMSetFocus); message WM_SETFOCUS;
+    procedure CMWantSpecialKey(var Message: TMessage); message CM_WANTSPECIALKEY;
   protected
     FBorders: Boolean;
-    FEditor: TWinControl;
 
     procedure AssignTextDrawParams(ACanvas: TCanvas); virtual;
     procedure BoundsChanged; override;
     function CanAutoSize(var NewWidth, NewHeight: Integer): Boolean; override;
-    procedure Changed; virtual;
-    procedure CreateHandle; override;
     function CreateStyleButton: TACLStyleButton; virtual;
   {$IFDEF FPC}
     procedure DoAutoSize; override;
   {$ENDIF}
-    procedure DoChange; virtual;
-    procedure DoEnter; override;
-    procedure DoExit; override;
-    procedure DoFullRefresh; override;
     procedure FocusChanged; override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     procedure Paint; override;
-    procedure SetFocusToInnerEdit; virtual;
     procedure SetTargetDPI(AValue: Integer); override;
     procedure UpdateBordersColor;
 
@@ -247,12 +284,10 @@ type
     function CreateEditor: TWinControl; virtual;
     procedure EditorClose; virtual;
     procedure EditorOpen;
-    procedure EditorUpdateBounds;
-    procedure EditorUpdateParams; inline;
-    procedure EditorUpdateParamsCore; virtual;
+    procedure EditorUpdateParamsCore; override;
 
     // Calculation
-    function CalculateEditorPosition: TRect; virtual;
+    function CalculateEditorPosition: TRect; override;
     function CalculateTextHeight: Integer; virtual;
     procedure Calculate(R: TRect); virtual;
     procedure CalculateAutoHeight(var ANewHeight: Integer); virtual;
@@ -287,17 +322,15 @@ type
     property Borders: Boolean read FBorders write SetBorders default True;
     property Buttons: TACLEditButtons read FButtons write SetButtons;
     property ButtonsImages: TCustomImageList read FButtonsImages write SetButtonsImages;
+    property Inplace: Boolean read FInplace;
     property Style: TACLStyleEdit read FStyle write SetStyle;
     property StyleButton: TACLStyleButton read FStyleButton write SetStyleButton;
-    // Events
-    property OnChange: TNotifyEvent read FOnChange write FOnChange;
   public
     constructor Create(AOwner: TComponent); override;
+    constructor CreateInplace(const AParams: TACLInplaceInfo); virtual;
     destructor Destroy; override;
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
-    function Focused: Boolean; override;
-    procedure GetTabOrderList(List: TTabOrderList); override;
     procedure Localize(const ASection: string); override;
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
   published
@@ -307,15 +340,16 @@ type
 
   { TACLInnerEdit }
 
+  TACLEditInputMask = (eimText, eimInteger, eimFloat, eimDateAndTime);
+
   TACLInnerEdit = class(TCustomMaskEdit, IACLInnerControl)
   strict private
     FInputMask: TACLEditInputMask;
     FOnValidate: TThreadMethod;
-
     procedure SetInputMask(const Value: TACLEditInputMask);
-    // IACLInnerControl
-    function GetContainer: TACLCustomEdit;
-    function GetInnerContainer: TWinControl;
+    //# Messages
+    procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
+    procedure WMPaste(var Message: TMessage); message WM_PASTE;
   protected
   {$IFDEF FPC}
     procedure CalculatePreferredSize(var
@@ -327,32 +361,17 @@ type
     procedure DeleteWordFromLeftOfCursor;
     procedure DeleteWordFromRightOfCursor;
 
-    // Numeric
-    function CanType(Key: WideChar): Boolean; virtual;
     // Keyboard
+    function CanType(Key: WideChar): Boolean; virtual;
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     procedure KeyPress(var Key: Char); override; {$IFDEF FPC}final;{$ENDIF}
     procedure KeyPressCore(var Key: WideChar); virtual;
-    procedure KeyUp(var Key: Word; Shift: TShiftState); override;
   {$IFDEF FPC}
     procedure Utf8KeyPress(var Key: TUTF8Char); override; final;
   {$ENDIF}
 
-    // Mouse
-    procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
-    procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
-    procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
-
-    //# Messages
-    procedure CMEnter(var Message: TCMEnter); message CM_ENTER;
-    procedure CMExit(var Message: TCMExit); message CM_EXIT;
-    procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
-    procedure CMWantSpecialKey(var Message: TMessage); message CM_WANTSPECIALKEY;
-    procedure WMContextMenu(var Message: TWMContextMenu); message WM_CONTEXTMENU;
-    procedure WMNCHitTest(var Message: TWMNCHitTest); message WM_NCHITTEST;
-    procedure WMPaste(var Message: TMessage); message WM_PASTE;
-    //# Properties
-    property Container: TACLCustomEdit read GetContainer;
+    // IACLInnerControl
+    function GetInnerContainer: TWinControl;
   public
     constructor Create(AOwner: TComponent); override;
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
@@ -367,22 +386,9 @@ type
     property OnValidate: TThreadMethod read FOnValidate write FOnValidate;
   end;
 
-  { TACLCustomInplaceEdit }
+{$ENDREGION}
 
-  TACLCustomInplaceEdit = class(TACLCustomEdit, IACLInplaceControl)
-  strict private
-    FInplace: Boolean;
-  protected
-    // IACLInplaceControl
-    function IACLInplaceControl.InplaceIsFocused = Focused;
-    function InplaceGetValue: string; virtual; abstract;
-    procedure InplaceSetFocus; virtual;
-    procedure InplaceSetValue(const AValue: string); virtual; abstract;
-    //# Properties
-    property Inplace: Boolean read FInplace;
-  public
-    constructor CreateInplace(const AParams: TACLInplaceInfo); virtual;
-  end;
+{$REGION ' Incremental Search '}
 
   { TACLIncrementalSearch }
 
@@ -421,6 +427,8 @@ type
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
     property OnLookup: TLookupEvent read FOnLookup write FOnLookup;
   end;
+
+{$ENDREGION}
 
 function EditDateTimeFormat: TFormatSettings;
 function EditDateTimeFormatToMask: string;
@@ -484,6 +492,260 @@ begin
     g_signal_stop_emission_by_name({%H-}Pointer(WndHandle), 'cut-clipboard');
 {$ENDIF}
 end;
+
+{$REGION ' In-place Container '}
+
+{ TACLCustomInplaceContainer }
+
+procedure TACLCustomInplaceContainer.BoundsChanged;
+begin
+  inherited;
+  EditorUpdateBounds;
+end;
+
+function TACLCustomInplaceContainer.CalculateEditorPosition: TRect;
+begin
+  Result := ClientRect;
+  AdjustClientRect(Result);
+end;
+
+procedure TACLCustomInplaceContainer.Changed;
+begin
+  if not (csLoading in ComponentState) then
+    DoChange;
+  Invalidate;
+end;
+
+procedure TACLCustomInplaceContainer.CMEnabledChanged(var Message: TMessage);
+begin
+  EditorUpdateParams;
+  BoundsChanged;
+  inherited;
+end;
+
+procedure TACLCustomInplaceContainer.CMFontChanged(var Message: TMessage);
+begin
+  inherited;
+  FullRefresh;
+end;
+
+procedure TACLCustomInplaceContainer.CreateHandle;
+begin
+  inherited;
+  BoundsChanged;
+end;
+
+procedure TACLCustomInplaceContainer.DoChange;
+begin
+  CallNotifyEvent(Self, OnChange);
+end;
+
+procedure TACLCustomInplaceContainer.DoEnter;
+begin
+  if FEditor = nil then
+    inherited DoEnter;
+end;
+
+procedure TACLCustomInplaceContainer.DoExit;
+begin
+  if FEditor = nil then
+    inherited DoExit;
+end;
+
+procedure TACLCustomInplaceContainer.DoFullRefresh;
+begin
+  if FEditor <> nil then
+    EditorUpdateParams;
+  BoundsChanged;
+end;
+
+procedure TACLCustomInplaceContainer.EditorHook(ASet: Boolean);
+var
+  LEdit: TWinControlAccess;
+begin
+  if FEditor = nil then
+    Exit;
+  LEdit := TWinControlAccess(FEditor);
+  if ASet then
+  begin
+    LEdit.Parent := Self;
+    LEdit.OnMouseDown := HandlerEditorMouseDown;
+    LEdit.OnMouseMove := HandlerEditorMouseMove;
+    LEdit.OnMouseUp := HandlerEditorMouseUp;
+  {$IFDEF FPC}
+    LEdit.OnUTF8KeyPress := HandlerEditorUtf8KeyPress;
+  {$ENDIF}
+    FEditorOrigWndProc := LEdit.WindowProc;
+    LEdit.WindowProc := EditorWndProc;
+    EditorUpdateBounds;
+    EditorUpdateParams;
+    EditorUpdateBounds;
+  end
+  else
+  begin
+    LEdit.OnMouseDown := nil;
+    LEdit.OnMouseMove := nil;
+    LEdit.OnMouseUp := nil;
+  {$IFDEF FPC}
+    LEdit.OnUTF8KeyPress := nil;
+  {$ENDIF}
+    LEdit.WindowProc := FEditorOrigWndProc;
+  end;
+end;
+
+procedure TACLCustomInplaceContainer.EditorUpdateBounds;
+var
+  LTemp: TRect;
+  LTempHeight: Integer;
+  LTempWidth: Integer;
+begin
+  if FEditor <> nil then
+  begin
+    LTemp := CalculateEditorPosition;
+    LTempHeight := LTemp.Height;
+    LTempWidth := LTemp.Width;
+    TWinControlAccess(FEditor).CanAutoSize(LTempWidth, LTempHeight);
+    if LTempHeight <> LTemp.Height then
+      LTemp.CenterVert(LTempHeight);
+    FEditor.BoundsRect := LTemp;
+    if HandleAllocated then
+    begin
+      if FEditor.Height > LTemp.Height then
+      begin
+        LTemp.Offset(-FEditor.Left, -FEditor.Top);
+        SetWindowRgn(FEditor.Handle, CreateRectRgnIndirect(LTemp), False);
+      end
+      else
+        SetWindowRgn(FEditor.Handle, 0, False);
+    end;
+  end;
+end;
+
+procedure TACLCustomInplaceContainer.EditorUpdateParams;
+begin
+  if FEditor <> nil then
+    EditorUpdateParamsCore;
+end;
+
+procedure TACLCustomInplaceContainer.EditorUpdateParamsCore;
+begin
+  TWinControlAccess(FEditor).Font := Font;
+end;
+
+procedure TACLCustomInplaceContainer.EditorWndProc(var Message: TMessage);
+begin
+  case Message.Msg of
+    CM_WANTSPECIALKEY:
+      begin
+        Message.Result := Perform(Message.Msg, Message.WParam, Message.LParam);
+        if Message.Result <> 0 then Exit;
+      end;
+
+    CN_CHAR:
+      if DoKeyPress(TWMKey(Message)) then Exit;
+
+    CN_KEYDOWN:
+    {$IFDEF FPC}
+      WMKeyDown(TWMKey(Message));
+    {$ELSE}
+      if DoKeyDown(TWMKey(Message)) then Exit;
+    {$ENDIF}
+
+    CN_KEYUP:
+    {$IFDEF FPC}
+      WMKeyUp(TWMKey(Message));
+    {$ELSE}
+      if DoKeyUp(TWMKey(Message)) then Exit;
+    {$ENDIF}
+
+    WM_NCHITTEST:
+      if csDesigning in ComponentState then
+      begin
+        Message.Result := HTTRANSPARENT;
+        Exit;
+      end;
+
+    WM_CONTEXTMENU:
+      begin
+        if not FEditor.Focused then
+          FEditor.SetFocus;
+        Message.Result := Perform(Message.Msg, Handle, TMessage(Message).LParam);
+        if Message.Result <> 0 then Exit;
+      end;
+  end;
+
+  FEditorOrigWndProc(Message);
+
+  case Message.Msg of
+    CM_ENTER:
+      CallNotifyEvent(Self, OnEnter);
+    CM_EXIT:
+      CallNotifyEvent(Self, OnExit);
+    WM_SETFOCUS, WM_KILLFOCUS:
+      FocusChanged;
+  end;
+end;
+
+function TACLCustomInplaceContainer.Focused: Boolean;
+begin
+  Result := inherited Focused or (FEditor <> nil) and FEditor.Focused;
+end;
+
+procedure TACLCustomInplaceContainer.GetTabOrderList(List: TTabOrderList);
+begin
+  inherited;
+  if (FEditor <> nil) and (List.IndexOf(FEditor) >= 0) then
+    List.Remove(Self);
+end;
+
+procedure TACLCustomInplaceContainer.HandlerEditorMouseDown(
+  Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  MouseDown(Button, Shift, X + FEditor.Left, Y + FEditor.Top);
+end;
+
+procedure TACLCustomInplaceContainer.HandlerEditorMouseMove(
+  Sender: TObject; Shift: TShiftState; X, Y: Integer);
+begin
+  MouseMove(Shift, X + FEditor.Left, Y + FEditor.Top);
+end;
+
+procedure TACLCustomInplaceContainer.HandlerEditorMouseUp(
+  Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  MouseUp(Button, Shift, X + FEditor.Left, Y + FEditor.Top);
+end;
+
+{$IFDEF FPC}
+procedure TACLCustomInplaceContainer.HandlerEditorUtf8KeyPress(
+  Sender: TObject; var UTF8Key: TUTF8Char);
+begin
+  UTF8KeyPress(UTF8Key);
+end;
+{$ENDIF}
+
+procedure TACLCustomInplaceContainer.SetFocus;
+begin
+  if FEditor <> nil then
+    SetFocusToInnerEdit
+  else
+    inherited;
+end;
+
+procedure TACLCustomInplaceContainer.SetFocusToInnerEdit;
+begin
+  FEditor.SetFocus;
+end;
+
+procedure TACLCustomInplaceContainer.WMSetFocus(var Message: TWMSetFocus);
+begin
+  inherited;
+  if FEditor <> nil then
+    SetFocusToInnerEdit;
+end;
+{$ENDREGION}
+
+{$REGION ' Basic Edit '}
 
 { TACLStyleEdit }
 
@@ -795,9 +1057,24 @@ begin
   FButtonsImagesLink := TChangeLink.Create;
   FButtonsImagesLink.OnChange := HandlerImageChange;
   FDefaultSize := TSize.Create(121, 21);
-  FBorders := True;
-  AutoSize := True;
+  FBorders := not Inplace;
+  AutoSize := not Inplace;
   TabStop := True;
+end;
+
+constructor TACLCustomEdit.CreateInplace(const AParams: TACLInplaceInfo);
+var
+  LRect: TRect;
+begin
+  FInplace := True;
+  Create(AParams.Parent);
+  OnKeyDown := AParams.OnKeyDown;
+  OnExit := AParams.OnApply;
+  Parent := AParams.Parent;
+
+  LRect := AParams.Bounds;
+  LRect.Left := AParams.TextBounds.Left - dpiApply(2, FCurrentPPI);
+  BoundsRect := LRect;
 end;
 
 destructor TACLCustomEdit.Destroy;
@@ -869,7 +1146,6 @@ begin
   if Borders then
     R.Inflate(-EditorInnerBorderSize);
   CalculateContent(R);
-  EditorUpdateBounds;
 end;
 
 procedure TACLCustomEdit.CalculateAutoHeight(var ANewHeight: Integer);
@@ -912,24 +1188,11 @@ begin
   Result := acFontHeight(Font);
 end;
 
-procedure TACLCustomEdit.Changed;
-begin
-  if not (csLoading in ComponentState) then
-    DoChange;
-  Invalidate;
-end;
-
 procedure TACLCustomEdit.SetTargetDPI(AValue: Integer);
 begin
   inherited SetTargetDPI(AValue);
   Style.TargetDPI := AValue;
   StyleButton.TargetDPI := AValue;
-end;
-
-procedure TACLCustomEdit.CreateHandle;
-begin
-  inherited CreateHandle;
-  BoundsChanged;
 end;
 
 {$IFDEF FPC}
@@ -938,30 +1201,6 @@ begin
   // do nothing
 end;
 {$ENDIF}
-
-procedure TACLCustomEdit.DoChange;
-begin
-  CallNotifyEvent(Self, OnChange);
-end;
-
-procedure TACLCustomEdit.DoEnter;
-begin
-  if FEditor = nil then
-    inherited DoEnter;
-end;
-
-procedure TACLCustomEdit.DoExit;
-begin
-  if FEditor = nil then
-    inherited DoExit;
-end;
-
-procedure TACLCustomEdit.DoFullRefresh;
-begin
-  if FEditor <> nil then
-    EditorUpdateParams;
-  BoundsChanged;
-end;
 
 procedure TACLCustomEdit.FocusChanged;
 begin
@@ -984,12 +1223,6 @@ begin
   Result := nil;
 end;
 
-procedure TACLCustomEdit.SetFocusToInnerEdit;
-begin
-  if FEditor <> nil then
-    FEditor.SetFocus;
-end;
-
 procedure TACLCustomEdit.DrawEditorBackground(ACanvas: TCanvas; const R: TRect);
 begin
   acFillRect(ACanvas, R, Style.ColorsContent[Enabled]);
@@ -1007,15 +1240,7 @@ begin
   if (FEditor = nil) and CanOpenEditor then
   begin
     FEditor := CreateEditor;
-    if FEditor <> nil then
-    begin
-      TWinControlAccess(FEditor).OnExit := HandlerEditorExit;
-      TWinControlAccess(FEditor).OnEnter := HandlerEditorEnter;
-      TWinControlAccess(FEditor).Parent := Self;
-      EditorUpdateBounds;
-      EditorUpdateParams;
-      EditorUpdateBounds;
-    end;
+    EditorHook(True);
   end;
 end;
 
@@ -1025,44 +1250,10 @@ begin
   UpdateBordersColor;
 end;
 
-procedure TACLCustomEdit.EditorUpdateBounds;
-var
-  LTemp: TRect;
-  LTempHeight: Integer;
-  LTempWidth: Integer;
-begin
-  if FEditor <> nil then
-  begin
-    LTemp := CalculateEditorPosition;
-    LTempHeight := LTemp.Height;
-    LTempWidth := LTemp.Width;
-    TWinControlAccess(FEditor).CanAutoSize(LTempWidth, LTempHeight);
-    if LTempHeight <> LTemp.Height then
-      LTemp.CenterVert(LTempHeight);
-    FEditor.BoundsRect := LTemp;
-    if HandleAllocated then
-    begin
-      if FEditor.Height > LTemp.Height then
-      begin
-        LTemp.Offset(-FEditor.Left, -FEditor.Top);
-        SetWindowRgn(FEditor.Handle, CreateRectRgnIndirect(LTemp), False);
-      end
-      else
-        SetWindowRgn(FEditor.Handle, 0, False);
-    end;
-  end;
-end;
-
-procedure TACLCustomEdit.EditorUpdateParams;
-begin
-  if FEditor <> nil then
-    EditorUpdateParamsCore;
-end;
-
 procedure TACLCustomEdit.EditorUpdateParamsCore;
 begin
+  inherited;
   TWinControlAccess(FEditor).Color := Style.ColorsContent[Enabled];
-  TWinControlAccess(FEditor).Font := Font;
   TWinControlAccess(FEditor).Font.Color := Style.ColorsText[Enabled];
 end;
 
@@ -1109,9 +1300,11 @@ end;
 
 procedure TACLCustomEdit.BoundsChanged;
 begin
-  inherited;
   if not (csDestroying in ComponentState) then
+  begin
     Calculate(ClientRect);
+    inherited;
+  end;
 {$IFDEF FPC}
   // RedrawOnResize? TACLTextureEditorDialog
   if (Parent <> nil) and (wcfAligningControls in TWinControlAccess(Parent).FWinControlFlags) then
@@ -1122,30 +1315,6 @@ end;
 procedure TACLCustomEdit.UpdateBordersColor;
 begin
   if HandleAllocated then Invalidate;
-end;
-
-procedure TACLCustomEdit.WMSetFocus(var Message: TWMSetFocus);
-begin
-  inherited;
-  SetFocusToInnerEdit;
-end;
-
-function TACLCustomEdit.Focused: Boolean;
-begin
-  Result := inherited Focused or (FEditor <> nil) and FEditor.Focused;
-end;
-
-procedure TACLCustomEdit.CMEnabledChanged(var Message: TMessage);
-begin
-  EditorUpdateParams;
-  BoundsChanged;
-  inherited;
-end;
-
-procedure TACLCustomEdit.CMFontChanged(var Message: TMessage);
-begin
-  inherited;
-  FullRefresh;
 end;
 
 procedure TACLCustomEdit.CMHintShow(var Message: TCMHintShow);
@@ -1159,6 +1328,14 @@ begin
     inherited;
 end;
 
+procedure TACLCustomEdit.CMWantSpecialKey(var Message: TMessage);
+begin
+  if Inplace then
+    Message.Result := 1
+  else
+    inherited;
+end;
+
 function TACLCustomEdit.GetCursor(const P: TPoint): TCursor;
 var
   AItem: TACLEditButton;
@@ -1167,13 +1344,6 @@ begin
     Result := crHandPoint
   else
     Result := Cursor;
-end;
-
-procedure TACLCustomEdit.GetTabOrderList(List: TTabOrderList);
-begin
-  inherited GetTabOrderList(List);
-  if (FEditor <> nil) and (List.IndexOf(FEditor) >= 0) then
-    List.Remove(Self);
 end;
 
 procedure TACLCustomEdit.Localize(const ASection: string);
@@ -1192,18 +1362,6 @@ begin
       Buttons.EndUpdate;
     end;
   end;
-end;
-
-procedure TACLCustomEdit.HandlerEditorEnter(Sender: TObject);
-begin
-  FocusChanged;
-  CallNotifyEvent(Self, OnEnter);
-end;
-
-procedure TACLCustomEdit.HandlerEditorExit(Sender: TObject);
-begin
-  FocusChanged;
-  CallNotifyEvent(Self, OnExit);
 end;
 
 procedure TACLCustomEdit.HandlerImageChange(Sender: TObject);
@@ -1258,42 +1416,6 @@ begin
   AutoSelect := True;
 end;
 
-procedure TACLInnerEdit.DeleteNearWord(AStartPosition, ADirection: Integer);
-const
-  Delims: UnicodeString = acParserDefaultDelimiterChars;
-var
-  LPosition: Integer;
-  LText: UnicodeString;
-  LTextLen: Integer;
-begin
-  LText := acUString(Text);
-  LTextLen := Length(LText);
-  LPosition := AStartPosition + ADirection;
-
-  // Skip spaces
-  while InRange(LPosition, 1, LTextLen) and acContains(LText[LPosition], Delims) do
-    Inc(LPosition, ADirection);
-
-  // Skip first word
-  while InRange(LPosition, 1, LTextLen) and not acContains(LText[LPosition], Delims) do
-    Inc(LPosition, ADirection);
-    
-  Text := acString(
-    Copy(LText, 1, Min(AStartPosition, LPosition)) +
-    Copy(LText, Max(AStartPosition, LPosition) + 1));
-  SelStart := Min(AStartPosition, LPosition);
-end;
-
-procedure TACLInnerEdit.DeleteWordFromLeftOfCursor;
-begin
-  DeleteNearWord(SelStart, -1);
-end;
-
-procedure TACLInnerEdit.DeleteWordFromRightOfCursor;
-begin
-  DeleteNearWord(SelStart, 1);
-end;
-
 function TACLInnerEdit.CanAutoSize(var NewWidth, NewHeight: Integer): Boolean;
 begin
   NewHeight := acFontHeight(Font);
@@ -1326,10 +1448,52 @@ begin
 {$ENDIF}
 end;
 
+{$IFDEF FPC}
+procedure TACLInnerEdit.CalculatePreferredSize(
+  var PreferredWidth, PreferredHeight: Integer; WithThemeSpace: Boolean);
+begin
+  CanAutoSize(PreferredWidth, PreferredHeight);
+end;
+{$ENDIF}
+
+procedure TACLInnerEdit.DeleteNearWord(AStartPosition, ADirection: Integer);
+const
+  Delims: UnicodeString = acParserDefaultDelimiterChars;
+var
+  LPosition: Integer;
+  LText: UnicodeString;
+  LTextLen: Integer;
+begin
+  LText := acUString(Text);
+  LTextLen := Length(LText);
+  LPosition := AStartPosition + ADirection;
+
+  // Skip spaces
+  while InRange(LPosition, 1, LTextLen) and acContains(LText[LPosition], Delims) do
+    Inc(LPosition, ADirection);
+
+  // Skip first word
+  while InRange(LPosition, 1, LTextLen) and not acContains(LText[LPosition], Delims) do
+    Inc(LPosition, ADirection);
+
+  Text := acString(
+    Copy(LText, 1, Min(AStartPosition, LPosition)) +
+    Copy(LText, Max(AStartPosition, LPosition) + 1));
+  SelStart := Min(AStartPosition, LPosition);
+end;
+
+procedure TACLInnerEdit.DeleteWordFromLeftOfCursor;
+begin
+  DeleteNearWord(SelStart, -1);
+end;
+
+procedure TACLInnerEdit.DeleteWordFromRightOfCursor;
+begin
+  DeleteNearWord(SelStart, 1);
+end;
+
 procedure TACLInnerEdit.KeyDown(var Key: Word; Shift: TShiftState);
 begin
-  inherited;
-  Container.KeyDown(Key, Shift);
   if [ssCtrl, ssShift, ssAlt] * Shift = [ssCtrl] then
   begin
     if (Key = 65) and ReadOnly then
@@ -1346,11 +1510,9 @@ end;
 
 procedure TACLInnerEdit.KeyPress(var Key: Char);
 begin
-  inherited;
 {$IFNDEF FPC}
   KeyPressCore(Key);
 {$ENDIF}
-  Container.KeyPress(Key);
 end;
 
 procedure TACLInnerEdit.KeyPressCore(var Key: WideChar);
@@ -1368,100 +1530,17 @@ begin
   end;
 end;
 
-procedure TACLInnerEdit.KeyUp(var Key: Word; Shift: TShiftState);
-begin
-  inherited;
-  Container.KeyUp(Key, Shift);
-end;
-
 {$IFDEF FPC}
 procedure TACLInnerEdit.Utf8KeyPress(var Key: TUTF8Char);
 begin
-  inherited;
+  inherited; {$MESSAGE 'TODO - IMPL!!'}
   ProcessUtf8KeyPress(Key, KeyPressCore);
-  Container.UTF8KeyPress(Key);
 end;
 {$ENDIF}
-
-procedure TACLInnerEdit.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
-begin
-  inherited;
-  Container.MouseDown(Button, Shift, X + Left, Y + Top);
-end;
-
-procedure TACLInnerEdit.MouseMove(Shift: TShiftState; X, Y: Integer);
-begin
-  inherited;
-  Container.MouseMove(Shift, X + Left, Y + Top);
-end;
-
-procedure TACLInnerEdit.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
-begin
-  inherited;
-  Container.MouseUp(Button, Shift, X + Left, Y + Top);
-end;
 
 function TACLInnerEdit.GetInnerContainer: TWinControl;
 begin
   Result := Parent;
-end;
-
-procedure TACLInnerEdit.CMEnter(var Message: TCMEnter);
-begin
-  inherited;
-  Parent.Perform(CM_ENTER, 0, 0);
-end;
-
-procedure TACLInnerEdit.CMExit(var Message: TCMExit);
-begin
-  inherited;
-  Parent.Perform(CM_EXIT, 0, 0);
-end;
-
-procedure TACLInnerEdit.CMTextChanged(var Message: TMessage);
-begin
-  if (Parent = nil) or not (csLoading in Parent.ComponentState) then
-    inherited;
-end;
-
-procedure TACLInnerEdit.CMWantSpecialKey(var Message: TMessage);
-begin
-  Message.Result := Parent.Perform(Message.Msg, Message.WParam, Message.LParam);
-  if Message.Result = 0 then
-    inherited;
-end;
-
-procedure TACLInnerEdit.WMContextMenu(var Message: TWMContextMenu);
-begin
-  if not Focused then
-  begin
-    SetFocus;
-    SelectAll;
-  end;
-
-  Message.Result := Parent.Perform(Message.Msg, Parent.Handle, TMessage(Message).LParam);
-  if Message.Result = 0 then
-    inherited;
-end;
-
-procedure TACLInnerEdit.WMNCHitTest(var Message: TWMNCHitTest);
-begin
-  if csDesigning in Container.ComponentState then
-    Message.Result := HTTRANSPARENT
-  else
-    inherited;
-end;
-
-procedure TACLInnerEdit.WMPaste(var Message: TMessage);
-begin
-  SelText := Clipboard.AsText;
-  SkipDefaultHandler(Handle, Message);
-  if Assigned(OnValidate) then OnValidate();
-end;
-
-function TACLInnerEdit.GetContainer: TACLCustomEdit;
-begin
-  Result := Parent as TACLCustomEdit;
 end;
 
 procedure TACLInnerEdit.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
@@ -1481,37 +1560,22 @@ begin
   end;
 end;
 
-{$IFDEF FPC}
-procedure TACLInnerEdit.CalculatePreferredSize(
-  var PreferredWidth, PreferredHeight: Integer; WithThemeSpace: Boolean);
+procedure TACLInnerEdit.CMTextChanged(var Message: TMessage);
 begin
-  CanAutoSize(PreferredWidth, PreferredHeight);
-end;
-{$ENDIF}
-
-{ TACLCustomInplaceEdit }
-
-constructor TACLCustomInplaceEdit.CreateInplace(const AParams: TACLInplaceInfo);
-var
-  ARect: TRect;
-begin
-  FInplace := True;
-  Create(nil);
-  Borders := False;
-  AutoSize := False;
-  OnKeyDown := AParams.OnKeyDown;
-  OnExit := AParams.OnApply;
-  Parent := AParams.Parent;
-
-  ARect := AParams.Bounds;
-  ARect.Left := AParams.TextBounds.Left - dpiApply(2, FCurrentPPI);
-  BoundsRect := ARect;
+  if (Parent = nil) or not (csLoading in Parent.ComponentState) then
+    inherited;
 end;
 
-procedure TACLCustomInplaceEdit.InplaceSetFocus;
+procedure TACLInnerEdit.WMPaste(var Message: TMessage);
 begin
-  SetFocus;
+  SelText := Clipboard.AsText;
+  SkipDefaultHandler(Handle, Message);
+  if Assigned(OnValidate) then OnValidate();
 end;
+
+{$ENDREGION}
+
+{$REGION ' Incremental Search '}
 
 { TACLIncrementalSearch }
 
@@ -1651,5 +1715,7 @@ begin
     end;
   end;
 end;
+
+{$ENDREGION}
 
 end.

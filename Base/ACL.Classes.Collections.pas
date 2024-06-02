@@ -147,8 +147,6 @@ type
   protected
     procedure Notify(Ptr: Pointer; Action: TListNotification); override;
   public
-    function AddIfAbsent(AValue: Pointer): Integer;
-    procedure AddRange(AValue: TACLList);
     function ChangePlace(AOldIndex, ANewIndex: Integer): Boolean;
     procedure Exchange(Index1, Index2: Integer);
     //# Events
@@ -159,6 +157,8 @@ type
 
   TACLListHelper = class helper for TList
   public
+    function AddIfAbsent(AValue: Pointer): Integer;
+    procedure AddRange(AValue: TList);
     function Contains(AItem: Pointer): Boolean; inline;
     procedure EnsureCapacity(ACount: Integer); inline;
     procedure Invert;
@@ -1043,22 +1043,6 @@ end;
 
 { TACLList }
 
-function TACLList.AddIfAbsent(AValue: Pointer): Integer;
-begin
-  Result := IndexOf(AValue);
-  if Result < 0 then
-    Result := Add(AValue);
-end;
-
-procedure TACLList.AddRange(AValue: TACLList);
-var
-  I: Integer;
-begin
-  EnsureCapacity(AValue.Count);
-  for I := 0 to AValue.Count - 1 do
-    Add(AValue.List[I]);
-end;
-
 function TACLList.ChangePlace(AOldIndex, ANewIndex: Integer): Boolean;
 var
   AOldValue: Pointer;
@@ -1590,6 +1574,22 @@ begin
 end;
 
 { TACLListHelper }
+
+function TACLListHelper.AddIfAbsent(AValue: Pointer): Integer;
+begin
+  Result := IndexOf(AValue);
+  if Result < 0 then
+    Result := Add(AValue);
+end;
+
+procedure TACLListHelper.AddRange(AValue: TList);
+var
+  I: Integer;
+begin
+  EnsureCapacity(AValue.Count);
+  for I := 0 to AValue.Count - 1 do
+    Add(AValue.List[I]);
+end;
 
 function TACLListHelper.Contains(AItem: Pointer): Boolean;
 begin
