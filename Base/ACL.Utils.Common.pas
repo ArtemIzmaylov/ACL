@@ -50,8 +50,12 @@ const
   MaxWord = Word.MaxValue;
 
 {$IFDEF MSWINDOWS}
+  E_ACCESSDENIED = Winapi.Windows.E_ACCESSDENIED;
+  E_FAIL = Winapi.Windows.E_FAIL;
   E_HANDLE = Winapi.Windows.E_HANDLE;
+  E_INVALIDARG = Winapi.Windows.E_INVALIDARG;
 {$ELSE}
+  E_ACCESSDENIED = HRESULT($80070005);
   E_FAIL = HRESULT($80004005);
   E_HANDLE = HRESULT($80070006);
   E_INVALIDARG = HRESULT($80070057);
@@ -221,6 +225,10 @@ function IfThen(AValue: Boolean; ATrue, AFalse: TACLBoolean): TACLBoolean; overl
 {$IFDEF MSWINDOWS}
 function WineGetVersion(out AVersion: string): Boolean;
 {$ENDIF}
+
+// HRESULT
+function Failed(Status: HRESULT) : BOOL;
+function Succeeded(Status: HRESULT) : BOOL;
 implementation
 
 {$IFDEF MSWINDOWS}
@@ -272,6 +280,20 @@ begin
     Result := SetErrorMode(Mode);
 end;
 {$ENDIF}
+
+//==============================================================================
+// HRESULT
+//==============================================================================
+
+function Failed(Status: HRESULT) : BOOL;
+begin
+  Result := Status and HRESULT($80000000) <> 0;
+end;
+
+function Succeeded(Status: HRESULT) : BOOL;
+begin
+  Result := Status and HRESULT($80000000) = 0;
+end;
 
 //==============================================================================
 // HMODULE

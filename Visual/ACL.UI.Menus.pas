@@ -2674,13 +2674,12 @@ function TACLMenuPopupLooper.PopupWindowAtCursor: TACLMenuPopupWindow;
 var
   LWnd: TACLMenuPopupWindow;
 begin
-  //LControl := FindControl(MouseCurrentWindow);
-  //Result := (LControl is TACLMenuPopupWindow) and
-  //  (TACLMenuPopupWindow(LControl).Looper = Self);
-  for LWnd in Popups do
+  LWnd := Popups.Peek;
+  while LWnd <> nil do
   begin
     if LWnd.IsMouseAtControl then
       Exit(LWnd);
+    LWnd := LWnd.Parent;
   end;
   Result := nil;
 end;

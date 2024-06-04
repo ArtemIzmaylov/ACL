@@ -557,8 +557,10 @@ function IfThenW(ACondition: Boolean; const ATrue: string; const AFalse: string 
 function IfThenW(const A, B: string): string; overload; inline;
 function acDupeString(const AText: string; ACount: Integer): string;
 function acTrim(const S: string): string;
-procedure acStrLCopy(ADest: PWideChar; const ASource: UnicodeString; AMax: Integer);
-function acStrLen(S: PWideChar; AMaxScanCount: Integer): Integer; inline;
+procedure acStrLCopy(ADest: PAnsiChar; const ASource: AnsiString; AMax: Integer); overload;
+procedure acStrLCopy(ADest: PWideChar; const ASource: UnicodeString; AMax: Integer); overload;
+function acStrLen(S: PAnsiChar; AMaxScanCount: Integer): Integer; overload; inline;
+function acStrLen(S: PWideChar; AMaxScanCount: Integer): Integer; overload; inline;
 function acStrScan(Str: PAnsiChar; ACount: Integer; C: AnsiChar): PAnsiChar; overload; inline;
 function acStrScan(Str: PAnsiChar; C: AnsiChar): PAnsiChar; overload; inline;
 function acStrScan(Str: PWideChar; ACount: Integer; C: WideChar): PWideChar; overload; inline;
@@ -2060,10 +2062,28 @@ begin
     Result := S;
 end;
 
+procedure acStrLCopy(ADest: PAnsiChar; const ASource: AnsiString; AMax: Integer);
+begin
+  FastZeroMem(ADest, AMax);
+  FastMove(PAnsiChar(ASource)^, ADest^, Min(AMax, Length(ASource)));
+end;
+
 procedure acStrLCopy(ADest: PWideChar; const ASource: UnicodeString; AMax: Integer);
 begin
   FastZeroMem(ADest, AMax * SizeOf(WideChar));
   FastMove(PWideChar(ASource)^, ADest^, SizeOf(WideChar) * Min(AMax, Length(ASource)));
+end;
+
+function acStrLen(S: PAnsiChar; AMaxScanCount: Integer): Integer;
+begin
+  Result := 0;
+  if S <> nil then
+    while (S^ <> #0) and (AMaxScanCount > 0) do
+    begin
+      Dec(AMaxScanCount);
+      Inc(Result);
+      Inc(S);
+    end;
 end;
 
 function acStrLen(S: PWideChar; AMaxScanCount: Integer): Integer;

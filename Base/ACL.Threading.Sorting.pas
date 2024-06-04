@@ -78,7 +78,7 @@ type
 
   TACLMultithreadedListSorter = class(TACLCustomMultithreadedSorter)
   protected
-    FCompareProc: TACLListCompareProc;
+    FCompareProc: TACLListCompareProcPtr;
     FList: PPointerArray;
     FTempList: PPointerArray;
 
@@ -87,9 +87,9 @@ type
     procedure QuickSort(L, R: Integer); override;
   public
     class procedure Sort(List: PPointerArray; Count: Integer;
-      CompareProc: TACLListCompareProc; Multithreadeding: Boolean = True); overload;
+      CompareProc: TACLListCompareProcPtr; Multithreadeding: Boolean = True); overload;
     class procedure Sort(List: TList;
-      CompareProc: TACLListCompareProc; Multithreadeding: Boolean = True); overload;
+      CompareProc: TACLListCompareProcPtr; Multithreadeding: Boolean = True); overload;
   end;
 
   { TACLMultithreadedStringListSorter }
@@ -259,7 +259,7 @@ end;
 { TACLMultithreadedListSorter }
 
 class procedure TACLMultithreadedListSorter.Sort(List: PPointerArray; Count: Integer;
-  CompareProc: TACLListCompareProc; Multithreadeding: Boolean = True);
+  CompareProc: TACLListCompareProcPtr; Multithreadeding: Boolean = True);
 begin
   if Count > 1 then
   begin
@@ -276,7 +276,7 @@ begin
 end;
 
 class procedure TACLMultithreadedListSorter.Sort(List: TList;
-  CompareProc: TACLListCompareProc; Multithreadeding: Boolean = True);
+  CompareProc: TACLListCompareProcPtr; Multithreadeding: Boolean = True);
 begin
   Sort(@List.List[0], List.Count, CompareProc, Multithreadeding);
 end;

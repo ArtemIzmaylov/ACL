@@ -194,16 +194,16 @@ type
     FFrameRect: TRect;
     FTabAreaRect: TRect;
 
-    function CreatePadding: TACLPadding; override;
-    function HitTest(X, Y: Integer; out AViewItem: TACLTabViewItem): Boolean;
-    function IsTabVisible(AIndex: Integer): Boolean;
     procedure AdjustClientRect(var Rect: TRect); override;
     procedure BoundsChanged; override;
-    procedure SetTargetDPI(AValue: Integer); override;
+    function CreatePadding: TACLPadding; override;
     procedure CreateWnd; override;
+    function HitTest(X, Y: Integer; out AViewItem: TACLTabViewItem): Boolean;
+    function IsTabVisible(AIndex: Integer): Boolean;
+    procedure SetTargetDPI(AValue: Integer); override;
+    procedure UpdateTransparency; override;
     procedure ValidateActiveTab;
     procedure ValidateFocus; virtual;
-    procedure UpdateTransparency; override;
 
     // Calculating
     function CalculateTabPlaceIndents(AItem: TACLTabViewItem): TRect; virtual;
@@ -316,11 +316,6 @@ type
     property Padding;
     property PageIndex: Integer read GetPageIndex write SetPageIndex stored False;
     property PageVisible: Boolean read FPageVisible write SetPageVisible default True;
-    //# Useless
-    property Height stored False;
-    property Left stored False;
-    property Top stored False;
-    property Width stored False;
   end;
 
   { TACLPageControl }

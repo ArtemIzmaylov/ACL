@@ -165,6 +165,7 @@ contains
   ACL.Utils.Shell in 'Base\ACL.Utils.Shell.pas',
   ACL.Utils.Stream in 'Base\ACL.Utils.Stream.pas',
   ACL.Utils.Strings in 'Base\ACL.Utils.Strings.pas',
+  ACL.Web.Auth in 'Base\ACL.Web.Auth.pas',
   ACL.Web.Http in 'Base\ACL.Web.Http.pas',
   ACL.Web in 'Base\ACL.Web.pas',
   ACL.Timers in 'Base\ACL.Timers.pas',

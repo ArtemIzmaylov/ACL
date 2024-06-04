@@ -137,6 +137,7 @@ type
     procedure SetSelText(const Value: string);
     procedure SetText(const Value: string);
   protected
+    function CreateEditor: TACLInnerMemo; virtual;
     function GetScrollBars: TScrollStyle; override;
     procedure SetScrollBars(AValue: TScrollStyle); override;
   public
@@ -402,9 +403,14 @@ end;
 constructor TACLMemo.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  FEditor := TACLInnerMemo.Create(Self);
+  FEditor := CreateEditor;
   ScrollBars := ssNone;
   EditorHook(True);
+end;
+
+function TACLMemo.CreateEditor: TACLInnerMemo;
+begin
+  Result := TACLInnerMemo.Create(Self);
 end;
 
 procedure TACLMemo.Clear;

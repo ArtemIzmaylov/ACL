@@ -139,8 +139,6 @@ type
 
   { TACLList }
 
-  TACLListCompareProc = reference to function (const Item1, Item2: Pointer): Integer;
-
   TACLList = class(TList)
   strict private
     FOnChanged: TNotifyEvent;
@@ -171,6 +169,7 @@ type
   end;
 
   TACLListCompareProc<T> = reference to function (const Left, Right: T): Integer;
+  TACLListCompareProcPtr = TACLListCompareProc<Pointer>;
 
   TACLList<T> = class(TACLEnumerable<T>)
   strict private type

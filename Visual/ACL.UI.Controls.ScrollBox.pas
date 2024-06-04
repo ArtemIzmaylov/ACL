@@ -114,6 +114,7 @@ type
   TACLCustomScrollBox = class(TACLCustomScrollingControl)
   strict private
     FAutoRangeLockCount: Integer;
+    FFocusing: Boolean;
   protected
     procedure AlignScrollBars(const ARect: TRect); override;
     function CalculateRange: TSize; virtual;
@@ -308,15 +309,22 @@ begin
 end;
 
 procedure TACLCustomScrollingControl.ScrollBy(dX, dY: Integer);
+
+  procedure TryScroll(var ADelta: Integer; AScrollBar: TACLScrollBar);
+  begin
+    if ADelta <> 0 then
+    begin
+      AScrollBar.Position := AScrollBar.Tag - ADelta;
+      ADelta := AScrollBar.Tag - AScrollBar.Position;
+      AScrollBar.Tag := AScrollBar.Position;
+    end;
+  end;
+
 begin
-  if (dX = 0) and (dY = 0) then Exit;
-
-  HorzScrollBar.Tag := HorzScrollBar.Tag - dX;
-  HorzScrollBar.Position := HorzScrollBar.Tag;
-  VertScrollBar.Tag := VertScrollBar.Tag - dY;
-  VertScrollBar.Position := VertScrollBar.Tag;
-
-  ScrollContent(dX, dY);
+  TryScroll(dX, HorzScrollBar);
+  TryScroll(dY, VertScrollBar);
+  if (dX <> 0) or (dY <> 0) then
+    ScrollContent(dX, dY);
 end;
 
 procedure TACLCustomScrollingControl.ScrollContent(dX, dY: Integer);
@@ -481,7 +489,9 @@ begin
 {$IFDEF FPC}
   {$MESSAGE 'TODO - CMFocusChanged - not implemented'}
 {$ELSE}
+  FFocusing := True;
   MakeVisible(TCMFocusChanged(Msg).Sender);
+  FFocusing := False;
 {$ENDIF}
 end;
 
@@ -531,6 +541,14 @@ begin
   LScrollBy := NullPoint;
   LClientRect := ClientRect;
   AdjustClientRect(LClientRect);
+
+  if not FFocusing then
+  begin
+    if ARect.Width > LClientRect.Width then
+      ARect.Width := LClientRect.Width;
+    if ARect.Height > LClientRect.Height then
+      ARect.Height := LClientRect.Height;
+  end;
 
   if ARect.Width <= LClientRect.Width then
   begin
