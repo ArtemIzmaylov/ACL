@@ -371,6 +371,7 @@ type
     class procedure ResetLocalization;
   end;
 
+procedure asMessageBeep(AType: TMsgDlgType);
 function acMessageBox(AHandle: HWND; const AMessage, ACaption: string; AFlags: Integer): Integer;
 implementation
 
@@ -381,6 +382,20 @@ uses
 
 type
   TControlAccess = class(TControl);
+
+procedure asMessageBeep(AType: TMsgDlgType);
+{$IFNDEF FPC}
+const
+  Map: array[TMsgDlgType] of Integer = (
+    MB_ICONWARNING, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONQUESTION, 0);
+{$ENDIF}
+begin
+{$IFDEF FPC}
+  Beep;
+{$ELSE}
+  MessageBeep(Map[AType]);
+{$ENDIF}
+end;
 
 function acMessageBox(AHandle: HWND; const AMessage, ACaption: string; AFlags: Integer): Integer;
 begin

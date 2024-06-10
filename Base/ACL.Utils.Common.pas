@@ -47,18 +47,26 @@ const
   NullSize: TSize = (cx: 0; cy: 0);
   Signs: array[Boolean] of Integer = (-1, 1);
 
-  MaxWord = Word.MaxValue;
+  MaxWord = High(Word);
 
 {$IFDEF MSWINDOWS}
+  E_ABORT = Winapi.Windows.E_ABORT;
   E_ACCESSDENIED = Winapi.Windows.E_ACCESSDENIED;
   E_FAIL = Winapi.Windows.E_FAIL;
   E_HANDLE = Winapi.Windows.E_HANDLE;
   E_INVALIDARG = Winapi.Windows.E_INVALIDARG;
+  E_PENDING = Winapi.Windows.E_PENDING;
+
+  SEM_FAILCRITICALERRORS = Winapi.Windows.SEM_FAILCRITICALERRORS;
 {$ELSE}
+  E_ABORT = HRESULT($80004004);
   E_ACCESSDENIED = HRESULT($80070005);
   E_FAIL = HRESULT($80004005);
   E_HANDLE = HRESULT($80070006);
   E_INVALIDARG = HRESULT($80070057);
+  E_PENDING = HRESULT($8000000A);
+
+  SEM_FAILCRITICALERRORS = 0; // just a stub
 {$ENDIF}
 
 {$IFDEF FPC}
@@ -192,10 +200,10 @@ function acModuleHandle(const AFileName: string): HMODULE;
 {$ENDIF}
 
 // Window Handles
-function acFindWindow(const AClassName: string): HWND;
-function acGetClassName(AWnd: HWND): string;
-function acGetProcessFileName(AWnd: HWND; out AFileName: string): Boolean;
-function acGetWindowRect(AWnd: HWND): TRect;
+function acFindWindow(const AClassName: string): TWndHandle;
+function acGetClassName(AWnd: TWndHandle): string;
+function acGetProcessFileName(AWnd: TWndHandle; out AFileName: string): Boolean;
+function acGetWindowRect(AWnd: TWndHandle): TRect;
 
 // System
 procedure MinimizeMemoryUsage;
@@ -213,12 +221,10 @@ procedure acExchangePointers(var AValue1, AValue2); inline;
 procedure acExchangeStrings(var AValue1, AValue2: string); inline;
 function acBoolToHRESULT(AValue: Boolean): HRESULT; inline;
 function acGenerateGUID: string;
-function acIsOK(Status: HRESULT): Boolean;
 function acLastSystemErrorMessage: string;
+function acLastSystemErrorHRESULT: HRESULT;
 function acObjectUID(AObject: TObject): string;
-{$IFDEF MSWINDOWS}
-function acSetThreadErrorMode(Mode: DWORD): DWORD;
-{$ENDIF}
+function acSetThreadErrorMode(Mode: DWORD): DWORD; // MSWINDOWS only!
 procedure FreeMemAndNil(var P: Pointer);
 function IfThen(AValue: Boolean; ATrue, AFalse: TACLBoolean): TACLBoolean; overload;
 
@@ -268,9 +274,9 @@ begin
 {$ENDIF}
 end;
 
-{$IFDEF MSWINDOWS}
 function acSetThreadErrorMode(Mode: DWORD): DWORD;
 begin
+{$IFDEF MSWINDOWS}
   if Assigned(FSetThreadErrorMode) then
   begin
     if not FSetThreadErrorMode(Mode, Result) then
@@ -278,8 +284,10 @@ begin
   end
   else
     Result := SetErrorMode(Mode);
-end;
+{$ELSE}
+  Result := 0;
 {$ENDIF}
+end;
 
 //==============================================================================
 // HRESULT
@@ -377,7 +385,7 @@ var
   AErrorMode: Cardinal;
   APrevCurPath: string;
 begin
-  AErrorMode := acSetThreadErrorMode(SEM_FailCriticalErrors);
+  AErrorMode := acSetThreadErrorMode(SEM_FAILCRITICALERRORS);
   try
     APrevCurPath := acGetCurrentDir;
     try
@@ -543,6 +551,16 @@ begin
   Result := SysErrorMessage({$IFDEF FPC}GetLastOSError{$ELSE}GetLastError{$ENDIF});
 end;
 
+function acLastSystemErrorHRESULT: HRESULT;
+begin
+{$IFDEF MSWINDOWS}
+  if GetLastError <> ERROR_SUCCESS then
+    Result := HResultFromWin32(GetLastError)
+  else
+{$ENDIF}
+    Result := E_FAIL;
+end;
+
 function acObjectUID(AObject: TObject): string;
 begin
   Result := IntToHex(NativeUInt(AObject), SizeOf(Pointer) * 2);
@@ -564,7 +582,7 @@ end;
 // Window Handle
 //==============================================================================
 
-function acGetClassName(AWnd: HWND): string;
+function acGetClassName(AWnd: TWndHandle): string;
 {$IFDEF MSWINDOWS}
 var
   ABuf: array[0..64] of Char;
@@ -578,7 +596,7 @@ begin
 {$ENDIF}
 end;
 
-function acFindWindow(const AClassName: string): HWND;
+function acFindWindow(const AClassName: string): TWndHandle;
 begin
 {$IFDEF MSWINDOWS}
   Result := FindWindow(PChar(AClassName), nil);
@@ -587,7 +605,7 @@ begin
 {$ENDIF}
 end;
 
-function acGetProcessFileName(AWnd: HWND; out AFileName: string): Boolean;
+function acGetProcessFileName(AWnd: TWndHandle; out AFileName: string): Boolean;
 {$IFDEF MSWINDOWS}
 var
   AProcess: THandle;
@@ -611,7 +629,7 @@ begin
 {$ENDIF}
 end;
 
-function acGetWindowRect(AWnd: HWND): TRect;
+function acGetWindowRect(AWnd: TWndHandle): TRect;
 begin
   if GetWindowRect(AWnd, Result{%H-}) = {$IFDEF FPC}0{$ELSE}False{$ENDIF} then
     Result := NullRect;
@@ -834,7 +852,7 @@ begin
     Result := False;
 end;
 
-class function TACLProcess.IsWow64Window(AWindow: HWND): LongBool;
+class function TACLProcess.IsWow64Window(AWindow: TWndHandle): LongBool;
 var
   AProcessID: Cardinal;
   AProcessHandle: THandle;

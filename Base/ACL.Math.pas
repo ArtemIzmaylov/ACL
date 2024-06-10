@@ -44,6 +44,7 @@ function Swap64(const AValue: Int64): Int64;
 function HiInteger(const A: UInt64): Integer;
 function LoInteger(const A: UInt64): Integer;
 function MakeInt64(const A, B: Integer): UInt64;
+function MulDiv(const AValue, ANumerator, ADenominator: Integer): Integer;
 function MulDiv64(const AValue, ANumerator, ADenominator: Int64): Int64;
 implementation
 
@@ -141,6 +142,11 @@ end;
 function MakeInt64(const A, B: Integer): UInt64;
 begin
   Result := UInt64(A) or (UInt64(B) shl 32);
+end;
+
+function MulDiv(const AValue, ANumerator, ADenominator: Integer): Integer;
+begin
+  Result := (AValue * ANumerator) div ADenominator;
 end;
 
 function MulDiv64(const AValue, ANumerator, ADenominator: Int64): Int64;

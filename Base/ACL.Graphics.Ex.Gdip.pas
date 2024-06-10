@@ -410,13 +410,16 @@ procedure GpDrawImage(AGraphics: GpGraphics; AImage: GpImage; AImageAttributes: 
 
   function GpIsRectVisible(AGraphics: GpGraphics; const R: TRect): LongBool;
   begin
-    Result := GdipIsVisibleRectI(AGraphics, R.Left, R.Top, R.Right - R.Left, R.Bottom - R.Top, Result) = Ok;
+    try
+      Result := GdipIsVisibleRectI(AGraphics, R.Left, R.Top, R.Width, R.Height, Result) = Ok;
+    except
+      Result := False; // Wine, "floating point operation" in GdipInvertMatrix
+    end;
   end;
 
   function CreateTextureBrush(const R: TRect; out ATexture: GpTexture): Boolean;
   begin
-    Result := GdipCreateTexture2I(AImage, WrapModeTile, R.Left, R.Top,
-      R.Right - R.Left, R.Bottom - R.Top, ATexture) = Ok;
+    Result := GdipCreateTexture2I(AImage, WrapModeTile, R.Left, R.Top, R.Width, R.Height, ATexture) = Ok;
   end;
 
   procedure StretchPart(const ADstRect, ASrcRect: TRect);
@@ -1266,7 +1269,11 @@ end;
 procedure TACLGdiplusRender.FillRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor);
 begin
   if (X2 > X1) and (Y2 > Y1) and Color.IsValid then
+  try
     GdipFillRectangle(FGraphics, TACLGdiplusResourcesCache.BrushGet(Color), X1, Y1, X2 - X1, Y2 - Y1);
+  except
+    // Wine, "floating point operation" in GdipInvertMatrix
+  end;
 end;
 
 procedure TACLGdiplusRender.FillRectangleByGradient(
@@ -1280,11 +1287,17 @@ begin
   ABrushRect.Width := R.Width + 2;
   ABrushRect.Height := R.Height + 2;
   if (ABrushRect.Width > 0) and (ABrushRect.Height > 0) then
-  begin
-    GdipCheck(GdipCreateLineBrushFromRectI(@ABrushRect, AColor1, AColor2,
-      TACLMath.IfThen(AVertical, gmVertical, gmHorizontal), WrapModeTile, ABrush));
-    GdipCheck(GdipFillRectangleI(FGraphics, ABrush, R.Left, R.Top, R.Width, R.Height));
-    GdipCheck(GdipDeleteBrush(ABrush));
+  try
+    if GdipCreateLineBrushFromRectI(@ABrushRect, AColor1, AColor2,
+      TACLMath.IfThen(AVertical, gmVertical, gmHorizontal),
+      WrapModeTile, ABrush) = Ok then
+    try
+      GdipFillRectangleI(FGraphics, ABrush, R.Left, R.Top, R.Width, R.Height);
+    finally
+      GdipDeleteBrush(ABrush);
+    end;
+  except
+    // Wine, "floating point operation" in GdipInvertMatrix
   end;
 end;
 

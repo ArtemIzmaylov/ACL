@@ -20,9 +20,9 @@ uses
   LCLIntf,
   LCLType,
 {$ELSE}
+  {Winapi.}Messages,
   {Winapi.}Windows,
 {$ENDIF}
-  {Winapi.}Messages,
   // System
   {System.}Classes,
   {System.}Math,

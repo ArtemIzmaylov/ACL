@@ -21,7 +21,6 @@ uses
 {$ENDIF}
   // System
   {System.}Classes,
-  {System.}Generics.Collections,
   {System.}Generics.Defaults,
   {System.}Math,
   {System.}SysUtils,
@@ -35,7 +34,6 @@ uses
   ACL.Classes,
   ACL.Classes.Collections,
   ACL.Classes.StringList,
-  ACL.FastCode,
   ACL.Utils.Common,
   ACL.Utils.FileSystem,
   ACL.Utils.Strings,
@@ -285,7 +283,7 @@ uses
 const
   SQLErrorMessage = 'Error: %s (%d)' + acCRLF + 'Last query:' + acCRLF + '%s';
 
-  SQLITE_GET_TABLES_QUERY = 'SELECT name FROM sqlite_master WHERE (type="table") ORDER BY name;';
+  //SQLITE_GET_TABLES_QUERY = 'SELECT name FROM sqlite_master WHERE (type="table") ORDER BY name;';
 
 type
 

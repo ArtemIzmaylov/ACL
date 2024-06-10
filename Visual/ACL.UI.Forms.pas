@@ -170,7 +170,7 @@ type
     procedure PaddingChangeHandler(Sender: TObject);
     procedure UpdateNonClientColors;
   protected
-    FOwnerHandle: HWND;
+    FOwnerHandle: TWndHandle;
     FRecreateWndLockCount: Integer;
 
     procedure AdjustClientRect(var Rect: TRect); override;
@@ -210,7 +210,7 @@ type
     procedure WndProc(var Message: TMessage); override;
   public
     constructor Create(AOwner: TComponent); override;
-    constructor CreateDialog(AOwnerHandle: HWND; ANew: Boolean = False); virtual;
+    constructor CreateDialog(AOwnerHandle: TWndHandle; ANew: Boolean = False); virtual;
     constructor CreateNew(AOwner: TComponent; Dummy: Integer = 0); override;
     destructor Destroy; override;
     procedure AfterConstruction; override;
@@ -835,7 +835,7 @@ begin
   AfterFormCreate;
 end;
 
-constructor TACLForm.CreateDialog(AOwnerHandle: HWND; ANew: Boolean = False);
+constructor TACLForm.CreateDialog(AOwnerHandle: TWndHandle; ANew: Boolean = False);
 var
   AOwner: TComponent;
 begin

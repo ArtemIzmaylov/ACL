@@ -1149,7 +1149,7 @@ var
   LMetrics: PCairoTextLayoutMetrics;
 begin
   LMetrics := PCairoTextLayoutMetrics(LBlock.FMetrics);
-  if (LMetrics <> nil) and (LMetrics^.Count > 0) then
+  if (LMetrics <> nil) and (LMetrics^.Count > 0) and (ABlock.TextLengthVisible > 0) then
   begin
     Dec(X, FOrigin.X);
     Dec(Y, FOrigin.Y);

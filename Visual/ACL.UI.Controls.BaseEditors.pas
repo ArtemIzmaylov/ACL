@@ -374,6 +374,7 @@ type
     function GetInnerContainer: TWinControl;
   public
     constructor Create(AOwner: TComponent); override;
+    procedure DefaultHandler(var Message); override;
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
     //# Properties
     property AutoSelect;
@@ -1456,6 +1457,16 @@ begin
 end;
 {$ENDIF}
 
+procedure TACLInnerEdit.DefaultHandler(var Message);
+begin
+  try
+    inherited;
+  except
+    // Access violation at address 000000026B55E080 in module 'gdi32.dll'
+    // gdi32.dll  ScriptPlaceOpenType (Wine)
+  end;
+end;
+
 procedure TACLInnerEdit.DeleteNearWord(AStartPosition, ADirection: Integer);
 const
   Delims: UnicodeString = acParserDefaultDelimiterChars;
@@ -1533,7 +1544,7 @@ end;
 {$IFDEF FPC}
 procedure TACLInnerEdit.Utf8KeyPress(var Key: TUTF8Char);
 begin
-  inherited; {$MESSAGE 'TODO - IMPL!!'}
+  inherited;
   ProcessUtf8KeyPress(Key, KeyPressCore);
 end;
 {$ENDIF}

@@ -792,6 +792,7 @@ procedure acRestoreFocus(ASavedFocus: HWND);
 function acSaveDC(ACanvas: TCanvas): Integer;
 function acSaveFocus: HWND;
 function acSafeSetFocus(AControl: TWinControl): Boolean;
+procedure acSetFocus(AWnd: TWndHandle);
 
 // Keyboard
 function acGetShiftState: TShiftState;
@@ -1136,6 +1137,11 @@ begin
   except
     Result := False;
   end;
+end;
+
+procedure acSetFocus(AWnd: TWndHandle);
+begin
+  SetFocus(AWnd);
 end;
 
 function CallCustomDrawEvent(Sender: TObject; AEvent: TACLCustomDrawEvent;

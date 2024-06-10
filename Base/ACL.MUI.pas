@@ -174,6 +174,7 @@ uses
 {$ENDIF}
   // ACL
   ACL.Utils.FileSystem,
+  ACL.Utils.Messaging,
   ACL.Utils.Strings;
 
 var
@@ -510,9 +511,9 @@ begin
 
 {$IFNDEF ACL_BASE_NOVCL}
   if Assigned(Application.MainForm) then
-    SendMessage(Application.MainForm.Handle, WM_ACL_LANG, 0, 0);
+    acSendMessage(Application.MainForm.Handle, WM_ACL_LANG, 0, 0);
   for I := 0 to Screen.FormCount - 1 do
-    SendMessage(Screen.Forms[I].Handle, WM_ACL_LANG, 0, 0);
+    acSendMessage(Screen.Forms[I].Handle, WM_ACL_LANG, 0, 0);
 {$ENDIF}
 
   FListeners.Enum<IACLLocalizationListener>(

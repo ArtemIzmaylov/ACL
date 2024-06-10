@@ -26,7 +26,9 @@ uses
 {$ENDIF}
   {Winapi.}Messages,
   // System
-  {System.}Classes;
+  {System.}Classes,
+  // ACL
+  ACL.Utils.Common;
 
 type
 {$IFDEF FPC}
@@ -40,7 +42,7 @@ type
   TACLMessaging = class sealed
   strict private
     class var FCustomMessages: TObject;
-    class var FHandle: HWND;
+    class var FHandle: TWndHandle;
     class var FHandlers: TObject;
 
     class procedure EnsureInitialized;
@@ -56,7 +58,7 @@ type
     class procedure PostMessage(AMessage: Cardinal; AParamW: WPARAM; AParamL: LPARAM);
     class procedure SendMessage(AMessage: Cardinal; AParamW: WPARAM; AParamL: LPARAM);
     // Properties
-    class property Handle: HWND read FHandle;
+    class property Handle: TWndHandle read FHandle;
   end;
 
 {$IFNDEF FPC}
@@ -65,18 +67,21 @@ type
 
   TMessagesHelper = class
   public
-    class function IsInQueue(AWndHandle: HWND; AMessage: Cardinal): Boolean;
-    class procedure Process(AFromMessage, AToMessage: Cardinal; AWndHandle: HWND = 0); overload;
-    class procedure Process(AMessage: Cardinal; AWndHandle: HWND = 0); overload;
-    class procedure Remove(AMessage: Cardinal; AWndHandle: HWND = 0);
+    class function IsInQueue(AWndHandle: TWndHandle; AMessage: Cardinal): Boolean;
+    class procedure Process(AFromMessage, AToMessage: Cardinal; AWndHandle: TWndHandle = 0); overload;
+    class procedure Process(AMessage: Cardinal; AWndHandle: TWndHandle = 0); overload;
+    class procedure Remove(AMessage: Cardinal; AWndHandle: TWndHandle = 0);
   end;
 
 {$ENDIF}
 
 function WndCreate(Method: TWndMethod; const ClassName: string;
-  IsMessageOnly: Boolean = False; const Name: string = ''): HWND;
-procedure WndDefaultProc(W: HWND; var Message: TMessage);
-procedure WndFree(W: HWND);
+  IsMessageOnly: Boolean = False; const Name: string = ''): TWndHandle;
+procedure WndDefaultProc(W: TWndHandle; var Message: TMessage);
+procedure WndFree(W: TWndHandle);
+
+function acSendMessage(AWnd: TWndHandle; AMsg: Cardinal; WParam: WPARAM; LParam: LPARAM): LRESULT;
+function acPostMessage(AWnd: TWndHandle; AMsg: Cardinal; WParam: WPARAM; LParam: LPARAM): Boolean;
 implementation
 
 uses
@@ -88,10 +93,33 @@ uses
   ACL.Classes.StringList,
   ACL.Threading;
 
+function acSendMessage(AWnd: TWndHandle; AMsg: Cardinal; WParam: WPARAM; LParam: LPARAM): LRESULT;
 {$IFDEF FPC}
+var
+  LInnerResult: LRESULT;
+{$ENDIF}
+begin
+{$IFDEF FPC}
+  if not IsMainThread then
+  begin
+    LInnerResult := 0;
+    TThread.Synchronize(nil, procedure begin
+      LInnerResult := LCLIntf.SendMessage(AWnd, AMsg, WParam, LParam);
+    end);
+    Exit(LInnerResult);
+  end;
+{$ENDIF}
+  Result := SendMessage(AWnd, AMsg, WParam, LParam);
+end;
 
+function acPostMessage(AWnd: TWndHandle; AMsg: Cardinal; WParam: WPARAM; LParam: LPARAM): Boolean;
+begin
+  Result := PostMessage(AWnd, AMsg, WParam, LParam);
+end;
+
+{$IFDEF FPC}
 function WndCreate(Method: TWndMethod; const ClassName: string;
-  IsMessageOnly: Boolean; const Name: string): HWND;
+  IsMessageOnly: Boolean; const Name: string): TWndHandle;
 begin
   if not IsMainThread then
     raise EInvalidOperation.Create('Cannot create window in non-main thread');
@@ -100,12 +128,12 @@ begin
     raise ENotImplemented.Create('AllocateHWnd is not implemented for this platform');
 end;
 
-procedure WndDefaultProc(W: HWND; var Message: TMessage);
+procedure WndDefaultProc(W: TWndHandle; var Message: TMessage);
 begin
   // do nothing
 end;
 
-procedure WndFree(W: HWND);
+procedure WndFree(W: TWndHandle);
 begin
   DeallocateHWnd(W);
 end;
@@ -119,7 +147,7 @@ var
   UtilWindowClassName: string;
 
 function WndCreate(Method: TWndMethod; const ClassName: string;
-  IsMessageOnly: Boolean = False; const Name: string = ''): HWND;
+  IsMessageOnly: Boolean = False; const Name: string = ''): TWndHandle;
 var
   ClassRegistered: Boolean;
   TempClass: TWndClass;
@@ -142,12 +170,12 @@ begin
     SetWindowLong(Result, GWL_WNDPROC, NativeUInt(System.Classes.MakeObjectInstance(Method)));
 end;
 
-procedure WndDefaultProc(W: HWND; var Message: TMessage);
+procedure WndDefaultProc(W: TWndHandle; var Message: TMessage);
 begin
   Message.Result := DefWindowProc(W, Message.Msg, Message.WParam, Message.LParam);
 end;
 
-procedure WndFree(W: HWND);
+procedure WndFree(W: TWndHandle);
 var
   AInstance: Pointer;
 begin
@@ -162,14 +190,14 @@ end;
 
 { TMessagesHelper }
 
-class function TMessagesHelper.IsInQueue(AWndHandle: HWND; AMessage: Cardinal): Boolean;
+class function TMessagesHelper.IsInQueue(AWndHandle: TWndHandle; AMessage: Cardinal): Boolean;
 var
   AMsg: TMSG;
 begin
   Result := PeekMessage(AMsg, AWndHandle, AMessage, AMessage, PM_NOREMOVE) and (AMsg.hwnd = AWndHandle);
 end;
 
-class procedure TMessagesHelper.Process(AFromMessage, AToMessage: Cardinal; AWndHandle: HWND = 0);
+class procedure TMessagesHelper.Process(AFromMessage, AToMessage: Cardinal; AWndHandle: TWndHandle = 0);
 var
   AMsg: TMsg;
 begin
@@ -180,12 +208,12 @@ begin
   end;
 end;
 
-class procedure TMessagesHelper.Process(AMessage: Cardinal; AWndHandle: HWND = 0);
+class procedure TMessagesHelper.Process(AMessage: Cardinal; AWndHandle: TWndHandle = 0);
 begin
   Process(AMessage, AMessage, AWndHandle);
 end;
 
-class procedure TMessagesHelper.Remove(AMessage: Cardinal; AWndHandle: HWND = 0);
+class procedure TMessagesHelper.Remove(AMessage: Cardinal; AWndHandle: TWndHandle = 0);
 var
   AMsg: TMsg;
 begin
@@ -221,24 +249,12 @@ end;
 
 class procedure TACLMessaging.PostMessage(AMessage: Cardinal; AParamW: WPARAM; AParamL: LPARAM);
 begin
-{$IFDEF FPC}
-  LCLIntf.PostMessage(FHandle, AMessage, AParamW, AParamL);
-{$ELSE}
-  {Winapi.}Windows.PostMessage(FHandle, AMessage, AParamW, AParamL);
-{$ENDIF}
+  acPostMessage(FHandle, AMessage, AParamW, AParamL);
 end;
 
 class procedure TACLMessaging.SendMessage(AMessage: Cardinal; AParamW: WPARAM; AParamL: LPARAM);
 begin
-{$IFDEF FPC}
-  TThread.Synchronize(nil,
-    procedure
-    begin
-      LCLIntf.SendMessage(FHandle, AMessage, AParamW, AParamL);
-    end);
-{$ELSE}
-  {Winapi.}Windows.SendMessage(FHandle, AMessage, AParamW, AParamL);
-{$ENDIF}
+  acSendMessage(FHandle, AMessage, AParamW, AParamL);
 end;
 
 class function TACLMessaging.RegisterMessage(const AName: string): Cardinal;
