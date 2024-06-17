@@ -1,17 +1,19 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*     Formatted Text with alpha channel     *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             v6.0
+//
+//  Purpose:   Formatted Text based on BB-codes (with alpha-channel)
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
 unit ACL.Graphics.TextLayout32;
 
-{$I ACL.Config.inc} // FPC:OK
+{$I ACL.Config.inc}
 {$SCOPEDENUMS ON}
 
 interface

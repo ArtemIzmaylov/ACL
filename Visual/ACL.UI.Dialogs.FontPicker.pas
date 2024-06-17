@@ -1,17 +1,19 @@
-﻿{*********************************************}
-{*                                           *}
-{*     Artem's Visual Components Library     *}
-{*            Font Picker Dialog             *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Controls Library aka ACL
+//             v6.0
+//
+//  Purpose:   Font Picker Dialog
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
 unit ACL.UI.Dialogs.FontPicker;
 
-{$I ACL.Config.inc} // FPC:OK
+{$I ACL.Config.inc}
 
 interface
 

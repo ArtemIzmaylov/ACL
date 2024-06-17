@@ -1,17 +1,19 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*             Strings Utilities             *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             v6.0
+//
+//  Purpose:   String Utilities
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
 unit ACL.Utils.Strings;
 
-{$I ACL.Config.inc} //FPC:OK
+{$I ACL.Config.inc}
 {$POINTERMATH ON}
 
 interface

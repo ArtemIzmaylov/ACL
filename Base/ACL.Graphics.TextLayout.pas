@@ -1,14 +1,16 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*     Formatted Text based on BB Codes      *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             v6.0
+//
+//  Purpose:   Formatted Text based on BB-codes
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
 unit ACL.Graphics.TextLayout;
 
 {$I ACL.Config.inc}

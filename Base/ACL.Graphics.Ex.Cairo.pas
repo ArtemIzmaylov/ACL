@@ -1,16 +1,18 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*         Extended Graphic Library          *}
-{*            Cairo Integration              *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2024-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
-unit ACL.Graphics.Ex.Cairo; // FPC:OK
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             Extended Graphics Library
+//             v6.0
+//
+//  Purpose:   Cairo Wrappers
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
+unit ACL.Graphics.Ex.Cairo;
 
 {$I ACL.Config.inc}
 

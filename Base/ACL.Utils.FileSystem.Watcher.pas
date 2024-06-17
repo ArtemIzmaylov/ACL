@@ -1,20 +1,20 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*        FileSystem Change Watchers         *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             v6.0
+//
+//  Purpose:   FileSystem Changes Watcher
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       Partial
+//             Linux: recursive monitoring does not supported by current gio api
+//
 unit ACL.Utils.FileSystem.Watcher;
 
-{$I ACL.Config.inc} // FPC:Partial
-
-// WARNING!
-//   Linux: recursive monitoring does not supported by current gio api
+{$I ACL.Config.inc}
 
 interface
 

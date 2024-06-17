@@ -1,17 +1,19 @@
-﻿{*********************************************}
-{*                                           *}
-{*     Artem's Visual Components Library     *}
-{*           Docking Layout Manager          *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2023-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Controls Library aka ACL
+//             v6.0
+//
+//  Purpose:   Docking Layout Manager
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
 unit ACL.UI.Controls.Docking;
 
-{$I ACL.Config.inc} // FPC:OK
+{$I ACL.Config.inc}
 {$R ACL.UI.Controls.Docking.res} // TODO: move to Styles
 
 {$DEFINE ACL_DOCKING_ANIMATE_SIDEBAR}

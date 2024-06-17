@@ -1,17 +1,19 @@
-﻿{*********************************************}
-{*                                           *}
-{*     Artem's Visual Components Library     *}
-{*            Shell Browse Dialog            *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Controls Library aka ACL
+//             v6.0
+//
+//  Purpose:   Folder Browser Dialog
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
 unit ACL.UI.Dialogs.FolderBrowser;
 
-{$I ACL.Config.inc} // FPC:OK
+{$I ACL.Config.inc}
 
 interface
 

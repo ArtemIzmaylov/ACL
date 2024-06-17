@@ -1,17 +1,19 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*           Thread Pool Routines            *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             v6.0
+//
+//  Purpose:   Thread Pool
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
 unit ACL.Threading.Pool;
 
-{$I ACL.Config.inc} // FPC:OK
+{$I ACL.Config.inc}
 
 interface
 

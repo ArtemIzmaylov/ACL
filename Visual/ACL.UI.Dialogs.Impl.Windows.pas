@@ -1,14 +1,16 @@
-﻿{*********************************************}
-{*                                           *}
-{*     Artem's Visual Components Library     *}
-{*          Windows Dialogs Wrappes          *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Controls Library aka ACL
+//             v6.0
+//
+//  Purpose:   General Dialogs (Implementation for Windows)
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
 unit ACL.UI.Dialogs.Impl.Windows;
 
 {$I ACL.Config.inc}

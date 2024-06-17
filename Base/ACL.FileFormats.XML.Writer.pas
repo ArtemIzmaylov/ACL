@@ -1,21 +1,22 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*         Stream based XML Writer           *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
-unit ACL.FileFormats.XML.Writer; //FPC:OK
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             v6.0
+//
+//  Purpose:   Stream-based XML Writer
+//             Based on .NET platform code:
+//             https://github.com/microsoft/referencesource/tree/master/System.Xml/System/Xml/Core
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
+unit ACL.FileFormats.XML.Writer;
 
 {$I ACL.Config.inc}
 {$SCOPEDENUMS ON}
-
-// Ported from .NET platform:
-// https://github.com/microsoft/referencesource/tree/master/System.Xml/System/Xml/Core
 
 interface
 

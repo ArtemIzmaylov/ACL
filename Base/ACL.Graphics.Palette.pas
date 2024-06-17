@@ -1,21 +1,22 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*       Material Design like Palette        *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             v6.0
+//
+//  Purpose:   Material Design like Palette
+//  Based on:
+//             https://android.googlesource.com/platform/frameworks/base.git/+/master/packages/SystemUI/src/com/android/systemui/statusbar/notification/MediaNotificationProcessor.java
+//             https://developer.android.com/training/material/palette-colors#extract-color-profiles
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
 unit ACL.Graphics.Palette;
 
-{$I ACL.Config.inc} // FPC:OK
-
-// Based on:
-// https://android.googlesource.com/platform/frameworks/base.git/+/master/packages/SystemUI/src/com/android/systemui/statusbar/notification/MediaNotificationProcessor.java
-// https://developer.android.com/training/material/palette-colors#extract-color-profiles
+{$I ACL.Config.inc}
 
 {.$DEFINE DEBUG_DUMP_ACCENT_PALETTE_QUANTANIZER}
 

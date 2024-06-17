@@ -1,17 +1,19 @@
-﻿{*********************************************}
-{*                                           *}
-{*     Artem's Visual Components Library     *}
-{*            Search Like Controls           *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Controls Library aka ACL
+//             v6.0
+//
+//  Purpose:   SearchBox
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
 unit ACL.UI.Controls.SearchBox;
 
-{$I ACL.Config.inc} // FPC:OK
+{$I ACL.Config.inc}
 
 interface
 

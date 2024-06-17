@@ -1,17 +1,19 @@
-﻿{*********************************************}
-{*                                           *}
-{*     Artem's Visual Components Library     *}
-{*          TrayIcon Implementation          *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Controls Library aka ACL
+//             v6.0
+//
+//  Purpose:   tray icon
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       Partial
+//
 unit ACL.UI.TrayIcon;
 
-{$I ACL.Config.inc} // FPC:Partial
+{$I ACL.Config.inc}
 
 {
   FPC:ToDo:

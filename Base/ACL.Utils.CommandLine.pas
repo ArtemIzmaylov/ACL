@@ -1,17 +1,19 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*          Command Line Processor           *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             v6.0
+//
+//  Purpose:   High-level command line switch processor
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
 unit ACL.Utils.CommandLine;
 
-{$I ACL.Config.inc} // FPC:OK
+{$I ACL.Config.inc}
 
 interface
 

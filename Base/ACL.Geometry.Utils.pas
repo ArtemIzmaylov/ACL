@@ -1,22 +1,22 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*       Operators for Geometry types        *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
-unit ACL.Geometry.Utils; // FPC:OK
-
-(*
-   Disclamer:
-     FreePascal does not allow to define the operators in record helpers,
-     but in objfpc mode it allow to define global operators.
-     So, mission of the unit is resolve operators issue in our code.
-*)
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             v6.0
+//
+//  Purpose:   Operators for Geometry types (FreePascal special)
+//
+//  Disclamer:
+//             FreePascal does not allow to define the operators in record helpers,
+//             but in objfpc mode it allow to define global operators.
+//             So, mission of the unit is resolve operators issue in our code.
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
+unit ACL.Geometry.Utils;
 
 {$IFDEF FPC}
   {$mode objfpc}{$H+}

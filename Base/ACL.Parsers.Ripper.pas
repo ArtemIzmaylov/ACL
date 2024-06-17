@@ -1,17 +1,19 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*       High-level Parsers Routines         *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2021-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             v6.0
+//
+//  Purpose:   High-level parsing routines
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
 unit ACL.Parsers.Ripper;
 
-{$I ACL.Config.inc} // FPC:OK
+{$I ACL.Config.inc}
 
 interface
 

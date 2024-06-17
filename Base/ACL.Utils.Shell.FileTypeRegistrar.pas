@@ -1,14 +1,16 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*              Common Classes               *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2021                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             v6.0
+//
+//  Purpose:   Registration for file types
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       NotImplemented
+//
 unit ACL.Utils.Shell.FileTypeRegistrar;
 
 // Refer to the http://msdn.microsoft.com/en-us/library/windows/desktop/cc144154(v=vs.85).aspx for more details

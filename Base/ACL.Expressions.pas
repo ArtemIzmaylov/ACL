@@ -1,26 +1,26 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*       Custom Expressions Processor        *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             v6.0
+//
+//  Purpose:   Expressions processor
+//             Refer following for more information about algorithms:
+//               http://ru.wikipedia.org/wiki/Обратная_польская_запись
+//               http://msdn.microsoft.com/ru-ru/library/ms139741.aspx
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
 unit ACL.Expressions;
 
-{$I ACL.Config.inc} //FPC:OK
-
-// Refer to the followed links for more information:
-// + http://ru.wikipedia.org/wiki/Обратная_польская_запись
-// + http://msdn.microsoft.com/ru-ru/library/ms139741.aspx
+{$I ACL.Config.inc}
 
 interface
 
 uses
-  // System
   {System.}Classes,
   {System.}Generics.Collections,
   {System.}Math,

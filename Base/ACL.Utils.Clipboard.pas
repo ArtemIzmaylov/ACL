@@ -1,17 +1,19 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*   Clipboard and Data Sharing Utilities    *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             v6.0
+//
+//  Purpose:   Clipboard and OS-wide data sharing utilities
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       Partial
+//
 unit ACL.Utils.Clipboard;
 
-{$I ACL.Config.inc} // FPC:Partial
+{$I ACL.Config.inc}
 
 {
    FPC: TODO

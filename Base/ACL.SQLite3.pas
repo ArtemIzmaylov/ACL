@@ -1,14 +1,16 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*         SQLite Database Wrappers          *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             v6.0
+//
+//  Purpose:   SQLite3 Wrappers
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
 unit ACL.SQLite3;
 
 {$I ACL.Config.inc}

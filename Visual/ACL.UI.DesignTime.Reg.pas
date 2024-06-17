@@ -1,14 +1,16 @@
-﻿{*********************************************}
-{*                                           *}
-{*     Artem's Visual Components Library     *}
-{*        Register Components Helper         *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2023                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Controls Library aka ACL
+//             v6.0
+//
+//  Purpose:   Design Time Routines
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
 unit ACL.UI.DesignTime.Reg;
 
 {$I ACL.Config.inc}

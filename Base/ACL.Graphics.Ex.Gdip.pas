@@ -1,15 +1,17 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*         Extended Graphic Library          *}
-{*            GDI+ Integration               *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             Extended Graphics Library
+//             v6.0
+//
+//  Purpose:   Gdi+ Wrappers
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
 unit ACL.Graphics.Ex.Gdip;
 
 {$I ACL.Config.inc}

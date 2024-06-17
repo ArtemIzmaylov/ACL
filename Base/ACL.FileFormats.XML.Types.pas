@@ -1,21 +1,22 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*    General Types for XML Reader/Writer    *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             v6.0
+//
+//  Purpose:   General Types for stream-based XML
+//             Based on .NET platform code:
+//             https://github.com/microsoft/referencesource/tree/master/System.Xml/System/Xml/Core
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
 unit ACL.FileFormats.XML.Types;
 
-{$I ACL.Config.inc} //FPC:OK
+{$I ACL.Config.inc}
 {$SCOPEDENUMS ON}
-
-// Ported from .NET platform:
-// https://github.com/microsoft/referencesource/tree/master/System.Xml/System/Xml/Core
 
 interface
 

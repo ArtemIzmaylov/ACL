@@ -1,17 +1,19 @@
-﻿{*********************************************}
-{*                                           *}
-{*     Artem's Visual Components Library     *}
-{*         Gtk2 Adapters and Helpers         *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2024-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Controls Library aka ACL
+//             v6.0
+//
+//  Purpose:   Gtk2 Adapters and Helpers
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
 unit ACL.UI.Application.Gtk2;
 
-{$I ACL.Config.inc} // FPC:OK
+{$I ACL.Config.inc}
 
 {$DEFINE DEBUG_MESSAGELOOP}
 

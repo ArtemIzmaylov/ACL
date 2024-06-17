@@ -1,17 +1,19 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*   Data Exchanging Between Applications    *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             v6.0
+//
+//  Purpose:   data exchange between applications
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       NotImplemented
+//
 unit ACL.DataBroadcaster;
 
-{$I ACL.Config.inc} // FPC:NotImplemented
+{$I ACL.Config.inc}
 
 // FPC: для передачи данных между приложениями WM_COPYDATA
 // уже не прокатит, нужно нативное решение

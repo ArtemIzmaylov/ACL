@@ -1,19 +1,19 @@
-﻿{*********************************************}
-{*                                           *}
-{*     Artem's Visual Components Library     *}
-{*             Editors Controls              *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Controls Library aka ACL
+//             v6.0
+//
+//  Purpose:   Memo
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       Partial (scrollbars are not get skinned)
+//
 unit ACL.UI.Controls.Memo;
 
-{$I ACL.Config.inc} // FPC:Partical
-
-// FPC: TODO - scrollbars not skinned
+{$I ACL.Config.inc}
 
 interface
 

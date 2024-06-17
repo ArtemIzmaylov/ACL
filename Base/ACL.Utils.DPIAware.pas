@@ -1,17 +1,19 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*              DPI Aware Utils              *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             v6.0
+//
+//  Purpose:   DpiAware utilities
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
 unit ACL.Utils.DPIAware;
 
-{$I ACL.Config.inc} // FPC:OK
+{$I ACL.Config.inc}
 
 {$IF DEFINED(FPC) OR NOT DEFINED(ACL_BASE_NOVCL)}
   {$DEFINE USE_VCL}

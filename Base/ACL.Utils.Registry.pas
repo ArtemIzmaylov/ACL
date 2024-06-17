@@ -1,17 +1,19 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*         Registry Access Functions         *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2022                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             v6.0
+//
+//  Purpose:   Registry Access
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK (Windows Only!)
+//
 unit ACL.Utils.Registry;
 
-{$I ACL.Config.inc} // FPC:OK
+{$I ACL.Config.inc}
 
 {$IFNDEF MSWINDOWS}
   {$MESSAGE FATAL 'Windows platform is required'}

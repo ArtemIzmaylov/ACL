@@ -1,17 +1,19 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*             Gnome IO Library              *}
-{*                                           *}
-{*           (c) Artem Izmaylov              *}
-{*               2024-2024                   *}
-{*              www.aimp.ru                  *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             v6.0
+//
+//  Purpose:   Wrappers for Gnome IO Library
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
 unit ACL.Utils.FileSystem.GIO;
 
-{$I ACL.Config.inc} //FPC:OK
+{$I ACL.Config.inc}
 
 interface
 

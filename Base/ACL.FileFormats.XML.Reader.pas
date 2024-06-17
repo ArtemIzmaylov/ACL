@@ -1,21 +1,22 @@
-﻿{*********************************************}
-{*                                           *}
-{*        Artem's Components Library         *}
-{*          Stream based XML Parser          *}
-{*                                           *}
-{*            (c) Artem Izmaylov             *}
-{*                 2006-2024                 *}
-{*                www.aimp.ru                *}
-{*                                           *}
-{*********************************************}
-
+﻿////////////////////////////////////////////////////////////////////////////////
+//
+//  Project:   Artem's Components Library aka ACL
+//             v6.0
+//
+//  Purpose:   Stream-based XML Reader
+//             Based on .NET platform code:
+//             https://github.com/microsoft/referencesource/tree/master/System.Xml/System/Xml/Core
+//
+//  Author:    Artem Izmaylov
+//             © 2006-2024
+//             www.aimp.ru
+//
+//  FPC:       OK
+//
 unit ACL.FileFormats.XML.Reader;
 
-{$I ACL.Config.inc} //FPC:OK
+{$I ACL.Config.inc}
 {$SCOPEDENUMS ON}
-
-// Ported from .NET platform:
-// https://github.com/microsoft/referencesource/tree/master/System.Xml/System/Xml/Core
 
 {.$DEFINE ACL_XML_DUPLICATES_CHECK} // Throws an exception if a node has duplicate attributes
 
