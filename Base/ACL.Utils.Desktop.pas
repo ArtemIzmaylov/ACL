@@ -34,7 +34,8 @@ uses
   {Vcl.}Controls,
   {Vcl.}Forms,
   // ACL
-  ACL.Classes.Collections;
+  ACL.Classes.Collections,
+  ACL.Utils.Common;
 
 type
   TTaskBarPosition = (tbpLeft, tbpTop, tbpRight, tbpBottom);
@@ -53,9 +54,9 @@ type
 function MonitorAlignPopupWindow(const R: TRect): TRect;
 function MonitorGet(const P: TPoint): TACLMonitor; overload;
 function MonitorGet(const R: TRect): TACLMonitor; overload;
-function MonitorGet(Wnd: THandle): TACLMonitor; overload;
+function MonitorGet(Wnd: TWndHandle): TACLMonitor; overload;
 function MonitorGetBounds(const P: TPoint): TRect; overload;
-function MonitorGetBounds(Wnd: THandle): TRect; overload;
+function MonitorGetBounds(Wnd: TWndHandle): TRect; overload;
 function MonitorGetBoundsByIndex(Index: Integer): TRect;
 function MonitorGetByIndex(Index: Integer): TACLMonitor;
 function MonitorGetDefault: TACLMonitor;
@@ -67,13 +68,12 @@ function MonitorGetTaskBarRect: TRect;
 function MonitorGetWorkArea(const P: TPoint): TRect;
 function MonitorIsFullScreenApplicationRunning(AMonitor: TACLMonitor = nil): Boolean;
 // Mouse
-function MouseCurrentWindow: HWND;
+function MouseCurrentWindow: TWndHandle;
 function MouseCursorPos: TPoint;
 function MouseCursorSize: TSize;
 implementation
 
 uses
-  ACL.Utils.Common,
   ACL.Utils.Strings;
 
 function MonitorAlignPopupWindow(const R: TRect): TRect;
@@ -108,7 +108,7 @@ begin
     Result := NullRect;
 end;
 
-function MonitorGet(Wnd: THandle): TACLMonitor;
+function MonitorGet(Wnd: TWndHandle): TACLMonitor;
 begin
   Result := Screen.MonitorFromWindow(Wnd);
   if Result = nil then
@@ -133,13 +133,13 @@ end;
 function MonitorIsFullScreenApplicationRunning(AMonitor: TACLMonitor = nil): Boolean;
 {$IFDEF MSWINDOWS}
 
-  function IsDesktopWindow(AHandle: THandle): Boolean;
+  function IsDesktopWindow(AHandle: TWndHandle): Boolean;
   begin
     Result := acSameTextEx(acGetClassName(AHandle), ['progman', 'WorkerW']);
   end;
 
 var
-  AAppHandle: THandle;
+  AAppHandle: TWndHandle;
   AAppMonitor: TACLMonitor;
   R: TRect;
 begin
@@ -174,7 +174,7 @@ begin
     Result := NullRect;
 end;
 
-function MonitorGetBounds(Wnd: THandle): TRect;
+function MonitorGetBounds(Wnd: TWndHandle): TRect;
 var
   AMonitor: TACLMonitor;
 begin

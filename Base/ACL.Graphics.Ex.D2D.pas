@@ -238,12 +238,12 @@ type
   strict private
     class var FAvailable: TACLBoolean;
     class var FD2D1CreateFactory: TD2D1CreateFactoryFunc;
-    class var FD2D1Library: THandle;
+    class var FD2D1Library: HMODULE;
     class var FD3D11CreateDevice: TD3D11CreateDeviceFunc;
-    class var FD3D11Library: THandle;
+    class var FD3D11Library: HMODULE;
     class var FDWriteCreateFactory: TDWriteCreateFactoryFunc;
     class var FDWriteFactory: IDWriteFactory;
-    class var FDWriteLibrary: THandle;
+    class var FDWriteLibrary: HMODULE;
     class var FFactory: ID2D1Factory1;
     class var FSwapChainSize: Integer;
     class var FVSync: Boolean;
@@ -262,7 +262,8 @@ type
     class constructor Create;
     class destructor Destroy;
     class function Initialize: Boolean;
-    class function TryCreateRender(AOnRecreateNeeded: TNotifyEvent; AWndHandle: THandle; out ARender: TACL2DRender): Boolean;
+    class function TryCreateRender(AOnRecreateNeeded: TNotifyEvent;
+      AWndHandle: TWndHandle; out ARender: TACL2DRender): Boolean;
 
     class property SwapChainSize: Integer read FSwapChainSize write SetSwapChainSize;
     class property VSync: Boolean read FVSync write FVSync;
@@ -539,16 +540,8 @@ begin
   FAvailable := TACLBoolean.False;
   FFactory := nil;
   FDWriteFactory := nil;
-  if FD2D1Library <> 0 then
-  begin
-    FreeLibrary(FD2D1Library);
-    FD2D1Library := 0;
-  end;
-  if FD3D11Library <> 0 then
-  begin
-    FreeLibrary(FD3D11Library);
-    FD3D11Library := 0;
-  end;
+  acFreeLibrary(FD2D1Library);
+  acFreeLibrary(FD3D11Library);
 end;
 
 class function TACLDirect2D.Initialize: Boolean;
@@ -576,7 +569,8 @@ begin
   Result := FAvailable = TACLBoolean.True;
 end;
 
-class function TACLDirect2D.TryCreateRender(AOnRecreateNeeded: TNotifyEvent; AWndHandle: THandle; out ARender: TACL2DRender): Boolean;
+class function TACLDirect2D.TryCreateRender(AOnRecreateNeeded: TNotifyEvent;
+  AWndHandle: TWndHandle; out ARender: TACL2DRender): Boolean;
 var
   AContext: ID2D1DeviceContext;
   ADevice: IDXGIDevice1;

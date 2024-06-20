@@ -45,6 +45,7 @@ uses
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.ProgressBar,
   ACL.UI.Resources,
+  ACL.Utils.Common,
   ACL.Utils.DPIAware;
 
 type
@@ -81,7 +82,7 @@ type
     FOptions: TACLProgressBoxOptions;
     FProgress: TACLProgressBar;
     FProgressActive: Boolean;
-    FSavedFocus: THandle;
+    FSavedFocus: TWndHandle;
     FStyle: TACLStyleProgressBox;
     FText: array[0..3] of string;
 
@@ -158,8 +159,7 @@ type
 implementation
 
 uses
-  ACL.Geometry,
-  ACL.Utils.Common;
+  ACL.Geometry;
 
 const
   sTextCancel = 'Cancel';

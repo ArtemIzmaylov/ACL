@@ -104,7 +104,7 @@ type
   strict private
     class var FFontCache: TACLDictionary<TACLFontData, TACLFontInfo>;
     class var FFonts: TACLStringSet;
-    class var FLoaderHandle: THandle;
+    class var FLoaderHandle: TObjHandle;
     class var FLock: TACLCriticalSection;
     class var FRemapFontProc: TACLFontRemapProc;
 
@@ -391,7 +391,7 @@ begin
 {$IFDEF ACL_LOG_FONTCACHE}
   AddToDebugLog('FontCache', 'Loader Finished');
 {$ENDIF}
-  FLoaderHandle := THandle(-1);
+  FLoaderHandle := TObjHandle(-1);
 end;
 
 class function TACLFontCache.CreateFont(const AFontData: TACLFontData): TACLFontInfo;
@@ -421,7 +421,7 @@ class procedure TACLFontCache.WaitForLoader(ACancel: Boolean);
 begin
   if (FLoaderHandle = 0) and not ACancel then
     StartLoader;
-  if FLoaderHandle <> THandle(-1) then
+  if FLoaderHandle <> TObjHandle(-1) then
   begin
     if ACancel then
       TaskDispatcher.Cancel(FLoaderHandle, True)

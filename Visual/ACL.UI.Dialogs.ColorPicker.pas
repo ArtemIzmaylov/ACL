@@ -67,15 +67,15 @@ type
     procedure PlaceControls(var R: TRect); override;
   public
     class function Execute(var AColor: TColor;
-      AOwnerWnd: THandle = 0; const ACaption: string = ''): Boolean; overload;
+      AOwnerWnd: TWndHandle = 0; const ACaption: string = ''): Boolean; overload;
     class function Execute(var AColor: TAlphaColor;
-      AOwnerWnd: THandle = 0; const ACaption: string = ''): Boolean; overload;
+      AOwnerWnd: TWndHandle = 0; const ACaption: string = ''): Boolean; overload;
     class function Execute(var AColor: TAlphaColor; AAllowEditAlpha: Boolean;
-      AOwnerWnd: THandle = 0; const ACaption: string = ''; AOnApply: TProc = nil): Boolean; overload;
+      AOwnerWnd: TWndHandle = 0; const ACaption: string = ''; AOnApply: TProc = nil): Boolean; overload;
     class function ExecuteQuery(AColor: TAlphaColor;
-      AOwnerWnd: THandle = 0; const ACaption: string = ''): TAlphaColor; overload;
+      AOwnerWnd: TWndHandle = 0; const ACaption: string = ''): TAlphaColor; overload;
     class function ExecuteQuery(AColor: TAlphaColor; AAllowEditAlpha: Boolean;
-      AOwnerWnd: THandle = 0; const ACaption: string = ''): TAlphaColor; overload;
+      AOwnerWnd: TWndHandle = 0; const ACaption: string = ''): TAlphaColor; overload;
   end;
 
 implementation
@@ -83,7 +83,7 @@ implementation
 { TACLColorPickerDialog }
 
 class function TACLColorPickerDialog.Execute(
-  var AColor: TColor; AOwnerWnd: THandle; const ACaption: string): Boolean;
+  var AColor: TColor; AOwnerWnd: TWndHandle; const ACaption: string): Boolean;
 var
   AGpColor: TAlphaColor;
 begin
@@ -94,13 +94,13 @@ begin
 end;
 
 class function TACLColorPickerDialog.Execute(
-  var AColor: TAlphaColor; AOwnerWnd: THandle; const ACaption: string): Boolean;
+  var AColor: TAlphaColor; AOwnerWnd: TWndHandle; const ACaption: string): Boolean;
 begin
   Result := Execute(AColor, True, AOwnerWnd, ACaption);
 end;
 
 class function TACLColorPickerDialog.Execute(
-  var AColor: TAlphaColor; AAllowEditAlpha: Boolean; AOwnerWnd: THandle;
+  var AColor: TAlphaColor; AAllowEditAlpha: Boolean; AOwnerWnd: TWndHandle;
   const ACaption: string; AOnApply: TProc): Boolean;
 var
   ADialog: TACLColorPickerDialog;
@@ -116,13 +116,13 @@ begin
 end;
 
 class function TACLColorPickerDialog.ExecuteQuery(
-  AColor: TAlphaColor; AOwnerWnd: THandle; const ACaption: string): TAlphaColor;
+  AColor: TAlphaColor; AOwnerWnd: TWndHandle; const ACaption: string): TAlphaColor;
 begin
   Result := ExecuteQuery(AColor, True, AOwnerWnd, ACaption);
 end;
 
 class function TACLColorPickerDialog.ExecuteQuery(AColor: TAlphaColor;
-  AAllowEditAlpha: Boolean; AOwnerWnd: THandle; const ACaption: string): TAlphaColor;
+  AAllowEditAlpha: Boolean; AOwnerWnd: TWndHandle; const ACaption: string): TAlphaColor;
 begin
   Result := AColor;
   if not Execute(Result, AAllowEditAlpha, AOwnerWnd, ACaption) then

@@ -34,6 +34,7 @@ uses
   ACL.Classes.Collections,
   ACL.Timers,
   ACL.Threading,
+  ACL.Utils.Common,
   ACL.Utils.Strings;
 
 type
@@ -64,7 +65,7 @@ type
     FOnComplete: TThreadMethod;
     FOnCompleteMode: TACLThreadMethodCallMode;
 
-    function GetHandle: THandle;
+    function GetHandle: TObjHandle;
   protected
     procedure Complete; virtual;
     procedure Execute; virtual; abstract;
@@ -75,7 +76,7 @@ type
     function IsCanceled: Boolean; virtual;
     //# Properties
     property Caption: string read GetCaption;
-    property Handle: THandle read GetHandle;
+    property Handle: TObjHandle read GetHandle;
   end;
 
   { TACLTaskGroup }
@@ -84,7 +85,7 @@ type
   strict private
     FActiveTasks: Integer;
     FEvent: TACLEvent;
-    FTasks: TACLList<THandle>;
+    FTasks: TACLList<TObjHandle>;
 
     FOnAsyncFinished: TNotifyEvent;
 
@@ -109,7 +110,7 @@ type
     FCurrentTask: TACLTask;
     FLock: TACLCriticalSection;
     FPendingTasks: TACLObjectList;
-    FTaskHandle: THandle;
+    FTaskHandle: TObjHandle;
 
     FOnAsyncFinished: TNotifyEvent;
 
@@ -163,24 +164,24 @@ type
     destructor Destroy; override;
     procedure BeforeDestruction; override;
 
-    function Run(AProc: TACLTaskProc): THandle; overload;
+    function Run(AProc: TACLTaskProc): TObjHandle; overload;
     function Run(AProc: TThreadMethod; ACompleteEvent: TThreadMethod;
-      ACompleteEventCallMode: TACLThreadMethodCallMode): THandle; overload;
+      ACompleteEventCallMode: TACLThreadMethodCallMode): TObjHandle; overload;
     function Run(AProc: TACLTaskProc; ACompleteEvent: TThreadMethod;
-      ACompleteEventCallMode: TACLThreadMethodCallMode): THandle; overload;
-    function Run(ATask: TACLTask): THandle; overload;
+      ACompleteEventCallMode: TACLThreadMethodCallMode): TObjHandle; overload;
+    function Run(ATask: TACLTask): TObjHandle; overload;
     function Run(ATask: TACLTask; ACompleteEvent: TThreadMethod;
-      ACompleteEventCallMode: TACLThreadMethodCallMode): THandle; overload;
-    function RunInCurrentThread(ATask: TACLTask): THandle;
+      ACompleteEventCallMode: TACLThreadMethodCallMode): TObjHandle; overload;
+    function RunInCurrentThread(ATask: TACLTask): TObjHandle;
 
-    function Cancel(ATaskHandle: THandle; AWaitFor: Boolean = False): Boolean; overload;
-    function Cancel(ATaskHandle: THandle; AWaitTimeOut: Cardinal): TWaitResult; overload;
+    function Cancel(ATaskHandle: TObjHandle; AWaitFor: Boolean = False): Boolean; overload;
+    function Cancel(ATaskHandle: TObjHandle; AWaitTimeOut: Cardinal): TWaitResult; overload;
     procedure CancelAll(AWaitFor: Boolean);
     function CurrentTask: TACLTask;
     function ToString: string; override;
 
-    function WaitFor(ATaskHandle: THandle): Boolean; overload;
-    function WaitFor(ATaskHandle: THandle; AWaitTimeOut: Cardinal): TWaitResult; overload;
+    function WaitFor(ATaskHandle: TObjHandle): Boolean; overload;
+    function WaitFor(ATaskHandle: TObjHandle; AWaitTimeOut: Cardinal): TWaitResult; overload;
 
     property MaxActiveTasks: Integer read FMaxActiveTasks write SetMaxActiveTasks;
     property UseCpuUsageMonitor: Boolean read GetUseCpuUsageMonitor write SetUseCpuUsageMonitor;
@@ -205,7 +206,7 @@ type
   {$IFDEF FPC}
     FEvent: TEvent;
   {$ELSE}
-    FHandle: THandle;
+    FHandle: TObjHandle;
   {$ENDIF}
   public
     constructor Create;
@@ -259,9 +260,9 @@ begin
   Result := '';
 end;
 
-function TACLTask.GetHandle: THandle;
+function TACLTask.GetHandle: TObjHandle;
 begin
-  Result := THandle(Self);
+  Result := TObjHandle(Self);
 end;
 
 function TACLTask.IsCanceled: Boolean;
@@ -274,7 +275,7 @@ end;
 constructor TACLTaskGroup.Create;
 begin
   FEvent := TACLEvent.Create(True, True);
-  FTasks := TACLList<THandle>.Create;
+  FTasks := TACLList<TObjHandle>.Create;
 end;
 
 destructor TACLTaskGroup.Destroy;
@@ -510,24 +511,24 @@ begin
   inherited Destroy;
 end;
 
-function TACLTaskDispatcher.Run(AProc: TACLTaskProc): THandle;
+function TACLTaskDispatcher.Run(AProc: TACLTaskProc): TObjHandle;
 begin
   Result := Run(TACLSimpleTask.Create(AProc));
 end;
 
 function TACLTaskDispatcher.Run(AProc: TACLTaskProc;
-  ACompleteEvent: TThreadMethod; ACompleteEventCallMode: TACLThreadMethodCallMode): THandle;
+  ACompleteEvent: TThreadMethod; ACompleteEventCallMode: TACLThreadMethodCallMode): TObjHandle;
 begin
   Result := Run(TACLSimpleTask.Create(AProc), ACompleteEvent, ACompleteEventCallMode);
 end;
 
-function TACLTaskDispatcher.Run(ATask: TACLTask): THandle;
+function TACLTaskDispatcher.Run(ATask: TACLTask): TObjHandle;
 begin
   Result := Run(ATask, TThreadMethod(nil), tmcmAsync);
 end;
 
 function TACLTaskDispatcher.Run(ATask: TACLTask;
-  ACompleteEvent: TThreadMethod; ACompleteEventCallMode: TACLThreadMethodCallMode): THandle;
+  ACompleteEvent: TThreadMethod; ACompleteEventCallMode: TACLThreadMethodCallMode): TObjHandle;
 var
   AComparer: IComparer<TACLTask>;
 begin
@@ -549,12 +550,12 @@ begin
   CheckActiveTasks;
 end;
 
-function TACLTaskDispatcher.Run(AProc, ACompleteEvent: TThreadMethod; ACompleteEventCallMode: TACLThreadMethodCallMode): THandle;
+function TACLTaskDispatcher.Run(AProc, ACompleteEvent: TThreadMethod; ACompleteEventCallMode: TACLThreadMethodCallMode): TObjHandle;
 begin
   Result := Run(TACLSimpleTask.Create(AProc), ACompleteEvent, ACompleteEventCallMode);
 end;
 
-function TACLTaskDispatcher.RunInCurrentThread(ATask: TACLTask): THandle;
+function TACLTaskDispatcher.RunInCurrentThread(ATask: TACLTask): TObjHandle;
 begin
   Result := 0;
   try
@@ -577,12 +578,12 @@ begin
   CancelAll(True);
 end;
 
-function TACLTaskDispatcher.Cancel(ATaskHandle: THandle; AWaitFor: Boolean = False): Boolean;
+function TACLTaskDispatcher.Cancel(ATaskHandle: TObjHandle; AWaitFor: Boolean = False): Boolean;
 begin
   Result := Cancel(ATaskHandle, IfThen(AWaitFor, INFINITE)) <> wrError;
 end;
 
-function TACLTaskDispatcher.Cancel(ATaskHandle: THandle; AWaitTimeOut: Cardinal): TWaitResult;
+function TACLTaskDispatcher.Cancel(ATaskHandle: TObjHandle; AWaitTimeOut: Cardinal): TWaitResult;
 var
   AIndex: Integer;
   ATask: TACLTask;
@@ -648,12 +649,12 @@ begin
   end;
 end;
 
-function TACLTaskDispatcher.WaitFor(ATaskHandle: THandle): Boolean;
+function TACLTaskDispatcher.WaitFor(ATaskHandle: TObjHandle): Boolean;
 begin
   Result := WaitFor(ATaskHandle, INFINITE) in SuccessfulWaitResults;
 end;
 
-function TACLTaskDispatcher.WaitFor(ATaskHandle: THandle; AWaitTimeOut: Cardinal): TWaitResult;
+function TACLTaskDispatcher.WaitFor(ATaskHandle: TObjHandle; AWaitTimeOut: Cardinal): TWaitResult;
 var
   AIndex: Integer;
   AWaitEvent: IACLTaskEvent;
@@ -772,7 +773,7 @@ end;
 
 procedure TACLTaskDispatcher.CancelAll(AWaitFor: Boolean);
 var
-  ATaskHandle: THandle;
+  ATaskHandle: TObjHandle;
   I: Integer;
 begin
   // Mark all as canceled

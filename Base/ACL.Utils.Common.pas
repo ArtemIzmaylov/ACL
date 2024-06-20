@@ -56,6 +56,7 @@ const
   E_ACCESSDENIED = Winapi.Windows.E_ACCESSDENIED;
   E_FAIL = Winapi.Windows.E_FAIL;
   E_HANDLE = Winapi.Windows.E_HANDLE;
+  E_OUTOFMEMORY = Winapi.Windows.E_OUTOFMEMORY;
   E_INVALIDARG = Winapi.Windows.E_INVALIDARG;
   E_PENDING = Winapi.Windows.E_PENDING;
 
@@ -64,6 +65,7 @@ const
   E_ABORT = HRESULT($80004004);
   E_ACCESSDENIED = HRESULT($80070005);
   E_FAIL = HRESULT($80004005);
+  E_OUTOFMEMORY = HRESULT($8007000E);
   E_HANDLE = HRESULT($80070006);
   E_INVALIDARG = HRESULT($80070057);
   E_PENDING = HRESULT($8000000A);
@@ -97,6 +99,8 @@ type
   TACLBoolean = (Default, False, True);
 {$SCOPEDENUMS OFF}
 
+  TObjHandle = type NativeUInt;
+  PObjHandle = ^TObjHandle;
   TWndHandle = HWND; // to avoid direct references to Winapi
 
 const
@@ -194,6 +198,7 @@ var
   InvariantFormatSettings: TFormatSettings;
 
 // HMODULE
+procedure acFreeLibrary(var ALibHandle: HMODULE);
 function acGetProcAddress(ALibHandle: HMODULE; AProcName: PChar; var AResult: Boolean): Pointer;
 function acLoadLibrary(const AFileName: string; AFlags: Cardinal = 0): HMODULE;
 {$IFDEF MSWINDOWS}
@@ -419,6 +424,16 @@ begin
   else
     Result := 0;
 {$ENDIF}
+end;
+
+procedure acFreeLibrary(var ALibHandle: HMODULE);
+begin
+  if ALibHandle <> 0 then
+  try
+    FreeLibrary(ALibHandle);
+  finally
+    ALibHandle := 0;
+  end;
 end;
 
 function acGetProcAddress(ALibHandle: HMODULE; AProcName: PChar; var AResult: Boolean): Pointer;

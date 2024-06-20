@@ -319,7 +319,7 @@ type
     class var FEncodeFunc: TEncodeFunc;
     class var FFreeFunc: TFreeFunc;
     class var FGetInfoFunc: TGetInfoFunc;
-    class var FLibHandle: THandle;
+    class var FLibHandle: HMODULE;
     class procedure Encode(AStream: TStream; AData: PByte; AWidth, AHeight: Integer);
   protected
     class function CheckIsAvailable: Boolean; override;
@@ -1714,11 +1714,10 @@ end;
 
 class destructor TACLImageFormatWebP.Destroy;
 begin
+  acFreeLibrary(FLibHandle);
   FEncodeFunc := nil;
   FDecodeFunc := nil;
   FFreeFunc := nil;
-  if FLibHandle <> 0 then
-    FreeLibrary(FLibHandle);
 end;
 
 class function TACLImageFormatWebP.CheckIsAvailable: Boolean;
@@ -1950,7 +1949,7 @@ class function TACLImageTools.PasteFromClipboard: IACLDataContainer;
 
   function CreateFromFormat(AFormat: Word): IACLDataContainer;
   var
-    LHandle: THandle;
+    LHandle: TObjHandle;
   begin
     LHandle := Clipboard.GetAsHandle(TACLImageFormatPNG.ClipboardFormat);
     if LHandle <> 0 then

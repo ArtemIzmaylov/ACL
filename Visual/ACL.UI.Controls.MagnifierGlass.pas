@@ -192,7 +192,7 @@ procedure TACLMagnifierGlass.PrepareBuffer(const ACursorPos: TPoint);
 
   procedure DrawGridLines(DC: HDC; const R: TRect);
   var
-    ABrush: THandle;
+    ABrush: HBRUSH;
     I, W, S: Integer;
   begin
     S := Ord(ZoomActual >= 20) + Ord(ZoomActual >= 5);

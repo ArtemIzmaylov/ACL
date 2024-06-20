@@ -67,7 +67,7 @@ type
   TACLEvent = class
   strict protected
   {$IFDEF MSWINDOWS}
-    FHandle: THandle;
+    FHandle: TObjHandle;
   {$ELSE}
     FSyncObj: TEvent;
   {$ENDIF}
@@ -80,7 +80,7 @@ type
     procedure Reset; inline;
     procedure Signal; inline;
   {$IFDEF MSWINDOWS}
-    property Handle: THandle read FHandle;
+    property Handle: TObjHandle read FHandle;
   {$ENDIF}
   end;
 
@@ -197,7 +197,7 @@ function IsMainThread: Boolean;
 
 {$IFDEF MSWINDOWS}
 function LockCompareExchange(const ACompareValue, ANewValue: Byte; AReturnAddress: PByte): Byte; // public to be inlined
-function WaitForSyncObject(AHandle: THandle; ATimeOut: Cardinal): TWaitResult;
+function WaitForSyncObject(AHandle: TObjHandle; ATimeOut: Cardinal): TWaitResult;
 {$ENDIF}
 
 procedure CallThreadMethod(AMethod: TThreadMethod; ACallInMainThread: Boolean); overload;
@@ -245,11 +245,11 @@ end;
 {$ENDIF}
 
 {$IFDEF MSWINDOWS}
-function WaitForSyncObject(AHandle: THandle; ATimeOut: Cardinal): TWaitResult;
+function WaitForSyncObject(AHandle: TObjHandle; ATimeOut: Cardinal): TWaitResult;
 const
   MaxWaitTime = 100;
 var
-  AHandles: array[0..1] of THandle;
+  AHandles: array[0..1] of TObjHandle;
   AMsg: TMsg;
   AStartWaitTime: Cardinal;
   AWaitResult: Cardinal;

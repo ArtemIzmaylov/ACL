@@ -495,7 +495,7 @@ type
 
 {$IFDEF MSWINDOWS}
 // AlphaBlend
-procedure acUpdateLayeredWindow(Wnd: THandle; SrcDC: HDC; const R: TRect; AAlpha: Integer = 255); overload;
+procedure acUpdateLayeredWindow(Wnd: TWndHandle; SrcDC: HDC; const R: TRect; AAlpha: Integer = 255); overload;
 {$ENDIF}
 
 // DoubleBuffer
@@ -575,7 +575,7 @@ function acRegionFromBitmap(AColors: PACLPixel32;
 // WindowOrg
 function acMoveWindowOrg(DC: HDC; const P: TPoint): TPoint; overload; inline;
 function acMoveWindowOrg(DC: HDC; DX, DY: Integer): TPoint; overload;
-procedure acRegionMoveToWindowOrg(DC: HDC; ARegion: THandle); inline;
+procedure acRegionMoveToWindowOrg(DC: HDC; ARegion: TRegionHandle); inline;
 procedure acRestoreWindowOrg(DC: HDC; const P: TPoint); inline;
 
 // Bitmaps
@@ -980,7 +980,7 @@ begin
   SetWindowOrgEx(DC, Result.X - DX, Result.Y - DY, nil);
 end;
 
-procedure acRegionMoveToWindowOrg(DC: HDC; ARegion: THandle);
+procedure acRegionMoveToWindowOrg(DC: HDC; ARegion: TRegionHandle);
 var
   P: TPoint;
 begin
@@ -1409,7 +1409,7 @@ end;
 //----------------------------------------------------------------------------------------------------------------------
 
 {$IFDEF MSWINDOWS}
-procedure acUpdateLayeredWindow(Wnd: THandle; SrcDC: HDC; const R: TRect; AAlpha: Integer = 255);
+procedure acUpdateLayeredWindow(Wnd: TWndHandle; SrcDC: HDC; const R: TRect; AAlpha: Integer = 255);
 var
   ABlendFunc: TBlendFunction;
   ASize: TSize;
@@ -2561,14 +2561,7 @@ begin
   Resize(ASource.Width, ASource.Height);
 {$IFDEF FPC}
   if ASource is TRasterImage then
-  begin
-    TRasterImage(ASource).BeginUpdate;
-    try
-      Assign(TRasterImage(ASource).RawImage)
-    finally
-      TRasterImage(ASource).EndUpdate;
-    end;
-  end
+    Assign(TRasterImage(ASource).RawImage)
   else
 {$ELSE}
   if ASource.SupportsPartialTransparency then

@@ -183,7 +183,7 @@ type
     function SetRange(ARange: IACLWebRequestRange): IACLHttpRequest;
     function SetPriority(APriority: TACLTaskPriority): IACLHttpRequest;
     // Run
-    function Run: THandle;
+    function Run: TObjHandle;
     function RunNoThread: TACLWebErrorInfo; overload;
     function RunNoThread(ACheckCanceled: TACLTaskCancelCallback): TACLWebErrorInfo; overload;
   end;
@@ -227,7 +227,7 @@ type
     function SetRange(ARange: IACLWebRequestRange): IACLHttpRequest; overload;
     function SetPriority(APriority: TACLTaskPriority): IACLHttpRequest;
     // Run
-    function Run: THandle;
+    function Run: TObjHandle;
     function RunNoThread: TACLWebErrorInfo; overload;
     function RunNoThread(ACheckCanceled: TACLTaskCancelCallback): TACLWebErrorInfo; overload;
   public
@@ -1291,7 +1291,7 @@ begin
   Result := Self;
 end;
 
-function TACLHttp.Run: THandle;
+function TACLHttp.Run: TObjHandle;
 begin
   Result := TaskDispatcher.Run(TACLHttpRequestTask.Create(Self));
 end;

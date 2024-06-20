@@ -113,7 +113,8 @@ type
   public
     destructor Destroy; override;
     procedure AfterConstruction; override;
-    class function Execute(AFont: TFont; AOwnerWnd: THandle = 0; AOnApply: TProc = nil): Boolean;
+    class function Execute(AFont: TFont;
+      AOwnerWnd: TWndHandle = 0; AOnApply: TProc = nil): Boolean;
   end;
 
 implementation
@@ -135,7 +136,8 @@ begin
   inherited;
 end;
 
-class function TACLFontPickerDialog.Execute(AFont: TFont; AOwnerWnd: THandle = 0; AOnApply: TProc = nil): Boolean;
+class function TACLFontPickerDialog.Execute(AFont: TFont;
+  AOwnerWnd: TWndHandle = 0; AOnApply: TProc = nil): Boolean;
 begin
   with TACLFontPickerDialog.CreateDialog(AOwnerWnd, True) do
   try

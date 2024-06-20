@@ -525,7 +525,7 @@ class procedure TACLExceptionMessageDialog.ShowException(E: Exception);
 var
   AMessage: string;
   ASubException: Exception;
-  AWndHandle: THandle;
+  AWndHandle: TWndHandle;
 begin
   AMessage := E.Message;
   while True do

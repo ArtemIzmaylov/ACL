@@ -265,7 +265,7 @@ type
     FThreadCurrent: THandle;
 
     function GetAttachThreadId: THandle;
-    function GetAttachWindow: THandle;
+    function GetAttachWindow: TWndHandle;
     procedure AttachThread;
     procedure DetachThread;
   protected
@@ -968,7 +968,7 @@ end;
 
 function TACLDropSource.GetAttachThreadId: THandle;
 var
-  AAttach: THandle;
+  AAttach: TWndHandle;
 begin
   AAttach := GetAttachWindow;
   if AAttach <> 0 then
@@ -977,7 +977,7 @@ begin
     Result := MainThreadID;
 end;
 
-function TACLDropSource.GetAttachWindow: THandle;
+function TACLDropSource.GetAttachWindow: TWndHandle;
 begin
   Result := GetForegroundWindow;
   // Fallback to the unsafe method in case GetForegroundWindow didn't work

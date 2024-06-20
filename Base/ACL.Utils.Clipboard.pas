@@ -110,7 +110,7 @@ function MakeFormat(AFormat: Word): TFormatEtc;
 
 // DropHandle
 {$IFDEF MSWINDOWS}
-function acGetFilesFromDrag(ADragQuery: THandle;
+function acGetFilesFromDrag(ADragQuery: HDROP;
   AFiles: TACLStringList; AFreeDropData: Boolean = True): Boolean;
 {$ENDIF}
 implementation
@@ -130,7 +130,7 @@ begin
 end;
 
 {$IFDEF MSWINDOWS}
-function acGetFilesFromDrag(ADragQuery: THandle;
+function acGetFilesFromDrag(ADragQuery: HDROP;
   AFiles: TACLStringList; AFreeDropData: Boolean = True): Boolean;
 var
   AFilename: PWideChar;

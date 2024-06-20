@@ -248,7 +248,7 @@ end;
 
 procedure TACLFileTypeIconLibrary.Load(const LibFileName: UnicodeString; const DefaultMap: AnsiString = '');
 var
-  AHandle: THandle;
+  AHandle: HMODULE;
   AXmlDoc: TACLXMLDocument;
 begin
   AHandle := acLoadLibrary(LibFileName, LOAD_LIBRARY_AS_DATAFILE);
@@ -279,7 +279,7 @@ begin
       AXmlDoc.Free;
     end;
   finally
-    FreeLibrary(AHandle);
+    acFreeLibrary(AHandle);
   end;
 end;
 
