@@ -722,17 +722,17 @@ begin
       end;
     end
     else
-
-    case GetPropType(AEditor.Info).Kind of
-      tkString, tkUString, tkWString, tkLString, tkVariant:
-        Result := CreateEdit(eimText);
-      tkInteger, tkInt64:
-        Result := CreateEdit(eimInteger);
-      tkFloat:
-        Result := CreateEdit(eimFloat);
-    else;
-    end;
-
+      case GetPropType(AEditor.Info).Kind of
+        tkVariant:
+          Result := CreateEdit(eimText);
+        tkInteger, tkInt64:
+          Result := CreateEdit(eimInteger);
+        tkFloat:
+          Result := CreateEdit(eimFloat);
+      else
+        if TRTTI.IsString(AEditor.Info) then
+          Result := CreateEdit(eimText);
+      end;
     if Supports(AEditor, IACLPropertyEditorDialog, ADialogIntf) and (Result is TACLCustomTextEdit) then
       TACLCustomTextEditAccess(Result).Buttons.Add(acEndEllipsis).OnClick := ShowExternalDialogHandler;
   end;

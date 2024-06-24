@@ -556,7 +556,8 @@ function acFormatTrackNo(ATrack: Integer): string;
 
 // Utils
 function IfThenW(ACondition: Boolean; const ATrue: string; const AFalse: string = ''): string; overload; inline;
-function IfThenW(const A, B: string): string; overload; inline;
+function IfThenW(const A, B: AnsiString): AnsiString; overload; inline;
+function IfThenW(const A, B: UnicodeString): UnicodeString; overload; inline;
 function acDupeString(const AText: string; ACount: Integer): string;
 function acTrim(const S: string): string;
 procedure acStrLCopy(ADest: PAnsiChar; const ASource: AnsiString; AMax: Integer); overload;
@@ -1519,9 +1520,9 @@ begin
   Result := acCompareStrings(PChar(S1), PChar(S2), Length(S1), Length(S2), AIgnoreCase);
 {$ELSE}
   if AIgnoreCase then
-    Result := AnsiCompareStr(S1, S2)
+    Result := AnsiCompareText(S1, S2)
   else
-    Result := AnsiCompareText(S1, S2);
+    Result := AnsiCompareStr(S1, S2);
 {$ENDIF}
 end;
 
@@ -1989,7 +1990,7 @@ end;
 
 function acDecodeLineBreaks(const S: string): string;
 begin
-  Result := acStringReplace(S, acLineBreakMacro, acCRLF);
+  Result := acStringReplace(S, acLineBreakMacro, sLineBreak);
 end;
 
 function acEncodeLineBreaks(const S: string): string;
@@ -2017,7 +2018,15 @@ begin
     Result := AFalse;
 end;
 
-function IfThenW(const A, B: string): string;
+function IfThenW(const A, B: AnsiString): AnsiString;
+begin
+  if A = '' then
+    Result := B
+  else
+    Result := A;
+end;
+
+function IfThenW(const A, B: UnicodeString): UnicodeString;
 begin
   if A = '' then
     Result := B
@@ -3179,7 +3188,7 @@ var
   B: Byte;
   L: Integer;
   P: Int64;
-  W: PWideChar;
+  W: PChar;
 begin
   Result := False;
   if (AStream <> nil) and (ACode <> '') then

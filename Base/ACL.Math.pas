@@ -20,6 +20,13 @@ interface
 uses
   {System.}Math;
 
+{$IFDEF FPC}
+const
+  exAllArithmeticExceptions = [
+    exInvalidOp, exDenormalized, exZeroDivide,
+    exOverflow, exUnderflow, exPrecision];
+{$ENDIF}
+
 type
   TACLMath = class
   public

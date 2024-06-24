@@ -32,9 +32,22 @@ uses
   // ACL
   ACL.Utils.Common;
 
+const
+{$IFDEF FPC}
+  WM_USER = LMessages.LM_USER;
+{$ELSE}
+  WM_USER = Messages.WM_USER;
+{$ENDIF}
+
 type
 {$IFDEF FPC}
   TWndMethod = TLCLWndMethod;
+
+  LPARAM = LCLType.LPARAM;
+  WPARAM = LCLType.WPARAM;
+{$ELSE}
+  LPARAM = Windows.LPARAM;
+  WPARAM = Windows.WPARAM;
 {$ENDIF}
 
   { TACLMessaging }
@@ -63,19 +76,17 @@ type
     class property Handle: TWndHandle read FHandle;
   end;
 
-{$IFNDEF FPC}
-
   { TMessagesHelper }
 
   TMessagesHelper = class
   public
     class function IsInQueue(AWndHandle: TWndHandle; AMessage: Cardinal): Boolean;
+  {$IFDEF MSWINDOWS}
     class procedure Process(AFromMessage, AToMessage: Cardinal; AWndHandle: TWndHandle = 0); overload;
     class procedure Process(AMessage: Cardinal; AWndHandle: TWndHandle = 0); overload;
+  {$ENDIF}
     class procedure Remove(AMessage: Cardinal; AWndHandle: TWndHandle = 0);
   end;
-
-{$ENDIF}
 
 function WndCreate(Method: TWndMethod; const ClassName: string;
   IsMessageOnly: Boolean = False; const Name: string = ''): TWndHandle;
@@ -190,20 +201,23 @@ begin
   end;
 end;
 
+{$ENDIF}
+
 { TMessagesHelper }
 
 class function TMessagesHelper.IsInQueue(AWndHandle: TWndHandle; AMessage: Cardinal): Boolean;
 var
   AMsg: TMSG;
 begin
-  Result := PeekMessage(AMsg, AWndHandle, AMessage, AMessage, PM_NOREMOVE) and (AMsg.hwnd = AWndHandle);
+  Result := PeekMessage(AMsg{%H-}, AWndHandle, AMessage, AMessage, PM_NOREMOVE) and (AMsg.hwnd = AWndHandle);
 end;
 
+{$IFDEF MSWINDOWS}
 class procedure TMessagesHelper.Process(AFromMessage, AToMessage: Cardinal; AWndHandle: TWndHandle = 0);
 var
   AMsg: TMsg;
 begin
-  while PeekMessage(AMsg, AWndHandle, AFromMessage, AToMessage, PM_REMOVE) do
+  while PeekMessage(AMsg{%H-}, AWndHandle, AFromMessage, AToMessage, PM_REMOVE) do
   begin
     TranslateMessage(AMsg);
     DispatchMessage(AMsg);
@@ -214,15 +228,14 @@ class procedure TMessagesHelper.Process(AMessage: Cardinal; AWndHandle: TWndHand
 begin
   Process(AMessage, AMessage, AWndHandle);
 end;
+{$ENDIF}
 
 class procedure TMessagesHelper.Remove(AMessage: Cardinal; AWndHandle: TWndHandle = 0);
 var
   AMsg: TMsg;
 begin
-  while PeekMessage(AMsg, AWndHandle, AMessage, AMessage, PM_REMOVE) do ;
+  while PeekMessage(AMsg{%H-}, AWndHandle, AMessage, AMessage, PM_REMOVE) do ;
 end;
-
-{$ENDIF}
 
 { TACLMessaging }
 

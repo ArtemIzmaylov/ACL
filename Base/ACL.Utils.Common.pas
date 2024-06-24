@@ -199,7 +199,8 @@ var
 
 // HMODULE
 procedure acFreeLibrary(var ALibHandle: HMODULE);
-function acGetProcAddress(ALibHandle: HMODULE; AProcName: PChar; var AResult: Boolean): Pointer;
+function acGetProcAddress(ALibHandle: HMODULE; AProcName: PChar): Pointer; overload;
+function acGetProcAddress(ALibHandle: HMODULE; AProcName: PChar; var AResult: Boolean): Pointer; overload;
 function acLoadLibrary(const AFileName: string; AFlags: Cardinal = 0): HMODULE;
 {$IFDEF MSWINDOWS}
 function acModuleFileName(AModule: HMODULE): string; inline;
@@ -434,6 +435,11 @@ begin
   finally
     ALibHandle := 0;
   end;
+end;
+
+function acGetProcAddress(ALibHandle: HMODULE; AProcName: PChar): Pointer; overload;
+begin
+  Result := GetProcAddress(ALibHandle, AProcName);
 end;
 
 function acGetProcAddress(ALibHandle: HMODULE; AProcName: PChar; var AResult: Boolean): Pointer;

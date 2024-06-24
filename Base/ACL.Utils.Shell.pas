@@ -479,7 +479,7 @@ begin
 {$IFDEF MSWINDOWS}
   Result := ShellPath(CSIDL_APPDATA);
 {$ELSE}
-  Result := acIncludeTrailingPathDelimiter(GetUserDir) + '/.config/';
+  Result := acIncludeTrailingPathDelimiter(GetUserDir) + '.config/';
 {$ENDIF}
 end;
 

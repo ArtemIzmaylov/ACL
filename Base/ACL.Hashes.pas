@@ -222,6 +222,19 @@ type
     class function GetAlgorithmId: Cardinal; override;
   end;
 
+{$ELSE}
+
+  { TACLHashMD5 }
+
+  TACLHashMD5 = class(TACLHash)
+  public
+    class function Finalize(var AState: Pointer): Variant; override; overload;
+    class procedure Finalize(var AState: Pointer; var AHash: TMD5Byte16); reintroduce; overload;
+    class procedure Initialize(out AState: Pointer); override;
+    class procedure Reset(var AState: Pointer); override;
+    class procedure Update(var AState: Pointer; AData: PByte; ASize: Cardinal); override;
+  end;
+
 {$ENDIF}
 
 // Elf
@@ -241,6 +254,8 @@ implementation
 uses
 {$IFDEF MSWINDOWS}
   Winapi.Windows,
+{$ELSE}
+  md5,
 {$ENDIF}
   // ACL
 {$IFDEF MSWINDOWS}
@@ -925,6 +940,45 @@ end;
 class function TACLHashSHA512.GetAlgorithmId: Cardinal;
 begin
   Result := CALG_SHA_512;
+end;
+
+{$ELSE}
+
+{ TACLHashMD5 }
+
+class function TACLHashMD5.Finalize(var AState: Pointer): Variant;
+var
+  LHash: TMD5Digest;
+begin
+  MD5Final(PMD5Context(AState)^, LHash);
+  FreeMemAndNil(AState);
+  Result := MD5Print(LHash);
+end;
+
+class procedure TACLHashMD5.Finalize(var AState: Pointer; var AHash: TMD5Byte16);
+begin
+  MD5Final(PMD5Context(AState)^, PMD5Digset(@AHash)^);
+  FreeMemAndNil(AState);
+end;
+
+class procedure TACLHashMD5.Initialize(out AState: Pointer);
+var
+  LContext: PMD5Context;
+begin
+  New(LContext);
+  MD5Init(LContext^);
+  AState := LContext;
+end;
+
+class procedure TACLHashMD5.Reset(var AState: Pointer);
+begin
+  FreeMemAndNil(AState);
+  Initialize(AState);
+end;
+
+class procedure TACLHashMD5.Update(var AState: Pointer; AData: PByte; ASize: Cardinal);
+begin
+  MD5Update(PMD5Context(AState)^, AData^, ASize);
 end;
 
 {$ENDIF}

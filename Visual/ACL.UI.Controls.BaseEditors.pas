@@ -271,6 +271,7 @@ type
     procedure AssignTextDrawParams(ACanvas: TCanvas); virtual;
     procedure BoundsChanged; override;
     function CanAutoSize(var NewWidth, NewHeight: Integer): Boolean; override;
+    procedure CreateHandle; override;
     function CreateStyleButton: TACLStyleButton; virtual;
   {$IFDEF FPC}
     procedure DoAutoSize; override;
@@ -442,6 +443,9 @@ implementation
 
 {$IFDEF LCLGtk2}
 uses
+  gtk2,
+  gtk2def,
+  gtk2int,
   glib2;
 {$ENDIF}
 
@@ -1116,6 +1120,12 @@ begin
   Result := True;
 end;
 
+procedure TACLCustomEdit.CreateHandle;
+begin
+  inherited CreateHandle;
+  EditorUpdateParams;
+end;
+
 function TACLCustomEdit.ButtonsGetEnabled: Boolean;
 begin
   Result := Enabled;
@@ -1258,6 +1268,12 @@ begin
   inherited;
   TWinControlAccess(FEditor).Color := Style.ColorsContent[Enabled];
   TWinControlAccess(FEditor).Font.Color := Style.ColorsText[Enabled];
+{$IFDEF LCLGtk2}
+  if FEditor.HandleAllocated and not Enabled then
+    GTK2WidgetSet.SetWidgetColor({%H-}PGtkWidget(FEditor.Handle),
+      Style.ColorTextDisabled.AsColor, Style.ColorContentDisabled.AsColor,
+      [GTK_STATE_INSENSITIVE, GTK_STYLE_BASE]);
+{$ENDIF}
 end;
 
 procedure TACLCustomEdit.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);

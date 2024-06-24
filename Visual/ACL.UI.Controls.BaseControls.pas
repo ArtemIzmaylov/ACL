@@ -1713,6 +1713,8 @@ end;
 {$IFDEF FPC}
 procedure TACLGraphicControl.CalculatePreferredSize(var W, H: Integer; X: Boolean);
 begin
+  H := Height;
+  W := Width;
   CanAutoSize(W, H);
 end;
 
@@ -2432,6 +2434,8 @@ end;
 {$IFDEF FPC}
 procedure TACLCustomControl.CalculatePreferredSize(var W, H: Integer; X: Boolean);
 begin
+  H := Height;
+  W := Width;
   // inherited должен быть вызван для паналей (иначе будет зависать на сложных макетах),
   // но при этом не должен вызываться для инплейс-редакторов
   if csAcceptsControls in ControlStyle then
@@ -2876,6 +2880,10 @@ begin
     Control.ControlState := Control.ControlState + [csAligning];
     try
       Control.BoundsRect := LBounds;
+    {$IFDEF FPC}
+      if csLoading in Control.ComponentState then
+        TACLMainThread.RunPostponed(TControlAccess(FOwner).BoundsChanged, Self);
+    {$ENDIF}
     finally
       Control.ControlState := Control.ControlState - [csAligning];
     end;
@@ -3018,6 +3026,7 @@ initialization
 {$IFDEF FPC}
   RegisterPropertyToSkip(TControl, 'Margins', '', '');
   RegisterPropertyToSkip(TControl, 'Padding', '', '');
+  RegisterPropertyToSkip(TDataModule, 'PixelsPerInch', '', '');
 {$ENDIF}
 
 finalization

@@ -586,6 +586,7 @@ begin
   else
     LDialog := TOpenDialog.Create(nil);
   try
+    LDialog.Filter := Dialog.Filter;
     LDialog.InitialDir := Dialog.GetActualInitialDir;
     LDialog.Options := LOptions;
     Result := LDialog.Execute;
@@ -1216,7 +1217,7 @@ procedure TACLProgressDialog.DoShow;
 begin
   Caption := TextCaption;
   if ShowInTaskBar = stAlways then
-    FAeroPeak := TACLAeroPeek.Create(Handle);
+    FAeroPeak := TACLAeroPeek.Create(Self);
   FCancelButton.Enabled := Assigned(OnCancel);
   inherited DoShow;
   Progress(0, 0);

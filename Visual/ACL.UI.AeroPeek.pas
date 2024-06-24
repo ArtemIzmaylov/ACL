@@ -35,6 +35,7 @@ uses
   {System.}SysUtils,
   {System.}Types,
   // Vcl
+  {Vcl.}Controls,
   {Vcl.}Graphics,
   {Vcl.}ImgList,
   // ACL
@@ -109,7 +110,8 @@ type
     FImageList: TACLImageList;
     FInitialized: Boolean;
     FLivePreviewTimer: TACLTimer;
-    FOwnerWindow: HWND;
+    FOwnerWindow: TWinControl;
+    FPrevWndProc: TWndMethod;
     FProgress: Int64;
     FProgressState: TACLAeroPeekProgressState;
     FProgressTotal: Int64;
@@ -118,8 +120,6 @@ type
     FShowStatusAsColor: Boolean;
     FTaskBarList: ITaskbarList3;
     FThumbnailSize: TSize;
-    FWindowProcOld: Pointer;
-    FWindowProcPtr: Pointer;
 
     FOnButtonClick: TACLAeroPeekButtonClickEvent;
     FOnDrawPreview: TACLAeroPeekDrawPreviewEvent;
@@ -144,6 +144,7 @@ type
     procedure StopLivePreviewTimer;
     procedure SyncButtons;
     procedure SyncProgress;
+    procedure SyncState;
     procedure UpdateForceIconicRepresentation;
     procedure UpdatePeekPreview;
     procedure UpdateThumbnailPreview;
@@ -153,19 +154,16 @@ type
     procedure DoDrawPreview(ABitmap: TACLBitmap); virtual;
     procedure DoInitialize; virtual;
     procedure SetWindowAttribute(AAttr: Cardinal; AValue: LongBool);
-    //# Hook
-    procedure HookOwnerWindow; virtual;
-    procedure UnhookOwnerWindow; virtual;
     //# Properties
     property Available: Boolean read GetAvailable;
     property Initialized: Boolean read FInitialized;
-    property OwnerWindow: HWND read FOwnerWindow;
+    property OwnerWindow: TWinControl read FOwnerWindow;
     property Progress: Int64 read FProgress;
     property ProgressPresents: Boolean read GetProgressPresents;
     property ProgressTotal: Int64 read FProgressTotal;
     property TaskBarList: ITaskbarList3 read FTaskBarList;
   public
-    constructor Create(AOwnerWindow: HWND); virtual;
+    constructor Create(AOwnerWindow: TWinControl);
     destructor Destroy; override;
     procedure ConfigLoad(AConfig: TACLIniFile; const ASection: string); virtual;
     procedure ConfigSave(AConfig: TACLIniFile; const ASection: string); virtual;
@@ -294,7 +292,7 @@ end;
 
 { TACLAeroPeek }
 
-constructor TACLAeroPeek.Create(AOwnerWindow: HWND);
+constructor TACLAeroPeek.Create(AOwnerWindow: TWinControl);
 begin
   inherited Create;
   FShowProgress := True;
@@ -306,15 +304,20 @@ begin
   FImageList.OnChange := ImageListChanged;
   FButtons := TACLAeroPeekButtons.Create(Self);
 {$IFDEF MSWINDOWS}
+  FPrevWndProc := FOwnerWindow.WindowProc;
+  FOwnerWindow.WindowProc := OwnerWindowWndProc;
   if Failed(CoCreateInstance(CLSID_TaskbarList, nil, CLSCTX_INPROC_SERVER, IID_ITaskbarList3, FTaskBarList)) then
     FTaskBarList := nil;
 {$ENDIF}
-  HookOwnerWindow;
+  SyncState;
 end;
 
 destructor TACLAeroPeek.Destroy;
 begin
-  UnhookOwnerWindow;
+{$IFDEF MSWINDOWS}
+  SetWindowAttribute(DWMWA_HAS_ICONIC_BITMAP, False);
+  FOwnerWindow.WindowProc := FPrevWndProc;
+{$ENDIF}
   StopLivePreviewTimer;
   FImageList.OnChange := nil;
   FTaskBarList := nil;
@@ -339,7 +342,7 @@ procedure TACLAeroPeek.UpdateOverlay(AIcon: HICON; const AHint: string);
 begin
   if Available then
   {$IFDEF MSWINDOWS}
-    TaskBarList.SetOverlayIcon(OwnerWindow, AIcon, PWideChar(AHint));
+    TaskBarList.SetOverlayIcon(OwnerWindow.Handle, AIcon, PWideChar(AHint));
   {$ENDIF}
 end;
 
@@ -354,7 +357,7 @@ begin
       UpdatePeekPreview;
     end
     else
-      DwmInvalidateIconicBitmaps(OwnerWindow);
+      DwmInvalidateIconicBitmaps(OwnerWindow.Handle);
   {$ENDIF}
   end;
 end;
@@ -388,17 +391,17 @@ var
   AWindowInfo: TWindowInfo;
   AWindowPlacement: TWindowPlacement;
 begin
-  if IsIconic(OwnerWindow) then
+  if IsIconic(OwnerWindow.Handle) then
   begin
     AHasFrame := False;
     AWindowPlacement.length := SizeOf(AWindowPlacement);
-    GetWindowPlacement(OwnerWindow, AWindowPlacement);
+    GetWindowPlacement(OwnerWindow.Handle, AWindowPlacement);
     Result := TACLBitmap.CreateEx(AWindowPlacement.rcNormalPosition, pf32bit, True);
     acDrawDragImage(Result.Canvas, Result.ClientRect);
 
     AIcon := TIcon.Create;
     try
-      AIcon.Handle := SendMessage(OwnerWindow, WM_GETICON, ICON_BIG, 0);
+      AIcon.Handle := SendMessage(OwnerWindow.Handle, WM_GETICON, ICON_BIG, 0);
       if AIcon.HandleAllocated then
         Result.Canvas.Draw((Result.Width - AIcon.Width) div 2, (Result.Height - AIcon.Height) div 2, AIcon);
     finally
@@ -408,7 +411,7 @@ begin
   else
   begin
     AWindowInfo.cbSize := SizeOf(AWindowInfo);
-    GetWindowInfo(OwnerWindow, AWindowInfo);
+    GetWindowInfo(OwnerWindow.Handle, AWindowInfo);
 
     Result := TACLBitmap.CreateEx(AWindowInfo.rcClient, pf32bit, True);
     Result.Canvas.Lock;
@@ -416,7 +419,7 @@ begin
       SetWindowOrgEx(Result.Canvas.Handle,
         AWindowInfo.rcClient.Left - AWindowInfo.rcWindow.Left,
         AWindowInfo.rcClient.Top - AWindowInfo.rcWindow.Top, nil);
-      SendMessage(OwnerWindow, WM_PRINT, Result.Canvas.Handle,
+      SendMessage(OwnerWindow.Handle, WM_PRINT, Result.Canvas.Handle,
         PRF_NONCLIENT or PRF_ERASEBKGND or PRF_CLIENT or PRF_CHILDREN);
     finally
       Result.Canvas.Unlock;
@@ -424,8 +427,8 @@ begin
 
     AHasFrame :=
       (AWindowInfo.rcWindow <> AWindowInfo.rcClient) and
-      (GetWindowLong(OwnerWindow, GWL_STYLE) and WS_BORDER <> 0) and
-      (GetWindowLong(OwnerWindow, GWL_EXSTYLE) and WS_EX_LAYERED = 0);
+      (GetWindowLong(OwnerWindow.Handle, GWL_STYLE) and WS_BORDER <> 0) and
+      (GetWindowLong(OwnerWindow.Handle, GWL_EXSTYLE) and WS_EX_LAYERED = 0);
   end;
 {$ELSE}
 begin
@@ -472,41 +475,18 @@ begin
   begin
     SyncProgress;
     SyncButtons;
+    SyncState;
     UpdatePreview;
+    UpdateForceIconicRepresentation;
   end;
 end;
 
 procedure TACLAeroPeek.SetWindowAttribute(AAttr: Cardinal; AValue: LongBool);
 begin
-  if Available then
+  if Available and OwnerWindow.HandleAllocated then
   {$IFDEF MSWINDOWS}
-    DwmSetWindowAttribute(OwnerWindow, AAttr, @AValue, SizeOf(AValue));
+    DwmSetWindowAttribute(OwnerWindow.Handle, AAttr, @AValue, SizeOf(AValue));
   {$ENDIF}
-end;
-
-procedure TACLAeroPeek.HookOwnerWindow;
-begin
-{$IFDEF MSWINDOWS}
-  FWindowProcPtr := MakeObjectInstance(OwnerWindowWndProc);
-  FWindowProcOld := Pointer(SetWindowLong(OwnerWindow, GWL_WNDPROC, NativeUInt(FWindowProcPtr)));
-  SetWindowAttribute(DWMWA_HAS_ICONIC_BITMAP, True);
-  UpdateForceIconicRepresentation;
-{$ENDIF}
-end;
-
-procedure TACLAeroPeek.UnhookOwnerWindow;
-begin
-  if FWindowProcOld <> nil then
-  try
-  {$IFDEF MSWINDOWS}
-    SetWindowAttribute(DWMWA_HAS_ICONIC_BITMAP, False);
-    SetWindowLong(OwnerWindow, GWL_WNDPROC, NativeUInt(FWindowProcOld));
-    FreeObjectInstance(FWindowProcPtr);
-  {$ENDIF}
-  finally
-    FWindowProcOld := nil;
-    FWindowProcPtr := nil;
-  end;
 end;
 
 function TACLAeroPeek.GetAvailable: Boolean;
@@ -548,12 +528,11 @@ begin
         Exit;
       end;
   end;
-
-  AMessage.Result := CallWindowProc(FWindowProcOld, OwnerWindow, AMessage.Msg, AMessage.WParam, AMessage.LParam);
+  FPrevWndProc(AMessage);
   if AMessage.Msg = WM_TASKBARBUTTONCREATED then
     DoInitialize;
-  if AMessage.Msg = WM_NCDESTROY then
-    UnhookOwnerWindow;
+  if AMessage.Msg = WM_CREATE then
+    SyncState;
 {$ENDIF}
 end;
 
@@ -638,12 +617,12 @@ procedure TACLAeroPeek.SyncButtons;
 
   procedure UpdateThumbBar(AButtons: PThumbButton; AButtonsCount: Integer);
   begin
-    TaskBarList.ThumbBarSetImageList(OwnerWindow, ImageList.Handle);
+    TaskBarList.ThumbBarSetImageList(OwnerWindow.Handle, ImageList.Handle);
     if FTaskBarButtonsInitialized then
-      TaskBarList.ThumbBarUpdateButtons(OwnerWindow, AButtonsCount, AButtons)
+      TaskBarList.ThumbBarUpdateButtons(OwnerWindow.Handle, AButtonsCount, AButtons)
     else
     begin
-      TaskBarList.ThumbBarAddButtons(OwnerWindow, AButtonsCount, AButtons);
+      TaskBarList.ThumbBarAddButtons(OwnerWindow.Handle, AButtonsCount, AButtons);
       FTaskBarButtonsInitialized := True;
     end;
   end;
@@ -690,21 +669,28 @@ begin
     if ShowProgress and ProgressPresents then
     begin
       AState := CalculateState;
-      TaskBarList.SetProgressState(OwnerWindow, AState);
+      TaskBarList.SetProgressState(OwnerWindow.Handle, AState);
       if (AState <> TBPF_NOPROGRESS) and (AState <> TBPF_INDETERMINATE) then
-        TaskBarList.SetProgressValue(OwnerWindow, Progress, ProgressTotal);
+        TaskBarList.SetProgressValue(OwnerWindow.Handle, Progress, ProgressTotal);
     end
     else
       if ShowStatusAsColor and ProgressPresents then
       begin
-        TaskBarList.SetProgressState(OwnerWindow, StateMap[ProgressState]);
-        TaskBarList.SetProgressValue(OwnerWindow, 100, 100);
+        TaskBarList.SetProgressState(OwnerWindow.Handle, StateMap[ProgressState]);
+        TaskBarList.SetProgressValue(OwnerWindow.Handle, 100, 100);
       end
       else
-        TaskBarList.SetProgressState(OwnerWindow, TBPF_NOPROGRESS);
+        TaskBarList.SetProgressState(OwnerWindow.Handle, TBPF_NOPROGRESS);
   end;
 {$ELSE}
 begin
+{$ENDIF}
+end;
+
+procedure TACLAeroPeek.SyncState;
+begin
+{$IFDEF MSWINDOWS}
+  SetWindowAttribute(DWMWA_HAS_ICONIC_BITMAP, True);
 {$ENDIF}
 end;
 
@@ -723,7 +709,7 @@ begin
   ABitmap := CreatePeekPreview(AHasBorder);
   try
   {$IFDEF MSWINDOWS}
-    DwmSetIconicLivePreviewBitmap(OwnerWindow,
+    DwmSetIconicLivePreviewBitmap(OwnerWindow.Handle,
       ABitmap.Handle, nil, IfThen(AHasBorder, DWM_SIT_DISPLAYFRAME));
   {$ENDIF}
   finally
@@ -739,7 +725,7 @@ begin
   try
   {$IFDEF MSWINDOWS}
     DoDrawPreview(ABitmap);
-    DwmSetIconicThumbnail(OwnerWindow, ABitmap.Handle, 0);
+    DwmSetIconicThumbnail(OwnerWindow.Handle, ABitmap.Handle, 0);
   {$ENDIF}
   finally
     ABitmap.Free;

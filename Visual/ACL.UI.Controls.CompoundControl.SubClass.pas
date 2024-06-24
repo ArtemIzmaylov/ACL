@@ -2620,7 +2620,7 @@ begin
       if (FChanges = []) and ([cccnStruct, cccnLayout] * AChanges <> []) then
         if Assigned(OnCalculated) then
         begin
-          if not (csReading in Container.GetControl.ComponentState) then
+          if [csReading, csLoading] * Container.GetControl.ComponentState = [] then
             OnCalculated(Self);
         end;
     end;

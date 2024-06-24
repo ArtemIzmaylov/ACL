@@ -224,9 +224,7 @@ type
 // Paths
 function acChangeFileExt(const FileName, Extension: string; ADoubleExt: Boolean = False): string;
 function acCompareFileNames(const AFileName1, AFileName2: string): Integer;
-{$IFDEF MSWINDOWS}
 function acExpandEnvironmentStrings(const AFileName: string): string;
-{$ENDIF}
 function acExpandFileName(const AFileName: string): string;
 function acExtractDirName(const APath: string; ADepth: Integer = 1): string;
 function acExtractFileDir(const FileName: string): string;
@@ -292,11 +290,14 @@ function acFileGetAttr(const FileName: string): Cardinal; overload;
 function acFileGetAttr(const FileName: string; out AAttrs: Cardinal): Boolean; overload;
 function acFileGetLastWriteTime(const FileName: string): Cardinal;
 function acFileSetAttr(const FileName: string; AAttr: Cardinal): Boolean;
+procedure acFileSetLastWriteTime(const FileName: string; AFileDate: Cardinal = 0);
 function acFileSize(const FileName: string): Int64;
 
 // Removing, Copying, Renaming
-function acCopyDirectory(const ASourcePath, ATargetPath: string; const AExts: string = ''; ARecursive: Boolean = True): Boolean;
-function acCopyDirectoryContent(ASourcePath, ATargetPath: string; const AExts: string = ''; ARecursive: Boolean = True): Boolean;
+function acCopyDirectory(const ASourcePath, ATargetPath: string;
+  const AExts: string = ''; ARecursive: Boolean = True): Boolean;
+function acCopyDirectoryContent(ASourcePath, ATargetPath: string;
+  const AExts: string = ''; ARecursive: Boolean = True): Boolean;
 function acCopyFile(const ASourceFileName, ATargetFileName: string; AFailIfExists: Boolean = True): Boolean;
 function acDeleteDirectory(const APath: string): Boolean;
 function acDeleteDirectoryFull(APath: string; ARecursive: Boolean = True): Boolean;
@@ -435,8 +436,8 @@ begin
 //    Result := acLogicalCompare(acExtractFileName(AFileName1), acExtractFileName(AFileName2));
 end;
 
-{$IFDEF MSWINDOWS}
 function acExpandEnvironmentStrings(const AFileName: string): string;
+{$IFDEF MSWINDOWS}
 var
   L: Integer;
   W: TFileLongPath;
@@ -450,8 +451,12 @@ begin
     SetString(Result, PWideChar(@W[0]), L - 1)
   else
     Result := AFileName;
-end;
+{$ELSE}
+begin
+  Result := AFileName;
 {$ENDIF}
+  {$MESSAGE WARN 'acExpandEnvironmentStrings'}
+end;
 
 function acExpandFileName(const AFileName: string): string;
 {$IFDEF MSWINDOWS}
@@ -738,11 +743,17 @@ end;
 function acIsRelativeFileName(const AFileName: string): Boolean;
 begin
 {$IFDEF MSWINDOWS}
-  Result := (Length(AFileName) >= 2) and (AFileName[2] <> DriveDelim);
+  if (Length(AFileName) >= 2) and (AFileName[2] = ':') then
+    Exit(False); // C: C:\
 {$ELSE}
-  Result := (AFileName <> '') and (AFileName[1] <> sUnixPathDelim);
+  if (AFileName <> '') and (AFileName[1] = sUnixPathDelim) then
+    Exit(False);
 {$ENDIF}
-  Result := Result and not (acIsUncFileName(AFileName) or acIsUrlFileName(AFileName));
+  if acIsUrlFileName(AFileName) then
+    Exit(False);
+  if acIsUncFileName(AFileName) then
+    Exit(False);
+  Result := True;
 end;
 
 function acRelativeFileName(const AFileName: string; ARootPath: string): string;
@@ -1035,6 +1046,13 @@ begin
   Result := DateTimeToFileDate(TACLFileStat.Create(FileName).LastWriteTime);
 end;
 
+procedure acFileSetLastWriteTime(const FileName: string; AFileDate: Cardinal = 0);
+begin
+  if AFileDate = 0 then
+    AFileDate := DateTimeToFileDate(Now);
+  FileSetDate(FileName, {$IFDEF FPC}Int64{$ENDIF}(AFileDate));
+end;
+
 function acFileSetAttr(const FileName: string; AAttr: Cardinal): Boolean;
 begin
 {$IFDEF MSWINDOWS}
@@ -1220,11 +1238,17 @@ begin
         PWideChar(acPrepareFileName(ASourceFileName)),
         nil, 0, nil, nil);
   {$ELSE}
-    try
-      TFile.Replace(ASourceFileName, ATargetFileName, ABackupFileName);
-      Result := True;
-    except
-      Result := False;
+    if ABackupFileName <> '' then
+    begin
+      acDeleteFile(ABackupFileName);
+      Result :=
+        acMoveFile(ATargetFileName, ABackupFileName) and
+        acMoveFile(ASourceFileName, ATargetFileName);
+    end
+    else
+    begin
+      acDeleteFile(ATargetFileName);
+      Result := acMoveFile(ASourceFileName, ATargetFileName);
     end;
   {$ENDIF}
   end

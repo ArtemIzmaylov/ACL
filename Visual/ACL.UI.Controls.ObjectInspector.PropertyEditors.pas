@@ -955,6 +955,10 @@ initialization
   TACLPropertyEditors.Register(tkUString, TACLPropertyEditor);
   TACLPropertyEditors.Register(tkWString, TACLPropertyEditor);
   TACLPropertyEditors.Register(tkVariant, TACLPropertyEditor);
+{$IFDEF FPC}
+  TACLPropertyEditors.Register(tkAString, TACLPropertyEditor);
+  TACLPropertyEditors.Register(tkBool, TACLEnumPropertyEditor);
+{$ENDIF}
 
   TACLPropertyEditors.Register(TypeInfo(TComponent), TPersistent, '', TACLComponentPropertyEditor);
   TACLPropertyEditors.Register(TypeInfo(TAlphaColor), nil, '', TACLAlphaColorPropertyEditor);

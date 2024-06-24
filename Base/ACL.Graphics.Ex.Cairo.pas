@@ -225,7 +225,7 @@ type
     function GetCount: Integer;
     function GetMaxWidth: Double;
     procedure Init(AGlyphs: PCairoGlyphArray; AIndex, ACount: Integer);
-    procedure Push(AGlyphs: PCairoGlyphArray; AIndex, ACount: Integer);
+    function Push(AGlyphs: PCairoGlyphArray; AIndex, ACount: Integer): PCairoTextLine;
     procedure Free;
   end;
 
@@ -547,11 +547,14 @@ begin
     end;
 end;
 
-function CairoCalculateTextLayout(AFont: Pcairo_scaled_font_t;
-  ALines: PCairoTextLine; const ARect: TRect; AFlags: Cardinal): Integer;
+procedure CairoCalculateTextLayout(AFont: Pcairo_scaled_font_t;
+  ALines: PCairoTextLine; const ARect: TRect; AFlags: Cardinal);
 const
-  LineBreaks = #13#10;
-  WordBreaks = LineBreaks + #9' ';
+  WordBreaks = #13#10#9' ';
+var
+  LGlyphCount: Integer;
+  LGlyphs: PCairoGlyphArray;
+  LGlyphCR, LGlyphLF: Integer;
 
   procedure InitDelimiters(out D: TLongWordDynArray;
     const S: string; AExtents: Pcairo_text_extents_t = nil);
@@ -561,7 +564,11 @@ const
     LGlyphs: PCairoGlyphArray;
   begin
     D := nil;
-    if cairo_text_to_glyphs(AFont, S, LGlyphs, LGlyphCount) then
+    LGlyphs := nil;
+    LGlyphCount := 0;
+    cairo_scaled_font_text_to_glyphs(AFont, 0, 0,
+      PChar(S), Length(S), @LGlyphs, @LGlyphCount, nil, nil, nil);
+    if LGlyphs <> nil then
     try
       SetLength(D{%H-}, LGlyphCount);
       for I := 0 to LGlyphCount - 1 do
@@ -573,11 +580,24 @@ const
     end;
   end;
 
+  procedure ProcessLineBreak(var Index: Integer);
+  var
+    LSize: Integer;
+  begin
+    if (LGlyphs^[Index].Index = LGlyphCR) and
+       (Index + 1 < LGlyphCount) and (LGlyphs^[Index + 1].Index = LGlyphLF)
+    then //#13#10
+      LSize := 2
+    else
+      LSize := 1; // #13 or #10
+
+    Inc(Index, LSize);
+    Dec(ALines.Push(LGlyphs, Index, LGlyphCount)^.GlyphCount, LSize);
+  end;
+
 var
   I, J: Integer;
   LDeltaY: Double;
-  LGlyphCount: Integer;
-  LGlyphs: PCairoGlyphArray;
   LGlyphWidth: Double;
   LGlyphWidths: TDoubleDynArray;
   LEndEllipsis: TLongWordDynArray;
@@ -585,7 +605,6 @@ var
   LTextExtents: cairo_text_extents_t;
   LLineScan: PCairoTextLine;
   LLineStart: Integer;
-  LLineBreaks: TLongWordDynArray;
   LWordBreaks: TLongWordDynArray;
   LOffsetX, LOffsetY: Double;
   LHeight: Double;
@@ -600,24 +619,35 @@ begin
   begin
     LOffsetX := 0;
     LOffsetY := 0;
+    LGlyphCR := 0;
+    LGlyphLF := 0;
     LGlyphWidth := 0;
-    InitDelimiters(LLineBreaks, LineBreaks);
-    // В этом режиме мы переносим строки только по LDelimitersHardBreak
+
+    InitDelimiters(LWordBreaks, #13#10);
+    if Length(LWordBreaks) > 0 then
+      LGlyphCR := LWordBreaks[0];
+    if Length(LWordBreaks) > 1 then
+      LGlyphLF := LWordBreaks[1];
+
+    // В этом режиме мы переносим строки только по CR/LF
     if AFlags and DT_WORDBREAK = 0 then
     begin
-      for I := 0 to LGlyphCount - 1 do
+      I := 0;
+      while I < LGlyphCount do
       begin
         if I + 1 < LGlyphCount then
           LGlyphWidth := LGlyphs^[I + 1].X - LGlyphs^[I].X;
         LGlyphs^[I].X := LOffsetX;
         LGlyphs^[I].Y := LOffsetY;
         LOffsetX := LOffsetX + LGlyphWidth;
-        if Contains(LLineBreaks, LGlyphs^[I].Index) then
+        if (LGlyphs^[I].Index = LGlyphCR) or (LGlyphs^[I].Index = LGlyphLF) then
         begin
-          ALines.Push(LGlyphs, I + 1, LGlyphCount);
+          ProcessLineBreak(I);
           LOffsetY := LOffsetY + LFontMetrics.height;
           LOffsetX := 0;
+          Continue;
         end;
+        Inc(I);
       end;
     end
     else // Wordbreak
@@ -656,12 +686,14 @@ begin
         LGlyphs^[I].X := LOffsetX;
         LGlyphs^[I].Y := LOffsetY;
         LOffsetX := LOffsetX + LGlyphWidths[I];
-        if Contains(LLineBreaks, LGlyphs^[I].Index) then
+        LOffsetX := LOffsetX + LGlyphWidth;
+        if (LGlyphs^[I].Index = LGlyphCR) or (LGlyphs^[I].Index = LGlyphLF) then
         begin
-          LLineStart := I + 1;
-          ALines.Push(LGlyphs, LLineStart, LGlyphCount);
+          ProcessLineBreak(I);
           LOffsetY := LOffsetY + LFontMetrics.height;
           LOffsetX := 0;
+          LLineStart := I;
+          Continue;
         end;
         Inc(I);
       end;
@@ -669,7 +701,7 @@ begin
   end;
 
   // EndEllipsis
-  if AFlags and DT_END_ELLIPSIS <> 0 then
+  if AFlags and (DT_CALCRECT or DT_END_ELLIPSIS) = DT_END_ELLIPSIS then
   begin
     // Считаем метрики
     ALines.CalcMetrics(AFont);
@@ -716,8 +748,6 @@ begin
           LLineScan^.Free;
           // Мы уже учли DT_EDITCONTROL - нет смысла делать работу еще раз
           AFlags := AFlags and not DT_EDITCONTROL;
-          // Обновляем количество символов для вывода
-          LGlyphCount := (LLineScan^.Glyphs - LGlyphs) + LLineScan^.GlyphCount;
           Break;
         end;
         Dec(I);
@@ -736,12 +766,17 @@ begin
     begin
       LHeight := 0;
       LLineScan := ALines;
-      LGlyphCount := 0;
       while (LLineScan <> nil) and (LHeight + LFontMetrics.height <= ARect.Height) do
       begin
-        Inc(LGlyphCount, LLineScan^.GlyphCount);
         LHeight := LHeight + LFontMetrics.height;
         LLineScan := LLineScan.NextLine;
+      end;
+      // Усекаем лейаут по последней видимой строке (последующие строки будут освобождены)
+      // Себя оставляем, ведь мы можем быть строкой-инициализатором
+      if LLineScan <> nil then
+      begin
+        LLineScan^.GlyphCount := 0;
+        LLineScan^.Free;
       end;
     end
     else
@@ -763,7 +798,6 @@ begin
 
     OffsetGlyphs(LGlyphs, LGlyphCount, ARect.Left, LDeltaY + LFontMetrics.baseline);
   end;
-  Result := LGlyphCount;
 end;
 
 procedure CairoDrawTextStyleLines(ACairo: Pcairo_t; AFontStyle: TFontStyles;
@@ -779,14 +813,18 @@ begin
   end;
 end;
 
-procedure CairoDrawTextStyleLines(ACairo: Pcairo_t; AFontStyle: TFontStyles;
-  ALines: PCairoTextLine; const AMetrics: TCairoFontMetrics); overload;
+procedure CairoDrawTextLines(ACairo: Pcairo_t; ALines: PCairoTextLine;
+  AFontStyle: TFontStyles; const AFontMetrics: TCairoFontMetrics);
 begin
   while ALines <> nil do
   begin
-    if ALines.GlyphCount > 0 then
-      CairoDrawTextStyleLines(ACairo, AFontStyle, ALines^.Glyphs^[0].X,
-        ALines^.Glyphs^[0].Y - AMetrics.baseline, ALines^.Width, AMetrics);
+    if ALines^.GlyphCount > 0 then
+    begin
+      cairo_show_glyphs(ACairo, @ALines^.Glyphs^[0], ALines^.GlyphCount);
+      CairoDrawTextStyleLines(ACairo, AFontStyle,
+        ALines^.Glyphs^[0].X, ALines^.Glyphs^[0].Y - AFontMetrics.baseline,
+        ALines^.Width, AFontMetrics);
+    end;
     ALines := ALines^.NextLine;
   end;
 end;
@@ -837,9 +875,7 @@ begin
               cairo_rectangle(LCairo, LRect.Left, LRect.Top, LRect.Width, LRect.Height);
               cairo_clip(LCairo);
             end;
-            cairo_show_glyphs(LCairo, @LGlyphs^[0], LGlyphCount);
-            if CairoTextStyleLines * ACanvas.Font.Style <> [] then
-              CairoDrawTextStyleLines(LCairo, ACanvas.Font.Style, @LLines, LFontMetrics);
+            CairoDrawTextLines(LCairo, @LLines, ACanvas.Font.Style, LFontMetrics);
           finally
             LLines.Free;
           end;
@@ -1094,7 +1130,7 @@ begin
   Width := -1;
 end;
 
-procedure TCairoTextLine.Push(AGlyphs: PCairoGlyphArray; AIndex, ACount: Integer);
+function TCairoTextLine.Push(AGlyphs: PCairoGlyphArray; AIndex, ACount: Integer): PCairoTextLine;
 var
   LCurr: PCairoTextLine;
 begin
@@ -1104,6 +1140,7 @@ begin
   New(LCurr^.NextLine);
   LCurr^.NextLine^.Init(AGlyphs, AIndex, ACount);
   LCurr^.GlyphCount := LCurr^.NextLine^.Glyphs - LCurr^.Glyphs;
+  Result := LCurr;
 end;
 
 { TCairoTextLayoutMetrics }
@@ -1628,13 +1665,9 @@ begin
     LLines.Init(LGlyphs, 0, LGlyphCount);
     try
       CairoCalculateTextLayout(LFont, @LLines, R + Origin, LFlags);
+      cairo_font_metrics(LFont, LFontMetrics);
       cairo_set_source_color(Handle, Color);
-      cairo_show_glyphs(Handle, @LGlyphs^[0], LGlyphCount);
-      if CairoTextStyleLines * Font.Style <> [] then
-      begin
-        cairo_font_metrics(LFont, LFontMetrics);
-        CairoDrawTextStyleLines(Handle, Font.Style, @LLines, LFontMetrics);
-      end;
+      CairoDrawTextLines(Handle, @LLines, Font.Style, LFontMetrics);
     finally
       LLines.Free;
     end;

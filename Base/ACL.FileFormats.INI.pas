@@ -64,11 +64,12 @@ type
     procedure Changed; override;
     function FindValue(const AName: string; out AIndex: Integer): Boolean; overload;
     function FindValue(const AName: string; ANameHash: Integer; out AIndex: Integer): Boolean; overload;
-    //
+    // Properties
     property NameHash: Integer read FNameHash;
   public
     procedure BeginUpdate; override;
     procedure EndUpdate; override;
+    function Exists(const AKey: string): Boolean;
     // Deleting
     function Delete(const AKey: string): Boolean; overload;
     // Reading
@@ -265,6 +266,13 @@ begin
     Changed;
 end;
 
+function TACLIniFileSection.Exists(const AKey: string): Boolean;
+var
+  LIndex: Integer;
+begin
+  Result := FindValue(AKey, LIndex);
+end;
+
 function TACLIniFileSection.Delete(const AKey: string): Boolean;
 var
   AIndex: Integer;
@@ -452,6 +460,7 @@ end;
 
 procedure TACLIniFileSection.WriteStream(const AKey: string; AStream: TStream);
 begin
+  {$MESSAGE 'TODO - mimecode?'}
   WriteString(AKey, TACLHexCode.Encode(AStream), '');
 end;
 
@@ -713,55 +722,55 @@ end;
 
 function TACLIniFile.ReadBool(const ASection, AKey: string; ADefault: Boolean = False): Boolean;
 var
-  ASectionObj: TACLIniFileSection;
+  LSection: TACLIniFileSection;
 begin
-  ASectionObj := GetSection(ASection);
-  if ASectionObj <> nil then
-    Result := ASectionObj.ReadBool(AKey, ADefault)
+  LSection := GetSection(ASection);
+  if LSection <> nil then
+    Result := LSection.ReadBool(AKey, ADefault)
   else
     Result := ADefault;
 end;
 
 function TACLIniFile.ReadEnum<T>(const ASection, AKey: string; const ADefault: T): T;
 var
-  ASectionObj: TACLIniFileSection;
+  LSection: TACLIniFileSection;
 begin
-  ASectionObj := GetSection(ASection);
-  if ASectionObj <> nil then
-    Result := ASectionObj.ReadEnum<T>(AKey, ADefault)
+  LSection := GetSection(ASection);
+  if LSection <> nil then
+    Result := LSection.ReadEnum<T>(AKey, ADefault)
   else
     Result := ADefault;
 end;
 
 function TACLIniFile.ReadFloat(const ASection, AKey: string; const ADefault: Double = 0): Double;
 var
-  ASectionObj: TACLIniFileSection;
+  LSection: TACLIniFileSection;
 begin
-  ASectionObj := GetSection(ASection);
-  if ASectionObj <> nil then
-    Result := ASectionObj.ReadFloat(AKey, ADefault)
+  LSection := GetSection(ASection);
+  if LSection <> nil then
+    Result := LSection.ReadFloat(AKey, ADefault)
   else
     Result := ADefault;
 end;
 
 function TACLIniFile.ReadInteger(const ASection, AKey: string; ADefault: Integer = 0): Integer;
 var
-  ASectionObj: TACLIniFileSection;
+  LSection: TACLIniFileSection;
 begin
-  ASectionObj := GetSection(ASection);
-  if ASectionObj <> nil then
-    Result := ASectionObj.ReadInt32(AKey, ADefault)
+  LSection := GetSection(ASection);
+  if LSection <> nil then
+    Result := LSection.ReadInt32(AKey, ADefault)
   else
     Result := ADefault;
 end;
 
 function TACLIniFile.ReadInt64(const ASection, AKey: string; const ADefault: Int64 = 0): Int64;
 var
-  ASectionObj: TACLIniFileSection;
+  LSection: TACLIniFileSection;
 begin
-  ASectionObj := GetSection(ASection);
-  if ASectionObj <> nil then
-    Result := ASectionObj.ReadInt64(AKey, ADefault)
+  LSection := GetSection(ASection);
+  if LSection <> nil then
+    Result := LSection.ReadInt64(AKey, ADefault)
   else
     Result := ADefault;
 end;
@@ -773,11 +782,11 @@ end;
 
 function TACLIniFile.ReadRect(const ASection, AKey: string; const ADefault: TRect): TRect;
 var
-  ASectionObj: TACLIniFileSection;
+  LSection: TACLIniFileSection;
 begin
-  ASectionObj := GetSection(ASection);
-  if ASectionObj <> nil then
-    Result := ASectionObj.ReadRect(AKey, ADefault)
+  LSection := GetSection(ASection);
+  if LSection <> nil then
+    Result := LSection.ReadRect(AKey, ADefault)
   else
     Result := ADefault;
 end;
@@ -788,10 +797,11 @@ begin
 end;
 
 function TACLIniFile.ReadStream(const ASection, AKey: string; AStream: TStream): Boolean;
+var
+  LSection: TACLIniFileSection;
 begin
-  Result := TACLHexCode.Decode(ReadString(ASection, AKey), AStream);
-  if Result then
-    AStream.Position := 0;
+  LSection := GetSection(ASection);
+  Result := (LSection <> nil) and LSection.ReadStream(AKey, AStream);
 end;
 
 function TACLIniFile.ReadString(const ASection, AKey: string; const ADefault: string = ''): string;
@@ -802,10 +812,10 @@ end;
 
 function TACLIniFile.ReadStringEx(const ASection, AKey: string; out AValue: string): Boolean;
 var
-  ASectionObj: TACLIniFileSection;
+  LSection: TACLIniFileSection;
 begin
-  ASectionObj := GetSection(ASection);
-  Result := (ASectionObj <> nil) and ASectionObj.ReadStringEx(AKey, AValue);
+  LSection := GetSection(ASection);
+  Result := (LSection <> nil) and LSection.ReadStringEx(AKey, AValue);
 end;
 
 function TACLIniFile.ReadStrings(const ASection: string; AStrings: TACLStringList): Integer;
@@ -859,21 +869,21 @@ end;
 {$IFNDEF ACL_BASE_NOVCL}
 function TACLIniFile.ReadColor(const ASection, AKey: string; ADefault: TColor = clDefault): TColor;
 var
-  ASectionObj: TACLIniFileSection;
+  LSection: TACLIniFileSection;
 begin
-  ASectionObj := GetSection(ASection);
-  if ASectionObj <> nil then
-    Result := ASectionObj.ReadColor(AKey, ADefault)
+  LSection := GetSection(ASection);
+  if LSection <> nil then
+    Result := LSection.ReadColor(AKey, ADefault)
   else
     Result := ADefault;
 end;
 
 function TACLIniFile.ReadFont(const ASection, AKey: string; AFont: TFont): Boolean;
 var
-  ASectionObj: TACLIniFileSection;
+  LSection: TACLIniFileSection;
 begin
-  ASectionObj := GetSection(ASection);
-  Result := (ASectionObj <> nil) and ASectionObj.ReadFont(AKey, AFont);
+  LSection := GetSection(ASection);
+  Result := (LSection <> nil) and LSection.ReadFont(AKey, AFont);
 end;
 {$ENDIF}
 
@@ -1021,7 +1031,12 @@ end;
 
 procedure TACLIniFile.WriteStream(const ASection, AKey: string; AStream: TStream);
 begin
-  WriteString(ASection, AKey, TACLHexCode.Encode(AStream), '');
+  BeginUpdate;
+  try
+    GetSection(ASection, True).WriteStream(AKey, AStream);
+  finally
+    EndUpdate;
+  end;
 end;
 
 procedure TACLIniFile.WriteString(const ASection, AKey, AValue: string);
@@ -1036,17 +1051,17 @@ end;
 
 procedure TACLIniFile.WriteStrings(const ASection: string; AStrings: TACLStringList);
 var
-  AList: TACLIniFileSection;
+  LSection: TACLIniFileSection;
   I: Integer;
 begin
   BeginUpdate;
   try
-    AList := GetSection(ASection, True);
-    AList.Clear;
-    AList.Capacity := AStrings.Count;
-    AList.WriteString('Count', IntToStr(AStrings.Count));
+    LSection := GetSection(ASection, True);
+    LSection.Clear;
+    LSection.Capacity := AStrings.Count;
+    LSection.WriteString('Count', IntToStr(AStrings.Count));
     for I := 0 to AStrings.Count - 1 do
-      AList.WriteString('i' + IntToStr(I + 1), AStrings[I]);
+      LSection.WriteString('i' + IntToStr(I + 1), AStrings[I]);
   finally
     EndUpdate;
   end;
@@ -1433,7 +1448,8 @@ begin
   if Modified then
   begin
     ATempFileName := FileName + '.new';
-    Result := SaveToFile(ATempFileName, Encoding) and acReplaceFile(ATempFileName, FileName, GetBackupFileName);
+    Result := SaveToFile(ATempFileName, Encoding) and
+      acReplaceFile(ATempFileName, FileName, GetBackupFileName);
     if Result then
       FModified := False;
   end

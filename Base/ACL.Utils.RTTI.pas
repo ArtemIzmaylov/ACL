@@ -277,7 +277,8 @@ end;
 
 class function TRTTI.IsString(APropInfo: PPropInfo): Boolean;
 begin
-  Result := APropInfo.PropType^.Kind in [tkString, tkLString, tkWString, tkUString];
+  Result := APropInfo.PropType^.Kind in [tkString, tkLString,
+    tkWString, tkUString{$IFDEF FPC}, tkAString{$ENDIF} ];
 end;
 
 class function TRTTI.IsUnsignedInt(APropInfo: PPropInfo): Boolean;

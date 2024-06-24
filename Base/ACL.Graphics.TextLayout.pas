@@ -73,6 +73,7 @@ type
     procedure Shrink(ARender: TACLTextLayoutRender; AMaxRight: Integer); virtual;
     //# Properties
     property Position: TPoint read FPosition;
+    property PositionInText: PChar read FPositionInText;
   end;
 
   { TACLTextLayoutBlockList }
@@ -319,7 +320,9 @@ type
     FHitPoint: TPoint;
     FHyperlinks: TStack;
 
+    function GetHint: string;
     function GetHyperlink: TACLTextLayoutBlockHyperlink;
+    function GetRowIndex: Integer;
   protected
     function OnBlock(ABlock: TACLTextLayoutBlock): Boolean; inline;
     function OnHyperlink(ABlock: TACLTextLayoutBlockHyperlink): Boolean; override;
@@ -329,9 +332,11 @@ type
     destructor Destroy; override;
     procedure Reset;
     //# Properties
+    property Hint: string read GetHint;
     property HitObject: TACLTextLayoutBlock read FHitObject;
     property HitPoint: TPoint read FHitPoint write FHitPoint;
     property Hyperlink: TACLTextLayoutBlockHyperlink read GetHyperlink;
+    property RowIndex: Integer read GetRowIndex;
   end;
 
   { TACLPlainTextExporter }
@@ -339,12 +344,14 @@ type
   TACLPlainTextExporterClass = class of TACLPlainTextExporter;
   TACLPlainTextExporter = class(TACLTextLayoutExporter)
   protected
-    FTarget: TACLStringBuilder;
+    FBuffer: TACLStringBuilder;
   public
-    constructor Create(ASource: TACLTextLayout; ATarget: TACLStringBuilder); reintroduce;
+    constructor Create(ASource: TACLTextLayout);
+    destructor Destroy; override;
     function OnLineBreak(ABlock: TACLTextLayoutBlock): Boolean; override;
     function OnSpace(ABlock: TACLTextLayoutBlockSpace): Boolean; override;
     function OnText(ABlock: TACLTextLayoutBlockText): Boolean; override;
+    function ToString: string; override;
   end;
 
   { TACLTextLayoutPainter }
@@ -1802,6 +1809,40 @@ begin
   Result := OnBlock(ABlock);
 end;
 
+function TACLTextLayoutHitTest.GetHint: string;
+var
+  I: Integer;
+  LEndIndex: Integer;
+  LExporter: TACLPlainTextExporter;
+  LRowIndex: Integer;
+  LStartIndex: Integer;
+begin
+  Result := acEmptyStr;
+  LRowIndex := RowIndex;
+  if LRowIndex < 0 then
+    Exit;
+  if Owner.FLayout[LRowIndex].EndEllipsis <> nil then
+  begin
+    LEndIndex := Owner.FBlocks.Count - 1;
+    LStartIndex := Owner.FBlocks.IndexOf(Owner.FLayout[LRowIndex].First);
+    for I := LRowIndex + 1 to Owner.RowCount - 1 do
+      if Owner.FLayout[I].Count > 0 then
+      begin
+        LEndIndex := Owner.FBlocks.IndexOf(Owner.FLayout[I].First) - 1;
+        Break;
+      end;
+
+    LExporter := TACLPlainTextExporter.Create(Owner);
+    try
+      for I := LStartIndex to LEndIndex do
+        Owner.FBlocks[I].Export(LExporter);
+      Result := LExporter.FBuffer.ToTrimmedString;
+    finally
+      LExporter.Free;
+    end;
+  end;
+end;
+
 function TACLTextLayoutHitTest.GetHyperlink: TACLTextLayoutBlockHyperlink;
 begin
   if (FHyperlinks <> nil) and (FHyperlinks.Count > 0) then
@@ -1810,30 +1851,53 @@ begin
     Result := nil;
 end;
 
+function TACLTextLayoutHitTest.GetRowIndex: Integer;
+var
+  I: Integer;
+begin
+  for I := 0 to Owner.RowCount - 1 do
+  begin
+    if Owner.FLayout[I].Contains(HitObject) then
+      Exit(I);
+  end;
+  Result := -1;
+end;
+
 { TACLPlainTextExporter }
 
-constructor TACLPlainTextExporter.Create(ASource: TACLTextLayout; ATarget: TACLStringBuilder);
+constructor TACLPlainTextExporter.Create;
 begin
-  inherited Create(ASource);
-  FTarget := ATarget;
+  inherited;
+  FBuffer := TACLStringBuilder.Create(Length(Owner.Text))
+end;
+
+destructor TACLPlainTextExporter.Destroy;
+begin
+  FreeAndNil(FBuffer);
+  inherited;
 end;
 
 function TACLPlainTextExporter.OnLineBreak(ABlock: TACLTextLayoutBlock): Boolean;
 begin
-  FTarget.AppendLine;
+  FBuffer.AppendLine;
   Result := True;
 end;
 
 function TACLPlainTextExporter.OnSpace(ABlock: TACLTextLayoutBlockSpace): Boolean;
 begin
-  FTarget.Append(' ');
+  FBuffer.Append(' ');
   Result := True;
 end;
 
 function TACLPlainTextExporter.OnText(ABlock: TACLTextLayoutBlockText): Boolean;
 begin
-  FTarget.Append(ABlock.ToString);
+  FBuffer.Append(ABlock.Text, ABlock.TextLength);
   Result := True;
+end;
+
+function TACLPlainTextExporter.ToString: string;
+begin
+  Result := FBuffer.ToString;
 end;
 
 { TACLTextLayoutPainter }
@@ -2994,14 +3058,14 @@ end;
 
 function TACLTextLayout.ToStringEx(ExporterClass: TACLPlainTextExporterClass): string;
 var
-  B: TACLStringBuilder;
+  LExporter: TACLPlainTextExporter;
 begin
-  B := TACLStringBuilder.Get(Length(Text));
+  LExporter := ExporterClass.Create(Self);
   try
-    FBlocks.Export(ExporterClass.Create(Self, B), True);
-    Result := B.ToString;
+    FBlocks.Export(LExporter, False);
+    Result := LExporter.ToString;
   finally
-    B.Release
+    LExporter.Free;
   end;
 end;
 

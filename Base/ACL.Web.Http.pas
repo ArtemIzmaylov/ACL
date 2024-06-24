@@ -483,7 +483,7 @@ begin
       FSession := InternetOpenW(nil, INTERNET_OPEN_TYPE_DIRECT, nil, nil, 0);
     ncmUserDefined:
       begin
-        LProxyServer := Format('http=%s:%s', [TACLWebSettings.Proxy.Server, TACLWebSettings.Proxy.ServerPort]);
+        LProxyServer := TACLWebSettings.Proxy.Server + ':' + TACLWebSettings.Proxy.ServerPort;
         FSession := InternetOpenW(nil, INTERNET_OPEN_TYPE_PROXY, PWideChar(LProxyServer), nil, 0);
       end;
   else
@@ -609,6 +609,13 @@ var
 begin
   LClient := TLazHttpClient.Create(nil);
   try
+    if TACLWebSettings.ConnectionMode = ncmUserDefined then
+    begin
+      LClient.Proxy.Host := TACLWebSettings.Proxy.Server;
+      LClient.Proxy.Port := StrToIntDef(TACLWebSettings.Proxy.ServerPort, 80);
+      LClient.Proxy.UserName := TACLWebSettings.Proxy.UserName;
+      LClient.Proxy.Password := TACLWebSettings.Proxy.UserPass;
+    end;
     LClient.FOnAccept := AOnAccept;
     LClient.FOnProgress := LClient.FOnProgress;
     while THttpHeaders.Extract(AHeaders, IdentCookie, LCookieValue) do

@@ -200,7 +200,6 @@ type
     procedure BoundsChanged; override;
     function CreatePadding: TACLPadding; override;
     procedure CreateWnd; override;
-    function HitTest(X, Y: Integer; out AViewItem: TACLTabViewItem): Boolean;
     function IsTabVisible(AIndex: Integer): Boolean;
     procedure SetTargetDPI(AValue: Integer); override;
     procedure UpdateTransparency; override;
@@ -251,6 +250,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    function HitTest(X, Y: Integer; out AViewItem: TACLTabViewItem): Boolean;
     procedure JumpToNextPage(AForward: Boolean);
     //# Properties
     property HoverTab: TACLTab read FHoverTab;
@@ -303,7 +303,6 @@ type
     procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
   protected
     FTab: TACLTab;
-
     procedure Paint; override;
     procedure SetParent(AParent: TWinControl); override;
     procedure UpdateTab;
@@ -313,6 +312,7 @@ type
     //# Properties
     property Active: Boolean read GetActive;
     property PageControl: TACLPageControl read GetPageControl write SetPageControl;
+    property Tab: TACLTab read FTab; {nullable}
   published
     property Caption;
     property Padding;
