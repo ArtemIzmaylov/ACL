@@ -30,6 +30,7 @@ uses
   {System.}Generics.Collections,
   // Vcl
   {Vcl.}Controls,
+  {Vcl.}ClipBrd,
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,

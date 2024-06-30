@@ -39,6 +39,7 @@ uses
   {System.}Math,
   {System.}SysUtils,
   {System.}Types,
+  {System.}TypInfo,
   System.UITypes,
   // Vcl
   {Vcl.}Forms,
@@ -208,6 +209,7 @@ type
       AEnabled, ASelected: Boolean); virtual;
     function GetTextIdent: Integer; inline;
     procedure InitializeResources; override;
+    function IsBitmapDefined(AItem: TMenuItem): Boolean;
   public
     procedure AfterConstruction; override;
     procedure AssignFontParams(ACanvas: TCanvas;
@@ -650,6 +652,7 @@ type
 
 function acMenuEscapeHotkeys(const ACaption: string): string;
 function acMenusHasActivePopup: Boolean;
+function acShortCutToText(ShortCut: TShortCut): string;
 implementation
 
 uses
@@ -706,6 +709,11 @@ end;
 function acMenusHasActivePopup: Boolean;
 begin
   Result := FMenuLoopCount > 0;
+end;
+
+function acShortCutToText(ShortCut: TShortCut): string;
+begin
+  Result := ShortCutToText(ShortCut);
 end;
 
 {$REGION ' Helpers '}
@@ -1166,7 +1174,7 @@ begin
     else
 
     // VCL Glyph
-    if not AItem.Bitmap.Empty then
+    if IsBitmapDefined(AItem) then
     begin
       AGlyph := TACLGlyph.Create(nil);
       try
@@ -1220,6 +1228,18 @@ begin
   FontDisabled.InitailizeDefaults('Popup.Fonts.Disabled');
   FontSelected.InitailizeDefaults('Popup.Fonts.Selected');
   Texture.InitailizeDefaults('Popup.Textures.General');
+end;
+
+function TACLStyleMenu.IsBitmapDefined(AItem: TMenuItem): Boolean;
+begin
+{$IFDEF FPC}
+  // В отличие от Delphi, Lazarus инициализирует битмап из имеджлиста при
+  // чтении проперти, единственный вариант без хаков узнать, назначил ли
+  // пользователь картинку - дергуть isStored свойства.
+  Result := IsStoredProp(AItem, 'Bitmap');
+{$ELSE}
+  Result := not AItem.Bitmap.Empty;
+{$ENDIF}
 end;
 
 function TACLStyleMenu.MeasureWidth(ACanvas: TCanvas;
@@ -1384,7 +1404,7 @@ begin
     acDrawArrow(ACanvas, R.Split(srRight, R.Height), acGetActualColor(ACanvas.Font), makRight, TargetDPI)
   else
     if AShortCut <> scNone then
-      acTextDraw(ACanvas, ShortCutToText(AShortCut), R, taRightJustify, taVerticalCenter);
+      acTextDraw(ACanvas, acShortCutToText(AShortCut), R, taRightJustify, taVerticalCenter);
 end;
 
 procedure TACLStylePopupMenu.DrawItemImage(
@@ -1417,7 +1437,7 @@ begin
   if AShortCut <> scNone then
   begin
     Inc(Result, acTextSize(ACanvas, '  ').Width);
-    Inc(Result, acTextSize(ACanvas, ShortCutToText(AShortCut)).Width);
+    Inc(Result, acTextSize(ACanvas, acShortCutToText(AShortCut)).Width);
   end;
 end;
 
@@ -2230,7 +2250,7 @@ end;
 class procedure TACLMenuPopupWindow.WSRegisterClass;
 begin
 {$IFDEF LCLGtk2}
-  RegisterWSComponent(Self, TGtk2PopupControl);
+  RegisterWSComponent(Self, TACLGtk2PopupControl);
 {$ELSE}
   inherited;
 {$ENDIF}
@@ -2650,7 +2670,7 @@ function TACLMenuPopupLooper.GetMenuHint(AItem: TMenuItem): string;
 begin
   Result := GetLongHint(AItem.Hint);
   if Application.HintShortCuts and (AItem.ShortCut <> scNone) then
-    Result := Format('%s (%s)', [Result, ShortCutToText(AItem.ShortCut)]);
+    Result := Format('%s (%s)', [Result, acShortCutToText(AItem.ShortCut)]);
 end;
 
 function TACLMenuPopupLooper.IsInLoop: Boolean;

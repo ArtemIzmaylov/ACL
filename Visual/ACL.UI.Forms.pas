@@ -202,6 +202,8 @@ type
     // IACLApplicationListener
     procedure ApplicationSettingsChanged(AChanges: TACLApplicationChanges); override;
 
+    // Properties
+    property InMenuLoop: Integer read FInMenuLoop;
     // Messages
     procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
     procedure CMRecreateWnd(var Message: TMessage); message {%H-}CM_RECREATEWND;

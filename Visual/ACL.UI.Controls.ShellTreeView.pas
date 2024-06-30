@@ -64,6 +64,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    // Returns image index for regular folder if AFolder = nil
     function GetImageIndex(AFolder: TACLShellFolder): Integer;
   end;
 
@@ -171,6 +172,7 @@ type
     procedure CreateDirectory(AFolder: string = '');
     function GetFullPath(ANode: TACLTreeListNode): string;
     //# Properties
+    property Images: TACLShellImageList read FImages;
     property OptionsBehavior: TACLShellTreeViewOptionsBehavior read FOptionsBehavior write SetOptionsBehavior;
     property OptionsView: TACLShellTreeViewOptionsView read FOptionsView write SetOptionsView;
     property QuickAccessNodeState: Boolean read GetQuickAccessNodeState write SetQuickAccessNodeState;
@@ -277,8 +279,19 @@ var
   LFileInfo: TSHFileInfoW;
 begin
   ZeroMemory(@LFileInfo, SizeOf(LFileInfo));
-  SHGetFileInfoW(PWideChar(AFolder.AbsoluteID), 0, LFileInfo, SizeOf(LFileInfo),
-    SHGFI_PIDL or SHGFI_SYSICONINDEX or SHGFI_SMALLICON);
+  if AFolder <> nil then
+  begin
+    SHGetFileInfoW(PWideChar(AFolder.AbsoluteID), 0,
+      LFileInfo, SizeOf(LFileInfo),
+      SHGFI_PIDL or SHGFI_SYSICONINDEX or SHGFI_SMALLICON);
+  end
+  else
+  begin
+    LFileInfo.dwAttributes := SFGAO_FOLDER;
+    SHGetFileInfo('C:\Folder\', FILE_ATTRIBUTE_DIRECTORY,
+      LFileInfo, SizeOf(LFileInfo),
+      SHGFI_USEFILEATTRIBUTES or SHGFI_SYSICONINDEX);
+  end;
   Result := LFileInfo.iIcon;
 {$ELSE}
 const
@@ -329,7 +342,7 @@ begin
     if FCache.Count = 0 then // FetchIcon облажалась
       FCache.Add('', RegularFolderImageIndex); // чтобы не было зацикливания
   end;
-  if AFolder.ID^.Flags <> 0 then // спец.папка, для них спрашиваем свою иконку
+  if (AFolder <> nil) and (AFolder.ID^.Flags <> 0) then // спец.папка, для таких спрашиваем свою иконку
     Result := FetchIcon(AFolder.Path)
   else
     Result := RegularFolderImageIndex;

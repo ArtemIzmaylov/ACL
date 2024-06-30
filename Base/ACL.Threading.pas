@@ -15,8 +15,6 @@ unit ACL.Threading;
 
 {$I ACL.Config.inc}
 
-{$DEFINE ACL_THREADING_USE_MESSAGES}
-
 interface
 
 uses
@@ -893,7 +891,7 @@ end;
 
 initialization
   IsMultiThread := True;
-{$IFDEF DEBUG}
+{$IFDEF ACL_THREADING_DEBUG}
   TThread.NameThreadForDebugging('Main');
 {$ENDIF}
 end.

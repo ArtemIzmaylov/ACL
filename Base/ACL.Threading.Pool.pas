@@ -691,11 +691,11 @@ end;
 
 class function TACLTaskDispatcher.ThreadProc(ATask: TACLTask): Integer;
 begin
-{$IFDEF DEBUG}
+{$IFDEF ACL_THREADING_DEBUG}
   TThread.NameThreadForDebugging('ThreadPool - ' + ATask.ClassName);
 {$ENDIF}
   ATask.FOwner.AsyncRun(ATask);
-{$IFDEF DEBUG}
+{$IFDEF ACL_THREADING_DEBUG}
   TThread.NameThreadForDebugging('ThreadPool - Idle');
 {$ENDIF}
   Result := 0;

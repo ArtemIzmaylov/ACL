@@ -507,7 +507,9 @@ var
   ATimer: TACLTimer;
   I: Integer;
 begin
+{$IFDEF ACL_THREADING_DEBUG}
   NameThreadForDebugging('HighResolutionTimer');
+{$ENDIF}
 
   ATicked := TList.Create;
   try

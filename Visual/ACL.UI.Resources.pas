@@ -459,7 +459,7 @@ type
     procedure MakeUnique;
     // IACLColorSchema
     procedure ApplyColorSchema(const AValue: TACLColorSchema);
-    //
+    //# Properties
     property ContentOffsets: TRect read GetContentOffsets;
     property Empty: Boolean read GetEmpty;
     property FrameCount: Integer read GetFrameCount;
@@ -470,7 +470,7 @@ type
     property HitTestMode: TACLSkinImageHitTestMode read GetHitTestMode;
     property Margins: TRect read GetMargins;
     property StretchMode: TACLStretchMode read GetStretchMode;
-    //
+    //# State
     property ActualAllowColoration: Boolean read GetActualAllowColoration;
     property ActualColorSchema: TACLColorSchema read GetActualColorSchema;
     property ActualScalable: Boolean read GetActualScalable;

@@ -215,9 +215,8 @@ end;
 procedure TACLCustomMemoContainer.EditorUpdateParamsCore;
 begin
   inherited;
-  TWinControlAccess(FEditor).Align := alClient;
-  TWinControlAccess(FEditor).Color := Style.ColorsContent[Enabled];
-  TWinControlAccess(FEditor).Font.Color := Style.ColorsText[Enabled];
+  FEditor.Align := alClient;
+  Style.ApplyColors(FEditor, Enabled);
 end;
 
 procedure TACLCustomMemoContainer.EditorWndProc(var Message: TMessage);

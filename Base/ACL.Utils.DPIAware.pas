@@ -74,15 +74,15 @@ function acGetTargetDPI(const APoint: TPoint): Integer; overload;
 function acGetTargetDPI(const AControl: TWinControl): Integer; overload;
 {$ENDIF}
 
-function dpiApply(const AValue: Integer; ATargetDpi: Integer): Integer; overload; inline;
-function dpiApply(const AValue: TPoint; ATargetDpi: Integer): TPoint; overload; inline;
-function dpiApply(const AValue: TRect; ATargetDpi: Integer): TRect; overload; inline;
-function dpiApply(const AValue: TSize; ATargetDpi: Integer): TSize; overload; inline;
+function dpiApply(const AValue: Integer; ATargetDpi: Integer): Integer; overload;
+function dpiApply(const AValue: TPoint; ATargetDpi: Integer): TPoint; overload;
+function dpiApply(const AValue: TRect; ATargetDpi: Integer): TRect; overload;
+function dpiApply(const AValue: TSize; ATargetDpi: Integer): TSize; overload;
 
-function dpiRevert(const AValue: Integer; ASourceDpi: Integer): Integer; overload; inline;
-function dpiRevert(const AValue: TPoint; ASourceDpi: Integer): TPoint; overload; inline;
-function dpiRevert(const AValue: TRect; ASourceDpi: Integer): TRect; overload; inline;
-function dpiRevert(const AValue: TSize; ASourceDpi: Integer): TSize; overload; inline;
+function dpiRevert(const AValue: Integer; ASourceDpi: Integer): Integer; overload;
+function dpiRevert(const AValue: TPoint; ASourceDpi: Integer): TPoint; overload;
+function dpiRevert(const AValue: TRect; ASourceDpi: Integer): TRect; overload;
+function dpiRevert(const AValue: TSize; ASourceDpi: Integer): TSize; overload;
 implementation
 
 uses

@@ -581,7 +581,7 @@ begin
   CheckError(sqlite3_create_collation16(Handle, 'UNICODE', SQLITE_UTF16, nil, @TSQLLiteHelper.NoCaseCompare));
   CheckError(sqlite3_create_collation16(Handle, 'LOGICAL', SQLITE_UTF16, nil, @TSQLLiteHelper.LogicalCompare));
 {$ELSE}
-  CheckError(sqlite3_open(PChar(AFileName), FHandle));
+  CheckError(sqlite3_open(PChar(AFileName), @FHandle));
   CheckError(sqlite3_create_collation(Handle, 'NOCASE',  SQLITE_UTF8, nil, @TSQLLiteHelper.NoCaseCompare));
   CheckError(sqlite3_create_collation(Handle, 'UNICODE', SQLITE_UTF8, nil, @TSQLLiteHelper.NoCaseCompare));
   CheckError(sqlite3_create_collation(Handle, 'LOGICAL', SQLITE_UTF8, nil, @TSQLLiteHelper.LogicalCompare));

@@ -330,7 +330,7 @@ end;
 
 procedure TACLCustomTextEdit.InplaceSetFocus;
 begin
-  inherited;
+  SetFocus;
   SelectAll;
 end;
 

@@ -84,6 +84,7 @@ type
     procedure SetFiles(AFiles: TACLStringList);
     procedure SetStream(AFormat: Word; AValue: TCustomMemoryStream);
   public
+    function HasText: Boolean;
     function SafeGetText: string;
     property AsFiles: TACLStringList read GetFiles write SetFiles;
     property AsStream[AFormat: Word]: TCustomMemoryStream read GetStream write SetStream;
@@ -97,8 +98,6 @@ type
   TFormatEtc = record end;
 const
   CF_HDROP = 0;
-  CF_UNICODETEXT = 0;
-  CF_TEXT = 0;
 {$ENDIF}
 
 var
@@ -112,6 +111,12 @@ function MakeFormat(AFormat: Word): TFormatEtc;
 {$IFDEF MSWINDOWS}
 function acGetFilesFromDrag(ADragQuery: HDROP;
   AFiles: TACLStringList; AFreeDropData: Boolean = True): Boolean;
+{$ENDIF}
+
+{$IFDEF FPC}
+function CF_UNICODETEXT: Word;
+{$ELSE}
+function CF_HTML: Word;
 {$ENDIF}
 implementation
 
@@ -128,6 +133,18 @@ begin
   raise ENotImplemented.Create('Clipboard routine');
 {$ENDIF}
 end;
+
+{$IFDEF FPC}
+function CF_UNICODETEXT: Word;
+begin
+  Result := CF_TEXT;
+end;
+{$ELSE}
+function CF_HTML: Word;
+begin
+  Result := RegisterClipboardFormat('HTML Format');
+end;
+{$ENDIF}
 
 {$IFDEF MSWINDOWS}
 function acGetFilesFromDrag(ADragQuery: HDROP;
@@ -356,6 +373,11 @@ begin
 {$ELSE}
   Clipboard.SetAsHandle(AFormat, TACLGlobalMemory.Alloc(AValue));
 {$ENDIF}
+end;
+
+function TACLClipboardHelper.HasText: Boolean;
+begin
+  Result := HasFormat(CF_TEXT){$IFDEF MSWINDOWS} or HasFormat(CF_UNICODETEXT){$ENDIF};
 end;
 
 {$ENDIF}

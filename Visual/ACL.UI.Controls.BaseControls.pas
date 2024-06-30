@@ -503,6 +503,7 @@ type
   {$ENDIF}
   protected
     FDefaultSize: TSize;
+    FRedrawOnResize: Boolean;
 
     procedure AdjustClientRect(var ARect: TRect); override;
     procedure BoundsChanged; {$IFDEF FPC}override;{$ELSE}virtual;{$ENDIF}
@@ -549,7 +550,8 @@ type
     property LangSection: string read GetLangSection;
     property MouseInClient: Boolean read FMouseInClient;
     property Padding: TACLPadding read FPadding write SetPadding stored IsPaddingStored;
-    property ResourceCollection: TACLCustomResourceCollection read FResourceCollection write SetResourceCollection;
+    property ResourceCollection: TACLCustomResourceCollection
+      read FResourceCollection write SetResourceCollection;
     property Transparent: Boolean read FTransparent write SetTransparent default False;
   public
     constructor Create(AOwner: TComponent); override;
@@ -661,6 +663,7 @@ type
     function CreateStyle: TACLStyleBackground; virtual;
     function GetContentOffset: TRect; override;
     procedure Paint; override;
+    procedure SetAutoSize(Value: Boolean); override;
     procedure SetTargetDPI(AValue: Integer); override;
     procedure UpdateTransparency; override;
     //# Properties
@@ -691,6 +694,7 @@ type
   strict private
     class procedure WMSetCursor(ACaller: TWinControl; var Message: TWMSetCursor);
   public
+    class procedure AlignControl(AControl: TControl; const ABounds: TRect);
     // Scaling
     class procedure ScaleChanging(AControl: TWinControl; var AState: TObject);
     class procedure ScaleChanged(AControl: TWinControl; var AState: TObject);
@@ -789,9 +793,11 @@ function acIsChild(AControl, AChildToTest: TControl): Boolean;
 function acIsSemitransparentFill(AContentColor1, AContentColor2: TACLResourceColor): Boolean;
 function acOpacityToAlphaBlendValue(AOpacity: Integer): Byte;
 
-procedure acRestoreDC(ACanvas: TCanvas; ASaveIndex: Integer);
-procedure acRestoreFocus(ASavedFocus: HWND);
 function acSaveDC(ACanvas: TCanvas): Integer;
+procedure acRestoreDC(ACanvas: TCanvas; ASaveIndex: Integer);
+
+function acGetFocus: HWND;
+procedure acRestoreFocus(ASavedFocus: HWND);
 function acSaveFocus: HWND;
 function acSafeSetFocus(AControl: TWinControl): Boolean;
 procedure acSetFocus(AWnd: TWndHandle);
@@ -1099,6 +1105,11 @@ begin
   ACanvas.Refresh; // to reset ACanvas.State
 end;
 
+function acGetFocus: HWND;
+begin
+  Result := GetFocus;
+end;
+
 procedure acRestoreFocus(ASavedFocus: HWND);
 begin
   if ASavedFocus <> 0 then
@@ -1133,7 +1144,7 @@ end;
 function acSafeSetFocus(AControl: TWinControl): Boolean;
 begin
   try
-    Result := AControl <> nil;
+    Result := (AControl <> nil) and AControl.CanFocus;
     if Result then
       AControl.SetFocus;
   except
@@ -1443,6 +1454,16 @@ begin
     end;
     SetCursor(Screen.Cursors[ACursor]);
     Message.Result := 1;
+  end;
+end;
+
+class procedure TACLControls.AlignControl(AControl: TControl; const ABounds: TRect);
+begin
+  AControl.ControlState := AControl.ControlState + [csAligning];
+  try
+    AControl.BoundsRect := ABounds;
+  finally
+    AControl.ControlState := AControl.ControlState - [csAligning];
   end;
 end;
 
@@ -2428,6 +2449,13 @@ procedure TACLCustomControl.BoundsChanged;
 begin
 {$IFDEF FPC}
   inherited;
+  if AutoSize then
+    InvalidatePreferredSize;
+  if FRedrawOnResize and (Parent <> nil) then
+  begin
+    if wcfAligningControls in TWinControlAccess(Parent).FWinControlFlags then
+      Invalidate;
+  end;
 {$ENDIF}
 end;
 
@@ -2540,8 +2568,8 @@ end;
 constructor TACLContainer.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  FBorders := acAllBorders;
   FStyle := CreateStyle;
+  Borders := acAllBorders;
 end;
 
 destructor TACLContainer.Destroy;
@@ -2573,11 +2601,28 @@ begin
   Style.Draw(Canvas, ClientRect, Transparent, Borders);
 end;
 
+procedure TACLContainer.SetAutoSize(Value: Boolean);
+begin
+  if Value <> AutoSize then
+  begin
+    inherited SetAutoSize(Value);
+  {$IFDEF FPC}
+    // Сохраняем поведение как в Delphi: дельфя корректирует положение
+    // анчорид-контролов только при включении автосайза, а не всегда.
+    if Value then
+      ControlStyle := ControlStyle + [csAutoSizeKeepChildLeft, csAutoSizeKeepChildTop]
+    else
+      ControlStyle := ControlStyle - [csAutoSizeKeepChildLeft, csAutoSizeKeepChildTop];
+  {$ENDIF}
+  end;
+end;
+
 procedure TACLContainer.SetBorders(AValue: TACLBorders);
 begin
   if AValue <> FBorders then
   begin
     FBorders := AValue;
+    FRedrawOnResize := AValue <> [];
     if HandleAllocated then
     begin
       AdjustSize;
@@ -2713,7 +2758,7 @@ begin
   FBounds.Enum(
     procedure (const AControl: TControl; const R: TRect)
     begin
-      AControl.SetBounds(R.Left, R.Top, R.Width, R.Height);
+      TACLControls.AlignControl(AControl, R);
     end);
   FBounds.Enum(
     procedure (const AControl: TControl; const R: TRect)
@@ -2876,17 +2921,7 @@ begin
           Dec(AClientRect.Bottom, Control.ExplicitHeight);
         end;
     end;
-
-    Control.ControlState := Control.ControlState + [csAligning];
-    try
-      Control.BoundsRect := LBounds;
-    {$IFDEF FPC}
-      if csLoading in Control.ComponentState then
-        TACLMainThread.RunPostponed(TControlAccess(FOwner).BoundsChanged, Self);
-    {$ENDIF}
-    finally
-      Control.ControlState := Control.ControlState - [csAligning];
-    end;
+    TACLControls.AlignControl(Control, LBounds);
   end;
 end;
 

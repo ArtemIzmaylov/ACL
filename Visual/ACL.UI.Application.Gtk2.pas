@@ -75,9 +75,9 @@ type
     class procedure SetNonClientBorder(AControl: TWinControl; ASize: Integer);
   end;
 
-  { TGtk2PopupControl }
+  { TACLGtk2PopupControl }
 
-  TGtk2PopupControl = class(TGtk2WSWinControl)
+  TACLGtk2PopupControl = class(TGtk2WSWinControl)
   protected
     class function MustBeFocusable(AControl: TWinControl): Boolean; virtual;
   published
@@ -280,9 +280,9 @@ begin
   end;
 end;
 
-{ TGtk2PopupControl }
+{ TACLGtk2PopupControl }
 
-class function TGtk2PopupControl.CreateHandle(
+class function TACLGtk2PopupControl.CreateHandle(
   const AWinControl: TWinControl;
   const AParams: TCreateParams): TLCLHandle;
 var
@@ -347,12 +347,12 @@ begin
   Result := TLCLHandle({%H-}PtrUInt(AWidget));
 end;
 
-class function TGtk2PopupControl.MustBeFocusable(AControl: TWinControl): Boolean;
+class function TACLGtk2PopupControl.MustBeFocusable(AControl: TWinControl): Boolean;
 begin
   Result := False;
 end;
 
-class procedure TGtk2PopupControl.SetBounds(
+class procedure TACLGtk2PopupControl.SetBounds(
   const AWinControl: TWinControl;
   const ALeft, ATop, AWidth, AHeight: Integer);
 var

@@ -20,7 +20,7 @@ interface
 
 uses
 {$IFDEF MSWINDOWS}
-  Winapi.Windows,
+  Windows,
 {$ELSE}
   LCLIntf,
   LCLType,
@@ -372,6 +372,11 @@ type
     class procedure ApplyLocalization;
     class procedure ResetLocalization;
   end;
+
+const
+  // Ремапы, чтобы не использовать if-def на более высоком уровне
+  MB_OK = {$IFDEF FPC}LCLType{$ELSE}Windows{$ENDIF}.MB_OK;
+  MB_ICONINFORMATION = {$IFDEF FPC}LCLType{$ELSE}Windows{$ENDIF}.MB_ICONINFORMATION;
 
 procedure asMessageBeep(AType: TMsgDlgType);
 function acMessageBox(AHandle: HWND; const AMessage, ACaption: string; AFlags: Integer): Integer;

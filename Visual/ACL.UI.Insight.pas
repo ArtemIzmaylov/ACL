@@ -61,6 +61,7 @@ uses
   ACL.UI.Controls.TreeList,
   ACL.UI.Controls.TreeList.SubClass,
   ACL.UI.Controls.TreeList.Types,
+  ACL.UI.Menus,
   ACL.UI.Forms,
   ACL.UI.Resources,
   ACL.Utils.Common,
@@ -451,9 +452,9 @@ begin
   if ShortCut <> scNone then
   begin
     if AHint <> '' then
-      AHint := AHint + ' (' + ShortCutToText(ShortCut) + ')'
+      AHint := AHint + ' (' + acShortCutToText(ShortCut) + ')'
     else
-      AHint := ShortCutToText(ShortCut);
+      AHint := acShortCutToText(ShortCut);
   end;
 end;
 

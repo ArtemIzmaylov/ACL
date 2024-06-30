@@ -136,6 +136,7 @@ type
   protected
     procedure InitializeResources; override;
   public
+    procedure ApplyColors(AInnerEdit: TWinControl; AEnabled: Boolean);
     procedure DrawBorders(ACanvas: TCanvas; const R: TRect; AFocused: Boolean);
     //# Properties
     property ColorsBorder[Focused: Boolean]: TColor read GetBorderColor;
@@ -446,6 +447,7 @@ uses
   gtk2,
   gtk2def,
   gtk2int,
+  gtk2proc,
   glib2;
 {$ENDIF}
 
@@ -756,6 +758,26 @@ end;
 
 { TACLStyleEdit }
 
+procedure TACLStyleEdit.ApplyColors(AInnerEdit: TWinControl; AEnabled: Boolean);
+{$IFDEF LCLGtk2}
+var
+  LWidget: PGtkWidget;
+{$ENDIF}
+begin
+  TWinControlAccess(AInnerEdit).Color := ColorsContent[AEnabled];
+  TWinControlAccess(AInnerEdit).Font.Color := ColorsText[AEnabled];
+{$IFDEF LCLGtk2}
+  if AInnerEdit.HandleAllocated and not AEnabled then
+  begin
+    LWidget := {%H-}PGtkWidget(AInnerEdit.Handle);
+    LWidget := GetWidgetInfo(LWidget)^.CoreWidget;
+    GTK2WidgetSet.SetWidgetColor(LWidget,
+      ColorTextDisabled.AsColor, ColorContentDisabled.AsColor,
+      [GTK_STATE_INSENSITIVE, GTK_STYLE_BASE]);
+  end;
+{$ENDIF}
+end;
+
 procedure TACLStyleEdit.DrawBorders(ACanvas: TCanvas; const R: TRect; AFocused: Boolean);
 var
   AFocusRect: TRect;
@@ -1064,8 +1086,8 @@ begin
   FButtonsImagesLink := TChangeLink.Create;
   FButtonsImagesLink.OnChange := HandlerImageChange;
   FDefaultSize := TSize.Create(121, 21);
-  FBorders := not Inplace;
   AutoSize := not Inplace;
+  Borders := not Inplace;
   TabStop := True;
 end;
 
@@ -1266,14 +1288,7 @@ end;
 procedure TACLCustomEdit.EditorUpdateParamsCore;
 begin
   inherited;
-  TWinControlAccess(FEditor).Color := Style.ColorsContent[Enabled];
-  TWinControlAccess(FEditor).Font.Color := Style.ColorsText[Enabled];
-{$IFDEF LCLGtk2}
-  if FEditor.HandleAllocated and not Enabled then
-    GTK2WidgetSet.SetWidgetColor({%H-}PGtkWidget(FEditor.Handle),
-      Style.ColorTextDisabled.AsColor, Style.ColorContentDisabled.AsColor,
-      [GTK_STATE_INSENSITIVE, GTK_STYLE_BASE]);
-{$ENDIF}
+  Style.ApplyColors(FEditor, Enabled);
 end;
 
 procedure TACLCustomEdit.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
@@ -1324,11 +1339,6 @@ begin
     Calculate(ClientRect);
     inherited;
   end;
-{$IFDEF FPC}
-  // RedrawOnResize? TACLTextureEditorDialog
-  if (Parent <> nil) and (wcfAligningControls in TWinControlAccess(Parent).FWinControlFlags) then
-    Invalidate;
-{$ENDIF}
 end;
 
 procedure TACLCustomEdit.UpdateBordersColor;
@@ -1393,9 +1403,13 @@ begin
   if AValue <> FBorders then
   begin
     FBorders := AValue;
-    AdjustSize;
-    Realign;
-    Invalidate;
+    FRedrawOnResize := Borders;
+    if HandleAllocated then
+    begin
+      AdjustSize;
+      Realign;
+      Invalidate;
+    end;
   end;
 end;
 

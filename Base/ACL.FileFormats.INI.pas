@@ -460,7 +460,6 @@ end;
 
 procedure TACLIniFileSection.WriteStream(const AKey: string; AStream: TStream);
 begin
-  {$MESSAGE 'TODO - mimecode?'}
   WriteString(AKey, TACLHexCode.Encode(AStream), '');
 end;
 
