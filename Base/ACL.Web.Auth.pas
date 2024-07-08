@@ -143,64 +143,32 @@ uses
 type
   THandleProc = function (const AData: string): string of object;
 
-{$IFDEF FPC}
-
   { TSimpleServer }
-
-  TSimpleServer = class
-  strict private
-    FHandler: TFPHttpServer;
-    FProc: THandleProc;
-
-    procedure DoRequest(Sender: TObject;
-      var ARequest: TFPHTTPConnectionRequest;
-      var AResponse : TFPHTTPConnectionResponse);
-  public
-    constructor Create(APort: Integer; AProc: THandleProc);
-    destructor Destroy; override;
-  end;
-
-  { TSimpleServer }
-
-  constructor TSimpleServer.Create(APort: Integer; AProc: THandleProc);
-  begin
-    FProc := AProc;
-    FHandler := TFPHttpServer.Create(nil);
-    FHandler.OnRequest := DoRequest;
-    FHandler.Port := APort;
-    FHandler.Active := True;
-  end;
-
-  destructor TSimpleServer.Destroy;
-  begin
-    FreeAndNil(FHandler);
-    inherited Destroy;
-  end;
-
-  procedure TSimpleServer.DoRequest(Sender: TObject;
-    var ARequest: TFPHTTPConnectionRequest;
-    var AResponse: TFPHTTPConnectionResponse);
-  begin
-    AResponse.Content := FProc(ARequest.Content);
-  end;
-
-{$ELSE}
 
   TSimpleServer = class(TThread)
   strict private
+  {$IFDEF MSWINDOWS}
     FPort: Integer;
-    FProc: THandleProc;
     FSocket: TSocket;
     FWsaData: TWsaData;
 
     procedure CheckResult(ACode: Integer);
+  {$ELSE}
+  strict private
+    FHandler: TFPHttpServer;
+    procedure DoRequest(Sender: TObject;
+      var ARequest: TFPHTTPConnectionRequest;
+      var AResponse : TFPHTTPConnectionResponse);
+  {$ENDIF}
   protected
+    FProc: THandleProc;
     procedure Execute; override;
   public
     constructor Create(APort: Integer; AProc: THandleProc);
     destructor Destroy; override;
   end;
 
+{$IFDEF MSWINDOWS}
 function bind(s: TSocket; name: PSockAddr; namelen: Integer): Integer; stdcall; external 'ws2_32.dll' name 'bind';
 
 { TSimpleServer }
@@ -270,6 +238,36 @@ procedure TSimpleServer.CheckResult(ACode: Integer);
 begin
   if ACode = SOCKET_ERROR then
     RaiseLastOSError;
+end;
+
+{$ELSE}
+
+{ TSimpleServer }
+
+constructor TSimpleServer.Create(APort: Integer; AProc: THandleProc);
+begin
+  FProc := AProc;
+  FHandler := TFPHttpServer.Create(nil);
+  FHandler.OnRequest := DoRequest;
+  FHandler.Port := APort;
+end;
+
+destructor TSimpleServer.Destroy;
+begin
+  FreeAndNil(FHandler);
+  inherited Destroy;
+end;
+
+procedure TSimpleServer.DoRequest(Sender: TObject;
+  var ARequest: TFPHTTPConnectionRequest;
+  var AResponse: TFPHTTPConnectionResponse);
+begin
+  AResponse.Content := FProc(ARequest.Content);
+end;
+
+procedure TSimpleServer.Execute;
+begin
+  FHandler.Active := True;
 end;
 {$ENDIF}
 
