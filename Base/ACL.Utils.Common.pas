@@ -144,6 +144,7 @@ type
     class function Execute(const ACmdLine: string;
       AOptions: TExecuteOptions = [eoShowGUI]; AOutputData: TStream = nil;
       AErrorData: TStream = nil; AExitCode: PCardinal = nil): LongBool; overload;
+    class function ExecuteToString(const ACmdLine: string): string;
   {$IFDEF MSWINDOWS}
     class function IsWow64: LongBool; overload;
     class function IsWow64(AProcess: THandle): LongBool; overload;
@@ -236,19 +237,21 @@ function acSetThreadErrorMode(Mode: DWORD): DWORD; // MSWINDOWS only!
 procedure FreeMemAndNil(var P: Pointer);
 function IfThen(AValue: Boolean; ATrue, AFalse: TACLBoolean): TACLBoolean; overload;
 
-{$IFDEF MSWINDOWS}
-function WineGetVersion(out AVersion: string): Boolean;
-{$ENDIF}
+// Version
+function acOSGetDescription: string;
 
 // HRESULT
 function Failed(Status: HRESULT) : BOOL;
 function Succeeded(Status: HRESULT) : BOOL;
 implementation
 
-{$IFDEF MSWINDOWS}
 uses
-  ACL.Utils.FileSystem;
+{$IFDEF MSWINDOWS}
+  ACL.Utils.FileSystem,
+{$ENDIF}
+  ACL.Utils.Strings;
 
+{$IFDEF MSWINDOWS}
 type
   TGetThreadErrorMode = function: DWORD; stdcall;
   TSetThreadErrorMode = function (NewMode: DWORD; out OldMode: DWORD): LongBool; stdcall;
@@ -259,14 +262,42 @@ var
   FSetThreadErrorMode: TSetThreadErrorMode = nil;
   FWineGetBuildId: TWineGetVersion = nil;
   FWineGetVersion: TWineGetVersion = nil;
-
-function WineGetVersion(out AVersion: string): Boolean;
-begin
-  Result := Assigned(FWineGetVersion) and Assigned(FWineGetBuildId);
-  if Result then
-    AVersion := Format('%s (%s)', [FWineGetVersion, FWineGetBuildId])
-end;
 {$ENDIF}
+
+function acOSGetDescription: string;
+var
+  LBuilder: TACLStringBuilder;
+{$IFDEF LINUX}
+  LDistroName: string;
+{$ENDIF}
+begin
+  LBuilder := TACLStringBuilder.Get(32);
+  try
+    LBuilder.Append(TOSVersion.Name);
+    LBuilder.Append(' / ');
+  {$IFDEF LINUX}
+    LDistroName := TACLProcess.ExecuteToString('lsb_release -d');
+    LDistroName := acTrim(Copy(LDistroName, Pos(':', LDistroName) + 1));
+    LBuilder.Append(LDistroName);
+  {$ENDIF}
+  {$IFDEF MSWINDOWS}
+    LBuilder.Append(TOSVersion.Major);
+    LBuilder.Append('.');
+    LBuilder.Append(TOSVersion.Minor);
+    LBuilder.Append('.');
+    LBuilder.Append(TOSVersion.Build);
+    if Assigned(FWineGetVersion) and Assigned(FWineGetBuildId) then
+    begin
+      LBuilder.Append(' / Wine: ');
+      LBuilder.Append(acString(FWineGetVersion));
+      LBuilder.AppendFormat(' (%s)', [FWineGetBuildId]);
+    end;
+  {$ENDIF}
+    Result := LBuilder.ToString;
+  finally
+    LBuilder.Release;
+  end;
+end;
 
 procedure CheckOSVersion;
 begin
@@ -849,6 +880,19 @@ begin
   finally
     AOutputData.Free;
     AErrorData.Free;
+  end;
+end;
+
+class function TACLProcess.ExecuteToString(const ACmdLine: string): string;
+var
+  LData: TStringStream;
+begin
+  LData := TStringStream.Create;
+  try
+    Execute(ACmdLine, [eoWaitForTerminate], LData);
+    Result := LData.DataString;
+  finally
+    LData.Free;
   end;
 end;
 

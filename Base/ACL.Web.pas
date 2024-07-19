@@ -36,7 +36,6 @@ const
   acWebTimeOutDefault = 5000;
   acWebTimeOutMax = 30000;
   acWebTimeOutMin = 1000;
-  acWebUserAgent = 'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.0)';
 
   acWebErrorUnknown     = -1;
   acWebErrorCanceled    = -2;
@@ -134,20 +133,27 @@ type
 
   TACLWebSettings = class
   strict private
+    class var FAppVersion: string;
     class var FConnectionMode: TACLWebConnectionMode;
     class var FConnectionTimeOut: Integer;
     class var FProxyInfo: TACLWebProxyInfo;
     class var FUserAgent: string;
+    class var FUserAgentCacheOfNative: string;
+
+    class function BuildUserAgent: string;
+    class function GetUserAgent: string; static;
     class procedure SetConnectionTimeOut(AValue: Integer); static;
+    class procedure SetUserAgent(const AValue: string); static;
   public
     class constructor Create;
     class procedure ConfigLoad(AConfig: TACLIniFile);
     class procedure ConfigSave(AConfig: TACLIniFile);
     //# Properties
+    class property AppVersion: string read FAppVersion write FAppVersion;
     class property ConnectionMode: TACLWebConnectionMode read FConnectionMode write FConnectionMode;
     class property ConnectionTimeOut: Integer read FConnectionTimeOut write SetConnectionTimeOut;
     class property Proxy: TACLWebProxyInfo read FProxyInfo write FProxyInfo;
-    class property UserAgent: string read FUserAgent write FUserAgent;
+    class property UserAgent: string read GetUserAgent write SetUserAgent;
   end;
 
   TACLDateTimeFormat = (RFC822, ISO8601);
@@ -509,7 +515,36 @@ class constructor TACLWebSettings.Create;
 begin
   ConnectionMode := acWebDefaultConnectionMode;
   ConnectionTimeOut := acWebTimeOutDefault;
-  UserAgent := acWebUserAgent;
+end;
+
+class function TACLWebSettings.BuildUserAgent: string;
+const
+  FormatLine = 'Mozilla/5.0 (%s%s%s) AppleWebKit/537.36 (KHTML, like Gecko)';
+var
+  LAppDetails: string;
+  LPlatform: string;
+  LOSFamily: string;
+begin
+  if FUserAgentCacheOfNative = '' then
+  begin
+    LAppDetails := IfThenW(AppVersion <> '', AppVersion + '; ');
+  {$IF DEFINED(MSWINDOWS)}
+    LOSFamily := Format('Windows NT %d.%d', [TOSVersion.Major, TOSVersion.Minor]);
+  {$ELSEIF DEFINED(LINUX)}
+    LOSFamily := acTrim(TACLProcess.ExecuteToString('uname -o'));
+  {$ELSE}
+    LOSFamily := TOSVersion.Name;
+  {$ENDIF}
+  {$IF DEFINED(LINUX)}
+    LPlatform := ' ' + acTrim(TACLProcess.ExecuteToString('uname -m'));
+  {$ELSEIF DEFINED(MSWINDOWS) AND DEFINED(CPUX64)}
+    LPlatform := '; Win64; x64';
+  {$ELSE}
+    LPlatform := '';
+  {$ENDIF}
+    FUserAgentCacheOfNative := Format(FormatLine, [LAppDetails, LOSFamily, LPlatform]);
+  end;
+  Result := FUserAgentCacheOfNative;
 end;
 
 class procedure TACLWebSettings.ConfigLoad(AConfig: TACLIniFile);
@@ -548,8 +583,7 @@ class procedure TACLWebSettings.ConfigLoad(AConfig: TACLIniFile);
 
 begin
   ReadProxyData;
-  ConnectionMode := AConfig.ReadEnum<TACLWebConnectionMode>(
-    sWebConfigSection, 'Mode', acWebDefaultConnectionMode);
+  ConnectionMode := AConfig.ReadEnum<TACLWebConnectionMode>(sWebConfigSection, 'Mode', acWebDefaultConnectionMode);
   ConnectionTimeOut := AConfig.ReadInteger(sWebConfigSection, 'TimeOut', acWebTimeOutDefault);
 end;
 
@@ -594,6 +628,22 @@ end;
 class procedure TACLWebSettings.SetConnectionTimeOut(AValue: Integer);
 begin
   FConnectionTimeOut := MinMax(AValue, acWebTimeOutMin, acWebTimeOutMax);
+end;
+
+class function TACLWebSettings.GetUserAgent: string;
+begin
+  if FUserAgent <> '' then
+    Result := FUserAgent
+  else
+    Result := BuildUserAgent;
+end;
+
+class procedure TACLWebSettings.SetUserAgent(const AValue: string);
+begin
+  if (AValue <> '') and (AValue <> BuildUserAgent) then
+    FUserAgent := AValue
+  else
+    FUserAgent := '';
 end;
 
 { TACLWebErrorInfo }
