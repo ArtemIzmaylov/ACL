@@ -250,6 +250,7 @@ type
     procedure EndUpdate;
     // IACLColorSchema
     procedure ApplyColorSchema(const AValue: TACLColorSchema);
+    procedure ApplyTint(const AColor: TACLPixel32);
     // Drawing
     procedure Draw(ACanvas: TCanvas; const R: TRect;
       AFrameIndex: Integer = 0; AAlpha: Byte = MaxByte); overload;
@@ -847,6 +848,14 @@ begin
     TACLColors.ApplyColorSchema(PACLPixel32(Bits), BitCount, AValue);
     Changed;
   end;
+end;
+
+procedure TACLSkinImage.ApplyTint(const AColor: TACLPixel32);
+begin
+  CheckUnpacked;
+  CheckBitsState(ibsUnpremultiplied);
+  TACLColors.Tint(@Bits^[0], BitCount, AColor);
+  Changed;
 end;
 
 procedure TACLSkinImage.Draw(ACanvas: TCanvas; const R: TRect; AFrameIndex: Integer; AAlpha: Byte);

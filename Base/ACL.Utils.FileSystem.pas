@@ -452,10 +452,28 @@ begin
   else
     Result := AFileName;
 {$ELSE}
+var
+  LName: string;
+  LPos1, LPos2: Integer;
 begin
   Result := AFileName;
+  LPos1 := 1;
+  repeat
+    LPos1 := acPos('%', Result, False, LPos1);
+    LPos2 := acPos('%', Result, False, LPos1 + 1);
+    if (LPos1 > 0) and (LPos2 > LPos1) then
+    begin
+      LName := Copy(Result, LPos1 + 1, LPos2 - LPos1 - 1);
+      LName := GetEnvironmentVariable(LName);
+      // Windows:
+      // If the name is not found, the %variableName% portion is left unexpanded.
+      if LName <> '' then
+        Result := Copy(Result, 1, LPos1 - 1) + LName +  Copy(Result, LPos2 + 1)
+      else
+        LPos1 := LPos2 + 1;
+    end;
+  until LPos1 = 0;
 {$ENDIF}
-  {$MESSAGE WARN 'acExpandEnvironmentStrings'}
 end;
 
 function acExpandFileName(const AFileName: string): string;

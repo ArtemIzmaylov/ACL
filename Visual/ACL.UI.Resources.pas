@@ -2470,7 +2470,7 @@ function TACLStyleMap<T>.GetOrCreate(Index: Integer): T;
 begin
   if not TryGetValue(Index, TACLResource(Result)) then
   begin
-    Result := T(TACLResourceClass(T).Create(FOwner));
+    Result := T(TACLResourceClass(T).Create(FOwner){%H-});
     Add(Index, Result);
   end;
 end;

@@ -209,7 +209,6 @@ type
 
 constructor TACLCustomDropDownEdit.Create(AOwner: TComponent);
 begin
-  FBorders := True;
   inherited Create(AOwner);
   FDefaultSize := TSize.Create(320, 240);
   FDropDownButtonVisible := True;

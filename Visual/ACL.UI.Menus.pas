@@ -1535,7 +1535,7 @@ end;
 
 procedure TACLPopupMenu.Popup(const P: TPoint);
 begin
-  Popup(P.X, P.Y);
+  PopupUnderControl(TRect.Create(P));
 end;
 
 procedure TACLPopupMenu.PopupUnderControl(const ControlRect: TRect);

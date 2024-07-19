@@ -120,7 +120,7 @@ function CF_HTML: Word;
 {$ENDIF}
 implementation
 
-function MakeFormat(AFormat: Word): TFormatEtc;
+function {%H-}MakeFormat(AFormat: Word): TFormatEtc;
 begin
 {$IFDEF MSWINDOWS}
   Result.cfFormat := AFormat;
@@ -352,6 +352,7 @@ begin
   Result := TACLGlobalMemory.ToFiles(GetAsHandle(CF_HDROP));
 {$ELSE}
   {$MESSAGE WARN 'NotImplemented'}
+  Result := nil;
   raise ENotImplemented.Create('Clipboard routine');
 {$ENDIF}
 end;

@@ -1095,6 +1095,8 @@ var
 begin
   if TACLRootResourceCollection.GetResource('Common.Colors.Background1', TACLResourceColor, Self, AColor) then
     Color := AColor.AsColor;
+  if TACLRootResourceCollection.GetResource('Common.Colors.Text', TACLResourceColor, Self, AColor) then
+    Font.Color := AColor.AsColor;
 end;
 
 function TACLForm.GetResource(const ID: string; AResourceClass: TClass; ASender: TObject = nil): TObject;

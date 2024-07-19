@@ -309,7 +309,8 @@ begin
   if Failed(CoCreateInstance(CLSID_TaskbarList, nil, CLSCTX_INPROC_SERVER, IID_ITaskbarList3, FTaskBarList)) then
     FTaskBarList := nil;
 {$ENDIF}
-  SyncState;
+  if OwnerWindow.HandleAllocated then
+    DoInitialize;
 end;
 
 destructor TACLAeroPeek.Destroy;

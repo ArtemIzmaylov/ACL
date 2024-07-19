@@ -1725,8 +1725,8 @@ begin
   Result := True;
   FLibHandle := acLoadLibrary('libwebp' + LibExt);
   @FGetInfoFunc := acGetProcAddress(FLibHandle, 'WebPGetInfo', Result);
-  @FDecodeFunc := acGetProcAddress(FLibHandle, 'WebPDecodeRGBA', Result);
-  @FEncodeFunc := acGetProcAddress(FLibHandle, 'WebPEncodeRGBA', Result);
+  @FDecodeFunc := acGetProcAddress(FLibHandle, 'WebPDecodeBGRA', Result);
+  @FEncodeFunc := acGetProcAddress(FLibHandle, 'WebPEncodeBGRA', Result);
   @FFreeFunc := acGetProcAddress(FLibHandle, 'WebPFree', Result);
 end;
 

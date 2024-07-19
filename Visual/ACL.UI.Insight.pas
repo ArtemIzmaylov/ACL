@@ -876,11 +876,11 @@ begin
 
   ACanvas.Font := Font;
   ACanvas.Font.Color := SearchResults.Style.RowColorsText[True];
-  acTextDraw(ACanvas, ANode.Caption, LRect, taLeftJustify, taAlignTop, True);
+  acSysDrawText(ACanvas, LRect, ANode.Caption, DT_TOP or DT_SINGLELINE or DT_END_ELLIPSIS);
 
   ACanvas.Font := FHintFont;
   ACanvas.Font.Color := SearchResults.Style.RowColorsText[ANode.Selected];
-  acTextDraw(ACanvas, ANode.Caption, LRect, taLeftJustify, taAlignBottom, True);
+  acSysDrawText(ACanvas, LRect, ANode.Caption, DT_BOTTOM or DT_SINGLELINE or DT_END_ELLIPSIS);
 
   AHandled := True;
 end;

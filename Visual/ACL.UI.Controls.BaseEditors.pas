@@ -249,6 +249,7 @@ type
   protected const
     ButtonsIndent = 1;
   strict private
+    FBorders: Boolean;
     FButtons: TACLEditButtons;
     FButtonsImages: TCustomImageList;
     FButtonsImagesLink: TChangeLink;
@@ -267,8 +268,6 @@ type
     procedure CMHintShow(var Message: TCMHintShow); message CM_HINTSHOW;
     procedure CMWantSpecialKey(var Message: TMessage); message CM_WANTSPECIALKEY;
   protected
-    FBorders: Boolean;
-
     procedure AssignTextDrawParams(ACanvas: TCanvas); virtual;
     procedure BoundsChanged; override;
     function CanAutoSize(var NewWidth, NewHeight: Integer): Boolean; override;

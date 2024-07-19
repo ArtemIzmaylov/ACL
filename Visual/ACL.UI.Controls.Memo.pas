@@ -174,9 +174,6 @@ uses
   ACL.MUI,
   ACL.Utils.Common;
 
-type
-  TWinControlAccess = class(TWinControl);
-
 { TACLCustomMemoContainer }
 
 constructor TACLCustomMemoContainer.Create(AOwner: TComponent);

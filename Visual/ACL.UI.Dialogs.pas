@@ -417,16 +417,13 @@ begin
       with TACLMessageTaskDialog.Create(AMessage, ACaption, AFlags) do
       try
         if Execute(AHandle) then
-          Result := ModalResult
-        else
-          Result := mrNone;
+          Exit(ModalResult);
       finally
         Free;
       end;
-    end
-    else
+    end;
   {$ENDIF}
-      Result := MessageBox(AHandle, PChar(AMessage), PChar(ACaption), AFlags);
+    Result := MessageBox(AHandle, PChar(AMessage), PChar(ACaption), AFlags);
   finally
     Application.ModalFinished;
   end;
