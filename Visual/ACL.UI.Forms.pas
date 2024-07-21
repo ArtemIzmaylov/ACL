@@ -1093,9 +1093,9 @@ procedure TACLForm.ResourceChanged;
 var
   AColor: TACLResourceColor;
 begin
-  if TACLRootResourceCollection.GetResource('Common.Colors.Background1', TACLResourceColor, Self, AColor) then
+  if TACLRootResourceCollection.GetResource('Form.Colors.Background', TACLResourceColor, Self, AColor) then
     Color := AColor.AsColor;
-  if TACLRootResourceCollection.GetResource('Common.Colors.Text', TACLResourceColor, Self, AColor) then
+  if TACLRootResourceCollection.GetResource('Form.Colors.Text', TACLResourceColor, Self, AColor) then
     Font.Color := AColor.AsColor;
 end;
 
