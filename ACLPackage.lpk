@@ -1,0 +1,526 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <Package Version="5">
+    <Name Value="ACLPackage"/>
+    <Type Value="RunAndDesignTime"/>
+    <Author Value="Artem Izmaylov"/>
+    <CompilerOptions>
+      <Version Value="11"/>
+      <SearchPaths>
+        <OtherUnitFiles Value="Visual;Base"/>
+        <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
+      </SearchPaths>
+      <Parsing>
+        <SyntaxOptions>
+          <SyntaxMode Value="Delphi"/>
+          <CStyleOperator Value="False"/>
+          <AllowLabel Value="False"/>
+          <CPPInline Value="False"/>
+        </SyntaxOptions>
+      </Parsing>
+      <CodeGeneration>
+        <Optimizations>
+          <OptimizationLevel Value="0"/>
+        </Optimizations>
+      </CodeGeneration>
+    </CompilerOptions>
+    <Description Value="ACL (Artem&apos;s component / controls library)"/>
+    <Version Major="6"/>
+    <Files>
+      <Item>
+        <Filename Value="Base/ACL.Classes.pas"/>
+        <UnitName Value="ACL.Classes"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Classes.ByteBuffer.pas"/>
+        <UnitName Value="ACL.Classes.ByteBuffer"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Classes.Collections.pas"/>
+        <UnitName Value="ACL.Classes.Collections"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Classes.StringList.pas"/>
+        <UnitName Value="ACL.Classes.StringList"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Crypto.pas"/>
+        <UnitName Value="ACL.Crypto"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Expressions.pas"/>
+        <UnitName Value="ACL.Expressions"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Expressions.FormatString.pas"/>
+        <UnitName Value="ACL.Expressions.FormatString"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Expressions.Math.pas"/>
+        <UnitName Value="ACL.Expressions.Math"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.FastCode.pas"/>
+        <UnitName Value="ACL.FastCode"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.FileFormats.CSV.pas"/>
+        <UnitName Value="ACL.FileFormats.CSV"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.FileFormats.INI.pas"/>
+        <UnitName Value="ACL.FileFormats.INI"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.FileFormats.XML.pas"/>
+        <UnitName Value="ACL.FileFormats.XML"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.FileFormats.XML.Reader.pas"/>
+        <UnitName Value="ACL.FileFormats.XML.Reader"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.FileFormats.XML.Types.pas"/>
+        <UnitName Value="ACL.FileFormats.XML.Types"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.FileFormats.XML.Writer.pas"/>
+        <UnitName Value="ACL.FileFormats.XML.Writer"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Geometry.pas"/>
+        <UnitName Value="ACL.Geometry"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Geometry.Utils.pas"/>
+        <UnitName Value="ACL.Geometry.Utils"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Graphics.pas"/>
+        <UnitName Value="ACL.Graphics"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Graphics.Ex.pas"/>
+        <UnitName Value="ACL.Graphics.Ex"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Graphics.Ex.Cairo.pas"/>
+        <UnitName Value="ACL.Graphics.Ex.Cairo"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Graphics.FontCache.pas"/>
+        <UnitName Value="ACL.Graphics.FontCache"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Graphics.Images.pas"/>
+        <UnitName Value="ACL.Graphics.Images"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Graphics.Palette.pas"/>
+        <UnitName Value="ACL.Graphics.Palette"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Graphics.SkinImage.pas"/>
+        <UnitName Value="ACL.Graphics.SkinImage"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Graphics.SkinImageSet.pas"/>
+        <UnitName Value="ACL.Graphics.SkinImageSet"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Graphics.TextLayout.pas"/>
+        <UnitName Value="ACL.Graphics.TextLayout"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Graphics.TextLayout32.pas"/>
+        <UnitName Value="ACL.Graphics.TextLayout32"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Hashes.pas"/>
+        <UnitName Value="ACL.Hashes"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.MUI.pas"/>
+        <UnitName Value="ACL.MUI"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Math.pas"/>
+        <UnitName Value="ACL.Math"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Math.Complex.pas"/>
+        <UnitName Value="ACL.Math.Complex"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.ObjectLinks.pas"/>
+        <UnitName Value="ACL.ObjectLinks"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Parsers.pas"/>
+        <UnitName Value="ACL.Parsers"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Parsers.Ripper.pas"/>
+        <UnitName Value="ACL.Parsers.Ripper"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Threading.pas"/>
+        <UnitName Value="ACL.Threading"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Threading.Pool.pas"/>
+        <UnitName Value="ACL.Threading.Pool"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Threading.Sorting.pas"/>
+        <UnitName Value="ACL.Threading.Sorting"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Timers.pas"/>
+        <UnitName Value="ACL.Timers"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Utils.Clipboard.pas"/>
+        <UnitName Value="ACL.Utils.Clipboard"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Utils.Common.pas"/>
+        <UnitName Value="ACL.Utils.Common"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Utils.DPIAware.pas"/>
+        <UnitName Value="ACL.Utils.DPIAware"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Utils.Date.pas"/>
+        <UnitName Value="ACL.Utils.Date"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Utils.Desktop.pas"/>
+        <UnitName Value="ACL.Utils.Desktop"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Utils.FileSystem.pas"/>
+        <UnitName Value="ACL.Utils.FileSystem"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Utils.FileSystem.GIO.pas"/>
+        <UnitName Value="ACL.Utils.FileSystem.GIO"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Utils.Logger.pas"/>
+        <UnitName Value="ACL.Utils.Logger"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Utils.Messaging.pas"/>
+        <UnitName Value="ACL.Utils.Messaging"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Utils.RTTI.pas"/>
+        <UnitName Value="ACL.Utils.RTTI"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Utils.Shell.pas"/>
+        <UnitName Value="ACL.Utils.Shell"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Utils.Stream.pas"/>
+        <UnitName Value="ACL.Utils.Stream"/>
+      </Item>
+      <Item>
+        <Filename Value="Base/ACL.Utils.Strings.pas"/>
+        <UnitName Value="ACL.Utils.Strings"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.AeroPeek.pas"/>
+        <UnitName Value="ACL.UI.AeroPeek"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Animation.pas"/>
+        <UnitName Value="ACL.UI.Animation"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Application.pas"/>
+        <UnitName Value="ACL.UI.Application"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.ActivityIndicator.pas"/>
+        <UnitName Value="ACL.UI.Controls.ActivityIndicator"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.BaseControls.pas"/>
+        <UnitName Value="ACL.UI.Controls.BaseControls"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.BaseEditors.pas"/>
+        <UnitName Value="ACL.UI.Controls.BaseEditors"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.Bevel.pas"/>
+        <UnitName Value="ACL.UI.Controls.Bevel"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.BindingDiagram.pas"/>
+        <UnitName Value="ACL.UI.Controls.BindingDiagram"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.BindingDiagram.SubClass.pas"/>
+        <UnitName Value="ACL.UI.Controls.BindingDiagram.SubClass"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.BindingDiagram.Types.pas"/>
+        <UnitName Value="ACL.UI.Controls.BindingDiagram.Types"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.Buttons.pas"/>
+        <UnitName Value="ACL.UI.Controls.Buttons"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.Calendar.pas"/>
+        <UnitName Value="ACL.UI.Controls.Calendar"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.Category.pas"/>
+        <UnitName Value="ACL.UI.Controls.Category"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.CheckComboBox.pas"/>
+        <UnitName Value="ACL.UI.Controls.CheckComboBox"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.ColorPalette.pas"/>
+        <UnitName Value="ACL.UI.Controls.ColorPalette"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.ColorPicker.pas"/>
+        <UnitName Value="ACL.UI.Controls.ColorPicker"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.ComboBox.pas"/>
+        <UnitName Value="ACL.UI.Controls.ComboBox"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.CompoundControl.pas"/>
+        <UnitName Value="ACL.UI.Controls.CompoundControl"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.CompoundControl.SubClass.pas"/>
+        <UnitName Value="ACL.UI.Controls.CompoundControl.SubClass"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.DateTimeEdit.pas"/>
+        <UnitName Value="ACL.UI.Controls.DateTimeEdit"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.Docking.pas"/>
+        <UnitName Value="ACL.UI.Controls.Docking"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.DropDown.pas"/>
+        <UnitName Value="ACL.UI.Controls.DropDown"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.FormattedLabel.pas"/>
+        <UnitName Value="ACL.UI.Controls.FormattedLabel"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.GroupBox.pas"/>
+        <UnitName Value="ACL.UI.Controls.GroupBox"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.HexView.pas"/>
+        <UnitName Value="ACL.UI.Controls.HexView"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.ImageComboBox.pas"/>
+        <UnitName Value="ACL.UI.Controls.ImageComboBox"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.Images.pas"/>
+        <UnitName Value="ACL.UI.Controls.Images"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.Labels.pas"/>
+        <UnitName Value="ACL.UI.Controls.Labels"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.MagnifierGlass.pas"/>
+        <UnitName Value="ACL.UI.Controls.MagnifierGlass"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.Memo.pas"/>
+        <UnitName Value="ACL.UI.Controls.Memo"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.ObjectInspector.pas"/>
+        <UnitName Value="ACL.UI.Controls.ObjectInspector"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.ObjectInspector.PropertyEditors.pas"/>
+        <UnitName Value="ACL.UI.Controls.ObjectInspector.PropertyEditors"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.Panel.pas"/>
+        <UnitName Value="ACL.UI.Controls.Panel"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.ProgressBar.pas"/>
+        <UnitName Value="ACL.UI.Controls.ProgressBar"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.ProgressBox.pas"/>
+        <UnitName Value="ACL.UI.Controls.ProgressBox"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.Scene2D.pas"/>
+        <UnitName Value="ACL.UI.Controls.Scene2D"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.ScrollBar.pas"/>
+        <UnitName Value="ACL.UI.Controls.ScrollBar"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.ScrollBox.pas"/>
+        <UnitName Value="ACL.UI.Controls.ScrollBox"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.SearchBox.pas"/>
+        <UnitName Value="ACL.UI.Controls.SearchBox"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.ShellTreeView.pas"/>
+        <UnitName Value="ACL.UI.Controls.ShellTreeView"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.Slider.pas"/>
+        <UnitName Value="ACL.UI.Controls.Slider"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.SpinEdit.pas"/>
+        <UnitName Value="ACL.UI.Controls.SpinEdit"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.Splitter.pas"/>
+        <UnitName Value="ACL.UI.Controls.Splitter"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.TabControl.pas"/>
+        <UnitName Value="ACL.UI.Controls.TabControl"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.TextEdit.pas"/>
+        <UnitName Value="ACL.UI.Controls.TextEdit"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.TimeEdit.pas"/>
+        <UnitName Value="ACL.UI.Controls.TimeEdit"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.TreeList.pas"/>
+        <UnitName Value="ACL.UI.Controls.TreeList"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.TreeList.Options.pas"/>
+        <UnitName Value="ACL.UI.Controls.TreeList.Options"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.TreeList.SubClass.pas"/>
+        <UnitName Value="ACL.UI.Controls.TreeList.SubClass"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.TreeList.SubClass.DragAndDrop.pas"/>
+        <UnitName Value="ACL.UI.Controls.TreeList.SubClass.DragAndDrop"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Controls.TreeList.Types.pas"/>
+        <UnitName Value="ACL.UI.Controls.TreeList.Types"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.DesignTime.PropEditors.pas"/>
+        <UnitName Value="ACL.UI.DesignTime.PropEditors"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.DesignTime.PropEditors.ImageList.pas"/>
+        <UnitName Value="ACL.UI.DesignTime.PropEditors.ImageList"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.DesignTime.PropEditors.Menu.pas"/>
+        <UnitName Value="ACL.UI.DesignTime.PropEditors.Menu"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.DesignTime.Reg.pas"/>
+        <HasRegisterProc Value="True"/>
+        <UnitName Value="ACL.UI.DesignTime.Reg"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Dialogs.pas"/>
+        <UnitName Value="ACL.UI.Dialogs"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Dialogs.ColorPicker.pas"/>
+        <UnitName Value="ACL.UI.Dialogs.ColorPicker"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Dialogs.FontPicker.pas"/>
+        <UnitName Value="ACL.UI.Dialogs.FontPicker"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.DropSource.pas"/>
+        <UnitName Value="ACL.UI.DropSource"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.DropTarget.pas"/>
+        <UnitName Value="ACL.UI.DropTarget"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Forms.pas"/>
+        <UnitName Value="ACL.UI.Forms"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.HintWindow.pas"/>
+        <UnitName Value="ACL.UI.HintWindow"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.ImageList.pas"/>
+        <UnitName Value="ACL.UI.ImageList"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Insight.pas"/>
+        <UnitName Value="ACL.UI.Insight"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Menus.pas"/>
+        <UnitName Value="ACL.UI.Menus"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.Resources.pas"/>
+        <UnitName Value="ACL.UI.Resources"/>
+      </Item>
+      <Item>
+        <Filename Value="Visual/ACL.UI.TrayIcon.pas"/>
+        <UnitName Value="ACL.UI.TrayIcon"/>
+      </Item>
+    </Files>
+    <RequiredPkgs>
+      <Item>
+        <PackageName Value="IDEIntf"/>
+      </Item>
+      <Item>
+        <PackageName Value="LCLBase"/>
+      </Item>
+      <Item>
+        <PackageName Value="LCL"/>
+      </Item>
+      <Item>
+        <PackageName Value="FCL"/>
+      </Item>
+    </RequiredPkgs>
+    <UsageOptions>
+      <UnitPath Value="$(PkgOutDir)"/>
+    </UsageOptions>
+    <PublishOptions>
+      <Version Value="2"/>
+      <UseFileFilters Value="True"/>
+    </PublishOptions>
+  </Package>
+</CONFIG>
