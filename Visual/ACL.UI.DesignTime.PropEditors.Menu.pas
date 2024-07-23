@@ -15,9 +15,7 @@ unit ACL.UI.DesignTime.PropEditors.Menu;
 
 {$I ACL.Config.inc}
 
-{$IFNDEF FPC}
-  {$DEFINE DESIGNER_AVAILABLE}
-{$ENDIF}
+{$DEFINE DESIGNER_AVAILABLE}
 
 interface
 
@@ -36,11 +34,6 @@ uses
   {System.}Math,
   {System.}SysUtils,
   {System.}Variants,
-  // Designer
-{$IFDEF DESIGNER_AVAILABLE}
-  DesignIntf,
-  DesignWindows,
-{$ENDIF}
   // Vcl
   {Vcl.}ActnList,
   {Vcl.}Controls,
@@ -49,6 +42,14 @@ uses
   {Vcl.}Graphics,
   {Vcl.}ImgList,
   {Vcl.}Menus,
+// Designer
+{$IFDEF DESIGNER_AVAILABLE}
+  ACL.UI.DesignTime.PropEditors,
+{$IFNDEF FPC}
+  DesignIntf,
+  DesignWindows,
+{$ENDIF}
+{$ENDIF}
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
@@ -193,13 +194,14 @@ var
   AItem: TMenuItem;
   AMenu: TMenuItem;
 begin
+  AMenu := lvItems.FocusedNodeData;
+
   AItem := AItemClass.Create(FMenu.Owner);
   AItem.Caption := ACaption;
 {$IFDEF DESIGNER_AVAILABLE}
-  AItem.Name := Designer.UniqueName('N');
+  AItem.Name := GetUniqueName(Designer, FMenu.Owner, 'N');
 {$ENDIF}
 
-  AMenu := lvItems.FocusedNodeData;
   if AMenu = nil then
     FMenu.Items.Add(AItem)
   else if ASubItem then
@@ -380,7 +382,7 @@ procedure TACLMenuEditorDialog.lvItemsFocusedNodeChanged(Sender: TObject);
 begin
 {$IFDEF DESIGNER_AVAILABLE}
   if lvItems.FocusedNodeData <> nil then
-    Designer.SelectComponent(lvItems.FocusedNodeData);
+    SelectComponent(Designer, lvItems.FocusedNodeData);
 {$ENDIF}
 end;
 
