@@ -256,56 +256,56 @@ end;
 
 class procedure TACLApplication.UpdateColorSet;
 var
-  AActualAccentColor: TAlphaColor;
-  AActualColorSchema: TACLColorSchema;
-  AActualDarkMode: Boolean;
-  AActualDarkModeForSystem: Boolean;
-  AChanges: TACLApplicationChanges;
+  LActualAccentColor: TAlphaColor;
+  LActualColorSchema: TACLColorSchema;
+  LActualDarkMode: Boolean;
+  LActualDarkModeForSystem: Boolean;
+  LChanges: TACLApplicationChanges;
 begin
-  AChanges := [];
+  LChanges := [];
 
-  GetNativeDarkMode(AActualDarkMode, AActualDarkModeForSystem);
+  GetNativeDarkMode(LActualDarkMode, LActualDarkModeForSystem);
   case DarkMode of
     TACLBoolean.True:
-      AActualDarkMode := True;
+      LActualDarkMode := True;
     TACLBoolean.False:
-      AActualDarkMode := False;
+      LActualDarkMode := False;
   else;
   end;
 
-  AActualAccentColor := GetNativeColorAccent;
-  if AActualAccentColor <> FActualAccentColor then
+  LActualAccentColor := GetNativeColorAccent;
+  if LActualAccentColor <> FActualAccentColor then
   begin
-    FActualAccentColor := AActualAccentColor;
-    Include(AChanges, acAccentColor);
+    FActualAccentColor := LActualAccentColor;
+    Include(LChanges, acAccentColor);
   end;
 
   if ColorSchemaUseNative then
   begin
-    AActualColorSchema := TACLColorSchema.CreateFromColor(AccentColor);
-    if AActualColorSchema <> FColorSchema then
+    LActualColorSchema := TACLColorSchema.CreateFromColor(AccentColor);
+    if LActualColorSchema <> FColorSchema then
     begin
-      FColorSchema := AActualColorSchema;
-      Include(AChanges, acColorSchema);
+      FColorSchema := LActualColorSchema;
+      Include(LChanges, acColorSchema);
     end;
   end;
 
-  if AActualDarkModeForSystem <> FActualDarkModeForSystem then
+  if LActualDarkModeForSystem <> FActualDarkModeForSystem then
   begin
-    FActualDarkModeForSystem := AActualDarkModeForSystem;
-    Include(AChanges, acDarkModeForSystem);
+    FActualDarkModeForSystem := LActualDarkModeForSystem;
+    Include(LChanges, acDarkModeForSystem);
   end;
 
-  if AActualDarkMode <> FActualDarkMode then
+  if LActualDarkMode <> FActualDarkMode then
   begin
-    FActualDarkMode := AActualDarkMode;
-    Include(AChanges, acDarkMode);
+    FActualDarkMode := LActualDarkMode;
+    Include(LChanges, acDarkMode);
     if ColorSchema.IsAssigned then
-      Include(AChanges, acColorSchema);
+      Include(LChanges, acColorSchema);
   end;
 
-  if AChanges <> [] then
-    Changed(AChanges);
+  if LChanges <> [] then
+    Changed(LChanges);
 end;
 
 class function TACLApplication.GetHandle: HWND;
@@ -400,22 +400,22 @@ end;
 class procedure TACLApplication.GetNativeDarkMode(out ADarkModeForApps, ADarkModeForSystem: Boolean);
 {$IFDEF MSWINDOWS}
 var
-  AKey: HKEY;
+  LKey: HKEY;
 {$ENDIF}
 begin
 {$IFDEF MSWINDOWS}
-  if acRegOpenRead(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Themes\Personalize', AKey) then
+  if acRegOpenRead(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Themes\Personalize', LKey) then
   try
-    ADarkModeForApps := acRegReadInt(AKey, 'AppsUseLightTheme', 1) = 0;
-    ADarkModeForSystem := acRegReadInt(AKey, 'SystemUsesLightTheme', 1) = 0;
+    ADarkModeForApps := acRegReadInt(LKey, 'AppsUseLightTheme', 1) = 0;
+    ADarkModeForSystem := acRegReadInt(LKey, 'SystemUsesLightTheme', 1) = 0;
   finally
-    acRegClose(AKey);
+    acRegClose(LKey);
   end
   else
 {$ENDIF}
   begin
-    ADarkModeForApps := False;
-    ADarkModeForSystem := False;
+    ADarkModeForSystem := TACLColors.IsDark(ColorToRGB(clWindow));
+    ADarkModeForApps := ADarkModeForSystem;
   end;
 end;
 

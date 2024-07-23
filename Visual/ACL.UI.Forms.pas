@@ -105,6 +105,7 @@ type
     procedure WMAppCommand(var Message: TMessage); message WM_APPCOMMAND;
     procedure WMDPIChanged(var Message: TWMDpi); message WM_DPICHANGED;
     procedure WMSettingsChanged(var Message: TWMSettingChange); message WM_SETTINGCHANGE;
+    procedure WMSysColorChanged(var Message: TMessage); message WM_SYSCOLORCHANGE;
   {$ENDIF}
   protected
   {$IFDEF FPC}
@@ -813,6 +814,12 @@ begin
   FSystemDpiCache := 0;
   if (Message.Section <> nil) and (Message.Section = 'ImmersiveColorSet') then
     TACLApplication.UpdateColorSet;
+end;
+
+procedure TACLBasicForm.WMSysColorChanged(var Message: TMessage);
+begin
+  inherited;
+  TACLApplication.UpdateColorSet;
 end;
 {$ENDIF}
 
