@@ -15,45 +15,60 @@ unit ACL.UI.DesignTime.PropEditors;
 
 {$I ACL.Config.inc}
 
+{$IFNDEF FPC}
+  {$DEFINE DESIGNER_CAN_CREATECOMPONENT}
+{$ENDIF}
+
 interface
 
 uses
-  Winapi.Windows,
+{$IFDEF FPC}
+  LCLIntf,
+  LCLType,
+{$ELSE}
+  Windows,
+{$ENDIF}
   // System
+  {System.}Classes,
+  {System.}Math,
+  {System.}Types,
+  {System.}TypInfo,
+  {System.}SysUtils,
   System.UITypes,
-  System.Types,
-  System.TypInfo,
-  System.Classes,
-  System.Math,
   // Vcl
-  Vcl.Dialogs,
-  Vcl.Graphics,
-  Vcl.ImgList,
-  Vcl.Menus,
-  // PropertyEditors
+  {Vcl.}Dialogs,
+  {Vcl.}Graphics,
+  {Vcl.}ImgList,
+  {Vcl.}Menus,
+  {Vcl.}Forms,
+  // IDE
+{$IFDEF FPC}
+  ComponentEditors,
+  LazIDEIntf,
+  PropEdits,
+{$ELSE}
   ColnEdit,
   DesignEditors,
   DesignIntf,
   VCLEditors,
+{$ENDIF}
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.Ex.Gdip,
   ACL.Graphics.SkinImage,
   ACL.Graphics.SkinImageSet,
-  ACL.UI.Dialogs,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.DropDown,
+  ACL.UI.Controls.Images,
+  ACL.UI.Controls.ImageComboBox,
   ACL.UI.Controls.TabControl,
   ACL.UI.Controls.TextEdit,
   ACL.UI.Controls.TreeList,
   ACL.UI.Controls.TreeList.SubClass,
   ACL.UI.Controls.TreeList.Types,
-  ACL.UI.DesignTime.PropEditors.ImageList,
-  ACL.UI.DesignTime.PropEditors.Texture,
-  ACL.UI.DesignTime.PropEditors.Menu,
+  ACL.UI.Dialogs,
   ACL.UI.Dialogs.ColorPicker,
   ACL.UI.Dialogs.FontPicker,
   ACL.UI.Menus,
@@ -63,61 +78,148 @@ uses
   ACL.Utils.Strings;
 
 type
+{$REGION ' FPC Base '}
+
+{$IFNDEF FPC}
+  TPropEditDrawState = Boolean;
+{$ENDIF}
+
+{$IFDEF FPC}
+  IDesigner = TPropertyEditorHook;
+  IDesignerSelections = TPersistentSelectionList;
+
+  { TDesignWindow }
+
+  TDesignWindow = class(TForm)
+  strict private
+    FDesigner: TPropertyEditorHook;
+    procedure DoCompAdded(APersistent: TPersistent; Select: boolean);
+    procedure DoCompDeleting(APersistent: TPersistent);
+    procedure DoCompSelection(const ASelection: TPersistentSelectionList);
+    procedure DoModified(Sender: TObject);
+    procedure SetDesigner(AValue: TPropertyEditorHook);
+  public
+    procedure BeforeDestruction; override;
+    procedure ItemDeleted(const ADesigner: IDesigner; Item: TPersistent); virtual;
+    procedure ItemInserted(const ADesigner: IDesigner; Item: TPersistent); virtual;
+    procedure ItemsModified(const ADesigner: IDesigner); virtual;
+    procedure SelectionChanged(const ADesigner: IDesigner; const ASelection: IDesignerSelections); virtual;
+    //# Properties
+    property Designer: TPropertyEditorHook read FDesigner write SetDesigner;
+  end;
+
+  { TPropertyEditorHelper }
+
+  TPropertyEditorHelper = class helper for TPropertyEditor
+  public
+    function Designer: TPropertyEditorHook;
+  end;
+{$ENDIF}
+
+{$ENDREGION}
+
+{$REGION ' General Properties '}
 
   { TAlphaColorPropertyEditor }
 
-  TAlphaColorPropertyEditor = class(TOrdinalProperty,
-    ICustomPropertyDrawing,
-    ICustomPropertyDrawing80)
+  TAlphaColorPropertyEditor = class(TOrdinalProperty
+  {$IFNDEF FPC}
+    , ICustomPropertyDrawing
+    , ICustomPropertyDrawing80
+  {$ENDIF})
   protected
     function IsAlphaSupported: Boolean; virtual;
-    // ICustomPropertyDrawing
-    procedure PropDrawName(ACanvas: TCanvas; const ARect: TRect; ASelected: Boolean);
-    procedure PropDrawValue(ACanvas: TCanvas; const ARect: TRect; ASelected: Boolean);
-    // ICustomPropertyDrawing80
-    function PropDrawNameRect(const ARect: TRect): TRect;
-    function PropDrawValueRect(const ARect: TRect): TRect;
   public
-    class procedure DrawPreview(ACanvas: TCanvas; R: TRect; AColor: TAlphaColor);
     procedure Edit; override;
     function GetAttributes: TPropertyAttributes; override;
     function GetValue: string; override;
     procedure SetValue(const Value: string); override;
+
+    class procedure DrawPreview(ACanvas: TCanvas; var ARect: TRect; AColor: TAlphaColor);
+    // ICustomPropertyDrawing
+    procedure PropDrawName(ACanvas: TCanvas;
+      const ARect: TRect; ASelected: TPropEditDrawState); {$IFDEF FPC}override;{$ENDIF}
+    procedure PropDrawValue(ACanvas: TCanvas;
+      const ARect: TRect; ASelected: TPropEditDrawState); {$IFDEF FPC}override;{$ENDIF}
+    // ICustomPropertyDrawing80
+    function PropDrawNameRect(const ARect: TRect): TRect;
+    function PropDrawValueRect(const ARect: TRect): TRect;
   end;
 
-  { TACLDPIPropertyEditor }
+  { TACLImageIndexProperty }
 
-  TACLDPIPropertyEditor = class(TIntegerProperty)
-  strict private const
-    Default = 'Default';
+  TACLImageIndexProperty = class(TIntegerProperty
+  {$IFNDEF FPC}, ICustomPropertyListDrawing{$ENDIF})
   protected
-    function StringToValue(const AValue: string): Integer;
-    function ValueToString(const AValue: Integer): string;
+    function GetImages: TCustomImageList; virtual;
   public
     function GetAttributes: TPropertyAttributes; override;
     function GetValue: string; override;
     procedure GetValues(Proc: TGetStrProc); override;
-    procedure SetValue(const S: string); override;
+    procedure SetValue(const Value: string); override;
+    // ICustomPropertyListDrawing
+  {$IFDEF FPC}
+    procedure ListDrawValue(const AValue: ansistring; Index: Integer;
+      ACanvas: TCanvas; const ARect: TRect; AState: TPropEditDrawState); override;
+    procedure ListMeasureHeight(const AValue: ansistring; Index: Integer;
+      ACanvas: TCanvas; var AHeight: Integer); override;
+    procedure ListMeasureWidth(const AValue: ansistring; Index: Integer;
+      ACanvas: TCanvas; var AWidth: Integer); override;
+  {$ELSE}
+    procedure ListDrawValue(const AValue: string;
+      ACanvas: TCanvas; const ARect: TRect; AState: TPropEditDrawState);
+    procedure ListMeasureHeight(const AValue: string;
+      ACanvas: TCanvas; var AHeight: Integer);
+    procedure ListMeasureWidth(const AValue: string;
+      ACanvas: TCanvas; var AWidth: Integer);
+  {$ENDIF}
+    //# Properties
+    property Images: TCustomImageList read GetImages;
   end;
+
+  { TACLMultiLineStringEditor }
+
+  TACLMultiLineStringEditor = class(TStringProperty)
+  public
+    function GetAttributes: TPropertyAttributes; override;
+    procedure Edit; override;
+  end;
+
+  { TACLSelectionEditor }
+
+  TACLSelectionEditor = class(TSelectionEditor)
+  public
+  {$IFDEF FPC}
+    procedure RequiresUnits(Proc: TGetStrProc); virtual;
+  {$ENDIF}
+  end;
+
+{$ENDREGION}
+
+{$REGION ' Resources '}
 
   { TACLResourceProperty }
 
-  TACLResourceProperty = class abstract(TClassProperty,
-    ICustomPropertyDrawing,
-    ICustomPropertyDrawing80)
+  TACLResourceProperty = class abstract(TClassProperty
+  {$IFNDEF FPC}
+    , ICustomPropertyDrawing
+    , ICustomPropertyDrawing80
+  {$ENDIF})
   strict private
     function GetResource: TACLResource;
-  protected
-    // ICustomPropertyDrawing
-    procedure PropDrawName(ACanvas: TCanvas; const ARect: TRect; ASelected: Boolean);
-    procedure PropDrawValue(ACanvas: TCanvas; const ARect: TRect; ASelected: Boolean); virtual;
-    // ICustomPropertyDrawing80
-    function PropDrawNameRect(const ARect: TRect): TRect;
-    function PropDrawValueRect(const ARect: TRect): TRect; virtual;
   public
     function GetAttributes: TPropertyAttributes; override;
     function GetValue: string; override;
-    //
+    // ICustomPropertyDrawing
+    procedure PropDrawName(ACanvas: TCanvas; const ARect: TRect;
+      ASelected: TPropEditDrawState); {$IFDEF FPC}override;{$ENDIF}
+    procedure PropDrawValue(ACanvas: TCanvas; const ARect: TRect;
+      ASelected: TPropEditDrawState); {$IFDEF FPC}override; final;{$ENDIF}
+    procedure PropDrawValueCore(ACanvas: TCanvas; var ARect: TRect); virtual;
+    // ICustomPropertyDrawing80
+    function PropDrawNameRect(const ARect: TRect): TRect;
+    function PropDrawValueRect(const ARect: TRect): TRect; virtual;
+    //# Properties
     property Resource: TACLResource read GetResource;
   end;
 
@@ -126,13 +228,12 @@ type
   TACLResourceColorProperty = class(TACLResourceProperty)
   strict private
     function GetResource: TACLResourceColor;
-  protected
-    procedure PropDrawValue(ACanvas: TCanvas; const ARect: TRect; ASelected: Boolean); override;
-    function PropDrawValueRect(const ARect: TRect): TRect; override;
   public
     procedure Edit; override;
     function GetAttributes: TPropertyAttributes; override;
-    //
+    procedure PropDrawValueCore(ACanvas: TCanvas; var ARect: TRect); override;
+    function PropDrawValueRect(const ARect: TRect): TRect; override;
+    //# Properties
     property Resource: TACLResourceColor read GetResource;
   end;
 
@@ -156,7 +257,7 @@ type
   public
     procedure Edit; override;
     function GetAttributes: TPropertyAttributes; override;
-    function GetName: string; override;
+    function GetName: {$IFDEF FPC}shortstring{$ELSE}string{$ENDIF}; override;
     function GetValue: string; override;
     procedure SetValue(const Value: string); override;
   end;
@@ -184,7 +285,7 @@ type
     function GetAttributes: TPropertyAttributes; override;
     procedure GetValues(Proc: TGetStrProc); override;
     procedure SetValue(const Value: string); override;
-    //
+    //# Properties
     property Resource: TACLResource read GetResource;
   end;
 
@@ -219,13 +320,12 @@ type
   TACLResourceFontProperty = class(TACLResourceProperty)
   strict private
     function GetResource: TACLResourceFont;
-  protected
-    procedure PropDrawValue(ACanvas: TCanvas; const ARect: TRect; ASelected: Boolean); override;
-    function PropDrawValueRect(const ARect: TRect): TRect; override;
   public
     procedure Edit; override;
     function GetAttributes: TPropertyAttributes; override;
-    //
+    procedure PropDrawValueCore(ACanvas: TCanvas; var ARect: TRect); override;
+    function PropDrawValueRect(const ARect: TRect): TRect; override;
+    //# Properties
     property Resource: TACLResourceFont read GetResource;
   end;
 
@@ -236,31 +336,39 @@ type
     function GetResource: TACLResource; override;
   end;
 
-  { TACLImageListEditor }
+{$ENDREGION}
 
-  TACLImageListEditor = class(TComponentEditor)
+{$REGION ' Controls '}
+
+  { TACLBindingDiagramSelectionEditor }
+
+  TACLBindingDiagramSelectionEditor = class(TACLSelectionEditor)
   public
-    function GetVerb(Index: Integer): string; override;
-    function GetVerbCount: Integer; override;
-    procedure ExecuteVerb(Index: Integer); override;
+    procedure RequiresUnits(Proc: TGetStrProc); override;
   end;
 
-  { TACLImageIndexProperty }
+  { TACLDPIPropertyEditor }
 
-  TACLImageIndexProperty = class(TIntegerProperty, ICustomPropertyListDrawing)
+  TACLDPIPropertyEditor = class(TIntegerProperty)
+  strict private const
+    Default = 'Default';
   protected
-    function GetImages: TCustomImageList; virtual;
+    function StringToValue(const AValue: string): Integer;
+    function ValueToString(const AValue: Integer): string;
   public
     function GetAttributes: TPropertyAttributes; override;
     function GetValue: string; override;
     procedure GetValues(Proc: TGetStrProc); override;
-    procedure SetValue(const Value: string); override;
-    // ICustomPropertyListDrawing
-    procedure ListDrawValue(const Value: string; ACanvas: TCanvas; const ARect: TRect; ASelected: Boolean);
-    procedure ListMeasureHeight(const Value: string; ACanvas: TCanvas; var AHeight: Integer);
-    procedure ListMeasureWidth(const Value: string; ACanvas: TCanvas; var AWidth: Integer);
-    //
-    property Images: TCustomImageList read GetImages;
+    procedure SetValue(const S: string); override;
+  end;
+
+  { TACLImageListEditor }
+
+  TACLImageListEditor = class(TComponentEditor)
+  public
+    procedure ExecuteVerb(Index: Integer); override;
+    function GetVerb(Index: Integer): string; override;
+    function GetVerbCount: Integer; override;
   end;
 
   { TACLPictureProperty }
@@ -287,20 +395,11 @@ type
     procedure ExecuteVerb(Index: Integer); override;
   end;
 
-  { TACLCollectionEditor }
+  { TACLDropDownImageIndexProperty }
 
-  TACLCollectionEditor = class(TClassProperty)
-  public
-    procedure Edit; override;
-    function GetAttributes: TPropertyAttributes; override;
-  end;
-
-  { TACLMultiLineStringEditor }
-
-  TACLMultiLineStringEditor = class(TStringProperty)
-  public
-    function GetAttributes: TPropertyAttributes; override;
-    procedure Edit; override;
+  TACLDropDownImageIndexProperty = class(TACLImageIndexProperty)
+  protected
+    function GetImages: TCustomImageList; override;
   end;
 
   { TACLEditButtonImageIndexProperty }
@@ -310,23 +409,16 @@ type
     function GetImages: TCustomImageList; override;
   end;
 
-  { TACLDropDownImageIndexProperty }
+  { TACLImageComboBoxImageIndexProperty }
 
-  TACLDropDownImageIndexProperty = class(TACLImageIndexProperty)
+  TACLImageComboBoxImageIndexProperty = class(TACLImageIndexProperty)
   protected
     function GetImages: TCustomImageList; override;
-  end;
-  
-  { TACLBindingDiagramSelectionEditor }
-
-  TACLBindingDiagramSelectionEditor = class(TSelectionEditor)
-  public
-    procedure RequiresUnits(Proc: TGetStrProc); override;
   end;
 
   { TACLTreeListSelectionEditor }
 
-  TACLTreeListSelectionEditor = class(TSelectionEditor)
+  TACLTreeListSelectionEditor = class(TACLSelectionEditor)
   public
     procedure RequiresUnits(Proc: TGetStrProc); override;
   end;
@@ -347,6 +439,10 @@ type
     function GetImages: TCustomImageList; override;
   end;
 
+{$ENDREGION}
+
+{$REGION ' Menus '}
+
   { TACLMenuPropertyEditor }
 
   TACLMenuPropertyEditor = class(TClassProperty)
@@ -360,6 +456,7 @@ type
   TACLPopupMenuEditor = class(TComponentEditor)
   public
     procedure ExecuteVerb(Index: Integer); override;
+    function GetDesigner(out ADesigner: IDesigner): Boolean; reintroduce;
     function GetVerb(Index: Integer): string; override;
     function GetVerbCount: Integer; override;
   end;
@@ -371,13 +468,16 @@ type
     procedure ExecuteVerb(Index: Integer); override;
   end;
 
+{$ENDREGION}
+
+function GetUniqueName(ADesigner: IDesigner; AOwner: TComponent; const AName: string): string;
+procedure SelectComponent(ADesigner: IDesigner; AComponent: TPersistent);
 implementation
 
 uses
-  System.SysUtils,
-  // ACL
-  ACL.UI.Controls.ColorPicker,
-  ACL.UI.Controls.Images;
+  ACL.UI.DesignTime.PropEditors.ImageList,
+  ACL.UI.DesignTime.PropEditors.Texture,
+  ACL.UI.DesignTime.PropEditors.Menu;
 
 const
   sNewResourceCollection = 'new resource collection';
@@ -385,17 +485,142 @@ const
   sResourceIDPrompt = 'Enter Resource ID';
 
 type
-  TACLResourceAccess = class(TACLResource);
   TACLResourceFontAccess = class(TACLResourceFont);
-  TACLResourceTextureAccess = class(TACLResourceTexture);
   TPersistentAccess = class(TPersistent);
+
+function GetUniqueName(ADesigner: IDesigner; AOwner: TComponent; const AName: string): string;
+begin
+{$IFDEF FPC}
+  Result := CreateUniqueName(AOwner, AName, '');
+{$ELSE}
+  Result := ADesigner.UniqueName(AName);
+{$ENDIF}
+end;
+
+function IsSelected(AValue: TPropEditDrawState): Boolean;
+begin
+{$IFDEF FPC}
+  Result := pedsSelected in AValue;
+{$ELSE}
+  Result := AValue;
+{$ENDIF}
+end;
+
+procedure SelectComponent(ADesigner: IDesigner; AComponent: TPersistent);
+begin
+  if ADesigner <> nil then
+  {$IFDEF FPC}
+    ADesigner.SelectOnlyThis(AComponent);
+  {$ELSE}
+    ADesigner.SelectComponent(AComponent);
+  {$ENDIF}
+end;
+
+{$REGION ' FPC Base '}
+
+{$IFDEF FPC}
+
+procedure ShowCollectionEditor(ADesigner: TObject;
+  AComponent: TComponent; ACollection: TCollection; const APropName: string);
+begin
+  EditCollection(AComponent, ACollection, APropName);
+end;
+
+{ TDesignWindow }
+
+procedure TDesignWindow.BeforeDestruction;
+begin
+  inherited BeforeDestruction;
+  Designer := nil;
+end;
+
+procedure TDesignWindow.ItemDeleted(const ADesigner: IDesigner; Item: TPersistent);
+begin
+  // do nothing
+end;
+
+procedure TDesignWindow.ItemInserted(const ADesigner: IDesigner; Item: TPersistent);
+begin
+  // do nothing
+end;
+
+procedure TDesignWindow.ItemsModified(const ADesigner: IDesigner);
+begin
+  // do nothing
+end;
+
+procedure TDesignWindow.SelectionChanged(
+  const ADesigner: IDesigner; const ASelection: IDesignerSelections);
+begin
+  // do nothing
+end;
+
+procedure TDesignWindow.DoCompAdded(APersistent: TPersistent; Select: boolean);
+begin
+  ItemInserted(Designer, APersistent);
+end;
+
+procedure TDesignWindow.DoCompDeleting(APersistent: TPersistent);
+begin
+  ItemDeleted(Designer, APersistent);
+end;
+
+procedure TDesignWindow.DoCompSelection(
+  const ASelection: TPersistentSelectionList);
+begin
+  SelectionChanged(Designer, ASelection);
+end;
+
+procedure TDesignWindow.DoModified(Sender: TObject);
+begin
+  ItemsModified(Designer);
+end;
+
+procedure TDesignWindow.SetDesigner(AValue: TPropertyEditorHook);
+begin
+  if FDesigner = AValue then
+  begin
+    if FDesigner <> nil then
+    begin
+      FDesigner.RemoveHandlerPersistentAdded(DoCompAdded);
+      FDesigner.RemoveHandlerPersistentDeleting(DoCompDeleting);
+      FDesigner.RemoveHandlerModified(DoModified);
+      FDesigner.RemoveHandlerSetSelection(DoCompSelection);
+      FDesigner := nil;
+    end;
+    if AValue <> nil then
+    begin
+      FDesigner := AValue;
+      FDesigner.AddHandlerPersistentAdded(DoCompAdded);
+      FDesigner.AddHandlerPersistentDeleting(DoCompDeleting);
+      FDesigner.AddHandlerModified(DoModified);
+      FDesigner.AddHandlerSetSelection(DoCompSelection);
+    end;
+  end;
+end;
+
+{ TPropertyEditorHelper }
+
+function TPropertyEditorHelper.Designer: TPropertyEditorHook;
+begin
+  Result := Self.PropertyHook;
+end;
+{$ENDIF}
+{$ENDREGION}
+
+{$REGION ' General Properties '}
 
 { TAlphaColorPropertyEditor }
 
-class procedure TAlphaColorPropertyEditor.DrawPreview(ACanvas: TCanvas; R: TRect; AColor: TAlphaColor);
+class procedure TAlphaColorPropertyEditor.DrawPreview(
+  ACanvas: TCanvas; var ARect: TRect; AColor: TAlphaColor);
+var
+  LRect: TRect;
 begin
-  R.Right := R.Left + R.Height;
-  acDrawColorPreview(ACanvas, R, AColor);
+  LRect := ARect;
+  LRect.Width := LRect.Height;
+  acDrawColorPreview(ACanvas, LRect, AColor);
+  ARect.Left := LRect.Right + acTextIndent;
 end;
 
 procedure TAlphaColorPropertyEditor.Edit;
@@ -419,12 +644,17 @@ end;
 
 function TAlphaColorPropertyEditor.IsAlphaSupported: Boolean;
 begin
-  Result := not (GetComponent(0) is TACLResourceColor) or TACLResourceColor(GetComponent(0)).IsAlphaSupported;
+  Result := not (GetComponent(0) is TACLResourceColor) or
+    TACLResourceColor(GetComponent(0)).IsAlphaSupported;
 end;
 
-procedure TAlphaColorPropertyEditor.PropDrawName(ACanvas: TCanvas; const ARect: TRect; ASelected: Boolean);
+procedure TAlphaColorPropertyEditor.PropDrawName;
 begin
+{$IFDEF FPC}
+  inherited;
+{$ELSE}
   DefaultPropertyDrawName(Self, ACanvas, ARect);
+{$ENDIF}
 end;
 
 function TAlphaColorPropertyEditor.PropDrawNameRect(const ARect: TRect): TRect;
@@ -432,10 +662,17 @@ begin
   Result := ARect;
 end;
 
-procedure TAlphaColorPropertyEditor.PropDrawValue(ACanvas: TCanvas; const ARect: TRect; ASelected: Boolean);
+procedure TAlphaColorPropertyEditor.PropDrawValue;
+var
+  LRect: TRect;
 begin
-  if AllEqual then
-    DrawPreview(ACanvas, ARect, GetOrdValue);
+  LRect := ARect;
+  DrawPreview(ACanvas, LRect, GetOrdValue);
+{$IFDEF FPC}
+  inherited PropDrawValue(ACanvas, LRect, ASelected);
+{$ELSE}
+  DefaultPropertyDrawName(Self, ACanvas, LRect);
+{$ENDIF}
 end;
 
 function TAlphaColorPropertyEditor.PropDrawValueRect(const ARect: TRect): TRect;
@@ -449,60 +686,116 @@ begin
   SetOrdValue(TAlphaColor.FromString(Value));
 end;
 
-{ TACLDPIPropertyEditor }
+{ TACLImageIndexProperty }
 
-function TACLDPIPropertyEditor.GetAttributes: TPropertyAttributes;
+function TACLImageIndexProperty.GetAttributes: TPropertyAttributes;
 begin
-  Result := inherited GetAttributes + [paValueList];
+  Result := [paValueList, paRevertable];
 end;
 
-function TACLDPIPropertyEditor.GetValue: string;
+function TACLImageIndexProperty.GetValue: string;
 begin
-  Result := ValueToString(GetOrdValue);
+  Result := IntToStr(GetOrdValue);
 end;
 
-procedure TACLDPIPropertyEditor.GetValues(Proc: TGetStrProc);
+procedure TACLImageIndexProperty.GetValues(Proc: TGetStrProc);
 var
   I: Integer;
 begin
-  Proc(Default);
-  for I := Low(acDefaultDPIValues) to High(acDefaultDPIValues) do
-    Proc(ValueToString(acDefaultDPIValues[I]));
-end;
-
-procedure TACLDPIPropertyEditor.SetValue(const S: string);
-begin
-  SetOrdValue(StringToValue(S));
-end;
-
-function TACLDPIPropertyEditor.StringToValue(const AValue: string): Integer;
-var
-  E: Integer;
-begin
-  if AValue = Default then
-    Exit(0);
-
-  Val(AValue, Result, E);
-  while (E > 0) and (E <= Length(AValue)) do
+  Proc('-1');
+  if Images <> nil then
   begin
-    if AValue[E] = ' ' then
-      Inc(E)
-    else
-    begin
-      if AValue[E] = '%' then
-        Result := MulDiv(acDefaultDPI, Result, 100);
-      Break;
-    end;
+    for I := 0 to Images.Count - 1 do
+      Proc(IntToStr(I));
   end;
 end;
 
-function TACLDPIPropertyEditor.ValueToString(const AValue: Integer): string;
+procedure TACLImageIndexProperty.SetValue(const Value: string);
 begin
-  if AValue = 0 then
-    Result := Default
-  else
-    Result := Format('%d dpi (%d %%)', [AValue, MulDiv(100, AValue, acDefaultDPI)]);
+  SetOrdValue(StrToInt(Value));
 end;
+
+procedure TACLImageIndexProperty.ListDrawValue;
+var
+  LImageWidth: Integer;
+  LRect: TRect;
+begin
+  // Image
+  if Images <> nil then
+  begin
+    ACanvas.FillRect(ARect);
+    if IsSelected(AState) then
+      ACanvas.DrawFocusRect(ARect);
+    LRect := ARect;
+    LRect.CenterVert(Images.Height);
+    Images.Draw(ACanvas, ARect.Left + acTextIndent, LRect.Top, StrToInt(AValue));
+    LImageWidth := Images.Width + 2 * acTextIndent;
+  end
+  else
+    LImageWidth := 0;
+
+  // Text
+  LRect := ARect;
+  LRect.CenterVert(ACanvas.TextHeight(AValue));
+  ACanvas.TextOut(ARect.Left + LImageWidth + acTextIndent, LRect.Top, AValue);
+end;
+
+procedure TACLImageIndexProperty.ListMeasureHeight;
+begin
+{$IFDEF FPC}
+  AHeight := ACanvas.TextHeight(AValue);
+{$ENDIF}
+  if Images <> nil then
+    AHeight := Max(AHeight, Images.Height + 2 * acTextIndent);
+end;
+
+procedure TACLImageIndexProperty.ListMeasureWidth;
+begin
+{$IFDEF FPC}
+  AWidth := ACanvas.TextWidth(AValue) + 2 * acTextIndent;
+{$ENDIF}
+  if Images <> nil then
+    Inc(AWidth, Images.Width + 2 * acTextIndent);
+end;
+
+function TACLImageIndexProperty.GetImages: TCustomImageList;
+var
+  APropInfo: PPropInfo;
+begin
+  APropInfo := TypInfo.GetPropInfo(GetComponent(0), 'Images', [tkClass]);
+  if APropInfo <> nil then
+    Result := TCustomImageList(GetObjectProp(GetComponent(0), APropInfo, TCustomImageList))
+  else
+    Result := nil;
+end;
+
+{ TACLMultiLineStringEditor }
+
+procedure TACLMultiLineStringEditor.Edit;
+var
+  LText: string;
+begin
+  LText := GetValue;
+  if TACLMemoQueryDialog.Execute(GetName, LText) then
+    SetValue(LText);
+end;
+
+function TACLMultiLineStringEditor.GetAttributes: TPropertyAttributes;
+begin
+  Result := inherited GetAttributes + [paDialog];
+end;
+
+{ TACLSelectionEditor }
+
+{$IFDEF FPC}
+procedure TACLSelectionEditor.RequiresUnits(Proc: TGetStrProc);
+begin
+  // do nothing
+end;
+{$ENDIF}
+{$ENDREGION}
+
+{$REGION ' Resources '}
 
 { TACLResourceProperty }
 
@@ -516,9 +809,14 @@ begin
   Result := Resource.ToString;
 end;
 
-procedure TACLResourceProperty.PropDrawName(ACanvas: TCanvas; const ARect: TRect; ASelected: Boolean);
+procedure TACLResourceProperty.PropDrawName(ACanvas: TCanvas;
+  const ARect: TRect; ASelected: TPropEditDrawState);
 begin
+{$IFDEF FPC}
+  inherited;
+{$ELSE}
   DefaultPropertyDrawName(Self, ACanvas, ARect);
+{$ENDIF}
 end;
 
 function TACLResourceProperty.PropDrawNameRect(const ARect: TRect): TRect;
@@ -526,9 +824,23 @@ begin
   Result := ARect;
 end;
 
-procedure TACLResourceProperty.PropDrawValue(ACanvas: TCanvas; const ARect: TRect; ASelected: Boolean);
+procedure TACLResourceProperty.PropDrawValue(ACanvas: TCanvas;
+  const ARect: TRect; ASelected: TPropEditDrawState);
+var
+  LRect: TRect;
 begin
-  DefaultPropertyDrawValue(Self, ACanvas, ARect);
+  LRect := ARect;
+  PropDrawValueCore(ACanvas, LRect);
+{$IFDEF FPC}
+  inherited PropDrawValue(ACanvas, LRect, ASelected);
+{$ELSE}
+  DefaultPropertyDrawValue(Self, ACanvas, LRect);
+{$ENDIF}
+end;
+
+procedure TACLResourceProperty.PropDrawValueCore(ACanvas: TCanvas; var ARect: TRect);
+begin
+  // do nothing
 end;
 
 function TACLResourceProperty.PropDrawValueRect(const ARect: TRect): TRect;
@@ -538,7 +850,11 @@ end;
 
 function TACLResourceProperty.GetResource: TACLResource;
 begin
+{$IFDEF FPC}
+  Result := TACLResource(GetObjectValue);
+{$ELSE}
   Result := TACLResource(GetOrdValue);
+{$ENDIF}
 end;
 
 { TACLResourceColorProperty }
@@ -557,10 +873,9 @@ begin
   Result := inherited GetAttributes + [paDialog];
 end;
 
-procedure TACLResourceColorProperty.PropDrawValue(ACanvas: TCanvas; const ARect: TRect; ASelected: Boolean);
+procedure TACLResourceColorProperty.PropDrawValueCore;
 begin
-  if AllEqual then
-    TAlphaColorPropertyEditor.DrawPreview(ACanvas, ARect, Resource.Value);
+  TAlphaColorPropertyEditor.DrawPreview(ACanvas, ARect, Resource.Value);
 end;
 
 function TACLResourceColorProperty.PropDrawValueRect(const ARect: TRect): TRect;
@@ -603,13 +918,10 @@ begin
   Result := TACLResourceFont(inherited Resource);
 end;
 
-procedure TACLResourceFontProperty.PropDrawValue(ACanvas: TCanvas; const ARect: TRect; ASelected: Boolean);
+procedure TACLResourceFontProperty.PropDrawValueCore;
 begin
-  if AllEqual then
-  begin
-    TAlphaColorPropertyEditor.DrawPreview(ACanvas, ARect, Resource.Color);
-    ACanvas.Font.Style := Resource.Style;
-  end;
+  TAlphaColorPropertyEditor.DrawPreview(ACanvas, ARect, Resource.Color);
+  ACanvas.Font.Style := Resource.Style;
 end;
 
 function TACLResourceFontProperty.PropDrawValueRect(const ARect: TRect): TRect;
@@ -649,7 +961,7 @@ begin
   Result := [paDialog, paReadOnly];
 end;
 
-function TACLResourceTextureDataProperty.GetName: string;
+function TACLResourceTextureDataProperty.GetName;
 begin
   Result := 'Data';
 end;
@@ -731,7 +1043,9 @@ begin
     else
     begin
       Designer.GetComponentNames(GetTypeData(TACLCustomResourceCollection.ClassInfo), GetResourceCollectionsProc);
+    {$IFDEF DESIGNER_CAN_CREATECOMPONENT}
       FTempResourceCollections.Add(sNewResourceCollection);
+    {$ENDIF}
     end;
   end;
   Result := FTempResourceCollections;
@@ -757,41 +1071,46 @@ begin
       if Supports(GetCollectionOwner(Resource), IACLResourceCollection, ACollectionGetter) then
         ACollection := ACollectionGetter.GetCollection
       else
-        raise EInvalidOperation.CreateFmt('The %s collection was not found', [ACollectionName]);
+        ACollection := nil;
     end
     else
     begin
       ACollection := Designer.GetComponent(ACollectionName) as TACLCustomResourceCollection;
+    {$IFDEF DESIGNER_CAN_CREATECOMPONENT}
       if ACollection = nil then
         ACollection := Designer.CreateComponent(TACLCustomResourceCollection, Designer.Root, 0, 0, 0, 0) as TACLCustomResourceCollection;
+    {$ENDIF}
       if Supports(GetCollectionOwner(Resource), IACLResourceCollectionSetter, ACollectionSetter) then
         ACollectionSetter.SetCollection(ACollection);
     end;
-
-    Designer.SelectComponent(ACollection.Items.AddResource(Resource, AResourceID).Owner);
+    if ACollection = nil then
+      raise EInvalidOperation.CreateFmt('The %s collection was not found', [ACollectionName]);
+    SelectComponent(Designer, ACollection.Items.AddResource(Resource, AResourceID).Owner);
     Resource.ID := AResourceID;
   end;
 end;
 
 procedure TACLResourceIDProperty.PopulateCommands(AResource: TACLResource; AList: TACLStringList);
 var
-  AResourceCollections: TACLStringList;
+  LCollections: TACLStringList;
   I: Integer;
 begin
-  AResourceCollections := GetResourceCollectionsToOverride;
+  LCollections := GetResourceCollectionsToOverride;
   try
-    for I := 0 to AResourceCollections.Count - 1 do
-      AList.Insert(I, Format(CmdOverride, [AResourceCollections[I]]));
+    for I := 0 to LCollections.Count - 1 do
+      AList.Insert(I, Format(CmdOverride, [LCollections[I]]));
     if not AResource.IsDefault then
       AList.Insert(0, CmdReset);
   finally
-    AResourceCollections.Free;
+    LCollections.Free;
   end;
 end;
 
-procedure TACLResourceIDProperty.PopulateResources(AResource: TACLResource; AList: TACLStringList);
+procedure TACLResourceIDProperty.PopulateResources(
+  AResource: TACLResource; AList: TACLStringList);
 
-  procedure EnumResources(AList: TACLStringList; AResource: TACLResource; ASource: TACLCustomResourceCollection);
+  procedure EnumResources(AList: TACLStringList;
+    AResource: TACLResource; ASource: TACLCustomResourceCollection);
   begin
     while ASource <> nil do
     begin
@@ -924,6 +1243,10 @@ begin
   end;
 end;
 
+{$ENDREGION}
+
+{$REGION ' Controls '}
+
 { TACLBindingDiagramSelectionEditor }
 
 procedure TACLBindingDiagramSelectionEditor.RequiresUnits(Proc: TGetStrProc);
@@ -933,45 +1256,59 @@ begin
   Proc('ACL.UI.Controls.BindingDiagram.Types');
 end;
 
-{ TACLTreeListSelectionEditor }
+{ TACLDPIPropertyEditor }
 
-procedure TACLTreeListSelectionEditor.RequiresUnits(Proc: TGetStrProc);
+function TACLDPIPropertyEditor.GetAttributes: TPropertyAttributes;
 begin
-  Proc('ACL.UI.DropSource');
-  Proc('ACL.UI.DropTarget');
-  Proc('ACL.UI.Controls.TreeList.Options');
-  Proc('ACL.UI.Controls.TreeList.SubClass');
-  Proc('ACL.UI.Controls.TreeList.Types');
+  Result := inherited GetAttributes + [paValueList];
 end;
 
-{ TACLTreeListComponentEditor }
-
-procedure TACLTreeListComponentEditor.ExecuteVerb(Index: Integer);
+function TACLDPIPropertyEditor.GetValue: string;
 begin
-  if Index = 0 then
-    ShowCollectionEditor(Designer, Component, TACLTreeList(Component).Columns, 'Columns')
+  Result := ValueToString(GetOrdValue);
+end;
+
+procedure TACLDPIPropertyEditor.GetValues(Proc: TGetStrProc);
+var
+  I: Integer;
+begin
+  Proc(Default);
+  for I := Low(acDefaultDPIValues) to High(acDefaultDPIValues) do
+    Proc(ValueToString(acDefaultDPIValues[I]));
+end;
+
+procedure TACLDPIPropertyEditor.SetValue(const S: string);
+begin
+  SetOrdValue(StringToValue(S));
+end;
+
+function TACLDPIPropertyEditor.StringToValue(const AValue: string): Integer;
+var
+  E: Integer;
+begin
+  if AValue = Default then
+    Exit(0);
+
+  Val(AValue, Result, E);
+  while (E > 0) and (E <= Length(AValue)) do
+  begin
+    if AValue[E] = ' ' then
+      Inc(E)
+    else
+    begin
+      if AValue[E] = '%' then
+        Result := MulDiv(acDefaultDPI, Result, 100);
+      Break;
+    end;
+  end;
+end;
+
+function TACLDPIPropertyEditor.ValueToString(const AValue: Integer): string;
+begin
+  if AValue = 0 then
+    Result := Default
   else
-    inherited ExecuteVerb(Index);
-end;
-
-function TACLTreeListComponentEditor.GetVerb(Index: Integer): string;
-begin
-  if Index = 0 then
-    Result := 'Columns...'
-  else
-    Result := inherited GetVerb(Index - 1);
-end;
-
-function TACLTreeListComponentEditor.GetVerbCount: Integer;
-begin
-  Result := inherited GetVerbCount + 1;
-end;
-
-{ TACLTreeListColumnImageIndexProperty }
-
-function TACLTreeListColumnImageIndexProperty.GetImages: TCustomImageList;
-begin
-  Result := ((GetComponent(0) as TACLTreeListColumn).Columns.Owner as TACLTreeListSubClass).OptionsView.Columns.Images;
+    Result := Format('%d dpi (%d %%)', [AValue, MulDiv(100, AValue, acDefaultDPI)]);
 end;
 
 { TACLImageListEditor }
@@ -997,102 +1334,6 @@ end;
 function TACLImageListEditor.GetVerbCount: Integer;
 begin
   Result := inherited GetVerbCount + 1;
-end;
-
-{ TACLImageIndexProperty }
-
-function TACLImageIndexProperty.GetAttributes: TPropertyAttributes;
-begin
-  Result := [paValueList, paRevertable];
-end;
-
-function TACLImageIndexProperty.GetValue: string;
-begin
-  Result := IntToStr(GetOrdValue);
-end;
-
-procedure TACLImageIndexProperty.GetValues(Proc: TGetStrProc);
-var
-  I: Integer;
-begin
-  Proc('-1');
-  if Images <> nil then
-  begin
-    for I := 0 to Images.Count - 1 do
-      Proc(IntToStr(I));
-  end;
-end;
-
-procedure TACLImageIndexProperty.SetValue(const Value: string);
-begin
-  SetOrdValue(StrToInt(Value));
-end;
-
-procedure TACLImageIndexProperty.ListDrawValue(const Value: string;
-  ACanvas: TCanvas; const ARect: TRect; ASelected: Boolean);
-var
-  LImageWidth: Integer;
-  LRect: TRect;
-begin
-  // Image
-  if Images <> nil then
-  begin
-    ACanvas.FillRect(ARect);
-    if ASelected then
-      ACanvas.DrawFocusRect(ARect);
-    LRect := ARect;
-    LRect.CenterVert(Images.Height);
-    Images.Draw(ACanvas, ARect.Left + 2, LRect.Top, StrToInt(Value));
-    LImageWidth := Images.Width + 2 * 2;
-  end
-  else
-    LImageWidth := 0;
-
-  // Text
-  LRect := ARect;
-  LRect.CenterVert(ACanvas.TextHeight(Value));
-  ACanvas.TextOut(ARect.Left + LImageWidth + 2, LRect.Top, Value);
-end;
-
-procedure TACLImageIndexProperty.ListMeasureHeight(const Value: string; ACanvas: TCanvas; var AHeight: Integer);
-begin
-  AHeight := ACanvas.TextHeight(Value);
-  if Images <> nil then
-    AHeight := Max(AHeight, Images.Height + 2 * 2);
-end;
-
-procedure TACLImageIndexProperty.ListMeasureWidth(const Value: string; ACanvas: TCanvas; var AWidth: Integer);
-begin
-  AWidth := ACanvas.TextWidth(Value) + 2 * 2;
-  if Images <> nil then
-    Inc(AWidth, Images.Width + 2 * 2);
-end;
-
-function TACLImageIndexProperty.GetImages: TCustomImageList;
-var
-  APropInfo: PPropInfo;
-begin
-  APropInfo := System.TypInfo.GetPropInfo(GetComponent(0), 'Images', [tkClass]);
-  if APropInfo <> nil then
-    Result := TCustomImageList(GetObjectProp(GetComponent(0), APropInfo, TCustomImageList))
-  else
-    Result := nil;
-end;
-
-{ TACLMultiLineStringEditor }
-
-procedure TACLMultiLineStringEditor.Edit;
-var
-  AText: string;
-begin
-  AText := Value;
-  if TACLMemoQueryDialog.Execute(GetName, AText) then
-    Value := AText;
-end;
-
-function TACLMultiLineStringEditor.GetAttributes: TPropertyAttributes;
-begin
-  Result := inherited GetAttributes + [paDialog];
 end;
 
 { TACLImagePictureProperty }
@@ -1144,21 +1385,70 @@ begin
   Modified;
 end;
 
+{ TACLDropDownImageIndexProperty }
+
+function TACLDropDownImageIndexProperty.GetImages: TCustomImageList;
+begin
+  Result := TACLDropDown(GetComponent(0)).Images;
+end;
+
+{ TACLTreeListSelectionEditor }
+
+procedure TACLTreeListSelectionEditor.RequiresUnits(Proc: TGetStrProc);
+begin
+  Proc('ACL.UI.DropSource');
+  Proc('ACL.UI.DropTarget');
+  Proc('ACL.UI.Controls.TreeList.Options');
+  Proc('ACL.UI.Controls.TreeList.SubClass');
+  Proc('ACL.UI.Controls.TreeList.Types');
+end;
+
+{ TACLTreeListComponentEditor }
+
+procedure TACLTreeListComponentEditor.ExecuteVerb(Index: Integer);
+begin
+  if Index = 0 then
+    ShowCollectionEditor(Designer, Component, TACLTreeList(Component).Columns, 'Columns')
+  else
+    inherited ExecuteVerb(Index);
+end;
+
+function TACLTreeListComponentEditor.GetVerb(Index: Integer): string;
+begin
+  if Index = 0 then
+    Result := 'Columns...'
+  else
+    Result := inherited GetVerb(Index - 1);
+end;
+
+function TACLTreeListComponentEditor.GetVerbCount: Integer;
+begin
+  Result := inherited GetVerbCount + 1;
+end;
+
+{ TACLTreeListColumnImageIndexProperty }
+
+function TACLTreeListColumnImageIndexProperty.GetImages: TCustomImageList;
+begin
+  Result := ((GetComponent(0) as TACLTreeListColumn).Columns.Owner as
+    TACLTreeListSubClass).OptionsView.Columns.Images;
+end;
+
 { TACLPageControlEditor }
 
 procedure TACLPageControlEditor.AddPage;
 var
-  APageControl: TACLPageControl;
+  LPageControl: TACLPageControl;
 begin
   if Component is TACLPageControl then
-    APageControl := TACLPageControl(Component)
+    LPageControl := TACLPageControl(Component)
   else if Component is TACLPageControlPage then
-    APageControl := TACLPageControlPage(Component).PageControl
+    LPageControl := TACLPageControlPage(Component).PageControl
   else
-    APageControl := nil;
+    LPageControl := nil;
 
-  if APageControl <> nil then
-    APageControl.AddPage('New Page');
+  if LPageControl <> nil then
+    LPageControl.AddPage('New Page');
 end;
 
 procedure TACLPageControlEditor.DeletePage;
@@ -1201,34 +1491,15 @@ begin
   Result := TACLEdit((GetComponent(0) as TACLEditButton).Collection.Owner).ButtonsImages;
 end;
 
-{ TACLCollectionEditor }
+{ TACLImageComboBoxImageIndexProperty }
 
-procedure TACLCollectionEditor.Edit;
-var
-  ACollection: TACLCollection;
-  APersistent: TPersistent;
-  APropInfo: PPropInfo;
+function TACLImageComboBoxImageIndexProperty.GetImages: TCustomImageList;
 begin
-  APropInfo := GetPropInfo;
-  APersistent := GetComponent(0);
-  ACollection := GetObjectProp(APersistent, APropInfo) as TACLCollection;
-  while (APersistent <> nil) and not (APersistent is TComponent) do
-    APersistent := TPersistentAccess(APersistent).GetOwner;
-  if APersistent <> nil then
-    ShowCollectionEditor(Designer, APersistent as TComponent, ACollection, GetPropName(APropInfo));
+  Result := TACLImageComboBoxItems(TACLImageComboBoxItem(GetComponent(0)).Collection).ComboBox.Images;
 end;
+{$ENDREGION}
 
-function TACLCollectionEditor.GetAttributes: TPropertyAttributes;
-begin
-  Result := [paDialog];
-end;
-
-{ TACLDropDownImageIndexProperty }
-
-function TACLDropDownImageIndexProperty.GetImages: TCustomImageList;
-begin
-  Result := TACLDropDown(GetComponent(0)).Images;
-end;
+{$REGION ' Menus '}
 
 { TACLMenuPropertyEditor }
 
@@ -1242,14 +1513,48 @@ begin
   Result := [paDialog];
 end;
 
+{ TACLMainMenuEditor }
+
+procedure TACLMainMenuEditor.ExecuteVerb(Index: Integer);
+var
+  LMainMenu: TACLMainMenu;
+  LDesigner: IDesigner;
+begin
+  if Index = 0 then
+  begin
+    LMainMenu := GetComponent as TACLMainMenu;
+    if LMainMenu.Menu = nil then
+      raise Exception.Create(LMainMenu.Name + '.Menu is not set');
+    if GetDesigner(LDesigner) then
+      TACLMenuEditorDialog.Execute(LMainMenu.Menu, LDesigner);
+  end
+  else
+    inherited;
+end;
+
 { TACLPopupMenuEditor }
 
 procedure TACLPopupMenuEditor.ExecuteVerb(Index: Integer);
+var
+  LDesigner: IDesigner;
 begin
   if Index = 0 then
-    TACLMenuEditorDialog.Execute(GetComponent as TACLPopupMenu, Designer)
+  begin
+    if GetDesigner(LDesigner) then
+      TACLMenuEditorDialog.Execute(GetComponent as TACLPopupMenu, LDesigner);
+  end
   else
     inherited;
+end;
+
+function TACLPopupMenuEditor.GetDesigner(out ADesigner: IDesigner): Boolean;
+begin
+{$IFDEF FPC}
+  Result := GetHook(ADesigner);
+{$ELSE}
+  ADesigner := Designer;
+  Result := ADesigner <> nil;
+{$ENDIF}
 end;
 
 function TACLPopupMenuEditor.GetVerb(Index: Integer): string;
@@ -1265,21 +1570,5 @@ begin
   Result := 1;
 end;
 
-{ TACLMainMenuEditor }
-
-procedure TACLMainMenuEditor.ExecuteVerb(Index: Integer);
-var
-  AMainMenu: TACLMainMenu;
-begin
-  if Index = 0 then
-  begin
-    AMainMenu := GetComponent as TACLMainMenu;
-    if AMainMenu.Menu = nil then
-      raise Exception.Create(AMainMenu.Name + '.Menu is not set');
-    TACLMenuEditorDialog.Execute(AMainMenu.Menu, Designer);
-  end
-  else
-    inherited;
-end;
-
+{$ENDREGION}
 end.
