@@ -15,6 +15,8 @@ unit ACL.UI.Application.Gtk2;
 
 {$I ACL.Config.inc}
 
+{$SCOPEDENUMS ON}
+
 {$DEFINE DEBUG_MESSAGELOOP}
 
 interface
@@ -37,26 +39,32 @@ uses
   WSLCLClasses,
   // System
   Classes,
+  Generics.Collections,
   SysUtils,
   // VCL
-  Controls;
+  Controls,
+  Forms;
 
 type
+  TGtk2EventCallback = procedure (AEvent: PGdkEvent; var AHandled: Boolean) of object;
 
   { TGtk2App }
-
-  TGtk2EventCallback = procedure (AEvent: PGdkEvent; var AHandled: Boolean) of object;
 
   TGtk2App = class
   strict private
     class var FHandlerInit: Boolean;
     class var FInputTarget: PGtkWidget;
-    class var FPopupCallback: TGtk2EventCallback;
+    class var FHooks: TStack<TGtk2EventCallback>;
     class var FPopupWindow: PGdkWindow;
 
     class procedure EnsureHandlerInit;
     class procedure Handler(event: PGdkEvent; data: gpointer); cdecl; static;
   public
+    class constructor Create;
+    class destructor Destroy;
+    class procedure Hook(ACallback: TGtk2EventCallback);
+    class procedure Unhook;
+
     class procedure BeginPopup(APopupControl: TWinControl;
      ACallback: TGtk2EventCallback = nil);
     class procedure EndPopup;
@@ -68,10 +76,17 @@ type
   { TGtk2Controls }
 
   TGtk2Controls = class
+  strict private type
+    TDragState = (None, Started, Canceled);
   strict private
-    class function DrawNonClientBorder(Widget: PGtkWidget;
+    class var FDragState: TDragState;
+    class var FDragTarget: TRect;
+
+    class procedure DoDragEvents(AEvent: PGdkEvent; var AHandled: Boolean);
+    class function DoDrawNonClientBorder(Widget: PGtkWidget;
       Event: PGDKEventExpose; Data: gPointer): GBoolean; cdecl; static;
   public
+    class function CheckStartDrag(AControl: TWinControl; X, Y, AThreshold: Integer): Boolean;
     class procedure SetNonClientBorder(AControl: TWinControl; ASize: Integer);
   end;
 
@@ -81,16 +96,54 @@ type
   protected
     class function MustBeFocusable(AControl: TWinControl): Boolean; virtual;
   published
-    class function CreateHandle(
-      const AWinControl: TWinControl;
+    class function CreateHandle(const AWinControl: TWinControl;
       const AParams: TCreateParams): TLCLHandle; override;
     class procedure SetBounds(const AWinControl: TWinControl;
       const ALeft, ATop, AWidth, AHeight: Integer); override;
   end;
 
+function CheckStartDragImpl(AControl: TWinControl; X, Y, AThreshold: Integer): Boolean;
 implementation
 
+uses
+  ACL.Geometry,
+  ACL.Geometry.Utils;
+
+type
+  TGtk2WidgetSetAccess = class(TGtk2WidgetSet);
+
+function CheckStartDragImpl(AControl: TWinControl; X, Y, AThreshold: Integer): Boolean;
+begin
+  Result := TGtk2Controls.CheckStartDrag(AControl, X, Y, AThreshold);
+end;
+
+function WidgetSet: TGtk2WidgetSetAccess;
+begin
+  Result := TGtk2WidgetSetAccess(GTK2WidgetSet);
+end;
+
 { TGtk2App }
+
+class constructor TGtk2App.Create;
+begin
+  FHooks := TStack<TGtk2EventCallback>.Create;
+end;
+
+class destructor TGtk2App.Destroy;
+begin
+  FreeAndNil(FHooks);
+end;
+
+class procedure TGtk2App.Hook(ACallback: TGtk2EventCallback);
+begin
+  FHooks.Push(ACallback);
+  EnsureHandlerInit;
+end;
+
+class procedure TGtk2App.Unhook;
+begin
+  FHooks.Pop;
+end;
 
 class procedure TGtk2App.EnsureHandlerInit;
 begin
@@ -103,13 +156,32 @@ end;
 
 class procedure TGtk2App.Handler(event: PGdkEvent; data: gpointer); cdecl;
 var
-  AHandled: Boolean;
+  LCallback: TGtk2EventCallback;
+  LHandled: Boolean;
 begin
-  if Assigned(FPopupCallback) then
+  if FHooks.Count > 0 then
   begin
-    AHandled := False;
-    FPopupCallback(event, AHandled);
-    if AHandled then Exit;
+    // #AI:
+    // Без вызова GtkKeySnooper функции GetAsyncKeyState/GetKeyState
+    // будут возвращать неактуальные данные, а у нас в тулбарах есть
+    // проверки на нажатость кнопок мыши и Escape
+    if event._type = GDK_KEY_PRESS then
+       GtkKeySnooper(nil, @event.key, WidgetSet.FKeyStateList_);
+
+    LHandled := False;
+    LCallback := FHooks.Peek;
+    LCallback(event, LHandled);
+
+    if LHandled then
+    begin
+      // #AI:
+      // GDK_KEY_RELEASE обрабатываем после callback-а и только в том случае,
+      // если callback запросил "съесть" эвент. В штатном режиме, snopper уже
+      // дернется со стороны обработчика gtk_main_do_event
+      if event._type = GDK_KEY_RELEASE then
+        GtkKeySnooper(nil, @event.key, WidgetSet.FKeyStateList_);
+      Exit;
+    end;
   end;
 
   // Input-Redirection
@@ -192,10 +264,9 @@ begin
 {$ENDIF}
 
   // если мы тут - все прошло ОК, инициализируем приемник сообщений и перехватчик
+  FPopupWindow := AWindow;
   try
-    FPopupCallback := ACallback;
-    FPopupWindow := AWindow;
-    EnsureHandlerInit;
+    Hook(ACallback);
   except
     EndPopup;
     raise;
@@ -206,9 +277,8 @@ class procedure TGtk2App.EndPopup;
 var
   LDisplay: PGdkDisplay;
 begin
-  FPopupCallback := nil;
+  Unhook;
   SetInputRedirection(nil);
-
   if FPopupWindow <> nil then
   try
     LDisplay := gdk_drawable_get_display(FPopupWindow);
@@ -222,7 +292,7 @@ end;
 
 class procedure TGtk2App.ProcessMessages;
 begin
-  Gtk2WidgetSet.AppProcessMessages;
+  WidgetSet.AppProcessMessages;
 end;
 
 class procedure TGtk2App.SetInputRedirection(AControl: TWinControl);
@@ -237,7 +307,37 @@ end;
 
 { TGtk2Controls }
 
-class function TGtk2Controls.DrawNonClientBorder(Widget: PGtkWidget;
+class function TGtk2Controls.CheckStartDrag(
+  AControl: TWinControl; X, Y, AThreshold: Integer): Boolean;
+var
+  LPoint: TPoint;
+begin
+  FDragState := TDragState.None;
+  FDragTarget := TRect.Create(AControl.ClientToScreen(Point(X, Y)));
+  FDragTarget.Inflate(AThreshold);
+
+  TGtk2App.Hook(DoDragEvents);
+  try
+    repeat
+      try
+        TGtk2App.ProcessMessages;
+      except
+        if Application.CaptureExceptions then
+          Application.HandleException(AControl)
+        else
+          raise;
+      end;
+      if Application.Terminated or not AControl.Visible then
+        Break;
+      Application.Idle(True);
+    until FDragState <> TDragState.None;
+    Result := FDragState = TDragState.Started;
+  finally
+    TGtk2App.Unhook;
+  end;
+end;
+
+class function TGtk2Controls.DoDrawNonClientBorder(Widget: PGtkWidget;
   Event: PGDKEventExpose; Data: gPointer): GBoolean; cdecl;
 var
   LPrevClient: PGtkWidget;
@@ -267,6 +367,21 @@ begin
   Result := CallBackDefaultReturn;
 end;
 
+class procedure TGtk2Controls.DoDragEvents(AEvent: PGdkEvent; var AHandled: Boolean);
+begin
+  if FDragState = TDragState.None then
+    case AEvent._type of
+      GDK_MOTION_NOTIFY:
+        if not FDragTarget.Contains(Mouse.CursorPos) then
+          FDragState := TDragState.Started;
+      GDK_BUTTON_RELEASE:
+        begin
+          FDragState := TDragState.Canceled;
+          //AHandled := True;
+        end;
+    end;
+end;
+
 class procedure TGtk2Controls.SetNonClientBorder(AControl: TWinControl; ASize: Integer);
 var
   LWidget: PGtkWidget;
@@ -276,7 +391,7 @@ begin
   if GTK_IS_CONTAINER(LWidget) then
   begin
     gtk_container_set_border_width(GTK_CONTAINER(LWidget), ASize);
-    ConnectSignalAfter(GTK_OBJECT(LWidget), 'expose-event', @DrawNonClientBorder, AControl);
+    ConnectSignalAfter(GTK_OBJECT(LWidget), 'expose-event', @DoDrawNonClientBorder, AControl);
   end;
 end;
 
@@ -341,7 +456,7 @@ begin
     AWidgetInfo^.ClientWidget := AWidget; // для Paint и MouseCapture, после setCallbacks
 
   // После того, как мы актуализировали ClientWidget - ставим обработчик сигнала на LM_PAINT
-  Gtk2WidgetSet.SetCallback(LM_PAINT, PGtkObject(AWidget), AWinControl);
+  WidgetSet.SetCallback(LM_PAINT, PGtkObject(AWidget), AWinControl);
 
   // Финалочка
   Result := TLCLHandle({%H-}PtrUInt(AWidget));

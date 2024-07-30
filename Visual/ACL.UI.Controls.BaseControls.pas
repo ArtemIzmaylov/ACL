@@ -785,6 +785,7 @@ procedure acDrawTransparentControlBackground(AControl: TWinControl;
   DC: HDC; R: TRect; APaintWithChildren: Boolean = True);
 procedure acInvalidateRect(AControl: TWinControl; const ARect: TRect; AErase: Boolean = True);
 
+function acCanStartDragging(AControl: TWinControl; X, Y: Integer): Boolean; overload;
 function acCanStartDragging(const ADeltaX, ADeltaY, ATargetDpi: Integer): Boolean; overload;
 function acCanStartDragging(const P0, P1: TPoint; ATargetDpi: Integer): Boolean; overload;
 procedure acDesignerSetModified(AInvoker: TPersistent);
@@ -819,6 +820,11 @@ procedure ProcessUtf8KeyPress(var Key: TUTF8Char; AEvent: TWideKeyEvent);
 implementation
 
 uses
+{$IF DEFINED(LCLGtk2)}
+  ACL.UI.Application.Gtk2,
+{$ELSEIF DEFINED(MSWINDOWS)}
+  ACL.UI.Application.Win32,
+{$ENDIF}
   ACL.Threading,
   ACL.UI.HintWindow;
 
@@ -1025,6 +1031,12 @@ begin
     else
       Result := 0;
   end;
+end;
+
+function acCanStartDragging(AControl: TWinControl; X, Y: Integer): Boolean;
+begin
+  Result := CheckStartDragImpl(AControl, X, Y,
+    dpiApply(Mouse.DragThreshold, acGetCurrentDpi(AControl)));
 end;
 
 function acCanStartDragging(const ADeltaX, ADeltaY, ATargetDpi: Integer): Boolean;

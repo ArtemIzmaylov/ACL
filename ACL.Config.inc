@@ -23,6 +23,8 @@
   {$IFDEF LCLGtk2}
     {$DEFINE ACL_CAIRO_TEXTOUT}
   {$ENDIF}
+
+  {$DEFINE DEBUG}
 {$ENDIF}
 
 
