@@ -1544,11 +1544,7 @@ begin
   begin
     ReleaseCapture;
     SetCursor(Screen.Cursors[crDefault]);
-  {$IFDEF FPC}
-    {$MESSAGE WARN 'SetPopupPoint'}
-  {$ELSE}
     SetPopupPoint(Point(ControlRect.Left, ControlRect.Bottom));
-  {$ENDIF}
     DoInitialize;
     DoShow(ControlRect);
   end;
