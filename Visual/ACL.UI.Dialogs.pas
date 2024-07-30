@@ -384,7 +384,7 @@ implementation
 
 {$IFDEF MSWINDOWS}
 uses
-  ACL.UI.Dialogs.Impl.Windows;
+  ACL.UI.Dialogs.Impl.Win32;
 {$ENDIF}
 
 type
