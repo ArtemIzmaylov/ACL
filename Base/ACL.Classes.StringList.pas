@@ -37,8 +37,8 @@ type
     FInterface: IUnknown;
     FObject: TObject;
     FString: string;
+    procedure Assign(const Item: TACLStringListItem); inline;
     procedure Exchange(var Item: TACLStringListItem); inline;
-    procedure MoveFrom(const Item: TACLStringListItem); inline;
   end;
 
   PACLStringListItemList = ^TACLStringListItemList;
@@ -71,7 +71,7 @@ type
     procedure SetObject(AIndex: Integer; const AValue: TObject);
     procedure SetValue(Index: Integer; const Value: string);
     procedure SetValueFromName(const AName, AValue: string);
-    //
+    // Interla;
     procedure Grow;
     procedure ParseBuffer(ABuffer: PChar; ACount: Integer);
   protected
@@ -82,7 +82,7 @@ type
     // IStringReceiver
     procedure IStringReceiver.Add = DoAdd;
     procedure DoAdd(const S: string);
-    //
+    //# Properties
     property List: PACLStringListItemList read FList;
   public
     constructor Create; overload;
@@ -92,6 +92,7 @@ type
     function Clone: TACLStringList;
     function IsValid(AIndex: Integer): Boolean; inline;
     procedure Exchange(Index1, Index2: Integer);
+    procedure Shuffle;
     procedure TrimLines;
 
     function GetDelimitedText(const ADelimiter: string; AAddTrailingDelimiter: Boolean = True): string;
@@ -186,28 +187,28 @@ uses
 
 { TACLStringListItem }
 
-procedure TACLStringListItem.Exchange(var Item: TACLStringListItem);
-var
-  ASwap: Pointer;
+procedure TACLStringListItem.Assign(const Item: TACLStringListItem);
 begin
-  ASwap := Pointer(FString);
-  Pointer(FString) := Pointer(Item.FString);
-  Pointer(Item.FString) := ASwap;
-
-  ASwap := Pointer(FObject);
-  Pointer(FObject) := Pointer(Item.FObject);
-  Pointer(Item.FObject) := ASwap;
-
-  ASwap := Pointer(FInterface);
   Pointer(FInterface) := Pointer(Item.FInterface);
-  Pointer(Item.FInterface) := ASwap;
+  Pointer(FObject) := Pointer(Item.FObject);
+  Pointer(FString) := Pointer(Item.FString);
 end;
 
-procedure TACLStringListItem.MoveFrom(const Item: TACLStringListItem);
+procedure TACLStringListItem.Exchange(var Item: TACLStringListItem);
+var
+  LSwap: Pointer;
 begin
-  Pointer(FInterface) := Pointer(Item.FInterface);
-  Pointer(FObject) := Pointer(Item.FObject);
+  LSwap := Pointer(FString);
   Pointer(FString) := Pointer(Item.FString);
+  Pointer(Item.FString) := LSwap;
+
+  LSwap := Pointer(FObject);
+  Pointer(FObject) := Pointer(Item.FObject);
+  Pointer(Item.FObject) := LSwap;
+
+  LSwap := Pointer(FInterface);
+  Pointer(FInterface) := Pointer(Item.FInterface);
+  Pointer(Item.FInterface) := LSwap;
 end;
 
 { TACLStringList }
@@ -845,6 +846,25 @@ begin
     Add(AName + Delimiter + AValue)
   else
     Strings[AIndex] := AName + Delimiter + AValue;
+end;
+
+procedure TACLStringList.Shuffle;
+var
+  L: TACLStringList;
+  I, J: Integer;
+begin
+  L := TACLStringList.Create;
+  try
+    L.Assign(Self);
+    for I := 0 to Count - 1 do
+    begin
+      J := Random(L.Count);
+      List[I].Assign(L.List[J]);
+      L.Delete(J);
+    end;
+  finally
+    L.Free;
+  end;
 end;
 
 procedure TACLStringList.Grow;

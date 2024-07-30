@@ -14,6 +14,7 @@
 unit ACL.Threading.Sorting;
 
 {$I ACL.Config.inc}
+{$POINTERMATH ON}
 
 interface
 
@@ -315,7 +316,7 @@ begin
   AItemB := AHighA;
   Inc(AItemB);
   AHighB := @FTempList[AHiBound];
-  while (NativeUInt(AItemA) <= NativeUInt(AHighA)) and (NativeUInt(AItemB) <= NativeUInt(AHighB)) do
+  while (AItemA <= AHighA) and (AItemB <= AHighB) do
   begin
     if FCompareProc(AItemA^, AItemB^) < 0 then
     begin
@@ -432,17 +433,17 @@ begin
   AItemB := AHighA;
   Inc(AItemB);
   AHighB := @FTempList[AHiBound];
-  while (NativeUInt(AItemA) <= NativeUInt(AHighA)) and (NativeUInt(AItemB) <= NativeUInt(AHighB)) do
+  while (AItemA <= AHighA) and (AItemB <= AHighB) do
   begin
     if FCompareProc(AItemA^, AItemB^) < 0 then
     begin
-      ADest^.MoveFrom(AItemA^);
+      ADest^.Assign(AItemA^);
       Inc(AItemA);
       Inc(AIndexA);
     end
     else
     begin
-      ADest^.MoveFrom(AItemB^);
+      ADest^.Assign(AItemB^);
       Inc(AItemB);
       Inc(AIndexB);
     end;

@@ -163,7 +163,7 @@ type
     procedure EnsureCapacity(ACount: Integer); inline;
     procedure Invert;
     function IsValid(Index: Integer): Boolean; inline;
-    procedure Randomize;
+    procedure Shuffle;
   {$IFDEF FPC}
     function IndexOfItem(Item: Pointer; Direction: TDirection): Integer;
     function RemoveItem(Item: Pointer; Direction: TDirection): Integer;
@@ -1625,7 +1625,7 @@ begin
   end;
 end;
 
-procedure TACLListHelper.Randomize;
+procedure TACLListHelper.Shuffle;
 var
   L: TList;
   I, J: Integer;
