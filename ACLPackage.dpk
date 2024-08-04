@@ -44,7 +44,6 @@ contains
   ACL.Classes.Collections in 'Base\ACL.Classes.Collections.pas',
   ACL.Classes.StringList in 'Base\ACL.Classes.StringList.pas',
   ACL.Crypto in 'Base\ACL.Crypto.pas',
-  ACL.DataBroadcaster in 'Base\ACL.DataBroadcaster.pas',
   ACL.Expressions in 'Base\ACL.Expressions.pas',
   ACL.Expressions.FormatString in 'Base\ACL.Expressions.FormatString.pas',
   ACL.Expressions.Math in 'Base\ACL.Expressions.Math.pas',
@@ -76,6 +75,7 @@ contains
   ACL.ObjectLinks in 'Base\ACL.ObjectLinks.pas',
   ACL.Parsers in 'Base\ACL.Parsers.pas',
   ACL.Parsers.Ripper in 'Base\ACL.Parsers.Ripper.pas',
+  ACL.SimpleIPC in 'Base\ACL.SimpleIPC.pas',
   ACL.SQLite3 in 'Base\ACL.SQLite3.pas',
   ACL.Threading in 'Base\ACL.Threading.pas',
   ACL.Threading.Pool in 'Base\ACL.Threading.Pool.pas',
@@ -100,6 +100,7 @@ contains
   ACL.Web in 'Base\ACL.Web.pas',
   ACL.Web.Auth in 'Base\ACL.Web.Auth.pas',
   ACL.Web.Http in 'Base\ACL.Web.Http.pas',
+
   ACL.UI.AeroPeek in 'Visual\ACL.UI.AeroPeek.pas',
   ACL.UI.Animation in 'Visual\ACL.UI.Animation.pas',
   ACL.UI.Application in 'Visual\ACL.UI.Application.pas',
