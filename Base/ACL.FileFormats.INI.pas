@@ -142,6 +142,7 @@ type
     constructor Create; overload;
     constructor Create(const AFileName: string; AutoSave: Boolean = True); overload; virtual;
     destructor Destroy; override;
+    procedure AfterConstruction; override;
     procedure Assign(AIniFile: TACLIniFile);
     procedure Merge(const AFileName: string; AOverwriteExisting: Boolean = True); overload;
     procedure Merge(const AIniFile: TACLIniFile; AOverwriteExisting: Boolean = True); overload;
@@ -590,11 +591,9 @@ constructor TACLIniFile.Create(const AFileName: string; AutoSave: Boolean = True
 begin
   inherited Create;
   FAutoSave := AutoSave;
-  FEncoding := TEncoding.Unicode;
   FFileName := AFileName;
+  FEncoding := TEncoding.Unicode;
   FSections := TACLObjectList<TACLIniFileSection>.Create;
-  if AFileName <> '' then
-    LoadFromFile(AFileName);
 end;
 
 destructor TACLIniFile.Destroy;
@@ -603,6 +602,13 @@ begin
     UpdateFile;
   FreeAndNil(FSections);
   inherited Destroy;
+end;
+
+procedure TACLIniFile.AfterConstruction;
+begin
+  inherited;
+  if FFileName <> '' then
+    LoadFromFile(FFileName);
 end;
 
 procedure TACLIniFile.Assign(AIniFile: TACLIniFile);

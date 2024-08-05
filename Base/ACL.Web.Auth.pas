@@ -477,6 +477,7 @@ procedure TAuthDialog.Paint;
 begin
   inherited Paint;
   Canvas.Font := Font;
+  Canvas.Font.Color := TextColor;
   acTextDraw(Canvas, FMessageText,
     ClientRect.InflateTo(-dpiApply(12, FCurrentPPI)),
     taLeftJustify, taVerticalCenter, False, False, True);
