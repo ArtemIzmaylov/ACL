@@ -657,7 +657,7 @@ implementation
 
 uses
 {$IFDEF LCLGtk2}
-  ACL.UI.Application.Gtk2,
+  ACL.UI.Core.Impl.Gtk2,
   Gdk2,
 {$ENDIF}
 {$IFDEF FPC}

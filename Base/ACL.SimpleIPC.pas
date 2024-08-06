@@ -95,9 +95,9 @@ function SendDataToIPC(const AIpcServerName: string;
 implementation
 
 {$IF DEFINED(MSWINDOWS)}
-  {$I ACL.SimpleIPC.Win32.inc}
+  {$I ACL.SimpleIPC.Impl.Win32.inc}
 {$ELSEIF DEFINED(LINUX)}
-  {$I ACL.SimpleIPC.Unix.inc}
+  {$I ACL.SimpleIPC.Impl.Unix.inc}
 {$ENDIF}
 
 function SendDataToApplication(const AAppFileName, AIpcServerName: string;

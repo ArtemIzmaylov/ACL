@@ -11,7 +11,7 @@
 //
 //  FPC:       OK
 //
-unit ACL.UI.Application.Gtk2;
+unit ACL.UI.Core.Impl.Gtk2;
 
 {$I ACL.Config.inc}
 

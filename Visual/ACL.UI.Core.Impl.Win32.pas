@@ -11,7 +11,7 @@
 //
 //  FPC:       OK
 //
-unit ACL.UI.Application.Win32;
+unit ACL.UI.Core.Impl.Win32;
 
 {$I ACL.Config.inc}
 

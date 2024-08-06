@@ -821,9 +821,9 @@ implementation
 
 uses
 {$IF DEFINED(LCLGtk2)}
-  ACL.UI.Application.Gtk2,
+  ACL.UI.Core.Impl.Gtk2,
 {$ELSEIF DEFINED(MSWINDOWS)}
-  ACL.UI.Application.Win32,
+  ACL.UI.Core.Impl.Win32,
 {$ENDIF}
   ACL.Threading,
   ACL.UI.HintWindow;

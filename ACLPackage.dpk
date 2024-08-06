@@ -104,7 +104,7 @@ contains
   ACL.UI.AeroPeek in 'Visual\ACL.UI.AeroPeek.pas',
   ACL.UI.Animation in 'Visual\ACL.UI.Animation.pas',
   ACL.UI.Application in 'Visual\ACL.UI.Application.pas',
-  ACL.UI.Application.Win32 in 'Visual\ACL.UI.Application.Win32.pas',
+  ACL.UI.Core.Impl.Win32 in 'Visual\ACL.UI.Core.Impl.Win32.pas',
   ACL.UI.Controls.ActivityIndicator in 'Visual\ACL.UI.Controls.ActivityIndicator.pas',
   ACL.UI.Controls.BaseControls in 'Visual\ACL.UI.Controls.BaseControls.pas',
   ACL.UI.Controls.BaseEditors in 'Visual\ACL.UI.Controls.BaseEditors.pas',
