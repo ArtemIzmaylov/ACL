@@ -211,6 +211,27 @@ type
     function Process(var Message: TMessage): Boolean;
   end;
 
+  { TACLStyleForm }
+
+  TACLStyleForm = class(TACLStyle)
+  strict private
+    function GetCaptionFont: TFont;
+    function GetCaptionFontColor(Active: Boolean): TColor;
+  protected
+    procedure InitializeResources; override;
+  public
+    property CaptionFont: TFont read GetCaptionFont;
+    property CaptionFontColor[Active: Boolean]: TColor read GetCaptionFontColor;
+  published
+    property ColorBorder1: TACLResourceColor index 0 read GetColor write SetColor stored IsColorStored;
+    property ColorBorder2: TACLResourceColor index 1 read GetColor write SetColor stored IsColorStored;
+    property ColorContent: TACLResourceColor index 3 read GetColor write SetColor stored IsColorStored;
+    property ColorCaption: TACLResourceColor index 4 read GetColor write SetColor stored IsColorStored;
+    property ColorCaptionInactive: TACLResourceColor index 5 read GetColor write SetColor stored IsColorStored;
+    property ColorText: TACLResourceColor index 6 read GetColor write SetColor stored IsColorStored;
+    property Glyphs: TACLResourceTexture index 0 read GetTexture write SetTexture stored IsTextureStored;
+  end;
+
   { TACLCustomForm }
 
   TACLCustomForm = class(TACLBasicForm,
@@ -222,12 +243,13 @@ type
     FPadding: TACLPadding;
     FShowInTaskBar: TShowInTaskbar;
     FStayOnTop: Boolean;
-    FTextColor: TColor;
+    FStyle: TACLStyleForm;
     FWndProcHooks: array[TACLWindowHookMode] of TACLWindowHooks;
 
     procedure SetPadding(AValue: TACLPadding);
     procedure SetShowInTaskBar(AValue: TShowInTaskbar);
     procedure SetStayOnTop(AValue: Boolean);
+    procedure SetStyle(AStyle: TACLStyleForm);
     procedure PaddingChangeHandler(Sender: TObject);
     procedure UpdateNonClientColors;
   protected
@@ -271,8 +293,6 @@ type
     procedure WMExitMenuLoop(var Msg: TMessage); message WM_EXITMENULOOP;
     procedure WMNCActivate(var Msg: TWMNCActivate); message WM_NCACTIVATE;
     procedure WndProc(var Message: TMessage); override;
-    // Properties
-    property TextColor: TColor read FTextColor write FTextColor;
   public
     constructor Create(AOwner: TComponent); override;
     constructor CreateDialog(AOwnerHandle: TWndHandle; ANew: Boolean = False); virtual;
@@ -292,6 +312,7 @@ type
     property Padding: TACLPadding read FPadding write SetPadding;
     property ShowInTaskBar: TShowInTaskbar read FShowInTaskBar write SetShowInTaskBar default stDefault;
     property StayOnTop: Boolean read FStayOnTop write SetStayOnTop default False;
+    property Style: TACLStyleForm read FStyle write SetStyle;
   end;
 
 {$ENDREGION}
@@ -1525,6 +1546,36 @@ begin
   Result := False;
 end;
 
+{ TACLStyleForm }
+
+function TACLStyleForm.GetCaptionFont: TFont;
+begin
+{$IFDEF FPC}
+  Result := Screen.SystemFont;
+{$ELSE}
+  Result := Screen.CaptionFont;
+{$ENDIF}
+end;
+
+function TACLStyleForm.GetCaptionFontColor(Active: Boolean): TColor;
+begin
+  if Active then
+    Result := ColorCaption.AsColor
+  else
+    Result := ColorCaptionInactive.AsColor;
+end;
+
+procedure TACLStyleForm.InitializeResources;
+begin
+  ColorBorder1.InitailizeDefaults('Form.Colors.Border');
+  ColorBorder2.InitailizeDefaults('Form.Colors.BorderInactive');
+  ColorContent.InitailizeDefaults('Form.Colors.Background', True);
+  ColorCaption.InitailizeDefaults('Form.Colors.CaptionText', True);
+  ColorCaptionInactive.InitailizeDefaults('Form.Colors.CaptionTextInactive', True);
+  ColorText.InitailizeDefaults('Form.Colors.Text', True);
+  Glyphs.InitailizeDefaults('Form.Textures.Glyphs');
+end;
+
 { TACLCustomForm }
 
 constructor TACLCustomForm.Create(AOwner: TComponent);
@@ -1572,11 +1623,11 @@ end;
 
 destructor TACLCustomForm.Destroy;
 begin
-  TACLRootResourceCollection.ListenerRemove(Self);
   inherited Destroy;
   FreeAndNil(FWndProcHooks[whmPostprocess]);
   FreeAndNil(FWndProcHooks[whmPreprocess]);
   FreeAndNil(FPadding);
+  FreeAndNil(FStyle);
   MinimizeMemoryUsage;
 end;
 
@@ -1591,7 +1642,6 @@ end;
 procedure TACLCustomForm.AfterFormCreate;
 begin
   DoubleBuffered := True;
-  TACLRootResourceCollection.ListenerAdd(Self);
 {$IFDEF MSWINDOWS}
   TACLFormMouseWheelHelper.CheckInstalled;
 {$ENDIF}
@@ -1602,6 +1652,7 @@ begin
   FInCreation := acTrue;
   FPadding := TACLPadding.Create(0);
   FPadding.OnChanged := PaddingChangeHandler;
+  FStyle := TACLStyleForm.Create(Self);
 end;
 
 function TACLCustomForm.CanCloseByEscape: Boolean;
@@ -1790,16 +1841,12 @@ begin
 end;
 
 procedure TACLCustomForm.ResourceChanged;
-var
-  AColor: TACLResourceColor;
 begin
-  if TACLRootResourceCollection.GetResource('Form.Colors.Background', TACLResourceColor, Self, AColor) then
-    Color := AColor.AsColor;
-  if TACLRootResourceCollection.GetResource('Form.Colors.Text', TACLResourceColor, Self, AColor) then
-    TextColor := AColor.AsColor;
+  Color := Style.ColorContent.AsColor;
 end;
 
-function TACLCustomForm.GetResource(const ID: string; AResourceClass: TClass; ASender: TObject = nil): TObject;
+function TACLCustomForm.GetResource(const ID: string;
+  AResourceClass: TClass; ASender: TObject = nil): TObject;
 begin
   Result := TACLRootResourceCollection.GetResource(ID, AResourceClass, ASender);
 end;
@@ -1946,6 +1993,11 @@ begin
     TACLStayOnTopHelper.Refresh;
     StayOnTopChanged;
   end;
+end;
+
+procedure TACLCustomForm.SetStyle(AStyle: TACLStyleForm);
+begin
+  FStyle.Assign(AStyle);
 end;
 
 procedure TACLCustomForm.PaddingChangeHandler(Sender: TObject);
