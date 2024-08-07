@@ -34,9 +34,11 @@ uses
   // Vcl
   {Vcl.}ActnList,
   {Vcl.}Controls,
+  {Vcl.}Forms,
   {Vcl.}Graphics,
   {Vcl.}ImgList,
   // ACL
+  ACL.Classes.Collections,
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Ex,
@@ -44,7 +46,8 @@ uses
   ACL.Graphics.SkinImage,
   ACL.MUI,
   ACL.ObjectLinks,
-  ACL.Utils.Common;
+  ACL.Utils.Common,
+  ACL.Utils.Strings;
 
 type
 
@@ -98,6 +101,42 @@ type
     property SourceDPI: Integer read FSourceDPI write SetSourceDPI default 96;
   end;
 
+  { TACLImageListReplacer }
+
+  /// <summary>
+  ///   Automatically replaces the references to ImageLists according to DPI and Dark mode.
+  ///   Imagelist must be named according following template:
+  ///     [name][dark][scale-factor]
+  ///   For example:
+  ///     imSmall100,
+  ///     imSmall200,
+  ///     imSmallDark100,
+  ///     imSmallDark200
+  /// </summary>
+  TACLImageListReplacer = class
+  strict private const
+    DarkModeSuffix = 'Dark';
+  strict private
+    FReplacementCache: TACLObjectDictionary;
+    FDarkMode: Boolean;
+    FTargetDPI: Integer;
+
+    class function GenerateName(const ABaseName, ASuffix: string; ATargetDPI: Integer): TComponentName; static;
+    class function GetBaseName(const AName: TComponentName): TComponentName; static;
+  protected
+    procedure UpdateImageList(AInstance: TObject; APropInfo: PPropInfo; APropValue: TObject);
+    procedure UpdateImageListProperties(APersistent: TPersistent);
+    procedure UpdateImageLists(AForm: TCustomForm);
+  public
+    constructor Create(ATargetDPI: Integer; ADarkMode: Boolean);
+    destructor Destroy; override;
+    class procedure Execute(ATargetDPI: Integer; AForm: TCustomForm);
+    class function GetReplacement(AImageList: TCustomImageList;
+      AForm: TCustomForm): TCustomImageList; overload;
+    class function GetReplacement(AImageList: TCustomImageList;
+      ATargetDPI: Integer; ADarkMode: Boolean): TCustomImageList; overload;
+  end;
+
 procedure acDrawImage(ACanvas: TCanvas; const R: TRect;
   AImages: TCustomImageList; AImageIndex: Integer;
   AEnabled: Boolean = True; ASmoothStrech: Boolean = True);
@@ -120,6 +159,7 @@ uses
   System.ZLib,
 {$ENDIF}
   // ACL
+  ACL.UI.Application,
   ACL.Utils.DPIAware,
   ACL.Utils.RTTI,
   ACL.Utils.Stream;
@@ -681,5 +721,173 @@ begin
   end;
 end;
 {$ENDIF}
+
+{ TACLImageListReplacer }
+
+constructor TACLImageListReplacer.Create(ATargetDPI: Integer; ADarkMode: Boolean);
+begin
+  FDarkMode := ADarkMode;
+  FTargetDPI := ATargetDPI;
+  FReplacementCache := TACLObjectDictionary.Create;
+end;
+
+destructor TACLImageListReplacer.Destroy;
+begin
+  FreeAndNil(FReplacementCache);
+  inherited Destroy;
+end;
+
+class procedure TACLImageListReplacer.Execute(ATargetDPI: Integer; AForm: TCustomForm);
+begin
+  with TACLImageListReplacer.Create(ATargetDPI, TACLApplication.IsDarkMode) do
+  try
+    UpdateImageLists(AForm);
+  finally
+    Free;
+  end;
+end;
+
+class function TACLImageListReplacer.GetReplacement(
+  AImageList: TCustomImageList; AForm: TCustomForm): TCustomImageList;
+begin
+  Result := GetReplacement(AImageList, acGetCurrentDpi(AForm), TACLApplication.IsDarkMode);
+end;
+
+class function TACLImageListReplacer.GetReplacement(
+  AImageList: TCustomImageList; ATargetDPI: Integer; ADarkMode: Boolean): TCustomImageList;
+
+  function CheckReference(const AReference: string; var AResult: TCustomImageList): Boolean;
+  var
+    LReference: TComponent;
+  begin
+    LReference := AImageList.Owner.FindComponent(AReference);
+    Result := LReference is TCustomImageList;
+    if Result then
+      AResult := TCustomImageList(LReference);
+  end;
+
+  function TryFind(const ABaseName: TComponentName; ATargetDPI: Integer; var AResult: TCustomImageList): Boolean;
+  begin
+    Result := False;
+    if ADarkMode then
+      Result := CheckReference(GenerateName(ABaseName, DarkModeSuffix, ATargetDPI), AResult);
+    if not Result then
+      Result := CheckReference(GenerateName(ABaseName, EmptyStr, ATargetDPI), AResult);
+    if not Result and (ATargetDPI = acDefaultDPI) then
+      Result := CheckReference(ABaseName, AResult);
+  end;
+
+var
+  ABaseName: TComponentName;
+  I: Integer;
+begin
+  Result := AImageList;
+
+  ABaseName := GetBaseName(AImageList.Name);
+  if (ABaseName <> '') and (AImageList.Owner <> nil) and not TryFind(ABaseName, ATargetDPI, Result) then
+  begin
+    for I := High(acDefaultDPIValues) downto Low(acDefaultDPIValues) do
+    begin
+      if (acDefaultDPIValues[I] < ATargetDPI) and TryFind(ABaseName, acDefaultDPIValues[I], Result) then
+        Break;
+    end;
+  end;
+end;
+
+procedure TACLImageListReplacer.UpdateImageList(AInstance: TObject; APropInfo: PPropInfo; APropValue: TObject);
+var
+  ANewValue: TObject;
+begin
+  if not FReplacementCache.TryGetValue(APropValue, ANewValue) then
+  begin
+    ANewValue := GetReplacement(TCustomImageList(APropValue), FTargetDPI, FDarkMode);
+    FReplacementCache.Add(APropValue, ANewValue);
+  end;
+  if APropValue <> ANewValue then
+    SetObjectProp(AInstance, APropInfo, ANewValue);
+end;
+
+procedure TACLImageListReplacer.UpdateImageListProperties(APersistent: TPersistent);
+
+  function EnumProperties(AObject: TObject; out AList: PPropList; out ACount: Integer): Boolean;
+  begin
+    Result := False;
+    if AObject <> nil then
+    begin
+      ACount := GetTypeData(AObject.ClassInfo)^.PropCount;
+      Result := ACount > 0;
+      if Result then
+      begin
+        AList := AllocMem(ACount * SizeOf(Pointer));
+        GetPropInfos(AObject.ClassInfo, AList);
+      end;
+    end;
+  end;
+
+var
+  APropClass: TClass;
+  AProperties: PPropList;
+  APropertyCount: Integer;
+  APropInfo: PPropInfo;
+  APropValue: TObject;
+  I: Integer;
+begin
+  if EnumProperties(APersistent, AProperties, APropertyCount) then
+  try
+    for I := 0 to APropertyCount - 1 do
+    begin
+      APropInfo := AProperties^[I];
+      if APropInfo.PropType^.Kind = tkClass then
+      begin
+        APropClass := GetObjectPropClass(APropInfo);
+        if APropClass.InheritsFrom(TComponent) then
+        begin
+          if APropClass.InheritsFrom(TCustomImageList) then
+          begin
+            APropValue := GetObjectProp(APersistent, APropInfo);
+            if APropValue <> nil then
+              UpdateImageList(APersistent, APropInfo, APropValue);
+          end;
+        end
+        else
+          if APropClass.InheritsFrom(TPersistent) then
+          begin
+            APropValue := GetObjectProp(APersistent, APropInfo);
+            if APropValue <> nil then
+              UpdateImageListProperties(TPersistent(APropValue));
+          end;
+      end;
+    end;
+  finally
+    FreeMem(AProperties);
+  end;
+end;
+
+procedure TACLImageListReplacer.UpdateImageLists(AForm: TCustomForm);
+var
+  I: Integer;
+begin
+  for I := 0 to AForm.ComponentCount - 1 do
+    UpdateImageListProperties(AForm.Components[I]);
+end;
+
+class function TACLImageListReplacer.GenerateName(
+  const ABaseName, ASuffix: string; ATargetDPI: Integer): TComponentName;
+begin
+  Result := ABaseName + ASuffix + IntToStr(MulDiv(100, ATargetDPI, acDefaultDPI));
+end;
+
+class function TACLImageListReplacer.GetBaseName(const AName: TComponentName): TComponentName;
+var
+  ALength: Integer;
+begin
+  Result := AName;
+  ALength := Length(Result);
+  while (ALength > 0) and CharInSet(Result[ALength], ['0'..'9']) do
+    Dec(ALength);
+  SetLength(Result, ALength);
+  if acEndsWith(Result, DarkModeSuffix) then
+    SetLength(Result, ALength - Length(DarkModeSuffix));
+end;
 
 end.

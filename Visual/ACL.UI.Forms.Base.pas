@@ -57,6 +57,7 @@ uses
   ACL.Threading,
   ACL.UI.Application,
   ACL.UI.Controls.Base,
+  ACL.UI.ImageList,
   ACL.UI.Resources,
   ACL.Utils.Common,
   ACL.Utils.Desktop,
@@ -297,11 +298,10 @@ type
 
 implementation
 
-uses
 {$IFNDEF FPC}
-  Vcl.AppEvnts,
+uses
+  Vcl.AppEvnts;
 {$ENDIF}
-  ACL.UI.Forms;
 
 type
   TCustomFormAccess = class(TCustomForm);
@@ -1192,7 +1192,7 @@ end;
 
 procedure TACLCustomForm.UpdateImageLists;
 begin
-  TACLFormImageListReplacer.Execute(FCurrentPPI, Self);
+  TACLImageListReplacer.Execute(FCurrentPPI, Self);
 end;
 
 procedure TACLCustomForm.UpdateNonClientColors;
