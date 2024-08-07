@@ -9,7 +9,7 @@
 //             © 2006-2024
 //             www.aimp.ru
 //
-//  FPC:       Partial
+//  FPC:       OK
 //
 unit ACL.UI.Forms;
 
@@ -72,13 +72,8 @@ const
 {$ENDIF}
 
 type
-{$IFDEF FPC}
-  TScalingFlags = set of (sfLeft, sfTop, sfWidth, sfHeight, sfFont, sfDesignSize);
-  TWindowHook = function (var Message: TMessage): Boolean of object;
-  TWMNCActivate = TLMNCActivate;
-{$ELSE}
-  TShowInTaskbar = (stDefault, stAlways, stNever);
-{$ENDIF}
+
+{$REGION ' Basic Form '}
 
   { TACLBasicForm }
 
@@ -107,17 +102,21 @@ type
     procedure WMSettingsChanged(var Message: TWMSettingChange); message WM_SETTINGCHANGE;
     procedure WMSysColorChanged(var Message: TMessage); message WM_SYSCOLORCHANGE;
   {$ENDIF}
-  protected
   {$IFDEF FPC}
+  protected type
+    TScalingFlags = set of (sfLeft, sfTop, sfWidth, sfHeight, sfFont, sfDesignSize);
+  protected
     FCurrentPPI: Integer;
     FIScaling: Boolean;
     ScalingFlags: TScalingFlags;
 
     procedure DoAutoAdjustLayout(const AMode: TLayoutAdjustmentPolicy; const X, Y: Double); override;
   {$ELSE}
+  protected
     procedure ChangeScale(M, D: Integer; IsDpiChange: Boolean); override; final;
   {$ENDIF}
   protected
+    procedure ApplyClientSize(AWidth, AHeight: Integer); virtual;
     function DialogChar(var Message: TWMKey): Boolean; {$IFDEF FPC}override;{$ELSE}virtual;{$ENDIF}
     procedure DoShow; override;
     procedure DpiChanged; virtual;
@@ -130,6 +129,10 @@ type
     // IACLApplicationListener
     procedure IACLApplicationListener.Changed = ApplicationSettingsChanged;
     procedure ApplicationSettingsChanged(AChanges: TACLApplicationChanges); virtual;
+
+    // Properties
+    property LoadedClientHeight: Integer read FLoadedClientHeight;
+    property LoadedClientWidth: Integer read FLoadedClientWidth;
   public
     constructor CreateNew(AOwner: TComponent; ADummy: Integer = 0); override;
     procedure AfterConstruction; override;
@@ -145,6 +148,62 @@ type
     property PixelsPerInch write SetPixelsPerInch;
   end;
 
+{$ENDREGION}
+
+{$REGION ' Popup Window '}
+
+  { TACLPopupWindow }
+
+  TACLPopupWindowClass = class of TACLPopupWindow;
+  TACLPopupWindow = class(TACLBasicForm)
+  strict private
+    FOwnerFormWnd: HWND;
+
+    FOnClosePopup: TNotifyEvent;
+    FOnPopup: TNotifyEvent;
+
+    procedure ConstraintBounds(var R: TRect);
+    procedure InitPopup;
+    procedure InitScaling;
+    procedure ShowPopup(const R: TRect);
+  protected
+    procedure CreateParams(var Params: TCreateParams); override;
+  {$IFDEF FPC}
+    procedure KeyDownBeforeInterface(var Key: Word; Shift: TShiftState); override;
+  {$ENDIF}
+    procedure WndProc(var Message: TMessage); override;
+    //# Events
+    procedure DoPopup; virtual;
+    procedure DoPopupClosed; virtual;
+    //# Mouse
+    function IsMouseInControl: Boolean;
+  public
+    constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
+    procedure ClosePopup;
+    procedure Popup(R: TRect); virtual;
+    procedure PopupUnderControl(const AControlBoundsOnScreen: TRect;
+      AAlignment: TAlignment = taLeftJustify);
+    //# Properties
+    property AutoSize;
+    //# Events
+    property OnClosePopup: TNotifyEvent read FOnClosePopup write FOnClosePopup;
+    property OnPopup: TNotifyEvent read FOnPopup write FOnPopup;
+  end;
+
+{$ENDREGION}
+
+{$REGION ' Custom Form '}
+
+{$IFDEF FPC}
+  TWindowHook = function (var Message: TMessage): Boolean of object;
+  TWMNCActivate = TLMNCActivate;
+{$ELSE}
+  TShowInTaskbar = (stDefault, stAlways, stNever);
+{$ENDIF}
+
+  TACLWindowHookMode = (whmPreprocess, whmPostprocess);
+
   { TACLWindowHooks }
 
   TACLWindowHooks = class(TACLList<TWindowHook>)
@@ -152,11 +211,9 @@ type
     function Process(var Message: TMessage): Boolean;
   end;
 
-  { TACLForm }
+  { TACLCustomForm }
 
-  TACLWindowHookMode = (whmPreprocess, whmPostprocess);
-
-  TACLForm = class(TACLBasicForm,
+  TACLCustomForm = class(TACLBasicForm,
     IACLResourceChangeListener,
     IACLResourceProvider)
   strict private
@@ -165,6 +222,7 @@ type
     FPadding: TACLPadding;
     FShowInTaskBar: TShowInTaskbar;
     FStayOnTop: Boolean;
+    FTextColor: TColor;
     FWndProcHooks: array[TACLWindowHookMode] of TACLWindowHooks;
 
     procedure SetPadding(AValue: TACLPadding);
@@ -213,6 +271,8 @@ type
     procedure WMExitMenuLoop(var Msg: TMessage); message WM_EXITMENULOOP;
     procedure WMNCActivate(var Msg: TWMNCActivate); message WM_NCACTIVATE;
     procedure WndProc(var Message: TMessage); override;
+    // Properties
+    property TextColor: TColor read FTextColor write FTextColor;
   public
     constructor Create(AOwner: TComponent); override;
     constructor CreateDialog(AOwnerHandle: TWndHandle; ANew: Boolean = False); virtual;
@@ -220,13 +280,13 @@ type
     destructor Destroy; override;
     procedure AfterConstruction; override;
     procedure ShowAndActivate; virtual;
-    // Hooks
+    //# Hooks
     procedure HookWndProc(AHook: TWindowHook; AMode: TACLWindowHookMode = whmPreprocess);
     procedure UnhookWndProc(AHook: TWindowHook);
-    // Placement
+    //# Placement
     procedure LoadPosition(AConfig: TACLIniFile); virtual;
     procedure SavePosition(AConfig: TACLIniFile); virtual;
-  published
+    //# Properties
     property Color stored False; // Color synchronizes with resources (ref. to ResourceChanged)
     property DoubleBuffered default True;
     property Padding: TACLPadding read FPadding write SetPadding;
@@ -234,50 +294,22 @@ type
     property StayOnTop: Boolean read FStayOnTop write SetStayOnTop default False;
   end;
 
-  { TACLPopupWindow }
+{$ENDREGION}
 
-  TACLPopupWindowClass = class of TACLPopupWindow;
-  TACLPopupWindow = class(TACLBasicForm)
-  strict private
-    FOwnerFormWnd: HWND;
+{$REGION ' Forms '}
 
-    FOnClosePopup: TNotifyEvent;
-    FOnPopup: TNotifyEvent;
+  { TACLForm }
 
-    procedure ConstraintBounds(var R: TRect);
-    procedure InitPopup;
-    procedure InitScaling;
-    procedure ShowPopup(const R: TRect);
-  protected
-    procedure CreateParams(var Params: TCreateParams); override;
-  {$IFDEF FPC}
-    procedure KeyDownBeforeInterface(var Key: Word; Shift: TShiftState); override;
-  {$ENDIF}
-    procedure WndProc(var Message: TMessage); override;
-    //# Events
-    procedure DoPopup; virtual;
-    procedure DoPopupClosed; virtual;
-    //# Mouse
-    function IsMouseInControl: Boolean;
-  public
-    constructor Create(AOwner: TComponent); override;
-    destructor Destroy; override;
-    procedure ClosePopup;
-    procedure Popup(R: TRect); virtual;
-    procedure PopupUnderControl(const AControlBoundsOnScreen: TRect;
-      AAlignment: TAlignment = taLeftJustify);
-    //# Properties
-    property AutoSize;
-    //# Events
-    property OnClosePopup: TNotifyEvent read FOnClosePopup write FOnClosePopup;
-    property OnPopup: TNotifyEvent read FOnPopup write FOnPopup;
+  TACLForm = class(TACLCustomForm)
+  published
+    property Padding;
+    property ShowInTaskBar;
+    property StayOnTop;
   end;
 
   { TACLLocalizableForm }
 
   TACLLocalizableForm = class(TACLForm, IACLLocalizableComponentRoot)
-  strict private
-    procedure WMLANG(var Msg: TMessage); message WM_ACL_LANG;
   protected
     function GetConfigSection: string; override;
     // IACLLocalizableComponentRoot
@@ -285,9 +317,15 @@ type
     procedure LangChange; virtual;
     function LangValue(const AKey: string): string; overload;
     function LangValue(const AKey: string; APartIndex: Integer): string; overload;
+    // Messages
+    procedure WMLang(var Msg: TMessage); message WM_ACL_LANG;
   public
     procedure AfterConstruction; override;
   end;
+
+{$ENDREGION}
+
+{$REGION ' Helpers '}
 
   { TACLFormImageListReplacer }
 
@@ -328,9 +366,11 @@ type
     class function ExecuteCommonDialog(ADialog: TCommonDialog; AHandleWnd: HWND): Boolean;
     class function IsStayOnTop(AHandle: HWND): Boolean;
     class function ShouldBeStayOnTop(AHandle: HWND): Boolean;
-    class procedure Refresh(AForm: TACLForm); overload;
+    class procedure Refresh(AForm: TACLCustomForm); overload;
     class procedure Refresh; overload;
   end;
+
+{$ENDREGION}
 
   TACLFormCorners = (afcDefault, afcRectangular, afcRounded, afcSmallRounded);
 
@@ -347,6 +387,7 @@ uses
   Vcl.AppEvnts;
 {$ENDIF}
 
+{$REGION ' Helpers '}
 type
   TCustomFormAccess = class(TCustomForm);
   TWinControlAccess = class(TWinControl);
@@ -483,6 +524,417 @@ begin
 {$ENDIF}
 end;
 
+{ TACLFormImageListReplacer }
+
+constructor TACLFormImageListReplacer.Create(ATargetDPI: Integer; ADarkMode: Boolean);
+begin
+  FDarkMode := ADarkMode;
+  FTargetDPI := ATargetDPI;
+  FReplacementCache := TACLObjectDictionary.Create;
+end;
+
+destructor TACLFormImageListReplacer.Destroy;
+begin
+  FreeAndNil(FReplacementCache);
+  inherited Destroy;
+end;
+
+class procedure TACLFormImageListReplacer.Execute(ATargetDPI: Integer; AForm: TCustomForm);
+begin
+  with TACLFormImageListReplacer.Create(ATargetDPI, TACLApplication.IsDarkMode) do
+  try
+    UpdateImageLists(AForm);
+  finally
+    Free;
+  end;
+end;
+
+class function TACLFormImageListReplacer.GetReplacement(
+  AImageList: TCustomImageList; AForm: TCustomForm): TCustomImageList;
+begin
+  Result := GetReplacement(AImageList, acGetCurrentDpi(AForm), TACLApplication.IsDarkMode);
+end;
+
+class function TACLFormImageListReplacer.GetReplacement(
+  AImageList: TCustomImageList; ATargetDPI: Integer; ADarkMode: Boolean): TCustomImageList;
+
+  function CheckReference(const AReference: TComponent; var AResult: TCustomImageList): Boolean;
+  begin
+    Result := AReference is TCustomImageList;
+    if Result then
+      AResult := TCustomImageList(AReference);
+  end;
+
+  function TryFind(const ABaseName: TComponentName; ATargetDPI: Integer; var AResult: TCustomImageList): Boolean;
+  begin
+    Result := False;
+    if ADarkMode then
+      Result := CheckReference(AImageList.Owner.FindComponent(GenerateName(ABaseName, DarkModeSuffix, ATargetDPI)), AResult);
+    if not Result then
+      Result := CheckReference(AImageList.Owner.FindComponent(GenerateName(ABaseName, EmptyStr, ATargetDPI)), AResult);
+    if not Result and (ATargetDPI = acDefaultDPI) then
+      Result := CheckReference(AImageList.Owner.FindComponent(ABaseName), AResult);
+  end;
+
+var
+  ABaseName: TComponentName;
+  I: Integer;
+begin
+  Result := AImageList;
+
+  ABaseName := GetBaseImageListName(AImageList.Name);
+  if (ABaseName <> '') and (AImageList.Owner <> nil) and not TryFind(ABaseName, ATargetDPI, Result) then
+  begin
+    for I := High(acDefaultDPIValues) downto Low(acDefaultDPIValues) do
+    begin
+      if (acDefaultDPIValues[I] < ATargetDPI) and TryFind(ABaseName, acDefaultDPIValues[I], Result) then
+        Break;
+    end;
+  end;
+end;
+
+procedure TACLFormImageListReplacer.UpdateImageList(AInstance: TObject; APropInfo: PPropInfo; APropValue: TObject);
+var
+  ANewValue: TObject;
+begin
+  if not FReplacementCache.TryGetValue(APropValue, ANewValue) then
+  begin
+    ANewValue := GetReplacement(TCustomImageList(APropValue), FTargetDPI, FDarkMode);
+    FReplacementCache.Add(APropValue, ANewValue);
+  end;
+  if APropValue <> ANewValue then
+    SetObjectProp(AInstance, APropInfo, ANewValue);
+end;
+
+procedure TACLFormImageListReplacer.UpdateImageListProperties(APersistent: TPersistent);
+
+  function EnumProperties(AObject: TObject; out AList: PPropList; out ACount: Integer): Boolean;
+  begin
+    Result := False;
+    if AObject <> nil then
+    begin
+      ACount := GetTypeData(AObject.ClassInfo)^.PropCount;
+      Result := ACount > 0;
+      if Result then
+      begin
+        AList := AllocMem(ACount * SizeOf(Pointer));
+        GetPropInfos(AObject.ClassInfo, AList);
+      end;
+    end;
+  end;
+
+var
+  APropClass: TClass;
+  AProperties: PPropList;
+  APropertyCount: Integer;
+  APropInfo: PPropInfo;
+  APropValue: TObject;
+  I: Integer;
+begin
+  if EnumProperties(APersistent, AProperties, APropertyCount) then
+  try
+    for I := 0 to APropertyCount - 1 do
+    begin
+      APropInfo := AProperties^[I];
+      if APropInfo.PropType^.Kind = tkClass then
+      begin
+        APropClass := GetObjectPropClass(APropInfo);
+        if APropClass.InheritsFrom(TComponent) then
+        begin
+          if APropClass.InheritsFrom(TCustomImageList) then
+          begin
+            APropValue := GetObjectProp(APersistent, APropInfo);
+            if APropValue <> nil then
+              UpdateImageList(APersistent, APropInfo, APropValue);
+          end;
+        end
+        else
+          if APropClass.InheritsFrom(TPersistent) then
+          begin
+            APropValue := GetObjectProp(APersistent, APropInfo);
+            if APropValue <> nil then
+              UpdateImageListProperties(TPersistent(APropValue));
+          end;
+      end;
+    end;
+  finally
+    FreeMem(AProperties);
+  end;
+end;
+
+procedure TACLFormImageListReplacer.UpdateImageLists(AForm: TCustomForm);
+var
+  I: Integer;
+begin
+  for I := 0 to AForm.ComponentCount - 1 do
+    UpdateImageListProperties(AForm.Components[I]);
+end;
+
+class function TACLFormImageListReplacer.GenerateName(
+  const ABaseName, ASuffix: string; ATargetDPI: Integer): TComponentName;
+begin
+  Result := ABaseName + ASuffix + IntToStr(MulDiv(100, ATargetDPI, acDefaultDPI));
+end;
+
+class function TACLFormImageListReplacer.GetBaseImageListName(const AName: TComponentName): TComponentName;
+var
+  ALength: Integer;
+begin
+  Result := AName;
+  ALength := Length(Result);
+  while (ALength > 0) and CharInSet(Result[ALength], ['0'..'9']) do
+    Dec(ALength);
+  SetLength(Result, ALength);
+  if acEndsWith(Result, DarkModeSuffix) then
+    SetLength(Result, ALength - Length(DarkModeSuffix));
+end;
+
+{ TACLStayOnTopHelper }
+
+class destructor TACLStayOnTopHelper.Destroy;
+begin
+  FreeAndNil(FEvents);
+end;
+
+class procedure TACLStayOnTopHelper.Refresh(AForm: TACLCustomForm);
+const
+  StyleMap: array[Boolean] of HWND = (HWND_NOTOPMOST, HWND_TOPMOST);
+var
+  AStayOnTop: Boolean;
+begin
+  if (AForm <> nil) and AForm.HandleAllocated and IsWindowVisible(AForm.Handle) then
+  begin
+    if csDesigning in AForm.ComponentState then Exit;
+
+    AStayOnTop := (AForm.FormStyle = fsStayOnTop) or StayOnTopAvailable and AForm.ShouldBeStayOnTop;
+    if IsStayOnTop(AForm.Handle) <> AStayOnTop then
+    begin
+      if AStayOnTop then
+        CheckForApplicationEvents;
+      SetWindowPos(AForm.Handle, StyleMap[AStayOnTop], 0, 0, 0, 0,
+        SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE or SWP_NOOWNERZORDER);
+    end;
+  end;
+end;
+
+class function TACLStayOnTopHelper.ExecuteCommonDialog(
+  ADialog: TCommonDialog; AHandleWnd: HWND): Boolean;
+begin
+  Application.ModalStarted;
+  try
+    Result := ADialog.Execute{$IFNDEF FPC}(AHandleWnd){$ENDIF};
+  finally
+    Application.ModalFinished;
+  end;
+end;
+
+class function TACLStayOnTopHelper.IsStayOnTop(AHandle: HWND): Boolean;
+begin
+  Result := (AHandle <> 0) and (GetWindowLong(AHandle, GWL_EXSTYLE) and WS_EX_TOPMOST <> 0);
+end;
+
+class procedure TACLStayOnTopHelper.Refresh;
+var
+  AForm: TForm;
+  I: Integer;
+begin
+  for I := Screen.FormCount - 1 downto 0 do
+  begin
+    AForm := Screen.Forms[I];
+    if AForm is TACLCustomForm then
+      Refresh(TACLCustomForm(AForm));
+  end;
+end;
+
+class function TACLStayOnTopHelper.ShouldBeStayOnTop(AHandle: HWND): Boolean;
+var
+  AControl: TWinControl;
+begin
+  AControl := FindControl(AHandle);
+  Result := (AControl is TACLCustomForm) and TACLCustomForm(AControl).ShouldBeStayOnTop;
+end;
+
+class procedure TACLStayOnTopHelper.AppEventsModalHandler(Sender: TObject);
+begin
+  Refresh;
+end;
+
+class procedure TACLStayOnTopHelper.CheckForApplicationEvents;
+begin
+  if FEvents = nil then
+  begin
+  {$IFDEF FPC}
+    FEvents := TObject.Create;
+    Application.AddOnModalBeginHandler(AppEventsModalHandler);
+    Application.AddOnModalEndHandler(AppEventsModalHandler);
+  {$ELSE}
+    FEvents := TApplicationEvents.Create(nil);
+    TApplicationEvents(FEvents).OnModalBegin := AppEventsModalHandler;
+    TApplicationEvents(FEvents).OnModalEnd := AppEventsModalHandler;
+  {$ENDIF}
+  end;
+end;
+
+class function TACLStayOnTopHelper.StayOnTopAvailable: Boolean;
+begin
+  Result := Application.ModalLevel = 0;
+end;
+
+{ TACLFormScaling }
+
+procedure TACLFormScaling.Start(AForm: TACLBasicForm);
+
+  procedure PopulateControls(AControl: TControl);
+  var
+    I: Integer;
+  begin
+    LockedControls.Add(AControl);
+    if AControl is TCustomForm then
+    begin
+      for I := 0 to TCustomFormAccess(AControl).MDIChildCount - 1 do
+        PopulateControls(TCustomFormAccess(AControl).MDIChildren[I]);
+    end;
+    if AControl is TWinControl then
+    begin
+      for I := 0 to TWinControl(AControl).ControlCount - 1 do
+        PopulateControls(TWinControl(AControl).Controls[I]);
+    end;
+  end;
+
+var
+  I: Integer;
+begin
+  //#AI: don't change the order
+  Form := AForm;
+  RedrawLocked := IsWinVistaOrLater and IsWindowVisible(AForm.Handle);
+  LockedControls := TComponentList.Create(False);
+  PopulateControls(AForm);
+  for I := 0 to LockedControls.Count - 1 do
+    TControl(LockedControls[I]).Perform(CM_SCALECHANGING, 0, 0);
+{$IFDEF MSWINDOWS}
+  if RedrawLocked then
+    SendMessage(Form.Handle, WM_SETREDRAW, 0, 0);
+{$ENDIF}
+  AForm.DisableAlign;
+end;
+
+procedure TACLFormScaling.Done;
+var
+  I: Integer;
+begin
+  //#AI: keep the order
+  Form.DpiChanged;
+  Form.EnableAlign;
+  Form.Realign;
+{$IFDEF MSWINDOWS}
+  if RedrawLocked then
+    SendMessage(Form.Handle, WM_SETREDRAW, 1, 1);
+{$ENDIF}
+  for I := LockedControls.Count - 1 downto 0 do
+    TControl(LockedControls[I]).Perform(CM_SCALECHANGED, 0, 0);
+  if RedrawLocked then
+    RedrawWindow(Form.Handle, nil, 0, RDW_INVALIDATE or RDW_ALLCHILDREN or RDW_ERASE);
+  FreeAndNil(LockedControls);
+end;
+
+{$IFDEF MSWINDOWS}
+
+{ TACLFormMouseWheelHelper }
+
+class procedure TACLFormMouseWheelHelper.CheckInstalled;
+begin
+  if (FHook = 0) and not IsWin10OrLater then
+    FHook := SetWindowsHookEx(WH_MOUSE, MouseHook, 0, GetCurrentThreadId);
+end;
+
+class destructor TACLFormMouseWheelHelper.Destroy;
+begin
+  UnhookWindowsHookEx(FHook);
+  FHook := 0;
+end;
+
+class function TACLFormMouseWheelHelper.MouseHook(
+  Code: Integer; wParam: WParam; lParam: LParam): LRESULT; stdcall;
+type
+  PMouseHookStructEx = ^TMouseHookStructEx;
+  TMouseHookStructEx = record
+    pt: TPoint;
+    hwnd: HWND;
+    wHitTestCode: UINT;
+    dwExtraInfo: NativeUInt;
+    mouseData: DWORD;
+  end;
+
+  function ShiftStateToKeys(AShift: TShiftState): WORD;
+  begin
+    Result := 0;
+    if ssShift in AShift then
+      Inc(Result, MK_SHIFT);
+    if ssCtrl in AShift then
+      Inc(Result, MK_CONTROL);
+    if ssLeft in AShift then
+      Inc(Result, MK_LBUTTON);
+    if ssRight in AShift then
+      Inc(Result, MK_RBUTTON);
+    if ssMiddle in AShift then
+      Inc(Result, MK_MBUTTON);
+  end;
+
+var
+  AControl: TControl;
+  AMHS: PMouseHookStructEx;
+  APoint: TPoint;
+  AWindow: TWinControl;
+begin
+  Result := 0;
+  if (Code >= 0) and ((wParam = WM_MOUSEWHEEL) or (wParam = WM_MOUSEHWHEEL)) and Mouse.WheelPresent then
+  begin
+    AMHS := PMouseHookStructEx(lParam);
+
+    AWindow := FindControl(AMHS.hwnd);
+    if AWindow <> nil then
+    begin
+      APoint := AMHS.pt;
+      if (APoint.X = -1) and (APoint.Y = -1) then
+        APoint := MouseCursorPos;
+
+      //#AI: Workaround for Synaptics TouchPad Driver
+      if acSameText(acGetClassName(WindowFromPoint(APoint)), 'SynTrackCursorWindowClass') then
+      begin
+        repeat
+          AControl := AWindow.ControlAtPos(AWindow.ScreenToClient(APoint), False, True);
+          if AControl = nil then
+          begin
+            AControl := AWindow;
+            Break;
+          end;
+          if AControl is TWinControl then
+            AWindow := TWinControl(AControl)
+          else
+            Break;
+        until False;
+      end
+      else
+        AControl := FindDragTarget(APoint, False);
+
+      if (AControl <> nil) and (AControl <> AWindow) then
+      begin
+        Result := AControl.Perform(CM_MOUSEWHEEL,
+          MakeWParam(ShiftStateToKeys(KeyboardStateToShiftState), HiWord(AMHS.mouseData)),
+          PointToLParam(APoint));
+        if Result = 1 then
+          Exit(1);
+      end;
+    end;
+  end
+  else
+    Result := CallNextHookEx(FHook, code, wParam, lParam);
+end;
+{$ENDIF}
+{$ENDREGION}
+
+{$REGION ' Basic Form '}
+
 { TACLBasicForm }
 
 constructor TACLBasicForm.CreateNew(AOwner: TComponent; ADummy: Integer);
@@ -518,6 +970,14 @@ begin
     acApplyColorSchema(Components[I], TACLApplication.ColorSchema);
 end;
 
+procedure TACLBasicForm.ApplyClientSize(AWidth, AHeight: Integer);
+begin
+  if AWidth >  0 then
+    inherited ClientWidth := AWidth;
+  if AHeight > 0 then
+    inherited ClientHeight := AHeight;
+end;
+
 {$IFDEF FPC}
 procedure TACLBasicForm.DoAutoAdjustLayout(
   const AMode: TLayoutAdjustmentPolicy; const X, Y: Double);
@@ -527,6 +987,7 @@ begin
   else
     ScaleForPPI(Round(X * FCurrentPPI));
 end;
+
 {$ELSE}
 procedure TACLBasicForm.ChangeScale(M, D: Integer; IsDpiChange: Boolean);
 begin
@@ -661,10 +1122,7 @@ begin
     FLoadedClientHeight := 0;
     FLoadedClientWidth := 0;
     inherited;
-    if FLoadedClientWidth >  0 then
-      inherited ClientWidth := FLoadedClientWidth;
-    if FLoadedClientHeight > 0 then
-      inherited ClientHeight := FLoadedClientHeight;
+    ApplyClientSize(FLoadedClientWidth, FLoadedClientHeight);
   finally
     EnableAlign;
   end;
@@ -823,442 +1281,9 @@ begin
 end;
 {$ENDIF}
 
-{ TACLWindowHooks }
+{$ENDREGION}
 
-function TACLWindowHooks.Process(var Message: TMessage): Boolean;
-var
-  I: Integer;
-begin
-  if Self = nil then
-    Exit(False);
-  for I := Count - 1 downto 0 do
-    if List[I](Message) then
-      Exit(True);
-  Result := False;
-end;
-
-{ TACLForm }
-
-constructor TACLForm.Create(AOwner: TComponent);
-begin
-  BeforeFormCreate;
-  inherited Create(AOwner);
-  AfterFormCreate;
-end;
-
-constructor TACLForm.CreateDialog(AOwnerHandle: TWndHandle; ANew: Boolean = False);
-var
-  AOwner: TComponent;
-begin
-  FOwnerHandle := AOwnerHandle;
-  AOwner := FindControl(AOwnerHandle);
-  if AOwner is TCustomForm then
-    AOwner := GetParentForm(TCustomForm(AOwner)); // to make a poOwnerFormCenter works correctly
-  if AOwner = nil then
-    AOwner := Application;
-  if ANew then
-    CreateNew(AOwner)
-  else
-    Create(AOwner);
-end;
-
-procedure TACLForm.CreateHandle;
-begin
-  inherited;
-  UpdateNonClientColors;
-end;
-
-constructor TACLForm.CreateNew(AOwner: TComponent; Dummy: Integer = 0);
-begin
-  // Lazarus вызывает CreateNew из Create.
-  // Из-за чего у нас возникал двойной вызов событий before/after form create
-  if FInCreation = TACLBoolean.Default then
-  begin
-    BeforeFormCreate;
-    inherited CreateNew(AOwner, Dummy);
-    AfterFormCreate;
-  end
-  else
-    inherited CreateNew(AOwner, Dummy);
-end;
-
-destructor TACLForm.Destroy;
-begin
-  TACLRootResourceCollection.ListenerRemove(Self);
-  inherited Destroy;
-  FreeAndNil(FWndProcHooks[whmPostprocess]);
-  FreeAndNil(FWndProcHooks[whmPreprocess]);
-  FreeAndNil(FPadding);
-  MinimizeMemoryUsage;
-end;
-
-procedure TACLForm.AfterConstruction;
-begin
-  inherited;
-  FInCreation := acFalse;
-  ResourceChanged;
-  UpdateImageLists;
-end;
-
-procedure TACLForm.AfterFormCreate;
-begin
-  DoubleBuffered := True;
-  TACLRootResourceCollection.ListenerAdd(Self);
-{$IFDEF MSWINDOWS}
-  TACLFormMouseWheelHelper.CheckInstalled;
-{$ENDIF}
-end;
-
-procedure TACLForm.BeforeFormCreate;
-begin
-  FInCreation := acTrue;
-  FPadding := TACLPadding.Create(0);
-  FPadding.OnChanged := PaddingChangeHandler;
-end;
-
-function TACLForm.CanCloseByEscape: Boolean;
-begin
-  Result := False;
-end;
-
-procedure TACLForm.CreateParams(var Params: TCreateParams);
-begin
-  inherited CreateParams(Params);
-  if (Parent = nil) and (ParentWindow = 0) then
-  begin
-    if ShowInTaskBar = stAlways then
-      Params.ExStyle := Params.ExStyle or WS_EX_APPWINDOW;
-    if (Application.MainForm <> nil) and Application.MainForm.HandleAllocated then
-      Params.WndParent := Application.MainFormHandle;
-    if FOwnerHandle <> 0 then
-      Params.WndParent := FOwnerHandle;
-  end;
-end;
-
-procedure TACLForm.DpiChanged;
-begin
-  inherited;
-  if FInCreation = acFalse then
-    ResourceChanged;
-  UpdateImageLists;
-end;
-
-procedure TACLForm.HookWndProc(AHook: TWindowHook; AMode: TACLWindowHookMode = whmPreprocess);
-begin
-  if FWndProcHooks[AMode] = nil then
-    FWndProcHooks[AMode] := TACLWindowHooks.Create;
-  FWndProcHooks[AMode].Add(AHook);
-end;
-
-procedure TACLForm.UnhookWndProc(AHook: TWindowHook);
-begin
-  if FWndProcHooks[whmPostprocess] <> nil then
-    FWndProcHooks[whmPostprocess].Remove(AHook);
-  if FWndProcHooks[whmPreprocess] <> nil then
-    FWndProcHooks[whmPreprocess].Remove(AHook);
-end;
-
-procedure TACLForm.LoadPosition(AConfig: TACLIniFile);
-
-  function IsFormResizable: Boolean;
-  begin
-    Result := BorderStyle in [bsSizeable, bsSizeToolWin];
-  end;
-
-  procedure RestoreBounds(ABounds: TRect);
-  begin
-    if IsFormResizable then
-      ABounds.Size := dpiApply(ABounds.Size, FCurrentPPI)
-    else
-      ABounds.Size := TSize.Create(Width, Height);
-
-  {$IFDEF FPC}
-    BoundsRect := ABounds;
-  {$ELSE}
-    var LPlacement: TWindowPlacement;
-    ZeroMemory(@LPlacement, SizeOf(LPlacement));
-    LPlacement.Length := SizeOf(TWindowPlacement);
-    LPlacement.rcNormalPosition := ABounds;
-    SetWindowPlacement(Handle, LPlacement);
-  {$ENDIF}
-  end;
-
-begin
-  Inc(FRecreateWndLockCount);
-  try
-    if AConfig.ExistsKey(GetConfigSection, 'WindowRect') then
-    begin
-      RestoreBounds(AConfig.ReadRect(GetConfigSection, 'WindowRect'));
-      Position := poDesigned;
-      DefaultMonitor := dmDesktop;
-      if not MonitorGetBounds(BoundsRect.TopLeft).Contains(BoundsRect) then
-        MakeFullyVisible;
-    end;
-    if IsFormResizable and AConfig.ReadBool(GetConfigSection, 'WindowMaximized') then
-      WindowState := wsMaximized;
-  finally
-    Dec(FRecreateWndLockCount);
-  end;
-end;
-
-procedure TACLForm.SavePosition(AConfig: TACLIniFile);
-var
-  LBounds: TRect;
-  LIsMaximized: Boolean;
-{$IFNDEF FPC}
-  LPlacement: TWindowPlacement;
-{$ENDIF}
-begin
-  if HandleAllocated then
-  begin
-  {$IFDEF FPC}
-    LBounds := BoundsRect;
-    LIsMaximized := WindowState = wsMaximized;
-  {$ELSE}
-    LPlacement.Length := SizeOf(TWindowPlacement);
-    if not GetWindowPlacement(Handle, LPlacement) then
-      Exit;
-    LBounds := LPlacement.rcNormalPosition;
-    case WindowState of
-      wsMaximized:
-        LIsMaximized := True;
-      wsMinimized:
-        LIsMaximized := LPlacement.flags and WPF_RESTORETOMAXIMIZED = WPF_RESTORETOMAXIMIZED;
-    else
-      LIsMaximized := False;
-    end;
-  {$ENDIF}
-    LBounds.Height := dpiRevert(LBounds.Height, FCurrentPPI);
-    LBounds.Width := dpiRevert(LBounds.Width, FCurrentPPI);
-    AConfig.WriteBool(GetConfigSection, 'WindowMaximized', LIsMaximized);
-    AConfig.WriteRect(GetConfigSection, 'WindowRect', LBounds);
-  end;
-end;
-
-procedure TACLForm.ShowAndActivate;
-begin
-  if TACLApplication.IsMinimized then
-    Visible := False;
-  Show;
-  SetForegroundWindow(Handle);
-  SetFocus;
-end;
-
-procedure TACLForm.UpdateImageLists;
-begin
-  TACLFormImageListReplacer.Execute(FCurrentPPI, Self);
-end;
-
-procedure TACLForm.UpdateNonClientColors;
-{$IFDEF MSWINDOWS}
-const
-  DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
-var
-  LValue: LongBool;
-  LWidth: Integer;
-begin
-  // https://stackoverflow.com/questions/39261826/change-the-color-of-the-title-bar-caption-of-a-win32-application
-  if IsWin10OrLater and HandleAllocated and (TOSVersion.Build >= 18985) then
-  begin
-    LValue := TACLApplication.IsDarkMode;
-    DwmSetWindowAttribute(Handle, DWMWA_USE_IMMERSIVE_DARK_MODE, @LValue, SizeOf(LValue));
-    // Fully recalculate and redraw the window
-    LWidth := Width;
-    SetWindowPos(Handle, 0, 0, 0, LWidth + 1,
-      Height, SWP_NOZORDER or SWP_NOACTIVATE or SWP_NOMOVE);
-    SetWindowPos(Handle, 0, 0, 0, LWidth,
-      Height, SWP_NOZORDER or SWP_NOACTIVATE or SWP_NOMOVE);
-  end;
-{$ELSE}
-begin
-{$ENDIF}
-end;
-
-procedure TACLForm.AdjustClientRect(var Rect: TRect);
-begin
-  inherited AdjustClientRect(Rect);
-  Rect.Content(Padding.GetScaledMargins(FCurrentPPI));
-end;
-
-function TACLForm.ShouldBeStayOnTop: Boolean;
-begin
-  Result := StayOnTop{$IFNDEF FPC} or TACLStayOnTopHelper.ShouldBeStayOnTop(GetOwnerWindow);{$ENDIF}
-end;
-
-procedure TACLForm.StayOnTopChanged;
-begin
-  // nothing
-end;
-
-procedure TACLForm.ResourceChanged(Sender: TObject; Resource: TACLResource = nil);
-begin
-  if FInCreation = acFalse then
-    ResourceChanged;
-end;
-
-procedure TACLForm.ResourceChanged;
-var
-  AColor: TACLResourceColor;
-begin
-  if TACLRootResourceCollection.GetResource('Form.Colors.Background', TACLResourceColor, Self, AColor) then
-    Color := AColor.AsColor;
-  if TACLRootResourceCollection.GetResource('Form.Colors.Text', TACLResourceColor, Self, AColor) then
-    Font.Color := AColor.AsColor;
-end;
-
-function TACLForm.GetResource(const ID: string; AResourceClass: TClass; ASender: TObject = nil): TObject;
-begin
-  Result := TACLRootResourceCollection.GetResource(ID, AResourceClass, ASender);
-end;
-
-procedure TACLForm.ApplicationSettingsChanged(AChanges: TACLApplicationChanges);
-begin
-  inherited;
-  if acDarkMode in AChanges then
-  begin
-    UpdateNonClientColors;
-    UpdateImageLists;
-  end;
-end;
-
-function TACLForm.DialogChar(var Message: TWMKey): Boolean;
-begin
-  case Message.CharCode of
-    VK_RETURN:
-      if [ssCtrl, ssAlt, ssShift] * KeyDataToShiftState(Message.KeyData) = [ssCtrl] then
-      begin
-        if fsModal in FormState then
-        begin
-          ModalResult := mrOk;
-          Exit(True);
-        end;
-      end;
-
-    VK_ESCAPE:
-      if [ssCtrl, ssAlt, ssShift] * KeyDataToShiftState(Message.KeyData) = [] then
-      begin
-        if fsModal in FormState then
-        begin
-          ModalResult := mrCancel;
-          Exit(True);
-        end;
-        if CanCloseByEscape then
-        begin
-          Close;
-          Exit(True);
-        end;
-      end;
-  end;
-  Result := inherited;
-end;
-
-procedure TACLForm.CMFontChanged(var Message: TMessage);
-begin
-  if FInCreation = acFalse then
-    ResourceChanged;
-  inherited;
-end;
-
-procedure TACLForm.CMRecreateWnd(var Message: TMessage);
-begin
-  if FRecreateWndLockCount = 0 then
-    inherited;
-end;
-
-procedure TACLForm.CMShowingChanged(var Message: TCMDialogKey);
-var
-  AIsDefaultPositionCenter: Boolean;
-begin
-  AIsDefaultPositionCenter := Position in [poMainFormCenter, poOwnerFormCenter];
-  inherited;
-  if Visible and AIsDefaultPositionCenter then
-    MakeFullyVisible;
-end;
-
-procedure TACLForm.WMEnterMenuLoop(var Msg: TMessage);
-begin
-  Inc(FInMenuLoop);
-  inherited;
-end;
-
-procedure TACLForm.WMExitMenuLoop(var Msg: TMessage);
-begin
-  inherited;
-  Dec(FInMenuLoop);
-end;
-
-procedure TACLForm.WMNCActivate(var Msg: TWMNCActivate);
-begin
-  // Чтобы не было промаргивания при фокусировке контрола внутри попапа.
-  if (FInMenuLoop <> 0) and not Msg.Active then
-    Msg.Active := True;
-  inherited;
-end;
-
-procedure TACLForm.WndProc(var Message: TMessage);
-begin
-  if not FWndProcHooks[whmPreprocess].Process(Message) then
-  begin
-    inherited WndProc(Message);
-  {$IFDEF MSWINDOWS}
-    if (Message.Msg = WM_SHOWWINDOW) or
-       (Message.Msg = WM_WINDOWPOSCHANGED) and Visible
-    then
-      TACLStayOnTopHelper.Refresh;
-  {$ENDIF}
-    if Message.Msg <> CM_RELEASE then
-      FWndProcHooks[whmPostprocess].Process(Message);
-  end;
-end;
-
-function TACLForm.GetConfigSection: string;
-begin
-  Result := Name;
-end;
-
-procedure TACLForm.SetPadding(AValue: TACLPadding);
-begin
-  FPadding.Assign(AValue);
-end;
-
-procedure TACLForm.SetShowInTaskBar(AValue: TShowInTaskbar);
-{$IFDEF FPC}
-begin
-  inherited ShowInTaskBar := AValue
-{$ELSE}
-var
-  LExStyle: Cardinal;
-begin
-  if FShowInTaskBar <> AValue then
-  begin
-    FShowInTaskBar := AValue;
-    if HandleAllocated and not (csDesigning in ComponentState) then
-    begin
-      LExStyle := GetWindowLong(Handle, GWL_EXSTYLE);
-      if ShowInTaskBar = stAlways then
-        LExStyle := LExStyle or WS_EX_APPWINDOW
-      else
-        LExStyle := LExStyle and not WS_EX_APPWINDOW;
-      SetWindowLong(Handle, GWL_EXSTYLE, LExStyle);
-    end;
-  end;
-{$ENDIF}
-end;
-
-procedure TACLForm.SetStayOnTop(AValue: Boolean);
-begin
-  if AValue <> FStayOnTop then
-  begin
-    FStayOnTop := AValue;
-    TACLStayOnTopHelper.Refresh;
-    StayOnTopChanged;
-  end;
-end;
-
-procedure TACLForm.PaddingChangeHandler(Sender: TObject);
-begin
-  Realign;
-end;
+{$REGION ' Popup Window '}
 
 { TACLPopupWindow }
 
@@ -1482,6 +1507,456 @@ begin
   inherited;
 end;
 
+{$ENDREGION}
+
+{$REGION ' Custom Form '}
+
+{ TACLWindowHooks }
+
+function TACLWindowHooks.Process(var Message: TMessage): Boolean;
+var
+  I: Integer;
+begin
+  if Self = nil then
+    Exit(False);
+  for I := Count - 1 downto 0 do
+    if List[I](Message) then
+      Exit(True);
+  Result := False;
+end;
+
+{ TACLCustomForm }
+
+constructor TACLCustomForm.Create(AOwner: TComponent);
+begin
+  BeforeFormCreate;
+  inherited Create(AOwner);
+  AfterFormCreate;
+end;
+
+constructor TACLCustomForm.CreateDialog(AOwnerHandle: TWndHandle; ANew: Boolean = False);
+var
+  AOwner: TComponent;
+begin
+  FOwnerHandle := AOwnerHandle;
+  AOwner := FindControl(AOwnerHandle);
+  if AOwner is TCustomForm then
+    AOwner := GetParentForm(TCustomForm(AOwner)); // to make a poOwnerFormCenter works correctly
+  if AOwner = nil then
+    AOwner := Application;
+  if ANew then
+    CreateNew(AOwner)
+  else
+    Create(AOwner);
+end;
+
+procedure TACLCustomForm.CreateHandle;
+begin
+  inherited;
+  UpdateNonClientColors;
+end;
+
+constructor TACLCustomForm.CreateNew(AOwner: TComponent; Dummy: Integer = 0);
+begin
+  // Lazarus вызывает CreateNew из Create.
+  // Из-за чего у нас возникал двойной вызов событий before/after form create
+  if FInCreation = TACLBoolean.Default then
+  begin
+    BeforeFormCreate;
+    inherited CreateNew(AOwner, Dummy);
+    AfterFormCreate;
+  end
+  else
+    inherited CreateNew(AOwner, Dummy);
+end;
+
+destructor TACLCustomForm.Destroy;
+begin
+  TACLRootResourceCollection.ListenerRemove(Self);
+  inherited Destroy;
+  FreeAndNil(FWndProcHooks[whmPostprocess]);
+  FreeAndNil(FWndProcHooks[whmPreprocess]);
+  FreeAndNil(FPadding);
+  MinimizeMemoryUsage;
+end;
+
+procedure TACLCustomForm.AfterConstruction;
+begin
+  inherited;
+  FInCreation := acFalse;
+  ResourceChanged;
+  UpdateImageLists;
+end;
+
+procedure TACLCustomForm.AfterFormCreate;
+begin
+  DoubleBuffered := True;
+  TACLRootResourceCollection.ListenerAdd(Self);
+{$IFDEF MSWINDOWS}
+  TACLFormMouseWheelHelper.CheckInstalled;
+{$ENDIF}
+end;
+
+procedure TACLCustomForm.BeforeFormCreate;
+begin
+  FInCreation := acTrue;
+  FPadding := TACLPadding.Create(0);
+  FPadding.OnChanged := PaddingChangeHandler;
+end;
+
+function TACLCustomForm.CanCloseByEscape: Boolean;
+begin
+  Result := False;
+end;
+
+procedure TACLCustomForm.CreateParams(var Params: TCreateParams);
+begin
+  inherited CreateParams(Params);
+  if (Parent = nil) and (ParentWindow = 0) then
+  begin
+    if ShowInTaskBar = stAlways then
+      Params.ExStyle := Params.ExStyle or WS_EX_APPWINDOW;
+    if (Application.MainForm <> nil) and Application.MainForm.HandleAllocated then
+      Params.WndParent := Application.MainFormHandle;
+    if FOwnerHandle <> 0 then
+      Params.WndParent := FOwnerHandle;
+  end;
+end;
+
+procedure TACLCustomForm.DpiChanged;
+begin
+  inherited;
+  if FInCreation = acFalse then
+    ResourceChanged;
+  UpdateImageLists;
+end;
+
+procedure TACLCustomForm.HookWndProc(AHook: TWindowHook; AMode: TACLWindowHookMode = whmPreprocess);
+begin
+  if FWndProcHooks[AMode] = nil then
+    FWndProcHooks[AMode] := TACLWindowHooks.Create;
+  FWndProcHooks[AMode].Add(AHook);
+end;
+
+procedure TACLCustomForm.UnhookWndProc(AHook: TWindowHook);
+begin
+  if FWndProcHooks[whmPostprocess] <> nil then
+    FWndProcHooks[whmPostprocess].Remove(AHook);
+  if FWndProcHooks[whmPreprocess] <> nil then
+    FWndProcHooks[whmPreprocess].Remove(AHook);
+end;
+
+procedure TACLCustomForm.LoadPosition(AConfig: TACLIniFile);
+
+  function IsFormResizable: Boolean;
+  begin
+    Result := BorderStyle in [bsSizeable, bsSizeToolWin];
+  end;
+
+  procedure RestoreBounds(ABounds: TRect);
+  begin
+    if IsFormResizable then
+      ABounds.Size := dpiApply(ABounds.Size, FCurrentPPI)
+    else
+      ABounds.Size := TSize.Create(Width, Height);
+
+  {$IFDEF FPC}
+    BoundsRect := ABounds;
+  {$ELSE}
+    var LPlacement: TWindowPlacement;
+    ZeroMemory(@LPlacement, SizeOf(LPlacement));
+    LPlacement.Length := SizeOf(TWindowPlacement);
+    LPlacement.rcNormalPosition := ABounds;
+    SetWindowPlacement(Handle, LPlacement);
+  {$ENDIF}
+  end;
+
+var
+  LCfgSection: string;
+begin
+  Inc(FRecreateWndLockCount);
+  try
+    LCfgSection := GetConfigSection;
+    if AConfig.ExistsKey(LCfgSection, 'WindowRect') then
+    begin
+      RestoreBounds(AConfig.ReadRect(LCfgSection, 'WindowRect'));
+      Position := poDesigned;
+      DefaultMonitor := dmDesktop;
+      if not MonitorGetBounds(BoundsRect.TopLeft).Contains(BoundsRect) then
+        MakeFullyVisible;
+    end;
+    if IsFormResizable and AConfig.ReadBool(LCfgSection, 'WindowMaximized') then
+      WindowState := wsMaximized;
+  finally
+    Dec(FRecreateWndLockCount);
+  end;
+end;
+
+procedure TACLCustomForm.SavePosition(AConfig: TACLIniFile);
+var
+  LBounds: TRect;
+  LCfgSection: string;
+  LIsMaximized: Boolean;
+{$IFNDEF FPC}
+  LPlacement: TWindowPlacement;
+{$ENDIF}
+begin
+  if HandleAllocated then
+  begin
+    LCfgSection := GetConfigSection;
+  {$IFDEF FPC}
+    LBounds := BoundsRect;
+    LIsMaximized := WindowState = wsMaximized;
+  {$ELSE}
+    LPlacement.Length := SizeOf(TWindowPlacement);
+    if not GetWindowPlacement(Handle, LPlacement) then
+      Exit;
+    LBounds := LPlacement.rcNormalPosition;
+    case WindowState of
+      wsMaximized:
+        LIsMaximized := True;
+      wsMinimized:
+        LIsMaximized := LPlacement.flags and WPF_RESTORETOMAXIMIZED = WPF_RESTORETOMAXIMIZED;
+    else
+      LIsMaximized := False;
+    end;
+  {$ENDIF}
+    LBounds.Height := dpiRevert(LBounds.Height, FCurrentPPI);
+    LBounds.Width := dpiRevert(LBounds.Width, FCurrentPPI);
+    AConfig.WriteBool(LCfgSection, 'WindowMaximized', LIsMaximized);
+    AConfig.WriteRect(LCfgSection, 'WindowRect', LBounds);
+  end;
+end;
+
+procedure TACLCustomForm.ShowAndActivate;
+begin
+  if TACLApplication.IsMinimized then
+    Visible := False;
+  Show;
+  SetForegroundWindow(Handle);
+  SetFocus;
+end;
+
+procedure TACLCustomForm.UpdateImageLists;
+begin
+  TACLFormImageListReplacer.Execute(FCurrentPPI, Self);
+end;
+
+procedure TACLCustomForm.UpdateNonClientColors;
+{$IFDEF MSWINDOWS}
+const
+  DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+var
+  LValue: LongBool;
+  LWidth: Integer;
+begin
+  // https://stackoverflow.com/questions/39261826/change-the-color-of-the-title-bar-caption-of-a-win32-application
+  if IsWin10OrLater and HandleAllocated and (TOSVersion.Build >= 18985) then
+  begin
+    LValue := TACLApplication.IsDarkMode;
+    DwmSetWindowAttribute(Handle, DWMWA_USE_IMMERSIVE_DARK_MODE, @LValue, SizeOf(LValue));
+    // Fully recalculate and redraw the window
+    LWidth := Width;
+    SetWindowPos(Handle, 0, 0, 0, LWidth + 1,
+      Height, SWP_NOZORDER or SWP_NOACTIVATE or SWP_NOMOVE);
+    SetWindowPos(Handle, 0, 0, 0, LWidth,
+      Height, SWP_NOZORDER or SWP_NOACTIVATE or SWP_NOMOVE);
+  end;
+{$ELSE}
+begin
+{$ENDIF}
+end;
+
+procedure TACLCustomForm.AdjustClientRect(var Rect: TRect);
+begin
+  inherited AdjustClientRect(Rect);
+  Rect.Content(Padding.GetScaledMargins(FCurrentPPI));
+end;
+
+function TACLCustomForm.ShouldBeStayOnTop: Boolean;
+begin
+  Result := StayOnTop{$IFNDEF FPC} or TACLStayOnTopHelper.ShouldBeStayOnTop(GetOwnerWindow);{$ENDIF}
+end;
+
+procedure TACLCustomForm.StayOnTopChanged;
+begin
+  // nothing
+end;
+
+procedure TACLCustomForm.ResourceChanged(Sender: TObject; Resource: TACLResource = nil);
+begin
+  if FInCreation = acFalse then
+    ResourceChanged;
+end;
+
+procedure TACLCustomForm.ResourceChanged;
+var
+  AColor: TACLResourceColor;
+begin
+  if TACLRootResourceCollection.GetResource('Form.Colors.Background', TACLResourceColor, Self, AColor) then
+    Color := AColor.AsColor;
+  if TACLRootResourceCollection.GetResource('Form.Colors.Text', TACLResourceColor, Self, AColor) then
+    TextColor := AColor.AsColor;
+end;
+
+function TACLCustomForm.GetResource(const ID: string; AResourceClass: TClass; ASender: TObject = nil): TObject;
+begin
+  Result := TACLRootResourceCollection.GetResource(ID, AResourceClass, ASender);
+end;
+
+procedure TACLCustomForm.ApplicationSettingsChanged(AChanges: TACLApplicationChanges);
+begin
+  inherited;
+  if acDarkMode in AChanges then
+  begin
+    UpdateNonClientColors;
+    UpdateImageLists;
+  end;
+end;
+
+function TACLCustomForm.DialogChar(var Message: TWMKey): Boolean;
+begin
+  case Message.CharCode of
+    VK_RETURN:
+      if [ssCtrl, ssAlt, ssShift] * KeyDataToShiftState(Message.KeyData) = [ssCtrl] then
+      begin
+        if fsModal in FormState then
+        begin
+          ModalResult := mrOk;
+          Exit(True);
+        end;
+      end;
+
+    VK_ESCAPE:
+      if [ssCtrl, ssAlt, ssShift] * KeyDataToShiftState(Message.KeyData) = [] then
+      begin
+        if fsModal in FormState then
+        begin
+          ModalResult := mrCancel;
+          Exit(True);
+        end;
+        if CanCloseByEscape then
+        begin
+          Close;
+          Exit(True);
+        end;
+      end;
+  end;
+  Result := inherited;
+end;
+
+procedure TACLCustomForm.CMFontChanged(var Message: TMessage);
+begin
+  if FInCreation = acFalse then
+    ResourceChanged;
+  inherited;
+end;
+
+procedure TACLCustomForm.CMRecreateWnd(var Message: TMessage);
+begin
+  if FRecreateWndLockCount = 0 then
+    inherited;
+end;
+
+procedure TACLCustomForm.CMShowingChanged(var Message: TCMDialogKey);
+var
+  AIsDefaultPositionCenter: Boolean;
+begin
+  AIsDefaultPositionCenter := Position in [poMainFormCenter, poOwnerFormCenter];
+  inherited;
+  if Visible and AIsDefaultPositionCenter then
+    MakeFullyVisible;
+end;
+
+procedure TACLCustomForm.WMEnterMenuLoop(var Msg: TMessage);
+begin
+  Inc(FInMenuLoop);
+  inherited;
+end;
+
+procedure TACLCustomForm.WMExitMenuLoop(var Msg: TMessage);
+begin
+  inherited;
+  Dec(FInMenuLoop);
+end;
+
+procedure TACLCustomForm.WMNCActivate(var Msg: TWMNCActivate);
+begin
+  // Чтобы не было промаргивания при фокусировке контрола внутри попапа.
+  if (FInMenuLoop <> 0) and not Msg.Active then
+    Msg.Active := True;
+  inherited;
+end;
+
+procedure TACLCustomForm.WndProc(var Message: TMessage);
+begin
+  if not FWndProcHooks[whmPreprocess].Process(Message) then
+  begin
+    inherited WndProc(Message);
+  {$IFDEF MSWINDOWS}
+    if (Message.Msg = WM_SHOWWINDOW) or
+       (Message.Msg = WM_WINDOWPOSCHANGED) and Visible
+    then
+      TACLStayOnTopHelper.Refresh;
+  {$ENDIF}
+    if Message.Msg <> CM_RELEASE then
+      FWndProcHooks[whmPostprocess].Process(Message);
+  end;
+end;
+
+function TACLCustomForm.GetConfigSection: string;
+begin
+  Result := Name;
+end;
+
+procedure TACLCustomForm.SetPadding(AValue: TACLPadding);
+begin
+  FPadding.Assign(AValue);
+end;
+
+procedure TACLCustomForm.SetShowInTaskBar(AValue: TShowInTaskbar);
+{$IFDEF FPC}
+begin
+  inherited ShowInTaskBar := AValue
+{$ELSE}
+var
+  LExStyle: Cardinal;
+begin
+  if FShowInTaskBar <> AValue then
+  begin
+    FShowInTaskBar := AValue;
+    if HandleAllocated and not (csDesigning in ComponentState) then
+    begin
+      LExStyle := GetWindowLong(Handle, GWL_EXSTYLE);
+      if ShowInTaskBar = stAlways then
+        LExStyle := LExStyle or WS_EX_APPWINDOW
+      else
+        LExStyle := LExStyle and not WS_EX_APPWINDOW;
+      SetWindowLong(Handle, GWL_EXSTYLE, LExStyle);
+    end;
+  end;
+{$ENDIF}
+end;
+
+procedure TACLCustomForm.SetStayOnTop(AValue: Boolean);
+begin
+  if AValue <> FStayOnTop then
+  begin
+    FStayOnTop := AValue;
+    TACLStayOnTopHelper.Refresh;
+    StayOnTopChanged;
+  end;
+end;
+
+procedure TACLCustomForm.PaddingChangeHandler(Sender: TObject);
+begin
+  Realign;
+end;
+
+{$ENDREGION}
+
+{$REGION ' Form '}
+
 { TACLLocalizableForm }
 
 procedure TACLLocalizableForm.AfterConstruction;
@@ -1501,9 +1976,12 @@ begin
 end;
 
 procedure TACLLocalizableForm.LangChange;
+var
+  LSection: string;
 begin
-  Caption := LangFile.ReadString(GetLangSection, 'Caption', Caption);
-  LangApplyTo(GetLangSection, Self);
+  LSection := GetLangSection;
+  Caption := LangFile.ReadString(LSection, 'Caption', Caption);
+  LangApplyTo(LSection, Self);
 end;
 
 function TACLLocalizableForm.LangValue(const AKey: string): string;
@@ -1516,418 +1994,11 @@ begin
   Result := LangExtractPart(LangValue(AKey), APartIndex);
 end;
 
-procedure TACLLocalizableForm.WMLANG(var Msg: TMessage);
+procedure TACLLocalizableForm.WMLang(var Msg: TMessage);
 begin
   LangChange;
 end;
 
-{ TACLFormImageListReplacer }
-
-constructor TACLFormImageListReplacer.Create(ATargetDPI: Integer; ADarkMode: Boolean);
-begin
-  FDarkMode := ADarkMode;
-  FTargetDPI := ATargetDPI;
-  FReplacementCache := TACLObjectDictionary.Create;
-end;
-
-destructor TACLFormImageListReplacer.Destroy;
-begin
-  FreeAndNil(FReplacementCache);
-  inherited Destroy;
-end;
-
-class procedure TACLFormImageListReplacer.Execute(ATargetDPI: Integer; AForm: TCustomForm);
-begin
-  with TACLFormImageListReplacer.Create(ATargetDPI, TACLApplication.IsDarkMode) do
-  try
-    UpdateImageLists(AForm);
-  finally
-    Free;
-  end;
-end;
-
-class function TACLFormImageListReplacer.GetReplacement(
-  AImageList: TCustomImageList; AForm: TCustomForm): TCustomImageList;
-begin
-  Result := GetReplacement(AImageList, acGetCurrentDpi(AForm), TACLApplication.IsDarkMode);
-end;
-
-class function TACLFormImageListReplacer.GetReplacement(
-  AImageList: TCustomImageList; ATargetDPI: Integer; ADarkMode: Boolean): TCustomImageList;
-
-  function CheckReference(const AReference: TComponent; var AResult: TCustomImageList): Boolean;
-  begin
-    Result := AReference is TCustomImageList;
-    if Result then
-      AResult := TCustomImageList(AReference);
-  end;
-
-  function TryFind(const ABaseName: TComponentName; ATargetDPI: Integer; var AResult: TCustomImageList): Boolean;
-  begin
-    Result := False;
-    if ADarkMode then
-      Result := CheckReference(AImageList.Owner.FindComponent(GenerateName(ABaseName, DarkModeSuffix, ATargetDPI)), AResult);
-    if not Result then
-      Result := CheckReference(AImageList.Owner.FindComponent(GenerateName(ABaseName, EmptyStr, ATargetDPI)), AResult);
-    if not Result and (ATargetDPI = acDefaultDPI) then
-      Result := CheckReference(AImageList.Owner.FindComponent(ABaseName), AResult);
-  end;
-
-var
-  ABaseName: TComponentName;
-  I: Integer;
-begin
-  Result := AImageList;
-
-  ABaseName := GetBaseImageListName(AImageList.Name);
-  if (ABaseName <> '') and (AImageList.Owner <> nil) and not TryFind(ABaseName, ATargetDPI, Result) then
-  begin
-    for I := High(acDefaultDPIValues) downto Low(acDefaultDPIValues) do
-    begin
-      if (acDefaultDPIValues[I] < ATargetDPI) and TryFind(ABaseName, acDefaultDPIValues[I], Result) then
-        Break;
-    end;
-  end;
-end;
-
-procedure TACLFormImageListReplacer.UpdateImageList(AInstance: TObject; APropInfo: PPropInfo; APropValue: TObject);
-var
-  ANewValue: TObject;
-begin
-  if not FReplacementCache.TryGetValue(APropValue, ANewValue) then
-  begin
-    ANewValue := GetReplacement(TCustomImageList(APropValue), FTargetDPI, FDarkMode);
-    FReplacementCache.Add(APropValue, ANewValue);
-  end;
-  if APropValue <> ANewValue then
-    SetObjectProp(AInstance, APropInfo, ANewValue);
-end;
-
-procedure TACLFormImageListReplacer.UpdateImageListProperties(APersistent: TPersistent);
-
-  function EnumProperties(AObject: TObject; out AList: PPropList; out ACount: Integer): Boolean;
-  begin
-    Result := False;
-    if AObject <> nil then
-    begin
-      ACount := GetTypeData(AObject.ClassInfo)^.PropCount;
-      Result := ACount > 0;
-      if Result then
-      begin
-        AList := AllocMem(ACount * SizeOf(Pointer));
-        GetPropInfos(AObject.ClassInfo, AList);
-      end;
-    end;
-  end;
-
-var
-  APropClass: TClass;
-  AProperties: PPropList;
-  APropertyCount: Integer;
-  APropInfo: PPropInfo;
-  APropValue: TObject;
-  I: Integer;
-begin
-  if EnumProperties(APersistent, AProperties, APropertyCount) then
-  try
-    for I := 0 to APropertyCount - 1 do
-    begin
-      APropInfo := AProperties^[I];
-      if APropInfo.PropType^.Kind = tkClass then
-      begin
-        APropClass := GetObjectPropClass(APropInfo);
-        if APropClass.InheritsFrom(TComponent) then
-        begin
-          if APropClass.InheritsFrom(TCustomImageList) then
-          begin
-            APropValue := GetObjectProp(APersistent, APropInfo);
-            if APropValue <> nil then
-              UpdateImageList(APersistent, APropInfo, APropValue);
-          end;
-        end
-        else
-          if APropClass.InheritsFrom(TPersistent) then
-          begin
-            APropValue := GetObjectProp(APersistent, APropInfo);
-            if APropValue <> nil then
-              UpdateImageListProperties(TPersistent(APropValue));
-          end;
-      end;
-    end;
-  finally
-    FreeMem(AProperties);
-  end;
-end;
-
-procedure TACLFormImageListReplacer.UpdateImageLists(AForm: TCustomForm);
-var
-  I: Integer;
-begin
-  for I := 0 to AForm.ComponentCount - 1 do
-    UpdateImageListProperties(AForm.Components[I]);
-end;
-
-class function TACLFormImageListReplacer.GenerateName(
-  const ABaseName, ASuffix: string; ATargetDPI: Integer): TComponentName;
-begin
-  Result := ABaseName + ASuffix + IntToStr(MulDiv(100, ATargetDPI, acDefaultDPI));
-end;
-
-class function TACLFormImageListReplacer.GetBaseImageListName(const AName: TComponentName): TComponentName;
-var
-  ALength: Integer;
-begin
-  Result := AName;
-  ALength := Length(Result);
-  while (ALength > 0) and CharInSet(Result[ALength], ['0'..'9']) do
-    Dec(ALength);
-  SetLength(Result, ALength);
-  if acEndsWith(Result, DarkModeSuffix) then
-    SetLength(Result, ALength - Length(DarkModeSuffix));
-end;
-
-{ TACLStayOnTopHelper }
-
-class destructor TACLStayOnTopHelper.Destroy;
-begin
-  FreeAndNil(FEvents);
-end;
-
-class procedure TACLStayOnTopHelper.Refresh(AForm: TACLForm);
-const
-  StyleMap: array[Boolean] of HWND = (HWND_NOTOPMOST, HWND_TOPMOST);
-var
-  AStayOnTop: Boolean;
-begin
-  if (AForm <> nil) and AForm.HandleAllocated and IsWindowVisible(AForm.Handle) then
-  begin
-    if csDesigning in AForm.ComponentState then Exit;
-
-    AStayOnTop := (AForm.FormStyle = fsStayOnTop) or StayOnTopAvailable and AForm.ShouldBeStayOnTop;
-    if IsStayOnTop(AForm.Handle) <> AStayOnTop then
-    begin
-      if AStayOnTop then
-        CheckForApplicationEvents;
-      SetWindowPos(AForm.Handle, StyleMap[AStayOnTop], 0, 0, 0, 0,
-        SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE or SWP_NOOWNERZORDER);
-    end;
-  end;
-end;
-
-class function TACLStayOnTopHelper.ExecuteCommonDialog(
-  ADialog: TCommonDialog; AHandleWnd: HWND): Boolean;
-begin
-  Application.ModalStarted;
-  try
-    Result := ADialog.Execute{$IFNDEF FPC}(AHandleWnd){$ENDIF};
-  finally
-    Application.ModalFinished;
-  end;
-end;
-
-class function TACLStayOnTopHelper.IsStayOnTop(AHandle: HWND): Boolean;
-begin
-  Result := (AHandle <> 0) and (GetWindowLong(AHandle, GWL_EXSTYLE) and WS_EX_TOPMOST <> 0);
-end;
-
-class procedure TACLStayOnTopHelper.Refresh;
-var
-  AForm: TForm;
-  I: Integer;
-begin
-  for I := Screen.FormCount - 1 downto 0 do
-  begin
-    AForm := Screen.Forms[I];
-    if AForm is TACLForm then
-      Refresh(TACLForm(AForm));
-  end;
-end;
-
-class function TACLStayOnTopHelper.ShouldBeStayOnTop(AHandle: HWND): Boolean;
-var
-  AControl: TWinControl;
-begin
-  AControl := FindControl(AHandle);
-  Result := (AControl is TACLForm) and TACLForm(AControl).ShouldBeStayOnTop;
-end;
-
-class procedure TACLStayOnTopHelper.AppEventsModalHandler(Sender: TObject);
-begin
-  Refresh;
-end;
-
-class procedure TACLStayOnTopHelper.CheckForApplicationEvents;
-begin
-  if FEvents = nil then
-  begin
-  {$IFDEF FPC}
-    FEvents := TObject.Create;
-    Application.AddOnModalBeginHandler(AppEventsModalHandler);
-    Application.AddOnModalEndHandler(AppEventsModalHandler);
-  {$ELSE}
-    FEvents := TApplicationEvents.Create(nil);
-    TApplicationEvents(FEvents).OnModalBegin := AppEventsModalHandler;
-    TApplicationEvents(FEvents).OnModalEnd := AppEventsModalHandler;
-  {$ENDIF}
-  end;
-end;
-
-class function TACLStayOnTopHelper.StayOnTopAvailable: Boolean;
-begin
-  Result := Application.ModalLevel = 0;
-end;
-
-{ TACLFormScaling }
-
-procedure TACLFormScaling.Start(AForm: TACLBasicForm);
-
-  procedure PopulateControls(AControl: TControl);
-  var
-    I: Integer;
-  begin
-    LockedControls.Add(AControl);
-    if AControl is TCustomForm then
-    begin
-      for I := 0 to TCustomFormAccess(AControl).MDIChildCount - 1 do
-        PopulateControls(TCustomFormAccess(AControl).MDIChildren[I]);
-    end;
-    if AControl is TWinControl then
-    begin
-      for I := 0 to TWinControl(AControl).ControlCount - 1 do
-        PopulateControls(TWinControl(AControl).Controls[I]);
-    end;
-  end;
-
-var
-  I: Integer;
-begin
-  //#AI: don't change the order
-  Form := AForm;
-  RedrawLocked := IsWinVistaOrLater and IsWindowVisible(AForm.Handle);
-  LockedControls := TComponentList.Create(False);
-  PopulateControls(AForm);
-  for I := 0 to LockedControls.Count - 1 do
-    TControl(LockedControls[I]).Perform(CM_SCALECHANGING, 0, 0);
-{$IFDEF MSWINDOWS}
-  if RedrawLocked then
-    SendMessage(Form.Handle, WM_SETREDRAW, 0, 0);
-{$ENDIF}
-  AForm.DisableAlign;
-end;
-
-procedure TACLFormScaling.Done;
-var
-  I: Integer;
-begin
-  //#AI: keep the order
-  Form.DpiChanged;
-  Form.EnableAlign;
-  Form.Realign;
-{$IFDEF MSWINDOWS}
-  if RedrawLocked then
-    SendMessage(Form.Handle, WM_SETREDRAW, 1, 1);
-{$ENDIF}
-  for I := LockedControls.Count - 1 downto 0 do
-    TControl(LockedControls[I]).Perform(CM_SCALECHANGED, 0, 0);
-  if RedrawLocked then
-    RedrawWindow(Form.Handle, nil, 0, RDW_INVALIDATE or RDW_ALLCHILDREN or RDW_ERASE);
-  FreeAndNil(LockedControls);
-end;
-
-{$IFDEF MSWINDOWS}
-
-{ TACLFormMouseWheelHelper }
-
-class procedure TACLFormMouseWheelHelper.CheckInstalled;
-begin
-  if (FHook = 0) and not IsWin10OrLater then
-    FHook := SetWindowsHookEx(WH_MOUSE, MouseHook, 0, GetCurrentThreadId);
-end;
-
-class destructor TACLFormMouseWheelHelper.Destroy;
-begin
-  UnhookWindowsHookEx(FHook);
-  FHook := 0;
-end;
-
-class function TACLFormMouseWheelHelper.MouseHook(
-  Code: Integer; wParam: WParam; lParam: LParam): LRESULT; stdcall;
-type
-  PMouseHookStructEx = ^TMouseHookStructEx;
-  TMouseHookStructEx = record
-    pt: TPoint;
-    hwnd: HWND;
-    wHitTestCode: UINT;
-    dwExtraInfo: NativeUInt;
-    mouseData: DWORD;
-  end;
-
-  function ShiftStateToKeys(AShift: TShiftState): WORD;
-  begin
-    Result := 0;
-    if ssShift in AShift then
-      Inc(Result, MK_SHIFT);
-    if ssCtrl in AShift then
-      Inc(Result, MK_CONTROL);
-    if ssLeft in AShift then
-      Inc(Result, MK_LBUTTON);
-    if ssRight in AShift then
-      Inc(Result, MK_RBUTTON);
-    if ssMiddle in AShift then
-      Inc(Result, MK_MBUTTON);
-  end;
-
-var
-  AControl: TControl;
-  AMHS: PMouseHookStructEx;
-  APoint: TPoint;
-  AWindow: TWinControl;
-begin
-  Result := 0;
-  if (Code >= 0) and ((wParam = WM_MOUSEWHEEL) or (wParam = WM_MOUSEHWHEEL)) and Mouse.WheelPresent then
-  begin
-    AMHS := PMouseHookStructEx(lParam);
-
-    AWindow := FindControl(AMHS.hwnd);
-    if AWindow <> nil then
-    begin
-      APoint := AMHS.pt;
-      if (APoint.X = -1) and (APoint.Y = -1) then
-        APoint := MouseCursorPos;
-
-      //#AI: Workaround for Synaptics TouchPad Driver
-      if acSameText(acGetClassName(WindowFromPoint(APoint)), 'SynTrackCursorWindowClass') then
-      begin
-        repeat
-          AControl := AWindow.ControlAtPos(AWindow.ScreenToClient(APoint), False, True);
-          if AControl = nil then
-          begin
-            AControl := AWindow;
-            Break;
-          end;
-          if AControl is TWinControl then
-            AWindow := TWinControl(AControl)
-          else
-            Break;
-        until False;
-      end
-      else
-        AControl := FindDragTarget(APoint, False);
-
-      if (AControl <> nil) and (AControl <> AWindow) then
-      begin
-        Result := AControl.Perform(CM_MOUSEWHEEL,
-          MakeWParam(ShiftStateToKeys(KeyboardStateToShiftState), HiWord(AMHS.mouseData)),
-          PointToLParam(APoint));
-        if Result = 1 then
-          Exit(1);
-      end;
-    end;
-  end
-  else
-    Result := CallNextHookEx(FHook, code, wParam, lParam);
-end;
-
-{$ENDIF}
+{$ENDREGION}
 
 end.
