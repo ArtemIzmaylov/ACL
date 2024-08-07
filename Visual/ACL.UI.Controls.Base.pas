@@ -747,6 +747,7 @@ type
 
   TACLControlHelper = class helper for TControl
   public
+    function BroadcastRecursive(Msg: Cardinal; ParamW: WPARAM; ParamL: LPARAM): LRESULT;
     function CalcCursorPos: TPoint;
   {$IFDEF FPC}
     function ExplicitHeight: Integer;
@@ -3063,6 +3064,22 @@ begin
 end;
 
 { TACLControlHelper }
+
+function TACLControlHelper.BroadcastRecursive(
+  Msg: Cardinal; ParamW: WPARAM; ParamL: LPARAM): LRESULT;
+var
+  I: Integer;
+begin
+  Result := Perform(Msg, ParamW, ParamL);
+  if (Result = 0) and (Self is TWinControl) then
+  begin
+    for I := 0 to TWinControl(Self).ControlCount - 1 do
+    begin
+      Result := TWinControl(Self).Controls[I].BroadcastRecursive(Msg, ParamW, ParamL);
+      if Result <> 0 then Exit;
+    end;
+  end;
+end;
 
 function TACLControlHelper.CalcCursorPos: TPoint;
 begin

@@ -76,7 +76,7 @@ type
       AState: TACLButtonState; APart: TACLButtonPart = abpButton); overload; virtual;
     procedure Draw(ACanvas: TCanvas; const R: TRect;
       AState: TACLButtonState; ACheckBoxState: TCheckBoxState); overload; virtual;
-    //
+    // Properties
     property ContentOffsets: TRect read GetContentOffsets;
     property TextColors[AState: TACLButtonState]: TColor read GetTextColor;
     // for backward compatibility with scripts
@@ -343,9 +343,6 @@ type
     FModalResult: TModalResult;
   {$IFDEF FPC}
     FRolesUpdateLocked: Boolean;
-  {$ELSE}
-    procedure CMDialogKey(var Message: TCMDialogKey); message CM_DIALOGKEY;
-    procedure CMFocusChanged(var Message: TCMFocusChanged); message CM_FOCUSCHANGED;
   {$ENDIF}
     procedure HandlerImageChange(Sender: TObject);
     function IsGlyphStored: Boolean;
@@ -358,6 +355,9 @@ type
     procedure SetImageIndex(AIndex: TImageIndex);
     procedure SetImages(const AList: TCustomImageList);
     procedure UpdateRoles;
+    // Messages
+    procedure CMDialogKey(var Message: TCMDialogKey); message CM_DIALOGKEY;
+    procedure CMFocusChanged(var Message: TMessage); message CM_FOCUSCHANGED;
   protected
     function CreateStyle: TACLStyleButton; override;
     function CreateSubClass: TACLCustomButtonSubClass; override;
@@ -1371,7 +1371,7 @@ begin
     Default := crffDefault in AForm.GetRolesForControl(Self);
 end;
 
-{$ELSE}
+{$ENDIF}
 
 procedure TACLSimpleButton.CMDialogKey(var Message: TCMDialogKey);
 begin
@@ -1388,16 +1388,18 @@ begin
   inherited;
 end;
 
-procedure TACLSimpleButton.CMFocusChanged(var Message: TCMFocusChanged);
+procedure TACLSimpleButton.CMFocusChanged(var Message: TMessage);
+var
+  LSender: TControl;
 begin
-  if Message.Sender is TACLSimpleButton then
-    SubClass.IsDefault := Default and (Message.Sender = Self)
+  LSender := TControl(Message.LParam);
+  if LSender is TACLSimpleButton then
+    SubClass.IsDefault := Default and (LSender = Self)
   else
     SubClass.IsDefault := Default;
 
   inherited;
 end;
-{$ENDIF}
 
 function TACLSimpleButton.CreateStyle: TACLStyleButton;
 begin

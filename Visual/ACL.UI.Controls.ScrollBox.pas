@@ -488,13 +488,12 @@ end;
 procedure TACLCustomScrollBox.CMFocusChanged(var Msg: TMessage);
 begin
   inherited;
-{$IFDEF FPC}
-  {$MESSAGE 'TODO - CMFocusChanged - not implemented'}
-{$ELSE}
   FFocusing := True;
-  MakeVisible(TCMFocusChanged(Msg).Sender);
-  FFocusing := False;
-{$ENDIF}
+  try
+    MakeVisible(TControl(Msg.LParam));
+  finally
+    FFocusing := False;
+  end;
 end;
 
 procedure TACLCustomScrollBox.DisableAutoRange;

@@ -147,6 +147,7 @@ type
     procedure ScaleForCurrentDPI{$IFDEF DELPHI120}(ForceScaling: Boolean = False){$ENDIF};{$IFNDEF FPC}override;{$ENDIF}
     procedure ScaleForPPI(ATargetPPI: Integer); overload; {$IFNDEF FPC}override; final;{$ENDIF}
     procedure ScaleForPPI(ATargetPPI: Integer; AWindowRect: PRect); reintroduce; overload; virtual;
+    function SetFocusedControl(Control: TWinControl): Boolean; override;
     //# Properties
     property CurrentDpi: Integer read FCurrentPPI;
   published
@@ -708,6 +709,19 @@ end;
 procedure TACLBasicForm.ScaleForPPI(ATargetPPI: Integer);
 begin
   ScaleForPPI(ATargetPPI, nil);
+end;
+
+function TACLBasicForm.SetFocusedControl(Control: TWinControl): Boolean;
+begin
+  Result := inherited SetFocusedControl(Control);
+{$IFDEF FPC}
+  if Result then
+  begin
+    if Control = nil then
+      Control := Self;
+    BroadcastRecursive(CM_FOCUSCHANGED, 0, LParam(Control));
+  end;
+{$ENDIF}
 end;
 
 function TACLBasicForm.DialogChar(var Message: TWMKey): Boolean;
