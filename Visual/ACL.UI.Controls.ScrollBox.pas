@@ -40,7 +40,7 @@ uses
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Ex,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.ScrollBar,
   ACL.UI.Resources,
@@ -145,7 +145,7 @@ implementation
 
 {$IFDEF LCLGtk2}
 uses
-  ACL.UI.Application.Gtk2;
+  ACL.UI.Core.Impl.Gtk2;
 {$ENDIF}
 
 type

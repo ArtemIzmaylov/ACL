@@ -56,7 +56,7 @@ uses
   ACL.ObjectLinks,
   ACL.Threading,
   ACL.UI.Application,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Resources,
   ACL.Utils.Common,
   ACL.Utils.Desktop,

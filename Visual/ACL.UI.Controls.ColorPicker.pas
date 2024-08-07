@@ -41,7 +41,7 @@ uses
   ACL.Geometry.Utils,
   ACL.Graphics,
   ACL.Graphics.SkinImage,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.CompoundControl,
   ACL.UI.Controls.CompoundControl.SubClass,

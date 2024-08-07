@@ -42,7 +42,7 @@ uses
   ACL.Graphics,
   ACL.Graphics.Images,
   ACL.UI.Application,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.CompoundControl.SubClass,
   ACL.UI.Controls.TreeList,
   ACL.UI.Controls.TreeList.Options,

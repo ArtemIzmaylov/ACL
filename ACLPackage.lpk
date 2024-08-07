@@ -252,8 +252,8 @@
         <UnitName Value="ACL.UI.Controls.ActivityIndicator"/>
       </Item>
       <Item>
-        <Filename Value="Visual/ACL.UI.Controls.BaseControls.pas"/>
-        <UnitName Value="ACL.UI.Controls.BaseControls"/>
+        <Filename Value="Visual/ACL.UI.Controls.Base.pas"/>
+        <UnitName Value="ACL.UI.Controls.Base"/>
       </Item>
       <Item>
         <Filename Value="Visual/ACL.UI.Controls.BaseEditors.pas"/>

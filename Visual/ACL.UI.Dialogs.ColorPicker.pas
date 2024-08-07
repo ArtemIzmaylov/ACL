@@ -35,7 +35,7 @@ uses
   // ACL
   ACL.Graphics,
   ACL.Classes.Collections,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.ColorPalette,
   ACL.UI.Controls.ColorPicker,

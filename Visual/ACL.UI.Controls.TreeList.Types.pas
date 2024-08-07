@@ -42,7 +42,7 @@ uses
   ACL.FileFormats.INI,
   ACL.ObjectLinks,
   ACL.UI.Resources,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.CompoundControl.SubClass;
 
 const

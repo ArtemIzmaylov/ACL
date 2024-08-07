@@ -25,7 +25,7 @@ uses
   {Vcl.}Controls,
   // ACL
   ACL.Geometry,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.BindingDiagram.SubClass,
   ACL.UI.Controls.BindingDiagram.Types,
   ACL.UI.Controls.CompoundControl,

@@ -181,7 +181,7 @@
         <DCCReference Include="Visual\ACL.UI.Application.pas"/>
         <DCCReference Include="Visual\ACL.UI.Core.Impl.Win32.pas"/>
         <DCCReference Include="Visual\ACL.UI.Controls.ActivityIndicator.pas"/>
-        <DCCReference Include="Visual\ACL.UI.Controls.BaseControls.pas"/>
+        <DCCReference Include="Visual\ACL.UI.Controls.Base.pas"/>
         <DCCReference Include="Visual\ACL.UI.Controls.BaseEditors.pas"/>
         <DCCReference Include="Visual\ACL.UI.Controls.Bevel.pas"/>
         <DCCReference Include="Visual\ACL.UI.Controls.BindingDiagram.pas"/>

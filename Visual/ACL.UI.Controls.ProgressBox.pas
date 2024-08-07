@@ -41,7 +41,7 @@ uses
   ACL.Graphics.SkinImage,
   ACL.Timers,
   ACL.Threading,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.ProgressBar,
   ACL.UI.Resources,

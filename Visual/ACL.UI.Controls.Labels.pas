@@ -44,7 +44,7 @@ uses
   ACL.Graphics.Ex,
   ACL.Graphics.SkinImage,
   ACL.Math,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Resources,
   ACL.Utils.Common,
   ACL.Utils.DPIAware,

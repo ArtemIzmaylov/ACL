@@ -43,7 +43,7 @@ uses
   ACL.Graphics.SkinImage,
   ACL.Math,
   ACL.MUI,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Forms,
   ACL.UI.Insight,
   ACL.UI.Resources,

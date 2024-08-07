@@ -822,7 +822,7 @@ uses
   // VCL
   {Vcl.}Forms,
   // ACL
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.Utils.Strings;
 
 type

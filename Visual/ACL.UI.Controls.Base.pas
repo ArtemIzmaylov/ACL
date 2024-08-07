@@ -11,7 +11,7 @@
 //
 //  FPC:       OK
 //
-unit ACL.UI.Controls.BaseControls;
+unit ACL.UI.Controls.Base;
 
 {$I ACL.Config.inc}
 
@@ -79,6 +79,13 @@ const
   WM_MOUSELAST   = LM_MOUSELAST;
 
   csAligning     = csCreating; // просто потому, что оно в LCL не используется
+
+type
+  TGestureEventInfo = record
+    {stub}
+  end;
+  TWMContextMenu = TLMContextMenu;
+  TWMMouseWheel = TCMMouseWheel;
 {$ENDIF}
 
 const
@@ -92,24 +99,11 @@ const
   acAnchorBottomRight = [akRight, akBottom];
 
 type
+
+{$REGION ' General Types '}
+
   TTabOrderList = {$IFDEF FPC}TFPList{$ELSE}TList{$ENDIF};
   TWideKeyEvent = procedure(var Key: WideChar) of object;
-
-{$IFDEF FPC}
-  TGestureEventInfo = record
-    {stub}
-  end;
-  TWMContextMenu = TLMContextMenu;
-  TWMMouseWheel = TCMMouseWheel;
-{$ENDIF}
-
-  TACLMouseWheelDirection =
-  (
-    mwdDown, // Scroll the mouse wheel down (to yourself),
-             // the list must be scrolled to next item. equals to LB_LINEDOWN.
-    mwdUp    // Scroll the mouse wheel up (from yourself),
-             // the list must be scrolled to previous item. equals to LB_LINEUP.
-  );
 
   TACLOrientation = (oHorizontal, oVertical);
   TACLControlActionType = (ccatNone, ccatMouse, ccatGesture, ccatKeyboard);
@@ -126,7 +120,6 @@ type
   IACLControl = interface(IACLCurrentDPI)
   ['{D41EBD0F-D2EE-4517-AD7E-EEE8FC0ACFD4}']
     function GetEnabled: Boolean;
-
     procedure InvalidateRect(const R: TRect);
     procedure Update;
 
@@ -156,6 +149,17 @@ type
     function GetCursor(const P: TPoint): TCursor;
   end;
 
+  { IACLPopup }
+
+  IACLPopup = interface
+  ['{EDDF3E8C-C4DA-4AE7-9CED-78F068DDB8AE}']
+    procedure PopupUnderControl(const ControlRect: TRect);
+  end;
+
+{$ENDREGION}
+
+{$REGION ' In-placing '}
+
   { IACLInnerControl }
 
   IACLInnerControl = interface
@@ -173,22 +177,6 @@ type
     procedure InplaceSetValue(const AValue: string);
   end;
 
-  { IACLMouseTracking }
-
-  IACLMouseTracking = interface
-  ['{38A56452-B7C5-4B72-B872-84BAC2163EC7}']
-    function IsMouseAtControl: Boolean;
-    procedure MouseEnter;
-    procedure MouseLeave;
-  end;
-
-  { IACLPopup }
-
-  IACLPopup = interface
-  ['{EDDF3E8C-C4DA-4AE7-9CED-78F068DDB8AE}']
-    procedure PopupUnderControl(const ControlRect: TRect);
-  end;
-
   { TACLInplaceInfo }
 
   TACLInplaceInfo = packed record
@@ -204,6 +192,10 @@ type
 
     procedure Reset;
   end;
+
+{$ENDREGION}
+
+{$REGION ' Positioning '}
 
   { TACLPadding }
 
@@ -252,27 +244,61 @@ type
     DefaultValue = 3;
   end;
 
-  { TACLCheckBoxStateHelper }
+  { TACLSubControlOptions }
 
-  TACLCheckBoxStateHelper = record helper for TCheckBoxState
-  public
-    class function Create(AChecked: Boolean): TCheckBoxState; overload; static;
-    class function Create(AHasChecked, AHasUnchecked: Boolean): TCheckBoxState; overload; static;
-    class function Create(AValue: TACLBoolean): TCheckBoxState; overload; static;
-    function ToBool: TACLBoolean;
-  end;
+  TACLSubControlOptions = class(TPersistent)
+  strict private
+    FAlign: TACLBoolean;
+    FControl: TControl;
+    FOwner: TControl;
+    FPosition: TACLBorder;
+    FPrevWndProc: TWndMethod;
 
-  { TACLCustomOptionsPersistent }
-
-  TACLCustomOptionsPersistent = class(TACLLockablePersistent)
+    function GetActualIndentBetweenElements: Integer;
+    function Validate: Boolean;
+    procedure SetAlign(AValue: TACLBoolean);
+    procedure SetControl(AValue: TControl);
+    procedure SetPosition(AValue: TACLBorder);
   protected
-    procedure SetBooleanFieldValue(var AFieldValue: Boolean;
-      AValue: Boolean; AChanges: TACLPersistentChanges = [apcStruct]);
-    procedure SetIntegerFieldValue(var AFieldValue: Integer;
-      AValue: Integer; AChanges: TACLPersistentChanges = [apcStruct]);
-    procedure SetSingleFieldValue(var AFieldValue: Single;
-      AValue: Single; AChanges: TACLPersistentChanges = [apcStruct]);
+    procedure Changed; virtual;
+    procedure WindowProc(var Message: TMessage); virtual;
+    // Called from the Owner
+    procedure AfterAutoSize(var AWidth, AHeight: Integer); virtual;
+    procedure AlignControl(var AClientRect: TRect); virtual;
+    procedure BeforeAutoSize(var AWidth, AHeight: Integer); virtual;
+    procedure Notification(AComponent: TComponent; AOperation: TOperation); virtual;
+    function TrySetFocus: Boolean;
+    procedure UpdateVisibility; virtual;
+    //# Properties
+    property Owner: TControl read FOwner;
+  public
+    constructor Create(AOwner: TControl);
+    destructor Destroy; override;
+    procedure Assign(Source: TPersistent); override;
+  published
+    property Align: TACLBoolean read FAlign write SetAlign default TACLBoolean.Default;
+    property Position: TACLBorder read FPosition write SetPosition default mRight;
+    property Control: TControl read FControl write SetControl; // last
   end;
+
+  { TACLDeferPlacementUpdate }
+
+  TACLDeferPlacementUpdate = class
+  strict private
+    FBounds: TACLDictionary<TControl, TRect>;
+    function GetBounds(AControl: TControl): TRect;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure Add(AControl: TControl; ALeft, ATop, AWidth, AHeight: Integer); overload;
+    procedure Add(AControl: TControl; const ABounds: TRect); overload;
+    procedure Apply;
+    property Bounds[AControl: TControl]: TRect read GetBounds;
+  end;
+
+{$ENDREGION}
+
+{$REGION ' Styles '}
 
   { TACLStyleBackground }
 
@@ -321,6 +347,71 @@ type
     property ColorContent1: TACLResourceColor index 1 read GetColor write SetColor stored IsColorStored;
     property ColorContent2: TACLResourceColor index 2 read GetColor write SetColor stored IsColorStored;
   end;
+
+{$ENDREGION}
+
+{$REGION ' Mouse Tracker '}
+
+  { IACLMouseTracking }
+
+  IACLMouseTracking = interface
+  ['{38A56452-B7C5-4B72-B872-84BAC2163EC7}']
+    function IsMouseAtControl: Boolean;
+    procedure MouseEnter;
+    procedure MouseLeave;
+  end;
+
+  { TACLMouseTracker }
+
+  TACLMouseTracker = class(TACLTimerList<IACLMouseTracking>)
+  strict private
+    class var FInstance: TACLMouseTracker;
+    class function Get: TACLMouseTracker;
+  protected
+    procedure DoAdding(const AObject: IACLMouseTracking); override;
+    procedure TimerObject(const AObject: IACLMouseTracking); override;
+  public
+    class destructor Destroy;
+    class procedure Release(const AIntf: IACLMouseTracking); overload;
+    class procedure Release(const AObj: TObject); overload;
+    class procedure Start(const AIntf: IACLMouseTracking);
+  end;
+
+  { TACLMouseWheelDirection }
+
+  TACLMouseWheelDirection =
+  (
+    mwdDown, // Scroll the mouse wheel down (to yourself),
+             // the list must be scrolled to next item. equals to LB_LINEDOWN.
+    mwdUp    // Scroll the mouse wheel up (from yourself),
+             // the list must be scrolled to previous item. equals to LB_LINEUP.
+  );
+
+  { TACLMouseWheel }
+
+  TACLMouseWheel = class
+  public const
+    DefaultScrollLines = 1;
+    DefaultScrollLinesAlt = 2;
+    DefaultScrollLinesCtrl = 4;
+  public
+    class var ScrollLines: Integer;
+    class var ScrollLinesAlt: Integer;
+    class var ScrollLinesCtrl: Integer;
+  public const
+    DirectionToInteger: array[TACLMouseWheelDirection] of Integer = (-1, 1);
+    DirectionToScrollCode: array[TACLMouseWheelDirection] of TScrollCode = (scLineDown, scLineUp);
+    DirectionToScrollCodeI: array[TACLMouseWheelDirection] of Integer = (SB_LINEDOWN, SB_LINEUP);
+  public
+    class constructor Create;
+    class function GetDirection(AValue: Integer): TACLMouseWheelDirection;
+    class function GetScrollLines(AState: TShiftState): Integer;
+    class function HWheelToVWheel(const AMessage: TWMMouseWheel): TWMMouseWheel;
+  end;
+
+{$ENDREGION}
+
+{$REGION ' Controls '}
 
   { TACLGraphicControl }
 
@@ -425,8 +516,7 @@ type
 
   { TCustomScalableControl }
 
-  TCustomScalableControl = class(TCustomControl,
-    IACLCurrentDpi)
+  TCustomScalableControl = class(TCustomControl, IACLCurrentDpi)
   protected
     // IACLCurrentDpi
     function GetCurrentDpi: Integer;
@@ -612,43 +702,6 @@ type
     property OnStartDrag;
   end;
 
-  { TACLSubControlOptions }
-
-  TACLSubControlOptions = class(TPersistent)
-  strict private
-    FAlign: TACLBoolean;
-    FControl: TControl;
-    FOwner: TControl;
-    FPosition: TACLBorder;
-    FPrevWndProc: TWndMethod;
-
-    function GetActualIndentBetweenElements: Integer;
-    function Validate: Boolean;
-    procedure SetAlign(AValue: TACLBoolean);
-    procedure SetControl(AValue: TControl);
-    procedure SetPosition(AValue: TACLBorder);
-  protected
-    procedure Changed; virtual;
-    procedure WindowProc(var Message: TMessage); virtual;
-    // Called from the Owner
-    procedure AfterAutoSize(var AWidth, AHeight: Integer); virtual;
-    procedure AlignControl(var AClientRect: TRect); virtual;
-    procedure BeforeAutoSize(var AWidth, AHeight: Integer); virtual;
-    procedure Notification(AComponent: TComponent; AOperation: TOperation); virtual;
-    function TrySetFocus: Boolean;
-    procedure UpdateVisibility; virtual;
-    //# Properties
-    property Owner: TControl read FOwner;
-  public
-    constructor Create(AOwner: TControl);
-    destructor Destroy; override;
-    procedure Assign(Source: TPersistent); override;
-  published
-    property Align: TACLBoolean read FAlign write SetAlign default TACLBoolean.Default;
-    property Position: TACLBorder read FPosition write SetPosition default mRight;
-    property Control: TControl read FControl write SetControl; // last
-  end;
-
   { TACLContainer }
 
   TACLContainer = class(TACLCustomControl)
@@ -674,6 +727,20 @@ type
   published
     property ResourceCollection;
     property Style: TACLStyleBackground read FStyle write SetStyle;
+  end;
+
+{$ENDREGION}
+
+{$REGION ' Helpers '}
+
+  { TACLCheckBoxStateHelper }
+
+  TACLCheckBoxStateHelper = record helper for TCheckBoxState
+  public
+    class function Create(AChecked: Boolean): TCheckBoxState; overload; static;
+    class function Create(AHasChecked, AHasUnchecked: Boolean): TCheckBoxState; overload; static;
+    class function Create(AValue: TACLBoolean): TCheckBoxState; overload; static;
+    function ToBool: TACLBoolean;
   end;
 
   { TACLControlHelper }
@@ -706,54 +773,19 @@ type
     class procedure UpdateMargins(AControl: TControl; const AMargins: TRect); overload;
   end;
 
-  { TACLMouseTracking }
+  { TACLCustomOptionsPersistent }
 
-  TACLMouseTracking = class(TACLTimerList<IACLMouseTracking>)
+  TACLCustomOptionsPersistent = class(TACLLockablePersistent)
   protected
-    procedure DoAdding(const AObject: IACLMouseTracking); override;
-    procedure TimerObject(const AObject: IACLMouseTracking); override;
-  public
-    procedure AfterConstruction; override;
-    procedure RemoveOwner(AOwnerObject: TObject);
+    procedure SetBooleanFieldValue(var AFieldValue: Boolean;
+      AValue: Boolean; AChanges: TACLPersistentChanges = [apcStruct]);
+    procedure SetIntegerFieldValue(var AFieldValue: Integer;
+      AValue: Integer; AChanges: TACLPersistentChanges = [apcStruct]);
+    procedure SetSingleFieldValue(var AFieldValue: Single;
+      AValue: Single; AChanges: TACLPersistentChanges = [apcStruct]);
   end;
 
-  { TACLMouseWheel }
-
-  TACLMouseWheel = class
-  public const
-    DefaultScrollLines = 1;
-    DefaultScrollLinesAlt = 2;
-    DefaultScrollLinesCtrl = 4;
-  public
-    class var ScrollLines: Integer;
-    class var ScrollLinesAlt: Integer;
-    class var ScrollLinesCtrl: Integer;
-  public const
-    DirectionToInteger: array[TACLMouseWheelDirection] of Integer = (-1, 1);
-    DirectionToScrollCode: array[TACLMouseWheelDirection] of TScrollCode = (scLineDown, scLineUp);
-    DirectionToScrollCodeI: array[TACLMouseWheelDirection] of Integer = (SB_LINEDOWN, SB_LINEUP);
-  public
-    class constructor Create;
-    class function GetDirection(AValue: Integer): TACLMouseWheelDirection;
-    class function GetScrollLines(AState: TShiftState): Integer;
-    class function HWheelToVWheel(const AMessage: TWMMouseWheel): TWMMouseWheel;
-  end;
-
-  { TACLDeferPlacementUpdate }
-
-  TACLDeferPlacementUpdate = class
-  strict private
-    FBounds: TACLDictionary<TControl, TRect>;
-
-    function GetBounds(AControl: TControl): TRect;
-  public
-    constructor Create;
-    destructor Destroy; override;
-    procedure Add(AControl: TControl; ALeft, ATop, AWidth, AHeight: Integer); overload;
-    procedure Add(AControl: TControl; const ABounds: TRect); overload;
-    procedure Apply;
-    property Bounds[AControl: TControl]: TRect read GetBounds;
-  end;
+{$ENDREGION}
 
   { TACLScrollToMode }
 
@@ -811,8 +843,6 @@ function acIsDropDownCommand(Key: Word; Shift: TShiftState): Boolean;
 function acIsShiftPressed(ATest, AState: TShiftState): Boolean;
 function acShiftStateToKeys(AShift: TShiftState): Word;
 
-function MouseTracker: TACLMouseTracking;
-
 {$IFDEF FPC}
 function PointToLParam(const P: TPoint): LPARAM;
 procedure ProcessUtf8KeyPress(var Key: TUTF8Char; AEvent: TWideKeyEvent);
@@ -832,16 +862,6 @@ type
   TPersistentAccess = class(TPersistent);
   TControlAccess = class(TControl);
   TWinControlAccess = class(TWinControl);
-
-var
-  FMouseTracker: TACLMouseTracking;
-
-function MouseTracker: TACLMouseTracking;
-begin
-  if FMouseTracker = nil then
-    FMouseTracker := TACLMouseTracking.Create;
-  Result := FMouseTracker;
-end;
 
 function acGetShiftState: TShiftState;
 begin
@@ -1215,42 +1235,7 @@ begin
 end;
 {$ENDIF}
 
-{ TACLMouseTracking }
-
-procedure TACLMouseTracking.AfterConstruction;
-begin
-  inherited AfterConstruction;
-  Interval := 50;
-end;
-
-procedure TACLMouseTracking.RemoveOwner(AOwnerObject: TObject);
-var
-  ATracker: IACLMouseTracking;
-begin
-  if Supports(AOwnerObject, IACLMouseTracking, ATracker) then
-    Remove(ATracker);
-end;
-
-procedure TACLMouseTracking.DoAdding(const AObject: IACLMouseTracking);
-begin
-  AObject.MouseEnter;
-end;
-
-procedure TACLMouseTracking.TimerObject(const AObject: IACLMouseTracking);
-begin
-  if not AObject.IsMouseAtControl then
-  begin
-    Remove(AObject);
-    AObject.MouseLeave;
-  end;
-end;
-
-{ TACLInplaceInfo }
-
-procedure TACLInplaceInfo.Reset;
-begin
-  FillChar(Self, SizeOf(Self), 0);
-end;
+{$REGION ' Positioning '}
 
 { TACLPadding }
 
@@ -1391,205 +1376,348 @@ begin
   end;
 end;
 
-{ TACLControls }
+{ TACLSubControlOptions }
 
-class procedure TACLControls.ScaleChanging(AControl: TWinControl; var AState: TObject);
-{$IFNDEF FPC}
-var
-  AChildControl: TControlAccess;
-  I: Integer;
-{$ENDIF}
+constructor TACLSubControlOptions.Create(AOwner: TControl);
 begin
-  AControl.DisableAlign;
-  AState := TObject(TWinControlAccess(AControl).AutoSize);
-{$IFNDEF FPC}
-  for I := 0 to AControl.ControlCount - 1 do
-  begin
-    AChildControl := TControlAccess(AControl.Controls[I]);
-    AChildControl.FAnchorMove := True;
-  end;
-{$ENDIF}
-  TWinControlAccess(AControl).AutoSize := False;
+  FOwner := AOwner;
+  FPosition := mRight;
 end;
 
-class procedure TACLControls.ScaleChanged(AControl: TWinControl; var AState: TObject);
-{$IFNDEF FPC}
-var
-  AChildControl: TControlAccess;
-  I: Integer;
-{$ENDIF}
+destructor TACLSubControlOptions.Destroy;
 begin
-{$IFNDEF FPC}
-  for I := 0 to AControl.ControlCount - 1 do
-  begin
-    AChildControl := TControlAccess(AControl.Controls[I]);
-    AChildControl.FAnchorMove := False;
-    AChildControl.UpdateBoundsRect(AChildControl.BoundsRect); // to invoke UpdateAnchorRules
-  end;
-{$ENDIF}
-  TWinControlAccess(AControl).AutoSize := Boolean(AState);
-  TWinControlAccess(AControl).EnableAlign;
+  Control := nil;
+  TACLMainThread.Unsubscribe(Self);
+  inherited;
 end;
 
-class procedure TACLControls.WMSetCursor(ACaller: TWinControl; var Message: TWMSetCursor);
-
-  function GetCursor(AControl: TControl): TCursor;
-  var
-    ACursorProvider: IACLCursorProvider;
+procedure TACLSubControlOptions.Assign(Source: TPersistent);
+begin
+  if Source is TACLSubControlOptions then
   begin
-    if Supports(AControl, IACLCursorProvider, ACursorProvider) then
-      Result := ACursorProvider.GetCursor(AControl.CalcCursorPos)
+    Control := TACLSubControlOptions(Source).Control;
+    Position := TACLSubControlOptions(Source).Position;
+    Align := TACLSubControlOptions(Source).Align;
+  end;
+end;
+
+procedure TACLSubControlOptions.Changed;
+begin
+  if not (csDestroying in FOwner.ComponentState) then
+  begin
+    TControlAccess(FOwner).AdjustSize;
+    TControlAccess(FOwner).Resize;
+    TControlAccess(FOwner).Invalidate;
+  end;
+end;
+
+procedure TACLSubControlOptions.WindowProc(var Message: TMessage);
+const
+  SWP_POS_CHANGE = SWP_NOMOVE or SWP_NOSIZE;
+var
+  AWindowPos: PWindowPos;
+begin
+  if Message.Msg = WM_WINDOWPOSCHANGED then
+  begin
+    AWindowPos := TWMWindowPosChanged(Message).WindowPos;
+    if (AWindowPos = nil) or (AWindowPos^.flags and SWP_POS_CHANGE <> SWP_POS_CHANGE) then
+    begin
+      if not (csAligning in Control.ControlState) then
+    {$IFDEF FPC}
+      if not Control.Parent.AutoSizeDelayed then
+    {$ENDIF}
+        TACLMainThread.RunPostponed(Changed, Self);
+    end;
+  end;
+  FPrevWndProc(Message);
+end;
+
+procedure TACLSubControlOptions.AlignControl(var AClientRect: TRect);
+var
+  LBounds: TRect;
+begin
+  if Validate then
+  begin
+    LBounds := AClientRect;
+    LBounds.Offset(FOwner.Left, FOwner.Top);
+    case Position of
+      mLeft:
+        begin
+          LBounds.Width := Control.ExplicitWidth;
+          if Align <> acTrue then
+            LBounds.CenterVert(Control.ExplicitHeight);
+          Inc(AClientRect.Left, GetActualIndentBetweenElements);
+          Inc(AClientRect.Left, Control.ExplicitWidth);
+        end;
+
+      mRight:
+        begin
+          LBounds := LBounds.Split(srRight, Control.ExplicitWidth);
+          if Align <> acTrue then
+            LBounds.CenterVert(Control.ExplicitHeight);
+          Dec(AClientRect.Right, GetActualIndentBetweenElements);
+          Dec(AClientRect.Right, Control.ExplicitWidth);
+        end;
+
+      mTop:
+        begin
+          LBounds.Height := Control.ExplicitHeight;
+          if Align = acFalse then
+            LBounds.Width := Control.ExplicitWidth;
+          Inc(AClientRect.Top, GetActualIndentBetweenElements);
+          Inc(AClientRect.Top, Control.ExplicitHeight);
+        end;
+
+      mBottom:
+        begin
+          LBounds := LBounds.Split(srBottom, Control.ExplicitHeight);
+          if Align = acFalse then
+            LBounds.Width := Control.ExplicitWidth;
+          Dec(AClientRect.Bottom, GetActualIndentBetweenElements);
+          Dec(AClientRect.Bottom, Control.ExplicitHeight);
+        end;
+    end;
+    TACLControls.AlignControl(Control, LBounds);
+  end;
+end;
+
+procedure TACLSubControlOptions.AfterAutoSize(var AWidth, AHeight: Integer);
+begin
+  if Validate then
+  begin
+    if Position in [mRight, mLeft] then
+    begin
+      AHeight := Max(AHeight, Control.ExplicitHeight);
+      Inc(AWidth, GetActualIndentBetweenElements);
+      Inc(AWidth, Control.ExplicitWidth);
+    end
     else
-      Result := AControl.Cursor;
-  end;
-
-var
-  AControl: TControl;
-  ACursor: TCursor;
-begin
-  if csDesigning in ACaller.ComponentState then
-    Exit;
-  if Message.HitTest <> HTCLIENT then
-    Exit;
-  if ACaller.HandleAllocated and (Message.CursorWnd = ACaller.Handle) then
-  begin
-    ACursor := Screen.Cursor;
-    if ACursor = crDefault then
     begin
-      AControl := GetCaptureControl;
-      if AControl = nil then
-        AControl := ACaller.ControlAtPos(ACaller.CalcCursorPos, False);
-      if AControl <> nil then
-        ACursor := GetCursor(AControl);
-      if ACursor = crDefault then
-        ACursor := GetCursor(ACaller);
+      AWidth := Max(AWidth, Control.ExplicitWidth);
+      Inc(AHeight, GetActualIndentBetweenElements);
+      Inc(AHeight, Control.ExplicitHeight);
     end;
-    SetCursor(Screen.Cursors[ACursor]);
-    Message.Result := 1;
   end;
 end;
 
-class procedure TACLControls.AlignControl(AControl: TControl; const ABounds: TRect);
+procedure TACLSubControlOptions.BeforeAutoSize(var AWidth, AHeight: Integer);
 begin
-  AControl.ControlState := AControl.ControlState + [csAligning];
+  if Validate then
+  begin
+    if Position in [mRight, mLeft] then
+    begin
+      Dec(AWidth, GetActualIndentBetweenElements);
+      Dec(AWidth, Control.ExplicitWidth);
+    end
+    else
+    begin
+      Dec(AHeight, GetActualIndentBetweenElements);
+      Dec(AHeight, Control.ExplicitHeight);
+    end;
+  end;
+end;
+
+procedure TACLSubControlOptions.Notification(AComponent: TComponent; AOperation: TOperation);
+begin
+  if AComponent = Control then
+    Control := nil;
+end;
+
+function TACLSubControlOptions.TrySetFocus: Boolean;
+begin
+  Result := (Control is TWinControl) and TWinControlAccess(Control).CanFocus;
+  if Result then
+    TWinControlAccess(Control).SetFocus;
+end;
+
+procedure TACLSubControlOptions.UpdateVisibility;
+begin
+  if Control <> nil then
+    Control.Visible := Owner.Visible;
+end;
+
+function TACLSubControlOptions.GetActualIndentBetweenElements: Integer;
+begin
+  if Position in [mRight, mLeft] then
+    Result := dpiApply(acIndentBetweenElements, acGetCurrentDpi(FOwner))
+  else
+    Result := dpiApply(2, acGetCurrentDpi(FOwner));
+end;
+
+function TACLSubControlOptions.Validate: Boolean;
+begin
+  if (Control <> nil) and (Control.Parent <> FOwner.Parent) then
+    Control := nil;
+  if (Control <> nil) and (Control.Align <> alNone) then
+    Control.Align := alNone; // alCustom disables auto-size feature
+{$IFNDEF FPC}
+  if (Control <> nil) and (Control.AlignWithMargins) then
+    Control.AlignWithMargins := False;
+{$ENDIF}
+  Result := Control <> nil;
+end;
+
+procedure TACLSubControlOptions.SetAlign(AValue: TACLBoolean);
+begin
+  if Align <> AValue then
+  begin
+    FAlign := AValue;
+    if Control <> nil then
+      Changed;
+  end;
+end;
+
+procedure TACLSubControlOptions.SetControl(AValue: TControl);
+const
+  sErrorUnsupportedControl = 'The control cannot be set as sub-control';
+begin
+  if FControl <> AValue then
   try
-    AControl.BoundsRect := ABounds;
-  finally
-    AControl.ControlState := AControl.ControlState - [csAligning];
+    if acIsChild(AValue, FOwner) then
+      raise EInvalidArgument.Create(sErrorUnsupportedControl);
+    if FControl <> nil then
+    begin
+      FControl.RemoveFreeNotification(FOwner);
+      FControl.WindowProc := FPrevWndProc;
+      FControl := nil;
+    end;
+    if AValue <> nil then
+    begin
+      FControl := AValue;
+      FPrevWndProc := FControl.WindowProc;
+      FControl.Parent := FOwner.Parent;
+      if Validate then
+      begin
+        FControl.WindowProc := WindowProc;
+        FControl.FreeNotification(FOwner);
+        FControl.BringToFront;
+        UpdateVisibility;
+      end
+      else
+        raise EInvalidArgument.Create(sErrorUnsupportedControl);
+    end;
+    Changed;
+  except
+    Control := nil;
+    raise;
   end;
 end;
 
-class function TACLControls.WndProc(ACaller: TWinControl; var Message: TMessage): Boolean;
+procedure TACLSubControlOptions.SetPosition(AValue: TACLBorder);
 begin
-  Result := False;
-{$IFDEF FPC}
-  if (Message.Msg >= LM_MOUSEFIRST) and (Message.Msg <= LM_MOUSELAST) then
+  if FPosition <> AValue then
   begin
-    if not Mouse.IsDragging then
+    FPosition := AValue;
+    if Control <> nil then
+      Changed;
+  end;
+end;
+
+{ TACLDeferPlacementUpdate }
+
+constructor TACLDeferPlacementUpdate.Create;
+begin
+  FBounds := TACLDictionary<TControl, TRect>.Create;
+end;
+
+destructor TACLDeferPlacementUpdate.Destroy;
+begin
+  FreeAndNil(FBounds);
+  inherited;
+end;
+
+procedure TACLDeferPlacementUpdate.Add(AControl: TControl; const ABounds: TRect);
+begin
+  FBounds.AddOrSetValue(AControl, ABounds);
+end;
+
+procedure TACLDeferPlacementUpdate.Add(AControl: TControl; ALeft, ATop, AWidth, AHeight: Integer);
+begin
+  Add(AControl, Rect(ALeft, ATop, ALeft + AWidth, ATop + AHeight));
+end;
+
+procedure TACLDeferPlacementUpdate.Apply;
+{$IFDEF FPC}
+begin
+  FBounds.Enum(
+    procedure (const AControl: TControl; const R: TRect)
     begin
-      if ACaller.Perform(WM_SETCURSOR, ACaller.Handle, MakeLong(HTCLIENT, Message.Msg)) = 0 then
-        SetCursor(crDefault);
+      TACLControls.AlignControl(AControl, R);
+    end);
+  FBounds.Enum(
+    procedure (const AControl: TControl; const R: TRect)
+    begin
+      AControl.Invalidate;
+    end);
+{$ELSE}
+var
+  ABounds: TRect;
+  AHandle: THandle;
+  AVclControls: TList;
+  AWinControls: TList;
+  I: Integer;
+begin
+  if FBounds.Count > 0 then
+  begin
+    AVclControls := TList.Create;
+    AWinControls := TList.Create;
+    try
+      AVclControls.Capacity := FBounds.Count;
+      AWinControls.Capacity := FBounds.Count;
+
+      FBounds.Enum(
+        procedure (const AControl: TControl; const R: TRect)
+        begin
+          if (AControl is TWinControl) and TWinControl(AControl).HandleAllocated then
+            AWinControls.Add(AControl)
+          else
+            AVclControls.Add(AControl);
+        end);
+
+      if AWinControls.Count > 0 then
+      begin
+        AHandle := BeginDeferWindowPos(AWinControls.Count);
+        try
+          for I := 0 to AWinControls.Count - 1 do
+          begin
+            ABounds := Bounds[AWinControls.List[I]];
+            DeferWindowPos(AHandle, TWinControl(AWinControls.List[I]).Handle, 0,
+              ABounds.Left, ABounds.Top, ABounds.Width, ABounds.Height, SWP_NOZORDER);
+          end;
+        finally
+          EndDeferWindowPos(AHandle)
+        end;
+      end;
+
+      for I := 0 to AVclControls.Count - 1 do
+        TControl(AVclControls.List[I]).BoundsRect := Bounds[AVclControls.List[I]];
+    finally
+      AWinControls.Free;
+      AVclControls.Free;
     end;
   end;
 {$ENDIF}
-  if Message.Msg = WM_SETCURSOR then
-  begin
-    WMSetCursor(ACaller, TWMSetCursor(Message));
-    Result := Message.Result = 1;
-  end;
 end;
 
-class procedure TACLControls.UpdateMargins(AControl: TControl;
-  AUseMargins: Boolean; AMargins: TACLPadding; ACurrentDpi: Integer);
+function TACLDeferPlacementUpdate.GetBounds(AControl: TControl): TRect;
 begin
-{$IFDEF FPC}
-  if not AUseMargins then
-    UpdateMargins(AControl, NullRect)
-  else
-{$ENDIF}
-    UpdateMargins(AControl, AMargins.GetScaledMargins(ACurrentDpi));
+  Result := FBounds[AControl];
 end;
 
-class procedure TACLControls.UpdateMargins(AControl: TControl; const AMargins: TRect);
+{$ENDREGION}
+
+{$REGION ' In-placing '}
+
+{ TACLInplaceInfo }
+
+procedure TACLInplaceInfo.Reset;
 begin
-{$IFDEF FPC}
-  with TControlAccess(AControl).BorderSpacing do
-{$ELSE}
-  with TControlAccess(AControl).Margins do
-{$ENDIF}
-  begin
-    Left := AMargins.Left;
-    Top := AMargins.Top;
-    Right := AMargins.Right;
-    Bottom := AMargins.Bottom;
-  end;
+  FillChar(Self, SizeOf(Self), 0);
 end;
 
-{ TACLCheckBoxStateHelper }
+{$ENDREGION}
 
-class function TACLCheckBoxStateHelper.Create(AChecked: Boolean): TCheckBoxState;
-begin
-  if AChecked then
-    Result := cbChecked
-  else
-    Result := cbUnchecked;
-end;
-
-class function TACLCheckBoxStateHelper.Create(AValue: TACLBoolean): TCheckBoxState;
-const
-  Map: array[TACLBoolean] of TCheckBoxState = (cbGrayed, cbUnchecked, cbChecked);
-begin
-  Result := Map[AValue];
-end;
-
-class function TACLCheckBoxStateHelper.Create(AHasChecked, AHasUnchecked: Boolean): TCheckBoxState;
-begin
-  if AHasChecked and AHasUnchecked then
-    Result := cbGrayed
-  else if AHasChecked then
-    Result := cbChecked
-  else
-    Result := cbUnchecked;
-end;
-
-function TACLCheckBoxStateHelper.ToBool: TACLBoolean;
-const
-  Map: array[TCheckBoxState] of TACLBoolean = (acFalse, acTrue, acDefault);
-begin
-  Result := Map[Self];
-end;
-
-{ TACLCustomOptionsPersistent }
-
-procedure TACLCustomOptionsPersistent.SetBooleanFieldValue(
-  var AFieldValue: Boolean; AValue: Boolean; AChanges: TACLPersistentChanges);
-begin
-  if AFieldValue <> AValue then
-  begin
-    AFieldValue := AValue;
-    Changed(AChanges);
-  end;
-end;
-
-procedure TACLCustomOptionsPersistent.SetIntegerFieldValue(
-  var AFieldValue: Integer; AValue: Integer; AChanges: TACLPersistentChanges);
-begin
-  if AFieldValue <> AValue then
-  begin
-    AFieldValue := AValue;
-    Changed(AChanges);
-  end;
-end;
-
-procedure TACLCustomOptionsPersistent.SetSingleFieldValue(
-  var AFieldValue: Single; AValue: Single; AChanges: TACLPersistentChanges);
-begin
-  if AFieldValue <> AValue then
-  begin
-    AFieldValue := AValue;
-    Changed(AChanges);
-  end;
-end;
+{$REGION ' Styles '}
 
 { TACLStyleBackground }
 
@@ -1668,6 +1796,105 @@ begin
   ColorContent2.InitailizeDefaults('Common.Colors.Hatch2', acHatchDefaultColor2);
 end;
 
+{$ENDREGION}
+
+{$REGION ' Mouse Tracker '}
+
+{ TACLMouseTracker }
+
+class destructor TACLMouseTracker.Destroy;
+begin
+  FreeAndNil(FInstance);
+end;
+
+class procedure TACLMouseTracker.Release(const AIntf: IACLMouseTracking);
+begin
+  if FInstance <> nil then
+    FInstance.Remove(AIntf);
+end;
+
+class procedure TACLMouseTracker.Release(const AObj: TObject);
+var
+  ATracker: IACLMouseTracking;
+begin
+  if Supports(AObj, IACLMouseTracking, ATracker) then
+    Release(ATracker);
+end;
+
+class procedure TACLMouseTracker.Start(const AIntf: IACLMouseTracking);
+begin
+  Get.Add(AIntf);
+end;
+
+procedure TACLMouseTracker.DoAdding(const AObject: IACLMouseTracking);
+begin
+  AObject.MouseEnter;
+end;
+
+class function TACLMouseTracker.Get: TACLMouseTracker;
+begin
+  if FInstance = nil then
+  begin
+    FInstance := TACLMouseTracker.Create;
+    FInstance.Interval := 50;
+  end;
+  Result := FInstance;
+end;
+
+procedure TACLMouseTracker.TimerObject(const AObject: IACLMouseTracking);
+begin
+  if not AObject.IsMouseAtControl then
+  begin
+    Remove(AObject);
+    AObject.MouseLeave;
+  end;
+end;
+
+{ TACLMouseWheel }
+
+class constructor TACLMouseWheel.Create;
+begin
+  ScrollLines := DefaultScrollLines;
+  ScrollLinesAlt := DefaultScrollLinesAlt;
+  ScrollLinesCtrl := DefaultScrollLinesCtrl;
+end;
+
+class function TACLMouseWheel.GetDirection(AValue: Integer): TACLMouseWheelDirection;
+begin
+  if AValue < 0 then
+    Result := mwdUp
+  else
+    Result := mwdDown;
+end;
+
+class function TACLMouseWheel.GetScrollLines(AState: TShiftState): Integer;
+begin
+  if ssCtrl in AState then
+    Result := ScrollLinesCtrl
+  else if ssAlt in AState then
+    Result := ScrollLinesAlt
+  else
+    Result := ScrollLines;
+
+  if Result <= 0 then
+    Result := Mouse.WheelScrollLines;
+end;
+
+class function TACLMouseWheel.HWheelToVWheel(const AMessage: TWMMouseWheel): TWMMouseWheel;
+begin
+  Result := AMessage;
+{$IFDEF FPC}
+  Include(Result.ShiftState, ssShift);
+{$ELSE}
+  Result.Keys := Result.Keys or MK_SHIFT;
+{$ENDIF}
+  Result.WheelDelta := -Result.WheelDelta;
+end;
+
+{$ENDREGION}
+
+{$REGION ' Controls '}
+
 { TACLGraphicControl }
 
 constructor TACLGraphicControl.Create(AOwner: TComponent);
@@ -1702,7 +1929,7 @@ begin
   inherited BeforeDestruction;
   RemoveFreeNotifications;
   ResourceCollection := nil;
-  MouseTracker.Remove(Self);
+  TACLMouseTracker.Release(Self);
   TACLObjectLinks.Release(Self);
   AnimationManager.RemoveOwner(Self);
 end;
@@ -1857,7 +2084,7 @@ end;
 procedure TACLGraphicControl.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
   inherited MouseMove(Shift, X, Y);
-  MouseTracker.Add(Self);
+  TACLMouseTracker.Start(Self);
 end;
 
 procedure TACLGraphicControl.CMFontChanged(var Message: TMessage);
@@ -2069,7 +2296,7 @@ begin
     if AForm <> nil then
       AForm.DefocusControl(Self, True);
   end;
-  MouseTracker.Remove(Self);
+  TACLMouseTracker.Release(Self);
   TACLObjectLinks.Release(Self);
   AnimationManager.RemoveOwner(Self);
 end;
@@ -2429,7 +2656,7 @@ end;
 procedure TACLCustomControl.WMMouseMove(var Message: TWMMouseMove);
 begin
   if IsMouseAtControl then
-    MouseTracker.Add(Self);
+    TACLMouseTracker.Start(Self);
   inherited;
 end;
 
@@ -2663,6 +2890,178 @@ begin
     ControlStyle := ControlStyle + [csOpaque];
 end;
 
+{$ENDREGION}
+
+{$REGION ' Helpers '}
+
+{ TACLCheckBoxStateHelper }
+
+class function TACLCheckBoxStateHelper.Create(AChecked: Boolean): TCheckBoxState;
+begin
+  if AChecked then
+    Result := cbChecked
+  else
+    Result := cbUnchecked;
+end;
+
+class function TACLCheckBoxStateHelper.Create(AValue: TACLBoolean): TCheckBoxState;
+const
+  Map: array[TACLBoolean] of TCheckBoxState = (cbGrayed, cbUnchecked, cbChecked);
+begin
+  Result := Map[AValue];
+end;
+
+class function TACLCheckBoxStateHelper.Create(AHasChecked, AHasUnchecked: Boolean): TCheckBoxState;
+begin
+  if AHasChecked and AHasUnchecked then
+    Result := cbGrayed
+  else if AHasChecked then
+    Result := cbChecked
+  else
+    Result := cbUnchecked;
+end;
+
+function TACLCheckBoxStateHelper.ToBool: TACLBoolean;
+const
+  Map: array[TCheckBoxState] of TACLBoolean = (acFalse, acTrue, acDefault);
+begin
+  Result := Map[Self];
+end;
+
+{ TACLControls }
+
+class procedure TACLControls.ScaleChanging(AControl: TWinControl; var AState: TObject);
+{$IFNDEF FPC}
+var
+  AChildControl: TControlAccess;
+  I: Integer;
+{$ENDIF}
+begin
+  AControl.DisableAlign;
+  AState := TObject(TWinControlAccess(AControl).AutoSize);
+{$IFNDEF FPC}
+  for I := 0 to AControl.ControlCount - 1 do
+  begin
+    AChildControl := TControlAccess(AControl.Controls[I]);
+    AChildControl.FAnchorMove := True;
+  end;
+{$ENDIF}
+  TWinControlAccess(AControl).AutoSize := False;
+end;
+
+class procedure TACLControls.ScaleChanged(AControl: TWinControl; var AState: TObject);
+{$IFNDEF FPC}
+var
+  AChildControl: TControlAccess;
+  I: Integer;
+{$ENDIF}
+begin
+{$IFNDEF FPC}
+  for I := 0 to AControl.ControlCount - 1 do
+  begin
+    AChildControl := TControlAccess(AControl.Controls[I]);
+    AChildControl.FAnchorMove := False;
+    AChildControl.UpdateBoundsRect(AChildControl.BoundsRect); // to invoke UpdateAnchorRules
+  end;
+{$ENDIF}
+  TWinControlAccess(AControl).AutoSize := Boolean(AState);
+  TWinControlAccess(AControl).EnableAlign;
+end;
+
+class procedure TACLControls.WMSetCursor(ACaller: TWinControl; var Message: TWMSetCursor);
+
+  function GetCursor(AControl: TControl): TCursor;
+  var
+    ACursorProvider: IACLCursorProvider;
+  begin
+    if Supports(AControl, IACLCursorProvider, ACursorProvider) then
+      Result := ACursorProvider.GetCursor(AControl.CalcCursorPos)
+    else
+      Result := AControl.Cursor;
+  end;
+
+var
+  AControl: TControl;
+  ACursor: TCursor;
+begin
+  if csDesigning in ACaller.ComponentState then
+    Exit;
+  if Message.HitTest <> HTCLIENT then
+    Exit;
+  if ACaller.HandleAllocated and (Message.CursorWnd = ACaller.Handle) then
+  begin
+    ACursor := Screen.Cursor;
+    if ACursor = crDefault then
+    begin
+      AControl := GetCaptureControl;
+      if AControl = nil then
+        AControl := ACaller.ControlAtPos(ACaller.CalcCursorPos, False);
+      if AControl <> nil then
+        ACursor := GetCursor(AControl);
+      if ACursor = crDefault then
+        ACursor := GetCursor(ACaller);
+    end;
+    SetCursor(Screen.Cursors[ACursor]);
+    Message.Result := 1;
+  end;
+end;
+
+class procedure TACLControls.AlignControl(AControl: TControl; const ABounds: TRect);
+begin
+  AControl.ControlState := AControl.ControlState + [csAligning];
+  try
+    AControl.BoundsRect := ABounds;
+  finally
+    AControl.ControlState := AControl.ControlState - [csAligning];
+  end;
+end;
+
+class function TACLControls.WndProc(ACaller: TWinControl; var Message: TMessage): Boolean;
+begin
+  Result := False;
+{$IFDEF FPC}
+  if (Message.Msg >= LM_MOUSEFIRST) and (Message.Msg <= LM_MOUSELAST) then
+  begin
+    if not Mouse.IsDragging then
+    begin
+      if ACaller.Perform(WM_SETCURSOR, ACaller.Handle, MakeLong(HTCLIENT, Message.Msg)) = 0 then
+        SetCursor(crDefault);
+    end;
+  end;
+{$ENDIF}
+  if Message.Msg = WM_SETCURSOR then
+  begin
+    WMSetCursor(ACaller, TWMSetCursor(Message));
+    Result := Message.Result = 1;
+  end;
+end;
+
+class procedure TACLControls.UpdateMargins(AControl: TControl;
+  AUseMargins: Boolean; AMargins: TACLPadding; ACurrentDpi: Integer);
+begin
+{$IFDEF FPC}
+  if not AUseMargins then
+    UpdateMargins(AControl, NullRect)
+  else
+{$ENDIF}
+    UpdateMargins(AControl, AMargins.GetScaledMargins(ACurrentDpi));
+end;
+
+class procedure TACLControls.UpdateMargins(AControl: TControl; const AMargins: TRect);
+begin
+{$IFDEF FPC}
+  with TControlAccess(AControl).BorderSpacing do
+{$ELSE}
+  with TControlAccess(AControl).Margins do
+{$ENDIF}
+  begin
+    Left := AMargins.Left;
+    Top := AMargins.Top;
+    Right := AMargins.Right;
+    Bottom := AMargins.Bottom;
+  end;
+end;
+
 { TACLControlHelper }
 
 function TACLControlHelper.CalcCursorPos: TPoint;
@@ -2700,374 +3099,39 @@ begin
 end;
 {$ENDIF}
 
-{ TACLMouseWheel }
+{ TACLCustomOptionsPersistent }
 
-class constructor TACLMouseWheel.Create;
+procedure TACLCustomOptionsPersistent.SetBooleanFieldValue(
+  var AFieldValue: Boolean; AValue: Boolean; AChanges: TACLPersistentChanges);
 begin
-  ScrollLines := DefaultScrollLines;
-  ScrollLinesAlt := DefaultScrollLinesAlt;
-  ScrollLinesCtrl := DefaultScrollLinesCtrl;
-end;
-
-class function TACLMouseWheel.GetDirection(AValue: Integer): TACLMouseWheelDirection;
-begin
-  if AValue < 0 then
-    Result := mwdUp
-  else
-    Result := mwdDown;
-end;
-
-class function TACLMouseWheel.GetScrollLines(AState: TShiftState): Integer;
-begin
-  if ssCtrl in AState then
-    Result := ScrollLinesCtrl
-  else if ssAlt in AState then
-    Result := ScrollLinesAlt
-  else
-    Result := ScrollLines;
-
-  if Result <= 0 then
-    Result := Mouse.WheelScrollLines;
-end;
-
-class function TACLMouseWheel.HWheelToVWheel(const AMessage: TWMMouseWheel): TWMMouseWheel;
-begin
-  Result := AMessage;
-{$IFDEF FPC}
-  Include(Result.ShiftState, ssShift);
-{$ELSE}
-  Result.Keys := Result.Keys or MK_SHIFT;
-{$ENDIF}
-  Result.WheelDelta := -Result.WheelDelta;
-end;
-
-{ TACLDeferPlacementUpdate }
-
-constructor TACLDeferPlacementUpdate.Create;
-begin
-  FBounds := TACLDictionary<TControl, TRect>.Create;
-end;
-
-destructor TACLDeferPlacementUpdate.Destroy;
-begin
-  FreeAndNil(FBounds);
-  inherited;
-end;
-
-procedure TACLDeferPlacementUpdate.Add(AControl: TControl; const ABounds: TRect);
-begin
-  FBounds.AddOrSetValue(AControl, ABounds);
-end;
-
-procedure TACLDeferPlacementUpdate.Add(AControl: TControl; ALeft, ATop, AWidth, AHeight: Integer);
-begin
-  Add(AControl, Rect(ALeft, ATop, ALeft + AWidth, ATop + AHeight));
-end;
-
-procedure TACLDeferPlacementUpdate.Apply;
-{$IFDEF FPC}
-begin
-  FBounds.Enum(
-    procedure (const AControl: TControl; const R: TRect)
-    begin
-      TACLControls.AlignControl(AControl, R);
-    end);
-  FBounds.Enum(
-    procedure (const AControl: TControl; const R: TRect)
-    begin
-      AControl.Invalidate;
-    end);
-{$ELSE}
-var
-  ABounds: TRect;
-  AHandle: THandle;
-  AVclControls: TList;
-  AWinControls: TList;
-  I: Integer;
-begin
-  if FBounds.Count > 0 then
+  if AFieldValue <> AValue then
   begin
-    AVclControls := TList.Create;
-    AWinControls := TList.Create;
-    try
-      AVclControls.Capacity := FBounds.Count;
-      AWinControls.Capacity := FBounds.Count;
-
-      FBounds.Enum(
-        procedure (const AControl: TControl; const R: TRect)
-        begin
-          if (AControl is TWinControl) and TWinControl(AControl).HandleAllocated then
-            AWinControls.Add(AControl)
-          else
-            AVclControls.Add(AControl);
-        end);
-
-      if AWinControls.Count > 0 then
-      begin
-        AHandle := BeginDeferWindowPos(AWinControls.Count);
-        try
-          for I := 0 to AWinControls.Count - 1 do
-          begin
-            ABounds := Bounds[AWinControls.List[I]];
-            DeferWindowPos(AHandle, TWinControl(AWinControls.List[I]).Handle, 0,
-              ABounds.Left, ABounds.Top, ABounds.Width, ABounds.Height, SWP_NOZORDER);
-          end;
-        finally
-          EndDeferWindowPos(AHandle)
-        end;
-      end;
-
-      for I := 0 to AVclControls.Count - 1 do
-        TControl(AVclControls.List[I]).BoundsRect := Bounds[AVclControls.List[I]];
-    finally
-      AWinControls.Free;
-      AVclControls.Free;
-    end;
+    AFieldValue := AValue;
+    Changed(AChanges);
   end;
-{$ENDIF}
 end;
 
-function TACLDeferPlacementUpdate.GetBounds(AControl: TControl): TRect;
+procedure TACLCustomOptionsPersistent.SetIntegerFieldValue(
+  var AFieldValue: Integer; AValue: Integer; AChanges: TACLPersistentChanges);
 begin
-  Result := FBounds[AControl];
-end;
-
-{ TACLSubControlOptions }
-
-constructor TACLSubControlOptions.Create(AOwner: TControl);
-begin
-  FOwner := AOwner;
-  FPosition := mRight;
-end;
-
-destructor TACLSubControlOptions.Destroy;
-begin
-  Control := nil;
-  TACLMainThread.Unsubscribe(Self);
-  inherited;
-end;
-
-procedure TACLSubControlOptions.Assign(Source: TPersistent);
-begin
-  if Source is TACLSubControlOptions then
+  if AFieldValue <> AValue then
   begin
-    Control := TACLSubControlOptions(Source).Control;
-    Position := TACLSubControlOptions(Source).Position;
-    Align := TACLSubControlOptions(Source).Align;
+    AFieldValue := AValue;
+    Changed(AChanges);
   end;
 end;
 
-procedure TACLSubControlOptions.Changed;
+procedure TACLCustomOptionsPersistent.SetSingleFieldValue(
+  var AFieldValue: Single; AValue: Single; AChanges: TACLPersistentChanges);
 begin
-  if not (csDestroying in FOwner.ComponentState) then
+  if AFieldValue <> AValue then
   begin
-    TControlAccess(FOwner).AdjustSize;
-    TControlAccess(FOwner).Resize;
-    TControlAccess(FOwner).Invalidate;
+    AFieldValue := AValue;
+    Changed(AChanges);
   end;
 end;
 
-procedure TACLSubControlOptions.WindowProc(var Message: TMessage);
-const
-  SWP_POS_CHANGE = SWP_NOMOVE or SWP_NOSIZE;
-var
-  AWindowPos: PWindowPos;
-begin
-  if Message.Msg = WM_WINDOWPOSCHANGED then
-  begin
-    AWindowPos := TWMWindowPosChanged(Message).WindowPos;
-    if (AWindowPos = nil) or (AWindowPos^.flags and SWP_POS_CHANGE <> SWP_POS_CHANGE) then
-    begin
-      if not (csAligning in Control.ControlState) then
-    {$IFDEF FPC}
-      if not Control.Parent.AutoSizeDelayed then
-    {$ENDIF}
-        TACLMainThread.RunPostponed(Changed, Self);
-    end;
-  end;
-  FPrevWndProc(Message);
-end;
-
-procedure TACLSubControlOptions.AlignControl(var AClientRect: TRect);
-var
-  LBounds: TRect;
-begin
-  if Validate then
-  begin
-    LBounds := AClientRect;
-    LBounds.Offset(FOwner.Left, FOwner.Top);
-    case Position of
-      mLeft:
-        begin
-          LBounds.Width := Control.ExplicitWidth;
-          if Align <> acTrue then
-            LBounds.CenterVert(Control.ExplicitHeight);
-          Inc(AClientRect.Left, GetActualIndentBetweenElements);
-          Inc(AClientRect.Left, Control.ExplicitWidth);
-        end;
-
-      mRight:
-        begin
-          LBounds := LBounds.Split(srRight, Control.ExplicitWidth);
-          if Align <> acTrue then
-            LBounds.CenterVert(Control.ExplicitHeight);
-          Dec(AClientRect.Right, GetActualIndentBetweenElements);
-          Dec(AClientRect.Right, Control.ExplicitWidth);
-        end;
-
-      mTop:
-        begin
-          LBounds.Height := Control.ExplicitHeight;
-          if Align = acFalse then
-            LBounds.Width := Control.ExplicitWidth;
-          Inc(AClientRect.Top, GetActualIndentBetweenElements);
-          Inc(AClientRect.Top, Control.ExplicitHeight);
-        end;
-
-      mBottom:
-        begin
-          LBounds := LBounds.Split(srBottom, Control.ExplicitHeight);
-          if Align = acFalse then
-            LBounds.Width := Control.ExplicitWidth;
-          Dec(AClientRect.Bottom, GetActualIndentBetweenElements);
-          Dec(AClientRect.Bottom, Control.ExplicitHeight);
-        end;
-    end;
-    TACLControls.AlignControl(Control, LBounds);
-  end;
-end;
-
-procedure TACLSubControlOptions.AfterAutoSize(var AWidth, AHeight: Integer);
-begin
-  if Validate then
-  begin
-    if Position in [mRight, mLeft] then
-    begin
-      AHeight := Max(AHeight, Control.ExplicitHeight);
-      Inc(AWidth, GetActualIndentBetweenElements);
-      Inc(AWidth, Control.ExplicitWidth);
-    end
-    else
-    begin
-      AWidth := Max(AWidth, Control.ExplicitWidth);
-      Inc(AHeight, GetActualIndentBetweenElements);
-      Inc(AHeight, Control.ExplicitHeight);
-    end;
-  end;
-end;
-
-procedure TACLSubControlOptions.BeforeAutoSize(var AWidth, AHeight: Integer);
-begin
-  if Validate then
-  begin
-    if Position in [mRight, mLeft] then
-    begin
-      Dec(AWidth, GetActualIndentBetweenElements);
-      Dec(AWidth, Control.ExplicitWidth);
-    end
-    else
-    begin
-      Dec(AHeight, GetActualIndentBetweenElements);
-      Dec(AHeight, Control.ExplicitHeight);
-    end;
-  end;
-end;
-
-procedure TACLSubControlOptions.Notification(AComponent: TComponent; AOperation: TOperation);
-begin
-  if AComponent = Control then
-    Control := nil;
-end;
-
-function TACLSubControlOptions.TrySetFocus: Boolean;
-begin
-  Result := (Control is TWinControl) and TWinControlAccess(Control).CanFocus;
-  if Result then
-    TWinControlAccess(Control).SetFocus;  
-end;
-
-procedure TACLSubControlOptions.UpdateVisibility;
-begin
-  if Control <> nil then
-    Control.Visible := Owner.Visible;
-end;
-
-function TACLSubControlOptions.GetActualIndentBetweenElements: Integer;
-begin
-  if Position in [mRight, mLeft] then
-    Result := dpiApply(acIndentBetweenElements, acGetCurrentDpi(FOwner))
-  else
-    Result := dpiApply(2, acGetCurrentDpi(FOwner));
-end;
-
-function TACLSubControlOptions.Validate: Boolean;
-begin
-  if (Control <> nil) and (Control.Parent <> FOwner.Parent) then
-    Control := nil;
-  if (Control <> nil) and (Control.Align <> alNone) then
-    Control.Align := alNone; // alCustom disables auto-size feature
-{$IFNDEF FPC}
-  if (Control <> nil) and (Control.AlignWithMargins) then
-    Control.AlignWithMargins := False;
-{$ENDIF}
-  Result := Control <> nil;
-end;
-
-procedure TACLSubControlOptions.SetAlign(AValue: TACLBoolean);
-begin
-  if Align <> AValue then
-  begin
-    FAlign := AValue;
-    if Control <> nil then
-      Changed;
-  end;
-end;
-
-procedure TACLSubControlOptions.SetControl(AValue: TControl);
-const
-  sErrorUnsupportedControl = 'The control cannot be set as sub-control';
-begin
-  if FControl <> AValue then
-  try
-    if acIsChild(AValue, FOwner) then
-      raise EInvalidArgument.Create(sErrorUnsupportedControl);
-    if FControl <> nil then
-    begin
-      FControl.RemoveFreeNotification(FOwner);
-      FControl.WindowProc := FPrevWndProc;
-      FControl := nil;
-    end;
-    if AValue <> nil then
-    begin
-      FControl := AValue;
-      FPrevWndProc := FControl.WindowProc;
-      FControl.Parent := FOwner.Parent;
-      if Validate then
-      begin
-        FControl.WindowProc := WindowProc;
-        FControl.FreeNotification(FOwner);
-        FControl.BringToFront;
-        UpdateVisibility;
-      end
-      else
-        raise EInvalidArgument.Create(sErrorUnsupportedControl);
-    end;
-    Changed;
-  except
-    Control := nil;
-    raise;
-  end;
-end;
-
-procedure TACLSubControlOptions.SetPosition(AValue: TACLBorder);
-begin
-  if FPosition <> AValue then
-  begin
-    FPosition := AValue;
-    if Control <> nil then
-      Changed;
-  end;
-end;
+{$ENDREGION}
 
 initialization
 {$IFDEF FPC}
@@ -3075,7 +3139,4 @@ initialization
   RegisterPropertyToSkip(TControl, 'Padding', '', '');
   RegisterPropertyToSkip(TDataModule, 'PixelsPerInch', '', '');
 {$ENDIF}
-
-finalization
-  FreeAndNil(FMouseTracker);
 end.

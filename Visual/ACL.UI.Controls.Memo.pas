@@ -43,7 +43,7 @@ uses
   ACL.Classes,
   ACL.Geometry,
   ACL.Graphics,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.ScrollBar,
   ACL.UI.Controls.ScrollBox,

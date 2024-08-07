@@ -25,7 +25,7 @@ uses
   {Vcl.}Graphics,
   // ACL
   ACL.Classes,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.Utils.Common;
 
 type

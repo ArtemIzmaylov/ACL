@@ -55,7 +55,7 @@ uses
   ACL.Timers,
   ACL.UI.Application,
   ACL.UI.Controls.ActivityIndicator,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.Bevel,
   ACL.UI.Controls.BindingDiagram,

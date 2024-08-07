@@ -39,7 +39,7 @@ uses
   ACL.Graphics,
   ACL.MUI,
   ACL.ObjectLinks,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Forms,
   ACL.UI.Resources,

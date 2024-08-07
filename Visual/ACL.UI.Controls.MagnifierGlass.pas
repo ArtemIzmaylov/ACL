@@ -36,7 +36,7 @@ uses
   ACL.Graphics,
   ACL.Graphics.Ex,
   ACL.Timers,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Resources,
   ACL.Utils.DPIAware;
 

@@ -39,7 +39,7 @@ uses
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Ex,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.BindingDiagram.Types,
   ACL.UI.Controls.CompoundControl.SubClass,
   ACL.UI.Forms,

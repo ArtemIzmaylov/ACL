@@ -48,7 +48,7 @@ uses
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Images,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.GroupBox,
   ACL.UI.Controls.Panel,

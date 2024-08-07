@@ -37,7 +37,7 @@ uses
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.FontCache,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.ComboBox,
   ACL.UI.Controls.GroupBox,

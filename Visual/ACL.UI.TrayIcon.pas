@@ -49,7 +49,7 @@ uses
   ACL.Timers,
   ACL.Graphics,
   ACL.ObjectLinks,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.HintWindow,
   ACL.Utils.Common,
   ACL.Utils.DPIAware;
@@ -242,7 +242,7 @@ destructor TACLTrayIcon.Destroy;
 begin
   Enabled := False;
   ClickTimer.Enabled := False;
-  MouseTracker.Remove(Self);
+  TACLMouseTracker.Release(Self);
   FreeAndNil(FIconImpl);
   FreeAndNil(FClickTimer);
   FreeAndNil(FIcon);
@@ -300,7 +300,7 @@ end;
 
 procedure TACLTrayIcon.MouseMove(Nop: TObject; Shift: TShiftState; X, Y: Integer);
 begin
-  MouseTracker.Add(Self);
+  TACLMouseTracker.Start(Self);
   FLastMousePos := Point(X, Y);
 end;
 

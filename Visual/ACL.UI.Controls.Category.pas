@@ -31,7 +31,7 @@ uses
   ACL.Classes,
   ACL.Geometry,
   ACL.Graphics,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Resources,
   ACL.Utils.Common;
 

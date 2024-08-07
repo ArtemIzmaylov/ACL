@@ -49,7 +49,7 @@ uses
   ACL.ObjectLinks,
   ACL.Timers,
   ACL.UI.Animation,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.ScrollBar,
   ACL.UI.DropSource,

@@ -37,7 +37,7 @@ uses
   ACL.Graphics.Images,
   ACL.Graphics.SkinImage,
   ACL.Graphics.SkinImageSet,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.ComboBox,
   ACL.UI.Controls.DropDown,

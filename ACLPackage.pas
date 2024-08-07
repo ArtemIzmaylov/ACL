@@ -24,7 +24,7 @@ uses
   ACL.Utils.FileSystem, ACL.Utils.FileSystem.GIO, ACL.Utils.Logger, 
   ACL.Utils.Messaging, ACL.Utils.RTTI, ACL.Utils.Shell, ACL.Utils.Stream, 
   ACL.Utils.Strings, ACL.UI.AeroPeek, ACL.UI.Animation, ACL.UI.Application, 
-  ACL.UI.Controls.ActivityIndicator, ACL.UI.Controls.BaseControls, 
+  ACL.UI.Controls.ActivityIndicator, ACL.UI.Controls.Base, 
   ACL.UI.Controls.BaseEditors, ACL.UI.Controls.Bevel, 
   ACL.UI.Controls.BindingDiagram, ACL.UI.Controls.BindingDiagram.SubClass, 
   ACL.UI.Controls.BindingDiagram.Types, ACL.UI.Controls.Buttons, 

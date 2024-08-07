@@ -30,7 +30,7 @@ uses
   ACL.Graphics,
   ACL.Graphics.SkinImage,
   ACL.MUI,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.ComboBox,
   ACL.UI.Controls.CompoundControl.SubClass,

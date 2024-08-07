@@ -44,7 +44,7 @@ uses
   ACL.Graphics.SkinImage,
   ACL.Math,
   ACL.Timers,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.Buttons,
   ACL.UI.Forms,
   ACL.UI.HintWindow,

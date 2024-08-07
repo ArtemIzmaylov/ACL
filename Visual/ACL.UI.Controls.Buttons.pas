@@ -46,7 +46,7 @@ uses
   ACL.Graphics,
   ACL.ObjectLinks,
   ACL.UI.Animation,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.ImageList,
   ACL.UI.Resources,
   ACL.Utils.Common,

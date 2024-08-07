@@ -45,7 +45,7 @@ uses
   ACL.Geometry,
   ACL.Graphics,
   ACL.Timers,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.ImageList,
   ACL.Utils.Common;
 

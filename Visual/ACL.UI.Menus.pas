@@ -67,7 +67,7 @@ uses
   ACL.ObjectLinks,
   ACL.Threading,
   ACL.UI.Application,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.ScrollBar,
   ACL.UI.Forms,
   ACL.UI.ImageList,
@@ -1647,7 +1647,7 @@ end;
 
 destructor TACLMenuWindow.Destroy;
 begin
-  MouseTracker.Remove(Self);
+  TACLMouseTracker.Release(Self);
   FreeAndNil(FItems);
   inherited;
 end;
@@ -1857,7 +1857,7 @@ end;
 
 procedure TACLMenuWindow.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
-  MouseTracker.Add(Self);
+  TACLMouseTracker.Start(Self);
   if FPrevMousePos <> Point(X, Y) then
   begin
     FPrevMousePos := Point(X, Y);

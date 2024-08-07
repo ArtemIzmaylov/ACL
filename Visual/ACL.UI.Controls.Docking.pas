@@ -57,7 +57,7 @@ uses
   ACL.Math,
   ACL.Timers,
   ACL.UI.Animation,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.Category,
   ACL.UI.Forms,
   ACL.UI.Resources,

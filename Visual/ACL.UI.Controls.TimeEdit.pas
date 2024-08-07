@@ -39,7 +39,7 @@ uses
   ACL.Timers,
   ACL.Graphics.SkinImage,
   ACL.MUI,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.SpinEdit,
   ACL.UI.Forms,

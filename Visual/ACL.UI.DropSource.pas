@@ -38,7 +38,7 @@ uses
   ACL.FileFormats.INI,
   ACL.Math,
   ACL.ObjectLinks,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.Threading,
   ACL.Utils.Clipboard,
   ACL.Utils.Common,

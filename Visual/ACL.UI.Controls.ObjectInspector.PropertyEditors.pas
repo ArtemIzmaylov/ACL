@@ -33,7 +33,7 @@ uses
   ACL.Classes.StringList,
   ACL.Graphics,
   ACL.Geometry,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.TreeList.SubClass,

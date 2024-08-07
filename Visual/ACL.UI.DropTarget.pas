@@ -36,7 +36,7 @@ uses
   ACL.Classes.Collections,
   ACL.Classes.StringList,
   ACL.FileFormats.INI,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.HintWindow,
   ACL.Utils.Clipboard,
   ACL.Utils.Desktop,

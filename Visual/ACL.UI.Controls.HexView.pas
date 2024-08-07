@@ -47,7 +47,7 @@ uses
   ACL.Graphics.FontCache,
   ACL.Graphics.TextLayout,
   ACL.Math,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.CompoundControl,
   ACL.UI.Controls.CompoundControl.SubClass,
   ACL.UI.Resources,

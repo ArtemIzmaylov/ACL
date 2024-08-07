@@ -38,7 +38,7 @@ uses
   ACL.MUI,
   ACL.Graphics.SkinImage,
   ACL.ObjectLinks,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.CompoundControl.SubClass,

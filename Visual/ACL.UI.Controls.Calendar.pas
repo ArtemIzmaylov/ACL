@@ -36,7 +36,7 @@ uses
   ACL.Geometry,
   ACL.Graphics,
   ACL.UI.Animation,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.CompoundControl,
   ACL.UI.Controls.CompoundControl.SubClass,
   ACL.UI.Resources,

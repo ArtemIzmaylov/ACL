@@ -45,7 +45,7 @@ uses
   ACL.Geometry,
   ACL.Graphics,
   ACL.MUI,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.ComboBox,

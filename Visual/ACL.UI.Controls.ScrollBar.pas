@@ -43,7 +43,7 @@ uses
   ACL.Math,
   ACL.Timers,
   ACL.UI.Animation,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.Buttons,
   ACL.UI.Resources,
   ACL.Utils.Common,

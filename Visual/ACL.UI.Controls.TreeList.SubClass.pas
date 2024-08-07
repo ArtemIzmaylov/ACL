@@ -52,7 +52,7 @@ uses
   ACL.Math,
   ACL.Threading,
   ACL.Threading.Sorting,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.CompoundControl.SubClass,

@@ -52,7 +52,7 @@ uses
   ACL.MUI,
   ACL.ObjectLinks,
   ACL.Parsers,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.Buttons,
   ACL.UI.Forms,
   ACL.UI.ImageList,

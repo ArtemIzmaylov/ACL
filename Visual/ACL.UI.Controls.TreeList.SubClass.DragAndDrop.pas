@@ -43,7 +43,7 @@ uses
   ACL.Graphics,
   ACL.Geometry,
   ACL.Timers,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.CompoundControl.SubClass,
   ACL.UI.Controls.TreeList.SubClass,
   ACL.UI.Controls.TreeList.Types,

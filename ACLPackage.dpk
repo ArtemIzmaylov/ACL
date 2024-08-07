@@ -106,7 +106,7 @@ contains
   ACL.UI.Application in 'Visual\ACL.UI.Application.pas',
   ACL.UI.Core.Impl.Win32 in 'Visual\ACL.UI.Core.Impl.Win32.pas',
   ACL.UI.Controls.ActivityIndicator in 'Visual\ACL.UI.Controls.ActivityIndicator.pas',
-  ACL.UI.Controls.BaseControls in 'Visual\ACL.UI.Controls.BaseControls.pas',
+  ACL.UI.Controls.Base in 'Visual\ACL.UI.Controls.Base.pas',
   ACL.UI.Controls.BaseEditors in 'Visual\ACL.UI.Controls.BaseEditors.pas',
   ACL.UI.Controls.Bevel in 'Visual\ACL.UI.Controls.Bevel.pas',
   ACL.UI.Controls.BindingDiagram in 'Visual\ACL.UI.Controls.BindingDiagram.pas',

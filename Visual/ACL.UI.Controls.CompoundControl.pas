@@ -37,7 +37,7 @@ uses
   {Vcl.}StdCtrls,
   // ACL
   ACL.MUI,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.CompoundControl.SubClass,
   ACL.UI.Controls.ScrollBar,
   ACL.UI.HintWindow,

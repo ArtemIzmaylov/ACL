@@ -40,7 +40,7 @@ uses
   ACL.Graphics,
   ACL.ObjectLinks,
   ACL.Threading,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.CompoundControl.SubClass,
   ACL.UI.Controls.TreeList.Types,

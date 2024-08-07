@@ -39,7 +39,7 @@ uses
   ACL.Graphics,
   ACL.Graphics.Ex,
   ACL.Graphics.SkinImage,
-  ACL.UI.Controls.BaseControls,
+  ACL.UI.Controls.Base,
   ACL.UI.Resources,
   ACL.Utils.Common;
 
