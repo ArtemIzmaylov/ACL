@@ -39,7 +39,6 @@ uses
   ACL.Geometry,
   ACL.Graphics,
   ACL.UI.Controls.Base,
-  ACL.UI.Forms,
   ACL.UI.Resources,
   ACL.Utils.Common,
   ACL.Utils.DPIAware;

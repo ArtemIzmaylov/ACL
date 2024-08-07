@@ -46,7 +46,6 @@ uses
   ACL.Timers,
   ACL.UI.Controls.Base,
   ACL.UI.Controls.Buttons,
-  ACL.UI.Forms,
   ACL.UI.HintWindow,
   ACL.UI.Resources,
   ACL.Utils.Common,

@@ -241,6 +241,7 @@
         <DCCReference Include="Visual\ACL.UI.DropSource.pas"/>
         <DCCReference Include="Visual\ACL.UI.DropTarget.pas"/>
         <DCCReference Include="Visual\ACL.UI.Forms.pas"/>
+        <DCCReference Include="Visual\ACL.UI.Forms.Base.pas"/>
         <DCCReference Include="Visual\ACL.UI.HintWindow.pas"/>
         <DCCReference Include="Visual\ACL.UI.ImageList.pas"/>
         <DCCReference Include="Visual\ACL.UI.Insight.pas"/>

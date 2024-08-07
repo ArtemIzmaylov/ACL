@@ -166,6 +166,7 @@ contains
   ACL.UI.DropSource in 'Visual\ACL.UI.DropSource.pas',
   ACL.UI.DropTarget in 'Visual\ACL.UI.DropTarget.pas',
   ACL.UI.Forms in 'Visual\ACL.UI.Forms.pas',
+  ACL.UI.Forms.Base in 'Visual\ACL.UI.Forms.Base.pas',
   ACL.UI.HintWindow in 'Visual\ACL.UI.HintWindow.pas',
   ACL.UI.ImageList in 'Visual\ACL.UI.ImageList.pas',
   ACL.UI.Insight in 'Visual\ACL.UI.Insight.pas',

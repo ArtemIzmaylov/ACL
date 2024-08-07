@@ -44,7 +44,6 @@ uses
   ACL.UI.Controls.Base,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.Buttons,
-  ACL.UI.Forms,
   ACL.UI.Resources,
   ACL.Utils.DPIAware;
 

@@ -70,6 +70,7 @@ uses
   ACL.UI.Controls.Base,
   ACL.UI.Controls.ScrollBar,
   ACL.UI.Forms,
+  ACL.UI.Forms.Base,
   ACL.UI.ImageList,
   ACL.UI.Resources,
   ACL.Utils.Common,

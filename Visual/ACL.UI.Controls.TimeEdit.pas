@@ -42,7 +42,6 @@ uses
   ACL.UI.Controls.Base,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.SpinEdit,
-  ACL.UI.Forms,
   ACL.UI.Resources;
 
 type

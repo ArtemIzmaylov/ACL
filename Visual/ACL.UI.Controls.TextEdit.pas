@@ -41,7 +41,6 @@ uses
   ACL.ObjectLinks,
   ACL.UI.Controls.Base,
   ACL.UI.Controls.BaseEditors,
-  ACL.UI.Forms,
   ACL.UI.Resources,
   ACL.Utils.Common,
   ACL.Utils.DPIAware,

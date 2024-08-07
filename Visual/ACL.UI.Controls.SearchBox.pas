@@ -47,7 +47,6 @@ uses
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.TextEdit,
-  ACL.UI.Forms,
   ACL.UI.Resources,
   ACL.Utils.Strings;
 

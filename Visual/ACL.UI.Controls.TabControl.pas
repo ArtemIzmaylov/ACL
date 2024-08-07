@@ -44,7 +44,6 @@ uses
   ACL.Math,
   ACL.MUI,
   ACL.UI.Controls.Base,
-  ACL.UI.Forms,
   ACL.UI.Insight,
   ACL.UI.Resources,
   ACL.Utils.Common,
