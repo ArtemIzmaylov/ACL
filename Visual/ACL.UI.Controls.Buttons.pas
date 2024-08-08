@@ -544,6 +544,7 @@ type
     // Messages
     procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
     procedure CMHitTest(var Message: TCMHitTest); message CM_HITTEST;
+    procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
     procedure CMVisibleChanged(var Message: TMessage); message CM_VISIBLECHANGED;
     procedure WMMove(var Message: TMessage); message WM_MOVE;
     procedure WMNCHitTest(var Message: TWMNCHitTest); message WM_NCHITTEST;
@@ -1128,8 +1129,8 @@ end;
 
 procedure TACLCustomButton.CMTextChanged(var Message: TMessage);
 begin
-  inherited;
   UpdateCaption;
+  inherited;
 end;
 
 procedure TACLCustomButton.ButtonClickHandler(Sender: TObject);
@@ -2095,6 +2096,13 @@ begin
     PtInRect(SubClass.ButtonRect, P) or
     PtInRect(SubClass.FocusRect, P) or
     PtInRect(SubClass.LineRect, P));
+end;
+
+procedure TACLCustomCheckBox.CMTextChanged(var Message: TMessage);
+begin
+  inherited;
+  if AutoSize then
+    AdjustSize;
 end;
 
 procedure TACLCustomCheckBox.CMVisibleChanged(var Message: TMessage);
