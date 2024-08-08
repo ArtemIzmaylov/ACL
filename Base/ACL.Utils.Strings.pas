@@ -548,9 +548,9 @@ function acStringToSize(const S: string): TSize;
 
 // Formatting
 function acFormatFloat(const AFormat: string;
-  const AValue: Double; AShowPlusSign: Boolean): string; overload;
+  const AValue: Double): string; overload;
 function acFormatFloat(const AFormat: string;
-  const AValue: Double; const ADecimalSeparator: Char = '.'): string; overload;
+  const AValue: Double; AShowPlusSign: Boolean): string; overload;
 function acFormatSize(const AValue: Int64; AAllowGigaBytes: Boolean = True): string;
 function acFormatTrackNo(ATrack: Integer): string;
 
@@ -709,6 +709,18 @@ end;
 // Formatting
 // ---------------------------------------------------------------------------------------------------------------------
 
+function acFormatFloat(const AFormat: string; const AValue: Double): string;
+begin
+  Result := FormatFloat(AFormat, AValue, InvariantFormatSettings);
+end;
+
+function acFormatFloat(const AFormat: string; const AValue: Double; AShowPlusSign: Boolean): string;
+const
+  SignsMap: array[Boolean] of string = ('', '+');
+begin
+  Result := SignsMap[(AValue >= 0) and AShowPlusSign] + acFormatFloat(AFormat, AValue);
+end;
+
 function acFormatSize(const AValue: Int64; AAllowGigaBytes: Boolean = True): string;
 begin
   if AValue < 0 then
@@ -730,22 +742,6 @@ begin
     Result := '0' + IntToStr(ATrack)
   else
     Result := IntToStr(ATrack);
-end;
-
-function acFormatFloat(const AFormat: string; const AValue: Double; const ADecimalSeparator: Char = '.'): string;
-var
-  AFormatSettings: TFormatSettings;
-begin
-  AFormatSettings := FormatSettings;
-  AFormatSettings.DecimalSeparator := ADecimalSeparator;
-  Result := FormatFloat(AFormat, AValue, AFormatSettings);
-end;
-
-function acFormatFloat(const AFormat: string; const AValue: Double; AShowPlusSign: Boolean): string;
-const
-  SignsMap: array[Boolean] of string = ('', '+');
-begin
-  Result := SignsMap[(AValue >= 0) and AShowPlusSign] + acFormatFloat(AFormat, AValue);
 end;
 
 // ---------------------------------------------------------------------------------------------------------------------

@@ -90,9 +90,9 @@ function GetPropType(PropInfo: PPropInfo): PTypeInfo; inline;
 implementation
 
 uses
-  {System.}SysUtils,
   {System.}Math,
   {System.}RTLConsts,
+  {System.}SysUtils,
   // ACL
   ACL.FastCode,
   ACL.Utils.Common,
@@ -306,18 +306,16 @@ end;
 
 class function TRTTI.GetPropValue(AObject: TObject; APropInfo: PPropInfo; out AValue: string): Boolean;
 var
-  APrevFormatSettings: TFormatSettings;
+  LValue: Variant;
 begin
   Result := APropInfo <> nil;
   if Result then
   begin
-    APrevFormatSettings := FormatSettings;
-    try
-      FormatSettings := InvariantFormatSettings;
-      AValue := GetPropValueAsVariant(AObject, APropInfo, True);
-    finally
-      FormatSettings := APrevFormatSettings;
-    end;
+    LValue := GetPropValueAsVariant(AObject, APropInfo, True);
+    if VarIsFloat(LValue) then
+      AValue := FloatToStr(Double(LValue), InvariantFormatSettings)
+    else
+      AValue := VarToStr(LValue);
   end;
 end;
 
@@ -332,14 +330,12 @@ end;
 class function TRTTI.GetPropValueAsVariant(
   AObject: TObject; APropInfo: PPropInfo; PreferStrings: Boolean): Variant;
 begin
-  if AObject <> nil then
-  begin
-    Result := {System.}TypInfo.GetPropValue(AObject, APropInfo, PreferStrings);
-    if IsUnsignedInt(APropInfo) then
-      Result := LongWord(Int64(Result));
-  end
-  else
-    Result := Null;
+  if AObject = nil then
+    Exit(Null);
+
+  Result := TypInfo.GetPropValue(AObject, APropInfo, PreferStrings);
+  if IsUnsignedInt(APropInfo) then
+    Result := LongWord(Int64(Result));
 end;
 
 class function TRTTI.GetPropValueAsVariant(
@@ -374,23 +370,18 @@ end;
 
 class procedure TRTTI.SetPropValue(
   AObject: TObject; APropInfo: PPropInfo; const AValue: string);
-var
-  APrevFormatSettings: TFormatSettings;
 begin
   if APropInfo = nil then
     Exit;
   if APropInfo.SetProc = nil then
     raise EPropReadOnly.CreateFmt(sErrorReadOnly, [APropInfo.Name]);
-
-  APrevFormatSettings := FormatSettings;
-  try
-    FormatSettings := InvariantFormatSettings;
-    if APropInfo^.PropType^.Kind = tkEnumeration then
-      SetEnumPropValue(AObject, APropInfo, AValue)
-    else
-      {System.}TypInfo.SetPropValue(AObject, APropInfo, AValue);
-  finally
-    FormatSettings := APrevFormatSettings;
+  case APropInfo^.PropType^.Kind of
+    tkEnumeration:
+      SetEnumPropValue(AObject, APropInfo, AValue);
+    tkFloat:
+      SetFloatProp(AObject, APropInfo, StrToFloat(AValue, InvariantFormatSettings));
+  else
+    TypInfo.SetPropValue(AObject, APropInfo, AValue);
   end;
 end;
 
@@ -407,7 +398,7 @@ begin
   if IsBoolean(APropInfo) and VarIsNumeric(AValue) then
     SetOrdProp(AObject, APropInfo, Ord(FastTrunc(AValue) <> 0))
   else
-    {System.}TypInfo.SetPropValue(AObject, APropInfo, AValue);
+    TypInfo.SetPropValue(AObject, APropInfo, AValue);
 end;
 
 class procedure TRTTI.SetPropValueAsVariant(
