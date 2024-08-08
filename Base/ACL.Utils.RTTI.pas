@@ -130,7 +130,7 @@ end;
 
 class constructor TRTTI.Create;
 begin
-  FContext := TRttiContext.Create;
+  FContext := TRttiContext.Create{$IFDEF FPC}(False){$ENDIF};
 end;
 
 class destructor TRTTI.Destroy;
