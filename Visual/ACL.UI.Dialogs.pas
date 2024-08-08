@@ -172,6 +172,7 @@ type
     FPrevClientRect: TRect;
   protected
     procedure AfterFormCreate; override;
+    procedure AlignControls(AControl: TControl; var ARect: TRect); override;
     procedure CreateControls; virtual;
     procedure SetHasChanges(AValue: Boolean);
 
@@ -694,15 +695,20 @@ end;
 procedure TACLCustomInputDialog.AfterFormCreate;
 begin
   inherited;
-
+  Padding.All := 7;
   BorderStyle := bsDialog;
   DoubleBuffered := True;
   ClientWidth := dpiApply(335, FCurrentPPI);
+end;
 
-  Padding.Left := dpiApply(7, FCurrentPPI);
-  Padding.Top := dpiApply(7, FCurrentPPI);
-  Padding.Right := dpiApply(7, FCurrentPPI);
-  Padding.Bottom := dpiApply(7, FCurrentPPI);
+procedure TACLCustomInputDialog.AlignControls(AControl: TControl; var ARect: TRect);
+begin
+  if InCreation = TACLBoolean.False then
+  begin
+    ARect := ClientRect;
+    AdjustClientRect(ARect);
+    PlaceControls(ARect);
+  end;
 end;
 
 procedure TACLCustomInputDialog.CreateControls;
@@ -744,15 +750,17 @@ end;
 
 procedure TACLCustomInputDialog.DoShow;
 var
-  R: TRect;
+  LMargins: TRect;
+  LRect: TRect;
 begin
   inherited;
 
-  R := ClientRect;
-  R.Content(Rect(Padding.Left, Padding.Top, Padding.Right, Padding.Bottom));
-  PlaceControls(R);
-  ClientHeight := R.Bottom + Padding.Bottom;
-  ClientWidth := R.Right + Padding.Right;
+  LRect := ClientRect;
+  AdjustClientRect(LRect);
+  LMargins := TRect.CreateMargins(ClientRect, LRect);
+  PlaceControls(LRect);
+  ClientHeight := LRect.Bottom + LMargins.Bottom;
+  ClientWidth := LRect.Right + LMargins.Right;
 
   DoUpdateState;
 end;
