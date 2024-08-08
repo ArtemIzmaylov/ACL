@@ -99,7 +99,6 @@ const
   acAnchorBottomRight = [akRight, akBottom];
 
 type
-
 {$REGION ' General Types '}
 
   TTabOrderList = {$IFDEF FPC}TFPList{$ELSE}TList{$ENDIF};

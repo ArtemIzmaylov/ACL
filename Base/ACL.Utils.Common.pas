@@ -659,6 +659,34 @@ begin
 {$ENDIF}
 end;
 
+function acGetWindowRect(AWnd: TWndHandle): TRect;
+begin
+  if GetWindowRect(AWnd, Result{%H-}) = {$IFDEF FPC}0{$ELSE}False{$ENDIF} then
+    Result := NullRect;
+end;
+
+{ TACLBooleanHelper }
+
+function TACLBooleanHelper.ActualValue(ADefault: Boolean): Boolean;
+begin
+  if Self = TACLBoolean.Default then
+    Result := ADefault
+  else
+    Result := Self = TACLBoolean.True;
+end;
+
+class function TACLBooleanHelper.From(AValue: Boolean): TACLBoolean;
+begin
+  if AValue then
+    Result := TACLBoolean.True
+  else
+    Result := TACLBoolean.False;
+end;
+
+// -----------------------------------------------------------------------------
+// Process
+// -----------------------------------------------------------------------------
+
 function acGetProcessFileName(AWnd: TWndHandle; out AFileName: string): Boolean;
 {$IFDEF MSWINDOWS}
 var
@@ -683,29 +711,70 @@ begin
 {$ENDIF}
 end;
 
-function acGetWindowRect(AWnd: TWndHandle): TRect;
+{$REGION ' TLiveLogStream '}
+type
+  TLiveLogStream = class(TStream)
+  strict private
+    FBuffer: TACLStringBuilder;
+    FLog: IStringReceiver;
+    procedure Flush;
+  public
+    constructor Create(ALog: IStringReceiver);
+    destructor Destroy; override;
+    class function Obtain(ALog: IStringReceiver): TLiveLogStream;
+    function Write(const Buffer; Count: Longint): Longint; override;
+  end;
+
+{ TLiveLogStream }
+
+class function TLiveLogStream.Obtain(ALog: IStringReceiver): TLiveLogStream;
 begin
-  if GetWindowRect(AWnd, Result{%H-}) = {$IFDEF FPC}0{$ELSE}False{$ENDIF} then
-    Result := NullRect;
+  if ALog <> nil then
+    Exit(TLiveLogStream.Create(ALog));
+  Result := nil;
 end;
 
-{ TACLBooleanHelper }
-
-function TACLBooleanHelper.ActualValue(ADefault: Boolean): Boolean;
+constructor TLiveLogStream.Create(ALog: IStringReceiver);
 begin
-  if Self = TACLBoolean.Default then
-    Result := ADefault
-  else
-    Result := Self = TACLBoolean.True;
+  FLog := ALog;
+  FBuffer := TACLStringBuilder.Create(128);
 end;
 
-class function TACLBooleanHelper.From(AValue: Boolean): TACLBoolean;
+destructor TLiveLogStream.Destroy;
 begin
-  if AValue then
-    Result := TACLBoolean.True
-  else
-    Result := TACLBoolean.False;
+  Flush;
+  FreeAndNil(FBuffer);
+  inherited;
 end;
+
+procedure TLiveLogStream.Flush;
+begin
+  if FBuffer.Length > 0 then
+  begin
+    FLog.Add(FBuffer.ToString);
+    FBuffer.Length := 0;
+  end;
+end;
+
+function TLiveLogStream.Write(const Buffer; Count: Longint): Longint;
+var
+  LBytes: PByte;
+begin
+  Result := Count;
+  LBytes := @Buffer;
+  while Count > 0 do
+  begin
+    case LBytes^ of
+      13, 10:
+        Flush;
+    else
+      FBuffer.Append(AnsiChar(LBytes^));
+    end;
+    Inc(LBytes);
+    Dec(Count);
+  end;
+end;
+{$ENDREGION}
 
 { TACLProcess }
 
@@ -852,25 +921,18 @@ end;
 class function TACLProcess.Execute(const ACmdLine: string;
   ALog: IStringReceiver; AOptions: TExecuteOptions = [eoShowGUI]): LongBool;
 var
-  AErrorData: TStringStream;
-  AExitCode: Cardinal;
-  AOutputData: TStringStream;
+  LErrorData: TStream;
+  LExitCode: Cardinal;
+  LOutputData: TStream;
 begin
-  AExitCode := 0;
-  AErrorData := TStringStream.Create;
-  AOutputData := TStringStream.Create;
+  LExitCode := 0;
+  LErrorData := TLiveLogStream.Obtain(ALog);
+  LOutputData := TLiveLogStream.Obtain(ALog);
   try
     if ALog <> nil then
       ALog.Add('Executing: ' + ACmdLine);
-    if Execute(ACmdLine, AOptions, AOutputData, AErrorData, @AExitCode) then
-    begin
-      if ALog <> nil then
-      begin
-        ALog.Add(AOutputData.DataString);
-        ALog.Add(AErrorData.DataString);
-      end;
-      Result := AExitCode = 0;
-    end
+    if Execute(ACmdLine, AOptions, LOutputData, LErrorData, @LExitCode) then
+      Result := LExitCode = 0
     else
     begin
       if ALog <> nil then
@@ -878,8 +940,8 @@ begin
       Result := False;
     end;
   finally
-    AOutputData.Free;
-    AErrorData.Free;
+    LOutputData.Free;
+    LErrorData.Free;
   end;
 end;
 
@@ -948,6 +1010,7 @@ begin
   AWow64SetProc := TWow64SetProc(GetProcAddress(ALibHandle, 'Wow64EnableWow64FsRedirection'));
   Result := Assigned(AWow64SetProc) and AWow64SetProc(AValue);
 end;
+
 {$ENDIF}
 
 { TACLInterfaceHelper }
@@ -1019,6 +1082,7 @@ begin
   else
     Result := nil;
 end;
+
 
 initialization
 {$IFDEF MSWINDOWS}

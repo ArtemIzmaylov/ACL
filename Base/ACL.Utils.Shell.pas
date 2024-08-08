@@ -648,7 +648,7 @@ begin
     try
       if Supports(AObject, IPersistFile, ALinkFile) then
       try
-        Result := Succeeded(ALinkFile.Load(PWideChar(sLongFileNamePrefix + ALink), OF_READ));
+        Result := Succeeded(ALinkFile.Load(PWideChar(acLongFileNamePrefix + ALink), OF_READ));
         if Result then
         begin
           acClearFileLongPath(ABuffer);
@@ -799,9 +799,9 @@ begin
       for I := 0 to LBookmarks.Count - 1 do
       begin
         LHomeDir := LBookmarks[I];
-        if LHomeDir.StartsWith('file://', True) then
+        if LHomeDir.StartsWith(acFileProtocol, True) then
         begin
-          LItem.Path := acURLDecode(Copy(LHomeDir, 8));
+          LItem.Path := acURLDecode(Copy(LHomeDir, Length(acFileProtocol) + 1));
           AProc(@LItem);
         end;
       end;

@@ -36,15 +36,16 @@ uses
   ACL.Utils.Stream;
 
 const
-  sFileExtDelims = ' .\/:';
-  sFilePathDelims = ':\/';
-  sLongFileNamePrefix = '\\?\';
-  sLongFileNamePrefixUNC = sLongFileNamePrefix + 'UNC\';
-  sUncPrefix = '\\';
-  sUnixPathDelim = '/';
-  sWindowPathDelim = '\';
+  acFileExtDelims = ' .\/:';
+  acFilePathDelims = ':\/';
+  acFileProtocol = 'file://';
+  acLongFileNamePrefix = '\\?\';
+  acLongFileNamePrefixUNC = acLongFileNamePrefix + 'UNC\';
+  acUncPrefix = '\\';
+  acUnixPathDelim = '/';
+  acWindowPathDelim = '\';
 
-  sPathDelims: TSysCharSet = [sUnixPathDelim, sWindowPathDelim];
+  acPathDelims: TSysCharSet = [acUnixPathDelim, acWindowPathDelim];
 
   INVALID_FILE_ATTRIBUTES = DWORD(-1);
   MAX_LONG_PATH = Word.MaxValue;
@@ -362,12 +363,12 @@ end;
 
 function acIsLocalUnixPath(const AFileName: string): Boolean;
 begin
-  Result := acContains(sUnixPathDelim, AFileName) and not acIsUrlFileName(AFileName);
+  Result := acContains(acUnixPathDelim, AFileName) and not acIsUrlFileName(AFileName);
 end;
 
 function acIsUncFileName(const AFileName: string): Boolean;
 begin
-  Result := acBeginsWith(AFileName, sUncPrefix, False);
+  Result := acBeginsWith(AFileName, acUncPrefix, False);
 end;
 
 function acIsUrlFileName(const AFileName: string): Boolean;
@@ -375,7 +376,7 @@ var
   P: PChar;
 begin
   P := acStrScan(PChar(AFileName), ':');
-  Result := (P <> nil) and ((P + 1)^ = (P + 2)^) and CharInSet((P + 1)^, sPathDelims);
+  Result := (P <> nil) and ((P + 1)^ = (P + 2)^) and CharInSet((P + 1)^, acPathDelims);
 //  Result := acExtractFileScheme(AFileName) <> '';
 end;
 
@@ -384,7 +385,7 @@ var
   P: PChar;
 begin
   P := acStrScan(PChar(AFileName), ACount, ':');
-  Result := (P <> nil) and ((P + 1)^ = (P + 2)^) and CharInSet((P + 1)^, sPathDelims);
+  Result := (P <> nil) and ((P + 1)^ = (P + 2)^) and CharInSet((P + 1)^, acPathDelims);
 end;
 
 function acPrepareFileName(const AFileName: string): string; inline;
@@ -393,12 +394,12 @@ begin
   //#AI: https://docs.microsoft.com/en-us/windows/desktop/fileio/naming-a-file
   if Length(AFileName) >= MAX_PATH then
   begin
-    if acBeginsWith(AFileName, sLongFileNamePrefix) then
+    if acBeginsWith(AFileName, acLongFileNamePrefix) then
       Exit(AFileName);
     if acIsUncFileName(AFileName) then
-      Result := sLongFileNamePrefixUNC + Copy(AFileName, 3, MaxInt)
+      Result := acLongFileNamePrefixUNC + Copy(AFileName, 3, MaxInt)
     else
-      Result := sLongFileNamePrefix + AFileName;
+      Result := acLongFileNamePrefix + AFileName;
   end
   else
 {$ENDIF}
@@ -407,10 +408,10 @@ end;
 
 function acSimplifyLongFileName(const AFileName: string): string;
 begin
-  if acBeginsWith(AFileName, sLongFileNamePrefixUNC) then
-    Result := Copy(AFileName, Length(sLongFileNamePrefixUNC) + 1)
-  else if acBeginsWith(AFileName, sLongFileNamePrefix) then
-    Result := Copy(AFileName, Length(sLongFileNamePrefix) + 1)
+  if acBeginsWith(AFileName, acLongFileNamePrefixUNC) then
+    Result := Copy(AFileName, Length(acLongFileNamePrefixUNC) + 1)
+  else if acBeginsWith(AFileName, acLongFileNamePrefix) then
+    Result := Copy(AFileName, Length(acLongFileNamePrefix) + 1)
   else
     Result := AFileName;
 end;
@@ -420,8 +421,8 @@ var
   ADelim1: Integer;
   ADelim2: Integer;
 begin
-  ADelim1 := acLastDelimiter(sFilePathDelims, AFileName1);
-  ADelim2 := acLastDelimiter(sFilePathDelims, AFileName2);
+  ADelim1 := acLastDelimiter(acFilePathDelims, AFileName1);
+  ADelim2 := acLastDelimiter(acFilePathDelims, AFileName2);
   Result := acLogicalCompare(PChar(AFileName1), PChar(AFileName2), ADelim1, ADelim2);
   if Result = 0 then
   begin
@@ -597,12 +598,12 @@ end;
 
 function acUnixPathToWindows(const Path: string): string;
 begin
-  Result := acReplaceChar(Path, sUnixPathDelim, sWindowPathDelim);
+  Result := acReplaceChar(Path, acUnixPathDelim, acWindowPathDelim);
 end;
 
 function acWindowsPathToUnix(const Path: string): string;
 begin
-  Result := acReplaceChar(Path, sWindowPathDelim, sUnixPathDelim);
+  Result := acReplaceChar(Path, acWindowPathDelim, acUnixPathDelim);
 end;
 
 function acGetFileExtBounds(const FileName: string;
@@ -620,14 +621,14 @@ begin
       ALength := AUrlParamPos - 1;
   end;
 
-  AExtDelimPos := acLastDelimiter(PChar(sFileExtDelims), PChar(FileName), Length(sFileExtDelims), ALength);
+  AExtDelimPos := acLastDelimiter(PChar(acFileExtDelims), PChar(FileName), Length(acFileExtDelims), ALength);
   if (AExtDelimPos > 0) and (FileName[AExtDelimPos] = '.') then
   begin
     AStart := AExtDelimPos;
     AFinish := ALength;
     if ADoubleExt then
     begin
-      AExtDelimPos := acLastDelimiter(PChar(sFileExtDelims), PChar(FileName), Length(sFileExtDelims), AStart - 1);
+      AExtDelimPos := acLastDelimiter(PChar(acFileExtDelims), PChar(FileName), Length(acFileExtDelims), AStart - 1);
       if (AExtDelimPos > 0) and (FileName[AExtDelimPos] = '.') then
         AStart := AExtDelimPos;
     end;
@@ -659,16 +660,16 @@ begin
   AStartIndex := AEndIndex;
   while (ADepth > 0) and (AStartIndex > 0) do
   begin
-    if CharInSet(APath[AStartIndex], sPathDelims) then
+    if CharInSet(APath[AStartIndex], acPathDelims) then
       Dec(AStartIndex);
-    AStartIndex := acLastDelimiter(PChar(sFilePathDelims), PChar(APath), Length(sFilePathDelims), AStartIndex);
+    AStartIndex := acLastDelimiter(PChar(acFilePathDelims), PChar(APath), Length(acFilePathDelims), AStartIndex);
     Dec(ADepth);
   end;
   Inc(AStartIndex);
 
-  while (AStartIndex <  AEndIndex) and CharInSet(APath[AEndIndex], sPathDelims) do
+  while (AStartIndex <  AEndIndex) and CharInSet(APath[AEndIndex], acPathDelims) do
     Dec(AEndIndex);
-  while (AStartIndex <= AEndIndex) and CharInSet(APath[AStartIndex], sPathDelims) do
+  while (AStartIndex <= AEndIndex) and CharInSet(APath[AStartIndex], acPathDelims) do
     Inc(AStartIndex);
 
   Result := Copy(APath, AStartIndex, AEndIndex - AStartIndex + 1);
@@ -678,7 +679,7 @@ function acExtractFileDir(const FileName: string): string;
 var
   I: Integer;
 begin
-  I := acLastDelimiter(sFilePathDelims, Filename);
+  I := acLastDelimiter(acFilePathDelims, Filename);
   if (I > 1) and (FileName[I] = PathDelim) and
     not CharInSet(FileName[I - 1], [PathDelim{$IFDEF MSWINDOWS}, DriveDelim{$ENDIF}])
   then
@@ -694,13 +695,13 @@ end;
 function acExtractFileDrive(const FileName: string): string;
 begin
 {$IFDEF MSWINDOWS}
-  if acBeginsWith(FileName, sLongFileNamePrefix) then
-    Exit(acExtractFileDrive(Copy(FileName, Length(sLongFileNamePrefix) + 1, MaxInt)));
+  if acBeginsWith(FileName, acLongFileNamePrefix) then
+    Exit(acExtractFileDrive(Copy(FileName, Length(acLongFileNamePrefix) + 1, MaxInt)));
   if (Length(FileName) >= 2) and (FileName[2] = DriveDelim) then
     Exit(Copy(FileName, 1, 2));
   if acIsUncFileName(FileName) then
   begin
-    var J := acPos(PathDelim, FileName, False, Length(sUncPrefix) + 1);
+    var J := acPos(PathDelim, FileName, False, Length(acUncPrefix) + 1);
     if J > 0 then
       Exit(Copy(FileName, 1, J - 1));
     Exit(FileName);
@@ -731,7 +732,7 @@ end;
 
 function acExtractFileName(const FileName: string): string;
 begin
-  Result := Copy(FileName, acLastDelimiter(sFilePathDelims, FileName) + 1, MaxInt);
+  Result := Copy(FileName, acLastDelimiter(acFilePathDelims, FileName) + 1, MaxInt);
 end;
 
 function acExtractFileNameWithoutExt(const FileName: string): string;
@@ -741,7 +742,7 @@ end;
 
 function acExtractFilePath(const FileName: string): string;
 begin
-  Result := Copy(FileName, 1, acLastDelimiter(sFilePathDelims, FileName));
+  Result := Copy(FileName, 1, acLastDelimiter(acFilePathDelims, FileName));
 end;
 
 function acExtractFileScheme(const AFileName: string): string;
@@ -752,7 +753,7 @@ begin
   C := P;
   while CharInSet(P^, ['A'..'Z', 'a'..'z', '0'..'9']) do
     Inc(P);
-  if (P^ = ':') and ((P + 1)^ = (P + 2)^) and CharInSet((P + 1)^, sPathDelims) then
+  if (P^ = ':') and ((P + 1)^ = (P + 2)^) and CharInSet((P + 1)^, acPathDelims) then
     Result := acMakeString(C, P)
   else
     Result := '';
@@ -764,7 +765,7 @@ begin
   if (Length(AFileName) >= 2) and (AFileName[2] = ':') then
     Exit(False); // C: C:\
 {$ELSE}
-  if (AFileName <> '') and (AFileName[1] = sUnixPathDelim) then
+  if (AFileName <> '') and (AFileName[1] = acUnixPathDelim) then
     Exit(False);
 {$ENDIF}
   if acIsUrlFileName(AFileName) then
@@ -848,8 +849,8 @@ begin
     SetLength(Result, ALength);
     ALength := GetShortPathNameW(PWideChar(acPrepareFileName(APath)), PWideChar(Result), ALength);
 
-    if acBeginsWith(Result, sLongFileNamePrefix) then
-      ASkipCount := Length(sLongFileNamePrefix)
+    if acBeginsWith(Result, acLongFileNamePrefix) then
+      ASkipCount := Length(acLongFileNamePrefix)
     else
       ASkipCount := 0;
 
