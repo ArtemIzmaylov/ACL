@@ -9,16 +9,11 @@
 //             © 2006-2024
 //             www.aimp.ru
 //
-//  FPC:       Partial
+//  FPC:       OK
 //
 unit ACL.Utils.Clipboard;
 
 {$I ACL.Config.inc}
-
-{
-   FPC: TODO
-     + Clipboard.AsFiles
-}
 
 interface
 
@@ -44,6 +39,7 @@ uses
   ACL.Classes,
   ACL.Classes.StringList,
   ACL.FileFormats.INI,
+  ACL.Utils.FileSystem,
   ACL.Utils.Strings;
 
 type
@@ -120,6 +116,11 @@ function CF_HTML: Word;
 {$ENDIF}
 implementation
 
+{$IFDEF FPC}
+uses
+  ACL.Web;
+{$ENDIF}
+
 function {%H-}MakeFormat(AFormat: Word): TFormatEtc;
 begin
 {$IFDEF MSWINDOWS}
@@ -128,9 +129,6 @@ begin
   Result.dwAspect := DVASPECT_CONTENT;
   Result.lindex := -1;
   Result.tymed := TYMED_HGLOBAL;
-{$ELSE}
-  {$MESSAGE WARN 'NotImplemented'}
-  raise ENotImplemented.Create('Clipboard routine');
 {$ENDIF}
 end;
 
@@ -347,23 +345,72 @@ begin
 end;
 
 function TACLClipboardHelper.GetFiles: TACLStringList;
-begin
 {$IFDEF MSWINDOWS}
+begin
   Result := TACLGlobalMemory.ToFiles(GetAsHandle(CF_HDROP));
 {$ELSE}
-  {$MESSAGE WARN 'NotImplemented'}
-  Result := nil;
-  raise ENotImplemented.Create('Clipboard routine');
+var
+  I: Integer;
+  LFormat: Word;
+  LStream: TStringStream;
+begin
+  Result := TACLStringList.Create;
+  LFormat := FindFormatID('text/uri-list');
+  if LFormat <> 0 then
+  begin
+    LStream := TStringStream.Create;
+    try
+      if GetFormat(LFormat, LStream) then
+      begin
+        Result.Text := LStream.DataString;
+        for I := 0 to Result.Count - 1 do
+        begin
+          if Result[I].StartsWith(acFileProtocol, True) then
+            Result[I] := acURLDecode(Copy(Result[I], Length(acFileProtocol) + 1));
+        end;
+      end;
+    finally
+      LStream.Free;
+    end;
+  end;
 {$ENDIF}
 end;
 
 procedure TACLClipboardHelper.SetFiles(AFiles: TACLStringList);
-begin
 {$IFDEF MSWINDOWS}
+begin
   SetAsHandle(CF_HDROP, TACLGlobalMemory.Alloc(AFiles));
 {$ELSE}
-  {$MESSAGE WARN 'NotImplemented'}
-  raise ENotImplemented.Create('Clipboard routine');
+
+  procedure Append(const AMimeType: AnsiString; AData: TACLStringList);
+  var
+    S: AnsiString;
+  begin
+    S := AData.GetDelimitedText(#10, False);
+    AddFormat(RegisterClipboardFormat(AMimeType), PAnsiChar(S)^, Length(S));
+  end;
+
+var
+  I: Integer;
+begin
+  AFiles := AFiles.Clone;
+  try
+    for I := 0 to AFiles.Count - 1 do
+      AFiles[I] := acFileProtocol + acURLEncode(AFiles[I]);
+
+    Open;
+    try
+      Clear;
+      Append('text/uri-list', AFiles);
+      AFiles.Insert(0, 'copy');
+      Append('x-special/mate-copied-files', AFiles);
+      Append('x-special/gnome-copied-files', AFiles);
+    finally
+      Close;
+    end;
+  finally
+    AFiles.Free;
+  end;
 {$ENDIF}
 end;
 
