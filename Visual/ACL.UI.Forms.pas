@@ -15,6 +15,10 @@ unit ACL.UI.Forms;
 
 {$I ACL.Config.inc}
 
+{$IFDEF LINUX}
+  {$DEFINE USE_SKINNED_FORM} // Experimental!
+{$ENDIF}
+
 interface
 
 uses
@@ -58,6 +62,9 @@ uses
   ACL.UI.Application,
   ACL.UI.Controls.Base,
   ACL.UI.Forms.Base,
+{$IFDEF USE_SKINNED_FORM}
+  ACL.UI.Forms.Styled,
+{$ENDIF}
   ACL.UI.Resources,
   ACL.Utils.Common,
   ACL.Utils.Desktop,
@@ -124,7 +131,11 @@ type
 
 {$REGION ' Forms '}
 
+{$IFDEF USE_SKINNED_FORM}
+  TACLCustomFormImpl = TACLCustomStyledFormImpl;
+{$ELSE}
   TACLCustomFormImpl = TACLCustomForm;
+{$ENDIF}
 
   { TACLForm }
 
