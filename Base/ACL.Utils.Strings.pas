@@ -1837,8 +1837,8 @@ begin
         $EC..$EF: B.Append('I');
         $F2..$F6: B.Append('o');
         $F9..$FC: B.Append('u');
-        $0000401: B.Append('Е'); // Ё
-        $0000451: B.Append('е'); // ё
+        $0000401: B.Append(#$0415); // Ё
+        $0000451: B.Append(#$0435); // ё
       else
         B.Append(C);
       end;
