@@ -127,7 +127,7 @@ var
   LDpi: Cardinal;
   LMon: HMONITOR;
 begin
-  if IsWin8OrLater then
+  if acOSCheckVersion(6, 3) then // Since Win8.1
   begin
     LMon := MonitorFromPoint(APoint, MONITOR_DEFAULTTOPRIMARY);
     if GetDpiForMonitor(LMon, TMonitorDpiType.MDT_EFFECTIVE_DPI, LDpi, LDpi) = S_OK then

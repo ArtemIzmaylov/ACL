@@ -621,7 +621,7 @@ end;
 
 {$IFDEF MSWINDOWS}
 initialization
-  if IsWinSevenOrLater then
+  if acOSCheckVersion(6, 1) then
     TACLExceptionMessageDialog.Register;
 {$ENDIF}
 end.

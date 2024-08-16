@@ -455,7 +455,7 @@ var
 begin
   //#AI: don't change the order
   Form := AForm;
-  RedrawLocked := IsWinVistaOrLater and IsWindowVisible(AForm.Handle);
+  RedrawLocked := acOSCheckVersion(6, 0) and IsWindowVisible(AForm.Handle);
   LockedControls := TComponentList.Create(False);
   PopulateControls(AForm);
   for I := 0 to LockedControls.Count - 1 do
@@ -492,7 +492,7 @@ end;
 
 class procedure TACLFormMouseWheelHelper.CheckInstalled;
 begin
-  if (FHook = 0) and not IsWin10OrLater then
+  if (FHook = 0) and not acOSCheckVersion(10, 0) then
     FHook := SetWindowsHookEx(WH_MOUSE, MouseHook, 0, GetCurrentThreadId);
 end;
 
@@ -1218,7 +1218,7 @@ var
   LWidth: Integer;
 begin
   // https://stackoverflow.com/questions/39261826/change-the-color-of-the-title-bar-caption-of-a-win32-application
-  if IsWin10OrLater and HandleAllocated and (TOSVersion.Build >= 18985) then
+  if HandleAllocated and acOSCheckVersion(10, 0, 18985) then
   begin
     LValue := TACLApplication.IsDarkMode;
     DwmSetWindowAttribute(Handle, DWMWA_USE_IMMERSIVE_DARK_MODE, @LValue, SizeOf(LValue));

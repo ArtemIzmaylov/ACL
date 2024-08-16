@@ -274,8 +274,8 @@ const
 {$ENDIF}
 begin
 {$IFDEF MSWINDOWS}
-  Result := IsWin11OrLater and Succeeded(DwmSetWindowAttribute(AHandle,
-    DWMWA_WINDOW_CORNER_PREFERENCE, @BorderCorners[ACorners], SizeOf(Cardinal)));
+  Result := acOSCheckVersion(10, 0, 22000) and Succeeded(DwmSetWindowAttribute(
+    AHandle, DWMWA_WINDOW_CORNER_PREFERENCE, @BorderCorners[ACorners], SizeOf(Cardinal)));
 {$ELSE}
   Result := False;
 {$ENDIF}

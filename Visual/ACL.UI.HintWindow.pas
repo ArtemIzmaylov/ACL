@@ -217,7 +217,7 @@ procedure TACLStyleHint.AfterConstruction;
 begin
   inherited AfterConstruction;
 {$IFNDEF FPC}
-  FRadius := IfThen(not IsWin8OrLater, 3);
+  FRadius := IfThen(acOSCheckVersion(6, 2), 0, 3);
 {$ENDIF}
 end;
 
@@ -536,7 +536,11 @@ begin
   // Otherwise cases, the hint does not want to be transparent for mouse (for some reason)
   // and prevents the user from clicking on the item
 {$IFDEF MSWINDOWS}
-  Result := IsWinVistaOrLater and not IsWine and (not IsWinSeven or DwmCompositionEnabled);
+  if IsWine then
+    Exit(False);
+  if (TOSVersion.Build = 6) and (TOSVersion.Build = 1) then
+    Exit(DwmCompositionEnabled);
+  Result := acOSCheckVersion(6, 0);
 {$ELSE}
   Result := True;
 {$ENDIF}

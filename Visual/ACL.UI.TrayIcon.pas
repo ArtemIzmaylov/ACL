@@ -491,14 +491,14 @@ begin
   FIconData.Wnd := FHandle;
   FIconData.uCallbackMessage := WM_TRAYNOTIFY;
   FIconData.uFlags := NIF_ICON or NIF_MESSAGE or NIF_TIP;
-  if IsWinVistaOrLater then
+  if acOSCheckVersion(6, 0) then
     FIconData.uVersion := NOTIFYICON_VERSION_4
   else
     FIconData.uVersion := NOTIFYICON_VERSION;
 
   if Icon.ID <> '' then
   begin
-    if IsWinSevenOrLater then
+    if acOSCheckVersion(6, 1) then
     begin
       TACLHashMD5.Initialize(AState);
       TACLHashMD5.Update(AState, Icon.ID);
@@ -509,7 +509,7 @@ begin
       FIconData.uID := TACLHashCRC32.Calculate(Icon.ID);
   end;
 
-  if IsWin11OrLater then
+  if acOSCheckVersion(10, 0, 22000) then
     acStrLCopy(FIconData.szTip, Icon.Hint, Length(FIconData.szTip) - 1)
   else
     acStrLCopy(FIconData.szTip, acStringReplace(Icon.Hint, '&', '&&&'), Length(FIconData.szTip) - 1);

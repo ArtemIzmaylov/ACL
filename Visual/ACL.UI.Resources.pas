@@ -3449,7 +3449,7 @@ begin
   BeginUpdate;
   try
     LoadFromResource(HInstance, 'ACLDEFAULTSKIN' + IfThenW(TACLApplication.IsDarkMode, '_DARK'));
-    if IsWin11OrLater then
+    if acOSCheckVersion(10, 0, 22000) then
     begin
       InheritIfNecessary('Buttons.Textures.Button', '.W11');
       InheritIfNecessary('Popup.Margins.Borders', '.W11');

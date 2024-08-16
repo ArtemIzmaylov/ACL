@@ -373,7 +373,7 @@ var
   AResult: Boolean;
 begin
   AResult := False;
-  if not IsWin10OrLater then
+  if not acOSCheckVersion(10, 0) then
   begin
     if CreateComObject(CLSID_ApplicationAssociationRegistrationUI, IApplicationAssociationRegistrationUI, AIntf) then
       AResult := Succeeded(AIntf.LaunchAdvancedAssociationUI(PChar(AppName)))
@@ -381,9 +381,9 @@ begin
 
   if not AResult then
   begin
-    if IsWin10OrLater and (TOSVersion.Build >= 19045) then
+    if acOSCheckVersion(10, 0, 19045) then
       ShellExecute('ms-settings:defaultapps?registeredAppMachine=' + AppName)
-    else if IsWinVistaOrLater then
+    else if acOSCheckVersion(6, 0) then
       ShellExecute('control.exe', '/NAME Microsoft.DefaultPrograms /PAGE pageDefaultProgram')
     else
       ShellExecute('control.exe', 'appwiz.cpl,,3');

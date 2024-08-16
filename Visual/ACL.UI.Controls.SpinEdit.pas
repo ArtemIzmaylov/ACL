@@ -258,7 +258,7 @@ begin
   Result := ClientRect;
   Result.Left := ButtonLeft.Bounds.Right;
   Result.Right := ButtonRight.Bounds.Left;
-  if IsWin11OrLater then
+  if acOSCheckVersion(10, 0, 22000) then
     Result.Inflate(0, -dpiApply(acTextIndent, FCurrentPPI))
   else
     Result.Inflate(0, -1);

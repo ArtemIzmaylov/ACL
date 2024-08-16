@@ -781,7 +781,7 @@ procedure TACLStyleEdit.DrawBorders(ACanvas: TCanvas; const R: TRect; AFocused: 
 var
   AFocusRect: TRect;
 begin
-  if IsWin11OrLater then
+  if acOSCheckVersion(10, 0, 22000) then
   begin
     acDrawFrame(ACanvas, R, ColorBorder.AsColor);
     if AFocused then

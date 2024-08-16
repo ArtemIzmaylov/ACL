@@ -413,7 +413,7 @@ begin
   Application.ModalStarted;
   try
   {$IFDEF MSWINDOWS}
-    if IsWinSevenOrLater and UseLatestCommonDialogs then
+    if acOSCheckVersion(6, 1) and UseLatestCommonDialogs then
     begin
       with TACLMessageTaskDialog.Create(AMessage, ACaption, AFlags) do
       try
@@ -529,7 +529,7 @@ end;
 function TACLFileDialog.CreateImpl(ASaveDialog: Boolean; AOwnerWnd: HWND): TACLFileDialogImpl;
 begin
 {$IFDEF MSWINDOWS}
-  if IsWinVistaOrLater then
+  if acOSCheckVersion(6, 0) then
     Result := TACLFileDialogVistaImpl.Create(AOwnerWnd, Self, ASaveDialog)
   else
     Result := TACLFileDialogOldImpl.Create(AOwnerWnd, Self, ASaveDialog);

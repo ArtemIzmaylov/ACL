@@ -153,9 +153,6 @@ type
   {$ENDIF}
   end;
 
-  TProcessHelper = class(TACLProcess)
-  end deprecated 'use TACLProcess class';
-
   { TACLInterfaceHelper }
 
   TACLInterfaceHelper<T: IUnknown> = class
@@ -187,15 +184,6 @@ const
 {$ENDIF}
 
 var
-  IsWin8OrLater: Boolean;
-  IsWin10OrLater: Boolean;
-  IsWin11OrLater: Boolean;
-  IsWinSeven: Boolean;
-  IsWinSevenOrLater: Boolean;
-  IsWinVistaOrLater: Boolean;
-  IsWinXP: Boolean;
-  IsWine: Boolean;
-
   InvariantFormatSettings: TFormatSettings;
 
 // HMODULE
@@ -238,7 +226,9 @@ procedure FreeMemAndNil(var P: Pointer);
 function IfThen(AValue: Boolean; ATrue, AFalse: TACLBoolean): TACLBoolean; overload;
 
 // Version
+function acOSCheckVersion(AMajor, AMinor: Integer; ABuild: Integer = -1): Boolean;
 function acOSGetDescription: string;
+function IsWine: Boolean;
 
 // HRESULT
 function Failed(Status: HRESULT) : BOOL;
@@ -299,17 +289,21 @@ begin
   end;
 end;
 
-procedure CheckOSVersion;
+function acOSCheckVersion(AMajor, AMinor: Integer; ABuild: Integer = -1): Boolean;
+begin
+  Result :=
+    (TOSVersion.Major > AMajor) or
+    (TOSVersion.Major = AMajor) and (TOSVersion.Minor > AMinor) or
+    (TOSVersion.Major = AMajor) and (TOSVersion.Minor = AMinor) and
+      ((ABuild < 0{dont care}) or (TOSVersion.Build >= ABuild));
+end;
+
+function IsWine: Boolean;
 begin
 {$IFDEF MSWINDOWS}
-  IsWine := Assigned(FWineGetVersion);
-  IsWinXP := (TOSVersion.Major = 5) and (TOSVersion.Minor = 1);
-  IsWinVistaOrLater := TOSVersion.Check(6, 0);
-  IsWinSeven := (TOSVersion.Major = 6) and (TOSVersion.Minor = 1);
-  IsWinSevenOrLater := TOSVersion.Check(6, 1);
-  IsWin8OrLater := TOSVersion.Check(6, 2);
-  IsWin10OrLater := TOSVersion.Check(10, 0);
-  IsWin11OrLater := TOSVersion.Check(10, 0) and (TOSVersion.Build >= 22000);
+  Result := Assigned(FWineGetVersion);
+{$ELSE}
+  Result := False;
 {$ENDIF}
 end;
 
@@ -1093,8 +1087,6 @@ initialization
   ALibHandle := GetModuleHandle(kernel32);
   FGetThreadErrorMode := GetProcAddress(ALibHandle, 'GetThreadErrorMode');
   FSetThreadErrorMode := GetProcAddress(ALibHandle, 'SetThreadErrorMode');
-
-  CheckOSVersion;
 {$ENDIF}
   InvariantFormatSettings := TFormatSettings.Invariant;
 end.

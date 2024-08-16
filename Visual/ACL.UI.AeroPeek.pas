@@ -492,7 +492,11 @@ end;
 
 function TACLAeroPeek.GetAvailable: Boolean;
 begin
-  Result := (FTaskBarList <> nil) and IsWinSevenOrLater;
+{$IFDEF MSWINDOWS}
+  Result := (FTaskBarList <> nil) and acOSCheckVersion(6, 1);
+{$ELSE}
+  Result := False;
+{$ENDIF}
 end;
 
 function TACLAeroPeek.GetProgressPresents: Boolean;

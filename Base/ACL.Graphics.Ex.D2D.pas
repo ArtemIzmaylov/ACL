@@ -529,7 +529,7 @@ class constructor TACLDirect2D.Create;
 begin
   // Direct2D support has been added in Windows 7 Platform update,
   // but it works not so perfect. Disabling it for Windows 7 at all.
-  if IsWine or not IsWin8OrLater then
+  if IsWine or not acOSCheckVersion(6, 2) then
     FAvailable := TACLBoolean.False;
   SwapChainSize := 2;
   VSync := True;
@@ -628,7 +628,7 @@ var
   AFeatureCount: Integer;
   AFeatures: PD3DFeatureLevel;
 begin
-  if IsWin8OrLater then
+  if acOSCheckVersion(6, 2) then
   begin
     AFeatures := @Windows8Features[0];
     AFeatureCount := Length(Windows8Features);
@@ -1397,7 +1397,7 @@ begin
       ASwapChainDescription.BufferUsage := DXGI_USAGE_RENDER_TARGET_OUTPUT;
       ASwapChainDescription.BufferCount := TACLDirect2D.SwapChainSize;
       ASwapChainDescription.SwapEffect := DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
-      ASwapChainDescription.Scaling := ScalingMode[IsWin8OrLater];
+      ASwapChainDescription.Scaling := ScalingMode[acOSCheckVersion(6, 2)];
 
       D2D1Check(AFactory.CreateSwapChainForHwnd(FDevice3D, AHandle, @ASwapChainDescription, nil, nil, FSwapChain));
     end;

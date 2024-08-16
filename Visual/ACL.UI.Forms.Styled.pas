@@ -578,7 +578,7 @@ end;
 
 procedure TACLCustomStyledFormImpl.CalculateMetrics;
 begin
-  FWeAreSkinned := IsWin8OrLater and not (csDesigning in ComponentState);
+  FWeAreSkinned := acOSCheckVersion(6, 2) and not (csDesigning in ComponentState);
   ZeroMemory(@FMetrics, SizeOf(FMetrics));
   if BorderStyle <> bsNone then
   begin
