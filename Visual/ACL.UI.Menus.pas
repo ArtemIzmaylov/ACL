@@ -1378,24 +1378,29 @@ end;
 
 procedure TACLStylePopupMenu.DrawSeparator(ACanvas: TCanvas; const R: TRect);
 var
-  ALayer: TACLDib;
-  ADstC, ADstG: TRect;
-  ASrcC, ASrcG: TRect;
+  LDib: TACLDib;
+  LDstC, LDstG: TRect;
+  LSrcC, LSrcG: TRect;
 begin
+  if R.IsEmpty then
+    Exit;
   if TextureSeparator.ImageDpi <> acDefaultDpi then
   begin
-    ALayer := TACLDib.Create(
+    LDib := TACLDib.Create(
       TextureGutter.Image.Width + TextureSeparator.Image.Width,
       TextureSeparator.Image.Height);
     try
-      acFillRect(ALayer.Canvas, ALayer.ClientRect, ColorItem.AsColor);
-      TextureSeparator.Draw(ALayer.Canvas, ALayer.ClientRect);
-      DoSplitRect(ALayer.ClientRect, TextureGutter.Image.Width, ASrcG, ASrcC);
-      DoSplitRect(R, ItemGutterWidth, ADstG, ADstC);
-      ALayer.DrawBlend(ACanvas, ADstG, ASrcG, MaxByte);
-      ALayer.DrawBlend(ACanvas, ADstC, ASrcC, MaxByte);
+      if not LDib.Empty then
+      begin
+        acFillRect(LDib.Canvas, LDib.ClientRect, ColorItem.AsColor);
+        TextureSeparator.Draw(LDib.Canvas, LDib.ClientRect);
+        DoSplitRect(LDib.ClientRect, TextureGutter.Image.Width, LSrcG, LSrcC);
+        DoSplitRect(R, ItemGutterWidth, LDstG, LDstC);
+        LDib.DrawBlend(ACanvas, LDstG, LSrcG, MaxByte);
+        LDib.DrawBlend(ACanvas, LDstC, LSrcC, MaxByte);
+      end;
     finally
-      ALayer.Free;
+      LDib.Free;
     end;
   end
   else
