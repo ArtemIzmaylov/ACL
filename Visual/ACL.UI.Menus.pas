@@ -651,6 +651,7 @@ type
 
 {$ENDREGION}
 
+function acMenuAppendShortCut(const AHint: string; AShortCut: TShortCut): string;
 function acMenuEscapeHotkeys(const ACaption: string): string;
 function acMenusHasActivePopup: Boolean;
 function acShortCutToText(ShortCut: TShortCut): string;
@@ -701,6 +702,16 @@ type
 
 var
   FMenuLoopCount: Integer;
+
+function acMenuAppendShortCut(const AHint: string; AShortCut: TShortCut): string;
+begin
+  if AShortCut = 0 then
+    Exit(AHint);
+  if AHint <> '' then
+    Result := Format('%s (%s)', [AHint, acShortCutToText(AShortCut)])
+  else
+    Result := acShortCutToText(AShortCut);
+end;
 
 function acMenuEscapeHotkeys(const ACaption: string): string;
 begin
@@ -2666,8 +2677,8 @@ end;
 function TACLMenuPopupLooper.GetMenuHint(AItem: TMenuItem): string;
 begin
   Result := GetLongHint(AItem.Hint);
-  if Application.HintShortCuts and (AItem.ShortCut <> scNone) then
-    Result := Format('%s (%s)', [Result, acShortCutToText(AItem.ShortCut)]);
+  if Application.HintShortCuts then
+    Result := acMenuAppendShortCut(Result, AItem.ShortCut);
 end;
 
 function TACLMenuPopupLooper.IsInLoop: Boolean;

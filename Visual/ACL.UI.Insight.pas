@@ -449,13 +449,7 @@ end;
 procedure TACLUIInsightButton.DoGetHint(const P: TPoint; var AHint: string);
 begin
   inherited;
-  if ShortCut <> scNone then
-  begin
-    if AHint <> '' then
-      AHint := AHint + ' (' + acShortCutToText(ShortCut) + ')'
-    else
-      AHint := acShortCutToText(ShortCut);
-  end;
+  AHint := acMenuAppendShortCut(AHint, ShortCut);
 end;
 
 function TACLUIInsightButton.CreateDropDownWindow: TACLPopupWindow;
