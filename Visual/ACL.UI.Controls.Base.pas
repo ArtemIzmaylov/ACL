@@ -77,6 +77,7 @@ const
   WM_NCCALCSIZE  = LM_NCCALCSIZE;
   WM_MOUSEFIRST  = LM_MOUSEFIRST;
   WM_MOUSELAST   = LM_MOUSELAST;
+  WM_DESTROY     = LM_DESTROY;
 
   csAligning     = csCreating; // просто потому, что оно в LCL не используется
 
@@ -598,6 +599,7 @@ type
     procedure BoundsChanged; {$IFDEF FPC}override;{$ELSE}virtual;{$ENDIF}
   {$IFDEF FPC}
     procedure CalculatePreferredSize(var W, H: Integer; X: Boolean); override; final;
+    procedure InitializeWnd; override;
   {$ENDIF}
     procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
     function CreatePadding: TACLPadding; virtual;
@@ -639,8 +641,7 @@ type
     property LangSection: string read GetLangSection;
     property MouseInClient: Boolean read FMouseInClient;
     property Padding: TACLPadding read FPadding write SetPadding stored IsPaddingStored;
-    property ResourceCollection: TACLCustomResourceCollection
-      read FResourceCollection write SetResourceCollection;
+    property ResourceCollection: TACLCustomResourceCollection read FResourceCollection write SetResourceCollection;
     property Transparent: Boolean read FTransparent write SetTransparent default False;
   public
     constructor Create(AOwner: TComponent); override;
@@ -2709,6 +2710,13 @@ begin
     inherited;
   CanAutoSize(W, H);
 end;
+
+procedure TACLCustomControl.InitializeWnd;
+begin
+  inherited InitializeWnd;
+  Perform(WM_CREATE, 0, 0); // especially for TACLDropTarget
+end;
+
 {$ENDIF}
 
 procedure TACLCustomControl.ChangeScale(M, D: Integer; isDpiChange: Boolean);

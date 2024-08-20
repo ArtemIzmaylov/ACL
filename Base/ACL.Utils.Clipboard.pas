@@ -42,8 +42,15 @@ uses
   ACL.Utils.FileSystem,
   ACL.Utils.Strings;
 
+const
+  acMimeConfig = 'text/aimp-config';
+  acMimeInternalFileList = 'text/aimp-uri-list';
+  acMimeLinuxFileList = 'text/uri-list';
+  acMimeHtml = 'text/html';
+
 type
 {$IFDEF MSWINDOWS}
+  TClipboardFormat = Word;
 
   TACLGlobalMemory = class
   public
@@ -76,32 +83,41 @@ type
   TACLClipboardHelper = class helper for TClipboard
   strict private
     function GetFiles: TACLStringList;
-    function GetStream(AFormat: Word): TCustomMemoryStream;
+    function GetStream(AFormat: TClipboardFormat): TCustomMemoryStream;
     procedure SetFiles(AFiles: TACLStringList);
-    procedure SetStream(AFormat: Word; AValue: TCustomMemoryStream);
+    procedure SetStream(AFormat: TClipboardFormat; AValue: TCustomMemoryStream);
   public
+  {$IFDEF LINUX}
+    function EncodeFiles(AFiles: TACLStringList): string;
+  {$ENDIF}
     function HasText: Boolean;
     function SafeGetText: string;
     property AsFiles: TACLStringList read GetFiles write SetFiles;
-    property AsStream[AFormat: Word]: TCustomMemoryStream read GetStream write SetStream;
+    property AsStream[AFormat: TClipboardFormat]: TCustomMemoryStream read GetStream write SetStream;
   end;
 
 {$ENDIF}
 
-// FPC stubs
 {$IFDEF FPC}
-  TStgMedium = record end;
-  TFormatEtc = record end;
-const
-  CF_HDROP = 0;
+  TFormatEtc = record
+    cfFormat: TClipboardFormat;
+  end;
+
+  TStgMedium = record
+    Owned: Boolean;
+    Data: PByte;
+    Size: Integer;
+  end;
 {$ENDIF}
 
-var
-  CF_CONFIG: Word = 0;
-  CF_FILEURIS: Word = 0;
-  CF_SHELLIDList: Word = 0;
-
 function MakeFormat(AFormat: Word): TFormatEtc;
+function MediumAlloc(AData: Pointer; ASize: Integer; out AMedium: TStgMedium): Boolean;
+function MediumGetFiles(const AMedium: TStgMedium; out AFiles: TACLStringList): Boolean;
+function MediumGetStream(const AMedium: TStgMedium; out AStream: TCustomMemoryStream): Boolean;
+function MediumGetString(const AMedium: TStgMedium; AFormat: TClipboardFormat): string;
+{$IFDEF FPC}
+procedure ReleaseStgMedium(var Medium: TStgMedium);
+{$ENDIF}
 
 // DropHandle
 {$IFDEF MSWINDOWS}
@@ -109,10 +125,15 @@ function acGetFilesFromDrag(ADragQuery: HDROP;
   AFiles: TACLStringList; AFreeDropData: Boolean = True): Boolean;
 {$ENDIF}
 
+// Formats
+function CF_CONFIG: TClipboardFormat;
+function CF_FILEURIS: TClipboardFormat;
+function CF_SHELLIDList: TClipboardFormat;
 {$IFDEF FPC}
-function CF_UNICODETEXT: Word;
+function CF_HDROP: TClipboardFormat;
+function CF_UNICODETEXT: TClipboardFormat;
 {$ELSE}
-function CF_HTML: Word;
+function CF_HTML: TClipboardFormat;
 {$ENDIF}
 implementation
 
@@ -123,8 +144,8 @@ uses
 
 function {%H-}MakeFormat(AFormat: Word): TFormatEtc;
 begin
-{$IFDEF MSWINDOWS}
   Result.cfFormat := AFormat;
+{$IFDEF MSWINDOWS}
   Result.ptd := nil;
   Result.dwAspect := DVASPECT_CONTENT;
   Result.lindex := -1;
@@ -132,17 +153,149 @@ begin
 {$ENDIF}
 end;
 
+function MediumAlloc(AData: Pointer; ASize: Integer; out AMedium: TStgMedium): Boolean;
+begin
+{$IFDEF MSWINDOWS}
+  AMedium.tymed := TYMED_HGLOBAL;
+  AMedium.hGlobal := TACLGlobalMemory.Alloc(AData, ASize);
+  Result := AMedium.hGlobal <> 0;
+{$ELSE}
+  Result := ASize > 0;
+  if Result then
+  begin
+    AMedium.Owned := True;
+    AMedium.Size := ASize;
+    AMedium.Data := AllocMem(ASize);
+    Move(AData^, AMedium.Data^, AMedium.Size);
+  end;
+{$ENDIF}
+end;
+
+function MediumGetFiles(const AMedium: TStgMedium; out AFiles: TACLStringList): Boolean;
+{$IFDEF MSWINDOWS}
+begin
+  if AMedium.tymed = TYMED_HGLOBAL then
+  begin
+    AFiles := TACLGlobalMemory.ToFiles(AMedium.hGlobal);
+    Result := AFiles <> nil;
+  end
+  else
+    Result := False;
+{$ELSE}
+var
+  I: Integer;
+begin
+  AFiles := TACLStringList.Create;
+  if (AMedium.Data <> nil) and (AMedium.Size > 0) then
+    AFiles.Append(PChar(AMedium.Data), AMedium.Size);
+  for I := 0 to AFiles.Count - 1 do
+  begin
+    if AFiles[I].StartsWith(acFileProtocol, True) then
+      AFiles[I] := acURLDecode(Copy(AFiles[I], Length(acFileProtocol) + 1));
+  end;
+  Result := AFiles.Count > 0;
+  if not Result then
+    FreeAndNil(AFiles);
+{$ENDIF}
+end;
+
+function MediumGetStream(const AMedium: TStgMedium; out AStream: TCustomMemoryStream): Boolean;
+begin
+{$IFDEF MSWINDOWS}
+  Result := AMedium.tymed = TYMED_HGLOBAL;
+  if Result then
+    AStream := TACLGlobalMemoryStream.Create(AMedium.hGlobal);
+{$ELSE}
+  Result := (AMedium.Data <> nil) and (AMedium.Size > 0);
+  if Result then
+  begin
+    AStream := TMemoryStream.Create;
+    AStream.Size := AMedium.Size;
+    Move(AMedium.Data^, AStream.Memory^, AMedium.Size);
+  end;
+{$ENDIF}
+end;
+
+function MediumGetString(const AMedium: TStgMedium; AFormat: TClipboardFormat): string;
+{$IFDEF MSWINDOWS}
+var
+  LFiles: TACLStringList;
+begin
+  case AFormat of
+    CF_TEXT:
+      Result := TACLGlobalMemory.ToString(AMedium.hGlobal, False);
+    CF_UNICODETEXT:
+      Result := TACLGlobalMemory.ToString(AMedium.hGlobal, True);
+    CF_HDROP:
+      begin
+        LFiles := TACLGlobalMemory.ToFiles(AMedium.hGlobal);
+        if LFiles <> nil then
+        try
+          Result := LFiles.Text;
+        finally
+          LFiles.Free;
+        end;
+      end;
+  else
+    Result := TACLGlobalMemory.ToString(AMedium.hGlobal, False);
+  end;
+{$ELSE}
+begin
+  Result := acMakeString(PChar(AMedium.Data), AMedium.Size);
+{$ENDIF}
+end;
+
 {$IFDEF FPC}
-function CF_UNICODETEXT: Word;
+procedure ReleaseStgMedium(var Medium: TStgMedium);
+begin
+  if Medium.Owned then
+    FreeMem(Medium.Data, Medium.Size);
+  FillChar(Medium, SizeOf(Medium), 0);
+end;
+{$ENDIF}
+
+{$REGION ' Clipboard Formats '}
+
+function CF_CONFIG: TClipboardFormat;
+begin
+  Result := RegisterClipboardFormat(acMimeConfig);
+end;
+
+function CF_FILEURIS: TClipboardFormat;
+begin
+  Result := RegisterClipboardFormat(acMimeInternalFileList);
+end;
+
+function CF_SHELLIDList: TClipboardFormat;
+begin
+{$IFDEF MSWINDOWS}
+  Result := RegisterClipboardFormat(CFSTR_SHELLIDLIST);
+{$ELSE}
+  Result := 0
+{$ENDIF}
+end;
+
+{$IFDEF FPC}
+
+function CF_HDROP: TClipboardFormat;
+begin
+  Result := RegisterClipboardFormat(acMimeLinuxFileList);
+end;
+
+function CF_UNICODETEXT: TClipboardFormat;
 begin
   Result := CF_TEXT;
 end;
+
 {$ELSE}
-function CF_HTML: Word;
+
+function CF_HTML: TClipboardFormat;
 begin
   Result := RegisterClipboardFormat('HTML Format');
 end;
+
 {$ENDIF}
+{$ENDREGION}
 
 {$IFDEF MSWINDOWS}
 function acGetFilesFromDrag(ADragQuery: HDROP;
@@ -320,7 +473,26 @@ end;
 
 { TACLClipboardHelper }
 
-function TACLClipboardHelper.GetStream(AFormat: Word): TCustomMemoryStream;
+{$IFDEF LINUX}
+function TACLClipboardHelper.EncodeFiles(AFiles: TACLStringList): string;
+var
+  I: Integer;
+begin
+  AFiles := AFiles.Clone;
+  try
+    for I := 0 to AFiles.Count - 1 do
+    begin
+      if not acIsUrlFileName(AFiles[I]) then
+        AFiles[I] := acFileProtocol + acURLEncode(AFiles[I]);
+    end;
+    Result := AFiles.GetDelimitedText(#10, False);
+  finally
+    AFiles.Free;
+  end;
+end;
+{$ENDIF}
+
+function TACLClipboardHelper.GetStream(AFormat: TClipboardFormat): TCustomMemoryStream;
 begin
 {$IFDEF FPC}
   Result := TMemoryStream.Create;
@@ -351,28 +523,22 @@ begin
 {$ELSE}
 var
   I: Integer;
-  LFormat: Word;
-  LStream: TStringStream;
+  LMedium: TStgMedium;
+  LStream: TMemoryStream;
 begin
-  Result := TACLStringList.Create;
-  LFormat := FindFormatID('text/uri-list');
-  if LFormat <> 0 then
-  begin
-    LStream := TStringStream.Create;
-    try
-      if GetFormat(LFormat, LStream) then
-      begin
-        Result.Text := LStream.DataString;
-        for I := 0 to Result.Count - 1 do
-        begin
-          if Result[I].StartsWith(acFileProtocol, True) then
-            Result[I] := acURLDecode(Copy(Result[I], Length(acFileProtocol) + 1));
-        end;
-      end;
-    finally
-      LStream.Free;
+  LStream := TMemoryStream.Create;
+  try
+    if GetFormat(FindFormatID(acMimeLinuxFileList), LStream) then
+    begin
+      LMedium.Owned := False;
+      LMedium.Data := LStream.Memory;
+      LMedium.Size := LStream.Size;
+      if MediumGetFiles(LMedium, Result) then Exit;
     end;
+  finally
+    LStream.Free;
   end;
+  Result := TACLStringList.Create;
 {$ENDIF}
 end;
 
@@ -382,44 +548,34 @@ begin
   SetAsHandle(CF_HDROP, TACLGlobalMemory.Alloc(AFiles));
 {$ELSE}
 
-  procedure Append(const AMimeType: AnsiString; AData: TACLStringList);
-  var
-    S: AnsiString;
+  procedure Append(const AMimeType, AData: AnsiString);
   begin
-    S := AData.GetDelimitedText(#10, False);
-    AddFormat(RegisterClipboardFormat(AMimeType), PAnsiChar(S)^, Length(S));
+    AddFormat(RegisterClipboardFormat(AMimeType), PAnsiChar(AData)^, Length(AData));
   end;
 
 var
-  I: Integer;
+  LFiles: AnsiString;
 begin
-  AFiles := AFiles.Clone;
+  Open;
   try
-    for I := 0 to AFiles.Count - 1 do
-      AFiles[I] := acFileProtocol + acURLEncode(AFiles[I]);
-
-    Open;
-    try
-      Clear;
-      Append('text/uri-list', AFiles);
-      AFiles.Insert(0, 'copy');
-      Append('x-special/mate-copied-files', AFiles);
-      Append('x-special/gnome-copied-files', AFiles);
-    finally
-      Close;
-    end;
+    Clear;
+    LFiles := EncodeFiles(AFiles);
+    Append(acMimeLinuxFileList, LFiles);
+    LFiles := 'copy'#10 + LFiles;
+    Append('x-special/mate-copied-files', LFiles);
+    Append('x-special/gnome-copied-files', LFiles);
   finally
-    AFiles.Free;
+    Close;
   end;
 {$ENDIF}
 end;
 
-procedure TACLClipboardHelper.SetStream(AFormat: Word; AValue: TCustomMemoryStream);
+procedure TACLClipboardHelper.SetStream(AFormat: TClipboardFormat; AValue: TCustomMemoryStream);
 begin
 {$IFDEF FPC}
   AddFormat(AFormat, AValue);
 {$ELSE}
-  Clipboard.SetAsHandle(AFormat, TACLGlobalMemory.Alloc(AValue));
+  Clipboard.SetAsHandle(AFormat, TACLGlobalMemory.Alloc(AValue.Memory, AValue.Size));
 {$ENDIF}
 end;
 
@@ -427,16 +583,11 @@ function TACLClipboardHelper.HasText: Boolean;
 begin
   Result := HasFormat(CF_TEXT){$IFDEF MSWINDOWS} or HasFormat(CF_UNICODETEXT){$ENDIF};
 end;
-
 {$ENDIF}
 
 {$IFDEF MSWINDOWS}
 initialization
   OleInitialize(nil);
-  CF_CONFIG := RegisterClipboardFormat('ACL.CFG');
-  CF_FILEURIS := RegisterClipboardFormat('ACL.FileURIs');
-  CF_SHELLIDList := RegisterClipboardFormat(CFSTR_SHELLIDLIST);
-
 finalization
   OleUninitialize;
 {$ENDIF}

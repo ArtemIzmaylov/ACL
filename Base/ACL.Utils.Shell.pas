@@ -184,8 +184,8 @@ function ShellIsLibraryPath(const APath: string): Boolean;
 // Shell - Links
 {$IFDEF MSWINDOWS}
 function ShellCreateLink(const ALinkFileName, AFileName: string): Boolean;
-function ShellParseLink(const ALink: string; out AFileName: string): Boolean;
 {$ENDIF}
+function ShellParseLink(const ALink: string; out AFileName: string): Boolean;
 
 function ShellGetFreeSpace(const AFileName: string): Int64;
 function ShellShutdown(AMode: TShellShutdownMode): Boolean;
@@ -665,6 +665,11 @@ begin
   except
     Result := False;
   end;
+end;
+{$ELSE}
+function ShellParseLink(const ALink: string; out AFileName: string): Boolean;
+begin
+  Result := False;
 end;
 {$ENDIF}
 {$ENDREGION}

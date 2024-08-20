@@ -17,7 +17,7 @@
   {$WARN 3124 off} // Inlining disabled
 
   {$IFNDEF LINUX}
-    {$MESSAGE FATAL 'ACL was not ready for other platforms using FPC/LCL'}
+    {$MESSAGE FATAL 'ACL is not yet ready for other platforms via FPC/LCL'}
   {$ENDIF}
 
   {$IFDEF LCLGtk2}

@@ -116,7 +116,9 @@ type
       AObject: TObject = nil; AInterface: IUnknown = nil): Integer;
     procedure AddEx(const S: string);
     procedure Append(const ASource: TACLStringList); overload;
+    procedure Append(const ASource: TStrings); overload;
     procedure Append(const ASource: string); overload;
+    procedure Append(const ASource: PChar; ALength: Integer); overload;
     procedure Assign(Source: TPersistent); override;
     procedure Insert(Index: Integer; const S: string;
       AObject: TObject = nil; AInterface: IUnknown = nil); virtual;
@@ -423,11 +425,30 @@ begin
   end;
 end;
 
-procedure TACLStringList.Append(const ASource: string);
+procedure TACLStringList.Append(const ASource: TStrings);
+var
+  I: Integer;
 begin
   BeginUpdate;
   try
-    ParseBuffer(PChar(ASource), Length(ASource))
+    EnsureCapacity(ASource.Count);
+    for I := 0 to ASource.Count - 1 do
+      Add(ASource[I], ASource.Objects[I]);
+  finally
+    EndUpdate;
+  end;
+end;
+
+procedure TACLStringList.Append(const ASource: string);
+begin
+  Append(PChar(ASource), Length(ASource))
+end;
+
+procedure TACLStringList.Append(const ASource: PChar; ALength: Integer);
+begin
+  BeginUpdate;
+  try
+    ParseBuffer(ASource, ALength);
   finally
     EndUpdate;
   end;
