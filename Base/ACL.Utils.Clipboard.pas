@@ -38,7 +38,6 @@ uses
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
-  ACL.FileFormats.INI,
   ACL.Utils.FileSystem,
   ACL.Utils.Strings;
 
@@ -55,11 +54,7 @@ type
   TACLGlobalMemory = class
   public
     class function Alloc(AData: PByte; ASize: Integer): HGLOBAL; overload;
-    class function Alloc(AData: TACLIniFile): HGLOBAL; overload;
-    class function Alloc(AData: TCustomMemoryStream): HGLOBAL; overload;
     class function Alloc(AFiles: TACLStringList): HGLOBAL; overload;
-    class function Alloc(const S: AnsiString): HGLOBAL; overload;
-    class function Alloc(const S: UnicodeString): HGLOBAL; overload;
     class function ToFiles(AHandle: HGLOBAL): TACLStringList;
     class function ToString(AHandle: HGLOBAL; AWide: Boolean): string; reintroduce;
   end;
@@ -163,10 +158,12 @@ begin
   Result := ASize > 0;
   if Result then
   begin
+    // Data must be a zero-terminated!
+    AMedium.Size := ASize + 1;
+    AMedium.Data := AllocMem(ASize + 1);
     AMedium.Owned := True;
-    AMedium.Size := ASize;
-    AMedium.Data := AllocMem(ASize);
-    Move(AData^, AMedium.Data^, AMedium.Size);
+    FillChar(AMedium.Data^, AMedium.Size, 0);
+    Move(AData^, AMedium.Data^, ASize);
   end;
 {$ENDIF}
 end;
@@ -347,16 +344,6 @@ begin
   end;
 end;
 
-class function TACLGlobalMemory.Alloc(AData: TCustomMemoryStream): HGLOBAL;
-begin
-  Result := Alloc(AData.Memory, AData.Size);
-end;
-
-class function TACLGlobalMemory.Alloc(const S: UnicodeString): HGLOBAL;
-begin
-  Result := Alloc(PByte(PWideChar(S)), (Length(S) + 1) * SizeOf(WideChar));
-end;
-
 class function TACLGlobalMemory.Alloc(AFiles: TACLStringList): HGLOBAL;
 var
   ADropFiles: PDropFiles;
@@ -378,29 +365,6 @@ begin
       GlobalUnlock(Result);
     end;
   end;
-end;
-
-class function TACLGlobalMemory.Alloc(const S: AnsiString): HGLOBAL;
-begin
-  Result := Alloc(PByte(PAnsiChar(S)), Length(S) + 1);
-end;
-
-class function TACLGlobalMemory.Alloc(AData: TACLIniFile): HGLOBAL;
-var
-  AStream: TMemoryStream;
-begin
-  if AData <> nil then
-  begin
-    AStream := TMemoryStream.Create;
-    try
-      AData.SaveToStream(AStream);
-      Result := Alloc(AStream);
-    finally
-      AStream.Free;
-    end;
-  end
-  else
-    Result := 0;
 end;
 
 class function TACLGlobalMemory.ToFiles(AHandle: HGLOBAL): TACLStringList;

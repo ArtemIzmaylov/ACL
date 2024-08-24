@@ -46,7 +46,6 @@ uses
   ACL.Graphics.SkinImage,
   ACL.Math,
   ACL.MUI,
-  ACL.ObjectLinks,
   ACL.Timers,
   ACL.UI.Animation,
   ACL.UI.Controls.Base,
@@ -298,13 +297,13 @@ type
   { TACLCompoundControlDragAndDropController }
 
   TACLCompoundControlDragAndDropController = class(TACLCompoundControlPersistent,
-    IACLObjectLinksSupport,
     IACLDropSourceOperation)
   strict private
     FAutoScrollTimer: TACLTimer;
     FCursor: TCursor;
     FDragObject: TACLCompoundControlDragObject;
     FDragWindow: TDragImageList;
+    FDropSource: TACLDropSource;
     FDropSourceConfig: TACLIniFile;
     FDropSourceObject: TObject;
     FDropSourceOperation: IACLDropSourceOperation;
@@ -345,7 +344,6 @@ type
     property DragWindow: TDragImageList{nullable} read FDragWindow;
     property DropSourceConfig: TACLIniFile read FDropSourceConfig;
     property DropSourceObject: TObject read FDropSourceObject;
-    property DropTarget: TACLDropTarget read FDropTarget;
     property LastPoint: TPoint read FLastPoint write FLastPoint;
     property IsStarted: Boolean read FIsStarted;
     property MouseCapturePoint: TPoint read FMouseCapturePoint write FMouseCapturePoint;
@@ -361,6 +359,7 @@ type
     //# Properties
     property Cursor: TCursor read FCursor;
     property DragObject: TACLCompoundControlDragObject read FDragObject;
+    property DropTarget: TACLDropTarget read FDropTarget;
     property HitTest: TACLHitTestInfo read GetHitTest;
     property IsActive: Boolean read FIsActive;
     property IsDropping: Boolean read FIsDropping write FIsDropping;
@@ -1290,7 +1289,6 @@ end;
 destructor TACLCompoundControlDragAndDropController.Destroy;
 begin
   Cancel;
-  TACLObjectLinks.Release(Self);
   FreeAndNil(FDropTarget);
   FreeAndNil(FDropSourceConfig);
   inherited Destroy;
@@ -1300,7 +1298,8 @@ procedure TACLCompoundControlDragAndDropController.Cancel;
 begin
   if IsActive then
   begin
-    TACLObjectLinks.Release(Self);
+    if FDropSource <> nil then
+      FDropSource.Cancel;
     if IsDropSourceOperation then
       DropSourceEnd([], [])
     else
@@ -1404,19 +1403,18 @@ end;
 
 procedure TACLCompoundControlDragAndDropController.StartDropSource(
   AActions: TACLDropSourceActions; ASource: IACLDropSourceOperation; ASourceObject: TObject);
-var
-  LDropSource: TACLDropSource;
 begin
   DropSourceConfig.Clear;
   if CanStartDropSource(AActions, ASourceObject) and (AActions <> []) then
   begin
     FDropSourceObject := ASourceObject;
     FDropSourceOperation := ASource;
-    LDropSource := TACLDropSource.Create(TACLDropSourceOwnerProxy.Create(Self));
-    LDropSource.AllowedActions := AActions;
-    LDropSource.DataProviders.Add(TACLDragDropDataProviderConfig.Create(DropSourceConfig));
-    SubClass.DoDropSourceGetData(LDropSource, DropSourceConfig);
-    LDropSource.ExecuteInThread;
+    FDropSource := TACLDropSource.Create(Self, SubClass.Container.GetControl);
+    FDropSource.AllowedActions := AActions;
+    if not DropSourceConfig.IsEmpty then
+      FDropSource.DataProviders.Add(TACLDragDropDataProviderConfig.Create(DropSourceConfig));
+    SubClass.DoDropSourceGetData(FDropSource, FDropSourceObject);
+    FDropSource.ExecuteInThread;
   end;
 end;
 
@@ -1437,6 +1435,7 @@ begin
   FDropSourceOperation.DropSourceEnd(AActions, AShiftState);
   FDropSourceOperation := nil;
   FDropSourceObject := nil;
+  FDropSource := nil;
   Finish(AActions = []);
   SubClass.DoDropSourceFinish(AActions = [], AShiftState);
 end;
@@ -3121,20 +3120,23 @@ begin
   SetHoveredObject(nil);
 end;
 
-function TACLCompoundControlSubClass.DoDropSourceBegin(var AAllowAction: TACLDropSourceActions; AConfig: TACLIniFile): Boolean;
+function TACLCompoundControlSubClass.DoDropSourceBegin(
+  var AAllowAction: TACLDropSourceActions; AConfig: TACLIniFile): Boolean;
 begin
   Result := False;
   if Assigned(OnDropSourceStart) then
     OnDropSourceStart(Self, Result, AAllowAction);
 end;
 
-procedure TACLCompoundControlSubClass.DoDropSourceFinish(Canceled: Boolean; const ShiftState: TShiftState);
+procedure TACLCompoundControlSubClass.DoDropSourceFinish(
+  Canceled: Boolean; const ShiftState: TShiftState);
 begin
   if Assigned(OnDropSourceFinish) then
     OnDropSourceFinish(Self, Canceled, ShiftState);
 end;
 
-procedure TACLCompoundControlSubClass.DoDropSourceGetData(ASource: TACLDropSource; ADropSourceObject: TObject);
+procedure TACLCompoundControlSubClass.DoDropSourceGetData(
+  ASource: TACLDropSource; ADropSourceObject: TObject);
 begin
   if Assigned(OnDropSourceData) then
     OnDropSourceData(Self, ASource);
