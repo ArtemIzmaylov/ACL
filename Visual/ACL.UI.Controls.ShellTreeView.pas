@@ -662,7 +662,7 @@ begin
   AddNodeSpecial(GetUserDir).Expanded := True;
   // В Windows, removable-устройства уже есть на уровне "рабочего стола".
   TACLDriveManager.Enum(
-    procedure (const ADrive: TACLDriveInfo; AMount: Boolean)
+    procedure (const ADrive: TACLDriveInfo)
     begin
       if ADrive.GetType = dtRemovable then
         AddNodeSpecial(ADrive.Path);

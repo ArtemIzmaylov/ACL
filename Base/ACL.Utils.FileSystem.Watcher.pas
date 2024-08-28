@@ -127,7 +127,8 @@ type
 
   TACLDriveManager = class
   public type
-    TCallback = reference to procedure (const Drive: TACLDriveInfo; Mounted: Boolean);
+    TCallback = procedure (const Drive: TACLDriveInfo; Mounted: Boolean) of object;
+    TEnumProc = reference to procedure (const Drive: TACLDriveInfo);
   strict private
     class var FList: TACLList<TACLDriveInfo>;
     class var FListeners: TACLList<TCallback>;
@@ -142,7 +143,7 @@ type
     class constructor Create;
     class destructor Destroy;
     class procedure EnsureReady;
-    class procedure Enum(AProc: TCallback);
+    class procedure Enum(AProc: TEnumProc);
     class function GetInfo(const ADrive: string): TACLDriveInfo;
     class procedure ListenerAdd(AListener: TCallback);
     class procedure ListenerRemove(AListener: TCallback);
@@ -1058,14 +1059,14 @@ begin
   TACLDriveMonitor(FMonitor).WaitFor;
 end;
 
-class procedure TACLDriveManager.Enum(AProc: TCallback);
+class procedure TACLDriveManager.Enum(AProc: TEnumProc);
 var
   I: Integer;
 begin
   FLock.Enter;
   try
     for I := 0 to FList.Count - 1 do
-      AProc(FList.List[I], True);
+      AProc(FList.List[I]);
   finally
     FLock.Leave;
   end;
