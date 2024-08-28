@@ -945,7 +945,7 @@ begin
     else
       if Options.ExpandShortcuts then
       begin
-        if acIsLnkFileName(AFiles[I]) and ShellParseLink(AFiles[I], LFileName) then
+        if ShellShortcutResolve(AFiles[I], LFileName) then
           AFiles[I] := LFileName;
       end
       else

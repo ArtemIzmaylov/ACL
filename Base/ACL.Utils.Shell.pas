@@ -51,6 +51,12 @@ const
   //G_USER_DIRECTORY_VIDEOS = 7;
 {$ENDIF}
 
+{$IF DEFINED(MSWINDOWS)}
+  acShortcutExt = '.lnk';
+{$ELSEIF DEFINED(LINUX)}
+  acShortcutExt = '.desktop';
+{$ENDIF}
+
 type
 {$IFDEF FPC}
   IShellFolder = Pointer;
@@ -181,11 +187,9 @@ function ShellPathSystem32WOW64: string;
 procedure ShellExpandPath(const APath: string; AReceiver: IStringReceiver);
 function ShellIsLibraryPath(const APath: string): Boolean;
 
-// Shell - Links
-{$IFDEF MSWINDOWS}
-function ShellCreateLink(const ALinkFileName, AFileName: string): Boolean;
-{$ENDIF}
-function ShellParseLink(const ALink: string; out AFileName: string): Boolean;
+// Shell - Shortcuts
+function ShellShortcutCreate(const ALinkFileName, AFileName: string): Boolean;
+function ShellShortcutResolve(const AShortcutFileName: string; out AFileName: string): Boolean;
 
 function ShellGetFreeSpace(const AFileName: string): Int64;
 function ShellShutdown(AMode: TShellShutdownMode): Boolean;
@@ -193,6 +197,7 @@ procedure ShellFlushCache;
 implementation
 
 uses
+  ACL.FileFormats.INI,
 {$IFDEF MSWINDOWS}
   ACL.Utils.Registry,
   ACL.Utils.Stream,
@@ -593,85 +598,94 @@ end;
 {$ENDREGION}
 
 //------------------------------------------------------------------------------
-// Shell - Link
+// Shell - Shortcuts
 //------------------------------------------------------------------------------
 
 {$REGION ' Links '}
 
 {$IFDEF MSWINDOWS}
-function ShellCreateLinkObject(out AObject: IShellLinkW): Boolean;
+function CreateShortcutObjects(out ALink: IShellLinkW; out AFile: IPersistFile): Boolean;
 begin
   CoInitialize(nil);
   Result := Succeeded(CoCreateInstance(CLSID_ShellLink, nil,
-    CLSCTX_INPROC_SERVER or CLSCTX_LOCAL_SERVER, IShellLinkW, AObject));
+    CLSCTX_INPROC_SERVER or CLSCTX_LOCAL_SERVER, IShellLinkW, ALink)) and
+    Supports(ALink, IPersistFile, AFile);
 end;
+{$ENDIF}
 
-function ShellCreateLink(const ALinkFileName, AFileName: string): Boolean;
+function ShellShortcutCreate(const ALinkFileName, AFileName: string): Boolean;
+{$IFDEF MSWINDOWS}
 var
-  ALink: IShellLinkW;
-  ALinkFile: IPersistFile;
-  ATempFileName: string;
+  LFile: IPersistFile;
+  LLink: IShellLinkW;
+  LTemp: WideString;
+{$ENDIF}
 begin
   Result := False;
   if acFileExists(AFileName) then
   try
-    if ShellCreateLinkObject(ALink) then
-    try
-      ATempFileName := AFileName; // Note: AV on 64x OS
-      ALink.SetPath(PWideChar(ATempFileName));
-      if Supports(ALink, IPersistFile, ALinkFile) then
-      try
-        Result := Succeeded(ALinkFile.Save(PWideChar(ALinkFileName), True));
-      finally
-        ALinkFile := nil;
-      end;
-    finally
-      ALink := nil;
+  {$IFDEF MSWINDOWS}
+    if CreateShortcutObjects(LLink, LFile) then
+    begin
+      LTemp := AFileName; // Note: AV on 64x OS
+      LLink.SetPath(PWideChar(LTemp));
+      Result := Succeeded(LFile.Save(PWideChar(ALinkFileName), True));
     end;
+  {$ENDIF}
+  {$IFDEF LINUX}
+    with TACLIniFile.Create(ALinkFileName) do
+    try
+      Encoding := TEncoding.UTF8;
+      WriteString('Desktop Entry', 'Version', '1.0');
+      WriteString('Desktop Entry', 'Encoding', 'UTF-8');
+      WriteString('Desktop Entry', 'Exec', AFileName);
+    finally
+      Free;
+    end;
+  {$ENDIF}
   except
     Result := False;
   end;
 end;
 
-function ShellParseLink(const ALink: string; out AFileName: string): Boolean;
-type
-  TFileFindData = _WIN32_FIND_DATAW;
+function ShellShortcutResolve(const AShortcutFileName: string; out AFileName: string): Boolean;
+{$IFDEF MSWINDOWS}
 var
-  ABuffer: TFileLongPath;
-  AData: TFileFindData;
-  ALinkFile: IPersistFile;
-  AObject: IShellLinkW;
+  LBuffer: TFileLongPath;
+  LData: _WIN32_FIND_DATAW;
+  LFile: IPersistFile;
+  LLink: IShellLinkW;
+{$ENDIF}
 begin
   Result := False;
+  if acEndsWith(AShortcutFileName, acShortcutExt) then
   try
-    if ShellCreateLinkObject(AObject) then
-    try
-      if Supports(AObject, IPersistFile, ALinkFile) then
-      try
-        Result := Succeeded(ALinkFile.Load(PWideChar(acLongFileNamePrefix + ALink), OF_READ));
-        if Result then
+  {$IFDEF MSWINDOWS}
+    if CreateShortcutObjects(LLink, LFile) then
+    begin
+      if Succeeded(LFile.Load(PWideChar(acLongFileNamePrefix + AShortcutFileName), OF_READ)) then
+      begin
+        acClearFileLongPath(LBuffer);
+        if Succeeded(LLink.GetPath(@LBuffer[0], Length(LBuffer), LData, 0)) then
         begin
-          acClearFileLongPath(ABuffer);
-          Result := Succeeded(AObject.GetPath(@ABuffer[0], Length(ABuffer), AData, 0));
-          if Result then
-            AFileName := ABuffer;
+          AFileName := LBuffer;
+          Result := True;
         end;
-      finally
-        ALinkFile := nil;
       end;
-    finally
-      AObject := nil;
     end;
+  {$ENDIF}
+  {$IFDEF LINUX}
+    with TACLIniFile.Create(AShortcutFileName, False) do
+    try
+      Result := ReadStringEx('Desktop Entry', 'Exec', AFileName);
+    finally
+      Free;
+    end;
+  {$ENDIF}
   except
     Result := False;
   end;
 end;
-{$ELSE}
-function ShellParseLink(const ALink: string; out AFileName: string): Boolean;
-begin
-  Result := False;
-end;
-{$ENDIF}
 {$ENDREGION}
 
 //------------------------------------------------------------------------------

@@ -273,14 +273,13 @@ function acGetShortFileName(const APath: string): string;
 function acExcludeTrailingPathDelimiter(const Path: string): string;
 function acIncludeTrailingPathDelimiter(const Path: string): string;
 function acIsDoubleExtFile(const AFileName: string): Boolean;
-function acIsLnkFileName(const AFileName: string): Boolean;
 function acIsLocalUnixPath(const AFileName: string): Boolean;
 function acIsOurFile(const AExtsList, AFileName: string; ADoubleExt: Boolean = False): Boolean; inline;
 function acIsOurFileEx(const AExtsList, ATestExt: string): Boolean;
 function acIsRelativeFileName(const AFileName: string): Boolean;
 function acIsUncFileName(const AFileName: string): Boolean;
-function acIsUrlFileName(const AFileName: string): Boolean; overload;
 function acIsUrlFileName(const AFileName: PChar; ACount: Integer): Boolean; overload;
+function acIsUrlFileName(const AFileName: string): Boolean; overload;
 function acLastDelimiter(const Delimiters, Str: string): Integer; overload;
 function acLastDelimiter(Delimiters, Str: PChar; DelimitersLength, StrLength: Integer): Integer; overload;
 function acRelativeFileName(const AFileName: string; ARootPath: string): string;
@@ -351,7 +350,7 @@ uses
 {$IFDEF LINUX}
   Baseunix,
 {$ENDIF}
-  {System.}RTLConsts,
+  RTLConsts,
   // ACL
 {$IFDEF MSWINDOWS}
   ACL.FileFormats.INI,
@@ -384,11 +383,6 @@ end;
 // ---------------------------------------------------------------------------------------------------------------------
 // Paths
 // ---------------------------------------------------------------------------------------------------------------------
-
-function acIsLnkFileName(const AFileName: string): Boolean;
-begin
-  Result := acEndsWith(AFileName, '.lnk');
-end;
 
 function acIsLocalUnixPath(const AFileName: string): Boolean;
 begin
