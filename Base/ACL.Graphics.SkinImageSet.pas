@@ -41,6 +41,7 @@ uses
   ACL.Graphics.SkinImage,
   ACL.Utils.DPIAware,
   ACL.Utils.Common,
+  ACL.Utils.FileSystem,
   ACL.Utils.Stream;
 
 type
@@ -504,7 +505,7 @@ procedure TACLSkinImageSet.ImportFromImageFile(const AFileName: string; DPI: Int
 var
   AStream: TStream;
 begin
-  AStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyNone);
+  AStream := TACLFileStream.Create(AFileName, fmOpenRead or fmShareDenyNone);
   try
     ImportFromImageStream(AStream);
   finally
@@ -527,7 +528,7 @@ procedure TACLSkinImageSet.LoadFromFile(const AFileName: string);
 var
   AStream: TStream;
 begin
-  AStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyNone);
+  AStream := TACLFileStream.Create(AFileName, fmOpenRead or fmShareDenyNone);
   try
     LoadFromStream(AStream);
   finally

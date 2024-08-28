@@ -48,6 +48,7 @@ uses
   ACL.UI.Application,
   ACL.Utils.Common,
   ACL.Utils.DPIAware,
+  ACL.Utils.FileSystem,
   ACL.Utils.RTTI;
 
 const
@@ -3230,7 +3231,7 @@ procedure TACLCustomResourceCollection.LoadFromFile(const AFileName: string);
 var
   AStream: TStream;
 begin
-  AStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyNone);
+  AStream := TACLFileStream.Create(AFileName, fmOpenRead or fmShareDenyNone);
   try
     LoadFromStream(AStream);
   finally

@@ -50,6 +50,35 @@ const
   INVALID_FILE_ATTRIBUTES = DWORD(-1);
   MAX_LONG_PATH = Word.MaxValue;
 
+{$REGION ' File Open Modes '}
+const
+(*AI, 28.08.24
+  Disclamer:
+    Каким оно было известно у нас в Delphi / Windows:
+    + fmShareExclusive		Другие приложения не могут открывать файл ни в каком режиме
+    + fmShareDenyWrite		Другие приложения могут открывать файл только для чтения
+    + fmShareDenyRead		  Другие приложения могут открывать файл только для записи
+    + fmShareDenyNone		  Полный доступ для других приложений
+
+    Однако в линуксе есть только два режима блокировки:
+    https://www.gnu.org/software/libc/manual/html_node/File-Locks.html
+    + exclusive/write 		У процесса будет эксклюзивные права на запись в этот файл, при этом другие процессы смогут читать файл
+    + shared/read  		    Запрещает другим процессам ставить write lock.
+
+    На текущий момент, и в дельфи, и в FPC:
+    + fmShareDenyExclusive - маппируется на write-lock
+    + fmShareDenyWrite - маппируется на read-lock
+
+    Однако, если сравнивать поведение, то: в случае fmShareDenyWrite мы ожидаем,
+    что наш код будет иметь эксклюзивные права на запись, а за это отвечает fmShareDenyExclusive.
+*)
+{$IFDEF LINUX}
+  fmOpenReadWriteExclusive = fmOpenReadWrite or fmShareDenyExclusive;
+{$ELSE}
+  fmOpenReadWriteExclusive = fmOpenReadWrite or fmShareDenyWrite;
+{$ENDIF}
+{$ENDREGION}
+
 type
   TFileLongPath = array [0..MAX_LONG_PATH - 1] of Char;
   TFilePath = array[0..MAX_PATH] of Char;
@@ -982,41 +1011,50 @@ const
     0, 0, FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_SHARE_READ or FILE_SHARE_WRITE
   );
 var
-  AAccess: Cardinal;
-  AAction: Cardinal;
-  AErrorMode: Integer;
-  AShareMode: Cardinal;
+  LAccess: Cardinal;
+  LAction: Cardinal;
+  LErrorMode: Integer;
+  LShareMode: Cardinal;
 begin
   if AMode and fmCreate = fmCreate then
   begin
-    AAction := CREATE_ALWAYS;
-    AAccess := GENERIC_READ or GENERIC_WRITE;
-    AShareMode := 0;
+    LAction := CREATE_ALWAYS;
+    LAccess := GENERIC_READ or GENERIC_WRITE;
+    LShareMode := 0;
   end
   else
   begin
-    AAction := OPEN_EXISTING;
-    AAccess := AccessMode[AMode and 3];
-    AShareMode := ShareMode[(AMode and $F0) shr 4];
+    LAction := OPEN_EXISTING;
+    LAccess := AccessMode[AMode and 3];
+    LShareMode := ShareMode[(AMode and $F0) shr 4];
   end;
 
   //#AI: to avoid to display "Disk is not inserted to the drive" dialog box for removable devices
-  AErrorMode := SetErrorMode(SEM_FailCriticalErrors);
+  LErrorMode := SetErrorMode(SEM_FailCriticalErrors);
   try
     Result := CreateFileW(PWideChar(acPrepareFileName(AFileName)),
-      AAccess, AShareMode, nil, AAction, FILE_ATTRIBUTE_NORMAL or ARights, 0);
+      LAccess, LShareMode, nil, LAction, FILE_ATTRIBUTE_NORMAL or ARights, 0);
   finally
-    SetErrorMode(AErrorMode);
+    SetErrorMode(LErrorMode);
   end;
-end;
 {$ELSE}
+const
+  fmReadOnly = fmOpenRead or fmShareDenyNone;
 begin
   if AMode and fmCreate = fmCreate then
     Result := {System.}SysUtils.FileCreate(AFileName, ARights)
   else
+  begin
+    // Refer to fmOpenReadWriteExclusive description above.
+    if AMode and fmReadOnly = fmReadOnly then
+    begin
+      AMode := AMode and not fmShareDenyNone;
+      AMode := AMode or fmShareNoLocking;
+    end;
     Result := {System.}SysUtils.FileOpen(AFileName, AMode);
-end;
+  end;
 {$ENDIF}
+end;
 
 function acFileExists(const FileName: string): Boolean;
 var

@@ -835,7 +835,7 @@ begin
 
   if acFileExists(ACachedFileName) then
   begin
-    FCacheStream := TACLFileStream.Create(ACachedFileName, fmOpenReadWrite or fmShareDenyNone);
+    FCacheStream := TACLFileStream.Create(ACachedFileName, fmOpenReadWriteExclusive);
     AList := FFreeBlocks.LockList;
     try
       ValidateCacheStream(FCacheStream, AList);
