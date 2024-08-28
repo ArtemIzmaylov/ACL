@@ -31,6 +31,8 @@ uses
   ACL.Graphics,
   ACL.Geometry,
   ACL.Threading,
+  ACL.UI.Controls.BaseEditors,
+  ACL.UI.Controls.TextEdit,
   ACL.UI.Forms,
   ACL.Utils.Common,
   ACL.Utils.DPIAware,
@@ -86,6 +88,7 @@ type
       'Waiting for authorization...' + acCRLF +
       'Please complete authorization request in your browser.' + acCRLF + acCRLF +
       'To cancel the operation just close the window.';
+    ContentIndent = 12;
   strict private
     FController: IAuthDialogController;
     FHomeURL: string;
@@ -93,10 +96,12 @@ type
     FRedirectURL: string;
     FServer: TObject;
     FToken: TAuthToken;
+    FUrl: TACLEdit;
 
     function HandlerGet(const UnparsedParams: string): string;
     procedure SendAuthRequest;
   protected
+    procedure DblClick; override;
     procedure DoShow; override;
     procedure Paint; override;
   public
@@ -457,6 +462,14 @@ begin
   FRedirectURL := FController.AuthGetRedirectURL;
   FHomeURL := FController.AuthGetHomeURL;
 
+  FUrl := TACLEdit.Create(Self);
+  FUrl.AlignWithMargins := True;
+  FUrl.Align := alBottom;
+  FUrl.Margins.All := ContentIndent;
+  FUrl.ReadOnly := True;
+  FUrl.Parent := Self;
+  FUrl.Visible := False;
+
   FServer := TSimpleServer.Create(TACLWebURL.ParseHttp(FRedirectURL).Port, HandlerGet);
 end;
 
@@ -465,6 +478,12 @@ begin
   TACLMainThread.Unsubscribe(Self);
   FreeAndNil(FServer);
   inherited;
+end;
+
+procedure TAuthDialog.DblClick;
+begin
+  inherited;
+  FUrl.Visible := True;
 end;
 
 procedure TAuthDialog.DoShow;
@@ -479,7 +498,7 @@ begin
   Canvas.Font := Font;
   Canvas.Font.Color := Style.ColorText.AsColor;
   acTextDraw(Canvas, FMessageText,
-    ClientRect.InflateTo(-dpiApply(12, FCurrentPPI)),
+    ClientRect.InflateTo(-dpiApply(ContentIndent, FCurrentPPI)),
     taLeftJustify, taVerticalCenter, False, False, True);
 end;
 
@@ -523,8 +542,12 @@ begin
 end;
 
 procedure TAuthDialog.SendAuthRequest;
+var
+  LUrl: string;
 begin
-  ShellExecuteURL(FController.AuthGetRequestURL);
+  LUrl := FController.AuthGetRequestURL;
+  FUrl.Text := LUrl;
+  ShellExecuteURL(LUrl);
 end;
 
 end.
