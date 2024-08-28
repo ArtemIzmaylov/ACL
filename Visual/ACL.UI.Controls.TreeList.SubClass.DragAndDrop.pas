@@ -151,6 +151,7 @@ type
   TACLTreeListCustomDragSortingObject = class(TACLCompoundControlDragObject,
     IACLDropSourceOperation)
   strict private
+    FInternalDropTarget: TACLTreeListNodeDragSortingDropTarget;
     function GetHitTest: TACLTreeListHitTest;
     function GetSubClass: TACLTreeListSubClass;
   protected
@@ -160,6 +161,7 @@ type
     procedure DropSourceDrop(var AllowDrop: Boolean);
     procedure DropSourceEnd(AActions: TACLDropSourceActions; AShiftState: TShiftState);
   public
+    procedure DragFinished(ACanceled: Boolean); override;
     procedure DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer); override;
     function DragStart: Boolean; override;
     //# Properties
@@ -246,7 +248,7 @@ type
   public
     constructor Create(ANode: TACLTreeListNode);
     procedure DragFinished(ACanceled: Boolean); override;
-    procedure DragMove(const P: TPoint; var ADeltaX: Integer; var ADeltaY: Integer); override;
+    procedure DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer); override;
     function DragStart: Boolean; override;
     //# Properties
     property ContentViewInfo: TACLTreeListContentViewInfo read GetContentViewInfo;
@@ -566,7 +568,8 @@ begin
   if HitTest.HitAtNode then
   begin
     ANode := HitTest.Node;
-    Result := (ANode.TopLevel.Group = SelectedGroup) and (Selection.IndexOf(ANode) < 0) and not Selection.IsChild(ANode);
+    Result := (ANode.TopLevel.Group = SelectedGroup) and
+      (Selection.IndexOf(ANode) < 0) and not Selection.IsChild(ANode);
     if not CanChangeNodeLevel then
       Result := Result and (ANode.Parent = SelectedLevel);
     if Result then
@@ -697,16 +700,56 @@ end;
 
 { TACLTreeListCustomDragSortingObject }
 
-procedure TACLTreeListCustomDragSortingObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
+procedure TACLTreeListCustomDragSortingObject.DragFinished(ACanceled: Boolean);
 begin
-  // do nothing
+  if FInternalDropTarget <> nil then
+  try
+    if not ACanceled then
+    try
+      FInternalDropTarget.DoDrop([], Mouse.CursorPos, daCopy);
+    except {ignore} end;
+  finally
+    FInternalDropTarget.DoLeave;
+    FInternalDropTarget := nil;
+    UpdateDropTarget(nil);
+  end;
+  inherited;
+end;
+
+procedure TACLTreeListCustomDragSortingObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
+var
+  LAction: TACLDropAction;
+  LAllow: Boolean;
+  LHint: string;
+begin
+  if FInternalDropTarget <> nil then
+  begin
+    LHint := '';
+    LAllow := True;
+    LAction := daCopy;
+    FInternalDropTarget.DoOver([], Mouse.CursorPos, LHint, LAllow, LAction);
+    if LAllow then
+      UpdateCursor(crDrag)
+    else
+      UpdateCursor(crNoDrop)
+  end;
 end;
 
 function TACLTreeListCustomDragSortingObject.DragStart: Boolean;
 begin
-  Result := SubClass.OptionsBehavior.DropSource or SubClass.OptionsBehavior.DragSorting;
-  if Result then
+  if SubClass.OptionsBehavior.DropSource then
+  begin
     StartDropSource([dsaCopy], Self, nil);
+    Exit(True);
+  end;
+  if SubClass.OptionsBehavior.DragSorting then
+  begin
+    FInternalDropTarget := TACLTreeListNodeDragSortingDropTarget(GetDropTargetClass.Create(SubClass));
+    FInternalDropTarget.DoEnter;
+    UpdateDropTarget(FInternalDropTarget);
+    Exit(True);
+  end;
+  Result := False;
 end;
 
 function TACLTreeListCustomDragSortingObject.GetDropTargetClass: TACLTreeListDropTargetClass;
@@ -992,7 +1035,9 @@ begin
       else
         SubClass.SelectNone;
     end;
-  end;
+  end
+  else
+    inherited;
 end;
 
 function TACLTreeListSelectionRectDragObject.DragStart: Boolean;

@@ -4278,14 +4278,16 @@ begin
   CallNotifyEvent(Self, OnDragSorting);
 end;
 
-function TACLTreeListSubClass.DoDragSortingDrop(ANode: TACLTreeListNode; AMode: TACLTreeListDropTargetInsertMode): Boolean;
+function TACLTreeListSubClass.DoDragSortingDrop(
+  ANode: TACLTreeListNode; AMode: TACLTreeListDropTargetInsertMode): Boolean;
 begin
   Result := False;
   if Assigned(OnDragSortingNodeDrop) then
     OnDragSortingNodeDrop(Self, ANode, AMode, Result);
 end;
 
-function TACLTreeListSubClass.DoDragSortingOver(ANode: TACLTreeListNode; AMode: TACLTreeListDropTargetInsertMode): Boolean;
+function TACLTreeListSubClass.DoDragSortingOver(
+  ANode: TACLTreeListNode; AMode: TACLTreeListDropTargetInsertMode): Boolean;
 begin
   Result := True;
   if Assigned(OnDragSortingNodeOver) then
@@ -4299,8 +4301,9 @@ begin
     OnDrop(Self, Data, Action, Target, Mode);
 end;
 
-procedure TACLTreeListSubClass.DoDropOver(Data: TACLDropTarget; var Action: TACLDropAction;
-  var Target: TObject; var Mode: TACLTreeListDropTargetInsertMode; var Allow: Boolean);
+procedure TACLTreeListSubClass.DoDropOver(Data: TACLDropTarget;
+  var Action: TACLDropAction; var Target: TObject;
+  var Mode: TACLTreeListDropTargetInsertMode; var Allow: Boolean);
 begin
   if Assigned(OnDropOver) then
     OnDropOver(Self, Data, Action, Target, Mode, Allow);
@@ -4335,8 +4338,9 @@ begin
     OnGetNodeCellDisplayText(Self, ANode, AValueIndex, AText);
 end;
 
-procedure TACLTreeListSubClass.DoGetNodeCellStyle(AFont: TFont;
-  ANode: TACLTreeListNode; AColumn: TACLTreeListColumn; out ATextAlignment: TAlignment);
+procedure TACLTreeListSubClass.DoGetNodeCellStyle(
+  AFont: TFont; ANode: TACLTreeListNode; AColumn: TACLTreeListColumn;
+  out ATextAlignment: TAlignment);
 var
   AFontStyles: TFontStyles;
 begin
