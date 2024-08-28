@@ -44,7 +44,6 @@ uses
   ACL.Classes.Collections,
   ACL.Geometry,
   ACL.Graphics,
-  ACL.ObjectLinks,
   ACL.UI.Animation,
   ACL.UI.Controls.Base,
   ACL.UI.ImageList,
@@ -107,9 +106,7 @@ type
   TACLButtonStateFlag = (bsfPressed, bsfActive, bsfEnabled, bsfFocused, bsfDown, bsfDefault);
   TACLButtonStateFlags = set of TACLButtonStateFlag;
 
-  TACLCustomButtonSubClass = class(TACLUnknownObject,
-    IACLAnimateControl,
-    IACLObjectLinksSupport)
+  TACLCustomButtonSubClass = class(TACLUnknownObject, IACLAnimateControl)
   strict private
     FBounds: TRect;
     FCaption: string;
@@ -356,7 +353,7 @@ type
     procedure SetImages(const AList: TCustomImageList);
     procedure UpdateRoles;
     // Messages
-    procedure CMDialogKey(var Message: TCMDialogKey); message CM_DIALOGKEY;
+    procedure CMDialogKey(var Message: TCMDialogKey); message {%H-}CM_DIALOGKEY;
     procedure CMFocusChanged(var Message: TMessage); message CM_FOCUSCHANGED;
   protected
     function CreateStyle: TACLStyleButton; override;
@@ -699,7 +696,6 @@ end;
 destructor TACLCustomButtonSubClass.Destroy;
 begin
   AnimationManager.RemoveOwner(Self);
-  TACLObjectLinks.Release(Self);
   inherited Destroy;
 end;
 
@@ -774,20 +770,13 @@ begin
 end;
 
 procedure TACLCustomButtonSubClass.MouseUp(Button: TMouseButton; const P: TPoint);
-var
-  ALink: TObject;
 begin
-  TACLObjectLinks.RegisterWeakReference(Self, @ALink);
+  if IsPressed then
   try
-    if (Button = mbLeft) and IsPressed then
-    begin
-      if PtInRect(Bounds, P) then
-        PerformClick;
-    end;
+    if (Button = mbLeft) and  PtInRect(Bounds, P) then
+      PerformClick;
   finally
-    if ALink <> nil then
-      IsPressed := False;
-    TACLObjectLinks.UnregisterWeakReference(@ALink);
+    IsPressed := False;
   end;
 end;
 
@@ -1309,22 +1298,12 @@ begin
 end;
 
 procedure TACLSimpleButton.Click;
-var
-  ALink: TObject;
 begin
   if Enabled then
   begin
-    TACLObjectLinks.RegisterWeakReference(Self, @ALink);
-    try
-      PerformClick;
-      if ALink <> nil then
-      begin
-        if ModalResult <> mrNone then
-          GetParentForm(Self).ModalResult := ModalResult;
-      end;
-    finally
-      TACLObjectLinks.UnregisterWeakReference(@ALink);
-    end;
+    PerformClick;
+    if ModalResult <> mrNone then
+      GetParentForm(Self).ModalResult := ModalResult;
   end;
 end;
 
@@ -1627,20 +1606,20 @@ end;
 
 procedure TACLButton.MouseLeave;
 begin
-  inherited MouseLeave;
   DropDownSubClass.MouseMove([], InvalidPoint);
+  inherited MouseLeave;
 end;
 
 procedure TACLButton.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
-  inherited MouseMove(Shift, X, Y);
   DropDownSubClass.MouseMove(Shift, Point(X, Y));
+  inherited MouseMove(Shift, X, Y);
 end;
 
 procedure TACLButton.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
-  inherited MouseUp(Button, Shift, X, Y);
   DropDownSubClass.MouseUp(Button, Point(X, Y));
+  inherited MouseUp(Button, Shift, X, Y);
 end;
 
 procedure TACLButton.HandlerDropDownClick(Sender: TObject);

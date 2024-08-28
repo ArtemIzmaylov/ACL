@@ -1578,14 +1578,10 @@ begin
 end;
 
 procedure TACLPopupMenu.DoInitialize;
-var
-  I: Integer;
 begin
   DoPopup(Self);
   if AutoScale then
     ScaleForDpi(CalculateTargetDpi);
-  for I := 0 to Items.Count - 1 do
-    Items[I].InitiateAction;
 end;
 
 procedure TACLPopupMenu.DoDpiChanged;
@@ -1609,7 +1605,8 @@ begin
     FPopupWindow := TACLMenuPopupWindow.Create(Self);
     try
       TACLMenuPopupWindow(FPopupWindow).Init(Items);
-      TACLMenuPopupWindow(FPopupWindow).Popup(ControlRect);
+      if TACLMenuPopupWindow(FPopupWindow).Items.Count > 0 then
+        TACLMenuPopupWindow(FPopupWindow).Popup(ControlRect);
     finally
       FreeAndNil(FPopupWindow);
 //  Lose Focus: MyRefreshStayOnTop;

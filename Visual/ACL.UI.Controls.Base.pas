@@ -830,10 +830,10 @@ function acOpacityToAlphaBlendValue(AOpacity: Integer): Byte;
 function acSaveDC(ACanvas: TCanvas): Integer;
 procedure acRestoreDC(ACanvas: TCanvas; ASaveIndex: Integer);
 
-function acGetFocus: HWND;
-procedure acRestoreFocus(ASavedFocus: HWND);
-function acSaveFocus: HWND;
+function acGetFocus: TWndHandle;
+function acRestoreFocus(ASavedFocus: TWndHandle): Boolean;
 function acSafeSetFocus(AControl: TWinControl): Boolean;
+function acSaveFocus: TWndHandle;
 procedure acSetFocus(AWnd: TWndHandle);
 
 // Keyboard
@@ -1138,14 +1138,15 @@ begin
   ACanvas.Refresh; // to reset ACanvas.State
 end;
 
-function acGetFocus: HWND;
+function acGetFocus: TWndHandle;
 begin
   Result := GetFocus;
 end;
 
-procedure acRestoreFocus(ASavedFocus: HWND);
+function acRestoreFocus(ASavedFocus: TWndHandle): Boolean;
 begin
-  if ASavedFocus <> 0 then
+  Result := (ASavedFocus <> 0) and IsWindow(ASavedFocus);
+  if Result then
   begin
   {$IFDEF MSWINDOWS}
     var AProcessId: Cardinal;
@@ -1163,7 +1164,7 @@ begin
   Result := SaveDC(ACanvas.Handle);
 end;
 
-function acSaveFocus: HWND;
+function acSaveFocus: TWndHandle;
 var
   AIntf: IACLInnerControl;
 begin
