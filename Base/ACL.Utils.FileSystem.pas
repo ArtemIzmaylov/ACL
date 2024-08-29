@@ -66,14 +66,14 @@ const
     + shared/read  		    Запрещает другим процессам ставить write lock.
 
     На текущий момент, и в дельфи, и в FPC:
-    + fmShareDenyExclusive - маппируется на write-lock
+    + fmShareExclusive - маппируется на write-lock
     + fmShareDenyWrite - маппируется на read-lock
 
     Однако, если сравнивать поведение, то: в случае fmShareDenyWrite мы ожидаем,
-    что наш код будет иметь эксклюзивные права на запись, а за это отвечает fmShareDenyExclusive.
+    что наш код будет иметь эксклюзивные права на запись, а за это отвечает fmShareExclusive.
 *)
 {$IFDEF LINUX}
-  fmOpenReadWriteExclusive = fmOpenReadWrite or fmShareDenyExclusive;
+  fmOpenReadWriteExclusive = fmOpenReadWrite or fmShareExclusive;
 {$ELSE}
   fmOpenReadWriteExclusive = fmOpenReadWrite or fmShareDenyWrite;
 {$ENDIF}
