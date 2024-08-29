@@ -18,6 +18,7 @@ unit ACL.Utils.FileSystem.GIO;
 interface
 
 uses
+  Contnrs,
   glib2,
   gtk2,
   gtk2Def;
@@ -71,6 +72,7 @@ type
   PGFileProgressCallback = ^TGFileProgressCallback;
   TGFileProgressCallback = procedure(current_num_bytes, total_num_bytes: gint64; user_data: gpointer); cdecl;
   TGFileMonitorFlags = LongWord;
+  TGFileQueryInfoFlags = LongWord;
 
   TGFileMonitorEvent = (
     TGFileMonitorEventMinValue = -$7FFFFFFF,
@@ -88,15 +90,62 @@ type
     TGFileMonitorEventMaxValue = $7FFFFFFF
   );
 
-//g_file_monitor_file
+  TGFileType = (
+    TGFileTypeMinValue = -$7FFFFFFF,
+    G_FILE_TYPE_UNKNOWN = 0,
+    G_FILE_TYPE_REGULAR = 1,
+    G_FILE_TYPE_DIRECTORY = 2,
+    G_FILE_TYPE_SYMBOLIC_LINK = 3,
+    G_FILE_TYPE_SPECIAL = 4,
+    G_FILE_TYPE_SHORTCUT = 5,
+    G_FILE_TYPE_MOUNTABLE = 6,
+    TGFileTypeMaxValue = $7FFFFFFF
+  );
+
+  { TGioFileMonitor }
+
+  // https://docs.gtk.org/gio/enum.FileMonitorEvent.html
+  // https://docs.gtk.org/gio/signal.FileMonitor.changed.html
+  // https://github.com/frida/glib/blob/main/gio/tests/testfilemonitor.c
+  TGioFileMonitor = class
+  strict private const
+    Flags =
+      G_FILE_MONITOR_WATCH_HARD_LINKS or
+      G_FILE_MONITOR_WATCH_MOUNTS;
+      //G_FILE_MONITOR_WATCH_MOVES; // since 2.46
+  public type
+    TCallback = procedure (File1, File2: PGFile; Event: TGFileMonitorEvent) of object;
+  strict private
+    FCallback: TCallback;
+    FCancelable: PGCancellable;
+    FChildren: TObjectList;
+    FFileOrDir: PGFile;
+    FHandle: PGFileMonitor;
+    FSubTreeDepth: Integer;
+
+    // https://docs.gtk.org/gio/signal.FileMonitor.changed.html
+    class procedure Notify(AHandle: PGFileMonitor; AFile, AOtherFile: PGFile;
+      AEvent: TGFileMonitorEvent; AMonitor: TGioFileMonitor); cdecl; static;
+    procedure Watch(AFile: PGFile);
+    procedure Unwatch(AFile: PGFile);
+  public
+    constructor Create(ACancelable: PGCancellable;
+      AFileOrDir: PGFile; ACallback: TCallback; ASubTreeDepth: Integer);
+    destructor Destroy; override;
+  end;
+
 function g_file_new_for_path(path: Pgchar): PGFile; cdecl; external libGio2;
 function g_file_new_for_commandline_arg(arg: Pgchar): PGFile; cdecl; external libGio2;
 function g_file_new_for_uri(uri: Pgchar): PGFile; cdecl; external libGio2;
+function g_file_get_path(file_: PGFile): Pgchar; cdecl; external libGio2;
 
 function g_file_info_get_name(info: PGFileInfo): Pgchar; cdecl; external libGio2;
 function g_file_info_get_icon(info: PGFileInfo): PGIcon; cdecl; external libGio2;
 function g_file_info_get_attribute_as_string(info: PGFileInfo; attribute: Pgchar): Pgchar; cdecl; external libGio2;
+function g_file_info_get_file_type(info: PGFileInfo): TGFileType; cdecl; external libGio2;
 
+function g_file_query_file_type(File_: PGFile; flags: TGFileQueryInfoFlags;
+  cancellable: PGCancellable): TGFileType; cdecl; external libGio2;
 function g_file_query_info(file_: PGFile; attributes: Pgchar; flags: LongWord;
   cancellable: PGCancellable; error: PPGError): PGFileInfo; cdecl; external libGio2;
 function g_file_enumerate_children(file_: PGFile; attributes: Pgchar;
@@ -107,6 +156,8 @@ function g_file_enumerator_close(enumerator: PGFileEnumerator;
 function g_file_enumerator_next_file(enumerator: PGFileEnumerator;
   cancellable: PGCancellable; error: PPGError): PGFileInfo; cdecl; external libGio2;
 
+function g_file_equal(a, b: PGFile): gboolean; cdecl; external libGio2;
+function g_file_is_dir(file_: PGFile; cancelable: PGCancellable = nil): Boolean;
 function g_file_get_child(file_: PGFile; name: Pgchar): PGFile; cdecl; external libGio2;
 function g_file_get_parent(file_: PGFile): PGFile; cdecl; external libGio2;
 function g_file_make_directory_with_parents(file_: PGFile;
@@ -124,6 +175,10 @@ function g_file_monitor_directory(file_: PGFile; flags: TGFileMonitorFlags;
 function g_file_monitor_file(file_: PGFile; flags: TGFileMonitorFlags;
   cancellable: PGCancellable; error: PPGError): PGFileMonitor; cdecl; external libGio2;
 function g_file_monitor_cancel(monitor: PGFileMonitor): gboolean; cdecl; external libGio2;
+
+procedure g_cancellable_cancel(cancellable: PGCancellable); cdecl; external libGio2;
+function g_cancellable_is_cancelled(cancellable: PGCancellable): gboolean; cdecl; external libGio2;
+function g_cancellable_new: PGCancellable; cdecl; external libGio2;
 
 function g_unix_mount_monitor_get: PGUnixMountMonitor; cdecl; external libGio2;
 function g_unix_mount_for(file_path: Pgchar; time_read: Pguint64): PGUnixMountEntry; cdecl; external libGio2;
@@ -185,6 +240,11 @@ begin
   finally
     B.Release;
   end;
+end;
+
+function g_file_is_dir(file_: PGFile; cancelable: PGCancellable): Boolean;
+begin
+  Result := g_file_query_file_type(file_, 0, cancelable) = G_FILE_TYPE_DIRECTORY;
 end;
 
 function gioErrorToString(Error: PGError): string;
@@ -345,6 +405,111 @@ begin
   except
     Result := E_UNEXPECTED;
   end;
+end;
+
+{ TGioFileMonitor }
+
+constructor TGioFileMonitor.Create(ACancelable: PGCancellable;
+  AFileOrDir: PGFile; ACallback: TCallback; ASubTreeDepth: Integer);
+var
+  LChild: PGFile;
+  LError: PGError;
+  LEnumerator: PGFileEnumerator;
+  LInfo: PGFileInfo;
+begin
+  FCallback := ACallback;
+  FFileOrDir := AFileOrDir;
+  FCancelable := ACancelable;
+  FSubTreeDepth := ASubTreeDepth;
+
+  FHandle := g_file_monitor(FFileOrDir, Flags, ACancelable, nil);
+  if FHandle <> nil then
+  begin
+    g_signal_connect(FHandle, 'changed', @Notify, Self);
+    if (FSubTreeDepth > 0) and g_file_is_dir(FFileOrDir, FCancelable) then
+    begin
+      LError := nil;
+      LEnumerator := g_file_enumerate_children(FFileOrDir, 'standard::name,', 0, FCancelable, @LError);
+      if LEnumerator <> nil then
+      try
+        while True do
+        begin
+          LInfo := g_file_enumerator_next_file(LEnumerator, FCancelable, @LError);
+          if LInfo = nil then
+            Break;
+          if g_file_info_get_file_type(LInfo) = G_FILE_TYPE_DIRECTORY then
+            Watch(g_file_get_child(FFileOrDir, g_file_info_get_name(LInfo)));
+        end;
+      finally
+        g_file_enumerator_close(LEnumerator, FCancelable, @LError);
+        g_clear_error(@LError);
+      end;
+    end;
+  end;
+end;
+
+destructor TGioFileMonitor.Destroy;
+begin
+  FreeAndNil(FChildren);
+  if FHandle <> nil then
+    g_file_monitor_cancel(FHandle);
+  g_object_unref(FHandle);
+  g_object_unref(FFileOrDir);
+  inherited Destroy;
+end;
+
+class procedure TGioFileMonitor.Notify(
+  AHandle: PGFileMonitor; AFile, AOtherFile: PGFile;
+  AEvent: TGFileMonitorEvent; AMonitor: TGioFileMonitor); cdecl;
+
+  procedure AddChildDir(AFileOrDir: PGFile);
+  begin
+    if (AMonitor.FSubTreeDepth > 0) and g_file_is_dir(AFileOrDir) then
+      AMonitor.Watch(g_object_ref(AFileOrDir));
+  end;
+
+begin
+  case AEvent of // https://docs.gtk.org/gio/enum.FileMonitorEvent.html
+    G_FILE_MONITOR_EVENT_CREATED,
+    G_FILE_MONITOR_EVENT_MOVED_IN: // req. G_FILE_MONITOR_WATCH_MOVES
+      AddChildDir(AFile);
+    G_FILE_MONITOR_EVENT_DELETED,
+    G_FILE_MONITOR_EVENT_MOVED_OUT,// req. G_FILE_MONITOR_WATCH_MOVES
+    G_FILE_MONITOR_EVENT_UNMOUNTED:
+      AMonitor.Unwatch(AFile);
+    //G_FILE_MONITOR_EVENT_MOVED, // req. G_FILE_MONITOR_SEND_MOVED (deprecated)
+    G_FILE_MONITOR_EVENT_RENAMED:  // req. G_FILE_MONITOR_WATCH_MOVES
+      begin
+        AMonitor.Unwatch(AFile);
+        AddChildDir(AOtherFile);
+      end;
+  end;
+  if Assigned(AMonitor.FCallback) then
+    AMonitor.FCallback(AFile, AOtherFile, AEvent);
+end;
+
+procedure TGioFileMonitor.Watch(AFile: PGFile);
+begin
+  if FChildren = nil then
+  begin
+    FChildren := TObjectList.Create(True);
+    FChildren.Capacity := 4;
+  end;
+  FChildren.Add(TGioFileMonitor.Create(FCancelable, AFile, FCallback, FSubTreeDepth - 1));
+end;
+
+procedure TGioFileMonitor.Unwatch(AFile: PGFile);
+var
+  LMon: TGioFileMonitor;
+  I: Integer;
+begin
+  if FChildren <> nil then
+    for I := FChildren.Count - 1 downto 0 do
+    begin
+      LMon := FChildren.List[I];
+      if g_file_equal(AFile, LMon.FFileOrDir) then
+        FChildren.Delete(I);
+    end;
 end;
 
 end.
