@@ -23,6 +23,7 @@ uses
   {System.}Variants,
   {System.}SysUtils,
   {System.}Types,
+  System.JSON,
   // Vcl
   {Vcl.}Controls,
   {Vcl.}Forms,
@@ -130,19 +131,30 @@ type
     class function ParseToken(AData: TBytesStream): TAuthToken;
   end;
 
+  { JSON }
+
+  TJSONValueClass = class of TJSONValue;
+
+  JSON = class
+  public
+    class function GetString(Obj: TJSONValue;
+      const Name: string): string;
+    class procedure GetValue(Obj: TJSONValue;
+      const Name: string; ValueClass: TJSONValueClass; out Value);
+    class function TryGetString(Obj: TJSONValue;
+      const Name: string; out Value: string): Boolean;
+    class function TryGetValue(Obj: TJSONValue;
+      const Name: string; ValueClass: TJSONValueClass; out Value): Boolean;
+  end;
+
 implementation
 
 uses
 {$IFDEF FPC}
-  fphttpserver,
-  fpjson,
-  jsonreader,
-  jsonscanner,
-  jsonparser;
+  fphttpserver;
 {$ELSE}
   Windows,
-  Winsock2,
-  System.Json;
+  Winsock2;
 {$ENDIF}
 
 type
@@ -410,31 +422,6 @@ begin
 end;
 
 class function TOAuth2.ParseToken(AData: TBytesStream): TAuthToken;
-
-  function CreateJSONObject(AData: TBytesStream): TJSONObject;
-  begin
-  {$IFDEF FPC}
-    with TJSONParser.Create(AData, [joUTF8]) do
-    try
-      Result := Parse as TJSONObject;
-    finally
-      Free;
-    end;
-  {$ELSE}
-    Result := TJSONObject.Create;
-    Result.Parse(AData.Bytes, 0);
-  {$ENDIF}
-  end;
-
-  function TryGetValue(Json: TJSONObject; const Name: string): string;
-  begin
-  {$IFDEF FPC}
-    Result := VarToStr(Json.Get(Name));
-  {$ELSE}
-    Result := Json.GetValue<string>(Name, '');
-  {$ENDIF}
-  end;
-
 var
   LErrorText: string;
   LObject: TJSONObject;
@@ -442,17 +429,59 @@ begin
 //{$IFDEF DEBUG}
 //  AData.SaveToFile('B:\OAuth2.log');
 //{$ENDIF}
-  LObject := CreateJSONObject(AData);
+  LObject := TJSONObject.Create;
   try
-    Result.AccessToken := TryGetValue(LObject, 'access_token');
-    Result.RefreshToken := TryGetValue(LObject, 'refresh_token');
-    Result.ExpiresIn := StrToIntDef(TryGetValue(LObject, 'expires_in'), 0);
-    LErrorText := TryGetValue(LObject, 'error');
-    if LErrorText <> '' then
+    LObject.Parse(AData.Bytes, 0);
+    Result.AccessToken := JSON.GetString(LObject, 'access_token');
+    Result.RefreshToken := JSON.GetString(LObject, 'refresh_token');
+    Result.ExpiresIn := StrToIntDef(JSON.GetString(LObject, 'expires_in'), 0);
+    if JSON.TryGetString(LObject, 'error', LErrorText) and (LErrorText <> '') then
       raise EAuthorizationError.Create(LErrorText);
   finally
     LObject.Free;
   end;
+end;
+
+{ JSON }
+
+class function JSON.GetString(Obj: TJSONValue; const Name: string): string;
+begin
+  if not TryGetString(Obj, Name, Result) then
+    Result := '';
+end;
+
+class procedure JSON.GetValue(Obj: TJSONValue;
+  const Name: string; ValueClass: TJSONValueClass; out Value);
+begin
+  if not TryGetValue(Obj, Name, ValueClass, Value) then
+    TObject(Value) := nil;
+end;
+
+class function JSON.TryGetString(Obj: TJSONValue;
+  const Name: string; out Value: string): Boolean;
+var
+  LValue: TJSONValue;
+begin
+  Result := TryGetValue(Obj, Name, TJSONValue, LValue);
+  if Result then
+    Value := acString(LValue.Value);
+end;
+
+class function JSON.TryGetValue(Obj: TJSONValue; const Name: string;
+  ValueClass: TJSONValueClass; out Value): Boolean;
+var
+  LValue: TJSONValue;
+begin
+  if Obj is TJSONObject then
+    LValue := TJSONObject(Obj).GetValue(acUString(Name))
+  else if Obj <> nil then
+    LValue := Obj.FindValue(acUString(Name))
+  else
+    LValue := nil;
+
+  Result := (LValue <> nil) and LValue.InheritsFrom(ValueClass);
+  if Result then
+    TObject(Value) := LValue;
 end;
 
 { TAuthDialog }
