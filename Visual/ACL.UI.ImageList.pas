@@ -267,7 +267,11 @@ begin
   inherited AfterConstruction;
   FSourceDPI := acDefaultDPI;
 {$IFNDEF FPC}
-  ColorDepth := cd32Bit;
+  try
+    ColorDepth := cd32Bit;
+  except
+    ColorDepth := cdDefault;
+  end;
 {$ENDIF}
   Masked := False;
 end;

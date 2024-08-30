@@ -1474,10 +1474,10 @@ begin
         Result := TryStrToInt(LTemp, LTempI);
     end;
   end;
-{$IFDEF DEBUG}
-  if not Result and (InputMask = eimFloat) and (Key = '.') then
-    raise Exception.CreateFmt('Test: %d, %d, (%s)', [SelStart, SelLength, LTemp]);
-{$ENDIF}
+//{$IFDEF DEBUG}
+//  if not Result and (InputMask = eimFloat) and (Key = '.') then
+//    raise Exception.CreateFmt('Test: %d, %d, (%s)', [SelStart, SelLength, LTemp]);
+//{$ENDIF}
 end;
 
 {$IFDEF FPC}

@@ -622,7 +622,11 @@ procedure TACLAeroPeek.SyncButtons;
 
   procedure UpdateThumbBar(AButtons: PThumbButton; AButtonsCount: Integer);
   begin
-    TaskBarList.ThumbBarSetImageList(OwnerWindow.Handle, ImageList.Handle);
+    try
+      TaskBarList.ThumbBarSetImageList(OwnerWindow.Handle, ImageList.Handle);
+    except
+      // failed to create imagelist
+    end;
     if FTaskBarButtonsInitialized then
       TaskBarList.ThumbBarUpdateButtons(OwnerWindow.Handle, AButtonsCount, AButtons)
     else

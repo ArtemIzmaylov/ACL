@@ -31,6 +31,7 @@ uses
   {System.}Classes,
   {System.}Math,
   {System.}SysUtils,
+  {System.}Types,
   // ACL
   ACL.Classes.Collections;
 
@@ -130,8 +131,8 @@ type
   protected
     FHandle: HWND;
     FHighResolutionThread: TACLPauseableThread;
-    FHighResolutionTimers: TACLThreadList<TACLTimer>;
-    FTimers: TACLList<TACLTimer>;
+    FHighResolutionTimers: TThreadList;
+    FTimers: TList;
 
     procedure SafeCallTimerProcs(AList: TList);
     property SystemTimerResolution: Integer read GetSystemTimerResolution;
@@ -358,9 +359,9 @@ end;
 constructor TACLTimerManager.Create;
 begin
   FLock := TACLCriticalSection.Create;
-  FTimers := TACLList<TACLTimer>.Create;
+  FTimers := TList.Create;
   FHandle := WndCreate(HandleMessage, ClassName, True);
-  FHighResolutionTimers := TACLThreadList<TACLTimer>.Create;
+  FHighResolutionTimers := TThreadList.Create;
 end;
 
 destructor TACLTimerManager.Destroy;
@@ -461,7 +462,7 @@ end;
 
 procedure TACLTimerManager.SafeUpdateHighResolutionThread;
 var
-  AList: TACLList<TACLTimer>;
+  AList: TList;
 begin
   AList := FHighResolutionTimers.LockList;
   try
@@ -499,7 +500,7 @@ end;
 
 procedure TACLTimerManagerHighResolutionThread.Execute;
 var
-  AList: TACLList<TACLTimer>;
+  AList: TList;
   ANextTick: Int64;
   ASleepTime: Integer;
   ATicked: TList;
