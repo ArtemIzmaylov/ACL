@@ -273,7 +273,7 @@ procedure TSimpleServer.DoRequest(Sender: TObject;
   var ARequest: TFPHTTPConnectionRequest;
   var AResponse: TFPHTTPConnectionResponse);
 begin
-  AResponse.Content := FProc(ARequest.Content);
+  AResponse.Content := FProc(ARequest.Query);
 end;
 
 procedure TSimpleServer.Execute;
