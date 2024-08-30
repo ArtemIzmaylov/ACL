@@ -247,10 +247,14 @@ end;
 
 {$ELSE}
 
+type
+  TFPHttpServer2 = class(TFPHttpServer);
+
 { TSimpleServer }
 
 constructor TSimpleServer.Create(APort: Integer; AProc: THandleProc);
 begin
+  inherited Create(False);
   FProc := AProc;
   FHandler := TFPHttpServer.Create(nil);
   FHandler.OnRequest := DoRequest;
@@ -259,8 +263,10 @@ end;
 
 destructor TSimpleServer.Destroy;
 begin
-  FreeAndNil(FHandler);
+  TFPHttpServer2(FHandler).Active := False;
+  TFPHttpServer2(FHandler).FreeServerSocket;
   inherited Destroy;
+  FreeAndNil(FHandler);
 end;
 
 procedure TSimpleServer.DoRequest(Sender: TObject;
