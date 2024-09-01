@@ -84,6 +84,7 @@ type
     class function FunctionStrRight(AContext: TObject; AParams: TACLExpressionElements): Variant;
     class function FunctionStrTransliterate(AContext: TObject; AParams: TACLExpressionElements): Variant;
     class function FunctionStrTrim(AContext: TObject; AParams: TACLExpressionElements): Variant;
+    class function FunctionStrTrimDiacritic(AContext: TObject; AParams: TACLExpressionElements): Variant;
     class function FunctionUpperCase(AContext: TObject; AParams: TACLExpressionElements): Variant;
   protected
     MacroDelimiter: Char;
@@ -392,6 +393,7 @@ begin
   RegisterFunction('StrPos', FunctionStrPos, 2, True, CategoryStrings);
   RegisterFunction('StrRight', FunctionStrRight, 2, True, CategoryStrings);
   RegisterFunction('StrTrim', FunctionStrTrim, 1, True, CategoryStrings);
+  RegisterFunction('StrTrimDiacritic', FunctionStrTrimDiacritic, 1, True, CategoryStrings);
   RegisterFunction('Detransliterate', FunctionStrDetransliterate, 1, True, CategoryStrings);
   RegisterFunction('Transliterate', FunctionStrTransliterate, 1, True, CategoryStrings);
 
@@ -639,17 +641,26 @@ begin
   end;
 end;
 
-class function TACLFormatStringFactory.FunctionStrTransliterate(AContext: TObject; AParams: TACLExpressionElements): Variant;
+class function TACLFormatStringFactory.FunctionStrTransliterate(
+  AContext: TObject; AParams: TACLExpressionElements): Variant;
 begin
   Result := TACLTranslit.Encode(AParams[0].Evaluate(AContext));
 end;
 
-class function TACLFormatStringFactory.FunctionStrTrim(AContext: TObject; AParams: TACLExpressionElements): Variant;
+class function TACLFormatStringFactory.FunctionStrTrim(
+  AContext: TObject; AParams: TACLExpressionElements): Variant;
 begin
   Result := Trim(AParams[0].Evaluate(AContext));
 end;
 
-class function TACLFormatStringFactory.FunctionUpperCase(AContext: TObject; AParams: TACLExpressionElements): Variant;
+class function TACLFormatStringFactory.FunctionStrTrimDiacritic(
+  AContext: TObject; AParams: TACLExpressionElements): Variant;
+begin
+  Result := acRemoveDiacritic(AParams[0].Evaluate(AContext));
+end;
+
+class function TACLFormatStringFactory.FunctionUpperCase(
+  AContext: TObject; AParams: TACLExpressionElements): Variant;
 begin
   Result := acUpperCase(AParams[0].Evaluate(AContext));
 end;
