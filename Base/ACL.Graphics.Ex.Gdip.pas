@@ -258,6 +258,9 @@ var
   GpPaintCanvas: TACLGdiplusPaintCanvas;
 
 procedure GdipCheck(AStatus: GpStatus);
+procedure GdipFree;
+procedure GdipInit;
+
 function GpCreateBitmap(AWidth, AHeight: Integer;
   ABits: PByte = nil; APixelFormat: Integer = PixelFormat32bppPARGB): GpImage;
 function GpGetCodecByMimeType(const AMimeType: UnicodeString; out ACodecID: TGUID): Boolean;
@@ -333,6 +336,35 @@ type
     procedure FigureClose; override;
     procedure FigureStart; override;
   end;
+
+//------------------------------------------------------------------------------
+// General
+//------------------------------------------------------------------------------
+var
+  gdiplusTokenOwned: Boolean = False;
+
+procedure GdipFree;
+begin
+  FreeAndNil(GpPaintCanvas);
+  TACLGdiplusAlphaBlendAttributes.Finalize;
+  TACLGdiplusResourcesCache.Flush;
+  if gdiplusTokenOwned then
+  begin
+    GdiplusShutdown(gdiplusToken);
+    gdiplusToken := 0;
+  end;
+end;
+
+procedure GdipInit;
+begin
+  if gdiplusToken = 0 then
+  begin
+    ZeroMemory(@StartupInput, SizeOf(StartupInput));
+    StartupInput.GdiplusVersion := 1;
+    GdiplusStartup(gdiplusToken, @StartupInput, nil);
+    gdiplusTokenOwned := gdiplusToken <> 0;
+  end;
+end;
 
 procedure GdipCheck(AStatus: GpStatus);
 begin
@@ -1413,9 +1445,6 @@ end;
 
 initialization
   GpPaintCanvas := TACLGdiplusPaintCanvas.Create;
-
 finalization
-  TACLGdiplusAlphaBlendAttributes.Finalize;
-  TACLGdiplusResourcesCache.Flush;
-  FreeAndNil(GpPaintCanvas);
+  GdipFree;
 end.
