@@ -9,7 +9,7 @@
 //             © 2006-2024
 //             www.aimp.ru
 //
-//  FPC:       Partial
+//  FPC:       OK
 //
 unit ACL.UI.Menus;
 
@@ -82,6 +82,9 @@ const
   CM_MENUCLICKED  = CM_BASE + $0401;
   CM_MENUSELECTED = CM_BASE + $0402;
   CM_MENUTRACKING = CM_BASE + $0403;
+
+  VK_MEDIA_KEYS_FIRST = VK_BROWSER_BACK;
+  VK_MEDIA_KEYS_LAST  = VK_LAUNCH_APP2;
 
 type
 {$REGION ' General '}
@@ -651,10 +654,59 @@ type
 
 {$ENDREGION}
 
+{$REGION ' Shortcuts '}
+
+  TKeyModifier = (kmWin, kmAlt, kmCtrl, kmShift);
+  TKeyModifiers = set of TKeyModifier;
+
+  TACLShortCut = class
+  protected const
+  {$REGION ' consts '}
+    sKeyBreak = 'Break';
+    sKeyNum = 'Num ';
+    sKeyNumLock = sKeyNum + 'Lock';
+    sKeyApps = 'Apps';
+    sKeyPlay = 'Play';
+
+    sKeyMedia: array[VK_MEDIA_KEYS_FIRST..VK_MEDIA_KEYS_LAST] of string = (
+      'Browser Back',
+      'Browser Forward',
+      'Browser Refresh',
+      'Browser Stop',
+      'Browser Search',
+      'Browser Favorites',
+      'Browser Home',
+      'Volume Mute',
+      'Volume Down',
+      'Volume Up',
+      'Media Next Track',
+      'Media Prev Track',
+      'Media Stop',
+      'Media Play/Pause',
+      'Launch Mail',
+      'Launch Media Select',
+      'Launch App1',
+      'Launch App2'
+    );
+
+    sKeyModifiersPrefix: array[TKeyModifier] of string = (
+      'Win+', 'Alt+', 'Ctrl+', 'Shift+'
+    );
+  {$ENDREGION}
+  protected
+    class function KeyToText(AKey: Byte): string;
+    class function ModifiersToText(AModifiers: TKeyModifiers): string;
+    class function TextToKey(AText: string): Byte;
+    class function TextToModifiers(const AText: string): TKeyModifiers;
+  public
+    class function ToText(AShortcut: TShortCut): string;
+  end;
+
+{$ENDREGION}
+
 function acMenuAppendShortCut(const AHint: string; AShortCut: TShortCut): string;
 function acMenuEscapeHotkeys(const ACaption: string): string;
 function acMenusHasActivePopup: Boolean;
-function acShortCutToText(ShortCut: TShortCut): string;
 implementation
 
 uses
@@ -708,9 +760,9 @@ begin
   if AShortCut = 0 then
     Exit(AHint);
   if AHint <> '' then
-    Result := Format('%s (%s)', [AHint, acShortCutToText(AShortCut)])
+    Result := Format('%s (%s)', [AHint, TACLShortCut.ToText(AShortCut)])
   else
-    Result := acShortCutToText(AShortCut);
+    Result := TACLShortCut.ToText(AShortCut);
 end;
 
 function acMenuEscapeHotkeys(const ACaption: string): string;
@@ -721,11 +773,6 @@ end;
 function acMenusHasActivePopup: Boolean;
 begin
   Result := FMenuLoopCount > 0;
-end;
-
-function acShortCutToText(ShortCut: TShortCut): string;
-begin
-  Result := ShortCutToText(ShortCut);
 end;
 
 {$REGION ' Helpers '}
@@ -1421,7 +1468,7 @@ begin
     acDrawArrow(ACanvas, R.Split(srRight, R.Height), acGetActualColor(ACanvas.Font), makRight, TargetDPI)
   else
     if AShortCut <> scNone then
-      acTextDraw(ACanvas, acShortCutToText(AShortCut), R, taRightJustify, taVerticalCenter);
+      acTextDraw(ACanvas, TACLShortCut.ToText(AShortCut), R, taRightJustify, taVerticalCenter);
 end;
 
 procedure TACLStylePopupMenu.DrawItemImage(
@@ -1454,7 +1501,7 @@ begin
   if AShortCut <> scNone then
   begin
     Inc(Result, acTextSize(ACanvas, '  ').Width);
-    Inc(Result, acTextSize(ACanvas, acShortCutToText(AShortCut)).Width);
+    Inc(Result, acTextSize(ACanvas, TACLShortCut.ToText(AShortCut)).Width);
   end;
 end;
 
@@ -3253,6 +3300,117 @@ end;
 
 {$ENDREGION}
 
+{$REGION ' Shortcuts '}
+
+{ TACLShortCut }
+
+class function TACLShortCut.KeyToText(AKey: Byte): string;
+begin
+  case AKey of
+    0:
+      Result := '';
+    VK_NUMLOCK:
+      Result := sKeyNumLock;
+    VK_PAUSE:
+      Result := sKeyBreak;
+    VK_NUMPAD0..VK_NUMPAD9:
+      Result := sKeyNum + IntToStr(AKey - VK_NUMPAD0);
+    VK_MEDIA_KEYS_FIRST..VK_MEDIA_KEYS_LAST:
+      Result := sKeyMedia[AKey];
+    VK_PLAY:
+      Result := sKeyPlay;
+    VK_APPS:
+      Result := sKeyApps;
+  else
+    Result := ShortCutToText(AKey);
+  end;
+end;
+
+class function TACLShortCut.ModifiersToText(AModifiers: TKeyModifiers): string;
+var
+  I: TKeyModifier;
+begin
+  Result := '';
+  for I := Low(TKeyModifier) to High(TKeyModifier) do
+  begin
+    if I in AModifiers then
+      Result := sKeyModifiersPrefix[I] + Result;
+  end;
+end;
+
+class function TACLShortCut.TextToKey(AText: string): Byte;
+
+  function NumTextToHotkey(const AText: string): Cardinal;
+  begin
+    if SameText(sKeyNumLock, AText) then
+      Result := VK_NUMLOCK
+    else
+      Result := VK_NUMPAD0 + Ord(AText[Length(AText)]) - Ord('0');
+  end;
+
+  function TextToMediaKey(const AText: string): Cardinal;
+  var
+    ACode: Integer;
+  begin
+    Result := 0;
+    for ACode := Low(sKeyMedia) to High(sKeyMedia) do
+      if acSameText(sKeyMedia[ACode], AText) then
+      begin
+        Result := ACode;
+        Break;
+      end;
+  end;
+
+  procedure RemoveModifiers(var S: string);
+  var
+    I: TKeyModifier;
+  begin
+    for I := Low(I) to High(I) do
+      S := acStringReplace(S, sKeyModifiersPrefix[I], '', True);
+  end;
+
+begin
+  RemoveModifiers(AText);
+  if acPos(sKeyNum, AText) > 0 then
+    Result := NumTextToHotkey(AText)
+  else if SameText(sKeyApps, AText) then
+    Result := VK_APPS
+  else if SameText(sKeyBreak, AText) then
+    Result := VK_PAUSE
+  else if SameText(sKeyPlay, AText) then
+    Result := VK_PLAY
+  else
+  begin
+    Result := TextToMediaKey(AText);
+    if Result = 0 then
+      Result := Byte(TextToShortCut(AText));
+  end;
+end;
+
+class function TACLShortCut.TextToModifiers(const AText: string): TKeyModifiers;
+var
+  I: TKeyModifier;
+begin
+  Result := [];
+  for I := Low(I) to High(I) do
+  begin
+    if acPos(sKeyModifiersPrefix[I], AText) > 0 then
+      Include(Result, I);
+  end;
+end;
+
+class function TACLShortCut.ToText(AShortcut: TShortCut): string;
+begin
+  Result := KeyToText(AShortCut and $FF);
+  if AShortCut and scAlt <> 0 then
+    Result :=  sKeyModifiersPrefix[kmAlt] + Result;
+  if AShortCut and scCtrl <> 0 then
+    Result :=  sKeyModifiersPrefix[kmCtrl] + Result;
+  if AShortCut and scShift <> 0 then
+    Result :=  sKeyModifiersPrefix[kmShift] + Result;
+end;
+
+{$ENDREGION}
 initialization
   RegisterClasses([TACLMenuItem, TACLMenuItemLink, TACLMenuListItem]);
 end.
