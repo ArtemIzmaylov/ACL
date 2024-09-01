@@ -50,7 +50,7 @@ uses
   ACL.Utils.FileSystem,
   ACL.Utils.Stream;
 
-{$REGION 'Aliases'}
+{$REGION ' Aliases '}
 const
   pomInvalid     = PixelOffsetModeInvalid;
   pomDefault     = PixelOffsetModeDefault;
@@ -81,7 +81,7 @@ type
     FStatus: GpStatus;
   public
     constructor Create(AStatus: GpStatus);
-    //
+    //# Properties
     property Status: GpStatus read FStatus;
   end;
 
@@ -165,11 +165,10 @@ type
       const TargetRect, SourceRect: TRect; Alpha: Byte = MaxByte); override;
 
     // Curves
-    procedure DrawCurve2(APenColor: TAlphaColor; APoints: array of TPoint;
-      ATension: Single; APenStyle: TACL2DRenderStrokeStyle = ssSolid; APenWidth: Single = 1.0);
-    procedure DrawClosedCurve2(APenColor: TAlphaColor; const APoints: array of TPoint;
-      ATension: Single; APenStyle: TACL2DRenderStrokeStyle = ssSolid; APenWidth: Single = 1.0);
-    procedure FillClosedCurve2(AColor: TAlphaColor; const APoints: array of TPoint; ATension: Single);
+    procedure DrawCurve(AColor: TAlphaColor;
+      const APoints: array of TPoint; ATension: Single; AWidth: Single = 1.0); override;
+    procedure FillCurve(AColor: TAlphaColor;
+      const APoints: array of TPoint; ATension: Single); override;
 
     // Ellipse
     procedure DrawEllipse(X1, Y1, X2, Y2: Single; Color: TAlphaColor;
@@ -341,9 +340,9 @@ begin
     raise EGdipException.Create(AStatus);
 end;
 
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // Internal Routines
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
 function GpCreateBitmap(AWidth, AHeight: Integer; ABits: PByte = nil;
   APixelFormat: Integer = PixelFormat32bppPARGB): GpImage;
@@ -352,9 +351,9 @@ begin
     Result := nil;
 end;
 
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // Fill Rect
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
 procedure GpFillRect(DC: HDC; const R: TRect; AColor: TAlphaColor);
 begin
@@ -403,9 +402,9 @@ begin
   end;
 end;
 
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // DrawImage
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
 procedure GpDrawImage(AGraphics: GpGraphics; AImage: GpImage; AImageAttributes: GpImageAttributes;
   const ADestRect, ASourceRect: TRect; ATileDrawingMode: Boolean); overload;
@@ -524,9 +523,9 @@ begin
     ADestRect, ASourceRect, ATileDrawingMode);
 end;
 
-//----------------------------------------------------------------------------------------------------------------------
-// Codec
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+// Codecs
+//------------------------------------------------------------------------------
 
 function GpGetCodecByMimeType(const AMimeType: UnicodeString; out ACodecID: TGUID): Boolean;
 var
@@ -564,8 +563,8 @@ end;
 
 class constructor TACLGdiplusAlphaBlendAttributes.Create;
 begin
-  FColorMatrix := GpDefaultColorMatrix;
   FAlpha := MaxByte;
+  FColorMatrix := GpDefaultColorMatrix;
 end;
 
 class procedure TACLGdiplusAlphaBlendAttributes.Finalize;
@@ -602,9 +601,9 @@ begin
   FStatus := AStatus;
 end;
 
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // GDI + Cache
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
 {$REGION ' GDI+ Cache '}
 
@@ -699,7 +698,8 @@ begin
   end;
 end;
 
-class function TACLGdiplusResourcesCache.PenGet(Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle): GpPen;
+class function TACLGdiplusResourcesCache.PenGet(
+  Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle): GpPen;
 const
   Map: array[TACL2DRenderStrokeStyle] of TDashStyle = (
     DashStyleSolid, DashStyleDash, DashStyleDot, DashStyleDashDot, DashStyleDashDotDot
@@ -740,9 +740,9 @@ end;
 
 {$ENDREGION}
 
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // 2D Render
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
 {$REGION ' 2D Render '}
 
@@ -1065,7 +1065,8 @@ begin
   end;
 end;
 
-procedure TACLGdiplusRender.DrawImage(Image: TACL2DRenderImage; const TargetRect, SourceRect: TRect; Alpha: Byte);
+procedure TACLGdiplusRender.DrawImage(
+  Image: TACL2DRenderImage; const TargetRect, SourceRect: TRect; Alpha: Byte);
 begin
   if IsValid(Image) then
     GpDrawImage(FGraphics,
@@ -1073,27 +1074,20 @@ begin
       TACLGdiplusAlphaBlendAttributes.Get(Alpha), TargetRect, SourceRect, False);
 end;
 
-procedure TACLGdiplusRender.FillClosedCurve2(
-  AColor: TAlphaColor; const APoints: array of TPoint; ATension: Single);
-begin
-  GdipCheck(GdipFillClosedCurve2I(FGraphics, TACLGdiplusResourcesCache.BrushGet(AColor),
-    @APoints[0], Length(APoints), ATension, FillModeWinding));
-end;
-
-procedure TACLGdiplusRender.DrawClosedCurve2(APenColor: TAlphaColor;
-  const APoints: array of TPoint; ATension: Single; APenStyle: TACL2DRenderStrokeStyle; APenWidth: Single);
-begin
-  GdipCheck(GdipDrawClosedCurve2I(FGraphics,
-    TACLGdiplusResourcesCache.PenGet(APenColor, APenWidth, APenStyle),
-    @APoints[0], Length(APoints), ATension));
-end;
-
-procedure TACLGdiplusRender.DrawCurve2(APenColor: TAlphaColor;
-  APoints: array of TPoint; ATension: Single; APenStyle: TACL2DRenderStrokeStyle; APenWidth: Single);
+procedure TACLGdiplusRender.DrawCurve(AColor: TAlphaColor;
+  const APoints: array of TPoint; ATension: Single; AWidth: Single = 1.0);
 begin
   GdipCheck(GdipDrawCurve2I(FGraphics,
-    TACLGdiplusResourcesCache.PenGet(APenColor, APenWidth, APenStyle),
+    TACLGdiplusResourcesCache.PenGet(AColor, AWidth, ssSolid),
     @APoints[0], Length(APoints), ATension));
+end;
+
+procedure TACLGdiplusRender.FillCurve(AColor: TAlphaColor;
+  const APoints: array of TPoint; ATension: Single);
+begin
+  GdipCheck(GdipFillClosedCurve2I(
+    FGraphics, TACLGdiplusResourcesCache.BrushGet(AColor),
+    @APoints[0], Length(APoints), ATension, FillModeWinding));
 end;
 
 procedure TACLGdiplusRender.DrawEllipse(X1, Y1, X2, Y2: Single;
@@ -1362,9 +1356,9 @@ end;
 
 {$ENDREGION}
 
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // Other
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
 { TACLGdiplusStream }
 

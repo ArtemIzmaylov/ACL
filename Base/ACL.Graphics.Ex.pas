@@ -229,6 +229,12 @@ type
     procedure RestoreClipRegion; virtual; abstract;
     procedure SaveClipRegion; virtual; abstract;
 
+    // Curve
+    procedure DrawCurve(AColor: TAlphaColor;
+      const APoints: array of TPoint; ATension: Single; APenWidth: Single = 1.0); virtual;
+    procedure FillCurve(AColor: TAlphaColor;
+      const APoints: array of TPoint; ATension: Single); virtual;
+
     // Ellipse
     procedure Ellipse(const R: TRect; Color, StrokeColor: TAlphaColor;
       StrokeWidth: Single = 1; StrokeStyle: TACL2DRenderStrokeStyle = ssSolid);
@@ -1712,6 +1718,18 @@ procedure TACL2DRender.DrawRectangle(const R: TRect;
   Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
 begin
   DrawRectangle(R.Left, R.Top, R.Right, R.Bottom, Color, Width, Style)
+end;
+
+procedure TACL2DRender.DrawCurve(AColor: TAlphaColor;
+  const APoints: array of TPoint; ATension, APenWidth: Single);
+begin
+  Line(APoints, AColor, APenWidth);
+end;
+
+procedure TACL2DRender.FillCurve(AColor: TAlphaColor;
+  const APoints: array of TPoint; ATension: Single);
+begin
+  FillPolygon(APoints, AColor);
 end;
 
 procedure TACL2DRender.Ellipse(const R: TRect;
