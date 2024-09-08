@@ -115,6 +115,7 @@ type
   ['{FBF02DB8-6F2B-42AC-9F87-FB8A313CDDD7}']
     function GetDataPtr: PByte;
     function GetDataSize: Integer;
+    function GetDataUnsafe: TMemoryStream; // unsafe!!! use LockData instead
     function SetDataSize(AValue: Integer): Boolean;
 
     function LockData: TMemoryStream;
@@ -136,6 +137,7 @@ type
     // IACLDataContainer
     function GetDataPtr: PByte;
     function GetDataSize: Integer;
+    function GetDataUnsafe: TMemoryStream;
     function SetDataSize(AValue: Integer): Boolean;
     function LockData: TMemoryStream;
     procedure UnlockData;
@@ -506,6 +508,11 @@ begin
   finally
     FDataLock.Leave;
   end;
+end;
+
+function TACLDataContainer.GetDataUnsafe: TMemoryStream;
+begin
+  Result := FData;
 end;
 
 function TACLDataContainer.SetDataSize(AValue: Integer): Boolean;

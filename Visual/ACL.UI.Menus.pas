@@ -2154,7 +2154,7 @@ var
   AParentRect: TRect;
   AWorkArea: TRect;
 begin
-  AWorkArea := MonitorGetWorkArea(ClientOrigin);
+  AWorkArea := MonitorGetDesktopClientArea(ClientOrigin);
   if AChild <> nil then
   begin
     AParentRect := AChild.SourceItem.Rect + ClientOrigin;

@@ -327,7 +327,10 @@ begin
   begin
     if FCommands.TryGetValue(FPendingToExecute.First.Name, ACommand) then
       ACommand.Execute(FPendingToExecute.First);
-    FPendingToExecute.Delete(0);
+    if FPendingToExecute.Count > 0 then // такое может произойти, если во время
+                                        // обработки команды протолкнется QuitMessage
+                                        // и приложение начнет завершение
+      FPendingToExecute.Delete(0);
   end;
 end;
 

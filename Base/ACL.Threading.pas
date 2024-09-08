@@ -320,16 +320,14 @@ end;
 procedure RunInThread(Func: TThreadStartRoutine; Context: Pointer);
 begin
 {$IFDEF MSWINDOWS}
-  if not QueueUserWorkItem(Func, Context, WT_EXECUTELONGFUNCTION) then
-    RaiseLastOSError;
-{$ELSE}
-  {$MESSAGE WARN 'OptimizeMe - emulate system thread-pool'}
-  TThread.CreateAnonymousThread(
-    procedure
-    begin
-      Func(Context);
-    end).Start;
+  if not ModuleIsLib or ModuleIsPackage then
+  begin
+    if not QueueUserWorkItem(Func, Context, WT_EXECUTELONGFUNCTION) then
+      RaiseLastOSError;
+  end;
 {$ENDIF}
+  {$MESSAGE WARN 'OptimizeMe - emulate system thread-pool'}
+  TThread.CreateAnonymousThread(procedure begin Func(Context); end).Start;
 end;
 
 { TACLCriticalSection }

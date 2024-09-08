@@ -2614,7 +2614,10 @@ begin
     ACollection := AIntf.GetCollection;
   if (ACollection = nil) then
     ACollection := TACLRootResourceCollection.GetInstance;
-  Result := ACollection.GetResource(ID, AResourceClass, ASender);
+  if (ACollection <> nil) then
+    Result := ACollection.GetResource(ID, AResourceClass, ASender)
+  else
+    Result := nil;
 end;
 
 procedure TACLStyle.DoAssign(ASource: TPersistent);

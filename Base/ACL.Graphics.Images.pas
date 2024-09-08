@@ -1991,18 +1991,10 @@ class function TACLImageTools.PasteFromClipboard: IACLDataContainer;
 {$ELSE}
 
   function CreateFromFormat(AFormat: Word): IACLDataContainer;
-  var
-    LStream: TStream;
   begin
-    LStream := TMemoryStream.Create;
-    try
-      if Clipboard.GetFormat(AFormat, LStream) then
-        Result := TACLDataContainer.Create(LStream)
-      else
-        Result := nil;
-    finally
-      LStream.Free;
-    end;
+    Result := TACLDataContainer.Create;
+    if not Clipboard.GetFormat(AFormat, Result.GetDataUnsafe) then
+      Result := nil;
   end;
 
   function CreateFromBitmap: IACLDataContainer;
