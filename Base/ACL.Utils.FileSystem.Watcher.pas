@@ -940,6 +940,7 @@ var
   AVolume: PDeviceBroadcastVolume;
 begin
   if Message.Msg = WM_DEVICECHANGE then
+  begin
     case Message.WParam of
       DBT_EVENT_DEVICEARRIVAL, DBT_EVENT_DEVICEREMOVED:
         begin
@@ -948,6 +949,7 @@ begin
             TACLDriveManager.Changed(DecodeDrive(AVolume), Message.WParam = DBT_EVENT_DEVICEARRIVAL);
         end;
     end;
+  end;
   WndDefaultProc(FWndHandle, Message);
 end;
 

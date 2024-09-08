@@ -322,8 +322,9 @@ begin
 {$IFDEF MSWINDOWS}
   if not ModuleIsLib or ModuleIsPackage then
   begin
-    if not QueueUserWorkItem(Func, Context, WT_EXECUTELONGFUNCTION) then
-      RaiseLastOSError;
+    if QueueUserWorkItem(Func, Context, WT_EXECUTELONGFUNCTION) then
+      Exit;
+    RaiseLastOSError;
   end;
 {$ENDIF}
   {$MESSAGE WARN 'OptimizeMe - emulate system thread-pool'}
