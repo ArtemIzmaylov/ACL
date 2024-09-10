@@ -236,6 +236,9 @@ type
 implementation
 
 uses
+{$IFDEF ACL_LOG_SHELL}
+  ACL.Utils.Logger,
+{$ENDIF}
 {$IFDEF MSWINDOWS}
   ACL.Utils.Desktop,
 {$ELSE}
@@ -509,7 +512,15 @@ begin
       TPIDLHelper.DisposePIDL(LPIDL);
     end;
   except
+  {$IFDEF ACL_LOG_SHELL}
+    on E: Exception do
+    begin
+      AddToDebugLog('Shell', e);
+      Result := nil;
+    end;
+  {$ELSE}
     Result := nil;
+  {$ENDIF}
   end;
 end;
 
@@ -788,15 +799,16 @@ begin
       TPIDLHelper.DisposePIDL(APIDL);
     end;
   except
-    // do nothing
+  {$IFDEF ACL_LOG_SHELL}
+    AddToDebugLog('Shell', 'SetSelectedPath failed');
+  {$ENDIF}
   end;
 end;
 
 class function TACLShellTreeViewSubClass.SortFolderNames(L, R: TACLTreeListNode): Integer;
 begin
   Result := TACLShellFolder(L.Data).Compare(
-    TACLShellFolder(L.Data).ID,
-    TACLShellFolder(R.Data).ID);
+    TACLShellFolder(L.Data).ID, TACLShellFolder(R.Data).ID);
 end;
 
 procedure TACLShellTreeViewSubClass.ProcessContextPopup(var AHandled: Boolean);

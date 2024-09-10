@@ -31,6 +31,7 @@ uses
 {$ENDIF}
   // System
   {System.}Classes,
+  {System.}Math,
   {System.}SysUtils,
   // ACL
   ACL.Classes.StringList,
@@ -204,6 +205,9 @@ uses
 {$ELSE}
   ACL.Utils.FileSystem.GIO,
   ACL.Web,
+{$ENDIF}
+{$IFDEF ACL_LOG_SHELL}
+  ACL.Utils.Logger,
 {$ENDIF}
   ACL.Utils.Strings;
 
@@ -772,23 +776,40 @@ end;
 procedure TACLShellFolder.Enum(AOwnerWnd: HWND; AShowHidden: Boolean; AProc: TProc<PItemIDLIst>);
 {$IFDEF MSWINDOWS}
 var
+  LEnum: IEnumIDList;
   LFlags: LongWord;
-  LEnumList: IEnumIDList;
   LItemID: PItemIDList;
   LNumIDs: LongWord;
+  LPrevErrMode: Integer;
+  LPrevExceptionMask: TArithmeticExceptionMask;
 begin
   try
-    LFlags := SHCONTF_FOLDERS;
-    if AShowHidden then
-      LFlags := LFlags or SHCONTF_INCLUDEHIDDEN;
-    if ShellFolder.EnumObjects(AOwnerWnd, LFlags, LEnumList) = 0 then
-      while LEnumList.Next(1, LItemID, LNumIDs) = S_OK do
+    LPrevErrMode := SetErrorMode(SEM_FAILCRITICALERRORS);
+    LPrevExceptionMask := GetExceptionMask;
+    try
+    {$IFDEF CPUX64}
+      if acOSCheckVersion(10, 0, 22000) then // Win11
+        SetExceptionMask(exAllArithmeticExceptions);
+    {$ENDIF}
+      LFlags := SHCONTF_FOLDERS;
+      if AShowHidden then
+        LFlags := LFlags or SHCONTF_INCLUDEHIDDEN;
+      if Succeeded(ShellFolder.EnumObjects(AOwnerWnd, LFlags, LEnum)) then
       begin
-        if LItemID <> nil then
-          AProc(LItemID);
+        while (LEnum <> nil) and (LEnum.Next(1, LItemID, LNumIDs) = S_OK) do
+        begin
+          if (LNumIDs = 1) and (LItemID <> nil) then
+            AProc(LItemID);
+        end;
       end;
+    finally
+      SetExceptionMask(LPrevExceptionMask);
+      SetErrorMode(LPrevErrMode);
+    end;
   except
-    // do nothing
+  {$IFDEF ACL_LOG_SHELL}
+    AddToDebugLog('Shell', 'TACLShellFolder.Enum(%s) failed', [PathForParsing]);
+  {$ENDIF}
   end;
 {$ELSE}
 var
@@ -1127,9 +1148,13 @@ begin
     APath := acIncludeTrailingPathDelimiter(APath);
 
   if Failed(TACLShellFolder.Root.ShellFolder.ParseDisplayName(
-    AOwnerWnd, nil, PWideChar(APath), AEaten, Result, AAttr))
-  then
+    AOwnerWnd, nil, PWideChar(APath), AEaten, Result, AAttr)) then
+  begin
+  {$IFDEF ACL_LOG_SHELL}
+    AddToDebugLog('Shell', 'ParseDisplayName(%s) failed', [APath]);
+  {$ENDIF}
     Result := nil;
+  end;
 {$ELSE}
 begin
   New(Result);
