@@ -1828,11 +1828,11 @@ end;
 
 procedure TACLTreeListGroupViewInfo.DoDraw(ACanvas: TCanvas);
 begin
-  SubClass.StylePrepareFont(ACanvas, TACLStyleTreeList.IndexGroupHeaderFont);
   SubClass.Style.DrawGroupHeader(ACanvas, BackgroundBounds);
   SubClass.Style.DrawCheckMark(ACanvas, CheckBoxRect, CheckBoxState, Group.CheckBoxState);
   if ExpandButtonVisible then
     SubClass.Style.DrawGroupExpandButton(ACanvas, ExpandButtonRect, Group.Expanded);
+  SubClass.StylePrepareFont(ACanvas, TACLStyleTreeList.IndexGroupHeaderFont);
   acTextDraw(ACanvas, Group.Caption, TextRect, taLeftJustify, taVerticalCenter, True);
 end;
 

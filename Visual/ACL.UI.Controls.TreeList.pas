@@ -191,7 +191,7 @@ type
     property OnDragSortingNodeOver: TACLTreeListDragSortingNodeOver read GetOnDragSortingNodeOver write SetOnDragSortingNodeOver;
     property OnDrop: TACLTreeListDropEvent read GetOnDrop write SetOnDrop;
     property OnDropOver: TACLTreeListDropOverEvent read GetOnDropOver write SetOnDropOver;
-    property OnEditApply: TACLTreeListEditingEvent read GetOnEditing write SetOnEditing;
+    property OnEditApply: TACLTreeListEditingEvent read GetOnEditing write SetOnEditing stored False; // legacy
     property OnEditing: TACLTreeListEditingEvent read GetOnEditing write SetOnEditing;
     property OnEdited: TACLTreeListEditedEvent read GetOnEdited write SetOnEdited;
     property OnEditCreate: TACLTreeListEditCreateEvent read GetOnEditCreate write SetOnEditCreate;

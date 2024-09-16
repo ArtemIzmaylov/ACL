@@ -220,7 +220,6 @@ type
     procedure Assign(ASource: TRawImage); overload;
   {$ENDIF}
     procedure AssignTo(ATarget: TBitmap);
-    procedure AssignParams(DC: HDC);
     function Clone(out AData: PACLPixel32Array): Boolean;
     function CoordToFlatIndex(X, Y: Integer): Integer; inline;
     function Equals(Obj: TObject): Boolean; override;
@@ -1443,7 +1442,7 @@ begin
   AClipRegion := 0;
   Result := CreateCompatibleDC(ASourceDC);
   AMemBmp := CreateCompatibleBitmap(ASourceDC, R.Right - R.Left, R.Bottom - R.Top);
-  SelectObject(Result, AMemBmp);
+  DeleteObject(SelectObject(Result, AMemBmp));
   SetWindowOrgEx(Result, R.Left, R.Top, nil);
   if GetClipBox(ASourceDC, {$IFDEF FPC}@{$ENDIF}AClipRect) <> ERROR then
     acIntersectClipRegion(Result, AClipRect);
@@ -2616,13 +2615,6 @@ begin
 end;
 {$ENDIF}
 
-procedure TACLDib.AssignParams(DC: HDC);
-begin
-  SelectObject(Handle, GetCurrentObject(DC, OBJ_BRUSH));
-  SelectObject(Handle, GetCurrentObject(DC, OBJ_FONT));
-  SetTextColor(Handle, GetTextColor(DC));
-end;
-
 procedure TACLDib.AssignTo(ATarget: TBitmap);
 {$IFDEF FPC}
 var
@@ -2908,7 +2900,7 @@ begin
 {$ELSE}
   FBitmap := CreateDIBSection(0, AInfo, DIB_RGB_COLORS, Pointer(FColors), 0, 0);
 {$ENDIF}
-  SelectObject(FHandle, FBitmap);
+  DeleteObject(SelectObject(FHandle, FBitmap));
   if FColors = nil then
   begin
     FreeHandles;

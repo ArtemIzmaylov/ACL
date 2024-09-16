@@ -1147,6 +1147,7 @@ begin
   if not ShellIsLibraryPath(APath) then
     APath := acIncludeTrailingPathDelimiter(APath);
 
+  AAttr := 0;
   if Failed(TACLShellFolder.Root.ShellFolder.ParseDisplayName(
     AOwnerWnd, nil, PWideChar(APath), AEaten, Result, AAttr)) then
   begin

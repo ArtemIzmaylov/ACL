@@ -159,6 +159,7 @@ uses
 {$IFDEF MSWINDOWS}
   ACL.Hashes,
 {$ENDIF}
+  ACL.Threading,
   ACL.Utils.Messaging,
   ACL.Utils.Desktop,
   ACL.Utils.Strings;
@@ -176,6 +177,7 @@ type
   strict private
     FHandle: HWND;
     FIconData: TNotifyIconData;
+    FTimestamp: Cardinal;
     procedure BuildIconData;
     procedure WndProc(var Message: TMessage);
   public
@@ -520,6 +522,8 @@ const
   Map: array[TACLTrayIconCommand] of Cardinal = (NIM_ADD, NIM_MODIFY, NIM_DELETE);
 begin
   BuildIconData;
+  if ACommand = ticAdd then
+    FTimestamp := TACLThread.Timestamp;
   Shell_NotifyIconW(Map[ACommand], @FIconData);
 end;
 
@@ -542,8 +546,6 @@ begin
         Icon.MouseDown(nil, mbRight, [], LCurPos.X, LCurPos.Y);
       WM_MBUTTONDOWN, WM_MBUTTONDBLCLK:
         Icon.MouseDown(nil, mbMiddle, [], LCurPos.X, LCurPos.Y);
-      WM_MOUSEMOVE:
-        Icon.MouseMove(nil, [], LCurPos.X, LCurPos.Y);
       WM_LBUTTONUP:
         Icon.MouseUp(nil, mbLeft, [], LCurPos.X, LCurPos.Y);
       WM_RBUTTONUP:
@@ -552,6 +554,13 @@ begin
         Icon.MouseUp(nil, mbMiddle, [], LCurPos.X, LCurPos.Y);
       NIN_BALLOONUSERCLICK:
         CallNotifyEvent(Icon, Icon.OnBallonHintClick);
+      WM_MOUSEMOVE:
+        // При запуске приложения приходит сообщение, что пользователь навел
+        // указатель мыши на иконку в трее, хотя это не так. Похоже на баг винды.
+        if TACLThread.IsTimeout(FTimestamp, 2000) then
+          Icon.MouseMove(nil, [], LCurPos.X, LCurPos.Y)
+        else
+          FTimestamp := 0;
     end;
   end;
   WndDefaultProc(FHandle, Message);
