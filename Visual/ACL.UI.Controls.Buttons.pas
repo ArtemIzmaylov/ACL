@@ -343,6 +343,7 @@ type
   {$ENDIF}
     procedure HandlerImageChange(Sender: TObject);
     function IsGlyphStored: Boolean;
+    function IsImageIndexStored: Boolean;
     function GetDown: Boolean;
     function GetSubClass: TACLButtonSubClass;
     procedure SetCancel(AValue: Boolean);
@@ -356,8 +357,10 @@ type
     procedure CMDialogKey(var Message: TCMDialogKey); message {%H-}CM_DIALOGKEY;
     procedure CMFocusChanged(var Message: TMessage); message CM_FOCUSCHANGED;
   protected
+    procedure ActionChange(Sender: TObject; CheckDefaults: Boolean); override;
     function CreateStyle: TACLStyleButton; override;
     function CreateSubClass: TACLCustomButtonSubClass; override;
+    function GetActionLinkClass: TControlActionLinkClass; override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     procedure PerformClick; virtual;
     procedure SetTargetDPI(AValue: Integer); override;
@@ -385,10 +388,19 @@ type
     property Default: Boolean read FDefault write SetDefault default False;
     property Down: Boolean read GetDown write SetDown default False;
     property Glyph: TACLGlyph read FGlyph write SetGlyph stored IsGlyphStored;
-    property ImageIndex: TImageIndex read FImageIndex write SetImageIndex default -1;
+    property ImageIndex: TImageIndex read FImageIndex write SetImageIndex stored IsImageIndexStored;
     property Images: TCustomImageList read FImages write SetImages;
     property ModalResult: TModalResult read FModalResult write FModalResult default mrNone;
     property ParentColor;
+  end;
+
+  { TACLSimpleButtonActionLink }
+
+  TACLSimpleButtonActionLink = class(TWinControlActionLink)
+  protected
+    procedure SetImageIndex(Value: Integer); override;
+  public
+    function IsImageIndexLinked: Boolean; override;
   end;
 
   { TACLButton }
@@ -1291,6 +1303,16 @@ begin
   inherited Destroy;
 end;
 
+procedure TACLSimpleButton.ActionChange(Sender: TObject; CheckDefaults: Boolean);
+begin
+  inherited;
+  if Sender is TCustomAction then
+  begin
+    if not CheckDefaults or (ImageIndex = -1) then
+      ImageIndex := TCustomAction(Sender).ImageIndex;
+  end;
+end;
+
 procedure TACLSimpleButton.BeforeDestruction;
 begin
   inherited BeforeDestruction;
@@ -1427,6 +1449,19 @@ begin
   Result := not FGlyph.Empty;
 end;
 
+function TACLSimpleButton.IsImageIndexStored: Boolean;
+begin
+  if ActionLink <> nil then
+    Result := not TACLSimpleButtonActionLink(ActionLink).IsImageIndexLinked
+  else
+    Result := ImageIndex <> -1;
+end;
+
+function TACLSimpleButton.GetActionLinkClass: TControlActionLinkClass;
+begin
+  Result := TACLSimpleButtonActionLink;
+end;
+
 function TACLSimpleButton.GetDown: Boolean;
 begin
   Result := SubClass.IsDown;
@@ -1520,6 +1555,20 @@ end;
 procedure TACLSimpleButton.HandlerImageChange(Sender: TObject);
 begin
   FullRefresh;
+end;
+
+{ TACLSimpleButtonActionLink }
+
+function TACLSimpleButtonActionLink.IsImageIndexLinked: Boolean;
+begin
+  Result := inherited IsImageIndexLinked and
+    (TACLSimpleButton(FClient).ImageIndex = TCustomAction(Action).ImageIndex);
+end;
+
+procedure TACLSimpleButtonActionLink.SetImageIndex(Value: Integer);
+begin
+  if IsImageIndexLinked then
+    TACLSimpleButton(FClient).ImageIndex := Value;
 end;
 
 { TACLButton }
