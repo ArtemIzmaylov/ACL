@@ -704,15 +704,20 @@ type
 
   { TACLContainer }
 
+  TAlignControlsEvent = procedure (Sender: TObject; var Rect: TRect) of object;
+
   TACLContainer = class(TACLCustomControl)
   strict private
     FBorders: TACLBorders;
     FStyle: TACLStyleBackground;
+    // Events
+    FOnAlignControls: TAlignControlsEvent;
 
     procedure CMShowingChanged(var Message: TMessage); message CM_SHOWINGCHANGED;
     procedure SetBorders(AValue: TACLBorders);
     procedure SetStyle(AValue: TACLStyleBackground);
   protected
+    procedure AlignControls(AControl: TControl; var Rect: TRect); override;
     function CreateStyle: TACLStyleBackground; virtual;
     function GetContentOffset: TRect; override;
     procedure Paint; override;
@@ -727,6 +732,8 @@ type
   published
     property ResourceCollection;
     property Style: TACLStyleBackground read FStyle write SetStyle;
+    //# Events
+    property OnAlignControls: TAlignControlsEvent read FOnAlignControls write FOnAlignControls;
   end;
 
 {$ENDREGION}
@@ -759,15 +766,14 @@ type
   { TACLControls }
 
   TACLControls = class
-  strict private
-    class procedure WMSetCursor(ACaller: TWinControl; var Message: TWMSetCursor);
   public
     class procedure AlignControl(AControl: TControl; const ABounds: TRect);
     // Scaling
     class procedure ScaleChanging(AControl: TWinControl; var AState: TObject);
     class procedure ScaleChanged(AControl: TWinControl; var AState: TObject);
     // Messages
-    class function WndProc(ACaller: TWinControl; var Message: TMessage): Boolean;
+    class function WndProc(ACaller: TWinControl; var Message: TMessage): Boolean; inline;
+    class procedure WMSetCursor(ACaller: TWinControl; var Message: TWMSetCursor);
     // Margins
     class procedure UpdateMargins(AControl: TControl;
       AUseMargins: Boolean; AMargins: TACLPadding; ACurrentDpi: Integer); overload;
@@ -1670,10 +1676,13 @@ begin
       FBounds.Enum(
         procedure (const AControl: TControl; const R: TRect)
         begin
-          if (AControl is TWinControl) and TWinControl(AControl).HandleAllocated then
-            AWinControls.Add(AControl)
-          else
-            AVclControls.Add(AControl);
+          if AControl.BoundsRect <> R then
+          begin
+            if (AControl is TWinControl) and TWinControl(AControl).HandleAllocated then
+              AWinControls.Add(AControl)
+            else
+              AVclControls.Add(AControl);
+          end;
         end);
 
       if AWinControls.Count > 0 then
@@ -1684,10 +1693,11 @@ begin
           begin
             ABounds := Bounds[AWinControls.List[I]];
             DeferWindowPos(AHandle, TWinControl(AWinControls.List[I]).Handle, 0,
-              ABounds.Left, ABounds.Top, ABounds.Width, ABounds.Height, SWP_NOZORDER);
+              ABounds.Left, ABounds.Top, ABounds.Width, ABounds.Height,
+              SWP_NOZORDER{ or SWP_NOREDRAW});
           end;
         finally
-          EndDeferWindowPos(AHandle)
+          EndDeferWindowPos(AHandle);
         end;
       end;
 
@@ -2532,21 +2542,25 @@ begin
 end;
 
 procedure TACLCustomControl.WMPaint(var Message: TWMPaint);
+{$IFDEF FPC}
+begin
+  inherited;
+{$ELSE}
 var
   AClipRgn: TRegionHandle;
   AMemBmp: HBITMAP;
   AMemDC: HDC;
+  APaintBuffer: HPAINTBUFFER;
   APaintStruct: TPaintStruct;
 begin
   if (Message.DC <> 0) or not DoubleBuffered then
     PaintHandler(Message)
   else
-  {$IFNDEF FPC}
     if (csGlassPaint in ControlState) and DwmCompositionEnabled then
     begin
       BeginPaint(Handle, APaintStruct);
       try
-        var APaintBuffer := BeginBufferedPaint(APaintStruct.hdc, APaintStruct.rcPaint, BPBF_COMPOSITED, nil, AMemDC);
+        APaintBuffer := BeginBufferedPaint(APaintStruct.hdc, APaintStruct.rcPaint, BPBF_COMPOSITED, nil, AMemDC);
         if APaintBuffer <> 0 then
         try
           Perform(WM_ERASEBKGND, AMemDC, AMemDC);
@@ -2561,7 +2575,6 @@ begin
       end;
     end
     else
-  {$ENDIF}
     begin
       BeginPaint(Handle, APaintStruct{%H-});
       try
@@ -2579,6 +2592,7 @@ begin
         EndPaint(Handle, APaintStruct);
       end;
     end;
+{$ENDIF}
 end;
 
 procedure TACLCustomControl.WMSetFocus(var Message: TWMSetFocus);
@@ -2824,6 +2838,17 @@ destructor TACLContainer.Destroy;
 begin
   FreeAndNil(FStyle);
   inherited Destroy;
+end;
+
+procedure TACLContainer.AlignControls(AControl: TControl; var Rect: TRect);
+begin
+  if Assigned(OnAlignControls) then
+  begin
+    AdjustClientRect(Rect);
+    OnAlignControls(Self, Rect);
+  end
+  else
+    inherited;
 end;
 
 procedure TACLContainer.CMShowingChanged(var Message: TMessage);
