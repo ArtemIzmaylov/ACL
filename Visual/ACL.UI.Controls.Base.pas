@@ -32,9 +32,11 @@ uses
   // System
   {System.}Classes,
   {System.}Generics.Collections,
+  {System.}Generics.Defaults,
   {System.}Math,
   {System.}SysUtils,
   {System.}Types,
+  {System.}TypInfo,
   System.UITypes,
   // Vcl
   {Vcl.}ActnList,
@@ -296,6 +298,25 @@ type
     property Bounds[AControl: TControl]: TRect read GetBounds;
   end;
 
+  { TACLOrderedAlign }
+
+  TACLOrderedAlign = class
+  strict private const
+    AlignWeightMap: array[TAlign] of Integer = (
+      5{alNone}, 0{alTop}, 1{alBottom}, 2{alLeft}, 3{alRight}, 4{alClient}, 6{alCustom}
+    );
+  strict private
+    class var FWorkInfo: TAlignInfo;
+    class var FWorkList: TTabOrderList;
+    class function Compare(const L, R: TControl): Integer; static;
+  public
+    class destructor Destroy;
+    class procedure Apply(AParent: TWinControl; var ARect: TRect);
+    class procedure List(AParent: TWinControl; AAlignSet: TAlignSet; AList: TTabOrderList);
+    class function GetOrder(AControl: TControl): Integer; static; inline;
+    class procedure SetOrder(AControl: TControl; AOrder: Integer); static; inline;
+  end;
+
 {$ENDREGION}
 
 {$REGION ' Styles '}
@@ -424,6 +445,7 @@ type
     IACLResourceChangeListener,
     IACLResourceCollection)
   strict private
+    FAlignOrder: Integer;
     FMargins: TACLMargins;
     FMouseInControl: Boolean;
     FResourceCollection: TACLCustomResourceCollection;
@@ -435,6 +457,7 @@ type
 
     function IsMarginsStored: Boolean;
     procedure MarginsChangeHandler(Sender: TObject);
+    procedure SetAlignOrder(AValue: Integer);
     procedure SetMargins(const Value: TACLMargins);
     procedure SetResourceCollection(AValue: TACLCustomResourceCollection);
   {$IFDEF FPC}
@@ -501,6 +524,7 @@ type
     property Canvas;
   published
     property Align;
+    property AlignOrder: Integer read FAlignOrder write SetAlignOrder default 0;
   {$IFDEF FPC}
     property AlignWithMargins: Boolean read FAlignWithMargins write SetAlignWithMargins default False;
   {$ENDIF}
@@ -549,6 +573,7 @@ type
     IACLResourceChangeListener,
     IACLResourceCollection)
   strict private
+    FAlignOrder: Integer;
     FFocusOnClick: Boolean;
     FLangSection: string;
     FMargins: TACLMargins;
@@ -564,6 +589,7 @@ type
     function GetLangSection: string;
     function IsMarginsStored: Boolean;
     function IsPaddingStored: Boolean;
+    procedure SetAlignOrder(AValue: Integer);
     procedure SetMargins(const Value: TACLMargins);
     procedure SetPadding(const Value: TACLPadding);
     procedure SetResourceCollection(AValue: TACLCustomResourceCollection);
@@ -596,9 +622,12 @@ type
     FRedrawOnResize: Boolean;
 
     procedure AdjustClientRect(var ARect: TRect); override;
+    procedure AlignControls(AControl: TControl; var Rect: TRect); override;
     procedure BoundsChanged; {$IFDEF FPC}override;{$ELSE}virtual;{$ENDIF}
   {$IFDEF FPC}
     procedure CalculatePreferredSize(var W, H: Integer; X: Boolean); override; final;
+    function DoAlignChildControls(AAlign: TAlign; AControl: TControl;
+      AList: TTabOrderList; var ARect: TRect): Boolean; override;
     procedure InitializeWnd; override;
   {$ENDIF}
     procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
@@ -660,6 +689,7 @@ type
     procedure Localize(const ASection: string); overload; virtual;
   published
     property Align;
+    property AlignOrder: Integer read FAlignOrder write SetAlignOrder default 0;
   {$IFDEF FPC}
     property AlignWithMargins: Boolean read FAlignWithMargins write SetAlignWithMargins default False;
   {$ENDIF}
@@ -1716,6 +1746,127 @@ begin
   Result := FBounds[AControl];
 end;
 
+{ TACLOrderedAlign }
+
+class destructor TACLOrderedAlign.Destroy;
+begin
+  FreeAndNil(FWorkList);
+end;
+
+class procedure TACLOrderedAlign.Apply(AParent: TWinControl; var ARect: TRect);
+{$IFDEF FPC}
+begin
+  // В Lazarus, это решается посредством DoAlignChildControls + TACLOrderedAlign.List:
+  // Мы просто подменяем заполняем список контролов в правильном порядке, а позиционирует он сам.
+  raise ENotSupportedException.Create('TACLOrderedAlign.Apply');
+{$ELSE}
+
+  function GetParentClientSize(ACalcType: TOriginalParentCalcType): TPoint; {inline;}
+  begin
+    if AParent.HandleAllocated and ((ACalcType = ctWinApi) or not (csDesigning in AParent.ComponentState)) then
+      Result := AParent.ClientRect.BottomRight
+    else
+      Result := Point(AParent.Width, AParent.Height);
+
+    Dec(Result.X, AParent.Padding.Left + AParent.Padding.Right);
+    Dec(Result.Y, AParent.Padding.Top + AParent.Padding.Bottom);
+  end;
+
+var
+  I: Integer;
+  LCtrl: TControlAccess;
+  LList: TTabOrderList;
+  LSizes: array[TOriginalParentCalcType] of TPoint;
+  LParent: TWinControlAccess absolute AParent;
+begin
+  LList := nil;
+  try
+    acExchangePointers(FWorkList, LList);
+    if LList = nil then
+      LList := TTabOrderList.Create;
+
+    List(AParent, [Low(TAlign)..High(TAlign)], LList);
+
+    if LList.Count > 0 then
+    begin
+      TWinControlAccess(AParent).AdjustClientRect(ARect);
+      LSizes[ctNative] := GetParentClientSize(ctNative);
+      LSizes[ctWinApi] := GetParentClientSize(ctWinApi);
+      for I := 0 to LList.Count - 1 do
+      begin
+        LCtrl := LList.List[I];
+        if LCtrl.Align = alClient then
+          LCtrl.Margins.SetControlBounds(ARect, True)
+        else
+          LParent.ArrangeControl(LCtrl,
+            LSizes[LCtrl.FOriginalParentCalcType], LCtrl.Align, FWorkInfo, ARect);
+      end;
+    end;
+  finally
+    acExchangePointers(FWorkList, LList);
+    LList.Free;
+  end;
+  LParent.ControlsAligned;
+  if LParent.Showing then
+    LParent.AdjustSize;
+{$ENDIF}
+end;
+
+class function TACLOrderedAlign.Compare(const L, R: TControl): Integer;
+begin
+  Result := AlignWeightMap[L.Align] - AlignWeightMap[R.Align];
+  if Result = 0 then
+    Result := GetOrder(L) - GetOrder(R);
+  if Result = 0 then
+    case L.Align of
+      alLeft:
+        Result := L.Left - R.Left;
+      alRight:
+        Result := R.Left - L.Left;
+      alTop:
+        Result := L.Top - R.Top;
+      alBottom:
+        Result := R.Top - L.Top;
+    end;
+end;
+
+class function TACLOrderedAlign.GetOrder(AControl: TControl): Integer;
+var
+  LOrderProp: PPropInfo;
+begin
+  LOrderProp := GetPropInfo(AControl.ClassType, 'AlignOrder');
+  if LOrderProp <> nil then
+    Result := GetOrdProp(AControl, LOrderProp)
+  else
+    Result := 0;
+end;
+
+class procedure TACLOrderedAlign.List(
+  AParent: TWinControl; AAlignSet: TAlignSet; AList: TTabOrderList);
+var
+  I: Integer;
+  LControl: TControl;
+begin
+  AList.Count := 0;
+  for I := 0 to AParent.ControlCount - 1 do
+  begin
+    LControl := AParent.Controls[I];
+    if LControl.Visible and (LControl.Align in AAlignSet) then
+      AList.Add(LControl);
+  end;
+  if AList.Count > 1 then
+    AList.Sort(@Compare);
+end;
+
+class procedure TACLOrderedAlign.SetOrder(AControl: TControl; AOrder: Integer);
+var
+  LOrderProp: PPropInfo;
+begin
+  LOrderProp := GetPropInfo(AControl.ClassType, 'AlignOrder');
+  if LOrderProp <> nil then
+    SetOrdProp(AControl, LOrderProp, AOrder);
+end;
+
 {$ENDREGION}
 
 {$REGION ' In-placing '}
@@ -1944,6 +2095,16 @@ begin
   TACLMouseTracker.Release(Self);
   TACLObjectLinks.Release(Self);
   AnimationManager.RemoveOwner(Self);
+end;
+
+procedure TACLGraphicControl.SetAlignOrder(AValue: Integer);
+begin
+  AValue := Max(AValue, 0);
+  if AValue <> FAlignOrder then
+  begin
+    FAlignOrder := AValue;
+    RequestAlign;
+  end;
 end;
 
 procedure TACLGraphicControl.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
@@ -2450,6 +2611,16 @@ begin
 {$ENDIF}
 end;
 
+procedure TACLCustomControl.SetAlignOrder(AValue: Integer);
+begin
+  AValue := Max(AValue, 0);
+  if AValue <> FAlignOrder then
+  begin
+    FAlignOrder := AValue;
+    RequestAlign;
+  end;
+end;
+
 procedure TACLCustomControl.SetFocusOnClick;
 begin
   if not Focused then SetFocus;
@@ -2700,6 +2871,15 @@ begin
   inherited AdjustSize;
 end;
 
+procedure TACLCustomControl.AlignControls(AControl: TControl; var Rect: TRect);
+begin
+{$IFDEF FPC}
+  inherited;
+{$ELSE}
+  TACLOrderedAlign.Apply(Self, Rect);
+{$ENDIF}
+end;
+
 procedure TACLCustomControl.BoundsChanged;
 begin
 {$IFDEF FPC}
@@ -2726,12 +2906,18 @@ begin
   CanAutoSize(W, H);
 end;
 
+function TACLCustomControl.DoAlignChildControls(AAlign: TAlign;
+  AControl: TControl; AList: TTabOrderList; var ARect: TRect): Boolean;
+begin
+  TACLOrderedAlign.List(Self, [AAlign], AList);
+  Result := False;
+end;
+
 procedure TACLCustomControl.InitializeWnd;
 begin
   inherited InitializeWnd;
   Perform(WM_CREATE, 0, 0); // especially for TACLDropTarget
 end;
-
 {$ENDIF}
 
 procedure TACLCustomControl.ChangeScale(M, D: Integer; isDpiChange: Boolean);
@@ -2846,6 +3032,9 @@ begin
   begin
     AdjustClientRect(Rect);
     OnAlignControls(Self, Rect);
+    ControlsAligned;
+    if Showing then
+      AdjustSize;
   end
   else
     inherited;

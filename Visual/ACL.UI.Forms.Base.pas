@@ -117,12 +117,16 @@ type
     FIScaling: Boolean;
     ScalingFlags: TScalingFlags;
 
+    function DoAlignChildControls(AAlign: TAlign; AControl: TControl;
+      AList: TTabOrderList; var ARect: TRect): Boolean; override;
     procedure DoAutoAdjustLayout(const AMode: TLayoutAdjustmentPolicy; const X, Y: Double); override;
   {$ELSE}
   protected
     procedure ChangeScale(M, D: Integer; IsDpiChange: Boolean); override; final;
   {$ENDIF}
   protected
+    procedure AdjustSize; override;
+    procedure AlignControls(AControl: TControl; var Rect: TRect); override;
     procedure ApplyClientSize(AWidth, AHeight: Integer); virtual;
     function DialogChar(var Message: TWMKey): Boolean; {$IFDEF FPC}override;{$ELSE}virtual;{$ENDIF}
     procedure DoShow; override;
@@ -629,6 +633,13 @@ begin
 end;
 
 {$IFDEF FPC}
+function TACLBasicForm.DoAlignChildControls(AAlign: TAlign;
+  AControl: TControl; AList: TTabOrderList; var ARect: TRect): Boolean;
+begin
+  TACLOrderedAlign.List(Self, [AAlign], AList);
+  Result := False;
+end;
+
 procedure TACLBasicForm.DoAutoAdjustLayout(
   const AMode: TLayoutAdjustmentPolicy; const X, Y: Double);
 begin
@@ -789,6 +800,15 @@ begin
   finally
     EnableAlign;
   end;
+end;
+
+procedure TACLBasicForm.AlignControls(AControl: TControl; var Rect: TRect);
+begin
+{$IFDEF FPC}
+  inherited;
+{$ELSE}
+  TACLOrderedAlign.Apply(Self, Rect);
+{$ENDIF}
 end;
 
 procedure TACLBasicForm.ApplicationSettingsChanged(AChanges: TACLApplicationChanges);
