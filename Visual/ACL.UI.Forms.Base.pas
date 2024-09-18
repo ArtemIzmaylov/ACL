@@ -90,7 +90,9 @@ type
   strict private
     FLoadedClientHeight: Integer;
     FLoadedClientWidth: Integer;
+  {$IFNDEF DELPHI120}
     FParentFontLocked: Boolean;
+  {$ENDIF}
 
     procedure ApplyColorSchema;
     procedure SetClientHeight(Value: Integer);
@@ -459,7 +461,8 @@ var
 begin
   //#AI: don't change the order
   Form := AForm;
-  RedrawLocked := acOSCheckVersion(6, 0) and IsWindowVisible(AForm.Handle);
+  RedrawLocked := acOSCheckVersion(6, 0) and
+    IsWindowVisible(AForm.Handle) and not (csDesigning in AForm.ComponentState);
   LockedControls := TComponentList.Create(False);
   PopulateControls(AForm);
   for I := 0 to LockedControls.Count - 1 do
@@ -681,53 +684,56 @@ var
   LPrevScaled: Boolean;
 {$ENDIF}
 begin
-  if (ATargetPPI <> FCurrentPPI) and (ATargetPPI >= acMinDPI) and not FIScaling then
-  begin
-    LScaling.Start(Self);
+  if FIScaling or (ATargetPPI < acMinDPI) then
+    Exit;
+{$IFNDEF DELPHI120}
+  if ATargetPPI = FCurrentPPI then
+    Exit;
+{$ENDIF}
+
+  LScaling.Start(Self);
+  try
+    LPrevDPI := FCurrentPPI;
+    LPrevBounds := BoundsRect;
+    LPrevClientRect := ClientRect;
+    LPrevParentFont := ParentFont;
+
+  {$IFDEF FPC}
+    FIScaling := True;
+    AutoAdjustLayout(lapAutoAdjustForDPI, FCurrentPPI, ATargetPPI, 0, 0);
+    FIScaling := False;
+  {$ELSE}
+    LPrevScaled := Scaled;
     try
-      LPrevDPI := FCurrentPPI;
-      LPrevBounds := BoundsRect;
-      LPrevClientRect := ClientRect;
-      LPrevParentFont := ParentFont;
-
-    {$IFDEF FPC}
-      FIScaling := True;
-      AutoAdjustLayout(lapAutoAdjustForDPI, FCurrentPPI, ATargetPPI, 0, 0);
-      FIScaling := False;
-    {$ELSE}
-      LPrevScaled := Scaled;
-      try
-        Scaled := True; // for Delphi 11.0
-        inherited ScaleForPPI(ATargetPPI);
-      finally
-        Scaled := LPrevScaled;
-      end;
-    {$ENDIF}
-
-      FCurrentPPI := ATargetPPI;
-      PixelsPerInch := ATargetPPI;
-      ParentFont := LPrevParentFont;
-
-      if AWindowRect <> nil then
-        BoundsRect := AWindowRect^
-      else
-        if not (AutoScroll or (HorzScrollBar.Range <> 0) or (VertScrollBar.Range <> 0)) then
-        begin
-          if WindowState <> wsMaximized then
-          begin
-            SetBounds(LPrevBounds.Left, LPrevBounds.Top,
-              LPrevBounds.Width - LPrevClientRect.Right +
-                MulDiv(LPrevClientRect.Right, ATargetPPI, LPrevDPI),
-              LPrevBounds.Height - LPrevClientRect.Bottom +
-                MulDiv(LPrevClientRect.Bottom, ATargetPPI, LPrevDPI));
-          end
-          else
-            BoundsRect := LPrevBounds;
-        end;
+      Scaled := True; // for Delphi 11.0
+      inherited ScaleForPPI(ATargetPPI);
     finally
-      LScaling.Done;
+      Scaled := LPrevScaled;
     end;
-    DpiChanged;
+  {$ENDIF}
+
+    FCurrentPPI := ATargetPPI;
+    PixelsPerInch := ATargetPPI;
+    ParentFont := LPrevParentFont;
+
+    if AWindowRect <> nil then
+      BoundsRect := AWindowRect^
+    else
+      if not (AutoScroll or (HorzScrollBar.Range <> 0) or (VertScrollBar.Range <> 0)) then
+      begin
+        if WindowState <> wsMaximized then
+        begin
+          SetBounds(LPrevBounds.Left, LPrevBounds.Top,
+            LPrevBounds.Width - LPrevClientRect.Right +
+              MulDiv(LPrevClientRect.Right, ATargetPPI, LPrevDPI),
+            LPrevBounds.Height - LPrevClientRect.Bottom +
+              MulDiv(LPrevClientRect.Bottom, ATargetPPI, LPrevDPI));
+        end
+        else
+          BoundsRect := LPrevBounds;
+      end;
+  finally
+    LScaling.Done;
   end;
 end;
 
@@ -884,6 +890,7 @@ end;
 
 procedure TACLBasicForm.TakeParentFontIfNecessary;
 begin
+{$IFNDEF DELPHI120}
   // Workaround for
   // The "TForm.ParentFont = true causes scaling error with HighDPI" issue
   // https://quality.embarcadero.com/browse/RSP-30677
@@ -901,6 +908,7 @@ begin
       FParentFontLocked := False;
     end;
   end;
+{$ENDIF}
 end;
 
 {$IFDEF FPC}
@@ -929,6 +937,9 @@ end;
 
 procedure TACLBasicForm.CMParentFontChanged(var Message: TCMParentFontChanged);
 begin
+{$IFDEF DELPHI120}
+  inherited;
+{$ELSE}
   if ParentFont then
   begin
     if Message.wParam <> 0 then
@@ -936,6 +947,7 @@ begin
     else
       TakeParentFontIfNecessary;
   end;
+{$ENDIF}
 end;
 
 procedure TACLBasicForm.WMAppCommand(var Message: TMessage);
