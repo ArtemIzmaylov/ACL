@@ -602,6 +602,20 @@ begin
 {$ENDIF}
 end;
 
+procedure TACLBasicForm.AdjustSize;
+begin
+{$IFDEF MSWINDOWS}
+  // When a top level window is maximized the call to SetWindowPos
+  // isn't needed unless the size of the window has changed.
+  if IsZoomed(Handle) and (GetParent(Handle) = 0) and not AutoSize then
+  begin
+    RequestAlign;
+    Exit;
+  end;
+{$ENDIF}
+  inherited;
+end;
+
 procedure TACLBasicForm.AfterConstruction;
 begin
   TACLApplication.ListenerAdd(Self);
