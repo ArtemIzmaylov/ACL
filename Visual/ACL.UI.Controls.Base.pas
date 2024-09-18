@@ -3030,11 +3030,21 @@ procedure TACLContainer.AlignControls(AControl: TControl; var Rect: TRect);
 begin
   if Assigned(OnAlignControls) then
   begin
-    AdjustClientRect(Rect);
-    OnAlignControls(Self, Rect);
-    ControlsAligned;
-    if Showing then
-      AdjustSize;
+  {$IFDEF FPC}
+    if wcfAligningControls in FWinControlFlags then exit;
+    Include(FWinControlFlags, wcfAligningControls);
+    try
+  {$ENDIF}
+      AdjustClientRect(Rect);
+      OnAlignControls(Self, Rect);
+      ControlsAligned;
+  {$IFDEF FPC}
+    finally
+      Exclude(FWinControlFlags, wcfAligningControls);
+    end;
+  {$ELSE}
+    if Showing then AdjustSize;
+  {$ENDIF}
   end
   else
     inherited;
