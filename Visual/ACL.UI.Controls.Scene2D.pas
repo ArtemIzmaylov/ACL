@@ -34,6 +34,7 @@ uses
   // ACL
   ACL.Graphics,
   ACL.Graphics.Ex,
+  ACL.Ui.Controls.Base,
   // VCL
   {Vcl.}Controls;
 
@@ -215,9 +216,6 @@ end;
 
 procedure TACLCustom2DScene.WMPaint(var Message: TWMPaint);
 var
-  AClipRgn: TRegionHandle;
-  AMemBmp: HBITMAP;
-  AMemDC: HDC;
   APaintStruct: TPaintStruct;
 begin
   if Message.DC <> 0 then
@@ -230,36 +228,24 @@ begin
     end;
   end
   else
-  begin
-    BeginPaint(Handle, APaintStruct{%H-});
-    try
-      if Supports(Render, IACL2DRenderGdiCompatible) then
-      begin
-        AMemDC := acCreateMemDC(APaintStruct.hdc, APaintStruct.rcPaint, AMemBmp, AClipRgn);
-        try
-          Message.DC := AMemDC;
-          Perform(WM_PAINT, Message.DC, 0);
-          Message.DC := 0;
-          acBitBlt(APaintStruct.hdc, AMemDC, APaintStruct.rcPaint, APaintStruct.rcPaint.TopLeft);
-        finally
-          acDeleteMemDC(AMemDC, AMemBmp, AClipRgn);
-        end;
-      end
-      else
-      begin
-        // We not need to copy directX frame's content to DC (its already been drawn over our hwnd).
-        // So, set DC to zero.
+    if Supports(Render, IACL2DRenderGdiCompatible) then
+      TACLControls.BufferedPaint(Self)
+    else
+    begin
+      BeginPaint(Handle, APaintStruct{%H-});
+      try
+        // We not need to copy directX frame's content to DC (its already been
+        // drawn over our hwnd). So, what why we set DC to zero.
         Render.BeginPaint(0, ClientRect, APaintStruct.rcPaint);
         try
           Paint(Render);
         finally
           Render.EndPaint;
         end;
+      finally
+        EndPaint(Handle, APaintStruct);
       end;
-    finally
-      EndPaint(Handle, APaintStruct);
     end;
-  end;
 end;
 
 { TACLPaintBox2D }

@@ -796,18 +796,20 @@ type
   { TACLControls }
 
   TACLControls = class
+  strict private
+    class procedure UpdateCursor(ACaller: TWinControl; var Message: TWMSetCursor);
   public
     class procedure AlignControl(AControl: TControl; const ABounds: TRect);
+    class procedure BufferedPaint(ACaller: TWinControl);
     // Scaling
     class procedure ScaleChanging(AControl: TWinControl; var AState: TObject);
     class procedure ScaleChanged(AControl: TWinControl; var AState: TObject);
-    // Messages
-    class function WndProc(ACaller: TWinControl; var Message: TMessage): Boolean; inline;
-    class procedure WMSetCursor(ACaller: TWinControl; var Message: TWMSetCursor);
     // Margins
     class procedure UpdateMargins(AControl: TControl;
       AUseMargins: Boolean; AMargins: TACLPadding; ACurrentDpi: Integer); overload;
     class procedure UpdateMargins(AControl: TControl; const AMargins: TRect); overload;
+    // Messages
+    class function WndProc(ACaller: TWinControl; var Message: TMessage): Boolean; inline;
   end;
 
   { TACLCustomOptionsPersistent }
@@ -2650,7 +2652,7 @@ end;
 
 procedure TACLCustomControl.ResourceChanged;
 begin
-  if not (csDestroying in ComponentState) then
+  if not (csDestroying in ComponentState) and (FScaleChangeCount = 0) then
   begin
     UpdateTransparency;
     FullRefresh;
@@ -2713,57 +2715,11 @@ begin
 end;
 
 procedure TACLCustomControl.WMPaint(var Message: TWMPaint);
-{$IFDEF FPC}
-begin
-  inherited;
-{$ELSE}
-var
-  AClipRgn: TRegionHandle;
-  AMemBmp: HBITMAP;
-  AMemDC: HDC;
-  APaintBuffer: HPAINTBUFFER;
-  APaintStruct: TPaintStruct;
 begin
   if (Message.DC <> 0) or not DoubleBuffered then
     PaintHandler(Message)
   else
-    if (csGlassPaint in ControlState) and DwmCompositionEnabled then
-    begin
-      BeginPaint(Handle, APaintStruct);
-      try
-        APaintBuffer := BeginBufferedPaint(APaintStruct.hdc, APaintStruct.rcPaint, BPBF_COMPOSITED, nil, AMemDC);
-        if APaintBuffer <> 0 then
-        try
-          Perform(WM_ERASEBKGND, AMemDC, AMemDC);
-          Perform(WM_PRINTCLIENT, AMemDC, PRF_CLIENT);
-          if not (csPaintBlackOpaqueOnGlass in ControlStyle) then
-            BufferedPaintMakeOpaque(APaintBuffer, APaintStruct.rcPaint);
-        finally
-          EndBufferedPaint(APaintBuffer, True);
-        end;
-      finally
-        EndPaint(Handle, APaintStruct);
-      end;
-    end
-    else
-    begin
-      BeginPaint(Handle, APaintStruct{%H-});
-      try
-        AMemDC := acCreateMemDC(APaintStruct.hdc, APaintStruct.rcPaint, AMemBmp, AClipRgn);
-        try
-          acBitBlt(AMemDC, APaintStruct.hdc, APaintStruct.rcPaint, APaintStruct.rcPaint.TopLeft);
-          Message.DC := AMemDC;
-          Perform(WM_PAINT, Message.DC, 0);
-          Message.DC := 0;
-          acBitBlt(APaintStruct.hdc, AMemDC, APaintStruct.rcPaint, APaintStruct.rcPaint.TopLeft);
-        finally
-          acDeleteMemDC(AMemDC, AMemBmp, AClipRgn);
-        end;
-      finally
-        EndPaint(Handle, APaintStruct);
-      end;
-    end;
-{$ENDIF}
+    TACLControls.BufferedPaint(Self);
 end;
 
 procedure TACLCustomControl.WMSetFocus(var Message: TWMSetFocus);
@@ -2814,7 +2770,10 @@ procedure TACLCustomControl.CMScaleChanged(var Message: TMessage);
 begin
   Dec(FScaleChangeCount);
   if FScaleChangeCount = 0 then
+  begin
+    ResourceChanged;
     TACLControls.ScaleChanged(Self, FScaleChangeState);
+  end;
 {$IFDEF DEBUG}
   if FScaleChangeCount < 0 then
     raise EInvalidOperation.Create(ClassName);
@@ -3163,6 +3122,79 @@ end;
 
 { TACLControls }
 
+//function GetUpdateRegion(AControl: TWinControl): TRegionHandle;
+//begin
+//  Result := 0;
+//{$IFDEF MSWINDOWS}
+//  if DwmCompositionEnabled then
+//  begin
+//    Result := CreateRectRgn(0, 0, 0, 0);
+//    if GetUpdateRgn(AControl.Handle, Result, False) <> COMPLEXREGION then
+//    begin
+//      DeleteObject(Result);
+//      Result := 0;
+//    end;
+//  end;
+//{$ENDIF}
+//end;
+
+class procedure TACLControls.AlignControl(AControl: TControl; const ABounds: TRect);
+begin
+  AControl.ControlState := AControl.ControlState + [csAligning];
+  try
+    AControl.BoundsRect := ABounds;
+  finally
+    AControl.ControlState := AControl.ControlState - [csAligning];
+  end;
+end;
+
+class procedure TACLControls.BufferedPaint(ACaller: TWinControl);
+var
+  LMemBmp: HBITMAP;
+  LMemDC: HDC;
+  LPaintStruct: TPaintStruct;
+begin
+  BeginPaint(ACaller.Handle, LPaintStruct);
+  try
+    if not LPaintStruct.rcPaint.IsEmpty then
+    begin
+    {$IFDEF MSWINDOWS}
+      if (csGlassPaint in ACaller.ControlState) and DwmCompositionEnabled then
+      begin
+        var LPaintBuffer := BeginBufferedPaint(LPaintStruct.hdc, LPaintStruct.rcPaint, BPBF_COMPOSITED, nil, LMemDC);
+        if LPaintBuffer <> 0 then
+        try
+          ACaller.Perform(WM_ERASEBKGND, LMemDC, LMemDC);
+          ACaller.Perform(WM_PRINTCLIENT, LMemDC, PRF_CLIENT);
+          if not (csPaintBlackOpaqueOnGlass in ACaller.ControlStyle) then
+            BufferedPaintMakeOpaque(LPaintBuffer, LPaintStruct.rcPaint);
+        finally
+          EndBufferedPaint(LPaintBuffer, True);
+        end;
+      end
+      else
+    {$ENDIF}
+      begin
+        LMemDC := CreateCompatibleDC(LPaintStruct.hdc);
+        LMemBmp := CreateCompatibleBitmap(LPaintStruct.hdc, LPaintStruct.rcPaint.Width, LPaintStruct.rcPaint.Height);
+        try
+          DeleteObject(SelectObject(LMemDC, LMemBmp));
+          SetWindowOrgEx(LMemDC, LPaintStruct.rcPaint.Left, LPaintStruct.rcPaint.Top, nil);
+          //acBitBlt(LMemDC, LPaintStruct.hdc, LPaintStruct.rcPaint, LPaintStruct.rcPaint.TopLeft);
+          ACaller.Perform(WM_ERASEBKGND, LMemDC, LMemDC);
+          ACaller.Perform(WM_PAINT, LMemDC, 0);
+          acBitBlt(LPaintStruct.hdc, LMemDC, LPaintStruct.rcPaint, LPaintStruct.rcPaint.TopLeft);
+        finally
+          DeleteDC(LMemDC);
+          DeleteObject(LMemBmp);
+        end;
+      end;
+    end;
+  finally
+    EndPaint(ACaller.Handle, LPaintStruct);
+  end;
+end;
+
 class procedure TACLControls.ScaleChanging(AControl: TWinControl; var AState: TObject);
 {$IFNDEF FPC}
 var
@@ -3201,7 +3233,53 @@ begin
   TWinControlAccess(AControl).EnableAlign;
 end;
 
-class procedure TACLControls.WMSetCursor(ACaller: TWinControl; var Message: TWMSetCursor);
+class function TACLControls.WndProc(ACaller: TWinControl; var Message: TMessage): Boolean;
+begin
+  Result := False;
+{$IFDEF FPC}
+  if (Message.Msg >= LM_MOUSEFIRST) and (Message.Msg <= LM_MOUSELAST) then
+  begin
+    if not Mouse.IsDragging then
+    begin
+      if ACaller.Perform(WM_SETCURSOR, ACaller.Handle, MakeLong(HTCLIENT, Message.Msg)) = 0 then
+        SetCursor(crDefault);
+    end;
+  end;
+{$ENDIF}
+  if Message.Msg = WM_SETCURSOR then
+  begin
+    UpdateCursor(ACaller, TWMSetCursor(Message));
+    Result := Message.Result = 1;
+  end;
+end;
+
+class procedure TACLControls.UpdateMargins(AControl: TControl;
+  AUseMargins: Boolean; AMargins: TACLPadding; ACurrentDpi: Integer);
+begin
+{$IFDEF FPC}
+  if not AUseMargins then
+    UpdateMargins(AControl, NullRect)
+  else
+{$ENDIF}
+    UpdateMargins(AControl, AMargins.GetScaledMargins(ACurrentDpi));
+end;
+
+class procedure TACLControls.UpdateMargins(AControl: TControl; const AMargins: TRect);
+begin
+{$IFDEF FPC}
+  with TControlAccess(AControl).BorderSpacing do
+{$ELSE}
+  with TControlAccess(AControl).Margins do
+{$ENDIF}
+  begin
+    Left := AMargins.Left;
+    Top := AMargins.Top;
+    Right := AMargins.Right;
+    Bottom := AMargins.Bottom;
+  end;
+end;
+
+class procedure TACLControls.UpdateCursor(ACaller: TWinControl; var Message: TWMSetCursor);
 
   function GetCursor(AControl: TControl): TCursor;
   var
@@ -3236,62 +3314,6 @@ begin
     end;
     SetCursor(Screen.Cursors[ACursor]);
     Message.Result := 1;
-  end;
-end;
-
-class procedure TACLControls.AlignControl(AControl: TControl; const ABounds: TRect);
-begin
-  AControl.ControlState := AControl.ControlState + [csAligning];
-  try
-    AControl.BoundsRect := ABounds;
-  finally
-    AControl.ControlState := AControl.ControlState - [csAligning];
-  end;
-end;
-
-class function TACLControls.WndProc(ACaller: TWinControl; var Message: TMessage): Boolean;
-begin
-  Result := False;
-{$IFDEF FPC}
-  if (Message.Msg >= LM_MOUSEFIRST) and (Message.Msg <= LM_MOUSELAST) then
-  begin
-    if not Mouse.IsDragging then
-    begin
-      if ACaller.Perform(WM_SETCURSOR, ACaller.Handle, MakeLong(HTCLIENT, Message.Msg)) = 0 then
-        SetCursor(crDefault);
-    end;
-  end;
-{$ENDIF}
-  if Message.Msg = WM_SETCURSOR then
-  begin
-    WMSetCursor(ACaller, TWMSetCursor(Message));
-    Result := Message.Result = 1;
-  end;
-end;
-
-class procedure TACLControls.UpdateMargins(AControl: TControl;
-  AUseMargins: Boolean; AMargins: TACLPadding; ACurrentDpi: Integer);
-begin
-{$IFDEF FPC}
-  if not AUseMargins then
-    UpdateMargins(AControl, NullRect)
-  else
-{$ENDIF}
-    UpdateMargins(AControl, AMargins.GetScaledMargins(ACurrentDpi));
-end;
-
-class procedure TACLControls.UpdateMargins(AControl: TControl; const AMargins: TRect);
-begin
-{$IFDEF FPC}
-  with TControlAccess(AControl).BorderSpacing do
-{$ELSE}
-  with TControlAccess(AControl).Margins do
-{$ENDIF}
-  begin
-    Left := AMargins.Left;
-    Top := AMargins.Top;
-    Right := AMargins.Right;
-    Bottom := AMargins.Bottom;
   end;
 end;
 

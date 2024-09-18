@@ -257,6 +257,7 @@ type
     procedure WMEnterMenuLoop(var Msg: TMessage); message WM_ENTERMENULOOP;
     procedure WMExitMenuLoop(var Msg: TMessage); message WM_EXITMENULOOP;
     procedure WMNCActivate(var Msg: TWMNCActivate); message WM_NCACTIVATE;
+    procedure WMPaint(var Message: TWMPaint); message WM_PAINT;
     procedure WndProc(var Message: TMessage); override;
   public
     constructor Create(AOwner: TComponent); override;
@@ -1395,6 +1396,14 @@ begin
   if (FInMenuLoop <> 0) and not Msg.Active then
     Msg.Active := True;
   inherited;
+end;
+
+procedure TACLCustomForm.WMPaint(var Message: TWMPaint);
+begin
+  if (Message.DC <> 0) or not DoubleBuffered then
+    PaintHandler(Message)
+  else
+    TACLControls.BufferedPaint(Self);
 end;
 
 procedure TACLCustomForm.WndProc(var Message: TMessage);

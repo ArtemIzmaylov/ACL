@@ -1445,6 +1445,8 @@ constructor TACLInnerEdit.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   BorderStyle := bsNone;
+  ParentDoubleBuffered := False;
+  DoubleBuffered := False;
   AutoSelect := True;
 end;
 

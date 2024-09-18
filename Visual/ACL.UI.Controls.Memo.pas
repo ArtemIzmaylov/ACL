@@ -369,6 +369,8 @@ end;
 constructor TACLInnerMemo.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  ParentDoubleBuffered := False;
+  DoubleBuffered := False;
   BorderStyle := bsNone;
 end;
 
