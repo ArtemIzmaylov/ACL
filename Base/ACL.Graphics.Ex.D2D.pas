@@ -76,7 +76,6 @@ type
     FCacheSolidBrushes: TACLValueCacheManager<TAlphaColor, ID2D1SolidColorBrush>;
     FCacheStrokeStyles: array[TACL2DRenderStrokeStyle] of ID2D1StrokeStyle1;
     FClipCounter: Integer;
-    FSavedClipRects: TStack<Integer>;
     FSavedWorldTransforms: TStack<TD2D1Matrix3x2F>;
     FWorldTransform: TD2D1Matrix3x2F;
 
@@ -84,7 +83,6 @@ type
 
     procedure AbandonResources;
     procedure ApplyWorldTransform;
-    procedure RollbackClipRectChanges(ATargetLevel: Integer);
   protected
     FDeviceContext: ID2D1DeviceContext;
     FRecreateContextNeeded: Boolean;
@@ -107,10 +105,9 @@ type
     procedure FlushCache;
 
     // Clipping
+    function Clip(const R: TRect; out Data: TACL2DRenderRawData): Boolean; override;
+    procedure ClipRestore(Data: TACL2DRenderRawData); override;
     function IsVisible(const R: TRect): Boolean; override;
-    function IntersectClipRect(const R: TRect): Boolean; override;
-    procedure RestoreClipRegion; override;
-    procedure SaveClipRegion; override;
 
     // Images
     function CreateImage(Colors: PACLPixel32; Width, Height: Integer;
@@ -807,7 +804,6 @@ begin
   FOnRecreateNeeded := OnRecreateNeeded;
   FResources := TList.Create;
   FResources.Capacity := 1024;
-  FSavedClipRects := TStack<Integer>.Create;
   FSavedWorldTransforms := TStack<TD2D1Matrix3x2F>.Create;
   FCacheHatchBrushes := TACLValueCacheManager<UInt64, ID2D1Brush>.Create;
   FCacheSolidBrushes := TACLValueCacheManager<TAlphaColor, ID2D1SolidColorBrush>.Create;
@@ -819,40 +815,33 @@ begin
   FreeAndNil(FCacheHatchBrushes);
   FreeAndNil(FCacheSolidBrushes);
   FreeAndNil(FSavedWorldTransforms);
-  FreeAndNil(FSavedClipRects);
   FreeAndNil(FResources);
   inherited;
 end;
 
-function TACLDirect2DAbstractRender.IntersectClipRect(const R: TRect): Boolean;
+function TACLDirect2DAbstractRender.Clip(const R: TRect; out Data: TACL2DRenderRawData): Boolean;
 begin
-  FDeviceContext.PushAxisAlignedClip(R, D2D1_ANTIALIAS_MODE_ALIASED);
-  Inc(FClipCounter);
   Result := IsVisible(R);
+  if Result then
+  begin
+    Data := TACL2DRenderRawData(FClipCounter);
+    FDeviceContext.PushAxisAlignedClip(R, D2D1_ANTIALIAS_MODE_ALIASED);
+    Inc(FClipCounter);
+  end;
 end;
 
-function TACLDirect2DAbstractRender.IsVisible(const R: TRect): Boolean;
+procedure TACLDirect2DAbstractRender.ClipRestore(Data: TACL2DRenderRawData);
 begin
-  Result := True;
-end;
-
-procedure TACLDirect2DAbstractRender.RestoreClipRegion;
-begin
-  RollbackClipRectChanges(FSavedClipRects.Pop);
-end;
-
-procedure TACLDirect2DAbstractRender.RollbackClipRectChanges(ATargetLevel: Integer);
-begin
-  while FClipCounter > ATargetLevel do
+  while FClipCounter > Integer(Data) do
   begin
     FDeviceContext.PopAxisAlignedClip;
     Dec(FClipCounter);
   end;
 end;
 
-procedure TACLDirect2DAbstractRender.SaveClipRegion;
+function TACLDirect2DAbstractRender.IsVisible(const R: TRect): Boolean;
 begin
-  FSavedClipRects.Push(FClipCounter);
+  Result := True;
 end;
 
 function TACLDirect2DAbstractRender.CreateImage(Colors: PACLPixel32;
@@ -1187,17 +1176,19 @@ begin
 end;
 
 procedure TACLDirect2DAbstractRender.DoBeginDraw(const AClipRect: TRect);
+var
+  LData: TACL2DRenderRawData;
 begin
   SetWorldTransform(TXForm.CreateIdentityMatrix);
   FDeviceContext.SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
   FDeviceContext.SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_DEFAULT);
   FDeviceContext.BeginDraw;
-  IntersectClipRect(AClipRect);
+  Clip(AClipRect, LData);
 end;
 
 procedure TACLDirect2DAbstractRender.DoEndDraw;
 begin
-  RollbackClipRectChanges(0);
+  ClipRestore(nil);
   if TACLDirect2D.NeedRecreateContext(FDeviceContext.EndDraw) then
     FRecreateContextNeeded := True;
 end;

@@ -737,10 +737,10 @@ procedure TACLSelectionFrame.Draw(ARender: TACL2DRender; ASelectedElement: TACLS
   procedure DrawElements(const AClipRect: TRect);
   var
     I: TACLSelectionFrameElement;
+    LClipData: TACL2DRenderRawData;
   begin
-    ARender.SaveClipRegion;
+    if ARender.Clip(AClipRect, LClipData) then
     try
-      ARender.IntersectClipRect(AClipRect);
       for I := Low(FElements) to High(FElements) do
       begin
         if I = ASelectedElement then
@@ -749,7 +749,7 @@ procedure TACLSelectionFrame.Draw(ARender: TACL2DRender; ASelectedElement: TACLS
           ARender.FillRectangle(FElements[I], TAlphaColors.Black);
       end;
     finally
-      ARender.RestoreClipRegion;
+      ARender.ClipRestore(LClipData);
     end;
   end;
 

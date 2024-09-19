@@ -42,7 +42,8 @@ uses
   ACL.Graphics,
   ACL.Graphics.Images,
   ACL.Graphics.SkinImage,
-  ACL.Utils.Common;
+  ACL.Utils.Common,
+  ACL.Utils.DPIAware;
 
 type
   // Refer to following articles for more information:
@@ -215,19 +216,21 @@ type
 
   { TACL2DRender }
 
+  TACL2DRenderRawData = type Pointer;
+
   TACL2DRender = class(TACLUnknownObject)
   public
     procedure BeginPaint(DC: HDC; const BoxRect: TRect); overload;
     procedure BeginPaint(DC: HDC; const BoxRect, UpdateRect: TRect); overload; virtual; abstract;
     procedure EndPaint; virtual; abstract;
 
+    // Resources
     function IsValid(const AResource: TACL2DRenderResource): Boolean; inline;
 
     // Clipping
-    function IntersectClipRect(const R: TRect): Boolean; virtual; abstract;
+    function Clip(const R: TRect; out Data: TACL2DRenderRawData): Boolean; virtual; abstract;
+    procedure ClipRestore(Data: TACL2DRenderRawData); virtual; abstract;
     function IsVisible(const R: TRect): Boolean; virtual; abstract;
-    procedure RestoreClipRegion; virtual; abstract;
-    procedure SaveClipRegion; virtual; abstract;
 
     // Curve
     procedure DrawCurve(AColor: TAlphaColor;
@@ -324,7 +327,7 @@ uses
 type
   TACLImageAccess = class(TACLImage);
 
-{$REGION 'Software-based filters implementation'}
+{$REGION ' Software-based filters implementation '}
 type
 
   { TACLSoftwareImplBlendMode }
@@ -1263,7 +1266,7 @@ end;
 
 {$ENDREGION}
 
-{$REGION 'Layers'}
+{$REGION ' Layers '}
 
 procedure TACLBitmapLayer.DrawBlend(ACanvas: TCanvas;
   const P: TPoint; AMode: TACLBlendMode; AAlpha: Byte = MaxByte);
@@ -1521,7 +1524,7 @@ end;
 
 {$ENDREGION}
 
-{$REGION 'Blur'}
+{$REGION ' Blur '}
 
 { TACLBlurFilter }
 
@@ -1578,7 +1581,7 @@ end;
 
 {$ENDREGION}
 
-{$REGION 'Abstract 2D Render'}
+{$REGION ' Abstract 2D Render '}
 
 { TACL2DRenderResource }
 

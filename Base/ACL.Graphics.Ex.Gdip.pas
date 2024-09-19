@@ -124,7 +124,6 @@ type
     IACL2DRenderGdiCompatible)
   strict private
     FPixelThickness: Single;
-    FSavedClipRegion: TStack;
     FSavedWorldTransforms: TStack;
 
     procedure AdjustRectToGdiLikeAppearance(var X2, Y2: Single); inline;
@@ -149,10 +148,9 @@ type
     procedure EndPaint; override;
 
     // Clipping
+    function Clip(const R: TRect; out Data: TACL2DRenderRawData): Boolean; override;
+    procedure ClipRestore(Data: TACL2DRenderRawData); override;
     function IsVisible(const R: TRect): Boolean; override;
-    function IntersectClipRect(const R: TRect): Boolean; override;
-    procedure RestoreClipRegion; override;
-    procedure SaveClipRegion; override;
 
     // Images
     function CreateImage(Colors: PACLPixel32; Width, Height: Integer;
@@ -340,6 +338,7 @@ type
 //------------------------------------------------------------------------------
 // General
 //------------------------------------------------------------------------------
+
 var
   gdiplusTokenOwned: Boolean = False;
 
@@ -889,7 +888,6 @@ end;
 constructor TACLGdiplusRender.Create;
 begin
   FPixelThickness := 1.0;
-  FSavedClipRegion := TStack.Create;
   FSavedWorldTransforms := TStack.Create;
 end;
 
@@ -909,12 +907,9 @@ destructor TACLGdiplusRender.Destroy;
 begin
   if FGraphics <> nil then
     GdipDeleteGraphics(FGraphics);
-  while FSavedClipRegion.Count > 0 do
-    GdipDeleteRegion(FSavedClipRegion.Pop);
   while FSavedWorldTransforms.Count > 0 do
     GdipDeleteMatrix(FSavedWorldTransforms.Pop);
   FreeAndNil(FSavedWorldTransforms);
-  FreeAndNil(FSavedClipRegion);
   inherited;
 end;
 
@@ -947,35 +942,30 @@ begin
 end;
 
 {$REGION ' Clipping '}
-function TACLGdiplusRender.IntersectClipRect(const R: TRect): Boolean;
+
+function TACLGdiplusRender.Clip(const R: TRect; out Data: TACL2DRenderRawData): Boolean;
 begin
-  GdipSetClipRectI(FGraphics, R.Left, R.Top, R.Width, R.Height, CombineModeIntersect);
   Result := IsVisible(R);
+  if Result then
+  begin
+    GdipCheck(GdipCreateRegion(GpRegion(Data)));
+    GdipCheck(GdipGetClip(FGraphics, GpRegion(Data)));
+    GdipSetClipRectI(FGraphics, R.Left, R.Top, R.Width, R.Height, CombineModeIntersect);
+  end;
+end;
+
+procedure TACLGdiplusRender.ClipRestore(Data: TACL2DRenderRawData);
+begin
+  GdipSetClipRegion(FGraphics, Data, CombineModeReplace);
+  GdipDeleteRegion(Data);
 end;
 
 function TACLGdiplusRender.IsVisible(const R: TRect): Boolean;
 var
   LResult: LongBool;
 begin
-  Result := (GdipIsVisibleRectI(FGraphics, R.Left, R.Top, R.Width, R.Height, LResult) = Ok) and LResult;
-end;
-
-procedure TACLGdiplusRender.RestoreClipRegion;
-var
-  AHandle: GpRegion;
-begin
-  AHandle := FSavedClipRegion.Pop;
-  GdipSetClipRegion(FGraphics, AHandle, CombineModeReplace);
-  GdipDeleteRegion(AHandle);
-end;
-
-procedure TACLGdiplusRender.SaveClipRegion;
-var
-  AHandle: Pointer;
-begin
-  GdipCheck(GdipCreateRegion(AHandle));
-  GdipCheck(GdipGetClip(FGraphics, AHandle));
-  FSavedClipRegion.Push(AHandle);
+  Result := (GdipIsVisibleRectI(FGraphics,
+    R.Left, R.Top, R.Width, R.Height, LResult) = Ok) and LResult;
 end;
 {$ENDREGION}
 
@@ -1062,7 +1052,9 @@ end;
 function TACLGdiplusRender.CreateImage(Colors: PACLPixel32;
   Width, Height: Integer; AlphaFormat: TAlphaFormat): TACL2DRenderImage;
 const
-  FormatMap: array[TAlphaFormat] of Integer = (PixelFormat32bppRGB, PixelFormat32bppARGB, PixelFormat32bppPARGB);
+  FormatMap: array[TAlphaFormat] of Integer = (
+    PixelFormat32bppRGB, PixelFormat32bppARGB, PixelFormat32bppPARGB
+  );
 var
   AHandle: GpBitmap;
 begin

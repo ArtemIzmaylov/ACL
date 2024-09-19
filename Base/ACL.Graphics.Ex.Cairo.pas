@@ -82,10 +82,9 @@ type
     procedure EndPaint; override;
 
     // Clipping
-    function IntersectClipRect(const R: TRect): Boolean; override;
+    function Clip(const R: TRect; out Data: TACL2DRenderRawData): Boolean; override;
+    procedure ClipRestore(Data: TACL2DRenderRawData); override;
     function IsVisible(const R: TRect): Boolean; override;
-    procedure RestoreClipRegion; override;
-    procedure SaveClipRegion; override;
 
     // Ellipse
     procedure DrawEllipse(X1, Y1, X2, Y2: Single; Color: TAlphaColor;
@@ -1375,28 +1374,30 @@ begin
   Result := TACLCairoRenderPath.Create(Self);
 end;
 
-function TACLCairoRender.IntersectClipRect(const R: TRect): Boolean;
+function TACLCairoRender.Clip(const R: TRect; out Data: TACL2DRenderRawData): Boolean;
 begin
-  cairo_rectangle(Handle, R.Left - Origin.X, R.Top - Origin.Y, R.Width, R.Height);
-  cairo_clip(Handle);
   Result := IsVisible(R);
+  if Result then
+  begin
+    Data := nil;
+    cairo_save(Handle);
+    cairo_rectangle(Handle, R.Left - Origin.X, R.Top - Origin.Y, R.Width, R.Height);
+    cairo_clip(Handle);
+  end;
+end;
+
+procedure TACLCairoRender.ClipRestore(Data: TACL2DRenderRawData);
+var
+  LMatrix: cairo_matrix_t;
+begin
+  cairo_get_matrix(Handle, @LMatrix);
+  cairo_restore(Handle);
+  cairo_set_matrix(Handle, @LMatrix);
 end;
 
 function TACLCairoRender.IsVisible(const R: TRect): Boolean;
 begin
   Result := True;
-end;
-
-procedure TACLCairoRender.RestoreClipRegion;
-begin
-  SaveWorldTransform;
-  cairo_restore(Handle);
-  RestoreWorldTransform;
-end;
-
-procedure TACLCairoRender.SaveClipRegion;
-begin
-  cairo_save(Handle);
 end;
 
 procedure TACLCairoRender.DrawEllipse(X1, Y1, X2, Y2: Single;
