@@ -219,6 +219,8 @@ type
   TACL2DRenderRawData = type Pointer;
 
   TACL2DRender = class(TACLUnknownObject)
+  protected
+    FOrigin: TPoint;
   public
     procedure BeginPaint(DC: HDC; const BoxRect: TRect); overload;
     procedure BeginPaint(DC: HDC; const BoxRect, UpdateRect: TRect); overload; virtual; abstract;
@@ -307,6 +309,12 @@ type
     procedure SetWorldTransform(const XForm: TXForm); virtual; abstract;
     procedure TransformPoints(Points: PPointF; Count: Integer); virtual; abstract;
     procedure TranslateWorldTransform(OffsetX, OffsetY: Single); virtual;
+
+    // WindowOrg
+    function ModifyOrigin(DeltaX, DeltaY: Integer): TPoint{Previous}; virtual;
+    procedure SetOrigin(const Origin: TPoint); virtual;
+  protected
+    property Origin: TPoint read FOrigin write SetOrigin;
   end;
 
 {$ENDREGION}
@@ -1789,6 +1797,17 @@ end;
 procedure TACL2DRender.TranslateWorldTransform(OffsetX, OffsetY: Single);
 begin
   ModifyWorldTransform(TXForm.CreateTranslateMatrix(OffsetX, OffsetY));
+end;
+
+function TACL2DRender.ModifyOrigin(DeltaX, DeltaY: Integer): TPoint;
+begin
+  Result := FOrigin;
+  FOrigin.Offset(-DeltaX, -DeltaY);
+end;
+
+procedure TACL2DRender.SetOrigin(const Origin: TPoint);
+begin
+  FOrigin := Origin;
 end;
 
 { TACL2DRenderPath }

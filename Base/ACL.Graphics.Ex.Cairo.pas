@@ -66,7 +66,6 @@ type
 
   TACLCairoRender = class(TACL2DRender)
   strict private
-    FOrigin: TPoint;
     FHandle: Pcairo_t;
     FTargetSurface: Pcairo_surface_t;
 
@@ -139,7 +138,6 @@ type
     procedure TranslateWorldTransform(OffsetX, OffsetY: Single); override;
 
     //# Properties
-    property Origin: TPoint read FOrigin;
     property Handle: Pcairo_t read FHandle;
   end;
 

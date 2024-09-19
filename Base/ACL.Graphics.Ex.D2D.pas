@@ -385,10 +385,10 @@ end;
 //  Result := ANewTarget;
 //end;
 
-function D2D1Ellipse(X1, Y1, X2, Y2: Single): TD2D1Ellipse;
+function D2D1Ellipse(const Origin: TPoint; const X1, Y1, X2, Y2: Single): TD2D1Ellipse;
 begin
-  Result.point.x := (X1 + X2) * 0.5;
-  Result.point.y := (Y1 + Y2) * 0.5;
+  Result.point.x := (X1 + X2) * 0.5 - Origin.X;
+  Result.point.y := (Y1 + Y2) * 0.5 - Origin.Y;
   Result.radiusX := (X2 - X1) * 0.5;
   Result.radiusY := (Y2 - Y1) * 0.5;
 end;
@@ -425,12 +425,12 @@ begin
   Result.Width := W;
 end;
 
-function D2D1Rect(X1, Y1, X2, Y2: Single): TD2D1RectF; inline;
+function D2D1Rect(const Origin: TPoint; const X1, Y1, X2, Y2: Single): TD2D1RectF; inline;
 begin
-  Result.left := X1;
-  Result.top := Y1;
-  Result.right := X2;
-  Result.bottom := Y2;
+  Result.left   := X1 - Origin.X;
+  Result.top    := Y1 - Origin.Y;
+  Result.right  := X2 - Origin.X;
+  Result.bottom := Y2 - Origin.Y;
 end;
 
 function D2D1ColorF(const AColor: TAlphaColor): TD2D1ColorF; inline;
@@ -616,7 +616,8 @@ begin
     FAvailable := TACLBoolean.False;
 end;
 
-class function TACLDirect2D.CreateDevice3DContext(out ADevice: ID3D11Device; out ADeviceContext: ID3D11DeviceContext): Boolean;
+class function TACLDirect2D.CreateDevice3DContext(
+  out ADevice: ID3D11Device; out ADeviceContext: ID3D11DeviceContext): Boolean;
 const
   Windows8Features: array[0..1] of TD3DFeatureLevel = (D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_11_1);
 var
@@ -734,14 +735,16 @@ begin
   inherited;
 end;
 
-procedure TACLDirect2DRenderPath.AddArc(CX, CY, RadiusX, RadiusY, StartAngle, SweepAngle: Single);
+procedure TACLDirect2DRenderPath.AddArc(
+  CX, CY, RadiusX, RadiusY, StartAngle, SweepAngle: Single);
 var
   AArcSegment: TD2D1ArcSegment;
   AStartPoint: TD2D1Point2F;
 begin
   if FSink <> nil then
   begin
-    AArcSegment := D2D1CalculateArcSegment(CX, CY, RadiusX, RadiusY, 360 - StartAngle, -SweepAngle, AStartPoint);
+    AArcSegment := D2D1CalculateArcSegment(CX, CY,
+      RadiusX, RadiusY, 360 - StartAngle, -SweepAngle, AStartPoint);
     StartFigureIfNecessary(AStartPoint);
     FSink.AddArc(AArcSegment);
   end;
@@ -822,7 +825,7 @@ begin
   if Result then
   begin
     Data := TACL2DRenderRawData(FClipCounter);
-    FDeviceContext.PushAxisAlignedClip(R, D2D1_ANTIALIAS_MODE_ALIASED);
+    FDeviceContext.PushAxisAlignedClip(R.OffsetTo(-Origin.X, -Origin.Y), D2D1_ANTIALIAS_MODE_ALIASED);
     Inc(FClipCounter);
   end;
 end;
@@ -869,8 +872,9 @@ begin
     @ASize, @ADesiredFormat, D2D1_COMPATIBLE_RENDER_TARGET_OPTIONS_NONE, ABitmapTarget));
 end;
 
-function TACLDirect2DAbstractRender.CreatePathGeometry(APoints: PPoint; ACount: Integer;
-  AFigureBegin: TD2D1FigureBegin; AFigureEnd: TD2D1_FigureEnd): ID2D1PathGeometry1;
+function TACLDirect2DAbstractRender.CreatePathGeometry(
+  APoints: PPoint; ACount: Integer; AFigureBegin: TD2D1FigureBegin;
+  AFigureEnd: TD2D1_FigureEnd): ID2D1PathGeometry1;
 var
   ASink: ID2D1GeometrySink;
 begin
@@ -900,7 +904,8 @@ procedure TACLDirect2DAbstractRender.DrawEllipse(X1, Y1, X2, Y2: Single;
   Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
 begin
   if Color.IsValid and (Width > 0) then
-    FDeviceContext.DrawEllipse(D2D1Ellipse(X1, Y1, X2, Y2),
+    FDeviceContext.DrawEllipse(
+      D2D1Ellipse(Origin, X1, Y1, X2, Y2),
       CacheGetSolidBrush(Color), Width,
       CacheGetStrokeStyle(Style));
 end;
@@ -908,27 +913,28 @@ end;
 procedure TACLDirect2DAbstractRender.DrawImage(
   Image: TACL2DRenderImage; const TargetRect, SourceRect: TRect; Alpha: Byte);
 var
-  ASourceRectangle: TD2D1RectF;
-  ATargetRectangle: TD2D1RectF;
+  LSourceRectangle: TD2D1RectF;
+  LTargetRectangle: TD2D1RectF;
 begin
   if IsValid(Image) then
   begin
-    ASourceRectangle := SourceRect;
-    ATargetRectangle := TargetRect;
-    FDeviceContext.DrawBitmap(TACLDirect2DRenderImage(Image).Handle, @ATargetRectangle,
-      Alpha / MaxByte, D2D1_INTERPOLATION_MODE_NEAREST_NEIGHBOR, @ASourceRectangle);
+    LSourceRectangle := SourceRect;
+    LTargetRectangle := TargetRect.OffsetTo(-Origin.X, -Origin.Y);
+    FDeviceContext.DrawBitmap(
+      TACLDirect2DRenderImage(Image).Handle, @LTargetRectangle,
+      Alpha / MaxByte, D2D1_INTERPOLATION_MODE_NEAREST_NEIGHBOR, @LSourceRectangle);
   end;
 end;
 
 procedure TACLDirect2DAbstractRender.DrawImage(Image: TACL2DRenderImage;
   const TargetRect, SourceRect: TRect; Attributes: TACL2DRenderImageAttributes);
 var
-  ABitmap: ID2D1Bitmap;
-//  ABitmapRectangle: TD2D1RectF;
-//  ABitmapTarget: ID2D1BitmapRenderTarget;
-  AColor: TAlphaColor;
-  ASourceRectangle: TD2D1RectF;
-  ATargetRectangle: TD2D1RectF;
+  LBitmap: ID2D1Bitmap;
+//  LBitmapRectangle: TD2D1RectF;
+//  LBitmapTarget: ID2D1BitmapRenderTarget;
+  LColor: TAlphaColor;
+  LSourceRectangle: TD2D1RectF;
+  LTargetRectangle: TD2D1RectF;
 begin
   if not IsValid(Image) then
     Exit;
@@ -941,32 +947,32 @@ begin
 
   if Attributes.TintColor.IsValid then
   begin
-    ABitmap := TACLDirect2DRenderImage(Image).Handle;
-    ASourceRectangle := SourceRect;
-    ATargetRectangle := TargetRect;
+    LBitmap := TACLDirect2DRenderImage(Image).Handle;
+    LSourceRectangle := SourceRect;
+    LTargetRectangle := TargetRect.OffsetTo(-Origin.X, -Origin.Y);
 
 //    if not acSizeIsEqual(TargetRect, SourceRect) then
 //    begin
-//      if CreateCompatibleRenderTarget(TargetRect.Size, ABitmapTarget) then
+//      if CreateCompatibleRenderTarget(TargetRect.Size, LBitmapTarget) then
 //      begin
-//        ABitmapRectangle := D2D1Rect(0, 0, TargetRect.Width, TargetRect.Height);
-//        ABitmapTarget.BeginDraw;
+//        LBitmapRectangle := D2D1Rect(0, 0, TargetRect.Width, TargetRect.Height);
+//        LBitmapTarget.BeginDraw;
 //        try
-//          ABitmapTarget.Clear(D2D1ColorF(TAlphaColor.None));
-//          ABitmapTarget.DrawBitmap(ABitmap, @ABitmapRectangle, 1.0,
-//            D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR, @ASourceRectangle);
+//          LBitmapTarget.Clear(D2D1ColorF(TAlphaColor.None));
+//          LBitmapTarget.DrawBitmap(LBitmap, @LBitmapRectangle, 1.0,
+//            D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR, @LSourceRectangle);
 //        finally
-//          ABitmapTarget.EndDraw;
+//          LBitmapTarget.EndDraw;
 //        end;
-//        D2D1Check(ABitmapTarget.GetBitmap(ABitmap));
-//        ASourceRectangle := ABitmapRectangle;
+//        D2D1Check(LBitmapTarget.GetBitmap(LBitmap));
+//        LSourceRectangle := LBitmapRectangle;
 //      end;
 //    end;
 
-    AColor := Attributes.TintColor;
-    AColor.A := MulDiv(AColor.A, Attributes.Alpha, MaxByte);
-    FDeviceContext.FillOpacityMask(ABitmap,
-      CacheGetSolidBrush(AColor), @ATargetRectangle, @ASourceRectangle);
+    LColor := Attributes.TintColor;
+    LColor.A := MulDiv(LColor.A, Attributes.Alpha, MaxByte);
+    FDeviceContext.FillOpacityMask(LBitmap,
+      CacheGetSolidBrush(LColor), @LTargetRectangle, @LSourceRectangle);
   end
   else
     DrawImage(Image, TargetRect, SourceRect, Attributes.Alpha);
@@ -988,12 +994,14 @@ end;
 procedure TACLDirect2DAbstractRender.DrawRectangle(X1, Y1, X2, Y2: Single;
   Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
 begin
-  FDeviceContext.DrawRectangle(D2D1Rect(X1, Y1, X2, Y2),
+  FDeviceContext.DrawRectangle(
+    D2D1Rect(Origin, X1, Y1, X2, Y2),
     CacheGetSolidBrush(Color), Width, CacheGetStrokeStyle(Style));
 end;
 
-procedure TACLDirect2DAbstractRender.DrawText(const Text: string; const R: TRect;
-  Color: TAlphaColor; Font: TFont; HorzAlign: TAlignment; VertAlign: TVerticalAlignment; WordWrap: Boolean);
+procedure TACLDirect2DAbstractRender.DrawText(const Text: string;
+  const R: TRect; Color: TAlphaColor; Font: TFont; HorzAlign: TAlignment;
+  VertAlign: TVerticalAlignment; WordWrap: Boolean);
 const
   HorzAlignMap: array[TAlignment] of DWRITE_TEXT_ALIGNMENT = (
     DWRITE_TEXT_ALIGNMENT_LEADING, DWRITE_TEXT_ALIGNMENT_TRAILING, DWRITE_TEXT_ALIGNMENT_CENTER
@@ -1030,12 +1038,14 @@ begin
           ATextRange.startPosition := 0;
           ATextRange.length := ATextLength;
           ATextLayout.SetUnderline(True, ATextRange);
-          FDeviceContext.DrawTextLayout(D2D1PointF(R.Left, R.Top),
+          FDeviceContext.DrawTextLayout(
+            D2D1PointF(R.Left - Origin.X, R.Top - Origin.Y),
             ATextLayout, CacheGetSolidBrush(Color), D2D1_DRAW_TEXT_OPTIONS_CLIP);
         end;
       end
       else
-        FDeviceContext.DrawText(PChar(Text), ATextLength, ATextFormat, R,
+        FDeviceContext.DrawText(PChar(Text), ATextLength,
+          ATextFormat, R.OffsetTo(-Origin.X, -Origin.Y),
           CacheGetSolidBrush(Color), D2D1_DRAW_TEXT_OPTIONS_CLIP);
     end
   end;
@@ -1051,29 +1061,38 @@ end;
 procedure TACLDirect2DAbstractRender.FillEllipse(X1, Y1, X2, Y2: Single; Color: TAlphaColor);
 begin
   if Color.IsValid then
-    FDeviceContext.FillEllipse(D2D1Ellipse(X1, Y1, X2, Y2), CacheGetSolidBrush(Color));
+    FDeviceContext.FillEllipse(
+      D2D1Ellipse(Origin, X1, Y1, X2, Y2),
+      CacheGetSolidBrush(Color));
 end;
 
 procedure TACLDirect2DAbstractRender.FillHatchRectangle(
   const R: TRect; Color1, Color2: TAlphaColor; Size: Integer);
 begin
-  FDeviceContext.FillRectangle(R, CacheGetHatchBrush(Color1, Color2, Size));
+  FDeviceContext.FillRectangle(
+    R.OffsetTo(-Origin.X, -Origin.Y),
+    CacheGetHatchBrush(Color1, Color2, Size));
 end;
 
-procedure TACLDirect2DAbstractRender.FillPath(Path: TACL2DRenderPath; Color: TAlphaColor);
+procedure TACLDirect2DAbstractRender.FillPath(
+  Path: TACL2DRenderPath; Color: TAlphaColor);
 begin
   if IsValid(Path) and Color.IsValid then
     Geometry(TACLDirect2DRenderPath(Path).Handle, Color);
 end;
 
-procedure TACLDirect2DAbstractRender.FillPolygon(const Points: array of TPoint; Color: TAlphaColor);
+procedure TACLDirect2DAbstractRender.FillPolygon(
+  const Points: array of TPoint; Color: TAlphaColor);
 begin
   Polygon(Points, Color, TAlphaColor.None);
 end;
 
-procedure TACLDirect2DAbstractRender.FillRectangle(X1, Y1, X2, Y2: Single; Color: TAlphaColor);
+procedure TACLDirect2DAbstractRender.FillRectangle(
+  X1, Y1, X2, Y2: Single; Color: TAlphaColor);
 begin
-  FDeviceContext.FillRectangle(D2D1Rect(X1, Y1, X2, Y2), CacheGetSolidBrush(Color));
+  FDeviceContext.FillRectangle(
+    D2D1Rect(Origin, X1, Y1, X2, Y2),
+    CacheGetSolidBrush(Color));
 end;
 
 procedure TACLDirect2DAbstractRender.FlushCache;
@@ -1085,20 +1104,27 @@ begin
 end;
 
 procedure TACLDirect2DAbstractRender.Geometry(const AHandle: ID2D1Geometry;
-  BackgroundColor, StrokeColor: TAlphaColor; StrokeWidth: Single; StrokeStyle: TACL2DRenderStrokeStyle);
+  BackgroundColor: TAlphaColor; StrokeColor: TAlphaColor;
+  StrokeWidth: Single; StrokeStyle: TACL2DRenderStrokeStyle);
 begin
-  if BackgroundColor.IsValid then
-    FDeviceContext.FillGeometry(AHandle, CacheGetSolidBrush(BackgroundColor));
-  if StrokeColor.IsValid and (StrokeWidth > 0) then
-    FDeviceContext.DrawGeometry(AHandle, CacheGetSolidBrush(StrokeColor),
-      StrokeWidth, CacheGetStrokeStyle(StrokeStyle));
+  TranslateWorldTransform(-Origin.X, -Origin.Y);
+  try
+    if BackgroundColor.IsValid then
+      FDeviceContext.FillGeometry(AHandle, CacheGetSolidBrush(BackgroundColor));
+    if StrokeColor.IsValid and (StrokeWidth > 0) then
+      FDeviceContext.DrawGeometry(AHandle, CacheGetSolidBrush(StrokeColor),
+        StrokeWidth, CacheGetStrokeStyle(StrokeStyle));
+  finally
+    TranslateWorldTransform(Origin.X, Origin.Y);
+  end;
 end;
 
 procedure TACLDirect2DAbstractRender.Line(const Points: PPoint;
   Count: Integer; Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
 begin
   if Color.IsValid and (Width > 0) and (Count > 0) then
-    Geometry(CreatePathGeometry(Points, Count, D2D1_FIGURE_BEGIN_HOLLOW, D2D1_FIGURE_END_OPEN),
+    Geometry(CreatePathGeometry(Points, Count,
+      D2D1_FIGURE_BEGIN_HOLLOW, D2D1_FIGURE_END_OPEN),
       TAlphaColor.None, Color, Width, Style);
 end;
 
@@ -1106,8 +1132,11 @@ procedure TACLDirect2DAbstractRender.Line(X1, Y1, X2, Y2: Single;
   Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle);
 begin
   if Color.IsValid and (Width > 0) then
-    FDeviceContext.DrawLine(D2D1PointF(X1, Y1), D2D1PointF(X2, Y2),
-      CacheGetSolidBrush(Color), Width, CacheGetStrokeStyle(Style));
+    FDeviceContext.DrawLine(
+      D2D1PointF(X1 - Origin.X, Y1 - Origin.Y),
+      D2D1PointF(X2 - Origin.X, Y2 - Origin.Y),
+      CacheGetSolidBrush(Color), Width,
+      CacheGetStrokeStyle(Style));
 end;
 
 procedure TACLDirect2DAbstractRender.ApplyWorldTransform;
@@ -1163,7 +1192,8 @@ begin
 end;
 
 procedure TACLDirect2DAbstractRender.Polygon(const Points: array of TPoint;
-  Color, StrokeColor: TAlphaColor; StrokeWidth: Single; StrokeStyle: TACL2DRenderStrokeStyle);
+  Color: TAlphaColor; StrokeColor: TAlphaColor; StrokeWidth: Single;
+  StrokeStyle: TACL2DRenderStrokeStyle);
 begin
   if StrokeColor.IsValid and (StrokeWidth > 0) or Color.IsValid then
     Geometry(CreatePathGeometry(@Points[0], Length(Points),
@@ -1203,11 +1233,12 @@ begin
   FDeviceContext := nil;
 end;
 
-function TACLDirect2DAbstractRender.CacheGetHatchBrush(AColor1, AColor2: TAlphaColor; ASize: Word): ID2D1Brush;
+function TACLDirect2DAbstractRender.CacheGetHatchBrush(
+  AColor1, AColor2: TAlphaColor; ASize: Word): ID2D1Brush;
 var
-  ABitmap: ID2D1Bitmap;
-  ABitmapBrush: ID2D1BitmapBrush1;
-  ABitmapBrushProperties: TD2D1BitmapBrushProperties1;
+  LBitmap: ID2D1Bitmap;
+  LBitmapBrush: ID2D1BitmapBrush1;
+  LBitmapBrushProperties: TD2D1BitmapBrushProperties1;
   APattern: TBitmap;
   AKey: UInt64;
 begin
@@ -1218,13 +1249,13 @@ begin
   begin
     APattern := acHatchCreatePattern(ASize, AColor1.ToColor, AColor2.ToColor);
     try
-      ABitmap := D2D1Bitmap(FDeviceContext, APattern, afIgnored);
-      ZeroMemory(@ABitmapBrushProperties, SizeOf(ABitmapBrushProperties));
-      ABitmapBrushProperties.extendModeX := D2D1_EXTEND_MODE_WRAP;
-      ABitmapBrushProperties.extendModeY := D2D1_EXTEND_MODE_WRAP;
-      ABitmapBrushProperties.interpolationMode := D2D1_INTERPOLATION_MODE_NEAREST_NEIGHBOR;
-      if Succeeded(FDeviceContext.CreateBitmapBrush(ABitmap, @ABitmapBrushProperties, nil, ABitmapBrush)) then
-        Result := ABitmapBrush;
+      LBitmap := D2D1Bitmap(FDeviceContext, APattern, afIgnored);
+      ZeroMemory(@LBitmapBrushProperties, SizeOf(LBitmapBrushProperties));
+      LBitmapBrushProperties.extendModeX := D2D1_EXTEND_MODE_WRAP;
+      LBitmapBrushProperties.extendModeY := D2D1_EXTEND_MODE_WRAP;
+      LBitmapBrushProperties.interpolationMode := D2D1_INTERPOLATION_MODE_NEAREST_NEIGHBOR;
+      if Succeeded(FDeviceContext.CreateBitmapBrush(LBitmap, @LBitmapBrushProperties, nil, LBitmapBrush)) then
+        Result := LBitmapBrush;
       FCacheHatchBrushes.Add(AKey, Result);
     finally
       APattern.Free;
@@ -1232,7 +1263,8 @@ begin
   end;
 end;
 
-function TACLDirect2DAbstractRender.CacheGetSolidBrush(AColor: TAlphaColor): ID2D1SolidColorBrush;
+function TACLDirect2DAbstractRender.CacheGetSolidBrush(
+  AColor: TAlphaColor): ID2D1SolidColorBrush;
 begin
   if not FCacheSolidBrushes.Get(AColor, Result) then
   begin
@@ -1241,7 +1273,8 @@ begin
   end;
 end;
 
-function TACLDirect2DAbstractRender.CacheGetStrokeStyle(AStyle: TACL2DRenderStrokeStyle): ID2D1StrokeStyle1;
+function TACLDirect2DAbstractRender.CacheGetStrokeStyle(
+  AStyle: TACL2DRenderStrokeStyle): ID2D1StrokeStyle1;
 const
   Styles: array[TACL2DRenderStrokeStyle] of TD2D1DashStyle = (
     D2D1_DASH_STYLE_SOLID,
@@ -1304,17 +1337,17 @@ end;
 
 procedure TACLDirect2DGdiCompatibleRender.GdiDraw(Proc: TACL2DRenderGdiDrawProc);
 var
-  ATarget: ID2D1GdiInteropRenderTarget;
-  ATargetDC: HDC;
-  AUpdateRect: TRect;
+  LTarget: ID2D1GdiInteropRenderTarget;
+  LTargetDC: HDC;
+  LUpdateRect: TRect;
 begin
-  if Supports(FDeviceContext, ID2D1GdiInteropRenderTarget, ATarget) then
+  if Supports(FDeviceContext, ID2D1GdiInteropRenderTarget, LTarget) then
   begin
-    D2D1Check(ATarget.GetDC(D2D1_DC_INITIALIZE_MODE_COPY, ATargetDC));
+    D2D1Check(LTarget.GetDC(D2D1_DC_INITIALIZE_MODE_COPY, LTargetDC));
     try
-      Proc(ATargetDC, AUpdateRect);
+      Proc(LTargetDC, LUpdateRect);
     finally
-      D2D1Check(ATarget.ReleaseDC(AUpdateRect));
+      D2D1Check(LTarget.ReleaseDC(LUpdateRect));
     end;
   end;
 end;
