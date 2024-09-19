@@ -299,9 +299,9 @@ type
     procedure FillPolygon(const Points: array of TPoint; Color: TAlphaColor); virtual; abstract;
 
     // World Transform
+    procedure SaveWorldTransform(out State: TACL2DRenderRawData); virtual; abstract;
+    procedure RestoreWorldTransform(State: TACL2DRenderRawData); virtual; abstract;
     procedure ModifyWorldTransform(const XForm: TXForm); virtual; abstract;
-    procedure RestoreWorldTransform; virtual; abstract;
-    procedure SaveWorldTransform; virtual; abstract;
     procedure ScaleWorldTransform(Scale: Single); overload;
     procedure ScaleWorldTransform(ScaleX, ScaleY: Single); overload; virtual;
     procedure SetWorldTransform(const XForm: TXForm); virtual; abstract;

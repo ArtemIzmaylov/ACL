@@ -69,13 +69,10 @@ type
     FOrigin: TPoint;
     FHandle: Pcairo_t;
     FTargetSurface: Pcairo_surface_t;
-    FWorldTransforms: TStack<cairo_matrix_t>;
 
     procedure PathEllipseArc(X1, Y1, X2, Y2: Double);
     procedure PathPolyline(Points: PPoint; Count: Integer; ClosePath: Boolean);
   public
-    constructor Create;
-    destructor Destroy; override;
     procedure BeginPaint(ACanvas: TCanvas); overload;
     procedure BeginPaint(ASurface: Pcairo_surface_t); overload;
     procedure BeginPaint(DC: HDC; const BoxRect, UpdateRect: TRect); overload; override;
@@ -134,8 +131,8 @@ type
 
     // World Transform
     procedure ModifyWorldTransform(const XForm: TXForm); override;
-    procedure RestoreWorldTransform; override;
-    procedure SaveWorldTransform; override;
+    procedure RestoreWorldTransform(State: TACL2DRenderRawData); override;
+    procedure SaveWorldTransform(out State: TACL2DRenderRawData); override;
     procedure ScaleWorldTransform(ScaleX, ScaleY: Single); overload; override;
     procedure SetWorldTransform(const XForm: TXForm); override;
     procedure TransformPoints(Points: PPointF; Count: Integer); override;
@@ -1288,18 +1285,6 @@ end;
 
 { TACLCairoRender }
 
-constructor TACLCairoRender.Create;
-begin
-  inherited;
-  FWorldTransforms := TStack<cairo_matrix_t>.Create;
-end;
-
-destructor TACLCairoRender.Destroy;
-begin
-  FreeAndNil(FWorldTransforms);
-  inherited Destroy;
-end;
-
 procedure TACLCairoRender.BeginPaint(ACanvas: TCanvas);
 begin
   if Handle <> nil then
@@ -1729,20 +1714,20 @@ begin
   cairo_transform(Handle, @LMatrix);
 end;
 
-procedure TACLCairoRender.RestoreWorldTransform;
+procedure TACLCairoRender.RestoreWorldTransform(State: TACL2DRenderRawData);
 var
-  LMatrix: cairo_matrix_t;
+  LMatrix: pcairo_matrix_t absolute State;
 begin
-  LMatrix := FWorldTransforms.Pop;
-  cairo_set_matrix(Handle, @LMatrix);
+  cairo_set_matrix(Handle, LMatrix);
+  Dispose(LMatrix);
 end;
 
-procedure TACLCairoRender.SaveWorldTransform;
+procedure TACLCairoRender.SaveWorldTransform(out State: TACL2DRenderRawData);
 var
-  LMatrix: cairo_matrix_t;
+  LMatrix: pcairo_matrix_t absolute State;
 begin
-  cairo_get_matrix(Handle, @LMatrix);
-  FWorldTransforms.Push(LMatrix);
+  New(LMatrix);
+  cairo_get_matrix(Handle, LMatrix);
 end;
 
 procedure TACLCairoRender.ScaleWorldTransform(ScaleX, ScaleY: Single);

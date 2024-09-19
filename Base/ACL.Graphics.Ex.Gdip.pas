@@ -124,7 +124,6 @@ type
     IACL2DRenderGdiCompatible)
   strict private
     FPixelThickness: Single;
-    FSavedWorldTransforms: TStack;
 
     procedure AdjustRectToGdiLikeAppearance(var X2, Y2: Single); inline;
     function GetInterpolationMode: TInterpolationMode;
@@ -205,8 +204,8 @@ type
 
     // World Transform
     procedure ModifyWorldTransform(const XForm: TXForm); override;
-    procedure RestoreWorldTransform; override;
-    procedure SaveWorldTransform; override;
+    procedure RestoreWorldTransform(State: TACL2DRenderRawData); override;
+    procedure SaveWorldTransform(out State: TACL2DRenderRawData); override;
     procedure ScaleWorldTransform(ScaleX, ScaleY: Single); override;
     procedure SetWorldTransform(const XForm: TXForm); override;
     procedure TransformPoints(Points: PPointF; Count: Integer); override;
@@ -888,7 +887,6 @@ end;
 constructor TACLGdiplusRender.Create;
 begin
   FPixelThickness := 1.0;
-  FSavedWorldTransforms := TStack.Create;
 end;
 
 constructor TACLGdiplusRender.Create(Graphics: GpGraphics);
@@ -907,9 +905,6 @@ destructor TACLGdiplusRender.Destroy;
 begin
   if FGraphics <> nil then
     GdipDeleteGraphics(FGraphics);
-  while FSavedWorldTransforms.Count > 0 do
-    GdipDeleteMatrix(FSavedWorldTransforms.Pop);
-  FreeAndNil(FSavedWorldTransforms);
   inherited;
 end;
 
@@ -981,23 +976,22 @@ begin
   UpdatePixelThickness;
 end;
 
-procedure TACLGdiplusRender.RestoreWorldTransform;
+procedure TACLGdiplusRender.RestoreWorldTransform(State: TACL2DRenderRawData);
 var
-  AHandle: GpMatrix;
+  LHandle: GpMatrix absolute State;
 begin
-  AHandle := FSavedWorldTransforms.Pop;
-  GdipSetWorldTransform(FGraphics, AHandle);
-  GdipDeleteMatrix(AHandle);
+  GdipSetWorldTransform(FGraphics, LHandle);
+  GdipDeleteMatrix(LHandle);
   UpdatePixelThickness;
 end;
 
-procedure TACLGdiplusRender.SaveWorldTransform;
+procedure TACLGdiplusRender.SaveWorldTransform(out State: TACL2DRenderRawData);
 var
-  AHandle: GpMatrix;
+  LHandle: GpMatrix;
 begin
-  GdipCheck(GdipCreateMatrix(AHandle));
-  GdipCheck(GdipGetWorldTransform(FGraphics, AHandle));
-  FSavedWorldTransforms.Push(AHandle);
+  GdipCheck(GdipCreateMatrix(LHandle));
+  GdipCheck(GdipGetWorldTransform(FGraphics, LHandle));
+  State := TACL2DRenderRawData(LHandle);
 end;
 
 procedure TACLGdiplusRender.ScaleWorldTransform(ScaleX, ScaleY: Single);

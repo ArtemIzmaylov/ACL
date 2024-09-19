@@ -76,7 +76,6 @@ type
     FCacheSolidBrushes: TACLValueCacheManager<TAlphaColor, ID2D1SolidColorBrush>;
     FCacheStrokeStyles: array[TACL2DRenderStrokeStyle] of ID2D1StrokeStyle1;
     FClipCounter: Integer;
-    FSavedWorldTransforms: TStack<TD2D1Matrix3x2F>;
     FWorldTransform: TD2D1Matrix3x2F;
 
     FOnRecreateNeeded: TNotifyEvent;
@@ -157,8 +156,8 @@ type
 
     // World Transform
     procedure ModifyWorldTransform(const XForm: TXForm); override;
-    procedure RestoreWorldTransform; override;
-    procedure SaveWorldTransform; override;
+    procedure RestoreWorldTransform(State: TACL2DRenderRawData); override;
+    procedure SaveWorldTransform(out State: TACL2DRenderRawData); override;
     procedure SetWorldTransform(const XForm: TXForm); override;
     procedure TransformPoints(Points: PPointF; Count: Integer); override;
   end;
@@ -804,7 +803,6 @@ begin
   FOnRecreateNeeded := OnRecreateNeeded;
   FResources := TList.Create;
   FResources.Capacity := 1024;
-  FSavedWorldTransforms := TStack<TD2D1Matrix3x2F>.Create;
   FCacheHatchBrushes := TACLValueCacheManager<UInt64, ID2D1Brush>.Create;
   FCacheSolidBrushes := TACLValueCacheManager<TAlphaColor, ID2D1SolidColorBrush>.Create;
 end;
@@ -814,7 +812,6 @@ begin
   ReleaseDevice;
   FreeAndNil(FCacheHatchBrushes);
   FreeAndNil(FCacheSolidBrushes);
-  FreeAndNil(FSavedWorldTransforms);
   FreeAndNil(FResources);
   inherited;
 end;
@@ -1128,15 +1125,21 @@ begin
   ApplyWorldTransform;
 end;
 
-procedure TACLDirect2DAbstractRender.RestoreWorldTransform;
+procedure TACLDirect2DAbstractRender.RestoreWorldTransform(State: TACL2DRenderRawData);
+var
+  LMatrix: PD2D1Matrix3x2F absolute State;
 begin
-  FWorldTransform := FSavedWorldTransforms.Pop;
+  FWorldTransform := LMatrix^;
+  Dispose(LMatrix);
   ApplyWorldTransform;
 end;
 
-procedure TACLDirect2DAbstractRender.SaveWorldTransform;
+procedure TACLDirect2DAbstractRender.SaveWorldTransform(out State: TACL2DRenderRawData);
+var
+  LMatrix: PD2D1Matrix3x2F absolute State;
 begin
-  FSavedWorldTransforms.Push(FWorldTransform);
+  New(LMatrix);
+  LMatrix^ := FWorldTransform;
 end;
 
 procedure TACLDirect2DAbstractRender.SetWorldTransform(const XForm: TXForm);
