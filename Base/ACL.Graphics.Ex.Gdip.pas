@@ -1432,5 +1432,7 @@ end;
 initialization
   GpPaintCanvas := TACLGdiplusPaintCanvas.Create;
 finalization
+  if IsLibrary then // shutdown must not be called from DLL finalization
+    GdiplusTokenOwned := False;
   GdipFree;
 end.
