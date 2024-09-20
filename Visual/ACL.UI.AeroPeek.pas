@@ -44,6 +44,7 @@ uses
   ACL.FileFormats.INI,
   ACL.Geometry,
   ACL.Graphics,
+  ACL.Graphics.Images,
   ACL.Timers,
   ACL.UI.Controls.Base,
   ACL.UI.ImageList,
@@ -146,12 +147,10 @@ type
     procedure SyncProgress;
     procedure SyncState;
     procedure UpdateForceIconicRepresentation;
-    procedure UpdatePeekPreview;
-    procedure UpdateThumbnailPreview;
+    procedure UpdateLivePreviews;
   protected
     function CreatePeekPreview(out AHasFrame: Boolean): TACLBitmap;
     procedure DoButtonClick(AIndex: Integer); virtual;
-    procedure DoDrawPreview(ABitmap: TACLBitmap); virtual;
     procedure DoInitialize; virtual;
     procedure SetWindowAttribute(AAttr: Cardinal; AValue: LongBool);
     //# Properties
@@ -353,10 +352,7 @@ begin
   begin
   {$IFDEF MSWINDOWS}
     if FLivePreviewTimer <> nil then
-    begin
-      UpdateThumbnailPreview;
-      UpdatePeekPreview;
-    end
+      UpdateLivePreviews
     else
       DwmInvalidateIconicBitmaps(OwnerWindow.Handle);
   {$ENDIF}
@@ -391,10 +387,13 @@ var
   AIcon: TIcon;
   AWindowInfo: TWindowInfo;
   AWindowPlacement: TWindowPlacement;
+{$ENDIF}
 begin
+  Result := nil;
+  AHasFrame := False;
+{$IFDEF MSWINDOWS}
   if IsIconic(OwnerWindow.Handle) then
-  begin
-    AHasFrame := False;
+  try
     AWindowPlacement.length := SizeOf(AWindowPlacement);
     GetWindowPlacement(OwnerWindow.Handle, AWindowPlacement);
     Result := TACLBitmap.CreateEx(AWindowPlacement.rcNormalPosition, pf32bit, True);
@@ -408,9 +407,11 @@ begin
     finally
       AIcon.Free;
     end;
+  except
+    FreeAndNil(Result);
   end
   else
-  begin
+  try
     AWindowInfo.cbSize := SizeOf(AWindowInfo);
     GetWindowInfo(OwnerWindow.Handle, AWindowInfo);
 
@@ -430,11 +431,9 @@ begin
       (AWindowInfo.rcWindow <> AWindowInfo.rcClient) and
       (GetWindowLong(OwnerWindow.Handle, GWL_STYLE) and WS_BORDER <> 0) and
       (GetWindowLong(OwnerWindow.Handle, GWL_EXSTYLE) and WS_EX_LAYERED = 0);
-  end;
-{$ELSE}
-begin
-  AHasFrame := False;
-  Result := TACLBitmap.Create;
+  except
+    FreeAndNil(Result);
+  end
 {$ENDIF}
 end;
 
@@ -442,28 +441,6 @@ procedure TACLAeroPeek.DoButtonClick(AIndex: Integer);
 begin
   if Assigned(OnButtonClick) then
     OnButtonClick(Self, AIndex);
-end;
-
-procedure TACLAeroPeek.DoDrawPreview(ABitmap: TACLBitmap);
-var
-  AHasFrame: Boolean;
-  APreview: TACLBitmap;
-  ASize: TSize;
-begin
-  if Assigned(OnDrawPreview) then
-    OnDrawPreview(Self, ABitmap)
-  else
-  begin
-    APreview := CreatePeekPreview(AHasFrame);
-    try
-      ASize := acFitSize(ABitmap.ClientRect.Size, APreview.ClientRect.Size, afmProportionalStretch);
-      ABitmap.SetSize(ASize.cx, ASize.cy);
-      SetStretchBltMode(ABitmap.Canvas.Handle, HALFTONE);
-      acStretchBlt(ABitmap.Canvas.Handle, APreview.Canvas.Handle, ABitmap.ClientRect, APreview.ClientRect);
-    finally
-      APreview.Free;
-    end;
-  end;
 end;
 
 procedure TACLAeroPeek.DoInitialize;
@@ -547,10 +524,7 @@ var
 begin
   AClassName := acGetClassName(WindowFromPoint(MouseCursorPos));
   if acSameTextEx(AClassName, ['TaskListThumbnailWnd', 'MSTaskListWClass', 'ToolbarWindow32']) then
-  begin
-    UpdateThumbnailPreview;
-    UpdatePeekPreview;
-  end
+    UpdateLivePreviews
   else
     StopLivePreviewTimer;
 end;
@@ -710,35 +684,54 @@ begin
 {$ENDIF}
 end;
 
-procedure TACLAeroPeek.UpdatePeekPreview;
+procedure TACLAeroPeek.UpdateLivePreviews;
+{$IFDEF MSWINDOWS}
 var
-  ABitmap: TACLBitmap;
-  AHasBorder: Boolean;
+  LHasBorder: Boolean;
+  LPreview: TACLBitmap;
+  LPreviewImage: TACLImage;
+  LThumbnailRect: TRect;
 begin
-  ABitmap := CreatePeekPreview(AHasBorder);
+  if Assigned(OnDrawPreview) and not FThumbnailSize.IsEmpty then
   try
-  {$IFDEF MSWINDOWS}
-    DwmSetIconicLivePreviewBitmap(OwnerWindow.Handle,
-      ABitmap.Handle, nil, IfThen(AHasBorder, DWM_SIT_DISPLAYFRAME));
-  {$ENDIF}
-  finally
-    ABitmap.Free;
+    LPreview := TACLBitmap.CreateEx(FThumbnailSize, pf32bit, True);
+    try
+      OnDrawPreview(Self, LPreview);
+      DwmSetIconicThumbnail(OwnerWindow.Handle, LPreview.Handle, 0);
+    finally
+      LPreview.Free;
+    end;
+  except
+    // do nothing
   end;
-end;
 
-procedure TACLAeroPeek.UpdateThumbnailPreview;
-var
-  ABitmap: TACLBitmap;
-begin
-  ABitmap := TACLBitmap.CreateEx(FThumbnailSize, pf32bit);
+  LPreview := CreatePeekPreview(LHasBorder);
+  if LPreview <> nil then
   try
-  {$IFDEF MSWINDOWS}
-    DoDrawPreview(ABitmap);
-    DwmSetIconicThumbnail(OwnerWindow.Handle, ABitmap.Handle, 0);
-  {$ENDIF}
+    DwmSetIconicLivePreviewBitmap(OwnerWindow.Handle,
+      LPreview.Handle, nil, IfThen(LHasBorder, DWM_SIT_DISPLAYFRAME));
+    if not Assigned(OnDrawPreview) and not FThumbnailSize.IsEmpty then
+    try
+      LThumbnailRect := acFitRect(FThumbnailSize,
+        LPreview.Width, LPreview.Height, afmProportionalStretch);
+      LPreviewImage := TACLImage.Create(LPreview);
+      try
+        LPreview.SetSize(FThumbnailSize);
+        LPreview.Reset;
+        LPreviewImage.Draw(LPreview.Canvas, LThumbnailRect);
+      finally
+        LPreviewImage.Free;
+      end;
+      DwmSetIconicThumbnail(OwnerWindow.Handle, LPreview.Handle, 0);
+    except
+      // do nothing
+    end;
   finally
-    ABitmap.Free;
+    LPreview.Free;
   end;
+{$ELSE}
+begin
+{$ENDIF}
 end;
 
 {$IFDEF MSWINDOWS}
