@@ -144,7 +144,8 @@ type
       Width: Single = 1; Style: TACL2DRenderStrokeStyle = ssSolid); override;
     procedure FillPath(Path: TACL2DRenderPath; Color: TAlphaColor); override;
     procedure Geometry(const AHandle: ID2D1Geometry; BackgroundColor: TAlphaColor;
-      StrokeColor: TAlphaColor = 0; StrokeWidth: Single = 1; StrokeStyle: TACL2DRenderStrokeStyle = ssSolid);
+      StrokeColor: TAlphaColor = 0; StrokeWidth: Single = 1;
+      StrokeStyle: TACL2DRenderStrokeStyle = ssSolid);
 
     // Polygon
     procedure Polygon(const Points: array of TPoint; Color, StrokeColor: TAlphaColor;
@@ -1420,7 +1421,8 @@ begin
       ASwapChainDescription.SwapEffect := DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
       ASwapChainDescription.Scaling := ScalingMode[acOSCheckVersion(6, 2)];
 
-      D2D1Check(AFactory.CreateSwapChainForHwnd(FDevice3D, AHandle, @ASwapChainDescription, nil, nil, FSwapChain));
+      D2D1Check(AFactory.CreateSwapChainForHwnd(FDevice3D,
+        AHandle, @ASwapChainDescription, nil, nil, FSwapChain));
     end;
     FBufferIsValid := False;
   end;

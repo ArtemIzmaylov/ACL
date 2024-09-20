@@ -239,8 +239,8 @@ type
     procedure Premultiply; overload;
     procedure Reset(const R: TRect); overload;
     procedure Reset; overload;
-    procedure Resize(ANewWidth, ANewHeight: Integer); overload;
-    procedure Resize(const R: TRect); overload;
+    function Resize(const ANewBounds: TRect): Boolean; overload;
+    function Resize(const ANewWidth, ANewHeight: Integer): Boolean; overload;
 
     //# Draw
   {$IFDEF MSWINDOWS}
@@ -496,10 +496,6 @@ type
 // AlphaBlend
 procedure acUpdateLayeredWindow(Wnd: TWndHandle; SrcDC: HDC; const R: TRect; AAlpha: Integer = 255); overload;
 {$ENDIF}
-
-// DoubleBuffer
-function acCreateMemDC(ASourceDC: HDC; const R: TRect; out AMemBmp: HBITMAP; out AClipRegion: TRegionHandle): HDC;
-procedure acDeleteMemDC(AMemDC: HDC; AMemBmp: HBITMAP; AClipRegion: TRegionHandle);
 
 // GDI
 procedure acBitBlt(DC, SourceDC: HDC; const R: TRect; const APoint: TPoint); overload; inline;
@@ -1430,30 +1426,6 @@ begin
   UpdateLayeredWindow(Wnd, 0, @ATopLeft, @ASize, SrcDC, @N, 0, @ABlendFunc, ULW_ALPHA);
 end;
 {$ENDIF}
-
-//----------------------------------------------------------------------------------------------------------------------
-// DoubleBuffer
-//----------------------------------------------------------------------------------------------------------------------
-
-function acCreateMemDC(ASourceDC: HDC; const R: TRect; out AMemBmp: HBITMAP; out AClipRegion: TRegionHandle): HDC;
-var
-  AClipRect: TRect;
-begin
-  AClipRegion := 0;
-  Result := CreateCompatibleDC(ASourceDC);
-  AMemBmp := CreateCompatibleBitmap(ASourceDC, R.Right - R.Left, R.Bottom - R.Top);
-  DeleteObject(SelectObject(Result, AMemBmp));
-  SetWindowOrgEx(Result, R.Left, R.Top, nil);
-  if GetClipBox(ASourceDC, {$IFDEF FPC}@{$ENDIF}AClipRect) <> ERROR then
-    acIntersectClipRegion(Result, AClipRect);
-end;
-
-procedure acDeleteMemDC(AMemDC: HDC; AMemBmp: HBITMAP; AClipRegion: TRegionHandle);
-begin
-  DeleteDC(AMemDC);
-  DeleteObject(AMemBmp);
-  DeleteObject(AClipRegion)
-end;
 
 //----------------------------------------------------------------------------------------------------------------------
 // GDI
@@ -2868,14 +2840,15 @@ begin
   acResetRect(Handle, R);
 end;
 
-procedure TACLDib.Resize(const R: TRect);
+function TACLDib.Resize(const ANewBounds: TRect): Boolean;
 begin
-  Resize(R.Width, R.Height);
+  Result := Resize(ANewBounds.Width, ANewBounds.Height);
 end;
 
-procedure TACLDib.Resize(ANewWidth, ANewHeight: Integer);
+function TACLDib.Resize(const ANewWidth, ANewHeight: Integer): Boolean;
 begin
-  if (ANewWidth <> Width) or (ANewHeight <> Height) then
+  Result := (ANewWidth <> Width) or (ANewHeight <> Height);
+  if Result then
   begin
     FreeHandles;
     CreateHandles(ANewWidth, ANewHeight);

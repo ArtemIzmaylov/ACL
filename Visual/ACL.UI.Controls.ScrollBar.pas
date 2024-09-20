@@ -47,7 +47,8 @@ uses
   ACL.UI.Controls.Buttons,
   ACL.UI.Resources,
   ACL.Utils.Common,
-  ACL.Utils.Desktop;
+  ACL.Utils.Desktop,
+  ACL.Utils.DPIAware;
 
 const
   acScrollBarHitArea = 120;

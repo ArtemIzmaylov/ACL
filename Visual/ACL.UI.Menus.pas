@@ -2626,7 +2626,7 @@ begin
         LMenu := FPostponedClosure;
         FPostponedClosure := nil;
         DoCloseMenu(LMenu);
-      end);
+      end, Self);
   end
   else
     FInLoop := False;

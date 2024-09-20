@@ -1593,8 +1593,8 @@ var
 begin
   inherited;
   LSettings := TACLXMLWriterSettings.Default;
+  LSettings.CheckCharacters := False;
   LSettings.CheckWellformed := False; // у нас имя ноды уже идет с префиксом (prefix:name), валидация не пройдет.
-  LSettings.EncodeInvalidXmlCharAsUCS2 := True;
   LSettings.NewLineOnAttributes := ASettings.NewLineOnAttributes;
   LSettings.NewLineOnNode := ASettings.NewLineOnNode;
   FWriter := TACLXMLWriter.Create(AStream, LSettings);
