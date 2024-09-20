@@ -263,9 +263,11 @@ type
       AlphaFormat: TAlphaFormat = afDefined): TACL2DRenderImage; overload; virtual; abstract;
     function CreateImage(Image: TACLDib): TACL2DRenderImage; overload; virtual;
     function CreateImage(Image: TACLImage): TACL2DRenderImage; overload; virtual;
-    function CreateImageAttributes: TACL2DRenderImageAttributes; virtual; abstract;
-    procedure DrawImage(Image: TACLDib; const TargetRect: TRect; Cache: PACL2DRenderImage = nil); overload;
-    procedure DrawImage(Image: TACL2DRenderImage; const TargetRect: TRect; Alpha: Byte = MaxByte); overload;
+    function CreateImageAttributes: TACL2DRenderImageAttributes; virtual;
+    procedure DrawImage(Image: TACLDib;
+      const TargetRect: TRect; Cache: PACL2DRenderImage = nil); overload;
+    procedure DrawImage(Image: TACL2DRenderImage;
+      const TargetRect: TRect; Alpha: Byte = MaxByte); overload;
     procedure DrawImage(Image: TACL2DRenderImage;
       const TargetRect, SourceRect: TRect; Alpha: Byte = MaxByte); overload; virtual; abstract;
     procedure DrawImage(Image: TACL2DRenderImage;
@@ -1679,6 +1681,11 @@ begin
 {$ENDIF}
   else
     Result := nil;
+end;
+
+function TACL2DRender.CreateImageAttributes: TACL2DRenderImageAttributes;
+begin
+  Result := TACL2DRenderImageAttributes.Create(Self);
 end;
 
 function TACL2DRender.CreateImage(Image: TACLDib): TACL2DRenderImage;

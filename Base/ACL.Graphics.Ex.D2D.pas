@@ -111,7 +111,6 @@ type
     // Images
     function CreateImage(Colors: PACLPixel32; Width, Height: Integer;
       AlphaFormat: TAlphaFormat = afDefined): TACL2DRenderImage; override;
-    function CreateImageAttributes: TACL2DRenderImageAttributes; override;
     procedure DrawImage(Image: TACL2DRenderImage;
       const TargetRect, SourceRect: TRect; Attributes: TACL2DRenderImageAttributes); override;
     procedure DrawImage(Image: TACL2DRenderImage;
@@ -848,11 +847,6 @@ function TACLDirect2DAbstractRender.CreateImage(Colors: PACLPixel32;
   Width, Height: Integer; AlphaFormat: TAlphaFormat): TACL2DRenderImage;
 begin
   Result := TACLDirect2DRenderImage.Create(Self, Colors, Width, Height, AlphaFormat);
-end;
-
-function TACLDirect2DAbstractRender.CreateImageAttributes: TACL2DRenderImageAttributes;
-begin
-  Result := TACL2DRenderImageAttributes.Create(Self);
 end;
 
 function TACLDirect2DAbstractRender.CreatePath: TACL2DRenderPath;
