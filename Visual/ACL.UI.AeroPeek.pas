@@ -611,16 +611,20 @@ procedure TACLAeroPeek.SyncButtons;
   end;
 
 var
-  AButtonsCount: Integer;
+  LButtonCount: Integer;
   I: Integer;
 begin
   if FTaskBarButtonsInitialized or (Buttons.Count <> 0) then
   begin
-    AButtonsCount := Min(Buttons.Count, Length(FTaskBarButtons));
-    for I := 0 to AButtonsCount - 1 do
+    LButtonCount := Min(Buttons.Count, Length(FTaskBarButtons));
+    for I := 0 to LButtonCount - 1 do
       PrepareButton(FTaskBarButtons[I], Buttons[I], I);
     if Initialized then
-      UpdateThumbBar(@FTaskBarButtons[0], AButtonsCount);
+    try
+      UpdateThumbBar(@FTaskBarButtons[0], LButtonCount);
+    except
+      // do nothing
+    end;
   end;
 {$ELSE}
 begin
