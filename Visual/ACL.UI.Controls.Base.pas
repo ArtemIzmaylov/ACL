@@ -861,7 +861,7 @@ function acCanStartDragging(const ADeltaX, ADeltaY, ATargetDpi: Integer): Boolea
 function acCanStartDragging(const P0, P1: TPoint; ATargetDpi: Integer): Boolean; overload;
 procedure acDesignerSetModified(AInvoker: TPersistent);
 function acGetContainer(AControl: TControl): TControl;
-function acIsChild(AControl, AChildToTest: TControl): Boolean;
+function acIsChildOrSelf(AControl, AChildToTest: TControl): Boolean;
 function acIsSemitransparentFill(AContentColor1, AContentColor2: TACLResourceColor): Boolean;
 function acOpacityToAlphaBlendValue(AOpacity: Integer): Byte;
 
@@ -1133,7 +1133,7 @@ begin
     Inc(Result, dpiApply(acIndentBetweenElements, ATargetDpi));
 end;
 
-function acIsChild(AControl, AChildToTest: TControl): Boolean;
+function acIsChildOrSelf(AControl, AChildToTest: TControl): Boolean;
 begin
   Result := False;
   while AChildToTest <> nil do
@@ -1613,7 +1613,7 @@ const
 begin
   if FControl <> AValue then
   try
-    if acIsChild(AValue, FOwner) then
+    if acIsChildOrSelf(AValue, FOwner) then
       raise EInvalidArgument.Create(sErrorUnsupportedControl);
     if FControl <> nil then
     begin

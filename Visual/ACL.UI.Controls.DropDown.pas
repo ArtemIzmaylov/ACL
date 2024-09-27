@@ -273,7 +273,7 @@ end;
 function TACLCustomDropDownEdit.Focused: Boolean;
 begin
   Result := inherited or (DropDownWindow <> nil) and
-    acIsChild(DropDownWindow, FindControl(GetFocus));
+    acIsChildOrSelf(DropDownWindow, FindControl(GetFocus));
 end;
 
 function TACLCustomDropDownEdit.GetCursor(const P: TPoint): TCursor;
@@ -572,7 +572,7 @@ end;
 
 procedure TACLDropDown.SetControl(AValue: TControl);
 begin
-  if acIsChild(Self, AValue) then
+  if acIsChildOrSelf(Self, AValue) then
     raise EInvalidArgument.CreateFmt('The %s cannot be used as child', [AValue.Name]);
   acComponentFieldSet(FControl, Self, AValue);
 end;

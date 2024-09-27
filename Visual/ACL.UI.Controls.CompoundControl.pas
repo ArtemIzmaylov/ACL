@@ -190,7 +190,7 @@ end;
 function TACLCompoundControl.Focused: Boolean;
 begin
 {$IFDEF FPC}
-  Result := acIsChild(Self, FindControl(GetFocus));
+  Result := acIsChildOrSelf(Self, FindControl(GetFocus));
 {$ELSE}
   var AHandle := GetFocus;
   Result := (AHandle <> 0) and (WindowHandle <> 0) and
