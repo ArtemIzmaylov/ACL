@@ -150,7 +150,7 @@ type
     constructor CreateNew(AOwner: TComponent; ADummy: Integer = 0); override;
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
-    procedure ScaleForCurrentDPI{$IFDEF DELPHI120}(ForceScaling: Boolean = False){$ENDIF};{$IFNDEF FPC}override;{$ENDIF}
+    procedure ScaleForCurrentDPI{$IFDEF DELPHI120}(ForceScaling: Boolean = False){$ENDIF};{$IFDEF FPC}virtual;{$ELSE}override;{$ENDIF}
     procedure ScaleForPPI(ATargetPPI: Integer); overload; {$IFNDEF FPC}override; final;{$ENDIF}
     procedure ScaleForPPI(ATargetPPI: Integer; AWindowRect: PRect); reintroduce; overload; virtual;
     function SetFocusedControl(Control: TWinControl): Boolean; override;
