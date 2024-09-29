@@ -67,6 +67,8 @@ const
   CM_SCALECHANGED  = $BF01;
 
 {$IFDEF FPC}
+  WHEEL_DELTA = 120;
+
   GetCaretBlinkTime = 500;
 
   CS_DROPSHADOW  = 0;
@@ -83,10 +85,41 @@ const
 
   csAligning     = csCreating; // просто потому, что оно в LCL не используется
 
+  // Interactive gesture id's (maps to Windows 7's WM_GESTURE)
+  igiFirst        = 256;
+  igiLast         = 511;
+  igiBegin        = igiFirst + 1{GID_BEGIN};
+  igiEnd          = igiFirst + 2{GID_END};
+  igiZoom         = igiFirst + 3{GID_ZOOM};
+  igiPan          = igiFirst + 4{GID_PAN};
+  igiRotate       = igiFirst + 5{GID_ROTATE};
+  igiTwoFingerTap = igiFirst + 6{GID_TWOFINGERTAP};
+  igiPressAndTap  = igiFirst + 7{GID_PRESSANDTAP};
+
 type
+  TGestureID = igiFirst..igiLast;
+
+  TInteractiveGesture = (igZoom, igPan, igRotate, igTwoFingerTap, igPressAndTap);
+  TInteractiveGestures = set of TInteractiveGesture;
+
+  TInteractiveGestureFlag = (gfBegin, gfInertia, gfEnd);
+  TInteractiveGestureFlags = set of TInteractiveGestureFlag;
+
+  TInteractiveGestureOption = (
+    igoPanSingleFingerHorizontal, igoPanSingleFingerVertical,
+    igoPanInertia, igoPanGutter, igoParentPassthrough);
+  TInteractiveGestureOptions = set of TInteractiveGestureOption;
+
+  PGestureEventInfo = ^TGestureEventInfo;
   TGestureEventInfo = record
-    {stub}
+    GestureID: TGestureID;
+    Location: TPoint;
+    Flags: TInteractiveGestureFlags;
+    Angle: Double;
+    InertiaVector: TSmallPoint;
+    Distance: Integer;
   end;
+
   TWMContextMenu = TLMContextMenu;
   TWMMouseWheel = TCMMouseWheel;
 {$ENDIF}

@@ -34,6 +34,7 @@ uses
   ACL.Utils.Strings;
 
 type
+  TACLStreamMethod = procedure (AStream: TStream) of object;
   TACLStreamProc = reference to procedure (AStream: TStream);
 
   { EACLCannotModifyReadOnlyStream }
@@ -283,8 +284,9 @@ function StreamCreateReader(const AFileName: string): TStream; overload;
 function StreamCreateReader(const AFileName: string; out AStream: TStream): Boolean; overload;
 function StreamCreateWriter(const AFileName: string): TStream; overload;
 function StreamCreateWriter(const AFileName: string; out AStream: TStream): Boolean; overload;
-procedure StreamLoad(AEvent: TACLStreamProc; AStreamContainer: IACLStreamContainer); overload; inline;
-procedure StreamLoad(AEvent: TACLStreamProc; AStream: TStream; AFreeStream: Boolean = True); overload; inline;
+procedure StreamLoad(AProc: TACLStreamMethod; AStreamContainer: IACLStreamContainer); overload; inline;
+procedure StreamLoad(AProc: TACLStreamProc; AStreamContainer: IACLStreamContainer); overload; inline;
+procedure StreamLoad(AProc: TACLStreamProc; AStream: TStream; AFreeStream: Boolean = True); overload; inline;
 function StreamLoadFromFile(AStream: TStream; const AFileName: string): Boolean;
 function StreamResourceExists(AInstance: HModule; const AResourceName: string; AResourceType: PChar): Boolean;
 function StreamSaveToFile(const AStream: IACLStreamContainer; const AFileName: string): Boolean; overload;
@@ -443,21 +445,33 @@ begin
   end;
 end;
 
-procedure StreamLoad(AEvent: TACLStreamProc; AStreamContainer: IACLStreamContainer);
+procedure StreamLoad(AProc: TACLStreamMethod; AStreamContainer: IACLStreamContainer);
 var
-  AStream: TStream;
+  LStream: TStream;
 begin
-  AStream := AStreamContainer.Lock;
+  LStream := AStreamContainer.Lock;
   try
-    AEvent(AStream);
+    AProc(LStream);
   finally
     AStreamContainer.Unlock;
   end;
 end;
 
-procedure StreamLoad(AEvent: TACLStreamProc; AStream: TStream; AFreeStream: Boolean = True);
+procedure StreamLoad(AProc: TACLStreamProc; AStreamContainer: IACLStreamContainer);
+var
+  LStream: TStream;
 begin
-  AEvent(AStream);
+  LStream := AStreamContainer.Lock;
+  try
+    AProc(LStream);
+  finally
+    AStreamContainer.Unlock;
+  end;
+end;
+
+procedure StreamLoad(AProc: TACLStreamProc; AStream: TStream; AFreeStream: Boolean = True);
+begin
+  AProc(AStream);
   if AFreeStream then
     AStream.Free;
 end;

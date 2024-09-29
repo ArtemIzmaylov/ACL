@@ -66,6 +66,7 @@ type
     procedure SetSourceDPI(AValue: Integer);
     procedure ReadDataWinIL(AStream: TStream);
   {$IFNDEF FPC}
+    function AddSliced(Source: TBitmap; XCount, YCount: Integer): Integer;
     procedure WriteDataCompressed(AStream: TStream);
   protected
     procedure DoDraw(Index: Integer; Canvas: TCanvas;
@@ -281,13 +282,7 @@ var
   LTemp: TACLBitmap;
 begin
   if acIs32BitBitmap(ABitmap) then
-  begin
-  {$IFDEF FPC}
-    Result := AddSliced(ABitmap, ABitmap.Width div Width, ABitmap.Height div Height);
-  {$ELSE}
-    Result := Add(ABitmap, nil);
-  {$ENDIF}
-  end
+    Result := AddSliced(ABitmap, ABitmap.Width div Width, ABitmap.Height div Height)
   else
   begin
     LTemp := ConvertTo32Bit(ABitmap);
@@ -335,6 +330,38 @@ begin
     LTmp.Free;
   end;
 end;
+
+{$IFNDEF FPC}
+function TACLImageList.AddSliced(Source: TBitmap; XCount, YCount: Integer): Integer;
+var
+  LBitmap: TACLBitmap;
+  LRect: TRect;
+begin
+  Result := -1;
+  if (XCount <= 0) or (YCount <= 0) then
+    Exit(-1);
+  if (YCount = 1) then // в этом случае Windows сама порежет битмап
+    Exit(Add(Source, nil));
+
+  LBitmap := TACLBitmap.Create(Width, Height);
+  try
+    LBitmap.PixelFormat := pf32Bit;
+    LRect := Rect(0, 0, Source.Width div XCount, Source.Height div YCount);
+    for var Y := 0 to YCount - 1 do
+    begin
+      for var X := 0 to XCount - 1 do
+      begin
+        LBitmap.Canvas.CopyRect(LBitmap.ClientRect, Source.Canvas, LRect);
+        Result := Add(LBitmap, nil);
+        LRect.Offset(LRect.Width, 0);
+      end;
+      LRect.Offset(-LRect.Left, LRect.Height);
+    end;
+  finally
+    LBitmap.Free;
+  end;
+end;
+{$ENDIF}
 
 function TACLImageList.AddIconFromResource(AInstance: HINST; const AName: string): Integer;
 var

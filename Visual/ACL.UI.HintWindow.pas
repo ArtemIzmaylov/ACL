@@ -97,9 +97,6 @@ type
   public const
     HeightCorrection = 4;
   strict private
-  {$IFDEF FPC}
-    FCurrentPPI: Integer;
-  {$ENDIF}
     FClickable: Boolean;
     FLayout: TACLTextLayout;
     FStyle: TACLStyleHint;
@@ -111,6 +108,9 @@ type
     procedure WMMouseWheel(var Message: TMessage); {$IFNDEF FPC}message WM_MOUSEWHEEL;{$ENDIF}
     procedure WMSize(var Message: TWMSize); message WM_SIZE;
   protected
+  {$IFDEF FPC}
+    FCurrentPPI: Integer;
+  {$ENDIF}
     procedure CreateParams(var Params: TCreateParams); override;
     procedure NCPaint(DC: HDC); {$IFNDEF FPC}override;{$ENDIF}
     procedure Paint; override;
