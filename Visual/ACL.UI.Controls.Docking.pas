@@ -1464,7 +1464,7 @@ procedure TACLDockEngine.UpdateDragTarget(AScreenPos: TPoint; ATarget: TControl)
         FDockZones.DeleteByOwner(AField);
         AField := nil;
       end;
-      if acIsChild(FExecutor, AValue) then
+      if acIsChildOrSelf(FExecutor, AValue) then
         Exit;
       if AValue <> nil then
       begin
@@ -3742,11 +3742,11 @@ begin
 {$ELSE}
   ADockControl := GetNearestDockControl(FindVCLWindow(ACursorPos), TACLDockControl);
 {$ENDIF}
-  if (ADockControl <> nil) and acIsChild(ActiveTab.Control, ADockControl) then
+  if (ADockControl <> nil) and acIsChildOrSelf(ActiveTab.Control, ADockControl) then
     Exit;
 
   ADockControl := GetNearestDockControl(FindControl(GetFocus), TACLDockControl);
-  if (ADockControl <> nil) and acIsChild(ActiveTab.Control, ADockControl) then
+  if (ADockControl <> nil) and acIsChildOrSelf(ActiveTab.Control, ADockControl) then
     Exit;
 
   ActivateTab(nil);
@@ -3924,7 +3924,7 @@ begin
     end;
   end;
 
-  if (ActiveTab <> nil) and not acIsChild(ActiveTab.Control, AChild) then
+  if (ActiveTab <> nil) and not acIsChildOrSelf(ActiveTab.Control, AChild) then
     ActivateTab(nil);
 end;
 
