@@ -309,6 +309,22 @@ type
     property TiledAreasMode: TACLSkinImageTiledAreasMode read FTiledAreasMode write SetTiledAreasMode;
   end;
 
+  { EZLibError }
+
+  EZLibError = class(Exception)
+  public
+    constructor Create(ACode: Integer);
+    class function Check(ACode: Integer; AIgnoreBufferError: Boolean = False): Integer;
+  end;
+
+  { EZLibCompressError }
+
+  EZLibCompressError = class(EZLibError);
+
+  { EZLibDecompressError }
+
+  EZLibDecompressError = class(EZLibError);
+
 const
   NullTileArea: TACLSkinImageTiledAreas = (
     Part1TileStart: 0; Part1TileWidth: 0;
@@ -494,37 +510,24 @@ begin
     FastMove(ASrc^, ADst^, ACount * SizeOf(TACLPixel32));
 end;
 
-function ZCompressCheck(code: Integer): Integer;
+{ EZLibError }
+
+constructor EZLibError.Create(ACode: Integer);
 begin
-  Result := code;
-  if code < 0 then
-  {$IFDEF FPC}
-    raise ECompressionError.Create(zError(code));
-  {$ELSE}
-    raise EZCompressionError.Create(string(_z_errmsg[2 - code])) at ReturnAddress;
-  {$ENDIF}
+{$IFDEF FPC}
+  inherited Create(zError(ACode));
+{$ELSE}
+  inherited Create(string(_z_errmsg[2 - ACode]));
+{$ENDIF}
 end;
 
-function ZCompressCheckWithoutBufferError(code: Integer): Integer;
+class function EZLibError.Check(ACode: Integer; AIgnoreBufferError: Boolean = False): Integer;
 begin
-  Result := code;
-  if (code < 0) and (code <> Z_BUF_ERROR) then
-  {$IFDEF FPC}
-    raise ECompressionError.Create(zError(code));
-  {$ELSE}
-    raise EZCompressionError.Create(string(_z_errmsg[2 - code])) at ReturnAddress;
-  {$ENDIF}
-end;
-
-function ZDecompressCheck(code: Integer): Integer;
-begin
-  Result := code;
-  if code < 0 then
-  {$IFDEF FPC}
-    raise EDecompressionError.Create(zError(code));
-  {$ELSE}
-    raise EZDecompressionError.Create(string(_z_errmsg[2 - code])) at ReturnAddress;
-  {$ENDIF}
+  Result := ACode;
+  if AIgnoreBufferError and (ACode <> Z_BUF_ERROR) then
+    Exit;
+  if ACode < 0 then
+    raise Create(ACode){$IFNDEF FPC} at ReturnAddress{$ENDIF};
 end;
 
 { TACLSkinImageTiledAreas }
@@ -605,9 +608,9 @@ begin
     ZStream.avail_in := AInSize;
     ZStream.avail_out := AOutSize;
 
-    ZCompressCheck(DeflateInit(ZStream, Levels[FSkinImageCompressionLevel]));
+    EZLibCompressError.Check(DeflateInit(ZStream, Levels[FSkinImageCompressionLevel]));
     try
-      while ZCompressCheckWithoutBufferError(deflate(ZStream, Z_FINISH)) <> Z_STREAM_END do
+      while EZLibCompressError.Check(deflate(ZStream, Z_FINISH), True) <> Z_STREAM_END do
       begin
         Inc(AOutSize, Delta);
         ReallocMem(Data, AOutSize);
@@ -615,7 +618,7 @@ begin
         ZStream.avail_out := Delta;
       end;
     finally
-      ZCompressCheck(deflateEnd(ZStream));
+      EZLibCompressError.Check(deflateEnd(ZStream));
     end;
 
     if Abs(Int64(ZStream.total_out) - Int64(AOutSize)) > Delta then
@@ -682,9 +685,9 @@ begin
   ZStream.next_out := PByteRef(ABits);
   ZStream.avail_out := ASize;
 
-  ZDecompressCheck(InflateInit(ZStream));
-  ZDecompressCheck(inflate(ZStream, Z_NO_FLUSH));
-  ZDecompressCheck(inflateEnd(ZStream));
+  EZLibDecompressError.Check(InflateInit(ZStream));
+  EZLibDecompressError.Check(inflate(ZStream, Z_NO_FLUSH));
+  EZLibDecompressError.Check(inflateEnd(ZStream));
 
   if ZStream.total_out <> ASize then
     raise EACLSkinImageException.Create(sErrorIncorrectDormantData);

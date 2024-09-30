@@ -430,6 +430,10 @@ function acUtf8ToUnicode(Dest: PWideChar; MaxDestChars: Integer; Source: PAnsiCh
 function acStringFromUtf8(const S: AnsiString): string;
 function acStringToUtf8(const S: string): AnsiString;
 
+// Characters
+function acCharLength(const P: PChar): Integer; overload;
+function acCharLength(const S: string; Index: Integer): Integer; overload;
+
 // Search
 function acContains(const AChar: AnsiChar; const AString: AnsiString): Boolean; inline; overload;
 function acContains(const AChar: WideChar; const AString: UnicodeString): Boolean; inline; overload;
@@ -1225,9 +1229,27 @@ begin
 {$ENDIF}
 end;
 
-// ---------------------------------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
+// Characters
+// -----------------------------------------------------------------------------
+
+function acCharLength(const P: PChar): Integer;
+begin
+{$IFDEF FPC}
+  Result := UTF8CodepointSizeFast(P);
+{$ELSE}
+  Result := 1 + Ord(P^.IsHighSurrogate);
+{$ENDIF}
+end;
+
+function acCharLength(const S: string; Index: Integer): Integer;
+begin
+  Result := acCharLength(@S[Index]);
+end;
+
+// -----------------------------------------------------------------------------
 // ExplodeString
-// ---------------------------------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 
 function acExplodeString(AScan: PAnsiChar; AScanCount: Integer;
   const ADelimiters: AnsiString; AReceiveProc: TAnsiExplodeStringReceiveResultProc): Integer;

@@ -541,7 +541,7 @@ procedure acFillRect(ACanvas: TCanvas; const ARect: TRect; AColor: TAlphaColor; 
 procedure acFillRect(ACanvas: TCanvas; const ARect: TRect; AColor: TColor); overload;
 procedure acFitFileName(ACanvas: TCanvas; ATargetWidth: Integer; var S: string);
 procedure acResetFont(AFont: TFont);
-procedure acResetRect(DC: HDC; const R: TRect); inline;
+procedure acResetRect(DC: HDC; const R: TRect);
 procedure acStretchBlt(DC, SourceDC: HDC; const ADest, ASource: TRect); inline;
 procedure acStretchDraw(DC, SourceDC: HDC; const ADest, ASource: TRect; AMode: TACLStretchMode);
 procedure acTileBlt(DC, SourceDC: HDC; const ADest, ASource: TRect);
@@ -568,10 +568,10 @@ function acRegionFromBitmap(AColors: PACLPixel32;
   AWidth, AHeight: Integer; ATransparentColor: TColor): TRegionHandle; overload;
 
 // WindowOrg
-function acMoveWindowOrg(DC: HDC; const P: TPoint): TPoint; overload; inline;
+function acMoveWindowOrg(DC: HDC; const P: TPoint): TPoint; overload;
 function acMoveWindowOrg(DC: HDC; DX, DY: Integer): TPoint; overload;
-procedure acRegionMoveToWindowOrg(DC: HDC; ARegion: TRegionHandle); inline;
-procedure acRestoreWindowOrg(DC: HDC; const P: TPoint); inline;
+procedure acRegionMoveToWindowOrg(DC: HDC; ARegion: TRegionHandle);
+procedure acRestoreWindowOrg(DC: HDC; const P: TPoint);
 
 // Bitmaps
 procedure acFillBitmapInfoHeader(out AHeader: TBitmapInfoHeader; AWidth, AHeight: Integer);

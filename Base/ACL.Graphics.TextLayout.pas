@@ -1024,9 +1024,7 @@ end;
 
 procedure acExpandPrefixes(var AText: string; AHide: Boolean);
 var
-{$IFDEF FPC}
   ABytesInChar: Integer;
-{$ENDIF}
   ABuffer: TACLStringBuilder;
   AChars: PChar;
   ALength: Integer;
@@ -1053,15 +1051,13 @@ begin
           begin
             ABuffer.Append('[u]');
             ABuffer.Append(AChars^);
-          {$IFDEF FPC}
-            ABytesInChar := UTF8CodepointSize(AChars) - 1;
+            ABytesInChar := acCharLength(AChars) - 1;
             if ABytesInChar > 0 then
             begin
               ABuffer.Append(AChars + 1, ABytesInChar);
               Dec(ALength, ABytesInChar);
               Inc(AChars, ABytesInChar);
             end;
-          {$ENDIF}
             ABuffer.Append('[/u]');
             AHide := True; // винда показывает только одно подчеркивание
           end
