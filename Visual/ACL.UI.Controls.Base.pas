@@ -1886,7 +1886,10 @@ begin
   for I := 0 to AParent.ControlCount - 1 do
   begin
     LControl := AParent.Controls[I];
-    if LControl.Visible and (LControl.Align in AAlignSet) then
+    if (LControl.Align in AAlignSet) and (
+      (LControl.Align = alNone) or // должны позиционироваться всегда, иначе якоря не обновятся
+      (csDesigning in LControl.ComponentState) or LControl.Visible)
+    then
       AList.Add(LControl);
   end;
   if AList.Count > 1 then

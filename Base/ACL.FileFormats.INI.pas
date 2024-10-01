@@ -165,7 +165,8 @@ type
     function ReadFloat(const ASection, AKey: string; const ADefault: Double = 0): Double;
     function ReadInteger(const ASection, AKey: string; ADefault: Integer = 0): Integer; virtual;
     function ReadInt64(const ASection, AKey: string; const ADefault: Int64 = 0): Int64;
-    function ReadObject(const ASection, AKey: string; ALoadProc: TACLStreamProc): Boolean;
+    function ReadObject(const ASection, AKey: string; ALoadProc: TACLStreamProc): Boolean; overload;
+    function ReadObject(const ASection, AKey: string; ALoadProc: TACLStreamMethod): Boolean; overload;
     function ReadRect(const ASection, AKey: string): TRect; overload;
     function ReadRect(const ASection, AKey: string; const ADefault: TRect): TRect; overload;
     function ReadSize(const ASection, AKey: string): TSize;
@@ -191,7 +192,8 @@ type
     procedure WriteInt64(const ASection, AKey: string; const AValue: Int64); overload;
     procedure WriteInteger(const ASection, AKey: string; AValue, ADefaultValue: Integer); overload;
     procedure WriteInteger(const ASection, AKey: string; AValue: Integer); overload;
-    procedure WriteObject(const ASection, AKey: string; ASaveProc: TACLStreamProc);
+    procedure WriteObject(const ASection, AKey: string; ASaveProc: TACLStreamProc); overload;
+    procedure WriteObject(const ASection, AKey: string; ASaveProc: TACLStreamMethod); overload;
     procedure WriteRect(const ASection, AKey: string; const AValue: TRect);
     procedure WriteSize(const ASection, AKey: string; const AValue: TSize);
     procedure WriteStream(const ASection, AKey: string; AStream: TStream);
@@ -948,6 +950,11 @@ begin
   end;
 end;
 
+function TACLIniFile.ReadObject(const ASection, AKey: string; ALoadProc: TACLStreamMethod): Boolean;
+begin
+  Result := ReadObject(ASection, AKey, procedure (S: TStream) begin ALoadProc(S); end);
+end;
+
 procedure TACLIniFile.WriteBool(const ASection, AKey: string; AValue: Boolean);
 begin
   WriteInteger(ASection, AKey, Ord(AValue));
@@ -1022,6 +1029,11 @@ begin
   finally
     AStream.Free;
   end;
+end;
+
+procedure TACLIniFile.WriteObject(const ASection, AKey: string; ASaveProc: TACLStreamMethod);
+begin
+  WriteObject(ASection, AKey, procedure (S: TStream) begin ASaveProc(S); end);
 end;
 
 procedure TACLIniFile.WriteRect(const ASection, AKey: string; const AValue: TRect);
