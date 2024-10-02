@@ -160,7 +160,7 @@ type
 
   { TACLDockZones }
 
-  TACLDockZones = class(TACLObjectList<TACLDockZone>)
+  TACLDockZones = class(TACLObjectListOf<TACLDockZone>)
   public
     procedure DeleteByOwner(AOwner: TComponent);
     function HitTest(const P: TPoint): TACLDockZone;
@@ -564,7 +564,7 @@ type
 
     function GetMainSite: TACLDockSite; inline;
   protected
-    FTabs: TACLList<TACLDockSiteSideBarTab>;
+    FTabs: TACLListOf<TACLDockSiteSideBarTab>;
 
     procedure Calculate;
     procedure Changed;
@@ -646,7 +646,7 @@ type
 
   TACLDockSite = class(TACLDockGroup)
   strict private
-    FFloatForms: TACLObjectList<TACLFloatDockForm>;
+    FFloatForms: TACLObjectListOf<TACLFloatDockForm>;
     FSideBars: TACLDockSiteSideBars;
 
     function GetStyle: TACLStyleDockSite;
@@ -667,7 +667,7 @@ type
     procedure CMDockingUpdateText(var Message: TMessage); message CM_DOCKING_UPDATETEXT;
     procedure CMDockingVisibility(var Message: TMessage); message CM_DOCKING_VISIBILITY;
     //# Properties
-    property FloatForms: TACLObjectList<TACLFloatDockForm> read FFloatForms;
+    property FloatForms: TACLObjectListOf<TACLFloatDockForm> read FFloatForms;
     property SideBars: TACLDockSiteSideBars read FSideBars;
   public
     constructor Create(AOwner: TComponent); override;
@@ -3428,7 +3428,7 @@ begin
   inherited Create(nil);
   FOwner := AOwner;
   FSide := ASide;
-  FTabs := TACLObjectList<TACLDockSiteSideBarTab>.Create;
+  FTabs := TACLObjectListOf<TACLDockSiteSideBarTab>.Create;
   FStyle := AOwner.Site.Style;
 end;
 
@@ -3982,7 +3982,7 @@ constructor TACLDockSite.Create(AOwner: TComponent);
 begin
   inherited;
   FSideBars := TACLDockSiteSideBars.Create(Self);
-  FFloatForms := TACLObjectList<TACLFloatDockForm>.Create;
+  FFloatForms := TACLObjectListOf<TACLFloatDockForm>.Create;
 end;
 
 destructor TACLDockSite.Destroy;

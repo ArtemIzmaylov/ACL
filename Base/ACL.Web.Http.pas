@@ -133,7 +133,7 @@ type
     FCacheStreamLock: TACLCriticalSection;
     FConnection: THttpConnection;
     FFatalError: Boolean;
-    FFreeBlocks: TACLThreadList<Integer>;
+    FFreeBlocks: TACLThreadListOf<Integer>;
     FFreeBlocksCursor: Integer;
     FFreeBlocksEvent: TACLEvent;
     FLoadOnRequest: Boolean;
@@ -151,7 +151,7 @@ type
       const ACachedFileName: string = ''; ALoadOnRequest: Boolean = False);
     destructor Destroy; override;
     class function ValidateCacheStream(AStream: TStream): Boolean; overload;
-    class procedure ValidateCacheStream(AStream: TStream; AFreeBlocks: TACLList<Integer>); overload;
+    class procedure ValidateCacheStream(AStream: TStream; AFreeBlocks: TACLListOf<Integer>); overload;
     function Read(var Buffer; Count: Longint): Longint; override;
     function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; override;
     function Write(const Buffer; Count: Longint): Longint; override;
@@ -824,12 +824,12 @@ type
 constructor TACLHttpInputStream.Create(const URL: TACLWebURL;
   const ACachedFileName: string = ''; ALoadOnRequest: Boolean = False);
 var
-  AList: TACLList<Integer>;
+  AList: TACLListOf<Integer>;
 begin
   inherited Create;
   FURL := URL;
   FLoadOnRequest := ALoadOnRequest;
-  FFreeBlocks := TACLThreadList<Integer>.Create;
+  FFreeBlocks := TACLThreadListOf<Integer>.Create;
   FFreeBlocksEvent := TACLEvent.Create;
   FCacheStreamLock := TACLCriticalSection.Create(Self, 'Lock');
 
@@ -890,9 +890,9 @@ end;
 
 class function TACLHttpInputStream.ValidateCacheStream(AStream: TStream): Boolean;
 var
-  AFreeBlocks: TACLList<Integer>;
+  AFreeBlocks: TACLListOf<Integer>;
 begin
-  AFreeBlocks := TACLList<Integer>.Create;
+  AFreeBlocks := TACLListOf<Integer>.Create;
   try
     ValidateCacheStream(AStream, AFreeBlocks);
     Result := AFreeBlocks.Count = 0;
@@ -901,7 +901,7 @@ begin
   end;
 end;
 
-class procedure TACLHttpInputStream.ValidateCacheStream(AStream: TStream; AFreeBlocks: TACLList<Integer>);
+class procedure TACLHttpInputStream.ValidateCacheStream(AStream: TStream; AFreeBlocks: TACLListOf<Integer>);
 var
   ABlockIndex: Integer;
   APosition: Int64;

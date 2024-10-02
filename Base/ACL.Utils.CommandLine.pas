@@ -67,7 +67,7 @@ type
       Name: string;
     end;
 
-    TCommands = class(TACLObjectList<TCommand>)
+    TCommands = class(TACLObjectListOf<TCommand>)
     public
       function ToString: string; override;
     end;

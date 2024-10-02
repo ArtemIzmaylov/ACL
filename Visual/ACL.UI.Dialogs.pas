@@ -196,8 +196,8 @@ type
 
   TACLCustomInputQueryDialog = class abstract(TACLCustomInputDialog)
   strict private
-    FEditors: TACLObjectList<TWinControl>;
-    FLabels: TACLObjectList<TACLLabel>;
+    FEditors: TACLObjectListOf<TWinControl>;
+    FLabels: TACLObjectListOf<TACLLabel>;
   protected
     procedure CreateEditors(AValueCount: Integer); virtual;
     function GetEditClass: TControlClass; virtual; abstract;
@@ -207,8 +207,8 @@ type
     procedure PlaceControls(var R: TRect); override;
     procedure PlaceEditors(var R: TRect); virtual;
     //# Properties
-    property Editors: TACLObjectList<TWinControl> read FEditors;
-    property Labels: TACLObjectList<TACLLabel> read FLabels;
+    property Editors: TACLObjectListOf<TWinControl> read FEditors;
+    property Labels: TACLObjectListOf<TACLLabel> read FLabels;
   public
     destructor Destroy; override;
   end;
@@ -862,8 +862,8 @@ end;
 
 procedure TACLCustomInputQueryDialog.Initialize(AValueCount: Integer);
 begin
-  FLabels := TACLObjectList<TACLLabel>.Create;
-  FEditors := TACLObjectList<TWinControl>.Create;
+  FLabels := TACLObjectListOf<TACLLabel>.Create;
+  FEditors := TACLObjectListOf<TWinControl>.Create;
   CreateEditors(AValueCount);
   CreateControls;
   ActiveControl := FEditors[0];

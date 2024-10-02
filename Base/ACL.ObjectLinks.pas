@@ -93,7 +93,7 @@ type
 
     FBridges: TList;
     FExtensions: TACLInterfaceList;
-    FRemoveListeners: TACLList<IACLObjectRemoveNotify>;
+    FRemoveListeners: TACLInterfaceList;
     FWeakReferences: TList;
   public
     constructor Create(AObject: TObject);
@@ -300,6 +300,7 @@ end;
 
 destructor TACLObjectLink.Destroy;
 var
+  LIntf: IACLObjectRemoveNotify;
   I: Integer;
 begin
   if FWeakReferences <> nil then
@@ -322,7 +323,8 @@ begin
   try
     for I := FRemoveListeners.Count - 1 downto 0 do
     begin
-      FRemoveListeners.List[I].Removing(FObject);
+      LIntf := IACLObjectRemoveNotify(FRemoveListeners.List[I]);
+      LIntf.Removing(FObject);
       FRemoveListeners.List[I] := nil;
     end;
   finally
@@ -351,7 +353,7 @@ end;
 procedure TACLObjectLink.AddRemoveListener(const ARemoveListener: IACLObjectRemoveNotify);
 begin
   if FRemoveListeners = nil then
-    FRemoveListeners := TACLList<IACLObjectRemoveNotify>.Create;
+    FRemoveListeners := TACLInterfaceList.Create;
   FRemoveListeners.Add(ARemoveListener);
 end;
 
@@ -412,3 +414,4 @@ begin
 end;
 
 end.
+

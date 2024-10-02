@@ -254,7 +254,7 @@ type
 
   { TACLTreeListColumnList }
 
-  TACLTreeListColumnList = class(TACLObjectList<TACLTreeListColumn>)
+  TACLTreeListColumnList = class(TACLObjectListOf<TACLTreeListColumn>)
   public
     function IsValidIndex(Index: Integer): Boolean; inline;
   end;
@@ -329,7 +329,7 @@ type
 
   { TACLTreeListGroups }
 
-  TACLTreeListGroups = class(TACLObjectList<TACLTreeListGroup>)
+  TACLTreeListGroups = class(TACLObjectListOf<TACLTreeListGroup>)
   strict private
     FIndex: TDictionary<string, TACLTreeListGroup>;
     FIndexLockCount: Integer;
@@ -343,7 +343,7 @@ type
     function Add(const ACaption: string): TACLTreeListGroup;
     procedure ClearLinks;
     function Find(const ACaption: string): TACLTreeListGroup;
-    procedure Move(ATargetIndex: Integer; AGroupsToMove: TACLList<TACLTreeListGroup>);
+    procedure Move(ATargetIndex: Integer; AGroupsToMove: TACLListOf<TACLTreeListGroup>);
     procedure SetExpanded(AValue: Boolean);
     procedure Sort(AIntf: IComparer<TACLTreeListGroup>); reintroduce;
     procedure SortByNodeIndex;
@@ -501,7 +501,7 @@ type
 
   TACLTreeListStringNode = class(TACLTreeListNode)
   protected
-    FValues: TACLList<string>;
+    FValues: TACLListOf<string>;
 
     function GetValue(Index: Integer): string; override;
     function GetValuesCapacity: Integer; override;
@@ -1307,7 +1307,7 @@ begin
     Result := nil;
 end;
 
-procedure TACLTreeListGroups.Move(ATargetIndex: Integer; AGroupsToMove: TACLList<TACLTreeListGroup>);
+procedure TACLTreeListGroups.Move(ATargetIndex: Integer; AGroupsToMove: TACLListOf<TACLTreeListGroup>);
 var
   AIndex: Integer;
 begin
@@ -2059,7 +2059,7 @@ begin
   if (FValues = nil) or (Index >= FValues.Count) or (FValues.List[Index] <> S) then
   begin
     if FValues = nil then
-      FValues := TACLList<string>.Create;
+      FValues := TACLListOf<string>.Create;
     for I := FValues.Count to Index do
       FValues.Add(EmptyStr);
     FValues.Items[Index] := S;
@@ -2072,7 +2072,7 @@ begin
   if AValue <> ValuesCapacity then
   begin
     if FValues = nil then
-      FValues := TACLList<string>.Create;
+      FValues := TACLListOf<string>.Create;
     FValues.Capacity := AValue;
   end;
 end;

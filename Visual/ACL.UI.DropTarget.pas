@@ -190,7 +190,7 @@ type
     procedure SetActiveTarget(AValue: IACLDropTarget);
     procedure SetRegistered(AValue: Boolean);
   protected
-    FTargets: TACLList<IACLDropTarget>;
+    FTargets: TACLListOf<IACLDropTarget>;
 
     procedure HockedWndProc(var AMessage: TMessage); virtual;
     // Actions
@@ -284,7 +284,7 @@ begin
   FControl := AControl;
   FControlWndProc := FControl.WindowProc;
   FControl.WindowProc := HockedWndProc;
-  FTargets := TACLList<IACLDropTarget>.Create;
+  FTargets := TACLListOf<IACLDropTarget>.Create;
   TACLDropTargetHookManager.DoAdd(Self);
 end;
 

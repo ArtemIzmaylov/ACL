@@ -170,7 +170,7 @@ type
 
   { TACLWindowHooks }
 
-  TACLWindowHooks = class(TACLList<TWindowHook>)
+  TACLWindowHooks = class(TACLListOf<TWindowHook>)
   public
     function Process(var Message: TMessage): Boolean;
   end;

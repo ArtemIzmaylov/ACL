@@ -91,7 +91,7 @@ type
 
   { TACLUIInsightCandidates }
 
-  TACLUIInsightCandidates = class(TACLObjectList<TACLUIInsightCandidate>);
+  TACLUIInsightCandidates = class(TACLObjectListOf<TACLUIInsightCandidate>);
 
   { TACLUIInsightSearchQueueBuilder }
 

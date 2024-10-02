@@ -81,11 +81,11 @@ type
 
   { TACLTimerList }
 
-  TACLTimerList<T> = class(TACLTimer)
+  TACLTimerListOf<T> = class(TACLTimer)
   strict private
     procedure CheckState;
   protected
-    FList: TACLList<T>;
+    FList: TACLListOf<T>;
 
     procedure DoAdding(const AObject: T); virtual;
     procedure DoRemoving(const AObject: T); virtual;
@@ -286,19 +286,19 @@ end;
 
 { TACLTimerList }
 
-constructor TACLTimerList<T>.Create;
+constructor TACLTimerListOf<T>.Create;
 begin
   inherited Create(nil);
-  FList := TACLList<T>.Create;
+  FList := TACLListOf<T>.Create;
 end;
 
-destructor TACLTimerList<T>.Destroy;
+destructor TACLTimerListOf<T>.Destroy;
 begin
   FreeAndNil(FList);
   inherited Destroy;
 end;
 
-procedure TACLTimerList<T>.Add(const AObject: T);
+procedure TACLTimerListOf<T>.Add(const AObject: T);
 begin
   if FList.IndexOf(AObject) < 0 then
   begin
@@ -308,12 +308,12 @@ begin
   end;
 end;
 
-function TACLTimerList<T>.Contains(const AObject: T): Boolean;
+function TACLTimerListOf<T>.Contains(const AObject: T): Boolean;
 begin
   Result := FList.Contains(AObject);
 end;
 
-procedure TACLTimerList<T>.Remove(const AObject: T);
+procedure TACLTimerListOf<T>.Remove(const AObject: T);
 var
   AIndex: Integer;
 begin
@@ -326,22 +326,22 @@ begin
   end;
 end;
 
-procedure TACLTimerList<T>.DoAdding(const AObject: T);
+procedure TACLTimerListOf<T>.DoAdding(const AObject: T);
 begin
   // do nothing
 end;
 
-procedure TACLTimerList<T>.DoRemoving(const AObject: T);
+procedure TACLTimerListOf<T>.DoRemoving(const AObject: T);
 begin
   // do nothing
 end;
 
-function TACLTimerList<T>.CanSetTimer: Boolean;
+function TACLTimerListOf<T>.CanSetTimer: Boolean;
 begin
   Result := Enabled and (Interval > 0);
 end;
 
-procedure TACLTimerList<T>.Timer;
+procedure TACLTimerListOf<T>.Timer;
 var
   I: Integer;
 begin
@@ -349,7 +349,7 @@ begin
     TimerObject(FList.List[I]);
 end;
 
-procedure TACLTimerList<T>.CheckState;
+procedure TACLTimerListOf<T>.CheckState;
 begin
   Enabled := FList.Count > 0;
 end;

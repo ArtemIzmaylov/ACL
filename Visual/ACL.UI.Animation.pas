@@ -126,7 +126,7 @@ type
 
   { TACLAnimationManager }
 
-  TACLAnimationManager = class(TACLTimerList<TACLAnimation>)
+  TACLAnimationManager = class(TACLTimerListOf<TACLAnimation>)
   protected
     procedure DoAdding(const AObject: TACLAnimation); override;
     procedure TimerObject(const AObject: TACLAnimation); override;

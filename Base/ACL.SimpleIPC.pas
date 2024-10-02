@@ -69,8 +69,8 @@ type
   public type
     TReceiver = procedure (ACmd: Cardinal; const AData: string) of object;
   private
-    class var FClients: TACLThreadList<IACLIPCClient>;
-    class var FReceivers: TACLThreadList<TReceiver>;
+    class var FClients: TACLThreadListOf<IACLIPCClient>;
+    class var FReceivers: TACLThreadListOf<TReceiver>;
     class var FServer: TObject;
     class procedure Receive(ACmd: Cardinal; const AData: string);
   public
@@ -131,8 +131,8 @@ end;
 
 class constructor TACLIPCHub.Create;
 begin
-  FClients := TACLThreadList<IACLIPCClient>.CreateMultiReadExclusiveWrite;
-  FReceivers := TACLThreadList<TReceiver>.Create;
+  FClients := TACLThreadListOf<IACLIPCClient>.CreateMultiReadExclusiveWrite;
+  FReceivers := TACLThreadListOf<TReceiver>.Create;
 end;
 
 class destructor TACLIPCHub.Destroy;
@@ -162,7 +162,7 @@ end;
 class procedure TACLIPCHub.Receive(ACmd: Cardinal; const AData: string);
 var
   I: Integer;
-  LList: TACLList<TReceiver>;
+  LList: TACLListOf<TReceiver>;
 begin
   if (ACmd <> 0) or (AData <> '') then
   begin

@@ -206,7 +206,7 @@ type
 
     procedure ReleaseHandle;
   protected
-    FChangeListeners: TACLList<TNotifyEvent>;
+    FChangeListeners: TACLListOf<TNotifyEvent>;
 
     procedure Changed;
     procedure CheckFrameIndex(var AIndex: Integer); inline;
@@ -708,7 +708,7 @@ constructor TACLSkinImage.Create;
 begin
   inherited Create;
   FAllowColoration := True;
-  FChangeListeners := TACLList<TNotifyEvent>.Create;
+  FChangeListeners := TACLListOf<TNotifyEvent>.Create;
   FFramesCount := 1;
 {$IFDEF ACL_DEBUG_SKINIMAGE_STAT}
   InterlockedIncremet(FSkinImageCount);

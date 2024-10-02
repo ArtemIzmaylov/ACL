@@ -78,7 +78,7 @@ type
 
   { TACLTextLayoutBlockList }
 
-  TACLTextLayoutBlockList = class(TACLObjectList<TACLTextLayoutBlock>)
+  TACLTextLayoutBlockList = class(TACLObjectListOf<TACLTextLayoutBlock>)
   protected
     procedure AddInit(ABlock: TACLTextLayoutBlock; var AScan: PChar; ABlockLength: Integer);
     procedure AddSpan(ABlock: TACLTextLayoutBlockList);
@@ -231,7 +231,7 @@ type
 
   { TACLTextLayoutRows }
 
-  TACLTextLayoutRows = class(TACLObjectList<TACLTextLayoutRow>)
+  TACLTextLayoutRows = class(TACLObjectListOf<TACLTextLayoutRow>)
   public
     function BoundingRect: TRect;
     function Export(AExporter: TACLTextLayoutExporter; AFreeExporter: Boolean): Boolean; inline;
@@ -558,7 +558,7 @@ type
     FRowTruncated: Boolean;
   {$IFDEF ACL_TEXTLAYOUT_RTL}
     FRowRtlRange: Boolean;
-    FRowRtlRanges: TACLList<TACLRange>;
+    FRowRtlRanges: TACLListOf<TACLRange>;
   {$ENDIF}
     FRows: TACLTextLayoutRows;
     FPrevRowEndEllipsis: TACLTextLayoutBlockText;
@@ -1992,7 +1992,7 @@ begin
   FRows := Owner.FLayout;
   FRow := TACLTextLayoutRow.Create;
 {$IFDEF ACL_TEXTLAYOUT_RTL}
-  FRowRtlRanges := TACLList<TACLRange>.Create;
+  FRowRtlRanges := TACLListOf<TACLRange>.Create;
   FRowRtlRanges.Capacity := RtlRangeCapacity;
 {$ENDIF}
   FEditControl := atoEditControl and Owner.Options <> 0;
@@ -2012,7 +2012,7 @@ begin
   inherited Create(ACalculator.Owner, ACalculator.Render);
   FRow := TACLTextLayoutRow.Create;
 {$IFDEF ACL_TEXTLAYOUT_RTL}
-  FRowRtlRanges := TACLList<TACLRange>.Create;
+  FRowRtlRanges := TACLListOf<TACLRange>.Create;
   FRowRtlRanges.Capacity := RtlRangeCapacity;
 {$ENDIF}
   FRowHasAlignment := True;

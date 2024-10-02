@@ -417,7 +417,7 @@ type
 
   { TACLMouseTracker }
 
-  TACLMouseTracker = class(TACLTimerList<IACLMouseTracking>)
+  TACLMouseTracker = class(TACLTimerListOf<IACLMouseTracking>)
   strict private
     class var FInstance: TACLMouseTracker;
     class function Get: TACLMouseTracker;

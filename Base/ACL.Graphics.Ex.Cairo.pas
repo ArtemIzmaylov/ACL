@@ -32,12 +32,12 @@ uses
   LCLType,
   // VCL
   Classes,
-  Generics.Collections,
   Math,
   Graphics,
   SysUtils,
   Types,
   // ACL
+  ACL.Classes.Collections,
   ACL.Geometry,
   ACL.Geometry.Utils,
   ACL.Graphics,
@@ -307,11 +307,11 @@ type
       procedure Write(Handle: Pcairo_t; dX, dY: Single); override;
     end;
 
-    TFigure = TObjectList<TItem>;
+    TFigure = TACLObjectListOf<TItem>;
   {$ENDREGION}
   strict private
     FFigure: TFigure;
-    FFigures: TObjectList<TFigure>;
+    FFigures: TACLObjectListOf<TFigure>;
 
     function StartFigureIfNecessary(X, Y: Single): TFigure;
   protected
@@ -1883,7 +1883,7 @@ begin
   if FFigure = nil then
   begin
     if FFigures = nil then
-      FFigures := TObjectList<TFigure>.Create(True);
+      FFigures := TACLObjectListOf<TFigure>.Create(True);
     FFigure := TFigure.Create;
     FFigures.Add(FFigure);
   end;

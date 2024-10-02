@@ -80,7 +80,7 @@ type
     //# Properties
     property PictureRect: TRect read GetPictureRect;
   public
-    class var PictureClasses: TACLList<TACLImagePictureClass>;
+    class var PictureClasses: TACLListOf<TACLImagePictureClass>;
     class constructor Create;
     class destructor Destroy;
     class function GetClassByDescription(const ADesctiption: string): TACLImagePictureClass;
@@ -430,7 +430,7 @@ end;
 
 class constructor TACLImageBox.Create;
 begin
-  PictureClasses := TACLList<TACLImagePictureClass>.Create;
+  PictureClasses := TACLListOf<TACLImagePictureClass>.Create;
   Register(TACLImagePictureGlyph);
   Register(TACLImagePictureImageList);
 end;

@@ -35,13 +35,13 @@ type
   strict private
     FSource: TACLRipperRule;
   protected
-    procedure ProcessCore(const ATarget: TACLList<string>; const ASource: string); virtual;
+    procedure ProcessCore(const ATarget: TACLListOf<string>; const ASource: string); virtual;
   public
     constructor Create(ASource: TACLRipperRule = nil);
     destructor Destroy; override;
     function Extract(const AData: string): string; overload;
-    function ExtractEx(const AData: string): TACLList<string>; overload;
-    procedure Process(var AData: TACLList<string>);
+    function ExtractEx(const AData: string): TACLListOf<string>; overload;
+    procedure Process(var AData: TACLListOf<string>);
   end;
 
   { TACLRipperRuleAimingByTags }
@@ -56,7 +56,7 @@ type
 
     function Find(const AStrToFind, AStr: string; AStartPos, AEndPos: Integer; AFromEnd: Boolean): Integer;
   protected
-    procedure ProcessCore(const ATarget: TACLList<string>; const ASource: string); override;
+    procedure ProcessCore(const ATarget: TACLListOf<string>; const ASource: string); override;
   public
     constructor Create(const AStartTags, AFinishTags: string;
       AOptions: TACLRipperRuleAimingByTagsOptions; ASource: TACLRipperRule = nil);
@@ -68,7 +68,7 @@ type
   strict private
     FExpression: TACLExpression;
   protected
-    procedure ProcessCore(const ATarget: TACLList<string>; const ASource: string); override;
+    procedure ProcessCore(const ATarget: TACLListOf<string>; const ASource: string); override;
   public
     constructor Create(const AExpression: string; ASource: TACLRipperRule = nil);
     destructor Destroy; override;
@@ -78,7 +78,7 @@ type
 
   TACLRipperRuleRemoveHtmlTags = class(TACLRipperRule)
   protected
-    procedure ProcessCore(const ATarget: TACLList<string>; const ASource: string); override;
+    procedure ProcessCore(const ATarget: TACLListOf<string>; const ASource: string); override;
   end;
 
 implementation
@@ -149,7 +149,7 @@ end;
 
 function TACLRipperRule.Extract(const AData: string): string;
 var
-  AList: TACLList<string>;
+  AList: TACLListOf<string>;
 begin
   AList := ExtractEx(AData);
   try
@@ -162,23 +162,23 @@ begin
   end;
 end;
 
-function TACLRipperRule.ExtractEx(const AData: string): TACLList<string>;
+function TACLRipperRule.ExtractEx(const AData: string): TACLListOf<string>;
 begin
-  Result := TACLList<string>.Create;
+  Result := TACLListOf<string>.Create;
   Result.Capacity := 1;
   Result.Add(AData);
   Process(Result)
 end;
 
-procedure TACLRipperRule.Process(var AData: TACLList<string>);
+procedure TACLRipperRule.Process(var AData: TACLListOf<string>);
 var
-  ATarget: TACLList<string>;
+  ATarget: TACLListOf<string>;
   I: Integer;
 begin
   if FSource <> nil then
     FSource.Process(AData);
 
-  ATarget := TACLList<string>.Create;
+  ATarget := TACLListOf<string>.Create;
   try
     ATarget.Capacity := AData.Count;
     for I := 0 to AData.Count - 1 do
@@ -189,7 +189,7 @@ begin
   end;
 end;
 
-procedure TACLRipperRule.ProcessCore(const ATarget: TACLList<string>; const ASource: string);
+procedure TACLRipperRule.ProcessCore(const ATarget: TACLListOf<string>; const ASource: string);
 begin
   ATarget.Add(ASource);
 end;
@@ -218,7 +218,7 @@ begin
   SplitTags(AFinishTags, FFinishTags);
 end;
 
-procedure TACLRipperRuleAimingByTags.ProcessCore(const ATarget: TACLList<string>; const ASource: string);
+procedure TACLRipperRuleAimingByTags.ProcessCore(const ATarget: TACLListOf<string>; const ASource: string);
 var
   I0: Integer;
   L1, L2: Integer;
@@ -327,7 +327,7 @@ begin
   inherited Destroy;
 end;
 
-procedure TACLRipperRuleExpression.ProcessCore(const ATarget: TACLList<string>; const ASource: string);
+procedure TACLRipperRuleExpression.ProcessCore(const ATarget: TACLListOf<string>; const ASource: string);
 var
   AContext: TACLRipperRuleExpressionContext;
 begin
@@ -342,7 +342,7 @@ end;
 
 { TACLRipperRuleRemoveHtmlTags }
 
-procedure TACLRipperRuleRemoveHtmlTags.ProcessCore(const ATarget: TACLList<string>; const ASource: string);
+procedure TACLRipperRuleRemoveHtmlTags.ProcessCore(const ATarget: TACLListOf<string>; const ASource: string);
 var
   ABuffer: TACLStringBuilder;
   AByte1, AByte2: Byte;

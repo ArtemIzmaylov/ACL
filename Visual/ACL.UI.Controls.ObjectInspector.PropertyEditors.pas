@@ -158,7 +158,7 @@ type
   {$ENDREGION}
   strict private
     class var FDefaultEditors: array[TTypeKind] of TACLPropertyEditorClass;
-    class var FList: TACLList<TPropertyInfo>;
+    class var FList: TACLListOf<TPropertyInfo>;
   public
     class destructor Destroy;
     class function GetEditorClass(PropInfo: PPropInfo; Obj: TObject): TACLPropertyEditorClass; overload;
@@ -520,7 +520,7 @@ begin
   if ComponentClass <> nil then
     P.PropertyName := PropertyName;
   if FList = nil then
-    FList := TACLList<TPropertyInfo>.Create;
+    FList := TACLListOf<TPropertyInfo>.Create;
   FList.Insert(0, P);
 end;
 

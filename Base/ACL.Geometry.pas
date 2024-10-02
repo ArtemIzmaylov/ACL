@@ -78,7 +78,7 @@ type
 
   { TACLAutoSizeCalculator }
 
-  TACLAutoSizeCalculator = class(TACLObjectList<TACLAutoSizeItem>)
+  TACLAutoSizeCalculator = class(TACLObjectListOf<TACLAutoSizeItem>)
   strict private
     FAvailableSize: Integer;
   public

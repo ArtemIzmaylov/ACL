@@ -230,7 +230,7 @@ type
     FOwner: TACLSlider;
     FThumbBarRect: TRect;
     FThumbRect: TRect;
-    FTickMarks: TACLList<TRect>;
+    FTickMarks: TACLListOf<TRect>;
     FTrackBarRect: TRect;
 
     function CalculateProgressCore(X: Integer): Single;
@@ -266,7 +266,7 @@ type
     property Style: TACLStyleSlider read GetStyle;
     property ThumbBarRect: TRect read FThumbBarRect;
     property ThumbRect: TRect read FThumbRect;
-    property TickMarks: TACLList<TRect> read FTickMarks;
+    property TickMarks: TACLListOf<TRect> read FTickMarks;
     property TrackBarRect: TRect read FTrackBarRect;
   end;
 
@@ -752,7 +752,7 @@ end;
 constructor TACLSliderViewInfo.Create(AOwner: TACLSlider);
 begin
   FOwner := AOwner;
-  FTickMarks := TACLList<TRect>.Create;
+  FTickMarks := TACLListOf<TRect>.Create;
 end;
 
 destructor TACLSliderViewInfo.Destroy;

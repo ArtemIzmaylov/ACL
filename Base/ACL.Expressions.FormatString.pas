@@ -316,10 +316,10 @@ procedure TACLFormatStringFactory.EnumMacros(AProc: TACLFormatStringEnumMacrosPr
 
 var
   LFunc: TACLExpressionFunctionInfo;
-  LTemp: TACLList<TACLExpressionFunctionInfo>;
+  LTemp: TACLListOf<TACLExpressionFunctionInfo>;
   I: Integer;
 begin
-  LTemp := TACLList<TACLExpressionFunctionInfo>.Create;
+  LTemp := TACLListOf<TACLExpressionFunctionInfo>.Create;
   try
     LTemp.Capacity := FRegisteredFunctions.Count;
     for I := 0 to FRegisteredFunctions.Count - 1 do

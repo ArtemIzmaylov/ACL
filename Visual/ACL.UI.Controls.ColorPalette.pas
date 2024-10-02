@@ -113,7 +113,7 @@ type
   strict private const
     BorderSize = 2;
   strict private
-    FCells: TACLObjectList<TACLColorPaletteItemViewInfo>;
+    FCells: TACLObjectListOf<TACLColorPaletteItemViewInfo>;
     FHeight: Integer;
     FOwner: TACLColorPalette;
     FWidth: Integer;
@@ -380,7 +380,7 @@ constructor TACLColorPaletteViewInfo.Create(AOwner: TACLColorPalette);
 begin
   inherited Create;
   FOwner := AOwner;
-  FCells := TACLObjectList<TACLColorPaletteItemViewInfo>.Create;
+  FCells := TACLObjectListOf<TACLColorPaletteItemViewInfo>.Create;
 end;
 
 destructor TACLColorPaletteViewInfo.Destroy;

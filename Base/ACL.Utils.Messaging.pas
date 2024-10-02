@@ -253,13 +253,13 @@ end;
 
 class procedure TACLMessaging.HandlerAdd(AHandler: TACLMessageHandler);
 begin
-  TACLThreadList<TACLMessageHandler>(FHandlers).Add(AHandler);
+  TACLThreadListOf<TACLMessageHandler>(FHandlers).Add(AHandler);
 end;
 
 class procedure TACLMessaging.HandlerRemove(AHandler: TACLMessageHandler);
 begin
   if FHandlers <> nil then
-    TACLThreadList<TACLMessageHandler>(FHandlers).Remove(AHandler);
+    TACLThreadListOf<TACLMessageHandler>(FHandlers).Remove(AHandler);
 end;
 
 class procedure TACLMessaging.PostMessage(AMessage: Cardinal; AParamW: WPARAM; AParamL: LPARAM);
@@ -277,14 +277,14 @@ var
   AIndex: Integer;
 begin
   EnsureInitialized;
-  TACLThreadList<TACLMessageHandler>(FHandlers).LockList;
+  TACLThreadListOf<TACLMessageHandler>(FHandlers).LockList;
   try
     AIndex := TACLStringList(FCustomMessages).IndexOf(AName);
     if AIndex < 0 then
       AIndex := TACLStringList(FCustomMessages).Add(AName);
     Result := WM_USER + AIndex + 1;
   finally
-    TACLThreadList<TACLMessageHandler>(FHandlers).UnlockList;
+    TACLThreadListOf<TACLMessageHandler>(FHandlers).UnlockList;
   end;
 end;
 
@@ -293,7 +293,7 @@ begin
   if FCustomMessages = nil then
   begin
     FCustomMessages := TACLStringList.Create;
-    FHandlers := TACLThreadList<TACLMessageHandler>.Create;
+    FHandlers := TACLThreadListOf<TACLMessageHandler>.Create;
     FHandle := WndCreate(WndProc, ClassName, True);
   end;
 end;
@@ -301,10 +301,10 @@ end;
 class procedure TACLMessaging.WndProc(var AMessage: TMessage);
 var
   AHandled: Boolean;
-  AHandlers: TACLList<TACLMessageHandler>;
+  AHandlers: TACLListOf<TACLMessageHandler>;
   I: Integer;
 begin
-  AHandlers := TACLThreadList<TACLMessageHandler>(FHandlers).LockList;
+  AHandlers := TACLThreadListOf<TACLMessageHandler>(FHandlers).LockList;
   try
     for I := AHandlers.Count - 1 downto 0 do
     begin
@@ -314,7 +314,7 @@ begin
     end;
     WndDefaultProc(FHandle, AMessage);
   finally
-    TACLThreadList<TACLMessageHandler>(FHandlers).UnlockList;
+    TACLThreadListOf<TACLMessageHandler>(FHandlers).UnlockList;
   end;
 end;
 

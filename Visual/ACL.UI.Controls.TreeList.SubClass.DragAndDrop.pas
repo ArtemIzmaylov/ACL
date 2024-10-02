@@ -107,7 +107,7 @@ type
 
   TACLTreeListGroupDragSortingDropTarget = class(TACLTreeListCustomDragSortingDropTarget)
   strict private
-    FSelection: TACLList<TACLTreeListGroup>;
+    FSelection: TACLListOf<TACLTreeListGroup>;
 
     procedure PopulateSelection;
   protected
@@ -118,7 +118,7 @@ type
     constructor Create(ASubClass: TACLTreeListSubClass); override;
     destructor Destroy; override;
     //# Properties
-    property Selection: TACLList<TACLTreeListGroup> read FSelection;
+    property Selection: TACLListOf<TACLTreeListGroup> read FSelection;
   end;
 
   { TACLTreeListNodeDragSortingDropTarget }
@@ -447,7 +447,7 @@ end;
 constructor TACLTreeListGroupDragSortingDropTarget.Create(ASubClass: TACLTreeListSubClass);
 begin
   inherited Create(ASubClass);
-  FSelection := TACLList<TACLTreeListGroup>.Create;
+  FSelection := TACLListOf<TACLTreeListGroup>.Create;
   PopulateSelection;
 end;
 

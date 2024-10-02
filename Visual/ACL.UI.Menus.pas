@@ -417,7 +417,7 @@ type
     end;
   {$ENDREGION}
   strict private
-    FItems: TACLObjectList<TItemInfo>;
+    FItems: TACLObjectListOf<TItemInfo>;
     FPrevMousePos: TPoint;
     FSelectedItemIndex: Integer;
     FTopIndex: Integer;
@@ -466,7 +466,7 @@ type
     function HasSubItems(AItem: TMenuItem): Boolean;
     procedure Init(ASource: TMenuItem);
 
-    property Items: TACLObjectList<TItemInfo> read FItems;
+    property Items: TACLObjectListOf<TItemInfo> read FItems;
     property SelectedItemIndex: Integer read FSelectedItemIndex;
     property SelectedItemInfo: TItemInfo read GetSelectedItemInfo;
     property TopIndex: Integer read FTopIndex write SetTopIndex;
@@ -1702,7 +1702,7 @@ constructor TACLMenuWindow.Create(AOwner: TComponent);
 begin
   inherited;
   FSelectedItemIndex := -1;
-  FItems := TACLObjectList<TItemInfo>.Create;
+  FItems := TACLObjectListOf<TItemInfo>.Create;
   DoubleBuffered := True;
 end;
 

@@ -83,7 +83,7 @@ type
   strict private const
     SYNC_WORD = $5458454E;
   strict private
-    FItems: TACLList<TACLSkinImageSetItem>;
+    FItems: TACLListOf<TACLSkinImageSetItem>;
     FTintedItems: TObject;
 
     FOnChange: TNotifyEvent;
@@ -277,7 +277,7 @@ end;
 constructor TACLSkinImageSet.Create;
 begin
   inherited Create;
-  FItems := TACLList<TACLSkinImageSetItem>.Create;
+  FItems := TACLListOf<TACLSkinImageSetItem>.Create;
   FItems.OnNotify := ItemsChangeHandler;
   FTintedItems := TACLSkinImageSetTintedItemList.Create(Self);
   Clear;

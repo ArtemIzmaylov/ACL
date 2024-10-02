@@ -73,9 +73,9 @@ type
   TACLFileSystemWatcher = class
   strict private
     class var FActiveMonitors: TACLObjectList;
-    class var FActiveTasks: TACLList<IACLFileSystemWatcherTask>;
+    class var FActiveTasks: TACLListOf<IACLFileSystemWatcherTask>;
     class var FLock: TACLCriticalSection;
-    class var FTasks: TACLList<IACLFileSystemWatcherTask>;
+    class var FTasks: TACLListOf<IACLFileSystemWatcherTask>;
     class procedure SafeStartMonitors;
     class procedure SafeStopMonitors;
   protected
@@ -129,8 +129,8 @@ type
     TCallback = procedure (const Drive: TACLDriveInfo; Mounted: Boolean) of object;
     TEnumProc = reference to procedure (const Drive: TACLDriveInfo);
   strict private
-    class var FList: TACLList<TACLDriveInfo>;
-    class var FListeners: TACLList<TCallback>;
+    class var FList: TACLListOf<TACLDriveInfo>;
+    class var FListeners: TACLListOf<TCallback>;
     class var FLock: TACLCriticalSection;
     class var FMonitor: TObject;
     class function SafeFind(const ADrive: string; out AIndex: Integer): Boolean;
@@ -163,7 +163,7 @@ uses
 {$REGION ' FileSystem Watcher '}
 type
   TTaskIndexedPair = TPair<Integer, IACLFileSystemWatcherTask>;
-  TTaskIndexedPairList = TACLList<TTaskIndexedPair>;
+  TTaskIndexedPairList = TACLListOf<TTaskIndexedPair>;
 
   { TACLFileSystemWatcherCustomTask }
 
@@ -228,7 +228,7 @@ type
     procedure ChangeNotify(AFile, AOtherFile: PGFile; AEvent: TGFileMonitorEvent);
   public
     constructor Create(
-      AActiveTasks: TACLList<IACLFileSystemWatcherTask>;
+      AActiveTasks: TACLListOf<IACLFileSystemWatcherTask>;
       ATasks: TTaskIndexedPairList; var AIndex: Integer);
     destructor Destroy; override;
   end;
@@ -244,7 +244,7 @@ type
     procedure TerminatedSet; override;
   public
     constructor Create(
-      AActiveTasks: TACLList<IACLFileSystemWatcherTask>;
+      AActiveTasks: TACLListOf<IACLFileSystemWatcherTask>;
       ATasks: TTaskIndexedPairList; var AIndex: Integer);
   end;
 {$ENDIF}
@@ -254,7 +254,7 @@ type
 { TACLFileSystemWatcherMonitor }
 
 constructor TACLFileSystemWatcherMonitor.Create(
-  AActiveTasks: TACLList<IACLFileSystemWatcherTask>;
+  AActiveTasks: TACLListOf<IACLFileSystemWatcherTask>;
   ATasks: TTaskIndexedPairList; var AIndex: Integer);
 var
   LPathIndex: Integer;
@@ -311,7 +311,7 @@ end;
 { TACLFileSystemWatcherMonitor }
 
 constructor TACLFileSystemWatcherMonitor.Create(
-  AActiveTasks: TACLList<IACLFileSystemWatcherTask>;
+  AActiveTasks: TACLListOf<IACLFileSystemWatcherTask>;
   ATasks: TTaskIndexedPairList; var AIndex: Integer);
 var
   AFlags: Cardinal;
@@ -400,8 +400,8 @@ end;
 class constructor TACLFileSystemWatcher.Create;
 begin
   FActiveMonitors := TACLObjectList.Create;
-  FActiveTasks := TACLList<IACLFileSystemWatcherTask>.Create;
-  FTasks := TACLList<IACLFileSystemWatcherTask>.Create;
+  FActiveTasks := TACLListOf<IACLFileSystemWatcherTask>.Create;
+  FTasks := TACLListOf<IACLFileSystemWatcherTask>.Create;
   FLock := TACLCriticalSection.Create(nil, 'FileSystemWatcher');
 end;
 
@@ -989,8 +989,8 @@ end;
 class constructor TACLDriveManager.Create;
 begin
   FLock := TACLCriticalSection.Create;
-  FList := TACLList<TACLDriveInfo>.Create;
-  FListeners := TACLList<TCallback>.Create;
+  FList := TACLListOf<TACLDriveInfo>.Create;
+  FListeners := TACLListOf<TCallback>.Create;
   FMonitor := TACLDriveMonitor.Create;
 end;
 

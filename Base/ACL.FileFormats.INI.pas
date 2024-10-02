@@ -133,7 +133,7 @@ type
     procedure SetSectionData(const ASection, AData: string);
   protected
     FModified: Boolean;
-    FSections: TACLObjectList<TACLIniFileSection>;
+    FSections: TACLObjectListOf<TACLIniFileSection>;
 
     function FindValue(const AName, AKey: string;
       out ASection: TACLIniFileSection; out AIndex: Integer): Boolean;
@@ -595,7 +595,7 @@ begin
   FAutoSave := AutoSave;
   FFileName := AFileName;
   FEncoding := TEncoding.Unicode;
-  FSections := TACLObjectList<TACLIniFileSection>.Create;
+  FSections := TACLObjectListOf<TACLIniFileSection>.Create;
 end;
 
 destructor TACLIniFile.Destroy;

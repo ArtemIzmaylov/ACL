@@ -139,7 +139,7 @@ type
 
   { TACLDragDropDataProviders }
 
-  TACLDragDropDataProviders = class(TACLObjectList<TACLDragDropDataProvider>);
+  TACLDragDropDataProviders = class(TACLObjectListOf<TACLDragDropDataProvider>);
 
   { TACLDropSource }
 
@@ -811,7 +811,7 @@ type
   procedure TACLDropSourceGtk2.ExecuteCore;
   var
     LActions: TGdkDragAction;
-    LEntries: TACLList<TGtkTargetEntry>;
+    LEntries: TACLListOf<TGtkTargetEntry>;
     LEntry: TGtkTargetEntry;
     LList: PGtkTargetList;
     LWidget: PGtkWidget;
@@ -883,7 +883,7 @@ type
     ResultMap: array[Boolean] of Integer = (S_FALSE, S_OK);
   strict private
     FCursor: Integer;
-    FList: TACLList<TFormatEtc>;
+    FList: TACLListOf<TFormatEtc>;
 
     function GetFormat(Index: Integer): TFormatEtc;
     function GetFormatCount: Integer;
@@ -938,7 +938,7 @@ type
   constructor TACLDropFormatEtcList.Create;
   begin
     inherited Create;
-    FList := TACLList<TFormatEtc>.Create;
+    FList := TACLListOf<TFormatEtc>.Create;
   end;
 
   destructor TACLDropFormatEtcList.Destroy;

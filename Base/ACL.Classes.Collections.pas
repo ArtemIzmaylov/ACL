@@ -112,7 +112,7 @@ type
 
   { TACLLinkedList }
 
-  TACLLinkedList<T> = class
+  TACLLinkedListOf<T> = class
   strict private
     FFirst: TACLLinkedListItem<T>;
     FLast: TACLLinkedListItem<T>;
@@ -173,7 +173,7 @@ type
   TACLListCompareProc<T> = reference to function (const Left, Right: T): Integer;
   TACLListCompareProcPtr = TACLListCompareProc<Pointer>;
 
-  TACLList<T> = class(TACLEnumerable<T>)
+  TACLListOf<T> = class(TACLEnumerable<T>)
   strict private type
   {$REGION 'Private Types'}
     TListItems = array of T;
@@ -219,14 +219,14 @@ type
     // Adding
     function Add(const Value: T): Integer;
     function AddIfAbsent(const Value: T): Integer;
-    procedure AddRange(const ASource: TACLList<T>);
-    procedure Assign(const ASource: TACLList<T>);
+    procedure AddRange(const ASource: TACLListOf<T>);
+    procedure Assign(const ASource: TACLListOf<T>);
     procedure Insert(Index: Integer; const Value: T); overload;
     procedure Insert(Index: Integer; const Values: array of T); overload;
     procedure Insert(Index: Integer; const Values: array of T; ValueCount: Integer); overload;
     procedure EnsureCapacity(ACount: Integer);
     procedure Move(CurIndex, NewIndex: Integer);
-    procedure Merge(const ASource: TACLList<T>);
+    procedure Merge(const ASource: TACLListOf<T>);
     function IsValid(Index: Integer): Boolean; inline;
 
     // Search
@@ -263,23 +263,23 @@ type
 
   TACLListEnumerator<T> = class(TInterfacedObject, IACLEnumerator<T>)
   strict private
-    FOwner: TACLList<T>;
+    FOwner: TACLListOf<T>;
     FIndex: Integer;
   protected
     // IACLEnumerator<T>
     function GetCurrent: T;
     function MoveNext: Boolean;
   public
-    constructor Create(AOwner: TACLList<T>);
+    constructor Create(AOwner: TACLListOf<T>);
   end;
 
   { TACLVariantList }
 
-  TACLVariantList = class(TACLList<Variant>);
+  TACLVariantList = class(TACLListOf<Variant>);
 
   { TACLInterfaceList }
 
-  TACLInterfaceList = class(TACLList<IUnknown>);
+  TACLInterfaceList = class(TACLListOf<IUnknown>);
 
   { TACLListenerList }
 
@@ -340,7 +340,7 @@ type
 
   { TACLObjectList }
 
-  TACLObjectList<T: class> = class(TACLList<T>)
+  TACLObjectListOf<T: class> = class(TACLListOf<T>)
   strict private
     FOwnsObjects: Boolean;
     procedure SetOwnObjects(AValue: Boolean);
@@ -470,11 +470,11 @@ type
 
   { TACLThreadList }
 
-  TACLThreadList<T> = class
+  TACLThreadListOf<T> = class
   public type
     TEnumProc = reference to procedure (const Value: T);
   strict private
-    FList: TACLList<T>;
+    FList: TACLListOf<T>;
     FLock: IReadWriteSync;
   public
     constructor Create; overload;
@@ -489,12 +489,12 @@ type
     function Read(AIndex: Integer; out AValue: T): Boolean;
     procedure Remove(const Value: T);
 
-    function BeginRead: TACLList<T>;
-    function BeginWrite: TACLList<T>;
+    function BeginRead: TACLListOf<T>;
+    function BeginWrite: TACLListOf<T>;
     procedure EndRead;
     procedure EndWrite;
 
-    function LockList: TACLList<T>;
+    function LockList: TACLListOf<T>;
     procedure UnlockList;
   end;
 
@@ -503,7 +503,6 @@ type
   TACLClassMap<T> = class(TACLUnknownObject)
   strict private
     FData: TACLDictionary<TClass, T>;
-
     function GetItem(AClass: TClass): T;
   public
     constructor Create;
@@ -554,7 +553,7 @@ type
     function Include(const Item: T): Boolean; overload; virtual; abstract;
     function Include(const ItemSet: TACLCustomHashSet<T>; AutoFree: Boolean): Boolean; overload;
     function ToArray: TArray<T>; override;
-    //
+    // Properties
     property Count: Integer read GetCount;
   end;
 
@@ -621,7 +620,7 @@ type
 //
 //  TACLStringSet = class(TACLCustomHashSet<string>)
 //  strict private
-//    FData: TACLList<string>;
+//    FData: TACLListOf<string>;
 //    FIgnoreCase: Boolean;
 //
 //    function FindCore(const Item: PWideChar; const ItemLength: Integer; out Index: Integer): Boolean;
@@ -723,7 +722,7 @@ type
 
   {$ENDREGION}
   strict private
-    FOrder: TACLList<TKey>;
+    FOrder: TACLListOf<TKey>;
 
     function GetKey(Index: Integer): TKey; inline;
   protected
@@ -737,7 +736,7 @@ type
     function GetEnumerator: IACLEnumerator<TPair<TKey, TValue>>; override;
     function GetKeys: IACLEnumerable<TKey>; override;
     function GetValues: IACLEnumerable<TValue>; override;
-    //
+    // Properties
     property Keys[Index: Integer]: TKey read GetKey; default;
   end;
 
@@ -770,9 +769,9 @@ type
     function Contains(const Key: TKey): Boolean;
     function Get(const Key: TKey; out Value: TValue): Boolean;
     procedure Remove(const Key: TKey);
-    //
+    // Properties
     property Capacity: Integer read FCapacity;
-    //
+    // Events
     property OnRemove: TRemoveEvent read FOnRemove write FOnRemove;
   end;
 
@@ -782,7 +781,7 @@ type
 
   { TACLFloatList }
 
-  TACLFloatList = class(TACLList<Single>)
+  TACLFloatList = class(TACLListOf<Single>)
   public
     function Contains(const Value, Tolerance: Single): Boolean; overload;
     function IndexOf(const Value, Tolerance: Single): Integer; reintroduce; overload;
@@ -925,9 +924,9 @@ begin
         ToArray[ToIndex + I] := FromArray[FromIndex + I];
 end;
 
-{ TACLLinkedList<T> }
+{ TACLLinkedListOf<T> }
 
-constructor TACLLinkedList<T>.Create(AOwnValues: Boolean);
+constructor TACLLinkedListOf<T>.Create(AOwnValues: Boolean);
 begin
   FOwnValues := AOwnValues;
   if AOwnValues then
@@ -937,20 +936,20 @@ begin
   end;
 end;
 
-function TACLLinkedList<T>.Add(const AItem: TACLLinkedListItem<T>): TACLLinkedListItem<T>;
+function TACLLinkedListOf<T>.Add(const AItem: TACLLinkedListItem<T>): TACLLinkedListItem<T>;
 begin
   Result := AItem;
   AddCore(Result);
 end;
 
-function TACLLinkedList<T>.Add(const AValue: T): TACLLinkedListItem<T>;
+function TACLLinkedListOf<T>.Add(const AValue: T): TACLLinkedListItem<T>;
 begin
   Result := TACLLinkedListItem<T>.Create;
   Result.Value := AValue;
   AddCore(Result);
 end;
 
-procedure TACLLinkedList<T>.AddCore(const AItem: TACLLinkedListItem<T>);
+procedure TACLLinkedListOf<T>.AddCore(const AItem: TACLLinkedListItem<T>);
 begin
   if Last <> nil then
     InsertAfter(AItem, Last)
@@ -961,13 +960,13 @@ begin
   end;
 end;
 
-procedure TACLLinkedList<T>.Clear;
+procedure TACLLinkedListOf<T>.Clear;
 begin
   while FFirst <> nil do
     Delete(FFirst);
 end;
 
-procedure TACLLinkedList<T>.Delete(AItem: TACLLinkedListItem<T>);
+procedure TACLLinkedListOf<T>.Delete(AItem: TACLLinkedListItem<T>);
 begin
   AItem := Extract(AItem);
   try
@@ -978,7 +977,7 @@ begin
   end;
 end;
 
-function TACLLinkedList<T>.Extract(AItem: TACLLinkedListItem<T>): TACLLinkedListItem<T>;
+function TACLLinkedListOf<T>.Extract(AItem: TACLLinkedListItem<T>): TACLLinkedListItem<T>;
 begin
   if AItem.Next <> nil then
     AItem.Next.Prev := AItem.Prev
@@ -995,7 +994,7 @@ begin
   Result.Prev := nil;
 end;
 
-procedure TACLLinkedList<T>.InsertAfter(ASource, ATarget: TACLLinkedListItem<T>);
+procedure TACLLinkedListOf<T>.InsertAfter(ASource, ATarget: TACLLinkedListItem<T>);
 begin
   ASource.Next := ATarget.Next;
   if ATarget.Next <> nil then
@@ -1007,7 +1006,7 @@ begin
   ASource.Prev := ATarget;
 end;
 
-procedure TACLLinkedList<T>.InsertBefore(ASource, ATarget: TACLLinkedListItem<T>);
+procedure TACLLinkedListOf<T>.InsertBefore(ASource, ATarget: TACLLinkedListItem<T>);
 begin
   ASource.Prev := ATarget.Prev;
   if ATarget.Prev <> nil then
@@ -1096,14 +1095,14 @@ begin
   if Assigned(OnChanged) then OnChanged(Self);
 end;
 
-{ TACLList<T> }
+{ TACLListOf<T> }
 
-constructor TACLList<T>.Create;
+constructor TACLListOf<T>.Create;
 begin
   Create(nil);
 end;
 
-constructor TACLList<T>.Create(const AComparer: IComparer<T>);
+constructor TACLListOf<T>.Create(const AComparer: IComparer<T>);
 begin
   FComparer := AComparer;
   if FComparer = nil then
@@ -1114,19 +1113,19 @@ begin
     FItemsManager := TACLMoveArrayManager<T>.Create;
 end;
 
-destructor TACLList<T>.Destroy;
+destructor TACLListOf<T>.Destroy;
 begin
   Clear;
   FreeAndNil(FItemsManager);
   inherited Destroy;
 end;
 
-function TACLList<T>.GetEnumerator: IACLEnumerator<T>;
+function TACLListOf<T>.GetEnumerator: IACLEnumerator<T>;
 begin
   Result := TACLListEnumerator<T>.Create(Self);
 end;
 
-function TACLList<T>.Add(const Value: T): Integer;
+function TACLListOf<T>.Add(const Value: T): Integer;
 begin
   GrowCheck(Count + 1);
   Result := Count;
@@ -1136,25 +1135,25 @@ begin
     Notify(Value, cnAdded);
 end;
 
-function TACLList<T>.AddIfAbsent(const Value: T): Integer;
+function TACLListOf<T>.AddIfAbsent(const Value: T): Integer;
 begin
   Result := IndexOf(Value);
   if Result < 0 then
     Result := Add(Value);
 end;
 
-procedure TACLList<T>.AddRange(const ASource: TACLList<T>);
+procedure TACLListOf<T>.AddRange(const ASource: TACLListOf<T>);
 begin
   Insert(Count, ASource.List, ASource.Count);
 end;
 
-procedure TACLList<T>.Assign(const ASource: TACLList<T>);
+procedure TACLListOf<T>.Assign(const ASource: TACLListOf<T>);
 begin
   Clear;
   AddRange(ASource);
 end;
 
-procedure TACLList<T>.Insert(Index: Integer; const Value: T);
+procedure TACLListOf<T>.Insert(Index: Integer; const Value: T);
 begin
   if (Index < 0) or (Index > Count) then
     raise EArgumentOutOfRangeException.CreateRes(@SArgumentOutOfRange);
@@ -1173,12 +1172,12 @@ begin
     Notify(Value, cnAdded);
 end;
 
-procedure TACLList<T>.Insert(Index: Integer; const Values: array of T);
+procedure TACLListOf<T>.Insert(Index: Integer; const Values: array of T);
 begin
   Insert(Index, Values, Length(Values));
 end;
 
-procedure TACLList<T>.Insert(Index: Integer; const Values: array of T; ValueCount: Integer);
+procedure TACLListOf<T>.Insert(Index: Integer; const Values: array of T; ValueCount: Integer);
 var
   I: Integer;
 begin
@@ -1203,17 +1202,17 @@ begin
   end;
 end;
 
-procedure TACLList<T>.EnsureCapacity(ACount: Integer);
+procedure TACLListOf<T>.EnsureCapacity(ACount: Integer);
 begin
   Capacity := Max(Capacity, Count + ACount);
 end;
 
-function TACLList<T>.IsValid(Index: Integer): Boolean;
+function TACLListOf<T>.IsValid(Index: Integer): Boolean;
 begin
   Result := (Index >= 0) and (Index < FCount);
 end;
 
-procedure TACLList<T>.Merge(const ASource: TACLList<T>);
+procedure TACLListOf<T>.Merge(const ASource: TACLListOf<T>);
 var
   I: Integer;
 begin
@@ -1222,7 +1221,7 @@ begin
     AddIfAbsent(ASource.List[I]);
 end;
 
-procedure TACLList<T>.Move(CurIndex, NewIndex: Integer);
+procedure TACLListOf<T>.Move(CurIndex, NewIndex: Integer);
 var
    ATemp: T;
 begin
@@ -1242,7 +1241,7 @@ begin
   FItems[NewIndex] := ATemp;
 end;
 
-function TACLList<T>.BinarySearch(const Value: T; out Index: Integer): Boolean;
+function TACLListOf<T>.BinarySearch(const Value: T; out Index: Integer): Boolean;
 var
   L, H: Integer;
   mid, cmp: Integer;
@@ -1276,12 +1275,12 @@ begin
   Result := False;
 end;
 
-function TACLList<T>.Contains(const Value: T): Boolean;
+function TACLListOf<T>.Contains(const Value: T): Boolean;
 begin
   Result := IndexOf(Value) >= 0;
 end;
 
-function TACLList<T>.IndexOf(const Value: T; ADirection: TDirection = TDirection.FromBeginning): Integer;
+function TACLListOf<T>.IndexOf(const Value: T; ADirection: TDirection = TDirection.FromBeginning): Integer;
 var
   I: Integer;
 begin
@@ -1303,22 +1302,22 @@ begin
   Result := -1;
 end;
 
-procedure TACLList<T>.Clear;
+procedure TACLListOf<T>.Clear;
 begin
   Capacity := 0;
 end;
 
-procedure TACLList<T>.Delete(Index: Integer);
+procedure TACLListOf<T>.Delete(Index: Integer);
 begin
   DeleteRange(Index, 1);
 end;
 
-procedure TACLList<T>.DeleteRange(AIndex, ACount: Integer);
+procedure TACLListOf<T>.DeleteRange(AIndex, ACount: Integer);
 begin
   DeleteRangeCore(AIndex, ACount, cnRemoved);
 end;
 
-function TACLList<T>.Extract(const Value: T): T;
+function TACLListOf<T>.Extract(const Value: T): T;
 var
   AIndex: Integer;
 begin
@@ -1332,14 +1331,14 @@ begin
   end;
 end;
 
-function TACLList<T>.Remove(const Value: T): Integer;
+function TACLListOf<T>.Remove(const Value: T): Integer;
 begin
   Result := IndexOf(Value);
   if Result >= 0 then
     Delete(Result);
 end;
 
-procedure TACLList<T>.Pack;
+procedure TACLListOf<T>.Pack;
 var
   AEndIndex: Integer;
   APackedCount: Integer;
@@ -1382,12 +1381,12 @@ begin
   FCount := APackedCount;
 end;
 
-procedure TACLList<T>.Sort;
+procedure TACLListOf<T>.Sort;
 begin
   Sort(FComparer);
 end;
 
-procedure TACLList<T>.Sort(AComparer: IComparer<T>);
+procedure TACLListOf<T>.Sort(AComparer: IComparer<T>);
 begin
 {$IFDEF FPC}
   TArrayHelper<T>.Sort(FItems, AComparer, 0, Count);
@@ -1396,12 +1395,12 @@ begin
 {$ENDIF}
 end;
 
-procedure TACLList<T>.Sort(AProc: TACLListCompareProc<T>);
+procedure TACLListOf<T>.Sort(AProc: TACLListCompareProc<T>);
 begin
   Sort(TCompareProcWrapper.Create(AProc));
 end;
 
-function TACLList<T>.ToArray: TArray<T>;
+function TACLListOf<T>.ToArray: TArray<T>;
 var
   I: Integer;
 begin
@@ -1410,7 +1409,7 @@ begin
     Result[I] := List[I];
 end;
 
-procedure TACLList<T>.DeleteRangeCore(AIndex, ACount: Integer; AAction: TCollectionNotification);
+procedure TACLListOf<T>.DeleteRangeCore(AIndex, ACount: Integer; AAction: TCollectionNotification);
 var
   AOldItems: TListItems;
   ATailCount, I: Integer;
@@ -1443,42 +1442,42 @@ begin
   end;
 end;
 
-procedure TACLList<T>.UpdateNotifications;
+procedure TACLListOf<T>.UpdateNotifications;
 begin
   FNotifications := Assigned(OnNotify);
 end;
 
-procedure TACLList<T>.Notify(const Item: T; Action: TCollectionNotification);
+procedure TACLListOf<T>.Notify(const Item: T; Action: TCollectionNotification);
 begin
   if Assigned(OnNotify) then
     OnNotify(Self, Item, Action);
 end;
 
-function TACLList<T>.GetCapacity: Integer;
+function TACLListOf<T>.GetCapacity: Integer;
 begin
   Result := Length(FItems);
 end;
 
-function TACLList<T>.GetItem(Index: Integer): T;
+function TACLListOf<T>.GetItem(Index: Integer): T;
 begin
   if (Index < 0) or (Index >= Count) then
     raise EArgumentOutOfRangeException.CreateRes(@SArgumentOutOfRange);
   Result := FItems[Index];
 end;
 
-function TACLList<T>.GetLast: T;
+function TACLListOf<T>.GetLast: T;
 begin
   Result := Items[Count - 1];
 end;
 
-procedure TACLList<T>.SetCapacity(Value: Integer);
+procedure TACLListOf<T>.SetCapacity(Value: Integer);
 begin
   if Value < Count then
     Count := Value;
   SetLength(FItems, Value);
 end;
 
-procedure TACLList<T>.SetCount(Value: Integer);
+procedure TACLListOf<T>.SetCount(Value: Integer);
 begin
   if Value < 0 then
     raise EArgumentOutOfRangeException.CreateRes(@SArgumentOutOfRange);
@@ -1489,7 +1488,7 @@ begin
   FCount := Value;
 end;
 
-procedure TACLList<T>.SetItem(Index: Integer; const Value: T);
+procedure TACLListOf<T>.SetItem(Index: Integer; const Value: T);
 var
   AOldItem: T;
 begin
@@ -1507,18 +1506,18 @@ begin
     FItems[Index] := Value;
 end;
 
-procedure TACLList<T>.SetLast(const Value: T);
+procedure TACLListOf<T>.SetLast(const Value: T);
 begin
   Items[Count - 1] := Value;
 end;
 
-procedure TACLList<T>.SetOnNotify(const Value: TCollectionNotifyEvent<T>);
+procedure TACLListOf<T>.SetOnNotify(const Value: TCollectionNotifyEvent<T>);
 begin
   FOnNotify := Value;
   UpdateNotifications;
 end;
 
-procedure TACLList<T>.Grow(ACount: Integer);
+procedure TACLListOf<T>.Grow(ACount: Integer);
 var
   ANewCount: Integer;
 begin
@@ -1535,7 +1534,7 @@ begin
   Capacity := ANewCount;
 end;
 
-procedure TACLList<T>.GrowCheck(ACount: Integer);
+procedure TACLListOf<T>.GrowCheck(ACount: Integer);
 begin
   if ACount > Length(FItems) then
     Grow(ACount)
@@ -1545,7 +1544,7 @@ end;
 
 { TACLListEnumerator<T> }
 
-constructor TACLListEnumerator<T>.Create(AOwner: TACLList<T>);
+constructor TACLListEnumerator<T>.Create(AOwner: TACLListOf<T>);
 begin
   FIndex := -1;
   FOwner := AOwner;
@@ -1562,14 +1561,14 @@ begin
   Result := FIndex < FOwner.Count;
 end;
 
-{ TACLList<T>.TCompareProcWrapper }
+{ TACLListOf<T>.TCompareProcWrapper }
 
-constructor TACLList<T>.TCompareProcWrapper.Create(AProc: TACLListCompareProc<T>);
+constructor TACLListOf<T>.TCompareProcWrapper.Create(AProc: TACLListCompareProc<T>);
 begin
   FProc := AProc;
 end;
 
-function TACLList<T>.TCompareProcWrapper.Compare(const Left, Right: T): Integer;
+function TACLListOf<T>.TCompareProcWrapper.Compare(const Left, Right: T): Integer;
 begin
   Result := FProc(Left, Right);
 end;
@@ -1825,7 +1824,7 @@ end;
 procedure TACLDictionary<TKey, TValue>.RemoveByValue(const Value: TValue);
 var
   LComparer: IEqualityComparer<TValue>;
-  LKeys: TACLList<TKey>;
+  LKeys: TACLListOf<TKey>;
   I: Integer;
 begin
   LKeys := nil;
@@ -1836,7 +1835,7 @@ begin
       if (FItems[I].HashCode <> EMPTY_HASH) and LComparer.Equals(FItems[I].Value, Value) then
       begin
         if LKeys = nil then
-          LKeys := TACLList<TKey>.Create;
+          LKeys := TACLListOf<TKey>.Create;
         LKeys.Add(FItems[I].Key);
       end;
     end;
@@ -2213,33 +2212,33 @@ begin
   Result := Self;
 end;
 
-{ TACLThreadList<T> }
+{ TACLThreadListOf<T> }
 
-constructor TACLThreadList<T>.Create;
+constructor TACLThreadListOf<T>.Create;
 begin
   Create(TSimpleRWSync.Create);
 end;
 
-constructor TACLThreadList<T>.Create(ASync: IReadWriteSync);
+constructor TACLThreadListOf<T>.Create(ASync: IReadWriteSync);
 begin
   FLock := ASync;
-  FList := TACLList<T>.Create;
+  FList := TACLListOf<T>.Create;
 end;
 
-constructor TACLThreadList<T>.CreateMultiReadExclusiveWrite;
+constructor TACLThreadListOf<T>.CreateMultiReadExclusiveWrite;
 begin
   Create(TMultiReadExclusiveWriteSynchronizer.Create);
 end;
 
-destructor TACLThreadList<T>.Destroy;
+destructor TACLThreadListOf<T>.Destroy;
 begin
   FreeAndNil(FList);
   inherited Destroy;
 end;
 
-procedure TACLThreadList<T>.Add(const Value: T);
+procedure TACLThreadListOf<T>.Add(const Value: T);
 var
-  AList: TACLList<T>;
+  AList: TACLListOf<T>;
 begin
   AList := BeginWrite;
   try
@@ -2249,9 +2248,9 @@ begin
   end;
 end;
 
-procedure TACLThreadList<T>.Clear;
+procedure TACLThreadListOf<T>.Clear;
 var
-  AList: TACLList<T>;
+  AList: TACLListOf<T>;
 begin
   AList := BeginWrite;
   try
@@ -2261,9 +2260,9 @@ begin
   end;
 end;
 
-function TACLThreadList<T>.Contains(const Value: T): Boolean;
+function TACLThreadListOf<T>.Contains(const Value: T): Boolean;
 var
-  AList: TACLList<T>;
+  AList: TACLListOf<T>;
 begin
   AList := BeginRead;
   try
@@ -2273,14 +2272,14 @@ begin
   end;
 end;
 
-function TACLThreadList<T>.Count: Integer;
+function TACLThreadListOf<T>.Count: Integer;
 begin
   Result := FList.Count;
 end;
 
-procedure TACLThreadList<T>.Enum(AProc: TEnumProc);
+procedure TACLThreadListOf<T>.Enum(AProc: TEnumProc);
 var
-  AList: TACLList<T>;
+  AList: TACLListOf<T>;
   I: Integer;
 begin
   AList := BeginRead;
@@ -2292,9 +2291,9 @@ begin
   end;
 end;
 
-function TACLThreadList<T>.Read(AIndex: Integer; out AValue: T): Boolean;
+function TACLThreadListOf<T>.Read(AIndex: Integer; out AValue: T): Boolean;
 var
-  AList: TACLList<T>;
+  AList: TACLListOf<T>;
 begin
   AList := BeginRead;
   try
@@ -2306,9 +2305,9 @@ begin
   end;
 end;
 
-procedure TACLThreadList<T>.Remove(const Value: T);
+procedure TACLThreadListOf<T>.Remove(const Value: T);
 var
-  AList: TACLList<T>;
+  AList: TACLListOf<T>;
 begin
   AList := BeginWrite;
   try
@@ -2318,34 +2317,34 @@ begin
   end;
 end;
 
-function TACLThreadList<T>.BeginRead: TACLList<T>;
+function TACLThreadListOf<T>.BeginRead: TACLListOf<T>;
 begin
   FLock.BeginRead;
   Result := FList;
 end;
 
-function TACLThreadList<T>.BeginWrite: TACLList<T>;
+function TACLThreadListOf<T>.BeginWrite: TACLListOf<T>;
 begin
   FLock.BeginWrite;
   Result := FList;
 end;
 
-procedure TACLThreadList<T>.EndRead;
+procedure TACLThreadListOf<T>.EndRead;
 begin
   FLock.EndRead;
 end;
 
-procedure TACLThreadList<T>.EndWrite;
+procedure TACLThreadListOf<T>.EndWrite;
 begin
   FLock.EndWrite;
 end;
 
-function TACLThreadList<T>.LockList: TACLList<T>;
+function TACLThreadListOf<T>.LockList: TACLListOf<T>;
 begin
   Result := BeginWrite;
 end;
 
-procedure TACLThreadList<T>.UnlockList;
+procedure TACLThreadListOf<T>.UnlockList;
 begin
   EndWrite;
 end;
@@ -2552,33 +2551,33 @@ begin
   inherited Items[Index] := AObject;
 end;
 
-{ TACLObjectList<T> }
+{ TACLObjectListOf<T> }
 
-constructor TACLObjectList<T>.Create(AOwnsObjects: Boolean);
+constructor TACLObjectListOf<T>.Create(AOwnsObjects: Boolean);
 begin
   inherited Create;
   OwnsObjects := AOwnsObjects;
 end;
 
-constructor TACLObjectList<T>.Create(const AComparer: IComparer<T>; AOwnsObjects: Boolean);
+constructor TACLObjectListOf<T>.Create(const AComparer: IComparer<T>; AOwnsObjects: Boolean);
 begin
   inherited Create(AComparer);
   OwnsObjects := AOwnsObjects;
 end;
 
-procedure TACLObjectList<T>.Notify(const Item: T; Action: TCollectionNotification);
+procedure TACLObjectListOf<T>.Notify(const Item: T; Action: TCollectionNotification);
 begin
   inherited Notify(Item, Action);
   if (Action = cnRemoved) and OwnsObjects then
     Item.Free;
 end;
 
-procedure TACLObjectList<T>.UpdateNotifications;
+procedure TACLObjectListOf<T>.UpdateNotifications;
 begin
   FNotifications := Assigned(OnNotify) or OwnsObjects;
 end;
 
-procedure TACLObjectList<T>.SetOwnObjects(AValue: Boolean);
+procedure TACLObjectListOf<T>.SetOwnObjects(AValue: Boolean);
 begin
   FOwnsObjects := AValue;
   UpdateNotifications;
@@ -3019,7 +3018,7 @@ end;
 //begin
 //  inherited Create;
 //  FIgnoreCase := IgnoreCase;
-//  FData := TACLList<string>.Create;
+//  FData := TACLListOf<string>.Create;
 //  FData.Capacity := InitialCapacity;
 //end;
 //
@@ -3304,7 +3303,7 @@ end;
 procedure TACLOrderedDictionary<TKey, TValue>.AfterConstruction;
 begin
   inherited;
-  FOrder := TACLList<TKey>.Create;
+  FOrder := TACLListOf<TKey>.Create;
   FOrder.Capacity := Capacity;
 end;
 

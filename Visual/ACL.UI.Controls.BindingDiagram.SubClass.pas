@@ -311,9 +311,9 @@ type
 
   TACLBindingDiagramLinkCustomPathBuilder = class
   protected
-    procedure AddPoint(APoints: TACLList<TPoint>; const P: TPoint); inline;
+    procedure AddPoint(APoints: TACLListOf<TPoint>; const P: TPoint); inline;
   public
-    procedure Build(APoints: TACLList<TPoint>;
+    procedure Build(APoints: TACLListOf<TPoint>;
       ASource, ATarget: TACLBindingDiagramObjectPinViewInfo); virtual; abstract;
     procedure Initialize(AViewInfo: TACLBindingDiagramSubClassViewInfo); virtual; abstract;
   end;
@@ -325,9 +325,9 @@ type
     ID_EMPTY = 0;
     ID_OBJECT = -1;
   protected
-    Columns: TACLList<Integer>;
+    Columns: TACLListOf<Integer>;
     Matrix: array of array of Integer;
-    Rows: TACLList<Integer>;
+    Rows: TACLListOf<Integer>;
 
     procedure Add(AObjectViewInfo: TACLBindingDiagramObjectViewInfo); overload;
     procedure Add(const R: TRect); overload;
@@ -340,7 +340,7 @@ type
   public
     constructor Create;
     destructor Destroy; override;
-    procedure Build(APoints: TACLList<TPoint>;
+    procedure Build(APoints: TACLListOf<TPoint>;
       ASource, ATarget: TACLBindingDiagramObjectPinViewInfo); override;
     procedure Initialize(AViewInfo: TACLBindingDiagramSubClassViewInfo); override;
   end;
@@ -349,7 +349,7 @@ type
 
   TACLBindingDiagramSimplePathBuilder = class(TACLBindingDiagramComplexPathBuilder)
   public
-    procedure Build(APoints: TACLList<TPoint>;
+    procedure Build(APoints: TACLListOf<TPoint>;
       ASource, ATarget: TACLBindingDiagramObjectPinViewInfo); override;
     procedure Initialize(AViewInfo: TACLBindingDiagramSubClassViewInfo); override;
   end;
@@ -404,7 +404,7 @@ type
     FIsEditing: Boolean;
     FLink: TACLBindingDiagramLink;
     FOwner: TACLBindingDiagramSubClassViewInfo;
-    FPoints: TACLList<TPoint>;
+    FPoints: TACLListOf<TPoint>;
     FSourcePin: TACLBindingDiagramObjectPinViewInfo;
     FTargetPin: TACLBindingDiagramObjectPinViewInfo;
 
@@ -478,7 +478,7 @@ type
   protected
     FLineOffset: Integer;
     FLinkColors: TACLColorList;
-    FLinks: TACLObjectList<TACLBindingDiagramLinkViewInfo>;
+    FLinks: TACLObjectListOf<TACLBindingDiagramLinkViewInfo>;
     FMoving: TACLBindingDiagramObject;
     FTextLineHeight: Integer;
 
@@ -1228,7 +1228,7 @@ end;
 
 { TACLBindingDiagramLinkCustomPathBuilder }
 
-procedure TACLBindingDiagramLinkCustomPathBuilder.AddPoint(APoints: TACLList<TPoint>; const P: TPoint);
+procedure TACLBindingDiagramLinkCustomPathBuilder.AddPoint(APoints: TACLListOf<TPoint>; const P: TPoint);
 
   function IsMiddle(const P, P0, P1: TPoint): Boolean; inline;
   begin
@@ -1246,8 +1246,8 @@ end;
 
 constructor TACLBindingDiagramComplexPathBuilder.Create;
 begin
-  Rows := TACLList<Integer>.Create;
-  Columns := TACLList<Integer>.Create;
+  Rows := TACLListOf<Integer>.Create;
+  Columns := TACLListOf<Integer>.Create;
 end;
 
 destructor TACLBindingDiagramComplexPathBuilder.Destroy;
@@ -1257,7 +1257,7 @@ begin
   inherited;
 end;
 
-procedure TACLBindingDiagramComplexPathBuilder.Build(APoints: TACLList<TPoint>; ASource, ATarget: TACLBindingDiagramObjectPinViewInfo);
+procedure TACLBindingDiagramComplexPathBuilder.Build(APoints: TACLListOf<TPoint>; ASource, ATarget: TACLBindingDiagramObjectPinViewInfo);
 
   function BuildPath(X, Y, ALevel: Integer): Boolean;
   begin
@@ -1388,7 +1388,7 @@ end;
 
 procedure TACLBindingDiagramComplexPathBuilder.Add(const R: TRect);
 
-  procedure AddToStortedList(L: TACLList<Integer>; V: Integer);
+  procedure AddToStortedList(L: TACLListOf<Integer>; V: Integer);
   var
     AIndex: Integer;
   begin
@@ -1445,7 +1445,7 @@ end;
 
 function TACLBindingDiagramComplexPathBuilder.RectToIndexes(const R: TRect): TRect;
 
-  function IndexOf(L: TACLList<Integer>; V: Integer): Integer; inline;
+  function IndexOf(L: TACLListOf<Integer>; V: Integer): Integer; inline;
   begin
     if not L.BinarySearch(V, Result) then
       raise EInvalidArgument.Create('Specified rect was not indexed');
@@ -1461,7 +1461,7 @@ end;
 { TACLBindingDiagramSimplePathBuilder }
 
 procedure TACLBindingDiagramSimplePathBuilder.Build(
-  APoints: TACLList<TPoint>; ASource, ATarget: TACLBindingDiagramObjectPinViewInfo);
+  APoints: TACLListOf<TPoint>; ASource, ATarget: TACLBindingDiagramObjectPinViewInfo);
 begin
   Rows.Count := 0;
   Columns.Count := 0;
@@ -1512,7 +1512,7 @@ constructor TACLBindingDiagramSubClassViewInfo.Create(AOwner: TACLCompoundContro
 begin
   inherited;
   FLinkColors := TACLColorList.Create;
-  FLinks := TACLObjectList<TACLBindingDiagramLinkViewInfo>.Create;
+  FLinks := TACLObjectListOf<TACLBindingDiagramLinkViewInfo>.Create;
 end;
 
 destructor TACLBindingDiagramSubClassViewInfo.Destroy;
@@ -1888,7 +1888,7 @@ begin
   FSourcePin.AddLink(Self);
   FTargetPin := ATargetPin;
   FTargetPin.AddLink(Self);
-  FPoints := TACLList<TPoint>.Create;
+  FPoints := TACLListOf<TPoint>.Create;
 end;
 
 destructor TACLBindingDiagramLinkViewInfo.Destroy;

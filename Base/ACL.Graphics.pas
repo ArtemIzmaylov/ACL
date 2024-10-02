@@ -279,7 +279,7 @@ type
 
   { TACLColorList }
 
-  TACLColorList = class(TACLList<TColor>);
+  TACLColorList = class(TACLListOf<TColor>);
 
   { TACLBitmap }
 

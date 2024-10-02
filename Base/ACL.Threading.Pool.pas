@@ -85,7 +85,7 @@ type
   strict private
     FActiveTasks: Integer;
     FEvent: TACLEvent;
-    FTasks: TACLList<TObjHandle>;
+    FTasks: TACLListOf<TObjHandle>;
 
     FOnAsyncFinished: TNotifyEvent;
 
@@ -138,7 +138,7 @@ type
     CpuUsageMonitorUpdateInterval = 1000;
     SuccessfulWaitResults = [wrSignaled, wrAbandoned];
   strict private
-    FActiveTasks: TACLList<TACLTask>;
+    FActiveTasks: TACLListOf<TACLTask>;
     FActualMaxActiveTasks: Integer;
     FCpuUsageLog: array [0..CpuUsageMonitorLogSize - 1] of Integer;
     FCpuUsageMonitor: TObject;
@@ -146,7 +146,7 @@ type
     FLock: TACLCriticalSection;
     FMaxActiveTasks: Integer;
     FPrevSystemTimes: TThread.TSystemTimes;
-    FTasks: TACLObjectList<TACLTask>;
+    FTasks: TACLObjectListOf<TACLTask>;
 
     procedure AsyncRun(ATask: TACLTask);
     procedure CheckActiveTasks;
@@ -275,7 +275,7 @@ end;
 constructor TACLTaskGroup.Create;
 begin
   FEvent := TACLEvent.Create(True, True);
-  FTasks := TACLList<TObjHandle>.Create;
+  FTasks := TACLListOf<TObjHandle>.Create;
 end;
 
 destructor TACLTaskGroup.Destroy;
@@ -495,8 +495,8 @@ constructor TACLTaskDispatcher.Create;
 begin
   inherited Create;
   IsMultiThread := True;
-  FTasks := TACLObjectList<TACLTask>.Create;
-  FActiveTasks := TACLList<TACLTask>.Create;
+  FTasks := TACLObjectListOf<TACLTask>.Create;
+  FActiveTasks := TACLListOf<TACLTask>.Create;
   FLock := TACLCriticalSection.Create(Self, 'TaskLock');
   FCpuUsageMonitor := TACLTimer.CreateEx(HandlerCpuUsageMonitor, CpuUsageMonitorUpdateInterval, True);
   MaxActiveTasks := 4 * CPUCount;

@@ -107,7 +107,7 @@ type
 
   { TACLExpressionFunctionInfoList }
 
-  TACLExpressionFunctionInfoList = class(TACLObjectList<TACLExpressionFunctionInfo>)
+  TACLExpressionFunctionInfoList = class(TACLObjectListOf<TACLExpressionFunctionInfo>)
   strict private
     function Compare(const S: string; B: PChar; L: Integer): Boolean; inline;
   public

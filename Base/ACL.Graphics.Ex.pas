@@ -352,7 +352,7 @@ type
       Target: PACLPixel32;
     end;
 
-    TChunks = class(TACLObjectList<TChunk>);
+    TChunks = class(TACLObjectListOf<TChunk>);
 
     TCalculateMatrixProc = function (const Source, Target: Integer): Integer;
   {$ENDREGION}
@@ -432,7 +432,7 @@ type
       procedure ApplyTo(AColors: PACLPixel32; ACount, AStep: Integer); overload;
     end;
 
-    TChunks = class(TACLObjectList<TChunk>);
+    TChunks = class(TACLObjectListOf<TChunk>);
   {$ENDREGION}
   strict private
     FRadius: Double;
