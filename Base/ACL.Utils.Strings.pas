@@ -396,27 +396,33 @@ function acMakeString(const AScanStart, AScanNext: PAnsiChar): AnsiString; overl
 function acMakeString(const AScanStart, AScanNext: PWideChar): UnicodeString; overload;
 function acStringLength(const AScanStart, AScanNext: PAnsiChar): Integer; overload; inline;
 function acStringLength(const AScanStart, AScanNext: PWideChar): Integer; overload; inline;
-function acStringFromAnsiString(const S: AnsiChar): WideChar; overload;
-function acStringFromAnsiString(const S: AnsiString): UnicodeString; overload;
-function acStringFromAnsiString(const S: AnsiString; CodePage: Integer): UnicodeString; overload;
-function acStringFromAnsiString(const S: PAnsiChar; Length, CodePage: Integer): UnicodeString; overload;
-function acStringFromBytes(const Bytes: PByte; Count: Integer): UnicodeString; overload;
-function acStringFromBytes(const Bytes: TBytes): UnicodeString; overload;
 function acStringIsRealUnicode(const S: string): Boolean;
-{$IFNDEF UNICODE}
-function acStringToAnsiString(const S: string; CodePage: Integer = -1): AnsiString; overload;
-{$ENDIF}
-function acStringToAnsiString(const S: UnicodeString; CodePage: Integer = -1): AnsiString; overload;
-function acStringToBytes(W: PWideChar; ACount: Integer): RawByteString;
+
+function acStringFromAnsiString(const S: AnsiString; CodePage: Integer = -1): string; inline;
+// Converts string (Unicode in Delphi or UTF8 in Lazarus) to AnsiString according
+// to specified codepage, if codepage is not specified the DefaultCodePage will be used.
+function acStringToAnsiString(const S: string; CodePage: Integer = -1): AnsiString; inline;
 
 // Special conversion functions between Delphi and FreePascal
-// Delphi: maps to acStringToAnsiString
+// Delphi: maps to acUStringFromAnsiString with CP_ACP
 // FPC: returns S as it is
 function acString(const S: AnsiString): string; overload; inline;
 // Delphi: returns S as it is
 // FPC: asumes that string is UTF8-encoded
 function acString(const S: UnicodeString): string; overload; inline;
 function acUString(const S: string): UnicodeString; inline;
+// Delphi: maps to acStringToAnsiString with CP_ACP
+// FPC: return S as it is
+function acAString(const S: string): AnsiString;
+
+function acUStringFromBytes(const Bytes: PByte; Count: Integer): UnicodeString; overload;
+function acUStringFromBytes(const Bytes: TBytes): UnicodeString; overload;
+function acUStringFromAnsiString(const S: AnsiChar): WideChar; overload;
+function acUStringFromAnsiString(const S: AnsiString): UnicodeString; overload;
+function acUStringFromAnsiString(const S: AnsiString; CodePage: Integer): UnicodeString; overload;
+function acUStringFromAnsiString(const S: PAnsiChar; Length, CodePage: Integer): UnicodeString; overload;
+function acUStringToAnsiString(const S: UnicodeString; CodePage: Integer = -1): AnsiString; overload;
+function acUStringToBytes(W: PWideChar; ACount: Integer): RawByteString;
 
 // UTF8
 // Unlike built-in to RTL and Windows OS versions of UTF8 Decoder
@@ -752,14 +758,78 @@ end;
 // Text Conversions
 // ---------------------------------------------------------------------------------------------------------------------
 
-{$IFNDEF UNICODE}
-function acStringToAnsiString(const S: string; CodePage: Integer = -1): AnsiString; overload;
+function acAString(const S: string): AnsiString;
 begin
-  Result := acStringToAnsiString(acUString(S), CodePage);
-end;
+{$IF DEFINED(UNICODE)}
+  Result := acUStringToAnsiString(S, CP_ACP);
+{$ELSE}
+  Result := S;
 {$ENDIF}
+end;
 
-function acStringToAnsiString(const S: UnicodeString; CodePage: Integer): AnsiString; overload;
+function acString(const S: AnsiString): string;
+begin
+{$IF DEFINED(UNICODE)}
+  Result := acUStringFromAnsiString(S, CP_ACP);
+{$ELSE}
+  Result := S;
+{$ENDIF}
+end;
+
+function acString(const S: UnicodeString): string; inline;
+begin
+{$IF DEFINED(UNICODE)}
+  Result := S;
+{$ELSEIF DEFINED(FPC)}
+  Result := acEncodeUtf8(S);
+{$ELSE}
+  Result := acStringToAnsiString(S, CP_ACP);
+{$ENDIF}
+end;
+
+function acStringIsRealUnicode(const S: string): Boolean;
+var
+  I: Integer;
+  L: Integer;
+  P: PChar;
+begin
+  L := Length(S);
+  P := PChar(S);
+  for I := 1 to L do
+  begin
+    if Ord(P^) >= $7F then
+      Exit(True); // Unicode (inc.UTF8) or Extended ASCII
+    Inc(P);
+  end;
+  Result := False;
+end;
+
+function acStringFromAnsiString(const S: AnsiString; CodePage: Integer = -1): string;
+begin
+  if CodePage < 0 then
+    CodePage := DefaultCodePage;
+  Result := acString(acUStringFromAnsiString(S, CodePage));
+end;
+
+function acStringToAnsiString(const S: string; CodePage: Integer = -1): AnsiString;
+begin
+  if CodePage < 0 then
+    CodePage := DefaultCodePage;
+  Result := acUStringToAnsiString(acUString(S), CodePage);
+end;
+
+function acUString(const S: string): UnicodeString; inline;
+begin
+{$IF DEFINED(UNICODE)}
+  Result := S;
+{$ELSEIF DEFINED(FPC)}
+  Result := acDecodeUtf8(S);
+{$ELSE}
+  Result := acUStringFromAnsiString(S, CP_ACP);
+{$ENDIF}
+end;
+
+function acUStringToAnsiString(const S: UnicodeString; CodePage: Integer): AnsiString; overload;
 {$IFDEF FPC}
 var
   LData: TBytes;
@@ -780,7 +850,7 @@ begin
 {$ENDIF}
 end;
 
-function acStringToBytes(W: PWideChar; ACount: Integer): RawByteString;
+function acUStringToBytes(W: PWideChar; ACount: Integer): RawByteString;
 var
   B: PByte;
 begin
@@ -798,21 +868,21 @@ begin
   end;
 end;
 
-function acStringFromAnsiString(const S: AnsiString): UnicodeString;
+function acUStringFromAnsiString(const S: AnsiString): UnicodeString;
 begin
-  Result := acStringFromAnsiString(S, DefaultCodePage);
+  Result := acUStringFromAnsiString(S, DefaultCodePage);
 end;
 
-function acStringFromAnsiString(const S: AnsiChar): WideChar;
+function acUStringFromAnsiString(const S: AnsiChar): WideChar;
 begin
 {$IFDEF FPC}
-  Result := PWideChar(acStringFromAnsiString(PAnsiChar(@S), 1, DefaultCodePage))^;
+  Result := PWideChar(acUStringFromAnsiString(PAnsiChar(@S), 1, DefaultCodePage))^;
 {$ELSE}
   UnicodeFromLocaleChars(DefaultCodePage, 0, @S, 1, @Result, 1);
 {$ENDIF}
 end;
 
-function acStringFromAnsiString(const S: PAnsiChar; Length, CodePage: Integer): UnicodeString;
+function acUStringFromAnsiString(const S: PAnsiChar; Length, CodePage: Integer): UnicodeString;
 {$IFDEF FPC}
 var
   LTxt: TBytes;
@@ -833,23 +903,23 @@ begin
 {$ENDIF}
 end;
 
-function acStringFromAnsiString(const S: AnsiString; CodePage: Integer): UnicodeString;
+function acUStringFromAnsiString(const S: AnsiString; CodePage: Integer): UnicodeString;
 begin
-  Result := acStringFromAnsiString(PAnsiChar(S), Length(S), CodePage);
+  Result := acUStringFromAnsiString(PAnsiChar(S), Length(S), CodePage);
 end;
 
-function acStringFromBytes(const Bytes: TBytes): UnicodeString;
+function acUStringFromBytes(const Bytes: TBytes): UnicodeString;
 var
   LCount: Integer;
 begin
   LCount := Length(Bytes);
   if LCount > 0 then
-    Result := acStringFromBytes(@Bytes[0], LCount)
+    Result := acUStringFromBytes(@Bytes[0], LCount)
   else
     Result := acEmptyStrU;
 end;
 
-function acStringFromBytes(const Bytes: PByte; Count: Integer): UnicodeString;
+function acUStringFromBytes(const Bytes: PByte; Count: Integer): UnicodeString;
 var
   B: PByte;
   W: PWord;
@@ -867,54 +937,6 @@ begin
     Inc(W);
     Inc(B);
   end;
-end;
-
-function acStringIsRealUnicode(const S: string): Boolean;
-var
-  I: Integer;
-  L: Integer;
-  P: PChar;
-begin
-  L := Length(S);
-  P := PChar(S);
-  for I := 1 to L do
-  begin
-    if Ord(P^) >= $7F then
-      Exit(True); // Unicode (inc.UTF8) or Extended ASCII
-    Inc(P);
-  end;
-  Result := False;
-end;
-
-function acString(const S: AnsiString): string;
-begin
-{$IF DEFINED(UNICODE)}
-  Result := acStringFromAnsiString(S);
-{$ELSE}
-  Result := S;
-{$ENDIF}
-end;
-
-function acString(const S: UnicodeString): string; inline;
-begin
-{$IF DEFINED(UNICODE)}
-  Result := S;
-{$ELSEIF DEFINED(FPC)}
-  Result := acEncodeUtf8(S);
-{$ELSE}
-  Result := acStringToAnsiString(S);
-{$ENDIF}
-end;
-
-function acUString(const S: string): UnicodeString; inline;
-begin
-{$IF DEFINED(UNICODE)}
-  Result := S;
-{$ELSEIF DEFINED(FPC)}
-  Result := acDecodeUtf8(S);
-{$ELSE}
-  Result := acStringFromAnsiString(S);
-{$ENDIF}
 end;
 
 //==============================================================================
@@ -3090,7 +3112,7 @@ end;
 function TACLStringBuilder.Append(const AValue: TArray<AnsiChar>; AStartIndex, ACount: Integer): TACLStringBuilder;
 begin
 {$IFDEF UNICODE}
-  Result := Append(acStringFromAnsiString(PAnsiChar(@AValue[AStartIndex]), ACount, DefaultCodePage));
+  Result := Append(acUStringFromAnsiString(PAnsiChar(@AValue[AStartIndex]), ACount, DefaultCodePage));
 {$ELSE}
   Result := Append(@AValue[AStartIndex], ACount);
 {$ENDIF}
@@ -3434,7 +3456,7 @@ end;
 
 class function TACLMimecode.DecodeBytes(const ACode: UnicodeString): TBytes;
 begin
-  Result := DecodeBytes(acStringToAnsiString(ACode));
+  Result := DecodeBytes(acUStringToBytes(PWideChar(ACode), Length(ACode)));
 end;
 
 class function TACLMimecode.DecodeBytes(const ACode: AnsiString): TBytes;

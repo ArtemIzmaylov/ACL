@@ -663,7 +663,7 @@ begin
   if ViewInfo.FocusedPane = pHex then
     CopyToClipboard(FormatHex)
   else
-    CopyToClipboard(acStringFromBytes);
+    CopyToClipboard(acUStringFromBytes);
 end;
 
 procedure TACLHexViewSubClass.CopyToClipboard(AEncoding: TEncoding);

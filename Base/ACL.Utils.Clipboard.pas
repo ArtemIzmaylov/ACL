@@ -388,7 +388,7 @@ begin
         end
         else
         begin
-          AString := acStringFromAnsiString(AFileName);
+          AString := acString(AFileName);
           Inc(AFileName, Length(AString) + 1);
         end;
         if Result = nil then

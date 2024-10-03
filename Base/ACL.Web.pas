@@ -309,7 +309,7 @@ begin
   {$IFDEF UNICODE}
     if LAsumeUtf8 = TACLBoolean.True then
     begin
-      Result := acDecodeUtf8(acStringToBytes(@LBuffer.Chars[0], LBuffer.Length));
+      Result := acDecodeUtf8(acUStringToBytes(@LBuffer.Chars[0], LBuffer.Length));
       if Result <> '' then Exit;
     end;
   {$ENDIF}

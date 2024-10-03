@@ -5481,7 +5481,7 @@ begin
 {$IFDEF UNICODE}
   SetString(Result.Value, PWideChar(@S[AStart]), ALen);
 {$ELSE}
-  Result.Value := acStringToBytes(PWideChar(@S[AStart]), ALen);
+  Result.Value := acUStringToBytes(PWideChar(@S[AStart]), ALen);
 {$ENDIF}
 end;
 
