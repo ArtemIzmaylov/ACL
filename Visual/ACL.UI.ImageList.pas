@@ -141,7 +141,8 @@ type
 procedure acDrawImage(ACanvas: TCanvas; const R: TRect;
   AImages: TCustomImageList; AImageIndex: Integer;
   AEnabled: Boolean = True; ASmoothStrech: Boolean = True);
-function acGetImage(AImages: TCustomImageList; AImageIndex: Integer): TACLBitmapLayer;
+function acGetImage(AImages: TCustomImageList;
+  AImageIndex: Integer; AEnabled: Boolean = True): TACLBitmapLayer;
 function acGetImageListSize(AImages: TCustomImageList; ATargetDPI: Integer): TSize;
 function acIs32BitBitmap(ABitmap: TBitmap): Boolean;
 procedure acSetImageList(AValue: TCustomImageList; var AFieldValue: TCustomImageList;
@@ -165,7 +166,8 @@ uses
   ACL.Utils.RTTI,
   ACL.Utils.Stream;
 
-function acGetImage(AImages: TCustomImageList; AImageIndex: Integer): TACLBitmapLayer;
+function acGetImage(AImages: TCustomImageList;
+  AImageIndex: Integer; AEnabled: Boolean = True): TACLBitmapLayer;
 {$IFDEF FPC}
 var
   ARawImage: TRawImage;
@@ -189,6 +191,8 @@ begin
   Result.Reset;
   AImages.Draw(Result.Canvas, 0, 0, AImageIndex);
 {$ENDIF}
+  if not AEnabled then
+    Result.MakeDisabled;
 end;
 
 procedure acDrawImage(ACanvas: TCanvas; const R: TRect;
@@ -206,10 +210,8 @@ begin
       Exit;
     end;
   {$ENDIF}
-    LImage := acGetImage(AImages, AImageIndex);
+    LImage := acGetImage(AImages, AImageIndex, AEnabled);
     try
-      if not AEnabled then
-        LImage.MakeDisabled;
       LImage.DrawBlend(ACanvas, R, MaxByte, ASmoothStrech);
     finally
       LImage.Free;

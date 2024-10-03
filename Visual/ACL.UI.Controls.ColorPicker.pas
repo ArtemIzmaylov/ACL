@@ -713,7 +713,7 @@ end;
 
 procedure TACLColorPickerVisualColorModifierCell.DrawContent(ACanvas: TCanvas);
 begin
-  FContentCache.DrawCopy(ACanvas.Handle, ContentBounds.TopLeft);
+  FContentCache.DrawCopy(ACanvas, ContentBounds.TopLeft);
 end;
 
 procedure TACLColorPickerVisualColorModifierCell.FlushContentCache;

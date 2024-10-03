@@ -243,14 +243,11 @@ type
     function Resize(const ANewWidth, ANewHeight: Integer): Boolean; overload;
 
     //# Draw
-  {$IFDEF MSWINDOWS}
-    procedure DrawBlend(DC: HDC; const R, SrcRect: TRect; AAlpha: Byte = MaxByte); overload;
-  {$ENDIF}
     procedure DrawBlend(ACanvas: TCanvas; const P: TPoint; AAlpha: Byte = MaxByte); overload;
     procedure DrawBlend(ACanvas: TCanvas; const R: TRect; AAlpha: Byte = MaxByte); overload;
     procedure DrawBlend(ACanvas: TCanvas; const R, SrcRect: TRect; AAlpha: Byte); overload;
-    procedure DrawCopy(DC: HDC; const P: TPoint); overload;
-    procedure DrawCopy(DC: HDC; const R: TRect; ASmoothStretch: Boolean = False); overload;
+    procedure DrawCopy(ACanvas: TCanvas; const P: TPoint); overload;
+    procedure DrawCopy(ACanvas: TCanvas; const R: TRect; ASmoothStretch: Boolean = False); overload;
 
     //# Properties
     property Canvas: TCanvas read GetCanvas;
@@ -2601,7 +2598,7 @@ begin
 begin
   ATarget.PixelFormat := pf32bit;
   ATarget.SetSize(Width, Height);
-  DrawCopy(ATarget.Canvas.Handle, NullPoint);
+  DrawCopy(ATarget.Canvas, NullPoint);
 {$ENDIF}
 end;
 
@@ -2687,8 +2684,15 @@ end;
 
 procedure TACLDib.DrawBlend(ACanvas: TCanvas; const R, SrcRect: TRect; AAlpha: Byte);
 {$IFDEF MSWINDOWS}
+var
+  LBlendFunc: TBlendFunction;
 begin
-  DrawBlend(ACanvas.Handle, R, SrcRect, AAlpha);
+  LBlendFunc.AlphaFormat := AC_SRC_ALPHA;
+  LBlendFunc.BlendOp := AC_SRC_OVER;
+  LBlendFunc.BlendFlags := 0;
+  LBlendFunc.SourceConstantAlpha := AAlpha;
+  AlphaBlend(ACanvas.Handle, R.Left, R.Top, R.Right - R.Left, R.Bottom - R.Top,
+    Handle, SrcRect.Left, SrcRect.Top, SrcRect.Width, SrcRect.Height, LBlendFunc);
 {$ELSE}
 var
   LSurface: Pcairo_surface_t;
@@ -2707,37 +2711,23 @@ begin
 {$ENDIF}
 end;
 
-{$IFDEF MSWINDOWS}
-procedure TACLDib.DrawBlend(DC: HDC; const R, SrcRect: TRect; AAlpha: Byte = MaxByte);
-var
-  ABlendFunc: TBlendFunction;
+procedure TACLDib.DrawCopy(ACanvas: TCanvas; const P: TPoint);
 begin
-  ABlendFunc.AlphaFormat := AC_SRC_ALPHA;
-  ABlendFunc.BlendOp := AC_SRC_OVER;
-  ABlendFunc.BlendFlags := 0;
-  ABlendFunc.SourceConstantAlpha := AAlpha;
-  AlphaBlend(DC, R.Left, R.Top, R.Right - R.Left, R.Bottom - R.Top,
-    Handle, SrcRect.Left, SrcRect.Top, SrcRect.Width, SrcRect.Height, ABlendFunc);
-end;
-{$ENDIF}
-
-procedure TACLDib.DrawCopy(DC: HDC; const P: TPoint);
-begin
-  acBitBlt(DC, Handle, Bounds(P.X, P.Y, Width, Height), NullPoint);
+  acBitBlt(ACanvas.Handle, Handle, Bounds(P.X, P.Y, Width, Height), NullPoint);
 end;
 
-procedure TACLDib.DrawCopy(DC: HDC; const R: TRect; ASmoothStretch: Boolean = False);
+procedure TACLDib.DrawCopy(ACanvas: TCanvas; const R: TRect; ASmoothStretch: Boolean = False);
 var
   AMode: Integer;
 begin
   if ASmoothStretch and not R.EqualSizes(ClientRect) then
   begin
-    AMode := SetStretchBltMode(DC, HALFTONE);
-    acStretchBlt(DC, Handle, R, ClientRect);
-    SetStretchBltMode(DC, AMode);
+    AMode := SetStretchBltMode(ACanvas.Handle, HALFTONE);
+    acStretchBlt(ACanvas.Handle, Handle, R, ClientRect);
+    SetStretchBltMode(ACanvas.Handle, AMode);
   end
   else
-    acStretchBlt(DC, Handle, R, ClientRect);
+    acStretchBlt(ACanvas.Handle, Handle, R, ClientRect);
 end;
 
 procedure TACLDib.Flip(AHorizontally, AVertically: Boolean);

@@ -1293,7 +1293,7 @@ begin
     try
       acBitBlt(ALayer.Handle, ACanvas.Handle, ALayer.ClientRect, P);
       FBlendFunctions[AMode](ALayer, Self, AAlpha);
-      ALayer.DrawCopy(ACanvas.Handle, P);
+      ALayer.DrawCopy(ACanvas, P);
     finally
       ALayer.Free;
     end;

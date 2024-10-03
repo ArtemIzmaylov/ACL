@@ -749,7 +749,7 @@ begin
         acBitBlt(ATemp.Handle, ACanvas.Handle, ATemp.ClientRect, AViewItem.Bounds.TopLeft);
         Style.DrawTab(ATemp.Canvas, ATemp.ClientRect, AViewItem.Active, Focused, OptionsView.Style);
         ATemp.Flip(False, True);
-        ATemp.DrawCopy(ACanvas.Handle, AViewItem.Bounds.TopLeft);
+        ATemp.DrawCopy(ACanvas, AViewItem.Bounds.TopLeft);
       finally
         ATemp.Free;
       end;

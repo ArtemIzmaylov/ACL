@@ -169,7 +169,7 @@ end;
 procedure TACLMagnifierGlass.Paint;
 begin
   PrepareBuffer(MouseCursorPos);
-  FBuffer.DrawCopy(Canvas.Handle, NullPoint);
+  FBuffer.DrawCopy(Canvas, NullPoint);
 end;
 
 procedure TACLMagnifierGlass.PrepareBuffer(const ACursorPos: TPoint);

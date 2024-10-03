@@ -296,7 +296,7 @@ begin
       LPix^.G := $FF xor LPix^.G;
       LPix^.B := $FF xor LPix^.B;
     end;
-    LDib.DrawCopy(DC, R.TopLeft);
+    acBitBlt(DC, LDib.Handle, R, NullPoint);
   finally
     LDib.Free;
   end;
