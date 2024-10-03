@@ -67,11 +67,13 @@ type
   TACLCairoRender = class(TACL2DRender)
   strict private
     FHandle: Pcairo_t;
+    FHandleOwnership: TStreamOwnership;
     FTargetSurface: Pcairo_surface_t;
 
     procedure PathEllipseArc(X1, Y1, X2, Y2: Double);
     procedure PathPolyline(Points: PPoint; Count: Integer; ClosePath: Boolean);
   public
+    procedure BeginPaint(ACairo: Pcairo_t); overload;
     procedure BeginPaint(ACanvas: TCanvas); overload;
     procedure BeginPaint(ASurface: Pcairo_surface_t); overload;
     procedure BeginPaint(DC: HDC; const BoxRect, UpdateRect: TRect); overload; override;
@@ -109,7 +111,8 @@ type
     procedure FillRectangleByGradient(
       AFrom, ATo: TAlphaColor; const ARect: TRect; AVertical: Boolean);
     procedure FillSurface(const ATargetRect, ASourceRect: TRect;
-      ASurface: Pcairo_surface_t; AAlpha: Double; ATileMode: Boolean);
+      ASurface: Pcairo_surface_t; AAlpha: Double; ATileMode: Boolean;
+      AOperator: cairo_operator_t = CAIRO_OPERATOR_OVER);
 
     // Text
     procedure DrawText(const Text: string; const R: TRect;
@@ -1282,12 +1285,21 @@ end;
 
 { TACLCairoRender }
 
+procedure TACLCairoRender.BeginPaint(ACairo: Pcairo_t);
+begin
+  FTargetSurface := nil;
+  FHandle := ACairo;
+  FHandleOwnership := soReference;
+  FOrigin := NullPoint;
+end;
+
 procedure TACLCairoRender.BeginPaint(ACanvas: TCanvas);
 begin
   if Handle <> nil then
     raise EInvalidGraphicOperation.Create(ClassName + ' recursive calls not yet supported');
 
   FOrigin := NullPoint;
+  FHandleOwnership := soOwned;
   // Если DC у DIB-а уже захвачен - рисуем на нем, не переключаемся.
   // Иначе запрос Bits спровоцирует отключение канваса и следующий за нами
   // вызов уже получит канвас без Handle-а и не сможет получить валидный WindowOrg
@@ -1311,6 +1323,7 @@ end;
 procedure TACLCairoRender.BeginPaint(ASurface: Pcairo_surface_t);
 begin
   FTargetSurface := nil;
+  FHandleOwnership := soOwned;
   FHandle := cairo_create(ASurface);
   FOrigin := NullPoint;
 end;
@@ -1318,6 +1331,7 @@ end;
 procedure TACLCairoRender.BeginPaint(DC: HDC; const BoxRect, UpdateRect: TRect);
 begin
   FTargetSurface := nil;
+  FHandleOwnership := soOwned;
   FHandle := cairo_create_context(DC);
   GetWindowOrgEx(DC, {%H-}FOrigin);
   cairo_rectangle(FHandle,
@@ -1331,7 +1345,8 @@ procedure TACLCairoRender.EndPaint;
 begin
   if FHandle <> nil then
   try
-    cairo_destroy(FHandle);
+    if FHandleOwnership = soOwned then
+      cairo_destroy(FHandle);
     if FTargetSurface <> nil then
       cairo_surface_destroy(FTargetSurface);
     FTargetSurface := nil;
@@ -1562,10 +1577,12 @@ begin
 end;
 
 procedure TACLCairoRender.FillSurface(const ATargetRect, ASourceRect: TRect;
-  ASurface: Pcairo_surface_t; AAlpha: Double; ATileMode: Boolean);
+  ASurface: Pcairo_surface_t; AAlpha: Double; ATileMode: Boolean;
+  AOperator: cairo_operator_t = CAIRO_OPERATOR_OVER);
 var
   LCairo: Pcairo_t;
   LMatrix: cairo_matrix_t;
+  LPrevOperator: cairo_operator_t;
   LSurface: Pcairo_surface_t;
   LSourceW, LSourceH: LongInt;
   LTargetW, LTargetH: Double;
@@ -1580,6 +1597,8 @@ begin
   if (LSourceW = 0) or (LSourceH = 0) or (LTargetH = 0) or (LTargetW = 0) then
     Exit;
 
+  LPrevOperator := cairo_get_operator(Handle);
+  cairo_set_operator(Handle, AOperator);
   if ATileMode then
   begin
     LSurface := cairo_create_surface(LSourceW, LSourceH);
@@ -1616,6 +1635,7 @@ begin
     else
       cairo_fill(Handle);
   end;
+  cairo_set_operator(Handle, LPrevOperator);
 end;
 
 procedure TACLCairoRender.DrawText(const Text: string; const R: TRect;
