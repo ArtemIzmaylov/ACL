@@ -162,6 +162,7 @@ type
     procedure LoadFromResource(AInstance: HINST; const AResName: string; AResType: PChar);
     procedure LoadFromStream(AStream: IACLDataContainer); overload;
     procedure LoadFromStream(AStream: TStream); overload;
+    procedure SaveToDib(const ATarget: TACLDib);
     procedure SaveToFile(const AFileName: string); overload;
     procedure SaveToFile(const AFileName: string; AFormat: TACLImageFormatClass); overload;
     procedure SaveToStream(AStream: TStream); overload; virtual;
@@ -606,29 +607,29 @@ end;
   end;
 
 var
-  AData: TBitmapData;
-  AHandle: HBITMAP;
+  LData: TBitmapData;
+  LHandle: HBITMAP;
 begin
   Result := nil;
-  if BeginLock(AData) then
+  if BeginLock(LData) then
   try
-    case AData.PixelFormat of
+    case LData.PixelFormat of
       PixelFormat32bppARGB:
-        Result := CloneAsBitmapCore(AData, afIgnored, False);
+        Result := CloneAsBitmapCore(LData, afDefined, False);
       PixelFormat32bppPARGB:
-        Result := CloneAsBitmapCore(AData, afPremultiplied, False);
+        Result := CloneAsBitmapCore(LData, afPremultiplied, False);
       PixelFormat32bppRGB:
-        Result := CloneAsBitmapCore(AData, afIgnored, True);
+        Result := CloneAsBitmapCore(LData, afIgnored, True);
     end;
   finally
-    EndLock(AData)
+    EndLock(LData)
   end;
 
   if Result = nil then
   begin
-    GdipCreateHBITMAPFromBitmap(Handle, AHandle, clBlack);
+    GdipCreateHBITMAPFromBitmap(Handle, LHandle, clBlack);
     Result := TACLBitmap.Create;
-    Result.Handle := AHandle;
+    Result.Handle := LHandle;
   end;
 end;
 {$ENDIF}
@@ -990,6 +991,39 @@ begin
     LFormat := TACLImageFormatBMP;
   end;
   LFormat.Load(AStream, Self);
+end;
+
+procedure TACLImage.SaveToDib(const ATarget: TACLDib);
+{$IFDEF FPC}
+begin
+  ATarget.Assign(Handle);
+{$ELSE}
+var
+  LData: TBitmapData;
+begin
+  if BeginLock(LData) then
+  try
+    case LData.PixelFormat of
+      PixelFormat32bppRGB,
+      PixelFormat32bppARGB,
+      PixelFormat32bppPARGB:
+        begin
+          ATarget.Assign(LData.Scan0, LData.Width, LData.Height);
+          if LData.PixelFormat = PixelFormat32bppARGB then
+            ATarget.Premultiply;
+          if LData.PixelFormat = PixelFormat32bppRGB then
+            ATarget.MakeOpaque;
+          Exit;
+        end;
+    end;
+  finally
+    EndLock(LData)
+  end;
+
+  ATarget.Resize(Width, Height);
+  Draw(ATarget.Canvas, ATarget.ClientRect);
+  ATarget.MakeOpaque;
+{$ENDIF}
 end;
 
 procedure TACLImage.SaveToFile(const AFileName: string);
