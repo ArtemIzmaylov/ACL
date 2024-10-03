@@ -261,10 +261,6 @@ function acFindOwnerThatSupportTheInterface(
 function acIsValidIdent(const S: string;
   AAllowUnicodeIdents: Boolean = True; AAllowDots: Boolean = False): Boolean;
 
-{$IFNDEF FPC}
-function acIsDelphiObject(AData: Pointer): Boolean;
-{$ENDIF}
-
 function CreateUniqueName(AComponent: TComponent; const APrefixName, ASuffixName: string): string;
 implementation
 
@@ -327,28 +323,6 @@ begin
     Result := TPersistentAccess(Result).GetOwner;
   until Result = nil;
 end;
-
-{$IFNDEF FPC}
-function acIsDelphiObject(AData: Pointer): Boolean;
-var
-  P: Pointer;
-  SelfPtr: Pointer;
-begin
-  Result := False;
-
-  P := Pointer(AData);
-  if IsBadReadPtr(P, SizeOf(Pointer)) then Exit;
-
-  P := PPointer(P)^;
-  if IsBadReadPtr(P, SizeOf(Pointer)) then Exit;
-
-  SelfPtr := Pointer(NativeInt(P) + vmtSelfPtr);
-  if IsBadReadPtr(SelfPtr, SizeOf(Pointer)) then Exit;
-  SelfPtr := PPointer(SelfPtr)^;
-
-  Result := P = SelfPtr;
-end;
-{$ENDIF}
 
 function acIsValidIdent(const S: string; AAllowUnicodeIdents, AAllowDots: Boolean): Boolean;
 var

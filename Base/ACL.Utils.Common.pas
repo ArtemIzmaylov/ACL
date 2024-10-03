@@ -56,9 +56,11 @@ const
   E_ACCESSDENIED = Winapi.Windows.E_ACCESSDENIED;
   E_FAIL = Winapi.Windows.E_FAIL;
   E_HANDLE = Winapi.Windows.E_HANDLE;
+  E_NOTIMPL = Winapi.Windows.E_NOTIMPL;
   E_OUTOFMEMORY = Winapi.Windows.E_OUTOFMEMORY;
   E_INVALIDARG = Winapi.Windows.E_INVALIDARG;
   E_PENDING = Winapi.Windows.E_PENDING;
+  E_POINTER = Winapi.Windows.E_POINTER;
 
   SEM_FAILCRITICALERRORS = Winapi.Windows.SEM_FAILCRITICALERRORS;
 {$ELSE}
@@ -67,8 +69,10 @@ const
   E_FAIL = HRESULT($80004005);
   E_OUTOFMEMORY = HRESULT($8007000E);
   E_HANDLE = HRESULT($80070006);
+  E_NOTIMPL = HRESULT($80004001);
   E_INVALIDARG = HRESULT($80070057);
   E_PENDING = HRESULT($8000000A);
+  E_POINTER = HRESULT($80004003);
 
   SEM_FAILCRITICALERRORS = 0; // just a stub
 {$ENDIF}
@@ -232,7 +236,12 @@ function IsWine: Boolean;
 
 // HRESULT
 function Failed(Status: HRESULT) : BOOL;
-function Succeeded(Status: HRESULT) : BOOL;
+function Succeeded(Status: HRESULT): BOOL;
+
+{$IFNDEF MSWINDOWS}
+function IsBadReadPtr(Ptr: Pointer; Size: Integer): Boolean; deprecated 'not implemented';
+function IsBadWritePtr(Ptr: Pointer; Size: Integer): Boolean; deprecated 'not implemented';
+{$ENDIF}
 implementation
 
 uses
@@ -321,6 +330,18 @@ begin
   Result := 0;
 {$ENDIF}
 end;
+
+{$IFNDEF MSWINDOWS}
+function IsBadReadPtr(Ptr: Pointer; Size: Integer): Boolean;
+begin
+  Result := False; // stub for compilation
+end;
+
+function IsBadWritePtr(Ptr: Pointer; Size: Integer): Boolean;
+begin
+  Result := False; // stub for compilation
+end;
+{$ENDIF}
 
 //==============================================================================
 // HRESULT
