@@ -272,6 +272,8 @@ type
       const TargetRect, SourceRect: TRect; Alpha: Byte = MaxByte); overload; virtual; abstract;
     procedure DrawImage(Image: TACL2DRenderImage;
       const TargetRect, SourceRect: TRect; Attributes: TACL2DRenderImageAttributes); overload; virtual; abstract;
+    procedure TileImage(Image: TACL2DRenderImage;
+      const TargetRect, SourceRect: TRect; Attributes: TACL2DRenderImageAttributes); overload; virtual;
 
     // Rectangles
     procedure Rectangle(const R: TRect; Color, StrokeColor: TAlphaColor;
@@ -1724,6 +1726,41 @@ procedure TACL2DRender.DrawImage(
   Image: TACL2DRenderImage; const TargetRect: TRect; Alpha: Byte);
 begin
   DrawImage(Image, TargetRect, Image.ClientRect, Alpha);
+end;
+
+procedure TACL2DRender.TileImage(Image: TACL2DRenderImage;
+  const TargetRect, SourceRect: TRect; Attributes: TACL2DRenderImageAttributes);
+var
+  LClipData: TACL2DRenderRawData;
+  R: TRect;
+  W, H: Integer;
+  X, XCount: Integer;
+  Y, YCount: Integer;
+begin
+  W := SourceRect.Width;
+  H := SourceRect.Height;
+  XCount := acCalcPatternCount(TargetRect.Width, W);
+  YCount := acCalcPatternCount(TargetRect.Height, H);
+
+  if Clip(TargetRect, LClipData) then
+  try
+    R := TargetRect.Split(srTop, H);
+    for Y := 1 to YCount do
+    begin
+      R.Left := TargetRect.Left;
+      R.Right := TargetRect.Left + W;
+      for X := 1 to XCount do
+      begin
+        DrawImage(Image, R, SourceRect, Attributes);
+        Inc(R.Right, W);
+        Inc(R.Left, W);
+      end;
+      Inc(R.Bottom, H);
+      Inc(R.Top, H);
+    end;
+  finally
+    ClipRestore(LClipData);
+  end;
 end;
 
 procedure TACL2DRender.DrawEllipse(const R: TRect;
