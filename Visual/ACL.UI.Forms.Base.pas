@@ -150,6 +150,9 @@ type
     constructor CreateNew(AOwner: TComponent; ADummy: Integer = 0); override;
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
+  {$IFDEF FPC}
+    procedure MouseWheelHandler(var Message: TMessage); virtual;
+  {$ENDIF}
     procedure ScaleForCurrentDPI{$IFDEF DELPHI120}(ForceScaling: Boolean = False){$ENDIF};{$IFDEF FPC}virtual;{$ELSE}override;{$ENDIF}
     procedure ScaleForPPI(ATargetPPI: Integer); overload; {$IFNDEF FPC}override; final;{$ENDIF}
     procedure ScaleForPPI(ATargetPPI: Integer; AWindowRect: PRect); reintroduce; overload; virtual;
@@ -667,11 +670,19 @@ begin
     ScaleForPPI(Round(X * FCurrentPPI));
 end;
 
+procedure TACLBasicForm.MouseWheelHandler(var Message: TMessage);
+begin
+  // Called from the TACLControls.WndProc
+  Message.Result := Perform(CM_MOUSEWHEEL, Message.WParam, Message.LParam);
+end;
+
 {$ELSE}
+
 procedure TACLBasicForm.ChangeScale(M, D: Integer; IsDpiChange: Boolean);
 begin
   ScaleForPPI(MulDiv(FCurrentPPI, M, D));
 end;
+
 {$ENDIF}
 
 procedure TACLBasicForm.ScaleForPPI(ATargetPPI: Integer; AWindowRect: PRect);

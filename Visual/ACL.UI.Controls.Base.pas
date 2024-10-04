@@ -922,6 +922,7 @@ procedure ProcessUtf8KeyPress(var Key: TUTF8Char; AEvent: TWideKeyEvent);
 implementation
 
 uses
+  ACL.UI.Forms.Base,
 {$IF DEFINED(LCLGtk2)}
   ACL.UI.Core.Impl.Gtk2,
 {$ELSEIF DEFINED(MSWINDOWS)}
@@ -3270,6 +3271,11 @@ begin
 end;
 
 class function TACLControls.WndProc(ACaller: TWinControl; var Message: TMessage): Boolean;
+{$IFDEF FPC}
+var
+  LCapture: TControl;
+  LForm: TCustomForm;
+{$ENDIF}
 begin
   Result := False;
 {$IFDEF FPC}
@@ -3280,6 +3286,16 @@ begin
       if ACaller.Perform(WM_SETCURSOR, ACaller.Handle, MakeLong(HTCLIENT, Message.Msg)) = 0 then
         SetCursor(crDefault);
     end;
+  end;
+  if Message.Msg = LM_MOUSEWHEEL then
+  begin
+    LForm := GetParentForm(ACaller);
+    LCapture := GetCaptureControl;
+    if (LCapture <> nil) and (LCapture <> LForm) and (LCapture <> ACaller) then
+      LCapture.WindowProc(Message);
+    if (Message.Result = 0) and (LForm <> ACaller) and (LForm is TACLBasicForm) then
+      TACLBasicForm(LForm).MouseWheelHandler(Message);
+    Result := Message.Result <> 0;
   end;
 {$ENDIF}
   if Message.Msg = WM_SETCURSOR then
