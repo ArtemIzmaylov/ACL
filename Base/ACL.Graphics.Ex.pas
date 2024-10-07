@@ -1327,7 +1327,7 @@ begin
           SetWindowOrgEx(ALayer.Handle, AClipBox.Left, AClipBox.Top, nil);
           AImage.Draw(ALayer.Canvas, R);
           SetWindowOrgEx(ALayer.Handle, 0, 0, nil);
-          ALayer.DrawBlend(ACanvas, AClipBox.TopLeft);
+          ALayer.DrawBlend(ACanvas, AClipBox.TopLeft, AAlpha);
         finally
           ALayer.Free;
         end;
