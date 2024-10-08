@@ -300,7 +300,7 @@ type
   TACLBinaryXMLBuilder = class(TACLXMLBuilder)
   strict private
     FStream: TStream;
-    FStringTable: TACLDictionary<string, Integer>;
+    FStringTable: TACLStringIndexes;
 
     function Share(const A: string): Integer;
     procedure WriteNode(ANode: TACLXMLNode);
@@ -1461,7 +1461,7 @@ constructor TACLBinaryXMLBuilder.Create(
 begin
   inherited;
   FStream := AStream;
-  FStringTable := TACLDictionary<string, Integer>.Create;
+  FStringTable := TACLStringIndexes.Create;
 end;
 
 destructor TACLBinaryXMLBuilder.Destroy;

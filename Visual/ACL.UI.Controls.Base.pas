@@ -70,6 +70,7 @@ const
   WHEEL_DELTA = 120;
 
   GetCaretBlinkTime = 500;
+  GetDesktopWindow = 0;
 
   CS_DROPSHADOW  = 0;
   CM_CANCELMODE  = LMessages.{%H-}CM_CANCELMODE;

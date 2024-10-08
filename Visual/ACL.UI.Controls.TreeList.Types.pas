@@ -501,7 +501,7 @@ type
 
   TACLTreeListStringNode = class(TACLTreeListNode)
   protected
-    FValues: TACLListOf<string>;
+    FValues: TACLListOfString;
 
     function GetValue(Index: Integer): string; override;
     function GetValuesCapacity: Integer; override;
@@ -2059,7 +2059,7 @@ begin
   if (FValues = nil) or (Index >= FValues.Count) or (FValues.List[Index] <> S) then
   begin
     if FValues = nil then
-      FValues := TACLListOf<string>.Create;
+      FValues := TACLListOfString.Create;
     for I := FValues.Count to Index do
       FValues.Add(EmptyStr);
     FValues.Items[Index] := S;
@@ -2072,7 +2072,7 @@ begin
   if AValue <> ValuesCapacity then
   begin
     if FValues = nil then
-      FValues := TACLListOf<string>.Create;
+      FValues := TACLListOfString.Create;
     FValues.Capacity := AValue;
   end;
 end;

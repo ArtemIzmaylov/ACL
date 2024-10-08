@@ -376,8 +376,20 @@ type
 
 const
   // Ремапы, чтобы не использовать if-def на более высоком уровне
-  MB_OK = {$IFDEF FPC}LCLType{$ELSE}Windows{$ENDIF}.MB_OK;
-  MB_ICONINFORMATION = {$IFDEF FPC}LCLType{$ELSE}Windows{$ENDIF}.MB_ICONINFORMATION;
+  ID_CANCEL           = {$IFDEF FPC}LCLType{$ELSE}Windows{$ENDIF}.ID_CANCEL;
+  ID_OK               = {$IFDEF FPC}LCLType{$ELSE}Windows{$ENDIF}.ID_OK;
+  ID_YES              = {$IFDEF FPC}LCLType{$ELSE}Windows{$ENDIF}.ID_YES;
+  MB_OK               = {$IFDEF FPC}LCLType{$ELSE}Windows{$ENDIF}.MB_OK;
+  MB_OKCANCEL         = {$IFDEF FPC}LCLType{$ELSE}Windows{$ENDIF}.MB_OKCANCEL;
+  MB_DEFBUTTON2       = {$IFDEF FPC}LCLType{$ELSE}Windows{$ENDIF}.MB_DEFBUTTON2;
+  MB_ICONINFORMATION  = {$IFDEF FPC}LCLType{$ELSE}Windows{$ENDIF}.MB_ICONINFORMATION;
+  MB_ICONQUESTION     = {$IFDEF FPC}LCLType{$ELSE}Windows{$ENDIF}.MB_ICONQUESTION;
+  MB_ICONWARNING      = {$IFDEF FPC}LCLType{$ELSE}Windows{$ENDIF}.MB_ICONWARNING;
+  MB_ICONERROR        = {$IFDEF FPC}LCLType{$ELSE}Windows{$ENDIF}.MB_ICONERROR;
+  MB_YESNO            = {$IFDEF FPC}LCLType{$ELSE}Windows{$ENDIF}.MB_YESNO;
+  MB_YESNOCANCEL      = {$IFDEF FPC}LCLType{$ELSE}Windows{$ENDIF}.MB_YESNOCANCEL;
+  MB_SYSTEMMODAL      = {$IFDEF FPC}      0{$ELSE}Windows.MB_SYSTEMMODAL{$ENDIF};
+
 
 procedure asMessageBeep(AType: TMsgDlgType);
 function acMessageBox(AHandle: HWND; const AMessage, ACaption: string; AFlags: Integer): Integer;

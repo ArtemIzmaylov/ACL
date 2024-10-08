@@ -890,9 +890,9 @@ end;
 
 class function TACLHttpInputStream.ValidateCacheStream(AStream: TStream): Boolean;
 var
-  AFreeBlocks: TACLListOf<Integer>;
+  AFreeBlocks: TACLListOfInteger;
 begin
-  AFreeBlocks := TACLListOf<Integer>.Create;
+  AFreeBlocks := TACLListOfInteger.Create;
   try
     ValidateCacheStream(AStream, AFreeBlocks);
     Result := AFreeBlocks.Count = 0;
@@ -901,7 +901,8 @@ begin
   end;
 end;
 
-class procedure TACLHttpInputStream.ValidateCacheStream(AStream: TStream; AFreeBlocks: TACLListOf<Integer>);
+class procedure TACLHttpInputStream.ValidateCacheStream(
+  AStream: TStream; AFreeBlocks: TACLListOf<Integer>);
 var
   ABlockIndex: Integer;
   APosition: Int64;

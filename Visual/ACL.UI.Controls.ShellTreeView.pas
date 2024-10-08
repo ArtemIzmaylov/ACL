@@ -60,7 +60,7 @@ type
 
   TACLShellImageList = class(TCustomImageList)
   strict private
-    FCache: TACLDictionary<string, Integer>;
+    FCache: TACLStringIndexes;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -266,7 +266,7 @@ begin
 {$ELSE}
 begin
   inherited Create(AOwner);
-  FCache := TACLDictionary<string, Integer>.Create;;
+  FCache := TACLStringIndexes.Create;;
 {$ENDIF}
 end;
 

@@ -465,6 +465,7 @@ begin
   ControlCreateNew.Enabled := False;
 
   CreateControl(FControlApply, TACLButton, alRight, APanel);
+  ControlApply.AlignOrder := 1;
   ControlApply.Width := dpiApply(ButtonWidth, FCurrentPPI);
   ControlApply.Caption := TACLDialogsStrs.MsgDlgButtons[mbOk];
   ControlApply.ModalResult := mrOk;
@@ -540,7 +541,8 @@ procedure TACLFolderBrowserDialog.UpdateState;
 begin
   ControlApply.Enabled :=
     (ControlShellTree.OptionsView.CheckBoxes) or
-    (ControlShellTree.SelectedPath <> '');
+    (ControlShellTree.SelectedPath <> '') or
+    (ControlCustomPath <> nil) and (ControlCustomPath.Text <> '');
 end;
 
 procedure TACLFolderBrowserDialog.CMVisibleChanged(var Message: TMessage);

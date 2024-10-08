@@ -325,9 +325,9 @@ type
     ID_EMPTY = 0;
     ID_OBJECT = -1;
   protected
-    Columns: TACLListOf<Integer>;
+    Columns: TACLListOfInteger;
     Matrix: array of array of Integer;
-    Rows: TACLListOf<Integer>;
+    Rows: TACLListOfInteger;
 
     procedure Add(AObjectViewInfo: TACLBindingDiagramObjectViewInfo); overload;
     procedure Add(const R: TRect); overload;
@@ -1246,8 +1246,8 @@ end;
 
 constructor TACLBindingDiagramComplexPathBuilder.Create;
 begin
-  Rows := TACLListOf<Integer>.Create;
-  Columns := TACLListOf<Integer>.Create;
+  Rows := TACLListOfInteger.Create;
+  Columns := TACLListOfInteger.Create;
 end;
 
 destructor TACLBindingDiagramComplexPathBuilder.Destroy;
@@ -1388,7 +1388,7 @@ end;
 
 procedure TACLBindingDiagramComplexPathBuilder.Add(const R: TRect);
 
-  procedure AddToStortedList(L: TACLListOf<Integer>; V: Integer);
+  procedure AddToStortedList(L: TACLListOfInteger; V: Integer);
   var
     AIndex: Integer;
   begin
@@ -1445,7 +1445,7 @@ end;
 
 function TACLBindingDiagramComplexPathBuilder.RectToIndexes(const R: TRect): TRect;
 
-  function IndexOf(L: TACLListOf<Integer>; V: Integer): Integer; inline;
+  function IndexOf(L: TACLListOfInteger; V: Integer): Integer; inline;
   begin
     if not L.BinarySearch(V, Result) then
       raise EInvalidArgument.Create('Specified rect was not indexed');

@@ -18,6 +18,7 @@ unit ACL.Utils.CommandLine;
 interface
 
 uses
+  {System.}Classes,
   {System.}Generics.Collections,
   {System.}Math,
   {System.}SysUtils,
@@ -46,7 +47,9 @@ type
 
   TACLCommandLineProcessor = class
   public type
+    TCommandMultipleParamsMethod = procedure (const AParams: TACLStringList) of object;
     TCommandMultipleParamsProc = reference to procedure (const AParams: TACLStringList);
+    TCommandSingleParamMethod = procedure (const AParam: string) of object;
     TCommandSingleParamProc = reference to procedure (const AParam: string);
   protected type
   {$REGION 'InternalTypes'}
@@ -93,9 +96,18 @@ type
     class procedure BeginUpdate;
     class procedure EndUpdate;
 
-    class procedure Register(const ACommand: string; AProc: TCommandMultipleParamsProc; AFlags: Cardinal = 0); overload;
-    class procedure Register(const ACommand: string; AProc: TCommandSingleParamProc; AFlags: Cardinal = 0); overload;
-    class procedure Register(const ACommand: string; AProc: TProc; AFlags: Cardinal = 0); overload;
+    class procedure Register(const ACommand: string;
+      AProc: TCommandMultipleParamsProc; AFlags: Cardinal = 0); overload;
+    class procedure Register(const ACommand: string;
+      AProc: TCommandSingleParamProc; AFlags: Cardinal = 0); overload;
+    class procedure Register(const ACommand: string;
+      AProc: TProc; AFlags: Cardinal = 0); overload;
+    class procedure Register(const ACommand: string;
+      AProc: TCommandMultipleParamsMethod; AFlags: Cardinal = 0); overload;
+    class procedure Register(const ACommand: string;
+      AProc: TCommandSingleParamMethod; AFlags: Cardinal = 0); overload;
+    class procedure Register(const ACommand: string;
+      AProc: TThreadMethod; AFlags: Cardinal = 0); overload;
     class procedure Unregister(const ACommand: string);
   end;
 
@@ -305,6 +317,32 @@ class procedure TACLCommandLineProcessor.Register(
   const ACommand: string; AProc: TProc; AFlags: Cardinal);
 begin
   FCommands.AddOrSetValue(ACommand, TCommandHandler.Create(AProc, nil, nil, AFlags));
+end;
+
+class procedure TACLCommandLineProcessor.Register(
+  const ACommand: string; AProc: TCommandMultipleParamsMethod; AFlags: Cardinal);
+begin
+  Register(ACommand,
+    procedure (const AParams: TACLStringList)
+    begin
+      AProc(AParams)
+    end, AFlags);
+end;
+
+class procedure TACLCommandLineProcessor.Register(
+  const ACommand: string; AProc: TCommandSingleParamMethod; AFlags: Cardinal);
+begin
+  Register(ACommand,
+    procedure (const AParam: string)
+    begin
+      AProc(AParam)
+    end, AFlags);
+end;
+
+class procedure TACLCommandLineProcessor.Register(
+  const ACommand: string; AProc: TThreadMethod; AFlags: Cardinal);
+begin
+  Register(ACommand, procedure begin AProc(); end, AFlags);
 end;
 
 class procedure TACLCommandLineProcessor.Unregister(const ACommand: string);

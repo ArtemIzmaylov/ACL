@@ -93,7 +93,7 @@ type
     FCursor: TCursor;
     FHitObject: TObject;
     FHitObjectData: TDictionary<string, TObject>;
-    FHitObjectFlags: TACLListOf<Integer>;
+    FHitObjectFlags: TACLListOfInteger;
     FHitPoint: TPoint;
 
     function GetHitObjectData(const Index: string): TObject;
@@ -974,7 +974,7 @@ procedure TACLHitTestInfo.AfterConstruction;
 begin
   inherited AfterConstruction;
   FHitObjectData := TDictionary<string, TObject>.Create;
-  FHitObjectFlags := TACLListOf<Integer>.Create;
+  FHitObjectFlags := TACLListOfInteger.Create;
 end;
 
 function TACLHitTestInfo.CreateDragObject: TACLCompoundControlDragObject;

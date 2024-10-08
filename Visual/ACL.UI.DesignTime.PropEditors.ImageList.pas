@@ -113,10 +113,10 @@ type
     procedure pbPreviewPaint(Sender: TObject);
   strict private
     function GetSelectedItem: TListItem;
-    function GetSelection: TACLListOf<Integer>;
-    procedure SetSelection(AValue: TACLListOf<Integer>);
+    function GetSelection: TACLListOfInteger;
+    procedure SetSelection(AValue: TACLListOfInteger);
   protected
-    function Export(AIndexes: TACLListOf<Integer>): TACLBitmap;
+    function Export(AIndexes: TACLListOfInteger): TACLBitmap;
     function ExportSelected: TACLBitmap;
     function LoadImage(const AFileName: string): TACLBitmap;
     procedure PopulateImages;
@@ -158,11 +158,11 @@ begin
     Result := lvImages.Selected;
 end;
 
-function TfrmImageListEditor.GetSelection: TACLListOf<Integer>;
+function TfrmImageListEditor.GetSelection: TACLListOfInteger;
 var
   I: Integer;
 begin
-  Result := TACLListOf<Integer>.Create;
+  Result := TACLListOfInteger.Create;
   Result.Capacity := lvImages.SelCount;
   for I := 0 to lvImages.Items.Count - 1 do
   begin
@@ -171,7 +171,7 @@ begin
   end;
 end;
 
-procedure TfrmImageListEditor.SetSelection(AValue: TACLListOf<Integer>);
+procedure TfrmImageListEditor.SetSelection(AValue: TACLListOfInteger);
 var
   I: Integer;
 begin
@@ -180,7 +180,7 @@ begin
     lvImages.Items[AValue[I]].Selected := True;
 end;
 
-function TfrmImageListEditor.Export(AIndexes: TACLListOf<Integer>): TACLBitmap;
+function TfrmImageListEditor.Export(AIndexes: TACLListOfInteger): TACLBitmap;
 var
   I: Integer;
 begin
@@ -201,11 +201,11 @@ end;
 
 function TfrmImageListEditor.ExportSelected: TACLBitmap;
 var
-  AIndexes: TACLListOf<Integer>;
+  AIndexes: TACLListOfInteger;
   AHasSelection: Boolean;
   I: Integer;
 begin
-  AIndexes := TACLListOf<Integer>.Create;
+  AIndexes := TACLListOfInteger.Create;
   try
     AIndexes.Capacity := lvImages.Items.Count;
     AHasSelection := SelectedItem <> nil;
@@ -286,8 +286,8 @@ procedure TfrmImageListEditor.Replace;
 
 var
   AFileIndex: Integer;
-  AIndexesToReplace: TACLListOf<Integer>;
-  AIndexesToSelect: TACLListOf<Integer>;
+  AIndexesToReplace: TACLListOfInteger;
+  AIndexesToSelect: TACLListOfInteger;
   AIndexToReplace: Integer;
   ASelectedCount: Integer;
 begin
@@ -295,7 +295,7 @@ begin
   if FileDialog.Execute(False, Handle) then
   begin
     AIndexesToReplace := GetSelection;
-    AIndexesToSelect := TACLListOf<Integer>.Create;
+    AIndexesToSelect := TACLListOfInteger.Create;
     try
       AIndexesToSelect.Capacity := lvImages.SelCount;
 

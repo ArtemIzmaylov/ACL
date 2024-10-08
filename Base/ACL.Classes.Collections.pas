@@ -356,6 +356,7 @@ type
   { TACLDictionary }
 
   TACLPairEnum<TKey, TValue> = reference to procedure (const Key: TKey; const Value: TValue);
+  TACLPairEnumMethod<TKey, TValue> = procedure (const Key: TKey; const Value: TValue) of object;
 
   TACLDictionary<TKey, TValue> = class(TACLEnumerable<TPair<TKey, TValue>>)
   strict private const
@@ -444,7 +445,8 @@ type
     function ContainsValue(const Value: TValue): Boolean;
 
     // Enums
-    procedure Enum(const AProc: TACLPairEnum<TKey, TValue>); virtual;
+    procedure Enum(const AProc: TACLPairEnum<TKey, TValue>); overload; virtual;
+    procedure Enum(const AProc: TACLPairEnumMethod<TKey, TValue>); overload;
     function GetEnumerator: IACLEnumerator<TPair<TKey, TValue>>; override;
     function GetKeys: IACLEnumerable<TKey>; virtual;
     function GetValues: IACLEnumerable<TValue>; virtual;
@@ -463,10 +465,6 @@ type
     property OnKeyNotify: TCollectionNotifyEvent<TKey> read FOnKeyNotify write FOnKeyNotify;
     property OnValueNotify: TCollectionNotifyEvent<TValue> read FOnValueNotify write FOnValueNotify;
   end;
-
-  { TACLStringsDictionary }
-
-  TACLStringsDictionary = class(TACLDictionary<string, string>);
 
   { TACLThreadList }
 
@@ -620,7 +618,7 @@ type
 //
 //  TACLStringSet = class(TACLCustomHashSet<string>)
 //  strict private
-//    FData: TACLListOf<string>;
+//    FData: TACLListOfString;
 //    FIgnoreCase: Boolean;
 //
 //    function FindCore(const Item: PWideChar; const ItemLength: Integer; out Index: Integer): Boolean;
@@ -814,6 +812,26 @@ type
     property Count: Integer read FCount;
     property List: TPointerList read FItems;
   end;
+
+  { TACLListOfDateTime }
+
+  TACLListOfDateTime = class(TACLListOf<TDateTime>);
+
+  { TACLListOfInteger }
+
+  TACLListOfInteger = class(TACLListOf<Integer>);
+
+  { TACLListOfString }
+
+  TACLListOfString = class(TACLListOf<string>);
+
+  { TACLStringIndexes }
+
+  TACLStringIndexes = class(TACLDictionary<string, Integer>);
+
+  { TACLStringsDictionary }
+
+  TACLStringsDictionary = class(TACLDictionary<string, string>);
 
 {$IFDEF FPC}
 resourcestring
@@ -1810,6 +1828,15 @@ begin
       if HashCode <> EMPTY_HASH then
         AProc(Key, Value);
   end;
+end;
+
+procedure TACLDictionary<TKey, TValue>.Enum(const AProc: TACLPairEnumMethod<TKey, TValue>);
+begin
+  Enum(
+    procedure (const K: TKey; const V: TValue)
+    begin
+      AProc(K, V);
+    end);
 end;
 
 procedure TACLDictionary<TKey, TValue>.Remove(const Key: TKey);
@@ -3018,7 +3045,7 @@ end;
 //begin
 //  inherited Create;
 //  FIgnoreCase := IgnoreCase;
-//  FData := TACLListOf<string>.Create;
+//  FData := TACLListOfString.Create;
 //  FData.Capacity := InitialCapacity;
 //end;
 //
