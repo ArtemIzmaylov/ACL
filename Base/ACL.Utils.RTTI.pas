@@ -61,6 +61,9 @@ type
     class function IsString(APropInfo: PPropInfo): Boolean; inline;
     class function IsUnsignedInt(APropInfo: PPropInfo): Boolean;
 
+    class function GetPropAttribute(AObject: TObject; APropInfo: PPropInfo;
+      AClass: TCustomAttributeClass; ACheckParents: Boolean = True): TCustomAttribute; overload;
+
     class function GetPropValue(AObject: TObject; APropInfo: PPropInfo): string; overload;
     class function GetPropValue(AObject: TObject; APropInfo: PPropInfo; out AValue: string): Boolean; overload;
     class function GetPropValue(AObject: TObject; const AName: string): string; overload;
@@ -73,6 +76,15 @@ type
     class procedure SetPropValueAsVariant(AObject: TObject; const AName: string; const AValue: Variant); overload;
 
     class property Context: TRttiContext read FContext;
+  end;
+
+  { HiddenAttribute }
+
+  HiddenAttribute = class(TCustomAttribute)
+{$IFDEF FPC}
+  public
+    constructor Create;
+{$ENDIF}
   end;
 
   { TValueHelper }
@@ -130,7 +142,7 @@ end;
 
 class constructor TRTTI.Create;
 begin
-  FContext := TRttiContext.Create{$IFDEF FPC}(False){$ENDIF};
+  FContext := TRttiContext.Create;
 end;
 
 class destructor TRTTI.Destroy;
@@ -138,8 +150,8 @@ begin
   FContext.Free;
 end;
 
-class procedure TRTTI.EnumClassProperties<T>(AObject: TObject; AEnumProc: TRttiEnumProc<T>;
-  ARecursive: Boolean = True; AVisibility: TMemberVisibilities = [mvPublished]);
+class procedure TRTTI.EnumClassProperties<T>(AObject: TObject;
+  AEnumProc: TRttiEnumProc<T>; ARecursive: Boolean; AVisibility: TMemberVisibilities);
 var
   AProperties: TArray<TRttiProperty>;
   AProperty: TRttiProperty;
@@ -293,6 +305,36 @@ begin
   end;
 end;
 
+class function TRTTI.GetPropAttribute(AObject: TObject; APropInfo: PPropInfo;
+  AClass: TCustomAttributeClass; ACheckParents: Boolean): TCustomAttribute;
+var
+  LAttr: TCustomAttribute;
+  LName: string;
+  LProp: TRttiProperty;
+  LType: TRttiType;
+begin
+  Result := nil;
+{$IFNDEF FPC}
+  if not HasCustomAttribute(AObject, APropInfo) then Exit;
+{$ENDIF}
+  LName := GetPropName(APropInfo);
+  LType := Context.GetType(AObject.ClassInfo);
+  while LType <> nil do
+  begin
+    LProp := LType.GetProperty(LName);
+    if LProp <> nil then
+    begin
+      for LAttr in LProp.GetAttributes do
+      begin
+        if LAttr.InheritsFrom(AClass) then
+          Exit(LAttr);
+      end;
+      if not ACheckParents then Exit;
+    end;
+    LType := LType.BaseType;
+  end;
+end;
+
 class function TRTTI.IsSameType(APropInfo: PPropInfo; const ATypeInfo: Pointer): Boolean;
 begin
   Result := (APropInfo <> nil) and (GetPropType(APropInfo) = ATypeInfo);
@@ -406,6 +448,14 @@ class procedure TRTTI.SetPropValueAsVariant(
 begin
   SetPropValueAsVariant(AObject, GetPropInfo(AObject, AName), AValue);
 end;
+
+{ HiddenAttribute }
+
+{$IFDEF FPC}
+constructor HiddenAttribute.Create;
+begin
+end;
+{$ENDIF}
 
 { TValueHelper }
 

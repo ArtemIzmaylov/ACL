@@ -21,6 +21,7 @@ uses
   {System.}Classes,
   {System.}Contnrs,
   {System.}Generics.Collections,
+  {System.}Rtti,
   {System.}SysUtils,
   {System.}TypInfo,
   {System.}Types,
@@ -134,7 +135,7 @@ type
     function HasData: Boolean; virtual;
     function IsNonStorable: Boolean;
     function IsReadOnly: Boolean;
-    //
+    // Properties
     property Designer: IACLObjectInspector read FDesigner;
     property FullName: string read GetFullName;
     property Info: PPropInfo read FInfo;

@@ -873,20 +873,24 @@ end;
 procedure TACLObjectInspectorSubClass.LoadObjectProperty(
   APropInfo: PPropInfo; AObject: TObject; AParentNode: TACLTreeListNode);
 var
-  AEditorClass: TACLPropertyEditorClass;
-  AIntf: IACLPropertyEditorSubProperties;
-  ANode: TACLObjectInspectorNode;
+  LEditorClass: TACLPropertyEditorClass;
+  LNode: TACLObjectInspectorNode;
+  LSubProps: IACLPropertyEditorSubProperties;
 begin
-  AEditorClass := TACLPropertyEditors.GetEditorClass(APropInfo, AObject);
-  if (AEditorClass <> nil) and CanAddProperty(AObject, APropInfo) then
+  LEditorClass := TACLPropertyEditors.GetEditorClass(APropInfo, AObject);
+  if LEditorClass = nil then
+    Exit;
+  if TRTTI.GetPropAttribute(AObject, APropInfo, HiddenAttribute, False) <> nil then
+    Exit;
+  if CanAddProperty(AObject, APropInfo) then
   begin
-    ANode := AddProperty(AParentNode, AEditorClass.Create(APropInfo, AObject, Self));
-    if Supports(ANode.PropertyEditor, IACLPropertyEditorSubProperties, AIntf) then
+    LNode := AddProperty(AParentNode, LEditorClass.Create(APropInfo, AObject, Self));
+    if Supports(LNode.PropertyEditor, IACLPropertyEditorSubProperties, LSubProps) then
     begin
-      AIntf.GetProperties(
+      LSubProps.GetProperties(
         procedure (AEditor: TACLPropertyEditor)
         begin
-          AddProperty(ANode, AEditor);
+          AddProperty(LNode, AEditor);
         end);
     end
     else
@@ -894,7 +898,7 @@ begin
       begin
         AObject := GetObjectProp(AObject, APropInfo);
         if (AObject <> nil) and not (AObject is TComponent) then
-          LoadObject(AObject, ANode);
+          LoadObject(AObject, LNode);
       end;
   end;
 end;
