@@ -21,6 +21,7 @@ uses
   {System.}Classes,
   {System.}Math,
   {System.}SysUtils,
+  {System.}Types,
   // ACL
   ACL.Classes,
   ACL.Utils.Common,
@@ -97,6 +98,7 @@ type
 
     function GetDelimitedText(const ADelimiter: string; AAddTrailingDelimiter: Boolean = True): string;
     procedure SetDelimitedText(const AText: string; ADelimiter: Char);
+    function ToStringArray: TStringDynArray;
 
     // Lock / Unlock
     procedure BeginUpdate; virtual;
@@ -115,9 +117,10 @@ type
     function AddPair(const Name, Value: string;
       AObject: TObject = nil; AInterface: IUnknown = nil): Integer;
     procedure AddEx(const S: string);
-    procedure Append(const ASource: TACLStringList); overload;
-    procedure Append(const ASource: TStrings); overload;
     procedure Append(const ASource: string); overload;
+    procedure Append(const ASource: TACLStringList); overload;
+    procedure Append(const ASource: TStringDynArray); overload;
+    procedure Append(const ASource: TStrings); overload;
     procedure Append(const ASource: PChar; ALength: Integer); overload;
     procedure Assign(Source: TPersistent); override;
     procedure Insert(Index: Integer; const S: string;
@@ -128,6 +131,8 @@ type
     function IndexOf(const S: string): Integer; virtual;
     function IndexOfName(const AName: string): Integer;
     function IndexOfObject(AObject: TObject): Integer;
+    function First: string; inline;
+    function Last: string; inline;
 
     // Removing
     procedure Clear; virtual;
@@ -144,9 +149,6 @@ type
     procedure Sort; overload;
     procedure Sort(ACompareProc: TACLStringListCompareProc; UseThreading: Boolean); overload;
     procedure SortLogical;
-    //
-    function First: string; inline;
-    function Last: string; inline;
 
     // Properties
     property Capacity: Integer read FCapacity write SetCapacity;
@@ -312,6 +314,15 @@ begin
   end;
 end;
 
+function TACLStringList.ToStringArray: TStringDynArray;
+var
+  I: Integer;
+begin
+  SetLength(Result{%H-}, Count);
+  for I := 0 to Count - 1 do
+    Result[I] := Strings[I];
+end;
+
 function TACLStringList.IsValid(AIndex: Integer): Boolean;
 begin
   Result := (AIndex >= 0) and (AIndex < Count);
@@ -449,6 +460,20 @@ begin
   BeginUpdate;
   try
     ParseBuffer(ASource, ALength);
+  finally
+    EndUpdate;
+  end;
+end;
+
+procedure TACLStringList.Append(const ASource: TStringDynArray);
+var
+  I: Integer;
+begin
+  BeginUpdate;
+  try
+    EnsureCapacity(Length(ASource));
+    for I := Low(ASource) to High(ASource) do
+      Add(ASource[I]);
   finally
     EndUpdate;
   end;
