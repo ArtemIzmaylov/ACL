@@ -877,8 +877,8 @@ end;
 
 function acRegionClone(ARegion: TRegionHandle): TRegionHandle;
 begin
-  Result := CreateRectRgnIndirect(NullRect);
-  CombineRgn(Result, Result, ARegion, RGN_COPY);
+  Result := CreateRectRgn(0, 0, 0, 0);
+  CombineRgn(Result, ARegion, 0, RGN_COPY);
 end;
 
 function acRegionCombine(ATarget, ASource: TRegionHandle; AOperation: Integer): Integer;

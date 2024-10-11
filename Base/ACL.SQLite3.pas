@@ -777,7 +777,7 @@ end;
 
 procedure TACLSQLiteBase.DestroySubClasses;
 begin
-  CheckError(sqlite3_close(Handle));
+  sqlite3_close(Handle);
   FHandle := nil;
 end;
 

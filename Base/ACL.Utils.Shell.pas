@@ -350,7 +350,7 @@ begin
   with TProcessUTF8.Create(nil) do
   try
     InheritHandles := False;
-    CommandLine := CmdMap[AMode];
+    {%H-}CommandLine{%H-} := CmdMap[AMode];
     try
       Execute;
       Result := True;

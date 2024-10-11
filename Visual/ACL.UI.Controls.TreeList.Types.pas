@@ -307,9 +307,8 @@ type
     constructor Create(const ACaption: string; AOwner: TACLTreeListGroups); virtual;
     destructor Destroy; override;
     procedure BeforeDestruction; override;
-    //
+    // Properties
     property Links: TACLTreeListNodeList read FLinks;
-    //
     property NextSibling: TACLTreeListGroup read GetNextSibling;
     property PrevSibling: TACLTreeListGroup read GetPrevSibling;
   published

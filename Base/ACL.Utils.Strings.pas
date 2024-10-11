@@ -2227,7 +2227,7 @@ end;
 
 class function TACLEncodings.Default: TEncoding;
 begin
-  Result := Get(DefaultCodePage);
+  Result := Get(CP_ACP);
 end;
 
 class procedure TACLEncodings.EnumAnsiCodePages(const AProc: TProc<Integer, string>);

@@ -1039,7 +1039,7 @@ begin
     Exit;
   end;
 
-  AValue := MinMax(AValue, -1, Tabs.Count - 1);
+  AValue := MinMax(AValue, 0, Tabs.Count - 1);
   if AValue <> FActiveIndex then
   try
     DoActiveIndexChanging(AValue);
