@@ -32,6 +32,7 @@ type
   public
     class function IfThen<T>(Condition: Boolean; const True: T): T; overload; inline;
     class function IfThen<T>(Condition: Boolean; const True: T; const False: T): T; overload; inline;
+    class procedure Exchange<T>(var L, R: T);
   end;
 
 // MinMax, MaxMin
@@ -177,6 +178,15 @@ begin
   if Condition then
     Exit(True);
   Result := Default(T);
+end;
+
+class procedure TACLMath.Exchange<T>(var L, R: T);
+var
+  LTemp: T;
+begin
+  LTemp := L;
+  L := R;
+  R := LTemp;
 end;
 
 class function TACLMath.IfThen<T>(Condition: Boolean; const True, False: T): T;
