@@ -204,7 +204,7 @@ type
   TACLTaskEvent = class(TInterfacedObject, IACLTaskEvent)
   strict private
   {$IFDEF FPC}
-    FEvent: TEvent;
+    FEvent: TACLEvent;
   {$ELSE}
     FHandle: TObjHandle;
   {$ENDIF}
@@ -454,7 +454,7 @@ end;
 constructor TACLTaskEvent.Create;
 begin
 {$IFDEF FPC}
-  FEvent := TEvent.Create(nil, True, False, ClassName);
+  FEvent := TACLEvent.Create(True, False);
 {$ELSE}
   FHandle := CreateEvent(nil, True, False, nil);
 {$ENDIF}
@@ -473,7 +473,7 @@ end;
 function TACLTaskEvent.Signal: Boolean;
 begin
 {$IFDEF FPC}
-  FEvent.SetEvent;
+  FEvent.Signal;
   Result := True;
 {$ELSE}
   Result := SetEvent(FHandle);
@@ -483,7 +483,12 @@ end;
 function TACLTaskEvent.WaitFor(ATimeOut: Cardinal): TWaitResult;
 begin
 {$IFDEF FPC}
-  Result := FEvent.WaitFor(ATimeOut);
+  if FEvent.WaitFor(ATimeOut) then
+    Result := wrSignaled
+  else if ATimeOut <> INFINITE then
+    Result := wrTimeout
+  else
+    Result := wrError;
 {$ELSE}
   Result := WaitForSyncObject(FHandle, ATimeOut);
 {$ENDIF}

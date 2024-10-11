@@ -327,7 +327,7 @@ begin
     RaiseLastOSError;
   end;
 {$ENDIF}
-  {$MESSAGE WARN 'OptimizeMe - emulate system thread-pool'}
+  {.$MESSAGE WARN 'OptimizeMe - emulate system thread-pool'}
   TThread.CreateAnonymousThread(procedure begin Func(Context); end).Start;
 end;
 

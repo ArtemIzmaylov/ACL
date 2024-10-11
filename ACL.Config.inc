@@ -76,7 +76,9 @@
 {$DEFINE ACL_PACK_VARIANT_INTEGERS}
 
 {.$DEFINE ACL_THREADING_DEBUG}
-{$DEFINE ACL_THREADING_USE_MESSAGES}
+{$IFNDEF FPC}
+  {$DEFINE ACL_THREADING_USE_MESSAGES}
+{$ENDIF}
 
 // ---------------------------------------------------------------------------------------------------------------------
 // IDE Versions
