@@ -27,6 +27,7 @@ uses
   {System.}Generics.Collections,
   {System.}Generics.Defaults,
   {System.}Math,
+  {System.}Variants,
   {System.}SysUtils,
   {System.}Types,
   // ACL
@@ -273,6 +274,21 @@ type
     constructor Create(AOwner: TACLListOf<T>);
   end;
 
+  { TACLVariantComparer }
+
+  TACLVariantComparer = class(TInterfacedObject,
+    IEqualityComparer<Variant>,
+    IComparer<Variant>)
+  public type
+    HashCode = {$IFDEF FPC}UInt32{$ELSE}Integer{$ENDIF};
+  public
+    // IComparer
+    function Compare(const Left, Right: Variant): Integer; reintroduce;
+    // IEqualityComparer
+    function Equals(const Left, Right: Variant): Boolean; reintroduce;
+    function GetHashCode(const AValue: Variant): HashCode; reintroduce;
+  end;
+
   { TACLVariantList }
 
   TACLVariantList = class(TACLListOf<Variant>);
@@ -431,11 +447,11 @@ type
     procedure ValueNotify(const Value: TValue; Action: TCollectionNotification); virtual;
   public
     constructor Create(ACapacity: Integer = 0); overload;
-    constructor Create(ACapacity: Integer; const AComparer: IEqualityComparer<TKey>); overload;
+    constructor Create(ACapacity: Integer; AComparer: IEqualityComparer<TKey>); overload;
     constructor Create(AOwnerships: TDictionaryOwnerships); overload;
-    constructor Create(AOwnerships: TDictionaryOwnerships; ACapacity: Integer; const AComparer: IEqualityComparer<TKey>); overload;
-    constructor Create(AOwnerships: TDictionaryOwnerships; const AComparer: IEqualityComparer<TKey>); overload;
-    constructor Create(const AComparer: IEqualityComparer<TKey>); overload;
+    constructor Create(AOwnerships: TDictionaryOwnerships; ACapacity: Integer; AComparer: IEqualityComparer<TKey>); overload;
+    constructor Create(AOwnerships: TDictionaryOwnerships; AComparer: IEqualityComparer<TKey>); overload;
+    constructor Create(AComparer: IEqualityComparer<TKey>); overload;
     destructor Destroy; override;
     procedure Add(const Key: TKey; const Value: TValue);
     function AddIfAbsent(const Key: TKey; const Value: TValue): Boolean;
@@ -1249,7 +1265,7 @@ begin
     raise EArgumentOutOfRangeException.CreateRes(@SArgumentOutOfRange);
 
   ATemp := FItems[CurIndex];
-  FItems[CurIndex] := Default(T);
+  FItems[CurIndex] := {%H-}Default(T);
   if CurIndex < NewIndex then
     FItemsManager.Move(FItems, CurIndex + 1, CurIndex, NewIndex - CurIndex)
   else
@@ -1341,7 +1357,7 @@ var
 begin
   AIndex := IndexOf(Value);
   if AIndex < 0 then
-    Result := Default(T)
+    Result := {%H-}Default(T)
   else
   begin
     Result := FItems[AIndex];
@@ -1369,14 +1385,14 @@ begin
   AStartIndex := 0;
   repeat
     // Locate the first/next non-nil element in the list
-    while (AStartIndex < FCount) and (FComparer.Compare(FItems[AStartIndex], Default(T)) = 0) do
+    while (AStartIndex < FCount) and (FComparer.Compare(FItems[AStartIndex], {%H-}Default(T)) = 0) do
       Inc(AStartIndex);
 
     if AStartIndex < FCount then // There is nothing more to do
     begin
       // Locate the next nil pointer
       AEndIndex := AStartIndex;
-      while (AEndIndex < FCount) and (FComparer.Compare(FItems[AEndIndex], Default(T)) <> 0) do
+      while (AEndIndex < FCount) and (FComparer.Compare(FItems[AEndIndex], {%H-}Default(T)) <> 0) do
         Inc(AEndIndex);
       Dec(AEndIndex);
 
@@ -1591,6 +1607,32 @@ begin
   Result := FProc(Left, Right);
 end;
 
+{ TACLVariantComparer }
+
+function TACLVariantComparer.Compare(const Left, Right: Variant): Integer;
+begin
+  case VarCompareValue(Left, Right) of
+    vrEqual:
+      Result := 0;
+    vrLessThan:
+      Result := -1;
+    vrGreaterThan:
+      Result := 1;
+  else
+    Result := CompareStr(VarToStr(Left), VarToStr(Right));
+  end;
+end;
+
+function TACLVariantComparer.Equals(const Left, Right: Variant): Boolean;
+begin
+  Result := VarCompareValue(Left, Right) = vrEqual;
+end;
+
+function TACLVariantComparer.GetHashCode(const AValue: Variant): HashCode;
+begin
+  Result := HashCode(acVariantHash(AValue));
+end;
+
 { TACLListHelper }
 
 function TACLListHelper.AddIfAbsent(AValue: Pointer): Integer;
@@ -1698,13 +1740,13 @@ begin
   Create(ACapacity, nil);
 end;
 
-constructor TACLDictionary<TKey, TValue>.Create(const AComparer: IEqualityComparer<TKey>);
+constructor TACLDictionary<TKey, TValue>.Create(AComparer: IEqualityComparer<TKey>);
 begin
   Create(0, AComparer);
 end;
 
 constructor TACLDictionary<TKey, TValue>.Create(
-  ACapacity: Integer; const AComparer: IEqualityComparer<TKey>);
+  ACapacity: Integer; AComparer: IEqualityComparer<TKey>);
 begin
   if ACapacity < 0 then
     raise EArgumentOutOfRangeException.CreateRes(@SArgumentOutOfRange);
@@ -1722,14 +1764,14 @@ begin
 end;
 
 constructor TACLDictionary<TKey, TValue>.Create(
-  AOwnerships: TDictionaryOwnerships; const AComparer: IEqualityComparer<TKey>);
+  AOwnerships: TDictionaryOwnerships; AComparer: IEqualityComparer<TKey>);
 begin
   Create(AOwnerships, 0, AComparer);
 end;
 
 constructor TACLDictionary<TKey, TValue>.Create(
   AOwnerships: TDictionaryOwnerships; ACapacity: Integer;
-  const AComparer: IEqualityComparer<TKey>);
+  AComparer: IEqualityComparer<TKey>);
 begin
   Create(ACapacity, AComparer);
 

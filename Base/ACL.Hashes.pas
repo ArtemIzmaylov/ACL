@@ -21,6 +21,8 @@ uses
   {System.}Classes,
   {System.}Generics.Defaults,
   {System.}SysUtils,
+  {System.}Variants,
+  {System.}VarUtils,
   System.AnsiStrings,
 {$IFDEF MSWINDOWS}
   System.Hash,
@@ -242,6 +244,7 @@ function ElfHash(S: PChar; ACount: Integer; AIgnoryCase: Boolean): Integer; over
 function ElfHash(const S: string; AIgnoryCase: Boolean = True): Integer; overload; inline;
 
 function acFileNameHash(const S: string): Cardinal; inline;
+function acVariantHash(const AVariant: Variant): Cardinal;
 implementation
 
 {$R-} { Range-Checking }
@@ -347,6 +350,109 @@ begin
 end;
 
 //==============================================================================
+// VariantHash
+//==============================================================================
+
+function GetVarDataHash(const AData: TVarData): Cardinal;
+{$IFDEF FPC}
+const
+  varUInt64 = varQWord;
+{$ENDIF}
+begin
+  case AData.vtype of
+    varNull:
+      Result := 0;
+    varEmpty:
+      Result := 1;
+    varBoolean:
+      Result := Ord(AData.VBoolean);
+    varShortInt:
+      Result := AData.VShortInt;
+    varByte:
+      Result := AData.VByte;
+    varWord:
+      Result := AData.VWord;
+    varLongWord:
+      Result := AData.VLongWord;
+    varSmallInt:
+      Result := AData.VSmallInt;
+    varInteger, varSingle: // 32-bit
+      Result := AData.VInteger;
+    varCurrency, varDouble, varDate, varInt64, varUInt64: // 64-bit
+      Result := Int64Rec(AData.VInt64).Lo xor Int64Rec(AData.VInt64).Hi;
+  else
+    Result := ElfHash(VarToStr(Variant(AData)), False);
+  end;
+end;
+
+function GetVarArrayInfo(const AVarData: TVarData; out AType: TVarType; out AArray: PVarArray): Boolean;
+begin
+  if AVarData.VType = varByRef or varVariant then
+    Exit(GetVarArrayInfo(PVarData(AVarData.VPointer)^, AType, AArray));
+
+  Result := AVarData.VType and varArray <> 0;
+  if Result then
+  begin
+    AType := AVarData.VType;
+    if AType and varByRef <> 0 then
+      AArray := PVarArray(AVarData.VPointer^)
+    else
+      AArray := AVarData.VArray
+  end;
+end;
+
+function GetVarArrayHash(AVarType: TVarType; AVarArray: PVarArray): Cardinal;
+const
+  MagicNumber = $5bd1e995;
+var
+  I: Integer;
+  LIndex: Integer;
+  LHash: Cardinal;
+  LData: TVarData;
+  LVarPtr: Pointer;
+begin
+  Result := 0;
+  if AVarArray.DimCount <> 1 then
+    raise Exception.Create('Wrong variant array dimension for hashing!');
+  for I := AVarArray.Bounds[0].LowBound to AVarArray.Bounds[0].ElementCount -1 do
+  begin
+    LIndex := I;
+    AVarType := AVarType and varTypeMask;
+    if AVarType = varVariant then
+    begin
+      VarResultCheck(SafeArrayPtrOfIndex(AVarArray, @LIndex, LVarPtr));
+      LHash := GetVarDataHash(PVarData(LVarPtr)^);
+    end
+    else
+    begin
+      LData.VType := AVarType;
+      FillChar(LData.VBytes, SizeOf(LData.VBytes), 0);
+      VarResultCheck(SafeArrayGetElement(AVarArray, @LIndex, @LData.VPointer));
+      LHash := GetVarDataHash(LData);
+    end;
+    if AVarArray.Bounds[0].ElementCount = 1 then
+      Result := LHash
+    else
+    begin
+      LHash  := LHash xor ((LHash * MagicNumber) shr 24);
+      LHash  := Cardinal(LHash * MagicNumber);
+      Result := Cardinal(Result * MagicNumber) xor LHash;
+    end;
+  end;
+end;
+
+function acVariantHash(const AVariant: Variant): Cardinal;
+var
+  LVarType: TVarType;
+  LVarArray: PVarArray;
+begin
+  if GetVarArrayInfo(TVarData(AVariant), LVarType, LVarArray) then
+    Result := GetVarArrayHash(LVarType, LVarArray)
+  else
+    Result := GetVarDataHash(TVarData(AVariant));
+end;
+
+//==============================================================================
 // ELF Hash
 //==============================================================================
 
@@ -355,7 +461,7 @@ var
 {$IFDEF MSWINDOWS}
   ABuffer: array[0..63] of WideChar;
 {$ENDIF}
-  AIndex: Integer;
+  LIndex: Integer;
 begin
   if AIgnoryCase then
   begin
@@ -373,9 +479,9 @@ begin
   while ACount > 0 do
   begin
     Result := Result shl 4 + Ord(S^);
-    AIndex := Result and $F0000000;
-    Result := Result xor (AIndex shr 24);
-    Result := Result and (not AIndex);
+    LIndex := Result and $F0000000;
+    Result := Result xor (LIndex shr 24);
+    Result := Result and (not LIndex);
     Dec(ACount);
     Inc(S);
   end;
