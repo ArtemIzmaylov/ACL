@@ -245,6 +245,20 @@ type
     function Stat(out AStatStg: TStatStg; AStatFlag: DWORD): HResult; override; stdcall;
   end;
 
+  { TACLGdiplusAlphaBlendAttributes }
+
+  TACLGdiplusAlphaBlendAttributes = class
+  strict private
+    class var FAlpha: Byte;
+    class var FColorMatrix: TColorMatrix;
+    class var FHandle: GpImageAttributes;
+  public
+    class constructor Create;
+    class procedure Finalize;
+    class function Get(Alpha: Byte): GpImageAttributes;
+  end;
+
+
 var
   GpDefaultColorMatrix: TColorMatrix = (
     (1.0, 0.0, 0.0, 0.0, 0.0),
@@ -280,19 +294,6 @@ const
 
 type
   TACLImageAccess = class(TACLImage);
-
-  { TACLGdiplusAlphaBlendAttributes }
-
-  TACLGdiplusAlphaBlendAttributes = class
-  strict private
-    class var FAlpha: Byte;
-    class var FColorMatrix: TColorMatrix;
-    class var FHandle: GpImageAttributes;
-  public
-    class constructor Create;
-    class procedure Finalize;
-    class function Get(Alpha: Byte): GpImageAttributes;
-  end;
 
   { TACLGdiplusRenderImage }
 

@@ -250,10 +250,12 @@ type
 
     //# Draw
     procedure DrawBlend(ACanvas: TCanvas; const P: TPoint; AAlpha: Byte = MaxByte); overload;
-    procedure DrawBlend(ACanvas: TCanvas; const P: TPoint; AMode: TACLBlendMode; AAlpha: Byte = MaxByte); overload;
-    procedure DrawBlend(ACanvas: TCanvas; const R, SrcRect: TRect; AAlpha: Byte); overload;
-    procedure DrawBlend(ACanvas: TCanvas; const R: TRect; AAlpha: Byte = MaxByte); overload;
-    procedure DrawBlend(ACanvas: TCanvas; const R: TRect; AAlpha: Byte; ASmoothStretch: Boolean); overload;
+    procedure DrawBlend(ACanvas: TCanvas; const P: TPoint;
+      AMode: TACLBlendMode; AAlpha: Byte = MaxByte); overload;
+    procedure DrawBlend(ACanvas: TCanvas; const R, SrcRect: TRect;
+      AAlpha: Byte; ASmoothStretch: Boolean = False); overload;
+    procedure DrawBlend(ACanvas: TCanvas; const R: TRect;
+      AAlpha: Byte = MaxByte; ASmoothStretch: Boolean = False); overload;
     procedure DrawCopy(ACanvas: TCanvas; const P: TPoint); overload;
     procedure DrawCopy(ACanvas: TCanvas; const R: TRect; ASmoothStretch: Boolean = False); overload;
 
@@ -649,7 +651,6 @@ uses
 {$IFNDEF ACL_CAIRO_TEXTOUT}
   ACL.Graphics.TextLayout,
 {$ENDIF}
-  ACL.Graphics.Images,
   ACL.Utils.DPIAware,
   ACL.Utils.Strings;
 
@@ -2686,22 +2687,44 @@ begin
   DrawBlend(ACanvas, Bounds(P.X, P.Y, Width, Height), AAlpha);
 end;
 
-procedure TACLDib.DrawBlend(ACanvas: TCanvas; const R: TRect; AAlpha: Byte);
+procedure TACLDib.DrawBlend(ACanvas: TCanvas;
+  const R: TRect; AAlpha: Byte; ASmoothStretch: Boolean);
 begin
-  DrawBlend(ACanvas, R, ClientRect, AAlpha);
+  DrawBlend(ACanvas, R, ClientRect, AAlpha, ASmoothStretch);
 end;
 
-procedure TACLDib.DrawBlend(ACanvas: TCanvas; const R, SrcRect: TRect; AAlpha: Byte);
+procedure TACLDib.DrawBlend(ACanvas: TCanvas;
+  const R, SrcRect: TRect; AAlpha: Byte; ASmoothStretch: Boolean);
 {$IFDEF MSWINDOWS}
 var
   LBlendFunc: TBlendFunction;
+  LGpCanvas: GpGraphics;
+  LGpHandle: GpImage;
 begin
-  LBlendFunc.AlphaFormat := AC_SRC_ALPHA;
-  LBlendFunc.BlendOp := AC_SRC_OVER;
-  LBlendFunc.BlendFlags := 0;
-  LBlendFunc.SourceConstantAlpha := AAlpha;
-  AlphaBlend(ACanvas.Handle, R.Left, R.Top, R.Right - R.Left, R.Bottom - R.Top,
-    Handle, SrcRect.Left, SrcRect.Top, SrcRect.Width, SrcRect.Height, LBlendFunc);
+  if ASmoothStretch and not R.EqualSizes(SrcRect) then
+  begin
+    LGpHandle := GpCreateBitmap(Width, Height, PByte(Colors));
+    GdipCheck(GdipCreateFromHDC(ACanvas.Handle, LGpCanvas));
+    try
+      GdipSetCompositingMode(LGpCanvas, CompositingModeSourceOver);
+      GdipSetInterpolationMode(LGpCanvas, InterpolationModeLowQuality);
+      GdipSetPixelOffsetMode(LGpCanvas, PixelOffsetModeHalf);
+      GpDrawImage(LGpCanvas, LGpHandle,
+        TACLGdiplusAlphaBlendAttributes.Get(AAlpha), R, SrcRect, False);
+    finally
+      GdipDeleteGraphics(LGpCanvas);
+      GdipDisposeImage(LGpHandle);
+    end;
+  end
+  else
+  begin
+    LBlendFunc.AlphaFormat := AC_SRC_ALPHA;
+    LBlendFunc.BlendOp := AC_SRC_OVER;
+    LBlendFunc.BlendFlags := 0;
+    LBlendFunc.SourceConstantAlpha := AAlpha;
+    AlphaBlend(ACanvas.Handle, R.Left, R.Top, R.Right - R.Left, R.Bottom - R.Top,
+      Handle, SrcRect.Left, SrcRect.Top, SrcRect.Width, SrcRect.Height, LBlendFunc);
+  end;
 {$ELSE}
 var
   LSurface: Pcairo_surface_t;
@@ -3010,44 +3033,6 @@ begin
   Result := FHandle;
 end;
 {$ENDIF}
-
-procedure TACLDib.DrawBlend(ACanvas: TCanvas; const R: TRect; AAlpha: Byte; ASmoothStretch: Boolean);
-{$IFDEF FPC}
-begin
-{$ELSE}
-var
-  AClipBox: TRect;
-  AImage: TACLImage;
-  ALayer: TACLDib;
-begin
-  if ASmoothStretch and not (Empty or R.EqualSizes(ClientRect)) then
-  begin
-    if (GetClipBox(ACanvas.Handle, AClipBox) <> NULLREGION) and IntersectRect(AClipBox, AClipBox, R) then
-    begin
-      AImage := TACLImage.Create(PACLPixel32(Colors), Width, Height);
-      try
-        AImage.StretchQuality := sqLowQuality;
-        AImage.PixelOffsetMode := ipomHalf;
-
-        // Layer is used for better performance
-        ALayer := TACLDib.Create(AClipBox);
-        try
-          SetWindowOrgEx(ALayer.Handle, AClipBox.Left, AClipBox.Top, nil);
-          AImage.Draw(ALayer.Canvas, R);
-          SetWindowOrgEx(ALayer.Handle, 0, 0, nil);
-          ALayer.DrawBlend(ACanvas, AClipBox.TopLeft, AAlpha);
-        finally
-          ALayer.Free;
-        end;
-      finally
-        AImage.Free;
-      end;
-    end;
-  end
-  else
-{$ENDIF}
-    DrawBlend(ACanvas, R, ClientRect, AAlpha);
-end;
 
 procedure TACLDib.DrawBlend(ACanvas: TCanvas; const P: TPoint; AMode: TACLBlendMode; AAlpha: Byte);
 var
