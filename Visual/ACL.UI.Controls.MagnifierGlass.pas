@@ -121,7 +121,7 @@ begin
   inherited Create(AOwner);
   DoubleBuffered := True;
   FShowGridLines := True;
-  FBuffer := TACLBitmapLayer.Create(BoundsRect);
+  FBuffer := TACLDib.Create(BoundsRect);
   FZoom := 2;
   Resize;
 end;

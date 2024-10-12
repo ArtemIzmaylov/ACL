@@ -2372,9 +2372,9 @@ end;
 
 procedure TACLGlyph.Draw(ACanvas: TCanvas; const R: TRect; AEnabled: Boolean; AAlpha: Byte);
 var
-  ALayer: TACLBitmapLayer;
+  ALayer: TACLDib;
 begin
-  ALayer := TACLBitmapLayer.Create(Image.FrameSize);
+  ALayer := TACLDib.Create(Image.FrameSize);
   try
     Image.Draw(ALayer.Canvas, ALayer.ClientRect, FrameIndex, AEnabled);
     ALayer.DrawBlend(ACanvas, R, AAlpha, True);

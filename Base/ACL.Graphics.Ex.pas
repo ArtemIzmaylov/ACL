@@ -46,58 +46,35 @@ uses
   ACL.Utils.DPIAware;
 
 type
-  // Refer to following articles for more information:
-  //  https://en.wikipedia.org/wiki/Blend_modes
-  //  https://en.wikipedia.org/wiki/Alpha_compositing
-  TACLBlendMode = (bmNormal, bmMultiply, bmScreen, bmOverlay, bmAddition,
-    bmSubstract, bmDifference, bmDivide, bmLighten, bmDarken, bmGrayscale);
+{$REGION ' Extended Dib '}
 
-{$REGION ' Layers '}
+  { TACLDibEx }
 
-  { TACLBitmapLayer }
-
-  TACLBitmapLayer = class(TACLDib)
-  public
-    procedure DrawBlend(ACanvas: TCanvas; const P: TPoint;
-      AMode: TACLBlendMode; AAlpha: Byte = MaxByte); overload;
-    procedure DrawBlend(ACanvas: TCanvas; const R: TRect;
-      AAlpha: Byte; ASmoothStretch: Boolean); overload;
-  end;
-
-  { TACLCacheLayer }
-
-  TACLCacheLayer = class(TACLBitmapLayer)
+  TACLDibEx = class(TACLDib)
   strict private
-    FIsDirty: Boolean;
-  public
-    procedure AfterConstruction; override;
-    function CheckNeedUpdate(const R: TRect): Boolean;
-    procedure Drop;
-    //# Properties
-    property IsDirty: Boolean read FIsDirty write FIsDirty;
-  end;
-
-  { TACLMaskLayer }
-
-  TACLMaskLayer = class(TACLBitmapLayer)
-  strict private
+    FDirty: Boolean;
     FMask: PByte;
-    FMaskFrameIndex: Integer;
+    FMaskFrame: Integer;
     FMaskInfo: TACLSkinImageFrameState;
     FMaskInfoValid: Boolean;
     FOpaqueRange: TPoint;
-
-    procedure ApplyMaskCore(AClipArea: PRect = nil); overload;
-    procedure ApplyMaskCore(AMask: PByte; AColors: PACLPixel32; ACount: Integer); overload; inline;
-  protected
-    procedure FreeHandles; override;
   public
-    procedure ApplyMask; overload; inline;
-    procedure ApplyMask(const AClipArea: TRect); overload; inline;
+    destructor Destroy; override;
+    procedure AfterConstruction; override;
+  public // caching
+    function CheckNeedRefresh(const R: TRect): Boolean;
+    property Dirty: Boolean read FDirty write FDirty;
+  public // masks
+    procedure ApplyMask(AClipArea: PRect = nil); overload;
+    procedure ApplyMask(AMask: PByte; AColors: PACLPixel32; ACount: Integer); overload; inline;
+    procedure LoadMask(AImage: TACLSkinImage; AFrame: Integer); overload;
     procedure LoadMask; overload;
-    procedure LoadMask(AImage: TACLSkinImage; AMaskFrameIndex: Integer); overload;
-    procedure UnloadMask;
+    property MaskFrame: Integer read FMaskFrame write FMaskFrame;
   end;
+
+  TACLBitmapLayer = TACLDib deprecated 'Use TACLDib instead';
+  TACLCacheLayer = TACLDibEx deprecated 'Use TACLDibEx instead';
+  TACLMaskLayer = TACLDibEx deprecated 'Use TACLDibEx instead';
 
 {$ENDREGION}
 
@@ -1280,178 +1257,64 @@ end;
 
 {$REGION ' Layers '}
 
-procedure TACLBitmapLayer.DrawBlend(ACanvas: TCanvas;
-  const P: TPoint; AMode: TACLBlendMode; AAlpha: Byte = MaxByte);
-var
-  ALayer: TACLBitmapLayer;
+{ TACLDibEx }
+
+destructor TACLDibEx.Destroy;
 begin
-  if Empty then
-    Exit;
-  if AMode = bmNormal then
-    DrawBlend(ACanvas, P, AAlpha)
-  else
-  begin
-    ALayer := TACLBitmapLayer.Create(Width, Height);
-    try
-      acBitBlt(ALayer.Handle, ACanvas.Handle, ALayer.ClientRect, P);
-      FBlendFunctions[AMode](ALayer, Self, AAlpha);
-      ALayer.DrawCopy(ACanvas, P);
-    finally
-      ALayer.Free;
-    end;
-  end;
+  FreeMem(FMask);
+  inherited;
 end;
 
-procedure TACLBitmapLayer.DrawBlend(ACanvas: TCanvas;
-  const R: TRect; AAlpha: Byte; ASmoothStretch: Boolean);
-{$IFDEF FPC}
+procedure TACLDibEx.AfterConstruction;
 begin
-{$ELSE}
-var
-  AClipBox: TRect;
-  AImage: TACLImage;
-  ALayer: TACLDib;
-begin
-  if ASmoothStretch and not (Empty or R.EqualSizes(ClientRect)) then
-  begin
-    if (GetClipBox(ACanvas.Handle, AClipBox) <> NULLREGION) and IntersectRect(AClipBox, AClipBox, R) then
-    begin
-      AImage := TACLImage.Create(PACLPixel32(Colors), Width, Height);
-      try
-        AImage.StretchQuality := sqLowQuality;
-        AImage.PixelOffsetMode := ipomHalf;
-
-        // Layer is used for better performance
-        ALayer := TACLDib.Create(AClipBox);
-        try
-          SetWindowOrgEx(ALayer.Handle, AClipBox.Left, AClipBox.Top, nil);
-          AImage.Draw(ALayer.Canvas, R);
-          SetWindowOrgEx(ALayer.Handle, 0, 0, nil);
-          ALayer.DrawBlend(ACanvas, AClipBox.TopLeft, AAlpha);
-        finally
-          ALayer.Free;
-        end;
-      finally
-        AImage.Free;
-      end;
-    end;
-  end
-  else
-{$ENDIF}
-    DrawBlend(ACanvas, R, ClientRect, AAlpha);
+  inherited;
+  FMaskFrame := -1;
+  FDirty := True;
 end;
 
-{ TACLCacheLayer }
-
-procedure TACLCacheLayer.AfterConstruction;
+function TACLDibEx.CheckNeedRefresh(const R: TRect): Boolean;
 begin
-  inherited AfterConstruction;
-  IsDirty := True;
-end;
-
-function TACLCacheLayer.CheckNeedUpdate(const R: TRect): Boolean;
-begin
-  if not R.EqualSizes(ClientRect) then
+  if (Width <> R.Width) or (Height <> R.Height) then
   begin
     Resize(R);
-    IsDirty := True;
+    Dirty := True;
   end
   else
-    if IsDirty then
+    if Dirty then
       Reset;
 
-  Result := IsDirty;
+  Result := Dirty;
 end;
 
-procedure TACLCacheLayer.Drop;
-begin
-  Resize(0, 0);
-end;
-
-{ TACLMaskLayer }
-
-procedure TACLMaskLayer.ApplyMask;
-begin
-  ApplyMaskCore(nil);
-end;
-
-procedure TACLMaskLayer.ApplyMask(const AClipArea: TRect);
-begin
-  ApplyMaskCore(@AClipArea)
-end;
-
-procedure TACLMaskLayer.LoadMask;
+procedure TACLDibEx.ApplyMask(AMask: PByte; AColors: PACLPixel32; ACount: Integer);
 var
-  AColor: PACLPixel32;
-  AColorIndex: Integer;
-  AMask: PByte;
-  AOpaqueCounter: Integer;
+  AAlpha: Byte;
 begin
-  FOpaqueRange := NullPoint;
-  FMaskInfoValid := False;
-  if FMask = nil then
-    FMask := AllocMem(ColorCount);
-
-  AMask := FMask;
-  AColor := @Colors^[0];
-  AOpaqueCounter := 0;
-  for AColorIndex := 0 to ColorCount - 1 do
+  while ACount > 0 do
   begin
-    AMask^ := AColor^.A;
-
-    if AMask^ = MaxByte then
-      Inc(AOpaqueCounter)
+    AAlpha := AMask^;
+    if AAlpha = 0 then
+      DWORD(AColors^) := 0
     else
-    begin
-      if AOpaqueCounter > FOpaqueRange.Y - FOpaqueRange.X then
+      if AAlpha < 255 then
       begin
-        FOpaqueRange.Y := AColorIndex - 1;
-        FOpaqueRange.X := FOpaqueRange.Y - AOpaqueCounter;
+        // less quality, but 2x faster
+        //    TACLColors.Unpremultiply(C^);
+        //    C^.A := TACLColors.PremultiplyTable[C^.A, S^];
+        //    TACLColors.Premultiply(C^);
+        AColors^.B := TACLColors.PremultiplyTable[AColors^.B, AAlpha];
+        AColors^.G := TACLColors.PremultiplyTable[AColors^.G, AAlpha];
+        AColors^.A := TACLColors.PremultiplyTable[AColors^.A, AAlpha];
+        AColors^.R := TACLColors.PremultiplyTable[AColors^.R, AAlpha];
       end;
-      AOpaqueCounter := 0;
-    end;
 
     Inc(AMask);
-    Inc(AColor);
-  end;
-
-  if FOpaqueRange.Y - FOpaqueRange.X < ColorCount div 3 then
-    FOpaqueRange := NullPoint;
-end;
-
-procedure TACLMaskLayer.LoadMask(AImage: TACLSkinImage; AMaskFrameIndex: Integer);
-begin
-  if (FMask = nil) or (FMaskFrameIndex <> AMaskFrameIndex) then
-  begin
-    Reset;
-    FMaskFrameIndex := AMaskFrameIndex;
-    FMaskInfo := AImage.FrameInfo[AMaskFrameIndex];
-    if {FMaskInfo.IsColor or }FMaskInfo.IsOpaque or FMaskInfo.IsTransparent then
-    begin
-      UnloadMask;
-      FMaskInfoValid := True;
-    end
-    else
-    begin
-      AImage.Draw(Canvas, ClientRect, AMaskFrameIndex);
-      LoadMask;
-    end;
+    Inc(AColors);
+    Dec(ACount);
   end;
 end;
 
-procedure TACLMaskLayer.UnloadMask;
-begin
-  FreeMemAndNil(Pointer(FMask));
-  FMaskInfoValid := False;
-end;
-
-procedure TACLMaskLayer.FreeHandles;
-begin
-  inherited FreeHandles;
-  UnloadMask;
-end;
-
-procedure TACLMaskLayer.ApplyMaskCore(AClipArea: PRect = nil);
+procedure TACLDibEx.ApplyMask(AClipArea: PRect);
 var
   AIndex: Integer;
   AMask: PByte;
@@ -1501,39 +1364,69 @@ begin
   end;
 
   if ARange1.Y > ARange1.X then
-    ApplyMaskCore(AMask + ARange1.X, @Colors^[ARange1.X], ARange1.Y - ARange1.X);
+    ApplyMask(AMask + ARange1.X, @Colors^[ARange1.X], ARange1.Y - ARange1.X);
   if ARange2.Y > ARange2.X then
-    ApplyMaskCore(AMask + ARange2.X, @Colors^[ARange2.X], ARange2.Y - ARange2.X);
+    ApplyMask(AMask + ARange2.X, @Colors^[ARange2.X], ARange2.Y - ARange2.X);
 end;
 
-procedure TACLMaskLayer.ApplyMaskCore(AMask: PByte; AColors: PACLPixel32; ACount: Integer);
+procedure TACLDibEx.LoadMask;
 var
-  AAlpha: Byte;
+  AColor: PACLPixel32;
+  AColorIndex: Integer;
+  AMask: PByte;
+  AOpaqueCounter: Integer;
 begin
-  while ACount > 0 do
+  FOpaqueRange := NullPoint;
+  FMaskInfoValid := False;
+  if FMask = nil then
+    FMask := AllocMem(ColorCount);
+
+  AMask := FMask;
+  AColor := @Colors^[0];
+  AOpaqueCounter := 0;
+  for AColorIndex := 0 to ColorCount - 1 do
   begin
-    AAlpha := AMask^;
-    if AAlpha = 0 then
-      DWORD(AColors^) := 0
+    AMask^ := AColor^.A;
+
+    if AMask^ = 255 then
+      Inc(AOpaqueCounter)
     else
-      if AAlpha < MaxByte then
+    begin
+      if AOpaqueCounter > FOpaqueRange.Y - FOpaqueRange.X then
       begin
-        // less quality, but 2x faster
-        //    TACLColors.Unpremultiply(C^);
-        //    C^.A := TACLColors.PremultiplyTable[C^.A, S^];
-        //    TACLColors.Premultiply(C^);
-        AColors^.B := TACLColors.PremultiplyTable[AColors^.B, AAlpha];
-        AColors^.G := TACLColors.PremultiplyTable[AColors^.G, AAlpha];
-        AColors^.A := TACLColors.PremultiplyTable[AColors^.A, AAlpha];
-        AColors^.R := TACLColors.PremultiplyTable[AColors^.R, AAlpha];
+        FOpaqueRange.Y := AColorIndex - 1;
+        FOpaqueRange.X := FOpaqueRange.Y - AOpaqueCounter;
       end;
+      AOpaqueCounter := 0;
+    end;
 
     Inc(AMask);
-    Inc(AColors);
-    Dec(ACount);
+    Inc(AColor);
   end;
+
+  if FOpaqueRange.Y - FOpaqueRange.X < ColorCount div 3 then
+    FOpaqueRange := NullPoint;
 end;
 
+procedure TACLDibEx.LoadMask(AImage: TACLSkinImage; AFrame: Integer);
+begin
+  if (FMask = nil) or (FMaskFrame <> AFrame) then
+  begin
+    Reset;
+    FMaskFrame := AFrame;
+    FMaskInfo := AImage.FrameInfo[FMaskFrame];
+    if {FMaskInfo.IsColor or }FMaskInfo.IsOpaque or FMaskInfo.IsTransparent then
+    begin
+      FreeMemAndNil(Pointer(FMask));
+      FMaskInfoValid := True;
+    end
+    else
+    begin
+      AImage.Draw(Canvas, ClientRect, AFrame);
+      LoadMask;
+    end;
+  end;
+end;
 {$ENDREGION}
 
 {$REGION ' Blur '}

@@ -142,7 +142,7 @@ procedure acDrawImage(ACanvas: TCanvas; const R: TRect;
   AImages: TCustomImageList; AImageIndex: Integer;
   AEnabled: Boolean = True; ASmoothStrech: Boolean = True);
 function acGetImage(AImages: TCustomImageList;
-  AImageIndex: Integer; AEnabled: Boolean = True): TACLBitmapLayer;
+  AImageIndex: Integer; AEnabled: Boolean = True): TACLDib;
 function acGetImageListSize(AImages: TCustomImageList; ATargetDPI: Integer): TSize;
 function acIs32BitBitmap(ABitmap: TBitmap): Boolean;
 procedure acSetImageList(AValue: TCustomImageList; var AFieldValue: TCustomImageList;
@@ -167,7 +167,7 @@ uses
   ACL.Utils.Stream;
 
 function acGetImage(AImages: TCustomImageList;
-  AImageIndex: Integer; AEnabled: Boolean = True): TACLBitmapLayer;
+  AImageIndex: Integer; AEnabled: Boolean = True): TACLDib;
 {$IFDEF FPC}
 var
   ARawImage: TRawImage;
@@ -183,11 +183,11 @@ begin
   ARawImage.Description.GreenShift := 8;
   ARawImage.Description.RedShift   := 16;
   ARawImage.Description.AlphaShift := 24;
-  Result := TACLBitmapLayer.Create;
+  Result := TACLDib.Create;
   Result.Assign(ARawImage);
 {$ELSE}
 begin
-  Result := TACLBitmapLayer.Create(AImages.Width, AImages.Height);
+  Result := TACLDib.Create(AImages.Width, AImages.Height);
   Result.Reset;
   AImages.Draw(Result.Canvas, 0, 0, AImageIndex);
 {$ENDIF}
@@ -199,7 +199,7 @@ procedure acDrawImage(ACanvas: TCanvas; const R: TRect;
   AImages: TCustomImageList; AImageIndex: Integer;
   AEnabled: Boolean; ASmoothStrech: Boolean);
 var
-  LImage: TACLBitmapLayer;
+  LImage: TACLDib;
 begin
   if (AImages <> nil) and (AImageIndex >= 0) and acRectVisible(ACanvas, R) then
   begin
@@ -385,11 +385,11 @@ end;
 procedure TACLImageList.DoDraw(Index: Integer; Canvas: TCanvas;
   X, Y: Integer; Style: Cardinal; Enabled: Boolean = True);
 var
-  ALayer: TACLBitmapLayer;
+  ALayer: TACLDib;
 begin
   if (Width > 0) and (Height > 0) then
   begin
-    ALayer := TACLBitmapLayer.Create(Width, Height);
+    ALayer := TACLDib.Create(Width, Height);
     try
       if ColorDepth = cd32Bit then
       begin

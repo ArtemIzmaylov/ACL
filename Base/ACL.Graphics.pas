@@ -178,6 +178,12 @@ type
     procedure SetScaledFont(AFont: TFont);
   end;
 
+  // Refer to following articles for more information:
+  //  https://en.wikipedia.org/wiki/Blend_modes
+  //  https://en.wikipedia.org/wiki/Alpha_compositing
+  TACLBlendMode = (bmNormal, bmMultiply, bmScreen, bmOverlay, bmAddition,
+    bmSubstract, bmDifference, bmDivide, bmLighten, bmDarken, bmGrayscale);
+
   { TACLDib }
 
   TACLDib = class
@@ -237,15 +243,17 @@ type
     procedure MakeTransparent(const AColor: TColor); overload;
     procedure Premultiply(R: TRect); overload;
     procedure Premultiply; overload;
-    procedure Reset(const R: TRect); overload;
-    procedure Reset; overload;
+    procedure Reset(const R: TRect); overload; virtual;
+    procedure Reset; overload; virtual;
     function Resize(const ANewBounds: TRect): Boolean; overload;
     function Resize(const ANewWidth, ANewHeight: Integer): Boolean; overload;
 
     //# Draw
     procedure DrawBlend(ACanvas: TCanvas; const P: TPoint; AAlpha: Byte = MaxByte); overload;
-    procedure DrawBlend(ACanvas: TCanvas; const R: TRect; AAlpha: Byte = MaxByte); overload;
+    procedure DrawBlend(ACanvas: TCanvas; const P: TPoint; AMode: TACLBlendMode; AAlpha: Byte = MaxByte); overload;
     procedure DrawBlend(ACanvas: TCanvas; const R, SrcRect: TRect; AAlpha: Byte); overload;
+    procedure DrawBlend(ACanvas: TCanvas; const R: TRect; AAlpha: Byte = MaxByte); overload;
+    procedure DrawBlend(ACanvas: TCanvas; const R: TRect; AAlpha: Byte; ASmoothStretch: Boolean); overload;
     procedure DrawCopy(ACanvas: TCanvas; const P: TPoint); overload;
     procedure DrawCopy(ACanvas: TCanvas; const R: TRect; ASmoothStretch: Boolean = False); overload;
 
@@ -631,16 +639,17 @@ uses
   gtk2Def,
   glib2,
 {$ENDIF}
+  ACL.Math,
   ACL.Graphics.Ex,
 {$IFDEF MSWINDOWS}
   ACL.Graphics.Ex.Gdip,
-  ACL.Math,
 {$ELSE}
   ACL.Graphics.Ex.Cairo,
 {$ENDIF}
 {$IFNDEF ACL_CAIRO_TEXTOUT}
   ACL.Graphics.TextLayout,
 {$ENDIF}
+  ACL.Graphics.Images,
   ACL.Utils.DPIAware,
   ACL.Utils.Strings;
 
@@ -3001,6 +3010,63 @@ begin
   Result := FHandle;
 end;
 {$ENDIF}
+
+procedure TACLDib.DrawBlend(ACanvas: TCanvas; const R: TRect; AAlpha: Byte; ASmoothStretch: Boolean);
+{$IFDEF FPC}
+begin
+{$ELSE}
+var
+  AClipBox: TRect;
+  AImage: TACLImage;
+  ALayer: TACLDib;
+begin
+  if ASmoothStretch and not (Empty or R.EqualSizes(ClientRect)) then
+  begin
+    if (GetClipBox(ACanvas.Handle, AClipBox) <> NULLREGION) and IntersectRect(AClipBox, AClipBox, R) then
+    begin
+      AImage := TACLImage.Create(PACLPixel32(Colors), Width, Height);
+      try
+        AImage.StretchQuality := sqLowQuality;
+        AImage.PixelOffsetMode := ipomHalf;
+
+        // Layer is used for better performance
+        ALayer := TACLDib.Create(AClipBox);
+        try
+          SetWindowOrgEx(ALayer.Handle, AClipBox.Left, AClipBox.Top, nil);
+          AImage.Draw(ALayer.Canvas, R);
+          SetWindowOrgEx(ALayer.Handle, 0, 0, nil);
+          ALayer.DrawBlend(ACanvas, AClipBox.TopLeft, AAlpha);
+        finally
+          ALayer.Free;
+        end;
+      finally
+        AImage.Free;
+      end;
+    end;
+  end
+  else
+{$ENDIF}
+    DrawBlend(ACanvas, R, ClientRect, AAlpha);
+end;
+
+procedure TACLDib.DrawBlend(ACanvas: TCanvas; const P: TPoint; AMode: TACLBlendMode; AAlpha: Byte);
+var
+  LDib: TACLDib;
+begin
+  if AMode = bmNormal then
+    DrawBlend(ACanvas, P, AAlpha)
+  else
+  begin
+    LDib := TACLDib.Create(Width, Height);
+    try
+      acBitBlt(LDib.Handle, ACanvas.Handle, LDib.ClientRect, P);
+      FBlendFunctions[AMode](LDib, Self, AAlpha);
+      LDib.DrawCopy(ACanvas, P);
+    finally
+      LDib.Free;
+    end;
+  end;
+end;
 
 { TACLDibCanvas }
 

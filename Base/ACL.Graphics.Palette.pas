@@ -221,15 +221,15 @@ end;
 
 procedure TACLPalette.Generate(DC: HDC; const R: TRect);
 var
-  AWorkLayer: TACLBitmapLayer;
+  AWorkLayer: TACLDib;
 begin
   Reset;
   if not IsRectEmpty(R) then
   begin
 //  {$IFDEF DEBUG_DUMP_ACCENT_PALETTE_QUANTANIZER}
-//    AWorkLayer := TACLBitmapLayer.Create(R.Width, R.Height);
+//    AWorkLayer := TACLDib.Create(R.Width, R.Height);
 //  {$ELSE}
-    AWorkLayer := TACLBitmapLayer.Create(Min(BufferSize, R.Width), Min(BufferSize, R.Height));
+    AWorkLayer := TACLDib.Create(Min(BufferSize, R.Width), Min(BufferSize, R.Height));
 //  {$ENDIF}
     try
     {$IFDEF MSWINDOWS}

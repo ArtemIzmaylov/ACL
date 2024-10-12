@@ -1783,7 +1783,7 @@ end;
 procedure TACLSkinImage.SetFrameSize(const AValue: TSize);
 var
   ABitmap: TACLDib;
-  AFrameBitmap: TACLBitmapLayer;
+  AFrameBitmap: TACLDib;
   AFrameRect: TRect;
   AFrameCount: Integer;
   I: Integer;
@@ -1798,7 +1798,7 @@ begin
         ABitmap.Reset;
         //ABitmap.AlphaFormat := afPremultiplied;
         AFrameRect := TRect.Create(AValue);
-        AFrameBitmap := TACLBitmapLayer.Create(FrameWidth, FrameHeight);
+        AFrameBitmap := TACLDib.Create(FrameWidth, FrameHeight);
         try
           for I := 0 to AFrameCount - 1 do
           begin
@@ -2243,7 +2243,7 @@ end;
 class procedure TACLSkinImageRenderer.doAlphaBlendTile(const R, SrcR: TRect);
 var
   AClipRgn: Integer;
-  ALayer: TACLBitmapLayer;
+  ALayer: TACLDib;
   R1: TRect;
   W, H: Integer;
   X, Y, XCount, YCount: Integer;
@@ -2257,7 +2257,7 @@ begin
 
   if XCount * YCount > 10 then
   begin
-    ALayer := TACLBitmapLayer.Create(R);
+    ALayer := TACLDib.Create(R);
     try
       acTileBlt(ALayer.Handle, FMemDC, ALayer.ClientRect, SrcR);
       AlphaBlend(FDstCanvas.Handle, R.Left, R.Top, R.Right - R.Left, R.Bottom - R.Top,
