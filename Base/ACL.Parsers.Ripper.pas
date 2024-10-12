@@ -23,6 +23,7 @@ uses
   {System.}Types,
   // ACL
   ACL.Classes.Collections,
+  ACL.Math,
   ACL.Expressions,
   ACL.Expressions.FormatString,
   ACL.FileFormats.XML.Types;
@@ -183,7 +184,7 @@ begin
     ATarget.Capacity := AData.Count;
     for I := 0 to AData.Count - 1 do
       ProcessCore(ATarget, AData.List[I]);
-    acExchangePointers(AData, ATarget);
+    TACLMath.ExchangePtr(AData, ATarget);
   finally
     ATarget.Free;
   end;

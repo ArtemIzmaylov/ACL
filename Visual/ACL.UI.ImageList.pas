@@ -39,6 +39,7 @@ uses
   {Vcl.}ImgList,
   // ACL
   ACL.Classes.Collections,
+  ACL.Math,
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Ex,

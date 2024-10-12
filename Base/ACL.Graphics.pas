@@ -1199,7 +1199,7 @@ begin
     LTextSize := acTextSize(ACanvas, LText);
     if AEndEllipsis then
       acTextEllipsize(ACanvas, LText, LTextSize, R.Height);
-    acExchangeIntegers(LTextSize.cx, LTextSize.cy);
+    TACLMath.Exchange<Integer>(LTextSize.cx, LTextSize.cy);
     LTextOffset := acTextAlign(R, LTextSize, TAlignment(AVertAlignment), MapVert[AHorzAlignment]);
     acTextOut(ACanvas, LTextOffset.X, LTextOffset.Y + LTextSize.cy, LText);
   finally
@@ -2207,7 +2207,7 @@ begin
   if ACombineFunc <> rcmCopy then
     CombineRgn(Handle, Handle, ARgn, CombineFuncMap[ACombineFunc])
   else
-    acExchangePointers(FHandle, ARgn);
+    TACLMath.Exchange<TRegionHandle>(FHandle, ARgn);
 
   DeleteObject(ARgn)
 end;

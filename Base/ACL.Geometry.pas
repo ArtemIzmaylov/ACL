@@ -34,6 +34,7 @@ uses
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
+  ACL.Math,
   ACL.Utils.Common,
   ACL.Utils.Strings;
 
@@ -1188,8 +1189,8 @@ end;
 
 procedure TACLRectHelper.Rotate;
 begin
-  acExchangeIntegers(Left, Top);
-  acExchangeIntegers(Right, Bottom);
+  TACLMath.Exchange<Integer>(Left, Top);
+  TACLMath.Exchange<Integer>(Right, Bottom);
 end;
 
 procedure TACLRectHelper.Scale(Numerator, Denominator: Integer);

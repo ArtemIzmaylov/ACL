@@ -52,6 +52,7 @@ uses
   ACL.Geometry,
   ACL.Geometry.Utils,
   ACL.Graphics,
+  ACL.Math,
   ACL.MUI,
   ACL.ObjectLinks,
   ACL.Timers,
@@ -1818,7 +1819,7 @@ var
 begin
   LList := nil;
   try
-    acExchangePointers(FWorkList, LList);
+    TACLMath.ExchangePtr(FWorkList, LList);
     if LList = nil then
       LList := TTabOrderList.Create;
 
@@ -1840,7 +1841,7 @@ begin
       end;
     end;
   finally
-    acExchangePointers(FWorkList, LList);
+    TACLMath.ExchangePtr(FWorkList, LList);
     LList.Free;
   end;
   LParent.ControlsAligned;

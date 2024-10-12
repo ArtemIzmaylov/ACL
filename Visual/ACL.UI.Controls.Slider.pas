@@ -1164,7 +1164,7 @@ var
   AMargins: TRect;
 begin
   Result := inherited;
-  acExchangeIntegers(Result.cx, Result.cy);
+  TACLMath.Exchange<Integer>(Result.cx, Result.cy);
 
   AMargins := FOwner.Padding.GetScaledMargins(CurrentDpi);
   Inc(Result.cx, AMargins.MarginsWidth);

@@ -588,7 +588,7 @@ begin
     Result.Top := dpiApply(TACLStyleTabControl.Offset, FCurrentPPI);
 
   if OptionsView.TabPosition = tpBottom then
-    acExchangeIntegers(Result.Top, Result.Bottom);
+    TACLMath.Exchange<Integer>(Result.Top, Result.Bottom);
 end;
 
 procedure TACLCustomTabControl.CalculateTabPlaces(const R: TRect);

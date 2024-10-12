@@ -37,6 +37,7 @@ uses
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.FontCache,
+  ACL.Math,
   ACL.UI.Controls.Base,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.ComboBox,
@@ -310,7 +311,7 @@ begin
   AForegroundColor := FontNameEdit.Style.ColorsText[True];
 
   if TACLColors.IsDark(ACanvas.Font.Color) = TACLColors.IsDark(ABackgroundColor) then
-    acExchangeIntegers(ABackgroundColor, AForegroundColor);
+    TACLMath.Exchange<TColor>(ABackgroundColor, AForegroundColor);
 
   acDrawFrame(ACanvas, R, FontNameEdit.Style.ColorBorder.AsColor);
   acFillRect(ACanvas, R.InflateTo(-1, -1), ABackgroundColor);

@@ -924,7 +924,7 @@ var
 begin
   ACursor := ATarget;
   if ATarget < AStart then
-    acExchangeInt64(AStart, ATarget);
+    TACLMath.Exchange<Int64>(AStart, ATarget);
 
   BeginUpdate;
   try
@@ -969,7 +969,7 @@ begin
       ACanvas.Font.Color := ATextColor1;
       ARender.SetFont(ACanvas.Font);
       ARender.DrawText(ATextViewInfo, X + (ASize.cx - ATextViewInfo.TextWidth) div 2, Y);
-      acExchangeIntegers(ATextColor1, ATextColor2);
+      TACLMath.Exchange<Cardinal>(ATextColor1, ATextColor2);
       Inc(X, ASize.cx + IndentBetweenCharacters);
       Dec(ADataSize);
       Inc(AData);

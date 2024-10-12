@@ -216,10 +216,6 @@ procedure acGetInterface(const Instance: TObject; const IID: TGUID; out Intf); o
 function acGetInterfaceEx(const Instance: IInterface; const IID: TGUID; out Intf): HRESULT; overload;
 function acGetInterfaceEx(const Instance: TObject; const IID: TGUID; out Intf): HRESULT; overload;
 
-procedure acExchangeInt64(var AValue1, AValue2: Int64); inline;
-procedure acExchangeIntegers(var AValue1, AValue2); inline;
-procedure acExchangePointers(var AValue1, AValue2); inline;
-procedure acExchangeStrings(var AValue1, AValue2: string); inline;
 function acBoolToHRESULT(AValue: Boolean): HRESULT; inline;
 function acGenerateGUID: string;
 function acLastSystemErrorMessage: string;
@@ -556,42 +552,6 @@ begin
       Result := S_OK
     else
       Result := E_NOINTERFACE;
-end;
-
-procedure acExchangeInt64(var AValue1, AValue2: Int64);
-var
-  ATempValue: Int64;
-begin
-  ATempValue := AValue1;
-  AValue1 := AValue2;
-  AValue2 := ATempValue;
-end;
-
-procedure acExchangeIntegers(var AValue1, AValue2);
-var
-  ATempValue: Integer;
-begin
-  ATempValue := Integer(AValue1);
-  Integer(AValue1) := Integer(AValue2);
-  Integer(AValue2) := ATempValue;
-end;
-
-procedure acExchangePointers(var AValue1, AValue2);
-var
-  ATempValue: Pointer;
-begin
-  ATempValue := Pointer(AValue1);
-  Pointer(AValue1) := Pointer(AValue2);
-  Pointer(AValue2) := ATempValue;
-end;
-
-procedure acExchangeStrings(var AValue1, AValue2: string);
-var
-  ATempValue: string;
-begin
-  ATempValue := AValue1;
-  AValue1 := AValue2;
-  AValue2 := ATempValue;
 end;
 
 function acBoolToHRESULT(AValue: Boolean): HRESULT;

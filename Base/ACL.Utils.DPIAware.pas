@@ -41,6 +41,7 @@ uses
   {Vcl.}Forms,
 {$ENDIF}
   // ACL
+  ACL.Math,
   ACL.Geometry;
 
 const
