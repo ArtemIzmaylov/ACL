@@ -324,7 +324,7 @@ type
 {$ENDREGION}
 
   // BackgroundLayer is a target layer
-  TACLBlendFunction = procedure (BackgroundLayer, ForegroundLayer: TACLBitmapLayer; Alpha: Byte) of object;
+  TACLBlendFunction = procedure (BackgroundLayer, ForegroundLayer: TACLDib; Alpha: Byte) of object;
 
 var
   FBlendFunctions: array[TACLBlendMode] of TACLBlendFunction;
@@ -373,7 +373,7 @@ type
     class var FWorkMatrix: PACLPixelMap;
     class var FWorkOpacity: Byte;
 
-    class function BuildChunks(ATarget, ASource: TACLBitmapLayer): TChunks;
+    class function BuildChunks(ATarget, ASource: TACLDib): TChunks;
     class procedure InitializeMatrix(var AMatrix: PACLPixelMap; AProc: TCalculateMatrixProc);
     class procedure ProcessByMatrix(Chunk: TChunk); static;
     class procedure ProcessGrayScale(Chunk: TChunk); static;
@@ -389,25 +389,25 @@ type
     class function CalculateSubstractMatrix(const ASource, ATarget: Integer): Integer; static;
   protected
     // General
-    class procedure Run(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer;
+    class procedure Run(ABackgroundLayer, AForegroundLayer: TACLDib;
       AProc: TACLMultithreadedOperation.TFilterProc; AOpacity: Byte); overload;
-    class procedure Run(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer;
+    class procedure Run(ABackgroundLayer, AForegroundLayer: TACLDib;
       var AMatrix: PACLPixelMap; AProc: TCalculateMatrixProc; AOpacity: Byte); overload;
   public
     class procedure Register;
     class procedure Unregister;
     // Blend Functions
-    class procedure DoAddition(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
-    class procedure DoDarken(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
-    class procedure DoDifference(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
-    class procedure DoDivide(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
-    class procedure DoGrayScale(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
-    class procedure DoLighten(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
-    class procedure DoMultiply(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
-    class procedure DoNormal(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
-    class procedure DoOverlay(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
-    class procedure DoScreen(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
-    class procedure DoSubstract(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
+    class procedure DoAddition(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
+    class procedure DoDarken(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
+    class procedure DoDifference(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
+    class procedure DoDivide(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
+    class procedure DoGrayScale(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
+    class procedure DoLighten(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
+    class procedure DoMultiply(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
+    class procedure DoNormal(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
+    class procedure DoOverlay(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
+    class procedure DoScreen(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
+    class procedure DoSubstract(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
   end;
 
   { TACLSoftwareImplGaussianBlur }
@@ -510,63 +510,63 @@ begin
   FreeAndNil(FLock);
 end;
 
-class procedure TACLSoftwareImplBlendMode.DoAddition(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
+class procedure TACLSoftwareImplBlendMode.DoAddition(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
 begin
   Run(ABackgroundLayer, AForegroundLayer, FAdditionMatrix, CalculateAdditionMatrix, AAlpha);
 end;
 
-class procedure TACLSoftwareImplBlendMode.DoDarken(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
+class procedure TACLSoftwareImplBlendMode.DoDarken(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
 begin
   Run(ABackgroundLayer, AForegroundLayer, FDarkenMatrix, CalculateDarkenMatrix, AAlpha);
 end;
 
-class procedure TACLSoftwareImplBlendMode.DoDifference(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
+class procedure TACLSoftwareImplBlendMode.DoDifference(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
 begin
   Run(ABackgroundLayer, AForegroundLayer, FDifferenceMatrix, CalculateDifferenceMatrix, AAlpha);
 end;
 
-class procedure TACLSoftwareImplBlendMode.DoDivide(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
+class procedure TACLSoftwareImplBlendMode.DoDivide(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
 begin
   Run(ABackgroundLayer, AForegroundLayer, FDivideMatrix, CalculateDivideMatrix, AAlpha);
 end;
 
-class procedure TACLSoftwareImplBlendMode.DoGrayScale(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
+class procedure TACLSoftwareImplBlendMode.DoGrayScale(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
 begin
   Run(ABackgroundLayer, AForegroundLayer, @ProcessGrayScale, AAlpha);
 end;
 
-class procedure TACLSoftwareImplBlendMode.DoLighten(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
+class procedure TACLSoftwareImplBlendMode.DoLighten(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
 begin
   Run(ABackgroundLayer, AForegroundLayer, FLightenMatrix, CalculateLightenMatrix, AAlpha);
 end;
 
-class procedure TACLSoftwareImplBlendMode.DoMultiply(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
+class procedure TACLSoftwareImplBlendMode.DoMultiply(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
 begin
   Run(ABackgroundLayer, AForegroundLayer, FMultiplyMatrix, CalculateMultiplyMatrix, AAlpha);
 end;
 
-class procedure TACLSoftwareImplBlendMode.DoNormal(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
+class procedure TACLSoftwareImplBlendMode.DoNormal(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
 begin
   AForegroundLayer.DrawBlend(ABackgroundLayer.Canvas, NullPoint, AAlpha);
 end;
 
-class procedure TACLSoftwareImplBlendMode.DoOverlay(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
+class procedure TACLSoftwareImplBlendMode.DoOverlay(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
 begin
   Run(ABackgroundLayer, AForegroundLayer, FOverlayMatrix, CalculateOverlayMatrix, AAlpha);
 end;
 
-class procedure TACLSoftwareImplBlendMode.DoScreen(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
+class procedure TACLSoftwareImplBlendMode.DoScreen(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
 begin
   Run(ABackgroundLayer, AForegroundLayer, FScreenMatrix, CalculateScreenMatrix, AAlpha);
 end;
 
-class procedure TACLSoftwareImplBlendMode.DoSubstract(ABackgroundLayer, AForegroundLayer: TACLBitmapLayer; AAlpha: Byte);
+class procedure TACLSoftwareImplBlendMode.DoSubstract(ABackgroundLayer, AForegroundLayer: TACLDib; AAlpha: Byte);
 begin
   Run(ABackgroundLayer, AForegroundLayer, FSubstractMatrix, CalculateSubstractMatrix, AAlpha);
 end;
 
 class procedure TACLSoftwareImplBlendMode.Run(
-  ABackgroundLayer, AForegroundLayer: TACLBitmapLayer;
+  ABackgroundLayer, AForegroundLayer: TACLDib;
   AProc: TACLMultithreadedOperation.TFilterProc; AOpacity: Byte);
 var
   AChunks: TChunks;
@@ -586,7 +586,7 @@ begin
 end;
 
 class procedure TACLSoftwareImplBlendMode.Run(
-  ABackgroundLayer, AForegroundLayer: TACLBitmapLayer;
+  ABackgroundLayer, AForegroundLayer: TACLDib;
   var AMatrix: PACLPixelMap; AProc: TCalculateMatrixProc; AOpacity: Byte);
 begin
   FLock.Enter;
@@ -599,7 +599,7 @@ begin
   end;
 end;
 
-class function TACLSoftwareImplBlendMode.BuildChunks(ATarget, ASource: TACLBitmapLayer): TChunks;
+class function TACLSoftwareImplBlendMode.BuildChunks(ATarget, ASource: TACLDib): TChunks;
 var
   AChunk: TChunk;
   AChunkCount: Integer;
