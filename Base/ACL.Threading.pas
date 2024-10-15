@@ -843,7 +843,7 @@ begin
   {$IFDEF ACL_THREADING_USE_MESSAGES}
     TACLMessaging.PostMessage(FMessage, 0, 0);
   {$ELSE}
-    TACLThread.Queue(nil, Execute);
+    TACLThread.ForceQueue(nil, Execute);
   {$ENDIF}
   end;
 end;
