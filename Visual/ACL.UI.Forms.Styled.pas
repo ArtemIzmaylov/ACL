@@ -144,6 +144,7 @@ type
     procedure PaintBorderIcons(ACanvas: TCanvas);
     procedure PaintBorders(ACanvas: TCanvas);
     procedure PaintCaption(ACanvas: TCanvas);
+    function UseCustomStyle: Boolean; virtual;
     // Messages
     procedure WndProc(var Message: TMessage); override;
     // Properties
@@ -162,12 +163,12 @@ type
   strict private
     FNativeBorderSize: Integer;
     FNativeCaptionSize: Integer;
-    FWeAreSkinned: Boolean;
   protected
     procedure CalculateMetrics; override;
     procedure CreateHandle; override;
     procedure CreateParams(var Params: TCreateParams); override;
     procedure PaintAppIcon(ACanvas: TCanvas; const R: TRect; AIcon: TIcon); override;
+    function UseCustomStyle: Boolean; override;
     // Messages
     procedure WMNCCalcSize(var Msg: TWMNCCalcSize); message WM_NCCALCSIZE;
     procedure WMNCHitTest(var Msg: TWMNCHitTest); message WM_NCHITTEST;
@@ -248,7 +249,7 @@ end;
 
 procedure TACLCustomStyledForm.AdjustClientRect(var Rect: TRect);
 begin
-  if not (csDesigning in ComponentState) then
+  if UseCustomStyle and not (csDesigning in ComponentState) then
   begin
     Inc(Rect.Top, FMetrics.CaptionHeight);
     if TinyClientBorders then
@@ -329,6 +330,9 @@ var
   LButton: TFormButton;
   LRect: TRect;
 begin
+  if not UseCustomStyle then
+    Exit(HTNOWHERE);
+
   LRect := ClientRect;
   if not LRect.Contains(P) then
     Exit(HTNOWHERE);
@@ -420,11 +424,14 @@ end;
 
 procedure TACLCustomStyledForm.MouseTracking;
 begin
-  if (WindowState = wsMinimized) or not (HandleAllocated and IsWindowVisible(Handle)) then
-    HoveredId := HTNOWHERE
-  else
-    with ScreenToClient(Mouse.CursorPos) do
-      MouseMove(KeyboardStateToShiftState, X, Y);
+  if UseCustomStyle then
+  begin
+    if (WindowState = wsMinimized) or not (HandleAllocated and IsWindowVisible(Handle)) then
+      HoveredId := HTNOWHERE
+    else
+      with ScreenToClient(Mouse.CursorPos) do
+        MouseMove(KeyboardStateToShiftState, X, Y);
+  end;
 end;
 
 procedure TACLCustomStyledForm.Paint;
@@ -517,6 +524,11 @@ begin
   acTextDraw(ACanvas, Caption, FMetrics.RectText, taLeftJustify, taVerticalCenter, True);
 end;
 
+function TACLCustomStyledForm.UseCustomStyle: Boolean;
+begin
+  Result := True;
+end;
+
 procedure TACLCustomStyledForm.Resize;
 begin
   CalculateMetrics;
@@ -578,7 +590,6 @@ end;
 
 procedure TACLCustomStyledFormImpl.CalculateMetrics;
 begin
-  FWeAreSkinned := acOSCheckVersion(6, 2) and not (csDesigning in ComponentState);
   ZeroMemory(@FMetrics, SizeOf(FMetrics));
   if BorderStyle <> bsNone then
   begin
@@ -610,11 +621,16 @@ begin
   DrawIconEx(ACanvas.Handle, R.Left, R.Top, AIcon.Handle, R.Width, R.Width, 0, 0, DI_NORMAL);
 end;
 
+function TACLCustomStyledFormImpl.UseCustomStyle: Boolean;
+begin
+  Result := acOSCheckVersion(6, 2) and not (csDesigning in ComponentState);
+end;
+
 procedure TACLCustomStyledFormImpl.WMNCCalcSize(var Msg: TWMNCCalcSize);
 var
   LRect: TRect;
 begin
-  if FWeAreSkinned then
+  if UseCustomStyle then
   begin
     LRect := Msg.CalcSize_Params.rgrc[0];
     inherited;
@@ -629,7 +645,7 @@ end;
 
 procedure TACLCustomStyledFormImpl.WMNCHitTest(var Msg: TWMNCHitTest);
 begin
-  if FWeAreSkinned then
+  if UseCustomStyle then
   begin
     Msg.Result := HitTest(ScreenToClient(Msg.Pos));
     case Msg.Result of

@@ -361,6 +361,7 @@ end;
 
 procedure TACLFolderBrowserDialog.AdjustClientRect(var Rect: TRect);
 begin
+  inherited;
   Rect.Inflate(-dpiApply(ContentOffset, FCurrentPPI));
 end;
 
@@ -371,9 +372,10 @@ begin
     AParent := Self;
 
   TACLCustomControl(AControl) := AClass.Create(Self);
-  TACLCustomControl(AControl).Parent := AParent;
-  TACLCustomControl(AControl).AlignWithMargins := True;
   TACLCustomControl(AControl).Align := AAlign;
+  TACLCustomControl(AControl).AlignOrder := AParent.ControlCount;
+  TACLCustomControl(AControl).AlignWithMargins := True;
+  TACLCustomControl(AControl).Parent := AParent;
 end;
 
 procedure TACLFolderBrowserDialog.CreateCustomControls;
@@ -451,8 +453,6 @@ begin
   ControlShellTree.OnFocusedNodeChanged := DoSelectionChanged;
   ActiveControl := ControlShellTree;
 
-  CreateCustomControls;
-
   CreateControl(APanel, TACLCustomControl, alBottom);
   APanel.AlignWithMargins := False;
   APanel.Height := dpiApply(ButtonHeight, FCurrentPPI) + 2 * dpiApply(3, FCurrentPPI);
@@ -464,16 +464,17 @@ begin
   ControlCreateNew.Visible := [ssoMultiPath, ssoRecursive] * Options = [];
   ControlCreateNew.Enabled := False;
 
-  CreateControl(FControlApply, TACLButton, alRight, APanel);
-  ControlApply.AlignOrder := 1;
-  ControlApply.Width := dpiApply(ButtonWidth, FCurrentPPI);
-  ControlApply.Caption := TACLDialogsStrs.MsgDlgButtons[mbOk];
-  ControlApply.ModalResult := mrOk;
-
   CreateControl(FControlCancel, TACLButton, alRight, APanel);
   ControlCancel.Width := dpiApply(ButtonWidth, FCurrentPPI);
   ControlCancel.Caption := TACLDialogsStrs.MsgDlgButtons[mbCancel];
   ControlCancel.ModalResult := mrCancel;
+
+  CreateControl(FControlApply, TACLButton, alRight, APanel);
+  ControlApply.Width := dpiApply(ButtonWidth, FCurrentPPI);
+  ControlApply.Caption := TACLDialogsStrs.MsgDlgButtons[mbOk];
+  ControlApply.ModalResult := mrOk;
+
+  CreateCustomControls;
 end;
 
 procedure TACLFolderBrowserDialog.InitializePath(const APath: string);
