@@ -451,13 +451,8 @@ end;
 
 procedure TACLTimerManager.SafeCallTimerProc(ATimer: TACLTimer);
 begin
-//  TMonitor.Enter(Self);
-//  try
   if FTimers.Contains(ATimer) then
     ATimer.Timer;
-//  finally
-//    TMonitor.Exit(Self);
-//  end;
 end;
 
 procedure TACLTimerManager.SafeUpdateHighResolutionThread;

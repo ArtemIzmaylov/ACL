@@ -52,7 +52,7 @@
   {$IF DEFINED(ACL_RTTI_OFF)}
     {$RTTI EXPLICIT METHODS([]) FIELDS([]) PROPERTIES([])}
   {$ELSE}
-    {$RTTI EXPLICIT METHODS([]) FIELDS([]) PROPERTIES([vcPublic, vcPublished])}
+    {$RTTI EXPLICIT METHODS([]) FIELDS([]) PROPERTIES([vcPublished])}
   {$IFEND}
 {$IFEND}
 
