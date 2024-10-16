@@ -70,6 +70,7 @@ type
     procedure SetStyleScrollBox(const AValue: TACLStyleScrollBox);
     procedure SetStyleHint(const Value: TACLStyleHint);
     //# Messages
+    procedure CMCancelMode(var Message: TMessage); message CM_CANCELMODE;
     procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
     procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
     procedure CMWantSpecialKey(var Message: TCMWantSpecialKey); message CM_WANTSPECIALKEY;
@@ -525,6 +526,13 @@ end;
 procedure TACLCompoundControl.SetOnDropSourceStart(const AValue: TACLCompoundControlDropSourceStartEvent);
 begin
   SubClass.OnDropSourceStart := AValue;
+end;
+
+procedure TACLCompoundControl.CMCancelMode(var Message: TMessage);
+begin
+  SubClass.DragAndDropController.Cancel;
+  SubClass.Dispatch(Message);
+  inherited;
 end;
 
 procedure TACLCompoundControl.CMEnabledChanged(var Message: TMessage);
