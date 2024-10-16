@@ -760,7 +760,7 @@ begin
     end;
 
   ARegion := CreatePolygonRgn({$IFDEF FPC}@{$ENDIF}FPolyline[0], Length(FPolyline), WINDING);
-  SetWindowRgn(Handle, ARegion, True);
+  acRegionSetToWindow(Handle, ARegion, True);
   DeleteObject(ARegion);
 
   if AContentMargins <> FContentMargins then

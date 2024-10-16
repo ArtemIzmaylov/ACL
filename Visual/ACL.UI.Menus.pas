@@ -2531,7 +2531,7 @@ begin
       LBitmap.Free;
     end;
   end;
-  SetWindowRgn(Handle, LRegion, True);
+  acRegionSetToWindow(Handle, LRegion, True);
 end;
 
 procedure TACLMenuPopupWindow.Scroll(ACode: TScrollCode; var APosition: Integer);

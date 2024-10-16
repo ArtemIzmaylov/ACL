@@ -573,6 +573,7 @@ procedure acRegionFree(var ARegion: TRegionHandle); inline;
 function acRegionFromBitmap(ABitmap: TACLDib): TRegionHandle; overload;
 function acRegionFromBitmap(AColors: PACLPixel32;
   AWidth, AHeight: Integer; ATransparentColor: TColor): TRegionHandle; overload;
+procedure acRegionSetToWindow(AWnd: TWndHandle; ARegion: TRegionHandle; ARedraw: Boolean);
 
 // WindowOrg
 function acMoveWindowOrg(DC: HDC; const P: TPoint): TPoint; overload;
@@ -888,7 +889,7 @@ end;
 function acRegionClone(ARegion: TRegionHandle): TRegionHandle;
 begin
   Result := CreateRectRgn(0, 0, 0, 0);
-  CombineRgn(Result, ARegion, 0, RGN_COPY);
+  CombineRgn(Result, ARegion, {$IFDEF FPC}ARegion{$ELSE}0{$ENDIF}, RGN_COPY);
 end;
 
 function acRegionCombine(ATarget, ASource: TRegionHandle; AOperation: Integer): Integer;
@@ -965,6 +966,21 @@ begin
     end;
     FlushRegion(AWidth, Y, ACount, Result);
   end;
+end;
+
+procedure acRegionSetToWindow(AWnd: TWndHandle; ARegion: TRegionHandle; ARedraw: Boolean);
+begin
+{$IFDEF FPC}
+  // LCLGtk2 не умеет делать Redraw для окна, если регион = 0:
+  //    gdk_region_empty: assertion 'region != NULL' failed
+  if ARedraw and (ARegion = 0) then
+  begin
+    SetWindowRgn(AWnd, ARegion, False);
+    InvalidateRect(AWnd, nil, True);
+    Exit;
+  end;
+{$ENDIF}
+  SetWindowRgn(AWnd, ARegion, ARedraw);
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -2243,7 +2259,7 @@ end;
 
 procedure TACLRegion.SetToWindow(AHandle: HWND; ARedraw: Boolean = True);
 begin
-  SetWindowRgn(AHandle, Clone, ARedraw);
+  acRegionSetToWindow(AHandle, Clone, ARedraw);
 end;
 
 { TACLRegionData }

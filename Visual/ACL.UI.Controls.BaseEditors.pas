@@ -621,10 +621,10 @@ begin
       if FEditor.Height > LTemp.Height then
       begin
         LTemp.Offset(-FEditor.Left, -FEditor.Top);
-        SetWindowRgn(FEditor.Handle, CreateRectRgnIndirect(LTemp), False);
+        acRegionSetToWindow(FEditor.Handle, CreateRectRgnIndirect(LTemp), False);
       end
       else
-        SetWindowRgn(FEditor.Handle, 0, False);
+        acRegionSetToWindow(FEditor.Handle, 0, False);
     end;
   end;
 end;

@@ -116,6 +116,7 @@ type
     procedure Paint; override;
     procedure ScaleForPPI(ATargetDpi: Integer); reintroduce; virtual;
     procedure SetHintData(const AHint: string; AData: TCustomData); virtual;
+    procedure UpdateRegion;{$IFDEF FPC}override;{$ENDIF}
     //# Properties
     property Layout: TACLTextLayout read FLayout;
   public
@@ -445,6 +446,12 @@ begin
   Layout.SetText(AHint, TACLTextFormatSettings.Formatted);
 end;
 
+procedure TACLHintWindow.UpdateRegion;
+begin
+  if HandleAllocated then
+    acRegionSetToWindow(Handle, Style.CreateRegion(Rect(0, 0, Width, Height)), True);
+end;
+
 procedure TACLHintWindow.SetStyle(AValue: TACLStyleHint);
 begin
   FStyle.Assign(AValue);
@@ -471,8 +478,9 @@ end;
 procedure TACLHintWindow.WMSize(var Message: TWMSize);
 begin
   inherited;
-  if HandleAllocated then
-    SetWindowRgn(Handle, Style.CreateRegion(Rect(0, 0, Width, Height)), True);
+{$IFNDEF FPC}
+  UpdateRegion;
+{$ENDIF}
 end;
 
 { TACLHintController }
