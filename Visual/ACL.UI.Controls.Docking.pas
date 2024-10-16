@@ -3061,7 +3061,7 @@ begin
     else if PtInRect(FCaptionRect, APoint) and CanStartDrag then
       StartDrag(APoint)
     else if HitOnSizeBox(APoint, FResizeHandler, ASide) then
-      FResizeHandler.StartResize(acMapPoint(Handle, FResizeHandler.Handle, APoint), ASide);
+      FResizeHandler.StartResize(acMapPoint(Self, FResizeHandler, APoint), ASide);
   end;
 
   inherited;

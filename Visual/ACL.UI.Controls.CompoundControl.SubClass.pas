@@ -889,11 +889,13 @@ type
     procedure BeginUpdate;
     procedure EndUpdate;
     function IsUpdateLocked: Boolean;
-    //
+
+    // Coords Transform
     function ClientToScreen(const P: TPoint): TPoint; overload;
     function ClientToScreen(const R: TRect): TRect; overload;
     function ScreenToClient(const P: TPoint): TPoint;
-    //
+
+    // Properties
     property ActionType: TACLControlActionType read FActionType;
     property Bounds: TRect read FBounds write SetBounds;
     property Container: IACLCompoundControlSubClassContainer read FContainer;

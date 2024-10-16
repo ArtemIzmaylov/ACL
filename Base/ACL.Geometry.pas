@@ -307,10 +307,6 @@ function acFitRect(const R: TRect; ASourceWidth, ASourceHeight: Integer;
   AMode: TACLFitMode; ACenter: Boolean = True): TRect; overload;
 function acFitRect(const R: TRect; const ASourceSize: TSize;
   AMode: TACLFitMode; ACenter: Boolean = True): TRect; overload; inline;
-
-// Map
-function acMapPoint(const ASource, ATarget: HWND; const P: TPoint): TPoint;
-function acMapRect(const ASource, ATarget: HWND; const R: TRect): TRect;
 implementation
 
 procedure acCalcArcSegment(ACenterX, ACenterY, ARadiusX, ARadiusY: Single;
@@ -493,30 +489,6 @@ end;
 function acHalfCoordinate(ASize: Integer): Integer; inline;
 begin
   Result := (ASize - Integer(Odd(ASize))) div 2;
-end;
-
-function acMapPoint(const ASource, ATarget: HWND; const P: TPoint): TPoint;
-begin
-  Result := P;
-{$IFDEF FPC}
-  ClientToScreen(ASource, Result);
-  ScreenToClient(ATarget, Result);
-{$ELSE}
-  MapWindowPoints(ASource, ATarget, Result, 1);
-{$ENDIF}
-end;
-
-function acMapRect(const ASource, ATarget: HWND; const R: TRect): TRect;
-begin
-  Result := R;
-{$IFDEF FPC}
-  ClientToScreen(ASource, Result.TopLeft);
-  ClientToScreen(ASource, Result.BottomRight);
-  ScreenToClient(ATarget, Result.TopLeft);
-  ScreenToClient(ATarget, Result.BottomRight);
-{$ELSE}
-  MapWindowPoints(ASource, ATarget, Result, 2);
-{$ENDIF}
 end;
 
 // ---------------------------------------------------------------------------------------------------------------------

@@ -909,6 +909,9 @@ function acSafeSetFocus(AControl: TWinControl): Boolean;
 function acSaveFocus: TWndHandle;
 procedure acSetFocus(AWnd: TWndHandle);
 
+function acMapPoint(ASource, ATarget: TWinControl; const P: TPoint): TPoint;
+function acMapRect(ASource, ATarget: TWinControl; const R: TRect): TRect;
+
 // Keyboard
 function acGetShiftState: TShiftState;
 function acIsAltKeyPressed: Boolean;
@@ -1263,6 +1266,27 @@ end;
 procedure acSetFocus(AWnd: TWndHandle);
 begin
   SetFocus(AWnd);
+end;
+
+function acMapPoint(ASource, ATarget: TWinControl; const P: TPoint): TPoint;
+begin
+{$IFDEF FPC}
+  Result := ATarget.ScreenToClient(ASource.ClientToScreen(P));
+{$ELSE}
+  Result := P;
+  MapWindowPoints(ASource.Handle, ATarget.Handle, Result, 1);
+{$ENDIF}
+end;
+
+function acMapRect(ASource, ATarget: TWinControl; const R: TRect): TRect;
+begin
+{$IFDEF FPC}
+  Result.TopLeft     := acMapPoint(ASource, ATarget, R.TopLeft);
+  Result.BottomRight := acMapPoint(ASource, ATarget, R.BottomRight);
+{$ELSE}
+  Result := R;
+  MapWindowPoints(ASource.Handle, ATarget.Handle, Result, 2);
+{$ENDIF}
 end;
 
 function CallCustomDrawEvent(Sender: TObject; AEvent: TACLCustomDrawEvent;

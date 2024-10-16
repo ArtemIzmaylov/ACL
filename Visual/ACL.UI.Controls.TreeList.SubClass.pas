@@ -203,7 +203,7 @@ type
     procedure InitializeActualWidth; virtual;
     // IACLHotTrackObject
     procedure OnHotTrack(Action: TACLHotTrackAction);
-    //
+    // Properties
     property ColumnBarViewInfo: TACLTreeListColumnBarViewInfo read GetColumnBarViewInfo;
     property NodeViewInfo: TACLTreeListNodeViewInfo read GetNodeViewInfo;
     property OptionsColumns: TACLTreeListOptionsViewColumns read GetOptionsColumns;
@@ -214,7 +214,7 @@ type
     function CalculateHitTest(const AInfo: TACLHitTestInfo): Boolean; override;
     // IACLDraggableObject
     function CreateDragObject(const AHitTest: TACLHitTestInfo): TACLCompoundControlDragObject;
-    //
+    // Properties
     property AbsoluteIndex: Integer read FAbsoluteIndex;
     property ActualWidth: Integer read FActualWidth write FActualWidth;
     property Borders: TACLBorders read FBorders;
@@ -229,7 +229,7 @@ type
     property SortByIndex: Integer read FSortByIndex write SetSortByIndex;
     property TextRect: TRect read FTextRect;
     property VisibleIndex: Integer read FVisibleIndex;
-    //
+    // Info
     property IsFirst: Boolean read GetIsFirst;
     property IsLast: Boolean read GetIsLast;
     property IsMultiColumnSorting: Boolean read GetIsMultiColumnSorting;
@@ -246,20 +246,20 @@ type
   protected
     function AddColumnCell(AColumn: TACLTreeListColumn): TACLTreeListColumnViewInfo;
     function CreateColumnViewInfo(AColumn: TACLTreeListColumn): TACLTreeListColumnViewInfo; virtual;
-    //
+    // Calculate
     function CalculateAutoHeight: Integer; virtual;
     procedure CalculateAutoWidth(const R: TRect); virtual;
     procedure CalculateChildren(R: TRect; const AChanges: TIntegerSet); virtual;
     procedure DoCalculate(AChanges: TIntegerSet); override;
     procedure DoDraw(ACanvas: TCanvas); override;
     procedure RecreateSubCells; override;
-    //
+    // Properties
     property FreeSpaceArea: TRect read GetFreeSpaceArea;
   public
     function GetColumnViewInfo(AColumn: TACLTreeListColumn; out AViewInfo: TACLTreeListColumnViewInfo): Boolean;
     function MeasureHeight: Integer; virtual;
     function MeasureWidth: Integer; virtual;
-    //
+    // Properties
     property Children[Index: Integer]: TACLTreeListColumnViewInfo read GetChild;
     property SubClass: TACLTreeListSubClass read GetSubClass;
   end;
