@@ -204,11 +204,11 @@ type
   strict private
     FCanvasChanged: Boolean;
     FColorsChanged: Boolean;
-
-    procedure CopyCanvasToColors;
-    procedure CopyColorsToCanvas;
     function GetColors: PACLPixel32Array;
     function GetDC: HDC;
+  protected
+    procedure CopyCanvasToColors; virtual;
+    procedure CopyColorsToCanvas; virtual;
   {$ENDIF}
   protected
     procedure CreateHandles(W, H: Integer); virtual;
@@ -241,10 +241,10 @@ type
     procedure MakeOpaque;
     procedure MakeTransparent(const AColor: TACLPixel32); overload;
     procedure MakeTransparent(const AColor: TColor); overload;
-    procedure Premultiply(R: TRect); overload;
     procedure Premultiply; overload;
-    procedure Reset(const R: TRect); overload; virtual;
-    procedure Reset; overload; virtual;
+    procedure Premultiply(R: TRect); overload;
+    procedure Reset; overload;
+    procedure Reset(const ARect: TRect); overload;
     function Resize(const ANewBounds: TRect): Boolean; overload;
     function Resize(const ANewWidth, ANewHeight: Integer): Boolean; overload;
 
@@ -2847,9 +2847,11 @@ procedure TACLDib.Premultiply(R: TRect);
 var
   Y: Integer;
 begin
-  IntersectRect(R, R, ClientRect);
-  for Y := R.Top to R.Bottom - 1 do
-    TACLColors.Premultiply(@Colors^[Y * Width + R.Left], R.Right - R.Left - 1);
+  if IntersectRect(R, R, ClientRect) then
+  begin
+    for Y := R.Top to R.Bottom - 1 do
+      TACLColors.Premultiply(@Colors^[Y * Width + R.Left], R.Width);
+  end;
 end;
 
 procedure TACLDib.Premultiply;
@@ -2873,9 +2875,25 @@ begin
   SetWindowOrgEx(Handle, LPrevPoint.X, LPrevPoint.Y, nil);
 end;
 
-procedure TACLDib.Reset(const R: TRect);
+procedure TACLDib.Reset(const ARect: TRect);
+{$IFDEF FPC}
+var
+  R: TRect;
+  Y: Integer;
 begin
-  acResetRect(Handle, R);
+  if not FCanvasChanged then
+  begin
+    if IntersectRect(R, ARect, ClientRect) then
+    begin
+      for Y := R.Top to R.Bottom - 1 do
+        FastZeroMem(@Colors^[Y * Width + R.Left], R.Width * SizeOf(TACLPixel32));
+    end;
+    Exit;
+  end;
+{$ELSE}
+begin
+{$ENDIF}
+  acResetRect(Handle, ARect);
 end;
 
 function TACLDib.Resize(const ANewBounds: TRect): Boolean;
