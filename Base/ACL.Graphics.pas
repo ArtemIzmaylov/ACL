@@ -520,7 +520,6 @@ procedure acDrawColorPreview(ACanvas: TCanvas; R: TRect; AColor: TAlphaColor;
   ABorderColor, AHatchColor1, AHatchColor2: TColor); overload;
 procedure acDrawDotsLineH(DC: HDC; X1, X2, Y: Integer; AColor: TColor);
 procedure acDrawDotsLineV(DC: HDC; X, Y1, Y2: Integer; AColor: TColor);
-procedure acDrawDragImage(ACanvas: TCanvas; const R: TRect; AAlpha: Byte = acDragImageAlpha);
 procedure acDrawDropArrow(DC: HDC; const R: TRect; AColor: TColor); overload;
 procedure acDrawDropArrow(DC: HDC; const R: TRect; AColor: TColor; const AArrowSize: TSize); overload;
 procedure acDrawExpandButton(ACanvas: TCanvas; const R: TRect; ABorderColor, AColor: TColor; AExpanded: Boolean);
@@ -1757,12 +1756,6 @@ begin
     isStretch, isCenter:
       acStretchBlt(DC, SourceDC, ADest, ASource);
   end;
-end;
-
-procedure acDrawDragImage(ACanvas: TCanvas; const R: TRect; AAlpha: Byte);
-begin
-  acFillRect(ACanvas, R, TAlphaColor.FromColor(acDragImageColor, AAlpha));
-  acDrawFrame(ACanvas, R, TAlphaColor.FromColor(clBlack, AAlpha), MulDiv(1, acGetSystemDpi, acDefaultDpi));
 end;
 
 procedure acDrawDropArrow(DC: HDC; const R: TRect; AColor: TColor);

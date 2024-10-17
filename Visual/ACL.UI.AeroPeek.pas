@@ -397,7 +397,8 @@ begin
     AWindowPlacement.length := SizeOf(AWindowPlacement);
     GetWindowPlacement(OwnerWindow.Handle, AWindowPlacement);
     Result := TACLBitmap.CreateEx(AWindowPlacement.rcNormalPosition, pf32bit, True);
-    acDrawDragImage(Result.Canvas, Result.ClientRect);
+    acFillRect(Result.Canvas, Result.ClientRect,
+      TAlphaColor.FromColor(acDragImageColor, acDragImageAlpha));
 
     AIcon := TIcon.Create;
     try
