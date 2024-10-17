@@ -20,6 +20,7 @@ interface
 
 uses
 {$IFDEF FPC}
+  Cairo,
   LCLIntf,
   LCLType,
 {$ELSE}
@@ -41,10 +42,10 @@ uses
   // ACL
   ACL.Classes,
   ACL.Classes.Collections,
+  ACL.Hashes,
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Images,
-  ACL.Hashes,
   ACL.Utils.Common,
   ACL.Utils.FileSystem;
 
@@ -148,6 +149,8 @@ type
   {$IFDEF MSWINDOWS}
     FHandle: HBITMAP;
   {$ENDIF}
+  private
+    FFramesInfoContent: TACLSkinImageFrameStateArray;
   strict private
     FAllowColoration: Boolean;
     FBitCount: Integer;
@@ -157,7 +160,6 @@ type
     FDormantData: TACLSkinImageBitsStorage;
     FFramesCount: Integer;
     FFramesInfo: TACLSkinImageFrameStateArray;
-    FFramesInfoContent: TACLSkinImageFrameStateArray;
     FFramesInfoIsValid: Boolean;
     FHasAlpha: TACLBoolean;
     FHeight: Integer;
@@ -252,12 +254,14 @@ type
     procedure ApplyColorSchema(const AValue: TACLColorSchema);
     procedure ApplyTint(const AColor: TACLPixel32);
     // Drawing
-    procedure Draw(ACanvas: TCanvas; const R: TRect;
+  {$IFDEF FPC}
+    procedure Draw(ACairo: Pcairo_t; ARect: TRect;
+      AFrameIndex: Integer = 0; AAlpha: Byte = MaxByte); overload;
+  {$ENDIF}
+    procedure Draw(ACanvas: TCanvas; ARect: TRect;
       AFrameIndex: Integer = 0; AAlpha: Byte = MaxByte); overload;
     procedure Draw(ACanvas: TCanvas; const R: TRect;
       AFrameIndex: Integer; AEnabled: Boolean; AAlpha: Byte = MaxByte); overload;
-    procedure DrawClipped(ACanvas: TCanvas; const AClipRect, R: TRect;
-      AFrameIndex: Integer; AAlpha: Byte = MaxByte);
     // HitTest
     function HitTest(const ABounds: TRect; X, Y: Integer): Boolean;
     function HitTestCore(const ABounds: TRect; AFrameIndex, X, Y: Integer): Boolean;
@@ -345,10 +349,6 @@ procedure acCalculateTiledAreas(const R: TRect; const AParams: TACLSkinImageTile
 implementation
 
 uses
-{$IFDEF FPC}
-  cairo,
-{$ENDIF}
-  // ACL
   ACL.FastCode,
   ACL.Graphics.Ex,
 {$IFDEF MSWINDOWS}
@@ -386,6 +386,8 @@ type
   TACLSkinImageRenderer = class
   strict private
     class var FLock: TACLCriticalSection;
+    class var FFrame: Integer;
+    class var FImage: TACLSkinImage;
   {$IFDEF MSWINDOWS}
     class var FDstCanvas: TCanvas;
     class var FFunc: TBlendFunction;
@@ -400,13 +402,18 @@ type
     class var FCairo: TACLCairoRender;
     class var FSourceSurface: Pcairo_surface_t;
   {$ENDIF}
+    class procedure FillPart(const ATarget: TRect; AColor: TAlphaColor);
+    class procedure DrawPart(const ATarget, ASource: TRect; AIsTileMode: Boolean);
   public
     class constructor Create;
     class destructor Destroy;
-    class procedure Start(ACanvas: TCanvas;
-      AAlpha: Byte; AImage: TACLSkinImage; AHasAlpha: Boolean);
-    class procedure Fill(const ATarget: TRect; AColor: TAlphaColor);
-    class procedure Draw(const ATarget, ASource: TRect; AIsTileMode: Boolean);
+    class procedure Start(AImage: TACLSkinImage;
+      ACanvas: TCanvas; AFrameIndex: Integer; AAlpha: Byte); overload;
+  {$IFDEF FPC}
+    class procedure Start(AImage: TACLSkinImage;
+      ACairo: Pcairo_t; AFrameIndex: Integer; AAlpha: Byte); overload;
+  {$ENDIF}
+    class procedure Draw(ARect: TRect);
     class procedure Finish;
   end;
 
@@ -859,86 +866,74 @@ begin
   Changed;
 end;
 
-procedure TACLSkinImage.Draw(ACanvas: TCanvas; const R: TRect; AFrameIndex: Integer; AAlpha: Byte);
-
-  procedure DoDrawWithMargins(const ASource, ATarget: TRect; AContentState: TACLSkinImageFrameState);
-  var
-    LSourceParts: TACLMarginPartBounds;
-    LTargetParts: TACLMarginPartBounds;
-    LPart: TACLMarginPart;
-  begin
-    acCalcPartBounds(LTargetParts, Margins, ATarget, ASource, StretchMode);
-    acCalcPartBounds(LSourceParts, Margins, ASource, ASource, StretchMode);
-    for LPart := Low(TACLMarginPart) to High(TACLMarginPart) do
-    begin
-      if LPart = mzClient then
-      begin
-        if AContentState.IsTransparent then
-          Continue;
-        if AContentState.IsColor then
-        begin
-          TACLSkinImageRenderer.Fill(LTargetParts[LPart], TAlphaColor(AContentState));
-          Continue;
-        end;
-      end;
-      TACLSkinImageRenderer.Draw(LTargetParts[LPart], LSourceParts[LPart], StretchMode = isTile);
-    end;
-  end;
-
-  procedure DoDrawTiledAreas(const ASource, ATarget: TRect);
-  var
-    I: TACLSkinImageTiledAreasPart;
-    S, D: TACLSkinImageTiledAreasPartBounds;
-  begin
-    acCalculateTiledAreas(ASource, TiledAreas, FrameWidth, FrameHeight, TiledAreasMode, S);
-    acCalculateTiledAreas(ATarget, TiledAreas, FrameWidth, FrameHeight, TiledAreasMode, D);
-    for I := Low(TACLSkinImageTiledAreasPart) to High(TACLSkinImageTiledAreasPart) do
-      TACLSkinImageRenderer.Draw(D[I], S[I], StretchMode = isTile);
-  end;
-
-  procedure DoDraw(ATarget, ASource: TRect; AState: TACLSkinImageFrameState);
-  begin
-    if AState.IsTransparent then
-      Exit;
-
-    if AState.IsColor then
-    begin
-      if (StretchMode = isCenter) and (ActualSizingMode = ismDefault) then
-      begin
-        R.CenterHorz(ASource.Width);
-        R.CenterVert(ASource.Height);
-      end;
-      acFillRect(ACanvas, R, TAlphaColor(AState));
-      Exit;
-    end;
-
-    TACLSkinImageRenderer.Start(ACanvas, AAlpha, Self, not AState.IsOpaque);
-    try
-      case ActualSizingMode of
-        ismMargins:
-          DoDrawWithMargins(ASource, ATarget, FFramesInfoContent[AFrameIndex]);
-        ismTiledAreas:
-          DoDrawTiledAreas(ASource, ATarget);
-      else {ismDefault}
-        if StretchMode = isCenter then
-        begin
-          ATarget.CenterHorz(ASource.Width);
-          ATarget.CenterVert(ASource.Height);
-        end;
-        TACLSkinImageRenderer.Draw(ATarget, ASource, StretchMode = isTile);
-      end;
-    finally
-      TACLSkinImageRenderer.Finish;
-    end;
-  end;
-
+{$IFDEF FPC}
+procedure TACLSkinImage.Draw(ACairo: Pcairo_t;
+  ARect: TRect; AFrameIndex: Integer = 0; AAlpha: Byte = MaxByte);
+var
+  LState: TACLSkinImageFrameState;
 begin
-  if not Empty and acRectVisible(ACanvas, R) then
+  if not Empty then
   begin
     CheckUnpacked;
     CheckBitsState(ibsPremultiplied);
     CheckFrameIndex(AFrameIndex);
-    DoDraw(R, FrameRect[AFrameIndex], FrameInfo[AFrameIndex]);
+    LState := FrameInfo[AFrameIndex];
+
+    if LState.IsTransparent then
+      Exit;
+    if LState.IsColor then
+    begin
+      if (StretchMode = isCenter) and (ActualSizingMode = ismDefault) then
+      begin
+        ARect.CenterHorz(FrameWidth);
+        ARect.CenterVert(FrameHeight);
+      end;
+      cairo_set_source_color(ACairo, TAlphaColor(LState));
+      cairo_rectangle(ACairo, ARect.Left, ARect.Top, ARect.Width, ARect.Height);
+      cairo_fill(ACairo);
+      Exit;
+    end;
+
+    TACLSkinImageRenderer.Start(Self, ACairo, AFrameIndex, AAlpha);
+    try
+      TACLSkinImageRenderer.Draw(ARect);
+    finally
+      TACLSkinImageRenderer.Finish;
+    end;
+  end;
+end;
+{$ENDIF}
+
+procedure TACLSkinImage.Draw(ACanvas: TCanvas; ARect: TRect; AFrameIndex: Integer; AAlpha: Byte);
+var
+  LState: TACLSkinImageFrameState;
+begin
+  if not Empty and acRectVisible(ACanvas, ARect) then
+  begin
+    CheckUnpacked;
+    CheckBitsState(ibsPremultiplied);
+    CheckFrameIndex(AFrameIndex);
+    LState := FrameInfo[AFrameIndex];
+
+    if LState.IsTransparent then
+      Exit;
+    if LState.IsColor then
+    begin
+      if (StretchMode = isCenter) and (ActualSizingMode = ismDefault) then
+      begin
+        ARect.CenterHorz(FrameWidth);
+        ARect.CenterVert(FrameHeight);
+      end;
+      acFillRect(ACanvas, ARect, TAlphaColor(LState));
+      Exit;
+    end;
+
+    TACLSkinImageRenderer.Start(Self, ACanvas, AFrameIndex, AAlpha);
+    try
+      TACLSkinImageRenderer.Draw(ARect);
+    finally
+      TACLSkinImageRenderer.Finish;
+    end;
   end;
 end;
 
@@ -960,20 +955,6 @@ begin
     finally
       ALayer.Free;
     end;
-  end;
-end;
-
-procedure TACLSkinImage.DrawClipped(ACanvas: TCanvas;
-  const AClipRect, R: TRect; AFrameIndex: Integer; AAlpha: Byte);
-var
-  LClipRegion: TRegionHandle;
-begin
-  LClipRegion := acSaveClipRegion(ACanvas.Handle);
-  try
-    if acIntersectClipRegion(ACanvas.Handle, AClipRect) then
-      Draw(ACanvas, R, AFrameIndex, AAlpha);
-  finally
-    acRestoreClipRegion(ACanvas.Handle, LClipRegion);
   end;
 end;
 
@@ -2291,16 +2272,18 @@ begin
 end;
 {$ENDIF}
 
-class procedure TACLSkinImageRenderer.Start(ACanvas: TCanvas;
-  AAlpha: Byte; AImage: TACLSkinImage; AHasAlpha: Boolean);
+class procedure TACLSkinImageRenderer.Start(AImage: TACLSkinImage;
+  ACanvas: TCanvas; AFrameIndex: Integer; AAlpha: Byte);
 begin
   FLock.Enter;
+  FImage := AImage;
+  FFrame := AFrameIndex;
 {$IFDEF MSWINDOWS}
   FDstCanvas := ACanvas;
   if FMemDC = 0 then
     FMemDC := CreateCompatibleDC(0);
   FOldBmp := SelectObject(FMemDC, AImage.Handle);
-  FOpaque := not AHasAlpha and (AAlpha = 255);
+  FOpaque := (AAlpha = 255) and FImage.FrameInfo[AFrameIndex].IsOpaque;
   FFunc.SourceConstantAlpha := AAlpha;
 {$ELSE}
   FAlpha := AAlpha / 255;
@@ -2309,7 +2292,20 @@ begin
 {$ENDIF}
 end;
 
-class procedure TACLSkinImageRenderer.Fill(const ATarget: TRect; AColor: TAlphaColor);
+{$IFDEF FPC}
+class procedure TACLSkinImageRenderer.Start(AImage: TACLSkinImage;
+  ACairo: Pcairo_t; AFrameIndex: Integer; AAlpha: Byte);
+begin
+  FLock.Enter;
+  FImage := AImage;
+  FFrame := AFrameIndex;
+  FAlpha := AAlpha / 255;
+  FCairo.BeginPaint(ACairo);
+  FSourceSurface := cairo_create_surface(AImage.Bits, AImage.Width, AImage.Height);
+end;
+{$ENDIF}
+
+class procedure TACLSkinImageRenderer.FillPart(const ATarget: TRect; AColor: TAlphaColor);
 begin
 {$IFDEF MSWINDOWS}
   acFillRect(FDstCanvas, ATarget, AColor);
@@ -2318,7 +2314,7 @@ begin
 {$ENDIF}
 end;
 
-class procedure TACLSkinImageRenderer.Draw(const ATarget, ASource: TRect; AIsTileMode: Boolean);
+class procedure TACLSkinImageRenderer.DrawPart(const ATarget, ASource: TRect; AIsTileMode: Boolean);
 begin
   if ATarget.IsEmpty then Exit;
 {$IFDEF MSWINDOWS}
@@ -2339,6 +2335,61 @@ begin
 {$ENDIF}
 end;
 
+class procedure TACLSkinImageRenderer.Draw(ARect: TRect);
+
+  procedure DoDrawWithMargins(const ATarget, ASource: TRect; AContentState: TACLSkinImageFrameState);
+  var
+    LSourceParts: TACLMarginPartBounds;
+    LTargetParts: TACLMarginPartBounds;
+    LPart: TACLMarginPart;
+  begin
+    acCalcPartBounds(LTargetParts, FImage.Margins, ATarget, ASource, FImage.StretchMode);
+    acCalcPartBounds(LSourceParts, FImage.Margins, ASource, ASource, FImage.StretchMode);
+    for LPart := Low(TACLMarginPart) to High(TACLMarginPart) do
+    begin
+      if LPart = mzClient then
+      begin
+        if AContentState.IsTransparent then
+          Continue;
+        if AContentState.IsColor then
+        begin
+          FillPart(LTargetParts[LPart], TAlphaColor(AContentState));
+          Continue;
+        end;
+      end;
+      DrawPart(LTargetParts[LPart], LSourceParts[LPart], FImage.StretchMode = isTile);
+    end;
+  end;
+
+  procedure DoDrawTiledAreas(const ATarget, ASource: TRect);
+  var
+    I: TACLSkinImageTiledAreasPart;
+    S, D: TACLSkinImageTiledAreasPartBounds;
+  begin
+    acCalculateTiledAreas(ASource, FImage.TiledAreas,
+      FImage.FrameWidth, FImage.FrameHeight, FImage.TiledAreasMode, S);
+    acCalculateTiledAreas(ATarget, FImage.TiledAreas,
+      FImage.FrameWidth, FImage.FrameHeight, FImage.TiledAreasMode, D);
+    for I := Low(TACLSkinImageTiledAreasPart) to High(TACLSkinImageTiledAreasPart) do
+      DrawPart(D[I], S[I], FImage.StretchMode = isTile);
+  end;
+
+begin
+  case FImage.ActualSizingMode of
+    ismMargins:
+      DoDrawWithMargins(ARect, FImage.FrameRect[FFrame], FImage.FFramesInfoContent[FFrame]);
+    ismTiledAreas:
+      DoDrawTiledAreas(ARect, FImage.FrameRect[FFrame]);
+  else {ismDefault}
+    if FImage.StretchMode = isCenter then
+    begin
+      ARect.CenterHorz(FImage.FrameWidth);
+      ARect.CenterVert(FImage.FrameHeight);
+    end;
+    DrawPart(ARect, FImage.FrameRect[FFrame], FImage.StretchMode = isTile);
+  end;
+end;
+
 class procedure TACLSkinImageRenderer.Finish;
 begin
 {$IFDEF MSWINDOWS}
@@ -2349,6 +2400,7 @@ begin
   cairo_surface_destroy(FSourceSurface);
   FSourceSurface := nil;
 {$ENDIF}
+  FImage := nil;
   FLock.Leave;
 end;
 
