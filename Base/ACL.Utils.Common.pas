@@ -96,6 +96,7 @@ type
 
 type
   TConsumerC<T> = reference to procedure (const Arg: T);
+  TConsumerC<T1, T2> = reference to procedure (const Arg1: T1; const Arg2: T2);
   TPredicateC<T> = reference to function (const Arg: T): Boolean;
   TObjHashCode = {$IFDEF FPC}PtrInt{$ELSE}Integer{$ENDIF};
 

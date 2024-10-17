@@ -563,8 +563,8 @@ begin
 end;
 
 class procedure TACLSoftwareImplBlendMode.Run(
-  ABackgroundLayer, AForegroundLayer: TACLDib;
-  var AMatrix: PACLPixelMap; AProc: TCalculateMatrixProc; AOpacity: Byte);
+  ABackgroundLayer, AForegroundLayer: TACLDib; var AMatrix: PACLPixelMap;
+  AProc: TCalculateMatrixProc; AOpacity: Byte);
 begin
   FLock.Enter;
   try
@@ -586,7 +586,7 @@ var
   I: Integer;
 begin
   if (ATarget.Width <> ASource.Width) or (ATarget.Height <> ASource.Height) then
-    raise EInvalidOperation.Create(ClassName);
+    raise EInvalidOperation.Create('Cannot blend DIBs with different sizes');
 
   if ASource.ColorCount > 256 * 256 then
     AChunkCount := CPUCount
