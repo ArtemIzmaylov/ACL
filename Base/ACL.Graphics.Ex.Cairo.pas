@@ -42,9 +42,26 @@ uses
   ACL.Geometry.Utils,
   ACL.Graphics,
   ACL.Graphics.Ex,
+  ACL.Graphics.TextLayout,
   ACL.Utils.Common;
 
 type
+  PCairoGlyphArray = ^TCairoGlyphArray;
+  TCairoGlyphArray = array[0..0] of cairo_glyph_t;
+
+  { TCairoFontMetrics }
+
+  TCairoFontMetrics = record
+    // same to cairo_font_extents_t
+    ascent: Double;
+    descent: Double;
+    height: Double;
+    max_x_advance: Double;
+    max_y_advance: Double;
+    // our extensions:
+    baseline: Double;
+    line_thickness: Double;
+  end;
 
   { EGSCairoError }
 
@@ -60,6 +77,44 @@ type
     class function From(Font: TFont): TCairoColor; overload; static;
   end;
 
+  { TACLTextLayoutCairoRender }
+
+  TACLTextLayoutCairoRender = class(TACLTextLayoutCanvasRender)
+  strict private
+    FFont: Pcairo_scaled_font_t;
+    FFontColor: TCairoColor;
+    FFontMetrics: TCairoFontMetrics;
+    FFontHasLines: Boolean;
+    FFillColor: TCairoColor;
+    FFillColorAssigned: Boolean;
+    FHandle: Pcairo_t;
+    FHandleOwnership: TStreamOwnership;
+    FLineHeight: Integer;
+    FOrigin: TPoint;
+    FSurface: Pcairo_surface_t;
+  public
+    constructor Create(ACanvas: TCanvas); override;
+    constructor CreateEx(ACairo: Pcairo_t); overload;
+    constructor CreateEx(ADib: TACLDib); overload;
+    destructor Destroy; override;
+    function CreateCompatibleRender(ADib: TACLDib): TACLTextLayoutRender; override;
+    // Drawing
+    procedure DrawImage(ADib: TACLDib; const R: TRect); override;
+    procedure DrawText(ABlock: TACLTextLayoutBlockText; X, Y: Integer); override;
+    procedure DrawUnderline(const R: TRect); override;
+    procedure FillBackground(const R: TRect); override;
+    function GetClipBox(out R: TRect): Boolean; override;
+    // Measuring
+    procedure GetMetrics(out ABaseline, ALineHeight, ASpaceWidth: Integer); override;
+    procedure Measure(ABlock: TACLTextLayoutBlockText); override;
+    procedure Shrink(ABlock: TACLTextLayoutBlockText; AMaxSize: Integer); override;
+    // Setup
+    procedure SetFill(AValue: TColor); override;
+    procedure SetFont(AFont: TFont); override;
+    // Properties
+    property Origin: TPoint read FOrigin write FOrigin;
+  end;
+
 {$REGION ' Render2D '}
 
   { TACLCairoRender }
@@ -70,17 +125,21 @@ type
     FHandleOwnership: TStreamOwnership;
     FTargetSurface: Pcairo_surface_t;
 
+    procedure CheckRecursivePaint;
     procedure PathEllipseArc(X1, Y1, X2, Y2: Double);
     procedure PathPolyline(Points: PPoint; Count: Integer; ClosePath: Boolean);
   public
     procedure BeginPaint(ACairo: Pcairo_t); overload;
     procedure BeginPaint(ACanvas: TCanvas); overload;
+    procedure BeginPaint(AColors: PACLPixel32Array; AWidth, AHeight: Integer); overload;
+    procedure BeginPaint(ADib: TACLDib); overload;
     procedure BeginPaint(ASurface: Pcairo_surface_t); overload;
     procedure BeginPaint(DC: HDC; const BoxRect, UpdateRect: TRect); overload; override;
     procedure EndPaint; override;
 
     // Clipping
-    function Clip(const R: TRect; out Data: TACL2DRenderRawData): Boolean; override;
+    function Clip(const R: TRect; out Data: TACL2DRenderRawData): Boolean; overload; override;
+    function Clip(const R: TACLRegionData; out Data: TACL2DRenderRawData): Boolean; overload; reintroduce;
     procedure ClipRestore(Data: TACL2DRenderRawData); override;
     function IsVisible(const R: TRect): Boolean; override;
 
@@ -141,6 +200,8 @@ type
 
     //# Properties
     property Handle: Pcairo_t read FHandle;
+    property Origin;
+    property TargetSurface: Pcairo_surface_t read FTargetSurface; // nullable
   end;
 
 {$ENDREGION}
@@ -179,23 +240,6 @@ const
 
 type
   TTextBlock = class(TACLTextLayoutBlockText);
-
-  PCairoGlyphArray = ^TCairoGlyphArray;
-  TCairoGlyphArray = array[0..0] of cairo_glyph_t;
-
-  { TCairoFontMetrics }
-
-  TCairoFontMetrics = record
-    // same to cairo_font_extents_t
-    ascent: Double;
-    descent: Double;
-    height: Double;
-    max_x_advance: Double;
-    max_y_advance: Double;
-    // our extensions:
-    baseline: Double;
-    line_thickness: Double;
-  end;
 
   { TCairoTextLayoutMetrics }
 
@@ -238,31 +282,6 @@ type
     class function Context(ACanvas: TCanvas): Pcairo_t;
     class function DefaultFontName: string;
     class function DefaultFontSize: Integer;
-  end;
-
-  { TACLTextLayoutCairoRender }
-
-  TACLTextLayoutCairoRender = class(TACLTextLayoutCanvasRender)
-  strict private
-    FFont: Pcairo_scaled_font_t;
-    FFontColor: TCairoColor;
-    FFontMetrics: TCairoFontMetrics;
-    FFontHasLines: Boolean;
-    FFillColor: TCairoColor;
-    FFillColorAssigned: Boolean;
-    FHandle: Pcairo_t;
-    FLineHeight: Integer;
-    FOrigin: TPoint;
-  public
-    constructor Create(ACanvas: TCanvas); override;
-    destructor Destroy; override;
-    procedure DrawText(ABlock: TACLTextLayoutBlockText; X, Y: Integer); override;
-    procedure DrawUnderline(const R: TRect); override;
-    procedure GetMetrics(out ABaseline, ALineHeight, ASpaceWidth: Integer); override;
-    procedure Measure(ABlock: TACLTextLayoutBlockText); override;
-    procedure SetFill(AValue: TColor); override;
-    procedure SetFont(AFont: TFont); override;
-    procedure Shrink(ABlock: TACLTextLayoutBlockText; AMaxSize: Integer); override;
   end;
 
 {$ENDREGION}
@@ -470,6 +489,70 @@ end;
 procedure cairo_set_source_color(ACairo: pcairo_t; const AColor: TCairoColor);
 begin
   cairo_set_source_rgba(ACairo, AColor.R, AColor.G, AColor.B, AColor.A);
+end;
+
+procedure cairo_fill_surface(ACairo: pcairo_t; ASurface: Pcairo_surface_t;
+  const ATargetRect, ASourceRect: TRect; const AOrigin: TPoint;
+  AAlpha: Double; ATileMode: Boolean;
+  AOperator: cairo_operator_t = CAIRO_OPERATOR_OVER;
+  AFilter: cairo_filter_t = CAIRO_FILTER_NEAREST);
+var
+  LCairo: Pcairo_t;
+  LMatrix: cairo_matrix_t;
+  LPrevOperator: cairo_operator_t;
+  LSurface: Pcairo_surface_t;
+  LSourceW, LSourceH: LongInt;
+  LTargetW, LTargetH: Double;
+  X, Y: Double;
+begin
+  LSourceH := ASourceRect.Height;
+  LSourceW := ASourceRect.Width;
+  LTargetH := ATargetRect.Height;
+  LTargetW := ATargetRect.Width;
+  X := ATargetRect.Left - AOrigin.X;
+  Y := ATargetRect.Top - AOrigin.Y;
+  if (LSourceW = 0) or (LSourceH = 0) or (LTargetH = 0) or (LTargetW = 0) then
+    Exit;
+
+  LPrevOperator := cairo_get_operator(ACairo);
+  cairo_set_operator(ACairo, AOperator);
+  if ATileMode then
+  begin
+    LSurface := cairo_create_surface(LSourceW, LSourceH);
+
+    LCairo := cairo_create(LSurface);
+    cairo_set_source_surface(LCairo, ASurface, -ASourceRect.Left, -ASourceRect.Top);
+    cairo_rectangle(LCairo, 0, 0, LSourceW, LSourceH);
+    cairo_paint_with_alpha(LCairo, AAlpha);
+    cairo_destroy(LCairo);
+
+    cairo_set_source_surface(ACairo, LSurface, X, Y);
+    cairo_pattern_set_extend(cairo_get_source(ACairo), CAIRO_EXTEND_REPEAT);
+    cairo_rectangle(ACairo, X, Y, LTargetW, LTargetH);
+    cairo_fill(ACairo);
+    cairo_surface_destroy(LSurface);
+  end
+  else
+  begin
+    cairo_set_source_surface(ACairo, ASurface, 0, 0);
+    cairo_matrix_init_identity(@LMatrix);
+    cairo_matrix_translate(@LMatrix, ASourceRect.Left, ASourceRect.Top);
+    cairo_matrix_scale(@LMatrix, LSourceW / LTargetW, LSourceH / LTargetH);
+    cairo_matrix_translate(@LMatrix, -X, -Y);
+    cairo_pattern_set_matrix(cairo_get_source(ACairo), @LMatrix);
+    cairo_pattern_set_filter(cairo_get_source(ACairo), AFilter);
+    cairo_rectangle(ACairo, X, Y, LTargetW, LTargetH);
+    if AAlpha < 1.0 then
+    begin
+      cairo_save(ACairo);
+      cairo_clip(ACairo);
+      cairo_paint_with_alpha(ACairo, AAlpha);
+      cairo_restore(ACairo);
+    end
+    else
+      cairo_fill(ACairo);
+  end;
+  cairo_set_operator(ACairo, LPrevOperator);
 end;
 
 function cairo_text_to_glyphs(AFont: Pcairo_scaled_font_t;
@@ -1162,20 +1245,73 @@ constructor TACLTextLayoutCairoRender.Create(ACanvas: TCanvas);
 begin
   inherited Create(ACanvas);
   FHandle := cairo_create_context(ACanvas.Handle);
+  FHandleOwnership := soOwned;
   GetWindowOrgEx(Canvas.Handle, @FOrigin);
   cairo_set_clipping(FHandle, Canvas.Handle, FOrigin);
 end;
 
+constructor TACLTextLayoutCairoRender.CreateEx(ACairo: Pcairo_t);
+begin
+  inherited Create(MeasureCanvas);
+  FHandle := ACairo;
+  FHandleOwnership := soReference;
+end;
+
+constructor TACLTextLayoutCairoRender.CreateEx(ADib: TACLDib);
+begin
+  inherited Create(MeasureCanvas);
+  FSurface := cairo_create_surface(ADib.Colors, ADib.Width, ADib.Height);
+  FHandle := cairo_create(FSurface);
+  FHandleOwnership := soOwned;
+end;
+
 destructor TACLTextLayoutCairoRender.Destroy;
 begin
-  cairo_destroy(FHandle);
+  if FHandleOwnership = soOwned then
+    cairo_destroy(FHandle);
+  if FSurface <> nil then
+    cairo_surface_destroy(FSurface);
   inherited Destroy;
+end;
+
+function TACLTextLayoutCairoRender.CreateCompatibleRender(ADib: TACLDib): TACLTextLayoutRender;
+begin
+  Result := TACLTextLayoutCairoRender.CreateEx(ADib);
+end;
+
+procedure TACLTextLayoutCairoRender.DrawImage(ADib: TACLDib; const R: TRect);
+var
+  LSurface: Pcairo_surface_t;
+begin
+  LSurface := cairo_create_surface(ADib.Colors, ADib.Width, ADib.Height);
+  if LSurface <> nil then
+  try
+    cairo_fill_surface(FHandle, LSurface, R, ADib.ClientRect, FOrigin, 1.0, False);
+  finally
+    cairo_surface_destroy(LSurface);
+  end;
 end;
 
 procedure TACLTextLayoutCairoRender.DrawUnderline(const R: TRect);
 begin
   if FFontHasLines then
     CairoDrawTextStyleLines(FHandle, Canvas.Font.Style, R.Left, R.Top, R.Width, FFontMetrics);
+end;
+
+procedure TACLTextLayoutCairoRender.FillBackground(const R: TRect);
+begin
+  if FFillColorAssigned then
+  begin
+    cairo_set_source_color(FHandle, FFillColor);
+    cairo_rectangle(FHandle, R.Left - FOrigin.X, R.Top - FOrigin.Y, R.Width, R.Height);
+    cairo_fill(FHandle);
+    cairo_set_source_color(FHandle, FFontColor);
+  end;
+end;
+
+function TACLTextLayoutCairoRender.GetClipBox(out R: TRect): Boolean;
+begin
+  Result := False;
 end;
 
 procedure TACLTextLayoutCairoRender.DrawText(ABlock: TACLTextLayoutBlockText; X, Y: Integer);
@@ -1206,8 +1342,7 @@ begin
   end;
 end;
 
-procedure TACLTextLayoutCairoRender.GetMetrics(
-  out ABaseline, ALineHeight, ASpaceWidth: Integer);
+procedure TACLTextLayoutCairoRender.GetMetrics(out ABaseline, ALineHeight, ASpaceWidth: Integer);
 var
   LTextExtents: cairo_text_extents_t;
 begin
@@ -1287,6 +1422,7 @@ end;
 
 procedure TACLCairoRender.BeginPaint(ACairo: Pcairo_t);
 begin
+  CheckRecursivePaint;
   FTargetSurface := nil;
   FHandle := ACairo;
   FHandleOwnership := soReference;
@@ -1295,29 +1431,34 @@ end;
 
 procedure TACLCairoRender.BeginPaint(ACanvas: TCanvas);
 begin
-  if Handle <> nil then
-    raise EInvalidGraphicOperation.Create(ClassName + ' recursive calls not yet supported');
-
-  FOrigin := NullPoint;
-  FHandleOwnership := soOwned;
+  CheckRecursivePaint;
   // Если DC у DIB-а уже захвачен - рисуем на нем, не переключаемся.
   // Иначе запрос Bits спровоцирует отключение канваса и следующий за нами
   // вызов уже получит канвас без Handle-а и не сможет получить валидный WindowOrg
   if not ACanvas.HandleAllocated and (ACanvas is TACLDibCanvas) then
-  begin
-    FTargetSurface := cairo_create_surface(
-      TACLDibCanvas(ACanvas).Owner.Colors,
-      TACLDibCanvas(ACanvas).Owner.Width,
-      TACLDibCanvas(ACanvas).Owner.Height);
-    FHandle := cairo_create(FTargetSurface);
-  end
+    BeginPaint(TACLDibCanvas(ACanvas).Owner)
   else
   begin
     FTargetSurface := nil;
     GetWindowOrgEx(ACanvas.Handle, @FOrigin);
+    FHandleOwnership := soOwned;
     FHandle := cairo_create_context(ACanvas.Handle);
     cairo_set_clipping(Handle, ACanvas.Handle, FOrigin);
   end;
+end;
+
+procedure TACLCairoRender.BeginPaint(AColors: PACLPixel32Array; AWidth, AHeight: Integer);
+begin
+  CheckRecursivePaint;
+  FOrigin := NullPoint;
+  FTargetSurface := cairo_create_surface(AColors, AWidth, AHeight);
+  FHandleOwnership := soOwned;
+  FHandle := cairo_create(FTargetSurface);
+end;
+
+procedure TACLCairoRender.BeginPaint(ADib: TACLDib);
+begin
+  BeginPaint(ADib.Colors, ADib.Width, ADib.Height);
 end;
 
 procedure TACLCairoRender.BeginPaint(ASurface: Pcairo_surface_t);
@@ -1374,6 +1515,28 @@ begin
     Data := nil;
     cairo_save(Handle);
     cairo_rectangle(Handle, R.Left - Origin.X, R.Top - Origin.Y, R.Width, R.Height);
+    cairo_clip(Handle);
+  end;
+end;
+
+function TACLCairoRender.Clip(const R: TACLRegionData; out Data: TACL2DRenderRawData): Boolean;
+var
+  LRect: PRect;
+  I: Integer;
+begin
+  Result := R.Count > 0;
+  if Result then
+  begin
+    Data := nil;
+    cairo_save(Handle);
+    LRect := @R.Rects^[0];
+    for I := 0 to R.Count - 1 do
+    begin
+      cairo_rectangle(Handle,
+        LRect^.Left - Origin.X, LRect^.Top - Origin.Y,
+        LRect^.Width, LRect^.Height);
+      Inc(LRect);
+    end;
     cairo_clip(Handle);
   end;
 end;
@@ -1579,63 +1742,9 @@ end;
 procedure TACLCairoRender.FillSurface(const ATargetRect, ASourceRect: TRect;
   ASurface: Pcairo_surface_t; AAlpha: Double; ATileMode: Boolean;
   AOperator: cairo_operator_t = CAIRO_OPERATOR_OVER);
-var
-  LCairo: Pcairo_t;
-  LMatrix: cairo_matrix_t;
-  LPrevOperator: cairo_operator_t;
-  LSurface: Pcairo_surface_t;
-  LSourceW, LSourceH: LongInt;
-  LTargetW, LTargetH: Double;
-  X, Y: Double;
 begin
-  LSourceH := ASourceRect.Height;
-  LSourceW := ASourceRect.Width;
-  LTargetH := ATargetRect.Height;
-  LTargetW := ATargetRect.Width;
-  X := ATargetRect.Left - Origin.X;
-  Y := ATargetRect.Top - Origin.Y;
-  if (LSourceW = 0) or (LSourceH = 0) or (LTargetH = 0) or (LTargetW = 0) then
-    Exit;
-
-  LPrevOperator := cairo_get_operator(Handle);
-  cairo_set_operator(Handle, AOperator);
-  if ATileMode then
-  begin
-    LSurface := cairo_create_surface(LSourceW, LSourceH);
-
-    LCairo := cairo_create(LSurface);
-    cairo_set_source_surface(LCairo, ASurface, -ASourceRect.Left, -ASourceRect.Top);
-    cairo_rectangle(LCairo, 0, 0, LSourceW, LSourceH);
-    cairo_paint_with_alpha(LCairo, AAlpha);
-    cairo_destroy(LCairo);
-
-    cairo_set_source_surface(Handle, LSurface, X, Y);
-    cairo_pattern_set_extend(cairo_get_source(Handle), CAIRO_EXTEND_REPEAT);
-    cairo_rectangle(Handle, X, Y, LTargetW, LTargetH);
-    cairo_fill(Handle);
-    cairo_surface_destroy(LSurface);
-  end
-  else
-  begin
-    cairo_set_source_surface(Handle, ASurface, 0, 0);
-    cairo_matrix_init_identity(@LMatrix);
-    cairo_matrix_translate(@LMatrix, ASourceRect.Left, ASourceRect.Top);
-    cairo_matrix_scale(@LMatrix, LSourceW / LTargetW, LSourceH / LTargetH);
-    cairo_matrix_translate(@LMatrix, -X, -Y);
-    cairo_pattern_set_matrix(cairo_get_source(Handle), @LMatrix);
-    cairo_pattern_set_filter(cairo_get_source(Handle), CAIRO_FILTER_NEAREST);
-    cairo_rectangle(Handle, X, Y, LTargetW, LTargetH);
-    if AAlpha < 1.0 then
-    begin
-      cairo_save(Handle);
-      cairo_clip(Handle);
-      cairo_paint_with_alpha(Handle, AAlpha);
-      cairo_restore(Handle);
-    end
-    else
-      cairo_fill(Handle);
-  end;
-  cairo_set_operator(Handle, LPrevOperator);
+  cairo_fill_surface(Handle, ASurface,
+    ATargetRect, ASourceRect, FOrigin, AAlpha, ATileMode, AOperator);
 end;
 
 procedure TACLCairoRender.DrawText(const Text: string; const R: TRect;
@@ -1774,6 +1883,12 @@ begin
     Inc(Points);
     Dec(Count);
   end;
+end;
+
+procedure TACLCairoRender.CheckRecursivePaint;
+begin
+  if Handle <> nil then
+    raise EInvalidGraphicOperation.Create(ClassName + ' recursive calls not yet supported');
 end;
 
 procedure TACLCairoRender.PathEllipseArc(X1, Y1, X2, Y2: Double);

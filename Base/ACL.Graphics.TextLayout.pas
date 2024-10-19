@@ -681,6 +681,9 @@ function acGetReadingDirection(P: PChar; L: Integer): TACLTextReadingDirection; 
 procedure DrawText32(ACanvas: TCanvas; const R: TRect; AText: string;
   AFont: TACLFont; AAlignment: TAlignment = taLeftJustify;
   AVertAlignment: TVerticalAlignment = taVerticalCenter; AEndEllipsis: Boolean = True);
+procedure DrawText32Core(const AText: PChar; ALength, AWidth, AHeight: Integer;
+  AFont: TACLFont; const ATextOffset: TPoint; ATextDuplicateIndent: Integer;
+  ADrawProc: TProc<TACLDib>);
 procedure DrawText32Duplicated(ACanvas: TCanvas; const R: TRect;
   const AText: string; const ATextOffset: TPoint; ADuplicateOffset: Integer; AFont: TACLFont);
 {$ENDREGION}
@@ -1621,11 +1624,9 @@ begin
   end;
 end;
 
-procedure DrawText32Core(ACanvas: TCanvas;
-  const AText: PChar; ALength: Integer; AFont: TACLFont;
-  const ABounds: TRect; const ATextOffset: TPoint;
-  ATextDuplicateIndent: Integer = 0;
-  ATextColor: TAlphaColor = TAlphaColor.Default);
+procedure DrawText32Core(const AText: PChar; ALength, AWidth, AHeight: Integer;
+  AFont: TACLFont; const ATextOffset: TPoint; ATextDuplicateIndent: Integer;
+  ADrawProc: TProc<TACLDib>);
 
   procedure Text32Output(ACanvas: TCanvas; const AOffset: TPoint);
   begin
@@ -1635,18 +1636,17 @@ procedure DrawText32Core(ACanvas: TCanvas;
   end;
 
 var
-  APoint: TPoint;
-  I, J, W, H: Integer;
+  LPoint: TPoint;
+  LTextColor: TACLPixel32;
+  I, J: Integer;
 begin
-  W := ABounds.Width;
-  H := ABounds.Height;
-  if (W <= 0) or (H <= 0) then
+  if (AWidth <= 0) or (AHeight <= 0) then
     Exit;
 
   if FTextBuffer = nil then
-    FTextBuffer := TACLDib.Create(W, H)
+    FTextBuffer := TACLDib.Create(AWidth, AHeight)
   else
-    FTextBuffer.Resize(W, H);
+    FTextBuffer.Resize(AWidth, AHeight);
 
   FTextBuffer.Canvas.SetScaledFont(AFont);
   FTextBuffer.Canvas.Font.Color := clWhite;
@@ -1665,27 +1665,25 @@ begin
     end
     else
     begin
-      APoint := ATextOffset;
+      LPoint := ATextOffset;
       for I := 1 to AFont.Shadow.Size do
       begin
-        APoint := APoint + TACLFontShadow.Offsets[AFont.Shadow.Direction];
-        Text32Output(FTextBuffer.Canvas, APoint);
+        LPoint := LPoint + TACLFontShadow.Offsets[AFont.Shadow.Direction];
+        Text32Output(FTextBuffer.Canvas, LPoint);
       end;
     end;
     Text32ApplyBlur(FTextBuffer, AFont.Shadow);
     Text32RecoverAlpha(FTextBuffer, TACLPixel32.Create(AFont.Shadow.Color));
-    FTextBuffer.DrawBlend(ACanvas, ABounds.TopLeft);
+    ADrawProc(FTextBuffer);
   end;
 
-  if ATextColor = TAlphaColor.Default then
-    ATextColor := TAlphaColor.FromColor(acGetActualColor(AFont.Color, clBlack), AFont.ColorAlpha);
-
-  if ATextColor.IsValid then
+  LTextColor := TACLPixel32.Create(acGetActualColor(AFont.Color, clBlack), AFont.ColorAlpha);
+  if LTextColor.A > 0 then
   begin
     FTextBuffer.Reset;
     Text32Output(FTextBuffer.Canvas, ATextOffset);
-    Text32RecoverAlpha(FTextBuffer, TACLPixel32.Create(ATextColor));
-    FTextBuffer.DrawBlend(ACanvas, ABounds.TopLeft);
+    Text32RecoverAlpha(FTextBuffer, LTextColor);
+    ADrawProc(FTextBuffer);
   end;
 end;
 
@@ -1707,8 +1705,12 @@ begin
     Inc(LTextSize.cy, LTextExtends.MarginsHeight);
     Inc(LTextSize.cx, LTextExtends.MarginsWidth);
     LTextOffset := acTextAlign(R, LTextSize, AAlignment, AVertAlignment);
-    DrawText32Core(ACanvas, PChar(AText), Length(AText), AFont,
-      TRect.Create(LTextOffset, LTextSize), LTextExtends.TopLeft, 0);
+    DrawText32Core(PChar(AText), Length(AText),
+      LTextSize.cx, LTextSize.cy, AFont, LTextExtends.TopLeft, 0,
+      procedure (ABuffer: TACLDib)
+      begin
+        ABuffer.DrawBlend(ACanvas, LTextOffset);
+      end);
   end;
 end;
 
@@ -1718,8 +1720,12 @@ procedure DrawText32Duplicated(ACanvas: TCanvas; const R: TRect;
 begin
   if CanDrawText32(ACanvas, AText, R, AFont) then
   begin
-    DrawText32Core(ACanvas, PChar(AText), Length(AText), AFont, R,
-      ATextOffset + AFont.TextExtends.TopLeft, ADuplicateOffset);
+    DrawText32Core(PChar(AText), Length(AText), R.Width, R.Height, AFont,
+      ATextOffset + AFont.TextExtends.TopLeft, ADuplicateOffset,
+      procedure (ABuffer: TACLDib)
+      begin
+        ABuffer.DrawBlend(ACanvas, R.TopLeft);
+      end);
   end;
 end;
 {$ENDREGION}
@@ -3439,7 +3445,12 @@ end;
 procedure TACLTextLayoutCanvasRender32.DrawText(
   ABlock: TACLTextLayoutBlockText; X, Y: Integer);
 begin
-  DrawText32Core(Canvas, ABlock.Text, ABlock.TextLength, FFont, ABlock.Bounds, NullPoint);
+  DrawText32Core(ABlock.Text, ABlock.TextLength,
+    ABlock.FWidth, ABlock.FHeight, FFont, NullPoint, 0,
+    procedure (ABuffer: TACLDib)
+    begin
+      ABuffer.DrawBlend(Canvas, Point(X, Y));
+    end);
 end;
 
 procedure TACLTextLayoutCanvasRender32.FillBackground(const R: TRect);
@@ -3781,7 +3792,11 @@ end;
 
 function TACLTextLayout32.GetDefaultRender: TACLTextLayoutCanvasRenderClass;
 begin
+{$IFDEF ACL_CAIRO_TEXTOUT}
+  Result := TACLTextLayoutCairoRender; // Cairo is already alpha-channel aware
+{$ELSE}
   Result := TACLTextLayoutCanvasRender32;
+{$ENDIF}
 end;
 
 { TACLTextViewInfo }
