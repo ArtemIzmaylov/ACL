@@ -181,7 +181,6 @@
         <DCCReference Include="Base\ACL.Graphics.SkinImage.pas"/>
         <DCCReference Include="Base\ACL.Graphics.SkinImageSet.pas"/>
         <DCCReference Include="Base\ACL.Graphics.TextLayout.pas"/>
-        <DCCReference Include="Base\ACL.Graphics.TextLayout32.pas"/>
         <DCCReference Include="Base\ACL.Hashes.pas"/>
         <DCCReference Include="Base\ACL.Math.pas"/>
         <DCCReference Include="Base\ACL.Math.Complex.pas"/>

@@ -39,6 +39,7 @@ uses
   // VCL
   {Vcl.}Graphics,
   // ACL
+  ACL.Classes,
   ACL.Classes.Collections,
   ACL.Parsers,
   ACL.FastCode,
@@ -57,6 +58,87 @@ type
   TACLTextLayoutExporter = class;
   TACLTextLayoutRender = class;
 
+{$REGION ' Advanced Font '}
+
+  { TACLFontShadow }
+
+  TACLFontShadow = class(TPersistent)
+  public const
+  {$REGION ' Consts '}
+    BlurRadiusFactor = 10;
+    Offsets: array[TACLMarginPart] of TPoint =
+    (
+      (X: -1; Y: -1), (X: -1; Y:  0), (X: -1; Y:  1),
+      (X:  0; Y: -1), (X:  0; Y:  1), (X:  1; Y:  0),
+      (X:  1; Y: -1), (X:  1; Y:  1), (X:  0; Y:  0)
+    );
+  {$ENDREGION}
+  strict private
+    FBlur: Integer;
+    FBlurSize: Integer;
+    FColor: TAlphaColor;
+    FDirection: TACLMarginPart;
+    FSize: Integer;
+
+    FOnChange: TNotifyEvent;
+
+    function GetAssigned: Boolean;
+  protected
+    procedure Changed; virtual;
+    function GetDrawIterations: Integer; inline;
+    function GetTextExtends: TRect;
+    // Get/Set
+    function GetBlur: Integer; virtual;
+    function GetColor: TAlphaColor; virtual;
+    function GetDirection: TACLMarginPart; virtual;
+    function GetSize: Integer; virtual;
+    procedure SetBlur(AValue: Integer); virtual;
+    procedure SetColor(AValue: TAlphaColor); virtual;
+    procedure SetDirection(AValue: TACLMarginPart); virtual;
+    procedure SetSize(AValue: Integer); virtual;
+  public
+    constructor Create(AChangeEvent: TNotifyEvent);
+    procedure Assign(Source: TPersistent); override;
+    function Equals(Obj: TObject): Boolean; override;
+    procedure Reset; virtual;
+    // Properties
+    property Assigned: Boolean read GetAssigned;
+    property Blur: Integer read GetBlur write SetBlur;
+    property Color: TAlphaColor read GetColor write SetColor;
+    property Direction: TACLMarginPart read GetDirection write SetDirection;
+    property Size: Integer read GetSize write SetSize;
+  end;
+
+  { TACLFont }
+
+  TACLFont = class sealed(TFont)
+  strict private
+    FColorAlpha: Byte;
+    FShadow: TACLFontShadow;
+
+    procedure ChangeHandler(Sender: TObject);
+    function GetAlphaColor: TAlphaColor;
+    function GetTextExtends: TRect; inline;
+    procedure SetAlphaColor(const Value: TAlphaColor);
+    procedure SetColorAlpha(const AValue: Byte);
+    procedure SetShadow(const AValue: TACLFontShadow);
+  public
+    destructor Destroy; override;
+    procedure AfterConstruction; override;
+    procedure Assign(Source: TPersistent); override;
+    function AppendTextExtends(const S: TSize): TSize;
+    function MeasureSize(const S: PChar; ALength: Integer): TSize; overload;
+    function MeasureSize(const S: string): TSize; overload;
+    // Properties
+    property AlphaColor: TAlphaColor read GetAlphaColor write SetAlphaColor;
+    property TextExtends: TRect read GetTextExtends;
+  published
+    property ColorAlpha: Byte read FColorAlpha write SetColorAlpha default MaxByte;
+    property Shadow: TACLFontShadow read FShadow write SetShadow;
+  end;
+
+{$ENDREGION}
+
 {$REGION ' Blocks '}
 
   { TACLTextLayoutBlock }
@@ -70,6 +152,7 @@ type
   public
     function Bounds: TRect; virtual;
     function Export(AExporter: TACLTextLayoutExporter): Boolean; virtual;
+    procedure FlushCalculatedValues; virtual;
     procedure Shrink(ARender: TACLTextLayoutRender; AMaxRight: Integer); virtual;
     //# Properties
     property Position: TPoint read FPosition;
@@ -119,7 +202,7 @@ type
     destructor Destroy; override;
     function Bounds: TRect; override;
     function Export(AExporter: TACLTextLayoutExporter): Boolean; override;
-    procedure Flush; inline;
+    procedure FlushCalculatedValues; override;
     procedure Shrink(ARender: TACLTextLayoutRender; AMaxRight: Integer); override;
     function ToString: string; override;
     //# Properties
@@ -245,13 +328,20 @@ type
 
   TACLTextLayoutRender = class
   public
+    function CreateCompatibleRender(ADib: TACLDib): TACLTextLayoutRender; virtual; abstract;
+    // Drawing
+    procedure DrawImage(ADib: TACLDib; const R: TRect); virtual; abstract;
     procedure DrawText(ABlock: TACLTextLayoutBlockText; X, Y: Integer); virtual; abstract;
     procedure DrawUnderline(const R: TRect); virtual; abstract;
+    procedure FillBackground(const R: TRect); virtual; abstract;
+    function GetClipBox(out R: TRect): Boolean; virtual; abstract;
+    // Measuring
     procedure GetMetrics(out ABaseline, ALineHeight, ASpaceWidth: Integer); virtual; abstract;
     procedure Measure(ABlock: TACLTextLayoutBlockText); virtual; abstract;
+    procedure Shrink(ABlock: TACLTextLayoutBlockText; AMaxSize: Integer); virtual; abstract;
+    // Setup
     procedure SetFill(AValue: TColor); virtual; abstract;
     procedure SetFont(AFont: TFont); virtual; abstract;
-    procedure Shrink(ABlock: TACLTextLayoutBlockText; AMaxSize: Integer); virtual; abstract;
   end;
 
   { TACLTextLayoutValueStack<T> }
@@ -359,9 +449,13 @@ type
   TACLTextLayoutPainter = class(TACLTextLayoutVisualExporter)
   strict private
     FDefaultTextColor: TColor;
+    FDrawBackground: Boolean;
+    FDrawContent: Boolean;
+    FHasBackground: Boolean;
     FFillColors: TACLTextLayoutValueStack<TColor>;
     FTextColors: TACLTextLayoutValueStack<TColor>;
-    procedure UpdateTextColor;
+
+    procedure UpdateTextColor; inline;
   protected
     function OnFillColor(ABlock: TACLTextLayoutBlockFillColor): Boolean; override;
     function OnFontColor(ABlock: TACLTextLayoutBlockFontColor): Boolean; override;
@@ -370,7 +464,28 @@ type
     function OnText(AText: TACLTextLayoutBlockText): Boolean; override;
   public
     constructor Create(AOwner: TACLTextLayout; ARender: TACLTextLayoutRender); override;
+    constructor CreateEx(AOwner: TACLTextLayout;
+      ARender: TACLTextLayoutRender; ADrawBackground, ADrawContent: Boolean); virtual;
     destructor Destroy; override;
+  end;
+
+  { TACLTextLayoutShadowPainter }
+
+  TACLTextLayoutShadowPainter = class(TACLTextLayoutVisualExporter)
+  strict private
+    FBuffer: TACLDib;
+    FOrigin: TPoint;
+    FShadow: TACLFontShadow;
+    FShadowDirection: TPoint;
+    FShadowSize: Integer;
+    FShadowStroke: Boolean;
+    FTargetRender: TACLTextLayoutRender;
+  protected
+    function OnText(ABlock: TACLTextLayoutBlockText): Boolean; override;
+  public
+    constructor Create(AOwner: TACLTextLayout; ARender: TACLTextLayoutRender); override;
+    destructor Destroy; override;
+    procedure AfterConstruction; override;
   end;
 
 {$ENDREGION}
@@ -383,17 +498,39 @@ type
     FCanvas: TCanvas;
   public
     constructor Create(ACanvas: TCanvas); virtual;
+    function CreateCompatibleRender(ADib: TACLDib): TACLTextLayoutRender; override;
+    // Drawing
+    procedure DrawImage(ADib: TACLDib; const R: TRect); override;
     procedure DrawText(ABlock: TACLTextLayoutBlockText; X, Y: Integer); override;
     procedure DrawUnderline(const R: TRect); override;
+    procedure FillBackground(const R: TRect); override;
+    function GetClipBox(out R: TRect): Boolean; override;
+    // Measuring
     procedure GetMetrics(out ABaseline, ALineHeight, ASpaceWidth: Integer); override;
     procedure Measure(ABlock: TACLTextLayoutBlockText); override;
+    procedure Shrink(ABlock: TACLTextLayoutBlockText; AMaxSize: Integer); override;
+    // Setup
     procedure SetFill(AValue: TColor); override;
     procedure SetFont(AFont: TFont); override;
-    procedure Shrink(ABlock: TACLTextLayoutBlockText; AMaxSize: Integer); override;
+    // Properties
     property Canvas: TCanvas read FCanvas;
   end;
 
+  { TACLTextLayoutCanvasRender32 }
+
+  TACLTextLayoutCanvasRender32 = class(TACLTextLayoutCanvasRender)
+  strict private
+    FFont: TACLFont;
+  public
+    destructor Destroy; override;
+    procedure DrawText(ABlock: TACLTextLayoutBlockText; X, Y: Integer); override;
+    procedure FillBackground(const R: TRect); override;
+    procedure SetFont(AFont: TFont); override;
+  end;
+
 {$ENDREGION}
+
+{$REGION ' TextLayout '}
 
   { TACLTextFormatSettings }
 
@@ -449,8 +586,8 @@ type
     FTruncated: Boolean;
 
     function GetDefaultHyperLinkColor: TColor; virtual;
+    function GetDefaultRender: TACLTextLayoutCanvasRenderClass; virtual;
     function GetDefaultTextColor: TColor; virtual;
-    function GetPadding: TRect; virtual;
   public
     constructor Create(AFont: TFont);
     destructor Destroy; override;
@@ -489,6 +626,13 @@ type
     property Text: string read FText;
   end;
 
+  { TACLTextLayout32 }
+
+  TACLTextLayout32 = class(TACLTextLayout)
+  protected
+    function GetDefaultRender: TACLTextLayoutCanvasRenderClass; override;
+  end;
+
   { TACLTextViewInfo }
 
   TACLTextViewInfo = class(TACLTextLayoutBlockText)
@@ -498,6 +642,8 @@ type
     constructor Create(const AText: string); reintroduce;
     function Measure(ARender: TACLTextLayoutRender): TSize;
   end;
+
+{$ENDREGION}
 
 const
   atoAutoHeight  = 1;
@@ -523,15 +669,28 @@ var
 /// </summary>
 procedure acAdvDrawText(ACanvas: TCanvas;
   const AText: string; var ABounds: TRect; AFlags: Cardinal);
+
 procedure acExpandPrefixes(var AText: string; AHide: Boolean);
 procedure acDrawFormattedText(ACanvas: TCanvas; const S: string; const R: TRect;
   AHorzAlignment: TAlignment; AVertAlignment: TVerticalAlignment; AWordWrap: Boolean);
 
 function acGetReadingDirection(const C: Char): TACLTextReadingDirection; overload;
 function acGetReadingDirection(P: PChar; L: Integer): TACLTextReadingDirection; overload; inline;
+
+{$REGION ' DrawText w alpha-channel '}
+procedure DrawText32(ACanvas: TCanvas; const R: TRect; AText: string;
+  AFont: TACLFont; AAlignment: TAlignment = taLeftJustify;
+  AVertAlignment: TVerticalAlignment = taVerticalCenter; AEndEllipsis: Boolean = True);
+procedure DrawText32Duplicated(ACanvas: TCanvas; const R: TRect;
+  const AText: string; const ATextOffset: TPoint; ADuplicateOffset: Integer; AFont: TACLFont);
+{$ENDREGION}
 implementation
 
+uses
+  ACL.Graphics.Ex;
+
 type
+
 {$REGION ' Calculator '}
 
   { TACLTextLayoutCalculator }
@@ -646,11 +805,6 @@ type
   end;
 
 {$ENDREGION}
-
-  TACLTextLayoutRefreshHelper = class(TACLTextLayoutExporter)
-  protected
-    function OnText(ABlock: TACLTextLayoutBlockText): Boolean; override;
-  end;
 
 {$REGION ' BiDi Support '}
 //#AI:
@@ -983,7 +1137,6 @@ const
     $0009, $0009, $0000, $0000, $0000, $0009, $0009, $0001, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0001,
     $0001, $0001, $0001, $0001, $0001, $0001, $0001, $0001, $0001, $0000, $0000, $0000, $0000, $0000, $0001, $0001
   );
-{$ENDREGION}
 
 function acCharacterType(const C: Word): TCharacterDirection;
 var
@@ -1019,6 +1172,8 @@ begin
   else
     Result := trdNeutral;
 end;
+
+{$ENDREGION}
 
 {$REGION ' acAdvDrawText '}
 
@@ -1169,13 +1324,405 @@ end;
 
 {$ENDREGION}
 
-{ TACLTextLayoutRefreshHelper }
+{$REGION ' Advanced Font '}
 
-function TACLTextLayoutRefreshHelper.OnText(ABlock: TACLTextLayoutBlockText): Boolean;
+{ TACLFont }
+
+destructor TACLFont.Destroy;
 begin
-  ABlock.Flush;
-  Result := True;
+  FreeAndNil(FShadow);
+  inherited Destroy;
 end;
+
+procedure TACLFont.AfterConstruction;
+begin
+  inherited;
+  FColorAlpha := MaxByte;
+  FShadow := TACLFontShadow.Create(ChangeHandler);
+end;
+
+procedure TACLFont.Assign(Source: TPersistent);
+begin
+  inherited Assign(Source);
+
+  if Source is TACLFont then
+  begin
+    ColorAlpha := TACLFont(Source).ColorAlpha;
+    Shadow := TACLFont(Source).Shadow;
+  end;
+end;
+
+function TACLFont.AppendTextExtends(const S: TSize): TSize;
+var
+  AExtends: TRect;
+begin
+  Result := S;
+  if not Result.IsEmpty then
+  begin
+    AExtends := TextExtends;
+    Inc(Result.cx, AExtends.MarginsWidth);
+    Inc(Result.cy, AExtends.MarginsHeight);
+  end;
+end;
+
+function TACLFont.MeasureSize(const S: PChar; ALength: Integer): TSize;
+begin
+  Result := AppendTextExtends(acTextSize(Self, S, ALength));
+end;
+
+function TACLFont.MeasureSize(const S: string): TSize;
+begin
+  Result := AppendTextExtends(acTextSize(Self, S));
+end;
+
+procedure TACLFont.ChangeHandler(Sender: TObject);
+begin
+  Changed;
+end;
+
+function TACLFont.GetAlphaColor: TAlphaColor;
+begin
+  Result := TAlphaColor.FromColor(Color, ColorAlpha);
+end;
+
+function TACLFont.GetTextExtends: TRect;
+begin
+  Result := Shadow.GetTextExtends;
+end;
+
+procedure TACLFont.SetAlphaColor(const Value: TAlphaColor);
+begin
+  Color := Value.ToColor;
+  ColorAlpha := Value.A;
+end;
+
+procedure TACLFont.SetColorAlpha(const AValue: Byte);
+begin
+  if FColorAlpha <> AValue then
+  begin
+    FColorAlpha := AValue;
+    Changed;
+  end;
+end;
+
+procedure TACLFont.SetShadow(const AValue: TACLFontShadow);
+begin
+  FShadow.Assign(AValue);
+end;
+
+{ TACLFontShadow }
+
+constructor TACLFontShadow.Create(AChangeEvent: TNotifyEvent);
+begin
+  inherited Create;
+  Reset;
+  FOnChange := AChangeEvent;
+end;
+
+procedure TACLFontShadow.Assign(Source: TPersistent);
+begin
+  if Source is TACLFontShadow then
+  begin
+    Color := TACLFontShadow(Source).Color;
+    Direction := TACLFontShadow(Source).Direction;
+    Size := TACLFontShadow(Source).Size;
+    Blur := TACLFontShadow(Source).Blur;
+  end;
+end;
+
+function TACLFontShadow.Equals(Obj: TObject): Boolean;
+begin
+  Result := (ClassType = Obj.ClassType) and
+    (TACLFontShadow(Obj).Blur = Blur) and
+    (TACLFontShadow(Obj).Color = Color) and
+    (TACLFontShadow(Obj).Size = Size) and
+    (TACLFontShadow(Obj).Direction = Direction);
+end;
+
+function TACLFontShadow.GetTextExtends: TRect;
+var
+  AIndent: Integer;
+begin
+  Result := NullRect;
+  if Assigned then
+  begin
+    AIndent := Size + FBlurSize + IfThen(FBlurSize > 0, Size);
+    if Direction in [mzLeftTop, mzTop, mzRightTop, mzClient] then
+      Result.Top := AIndent
+    else
+      Result.Top := FBlurSize;
+
+    if Direction in [mzLeftTop, mzLeft, mzLeftBottom, mzClient] then
+      Result.Left := AIndent
+    else
+      Result.Left := FBlurSize;
+
+    if Direction in [mzLeftBottom, mzBottom, mzRightBottom, mzClient] then
+      Result.Bottom := AIndent
+    else
+      Result.Bottom := FBlurSize;
+
+    if Direction in [mzRightTop, mzRight, mzRightBottom, mzClient] then
+      Result.Right := AIndent
+    else
+      Result.Right := FBlurSize;
+  end;
+end;
+
+procedure TACLFontShadow.Reset;
+begin
+  FColor := TAlphaColor.None;
+  FDirection := mzRightBottom;
+  FBlur := 0;
+  FBlurSize := 0;
+  FSize := 1;
+  Changed;
+end;
+
+procedure TACLFontShadow.Changed;
+begin
+  CallNotifyEvent(Self, FOnChange);
+end;
+
+function TACLFontShadow.GetAssigned: Boolean;
+begin
+  Result := (Size > 0) and Color.IsValid;
+end;
+
+function TACLFontShadow.GetBlur: Integer;
+begin
+  Result := FBlur;
+end;
+
+function TACLFontShadow.GetColor: TAlphaColor;
+begin
+  Result := FColor;
+end;
+
+function TACLFontShadow.GetDirection: TACLMarginPart;
+begin
+  Result := FDirection;
+end;
+
+function TACLFontShadow.GetDrawIterations: Integer;
+begin
+  if not Assigned then
+    Result := 0
+  else
+    if Direction = mzClient then
+      Result := Size * 2
+    else
+      Result := Size;
+end;
+
+function TACLFontShadow.GetSize: Integer;
+begin
+  Result := FSize;
+end;
+
+procedure TACLFontShadow.SetBlur(AValue: Integer);
+begin
+  AValue := EnsureRange(AValue, 0, 5 * BlurRadiusFactor);
+  if FBlur <> AValue then
+  begin
+    FBlur := AValue;
+    FBlurSize := (Blur div BlurRadiusFactor) + Ord(Blur mod BlurRadiusFactor <> 0);
+    Changed;
+  end;
+end;
+
+procedure TACLFontShadow.SetColor(AValue: TAlphaColor);
+begin
+  if FColor <> AValue then
+  begin
+    FColor := AValue;
+    Changed;
+  end;
+end;
+
+procedure TACLFontShadow.SetDirection(AValue: TACLMarginPart);
+begin
+  if Direction <> AValue then
+  begin
+    FDirection := AValue;
+    Changed;
+  end;
+end;
+
+procedure TACLFontShadow.SetSize(AValue: Integer);
+begin
+  AValue := MinMax(AValue, 1, 3);
+  if AValue <> Size then
+  begin
+    FSize := AValue;
+    Changed;
+  end;
+end;
+
+{$ENDREGION}
+
+{$REGION ' DrawText w alpha-channel '}
+var
+  FGammaTable: array[Byte] of Byte;
+  FGammaTableInitialized: Boolean;
+  FTextBlur: TACLBlurFilter;
+  FTextBuffer: TACLDib;
+
+function CanDrawText32(ACanvas: TCanvas; const AText: string;
+  const ARect: TRect; AFont: TACLFont): Boolean; inline;
+begin
+  Result := (AText <> '') and not ARect.IsEmpty and
+    ((AFont.ColorAlpha > 0) and (AFont.Color <> clNone) or AFont.Shadow.Assigned) and
+    acRectVisible(ACanvas, ARect);
+end;
+
+procedure Text32ApplyBlur(ALayer: TACLDib; AShadow: TACLFontShadow);
+begin
+  if AShadow.Blur > 0 then
+  begin
+    if FTextBlur = nil then
+      FTextBlur := TACLBlurFilter.Create;
+    FTextBlur.Radius := Round(AShadow.Blur / TACLFontShadow.BlurRadiusFactor);
+    FTextBlur.Apply(ALayer);
+  end;
+end;
+
+procedure Text32RecoverAlpha(ALayer: TACLDib; const ATextColor: TACLPixel32);
+const
+  K = 700; // [1..5000]
+var
+  AAlpha: Integer;
+  P: PACLPixel32;
+  I: Integer;
+begin
+  if not FGammaTableInitialized then
+  begin
+    for I := 0 to MaxByte do
+      FGammaTable[I] := FastTrunc(MaxByte * Power(I / MaxByte, 1000 / K));
+    FGammaTableInitialized := True;
+  end;
+
+  P := PACLPixel32(ALayer.Colors);
+  for I := 1 to ALayer.ColorCount do
+  begin
+    if PDWORD(P)^ and TACLPixel32.EssenceMask <> 0 then
+    begin
+      AAlpha := 128 + FGammaTable[P^.R] * 77 + FGammaTable[P^.G] * 151 + FGammaTable[P^.B] * 28;
+      AAlpha := AAlpha * ATextColor.A shr 16;
+      P^.B := TACLColors.PremultiplyTable[ATextColor.B, AAlpha];
+      P^.G := TACLColors.PremultiplyTable[ATextColor.G, AAlpha];
+      P^.R := TACLColors.PremultiplyTable[ATextColor.R, AAlpha];
+      P^.A := AAlpha;
+    end
+    else
+      P^.A := 0;
+
+    Inc(P);
+  end;
+end;
+
+procedure DrawText32Core(ACanvas: TCanvas;
+  const AText: PChar; ALength: Integer; AFont: TACLFont;
+  const ABounds: TRect; const ATextOffset: TPoint;
+  ATextDuplicateIndent: Integer = 0;
+  ATextColor: TAlphaColor = TAlphaColor.Default);
+
+  procedure Text32Output(ACanvas: TCanvas; const AOffset: TPoint);
+  begin
+    acTextOut(ACanvas, AOffset.X, AOffset.Y, AText, ALength, nil);
+    if ATextDuplicateIndent > 0 then
+      acTextOut(ACanvas, AOffset.X + ATextDuplicateIndent, AOffset.Y, AText, ALength, nil);
+  end;
+
+var
+  APoint: TPoint;
+  I, J, W, H: Integer;
+begin
+  W := ABounds.Width;
+  H := ABounds.Height;
+  if (W <= 0) or (H <= 0) then
+    Exit;
+
+  if FTextBuffer = nil then
+    FTextBuffer := TACLDib.Create(W, H)
+  else
+    FTextBuffer.Resize(W, H);
+
+  FTextBuffer.Canvas.SetScaledFont(AFont);
+  FTextBuffer.Canvas.Font.Color := clWhite;
+  FTextBuffer.Canvas.Brush.Style := bsClear;
+
+  if AFont.Shadow.Assigned then
+  begin
+    FTextBuffer.Reset;
+
+    if AFont.Shadow.Direction = mzClient then
+    begin
+      for I := -AFont.Shadow.Size to AFont.Shadow.Size do
+      for J := -AFont.Shadow.Size to AFont.Shadow.Size do
+        if I <> J then
+          Text32Output(FTextBuffer.Canvas, ATextOffset + Point(I, J));
+    end
+    else
+    begin
+      APoint := ATextOffset;
+      for I := 1 to AFont.Shadow.Size do
+      begin
+        APoint := APoint + TACLFontShadow.Offsets[AFont.Shadow.Direction];
+        Text32Output(FTextBuffer.Canvas, APoint);
+      end;
+    end;
+    Text32ApplyBlur(FTextBuffer, AFont.Shadow);
+    Text32RecoverAlpha(FTextBuffer, TACLPixel32.Create(AFont.Shadow.Color));
+    FTextBuffer.DrawBlend(ACanvas, ABounds.TopLeft);
+  end;
+
+  if ATextColor = TAlphaColor.Default then
+    ATextColor := TAlphaColor.FromColor(acGetActualColor(AFont.Color, clBlack), AFont.ColorAlpha);
+
+  if ATextColor.IsValid then
+  begin
+    FTextBuffer.Reset;
+    Text32Output(FTextBuffer.Canvas, ATextOffset);
+    Text32RecoverAlpha(FTextBuffer, TACLPixel32.Create(ATextColor));
+    FTextBuffer.DrawBlend(ACanvas, ABounds.TopLeft);
+  end;
+end;
+
+procedure DrawText32(ACanvas: TCanvas; const R: TRect; AText: string;
+  AFont: TACLFont; AAlignment: TAlignment; AVertAlignment: TVerticalAlignment;
+  AEndEllipsis: Boolean);
+var
+  LTextExtends: TRect;
+  LTextOffset: TPoint;
+  LTextSize: TSize;
+begin
+  if CanDrawText32(ACanvas, AText, R, AFont) then
+  begin
+    MeasureCanvas.SetScaledFont(AFont);
+    LTextExtends := AFont.TextExtends;
+    LTextSize := acTextSize(MeasureCanvas, AText);
+    if AEndEllipsis then
+      acTextEllipsize(MeasureCanvas, AText, LTextSize, R.Width - LTextExtends.MarginsWidth);
+    Inc(LTextSize.cy, LTextExtends.MarginsHeight);
+    Inc(LTextSize.cx, LTextExtends.MarginsWidth);
+    LTextOffset := acTextAlign(R, LTextSize, AAlignment, AVertAlignment);
+    DrawText32Core(ACanvas, PChar(AText), Length(AText), AFont,
+      TRect.Create(LTextOffset, LTextSize), LTextExtends.TopLeft, 0);
+  end;
+end;
+
+procedure DrawText32Duplicated(ACanvas: TCanvas; const R: TRect;
+  const AText: string; const ATextOffset: TPoint; ADuplicateOffset: Integer;
+  AFont: TACLFont);
+begin
+  if CanDrawText32(ACanvas, AText, R, AFont) then
+  begin
+    DrawText32Core(ACanvas, PChar(AText), Length(AText), AFont, R,
+      ATextOffset + AFont.TextExtends.TopLeft, ADuplicateOffset);
+  end;
+end;
+{$ENDREGION}
 
 {$REGION ' Blocks '}
 
@@ -1189,6 +1736,11 @@ end;
 function TACLTextLayoutBlock.Export(AExporter: TACLTextLayoutExporter): Boolean;
 begin
   Result := True;
+end;
+
+procedure TACLTextLayoutBlock.FlushCalculatedValues;
+begin
+  // do nothing
 end;
 
 procedure TACLTextLayoutBlock.Shrink(ARender: TACLTextLayoutRender; AMaxRight: Integer);
@@ -1322,7 +1874,7 @@ begin
   Result := AExporter.OnText(Self);
 end;
 
-procedure TACLTextLayoutBlockText.Flush;
+procedure TACLTextLayoutBlockText.FlushCalculatedValues;
 begin
   FLengthVisible := 0;
   FHeight := 0;
@@ -1898,9 +2450,17 @@ end;
 
 { TACLTextLayoutPainter }
 
-constructor TACLTextLayoutPainter.Create(AOwner: TACLTextLayout; ARender: TACLTextLayoutRender);
+constructor TACLTextLayoutPainter.Create;
 begin
-  inherited;
+  CreateEx(AOwner, ARender, True, True);
+end;
+
+constructor TACLTextLayoutPainter.CreateEx(AOwner: TACLTextLayout;
+  ARender: TACLTextLayoutRender; ADrawBackground, ADrawContent: Boolean);
+begin
+  inherited Create(AOwner, ARender);
+  FDrawContent := ADrawContent;
+  FDrawBackground := ADrawBackground;
   FDefaultTextColor := Owner.GetDefaultTextColor;
   FFillColors := TACLTextLayoutValueStack<TColor>.Create;
   FTextColors := TACLTextLayoutValueStack<TColor>.Create;
@@ -1922,10 +2482,14 @@ begin
   else
     FFillColors.Pop(TACLTextLayoutBlockFillColor);
 
-  if FFillColors.Count > 0 then
-    Render.SetFill(FFillColors.Peek)
-  else
-    Render.SetFill(clNone);
+  if FDrawBackground then
+  begin
+    FHasBackground := FFillColors.Count > 0;
+    if FHasBackground then
+      Render.SetFill(FFillColors.Peek)
+    else
+      Render.SetFill(clNone);
+  end;
 
   Result := True;
 end;
@@ -1956,15 +2520,25 @@ end;
 
 function TACLTextLayoutPainter.OnSpace(ABlock: TACLTextLayoutBlockSpace): Boolean;
 begin
-  if (ABlock.FWidth > 0) and (fsUnderline in Font.Style) then
-    Render.DrawUnderline(ABlock.Bounds);
+  if ABlock.FWidth > 0 then
+  begin
+    if (fsUnderline in Font.Style) and FDrawContent then
+      Render.DrawUnderline(ABlock.Bounds)
+    else if FHasBackground then
+      Render.FillBackground(ABlock.Bounds);
+  end;
   Result := True;
 end;
 
 function TACLTextLayoutPainter.OnText(AText: TACLTextLayoutBlockText): Boolean;
 begin
   if AText.TextLengthVisible > 0 then
-    Render.DrawText(AText, AText.FPosition.X, AText.FPosition.Y);
+  begin
+    if FDrawContent then
+      Render.DrawText(AText, AText.FPosition.X, AText.FPosition.Y)
+    else if FHasBackground then
+      Render.FillBackground(AText.Bounds);
+  end;
   Result := True;
 end;
 
@@ -1978,6 +2552,76 @@ begin
   if LColor = clDefault then
     LColor := FDefaultTextColor;
   Font.Color := LColor;
+end;
+
+{ TACLTextLayoutShadowPainter }
+
+constructor TACLTextLayoutShadowPainter.Create;
+var
+  LClipBox: TRect;
+  LFont: TACLFont;
+  LLayoutBox: TRect;
+begin
+  FTargetRender := ARender;
+  LFont := AOwner.Font as TACLFont;
+  LLayoutBox := AOwner.FLayout.BoundingRect;
+  LLayoutBox.Inflate(LFont.TextExtends);
+  if ARender.GetClipBox(LClipBox) then
+    LLayoutBox.Intersect(LClipBox);
+  if LClipBox.IsEmpty then
+    LClipBox.Size := TSize.Create(1);
+
+  FOrigin := LClipBox.TopLeft;
+  FBuffer := TACLDib.Create(LClipBox);
+  FBuffer.Reset;
+  inherited Create(AOwner, ARender.CreateCompatibleRender(FBuffer));
+  FShadow := LFont.Shadow;
+  FShadowDirection := TACLFontShadow.Offsets[FShadow.Direction];
+  FShadowStroke := FShadowDirection = NullPoint;
+  FShadowSize := FShadow.Size;
+end;
+
+destructor TACLTextLayoutShadowPainter.Destroy;
+begin
+  Render.Free; // end drawing
+  Text32ApplyBlur(FBuffer, FShadow);
+  Text32RecoverAlpha(FBuffer, TACLPixel32.Create(FShadow.Color));
+  FTargetRender.DrawImage(FBuffer, TRect.Create(FOrigin, FBuffer.Size));
+  FreeAndNil(FBuffer);
+  inherited;
+end;
+
+procedure TACLTextLayoutShadowPainter.AfterConstruction;
+begin
+  inherited;
+  Font.Color := clWhite;
+  Render.SetFill(clNone);
+end;
+
+function TACLTextLayoutShadowPainter.OnText(ABlock: TACLTextLayoutBlockText): Boolean;
+var
+  I, J: Integer;
+begin
+  if ABlock.TextWidth > 0 then
+  begin
+    if FShadowStroke then
+    begin
+      for I := -FShadowSize to FShadowSize do
+      for J := -FShadowSize to FShadowSize do
+        if I <> J then
+          Render.DrawText(ABlock,
+            ABlock.Position.X + I - FOrigin.X,
+            ABlock.Position.Y + J - FOrigin.Y);
+    end
+    else
+      for I := 1 to FShadowSize do
+      begin
+        Render.DrawText(ABlock,
+          ABlock.Position.X + I * FShadowDirection.X - FOrigin.X,
+          ABlock.Position.Y + I * FShadowDirection.Y - FOrigin.Y);
+      end;
+  end;
+  Result := True;
 end;
 
 {$ENDREGION}
@@ -2002,7 +2646,8 @@ begin
   FWordWrap := (atoWordWrap and Owner.Options <> 0) and not FSingleLine;
 
   FBounds := AOwner.Bounds;
-  FBounds.Content(Owner.GetPadding);
+  if Owner.Font is TACLFont then
+    FBounds.Content(TACLFont(Owner.Font).TextExtends);
   FMaxHeight := IfThen(atoAutoHeight and Owner.Options <> 0, MaxInt, FBounds.Height);
   FMaxWidth := IfThen(atoAutoWidth and Owner.Options <> 0, MaxInt, FBounds.Width);
 end;
@@ -2649,9 +3294,16 @@ begin
   Result := False;
 end;
 
+{ TACLTextImporter.TContext }
+
+destructor TACLTextImporter.TContext.Destroy;
+begin
+  FreeAndNil(Span);
+  inherited;
+end;
 {$ENDREGION}
 
-{$REGION ' Native Canvases '}
+{$REGION ' Native Render '}
 
 { TACLTextLayoutCanvasRender }
 
@@ -2659,6 +3311,11 @@ constructor TACLTextLayoutCanvasRender.Create(ACanvas: TCanvas);
 begin
   FCanvas := ACanvas;
   inherited Create;
+end;
+
+function TACLTextLayoutCanvasRender.CreateCompatibleRender(ADib: TACLDib): TACLTextLayoutRender;
+begin
+  Result := TACLTextLayoutCanvasRenderClass(ClassType).Create(ADib.Canvas);
 end;
 
 procedure TACLTextLayoutCanvasRender.Measure(ABlock: TACLTextLayoutBlockText);
@@ -2696,6 +3353,21 @@ begin
   LRect := R;
   LSize := R.Width;
   ExtTextOut(FCanvas.Handle, LRect.Left, LRect.Top, ETO_CLIPPED, @LRect, ' ', 1, @LSize);
+end;
+
+procedure TACLTextLayoutCanvasRender.FillBackground(const R: TRect);
+begin
+  if Canvas.Brush.Style <> bsClear then
+    Canvas.FillRect(R);
+end;
+
+function TACLTextLayoutCanvasRender.GetClipBox(out R: TRect): Boolean;
+begin
+{$IFDEF FPC}
+  Result := LCLIntf.GetClipBox(Canvas.Handle, @R) <> NULLREGION;
+{$ELSE}
+  Result := Windows.GetClipBox(Canvas.Handle,  R) <> NULLREGION;
+{$ENDIF}
 end;
 
 procedure TACLTextLayoutCanvasRender.GetMetrics(out ABaseline, ALineHeight, ASpaceWidth: Integer);
@@ -2744,6 +3416,11 @@ begin
 {$ENDIF}
 end;
 
+procedure TACLTextLayoutCanvasRender.DrawImage(ADib: TACLDib; const R: TRect);
+begin
+  ADib.DrawBlend(Canvas, R);
+end;
+
 procedure TACLTextLayoutCanvasRender.DrawText(ABlock: TACLTextLayoutBlockText; X, Y: Integer);
 begin
   ExtTextOut(FCanvas.Handle, X, Y, 0, nil,
@@ -2751,7 +3428,38 @@ begin
     @PIntegerArray(ABlock.FMetrics)^[1]);
 end;
 
+{ TACLTextLayoutCanvasRender32 }
+
+destructor TACLTextLayoutCanvasRender32.Destroy;
+begin
+  FreeAndNil(FFont);
+  inherited;
+end;
+
+procedure TACLTextLayoutCanvasRender32.DrawText(
+  ABlock: TACLTextLayoutBlockText; X, Y: Integer);
+begin
+  DrawText32Core(Canvas, ABlock.Text, ABlock.TextLength, FFont, ABlock.Bounds, NullPoint);
+end;
+
+procedure TACLTextLayoutCanvasRender32.FillBackground(const R: TRect);
+begin
+  if Canvas.Brush.Style = bsSolid then
+    acFillRect(Canvas, R, TAlphaColor.FromColor(Canvas.Brush.Color));
+end;
+
+procedure TACLTextLayoutCanvasRender32.SetFont(AFont: TFont);
+begin
+  if FFont = nil then
+    FFont := TACLFont.Create;
+  inherited;
+  FFont.Assign(AFont);
+  FFont.Shadow.Reset;
+end;
+
 {$ENDREGION}
+
+{$REGION ' TextLayout '}
 
 { TACLTextFormatSettings }
 
@@ -2797,7 +3505,7 @@ var
 begin
   if FLayoutIsDirty then
   begin
-    LRender := DefaultTextLayoutCanvasRender.Create(ACanvas);
+    LRender := GetDefaultRender.Create(ACanvas);
     try
       Calculate(LRender);
     finally
@@ -2819,8 +3527,11 @@ begin
 end;
 
 procedure TACLTextLayout.FlushCalculatedValues;
+var
+  I: Integer;
 begin
-  FBlocks.Export(TACLTextLayoutRefreshHelper.Create(Self), True);
+  for I := 0 to FBlocks.Count - 1 do
+    FBlocks.List[I].FlushCalculatedValues;
   FLayoutIsDirty := True;
 end;
 
@@ -2830,7 +3541,7 @@ var
 begin
   if Options and atoNoClip <> 0 then
   begin
-    LRender := DefaultTextLayoutCanvasRender.Create(ACanvas);
+    LRender := GetDefaultRender.Create(ACanvas);
     try
       Draw(LRender);
     finally
@@ -2851,7 +3562,7 @@ begin
     LClipRegion := acSaveClipRegion(ACanvas.Handle);
     try
       acIntersectClipRegion(ACanvas.Handle, AClipRect);
-      LRender := DefaultTextLayoutCanvasRender.Create(ACanvas);
+      LRender := GetDefaultRender.Create(ACanvas);
       try
         Draw(LRender);
       finally
@@ -2866,20 +3577,27 @@ end;
 procedure TACLTextLayout.Draw(ARender: TACLTextLayoutRender);
 begin
   Calculate(ARender);
-  FLayout.Export(TACLTextLayoutPainter.Create(Self, ARender), True);
+  if (Font is TACLFont) and TACLFont(Font).Shadow.Assigned then
+  begin
+    FLayout.Export(TACLTextLayoutPainter.CreateEx(Self, ARender, True, False), True);
+    FLayout.Export(TACLTextLayoutShadowPainter.Create(Self, ARender), True);
+    FLayout.Export(TACLTextLayoutPainter.CreateEx(Self, ARender, False, True), True);
+  end
+  else
+    FLayout.Export(TACLTextLayoutPainter.Create(Self, ARender), True);
 end;
 
 procedure TACLTextLayout.DrawTo(ACanvas: TCanvas; const AClipRect: TRect; const AOrigin: TPoint);
 var
-  APrevOrigin: TPoint;
+  LOrigin: TPoint;
 begin
   if AOrigin <> NullPoint then
   begin
-    APrevOrigin := acMoveWindowOrg(ACanvas.Handle, AOrigin);
+    LOrigin := acMoveWindowOrg(ACanvas.Handle, AOrigin);
     try
       Draw(ACanvas, AClipRect - AOrigin);
     finally
-      acRestoreWindowOrg(ACanvas.Handle, APrevOrigin);
+      acRestoreWindowOrg(ACanvas.Handle, LOrigin);
     end;
   end
   else
@@ -2888,22 +3606,22 @@ end;
 
 function TACLTextLayout.FindBlock(APositionInText: Integer; out ABlock: TACLTextLayoutBlock): Boolean;
 var
-  AItem: TACLTextLayoutBlock;
-  ASearchPosition: PByte;
+  LItem: TACLTextLayoutBlock;
+  LSearchPosition: PByte;
   I: Integer;
 begin
   if not InRange(APositionInText, 1, Length(FText)) then
     Exit(False);
 
-  ASearchPosition := PByte(PChar(FText) + APositionInText);
+  LSearchPosition := PByte(PChar(FText) + APositionInText);
   for I := 0 to FBlocks.Count - 1 do
   begin
-    AItem := FBlocks.List[I];
-    if (PByte(AItem.FPositionInText) >= ASearchPosition) and
-       (PByte(AItem.FPositionInText) <  ASearchPosition + AItem.FLength)
+    LItem := FBlocks.List[I];
+    if (PByte(LItem.FPositionInText) >= LSearchPosition) and
+       (PByte(LItem.FPositionInText) <  LSearchPosition + LItem.FLength)
     then
       begin
-        ABlock := AItem;
+        ABlock := LItem;
         Exit(True);
       end;
   end;
@@ -2938,7 +3656,12 @@ var
 begin
   Result := GetDefaultTextColor;
   TACLColors.RGBtoHSLi(Result, H, S, L);
-  TACLColors.HSLtoRGBi(154, Max(S, 154), Min(Max(L, 100), 200), Result);
+  TACLColors.HSLtoRGBi(154, Max(S, 154), EnsureRange(L, 100, 200), Result);
+end;
+
+function TACLTextLayout.GetDefaultRender: TACLTextLayoutCanvasRenderClass;
+begin
+  Result := DefaultTextLayoutCanvasRender;
 end;
 
 function TACLTextLayout.GetDefaultTextColor: TColor;
@@ -2946,31 +3669,20 @@ begin
   Result := Font.Color;
 end;
 
-function TACLTextLayout.GetPadding: TRect;
-begin
-  Result := NullRect;
-end;
-
 function TACLTextLayout.GetRowCount: Integer;
 begin
   if FLayoutIsDirty then
-    raise EInvalidOperation.Create(ClassName + ' not calculated yet');
+    raise EInvalidOperation.Create(ClassName + ' is not yet calculated');
   Result := FLayout.Count;
 end;
 
 function TACLTextLayout.MeasureSize: TSize;
-var
-  LPadding: TRect;
 begin
   if FLayoutIsDirty then
-    raise EInvalidOperation.Create(ClassName + ' not calculated yet');
+    raise EInvalidOperation.Create(ClassName + ' is not yet calculated');
   Result := FLayout.BoundingRect.Size;
-  if not Result.IsEmpty then
-  begin
-    LPadding := GetPadding;
-    Inc(Result.cx, LPadding.MarginsWidth);
-    Inc(Result.cy, LPadding.MarginsHeight);
-  end;
+  if not Result.IsEmpty and (Font is TACLFont) then
+    Result := TACLFont(Font).AppendTextExtends(Result)
 end;
 
 procedure TACLTextLayout.SetBounds(const ABounds: TRect);
@@ -3065,12 +3777,11 @@ begin
   end;
 end;
 
-{ TACLTextImporter.TContext }
+{ TACLTextLayout32 }
 
-destructor TACLTextImporter.TContext.Destroy;
+function TACLTextLayout32.GetDefaultRender: TACLTextLayoutCanvasRenderClass;
 begin
-  FreeAndNil(Span);
-  inherited;
+  Result := TACLTextLayoutCanvasRender32;
 end;
 
 { TACLTextViewInfo }
@@ -3088,4 +3799,11 @@ begin
   Result.cy := FHeight;
 end;
 
+{$ENDREGION}
+
+initialization
+
+finalization
+  FreeAndNil(FTextBuffer);
+  FreeAndNil(FTextBlur);
 end.

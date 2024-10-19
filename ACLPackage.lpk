@@ -132,10 +132,6 @@
         <UnitName Value="ACL.Graphics.TextLayout"/>
       </Item>
       <Item>
-        <Filename Value="Base/ACL.Graphics.TextLayout32.pas"/>
-        <UnitName Value="ACL.Graphics.TextLayout32"/>
-      </Item>
-      <Item>
         <Filename Value="Base/ACL.Hashes.pas"/>
         <UnitName Value="ACL.Hashes"/>
       </Item>

@@ -67,7 +67,6 @@ contains
   ACL.Graphics.SkinImage in 'Base\ACL.Graphics.SkinImage.pas',
   ACL.Graphics.SkinImageSet in 'Base\ACL.Graphics.SkinImageSet.pas',
   ACL.Graphics.TextLayout in 'Base\ACL.Graphics.TextLayout.pas',
-  ACL.Graphics.TextLayout32 in 'Base\ACL.Graphics.TextLayout32.pas',
   ACL.Hashes in 'Base\ACL.Hashes.pas',
   ACL.Math in 'Base\ACL.Math.pas',
   ACL.Math.Complex in 'Base\ACL.Math.Complex.pas',

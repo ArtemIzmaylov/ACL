@@ -17,7 +17,7 @@ uses
   ACL.Graphics.Ex, ACL.Graphics.Ex.Cairo, ACL.Graphics.FontCache, 
   ACL.Graphics.Images, ACL.Graphics.Palette, ACL.Graphics.SkinImage, 
   ACL.Graphics.SkinImageSet, ACL.Graphics.TextLayout, 
-  ACL.Graphics.TextLayout32, ACL.Hashes, ACL.MUI, ACL.Math, ACL.Math.Complex, 
+  ACL.Hashes, ACL.MUI, ACL.Math, ACL.Math.Complex, 
   ACL.ObjectLinks, ACL.Parsers, ACL.Parsers.Ripper, ACL.SimpleIPC, 
   ACL.Threading, ACL.Threading.Pool, ACL.Threading.Sorting, ACL.Timers, 
   ACL.Utils.Clipboard, ACL.Utils.Common, ACL.Utils.DPIAware, ACL.Utils.Date, 
