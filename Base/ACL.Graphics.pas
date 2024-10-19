@@ -244,6 +244,7 @@ type
     procedure MakeTransparent(const AColor: TColor); overload;
     procedure Premultiply; overload;
     procedure Premultiply(R: TRect); overload;
+    procedure Unpremultiply;
     procedure Reset; overload;
     procedure Reset(const ARect: TRect); overload;
     function Resize(const ANewBounds: TRect): Boolean; overload;
@@ -2858,6 +2859,11 @@ end;
 procedure TACLDib.Premultiply;
 begin
   TACLColors.Premultiply(@Colors^[0], ColorCount);
+end;
+
+procedure TACLDib.Unpremultiply;
+begin
+  TACLColors.Unpremultiply(@Colors^[0], ColorCount);
 end;
 
 procedure TACLDib.Reset;
