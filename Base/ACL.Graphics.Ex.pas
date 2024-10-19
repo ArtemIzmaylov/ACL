@@ -305,6 +305,7 @@ type
 
 var
   FBlendFunctions: array[TACLBlendMode] of TACLBlendFunction;
+  FBlendFunctionsThreadingThreshold: Integer = 800 * 800; // px
 
 implementation
 
@@ -588,7 +589,7 @@ begin
   if (ATarget.Width <> ASource.Width) or (ATarget.Height <> ASource.Height) then
     raise EInvalidOperation.Create('Cannot blend DIBs with different sizes');
 
-  if ASource.ColorCount > 256 * 256 then
+  if ASource.ColorCount >= FBlendFunctionsThreadingThreshold then
     AChunkCount := CPUCount
   else
     AChunkCount := 1;
