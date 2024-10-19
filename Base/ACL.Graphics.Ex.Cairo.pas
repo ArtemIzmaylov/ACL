@@ -232,7 +232,7 @@ procedure cairo_set_source_color(ACairo: pcairo_t; const AColor: TCairoColor); o
 implementation
 
 uses
-  ACL.Graphics.TextLayout;
+  ACL.Graphics.FontCache;
 
 {$REGION ' DrawText '}
 const
@@ -473,7 +473,7 @@ begin
   if AFont.Height = 0 then
     cairo_set_font_size(ACairo, TCairoMeasurer.DefaultFontSize)
   else
-    cairo_set_font_size(ACairo, Abs(AFont.Height));
+    cairo_set_font_size(ACairo, Abs(acResolveFontHeight(AFont, AFont.Height)));
 end;
 
 procedure cairo_set_source_color(ACairo: pcairo_t; const AColor: TAlphaColor);
