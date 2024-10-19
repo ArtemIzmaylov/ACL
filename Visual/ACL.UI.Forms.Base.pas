@@ -913,7 +913,7 @@ begin
       if (Parent <> nil) and not (csDesigning in ComponentState) then
         Font := TWinControlAccess(Parent).Font
       else
-        acAssignFont(Font, TACLApplication.DefaultFont, FCurrentPPI, acGetSystemDpi);
+        Font.Assign(TACLApplication.DefaultFont, acGetSystemDpi, FCurrentPPI);
 
       ParentFont := True;
     finally

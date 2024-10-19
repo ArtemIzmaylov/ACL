@@ -166,6 +166,7 @@ type
 
   TFontHelper = class helper for TFont
   public
+    procedure Assign(Source: TFont; SourceDpi, TargetDpi: Integer); overload;
     function Clone: TFont;
     procedure ResolveHeight;
     procedure SetSize(ASize: Integer; ATargetDpi: Integer); overload;
@@ -2448,6 +2449,13 @@ begin
 end;
 
 { TFontHelper }
+
+procedure TFontHelper.Assign(Source: TFont; SourceDpi, TargetDpi: Integer);
+begin
+  Assign(Source);
+  if SourceDpi <> TargetDpi then
+    Height := dpiApply(dpiRevert(Source.Height, SourceDpi), TargetDpi);
+end;
 
 function TFontHelper.Clone: TFont;
 type

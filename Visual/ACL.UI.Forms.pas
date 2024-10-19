@@ -377,7 +377,7 @@ begin
   if LSourceDPI <> 0 then
     ScaleForPPI(LSourceDPI);
   if Owner is TControl then
-    acAssignFont(Font, TWinControlAccess(Owner).Font, CurrentDpi, LSourceDPI);
+    Font.Assign(TWinControlAccess(Owner).Font, LSourceDPI, CurrentDpi);
 end;
 
 function TACLPopupWindow.IsMouseInControl: Boolean;
