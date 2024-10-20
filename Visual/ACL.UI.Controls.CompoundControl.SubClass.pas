@@ -340,6 +340,9 @@ type
     function CreateDefaultDropTarget: TACLDropTarget; virtual;
     procedure UpdateDropTarget(ADropTarget: TACLDropTarget);
 
+    // Messages
+    procedure CMCancelMode(var Message: TMessage); message CM_CANCELMODE;
+
     property AutoScrollTimer: TACLTimer read FAutoScrollTimer;
     property DragWindow: TDragImageList{nullable} read FDragWindow;
     property DropSourceConfig: TACLIniFile read FDropSourceConfig;
@@ -827,6 +830,8 @@ type
 
     function GetFocused: Boolean; virtual;
     function GetFullRefreshChanges: TIntegerSet; virtual;
+    // Messages
+    procedure CMCancelMode(var Message: TMessage); message CM_CANCELMODE;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -1401,6 +1406,11 @@ function TACLCompoundControlDragAndDropController.CanStartDropSource(
   var AActions: TACLDropSourceActions; ASourceObject: TObject): Boolean;
 begin
   Result := not SubClass.DoDropSourceBegin(AActions, DropSourceConfig);
+end;
+
+procedure TACLCompoundControlDragAndDropController.CMCancelMode(var Message: TMessage);
+begin
+  if not IsDropSourceOperation then Cancel;
 end;
 
 procedure TACLCompoundControlDragAndDropController.StartDropSource(
@@ -2953,6 +2963,12 @@ function TACLCompoundControlSubClass.ClientToScreen(const R: TRect): TRect;
 begin
   Result.BottomRight := ClientToScreen(R.BottomRight);
   Result.TopLeft := ClientToScreen(R.TopLeft);
+end;
+
+procedure TACLCompoundControlSubClass.CMCancelMode(var Message: TMessage);
+begin
+  DragAndDropController.Dispatch(Message);
+  inherited;
 end;
 
 function TACLCompoundControlSubClass.ClientToScreen(const P: TPoint): TPoint;

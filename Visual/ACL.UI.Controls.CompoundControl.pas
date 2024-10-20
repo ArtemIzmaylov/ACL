@@ -530,7 +530,6 @@ end;
 
 procedure TACLCompoundControl.CMCancelMode(var Message: TMessage);
 begin
-  SubClass.DragAndDropController.Cancel;
   SubClass.Dispatch(Message);
   inherited;
 end;
