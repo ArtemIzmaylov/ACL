@@ -306,8 +306,9 @@ type
 
   { TACLCalendarViewInfo }
 
-  TACLCalendarViewInfo = class(TACLCalendarAbstractViewViewInfo,
-    IACLAnimateControl)
+  TACLCalendarViewInfo = class(TACLCalendarAbstractViewViewInfo, IACLAnimateControl)
+  strict private const
+    ContentSliding = 42;
   strict private
     FActiveView: TACLCalendarCustomViewViewInfo;
     FDayView: TACLCalendarDayViewViewInfo;
@@ -549,9 +550,9 @@ begin
     htaLeave:
       if not IsSelected then
       begin
-        if acUIFadingEnabled then
+        if acUIAnimations then
         begin
-          AAnimation := TACLAnimation.Create(Self, acUIFadingTime);
+          AAnimation := TACLAnimation.Create(Self, acUIAnimationTime);
           AAnimation.Tag := TagAnimationFrame;
           AAnimation.Run;
         end
@@ -1043,18 +1044,23 @@ begin
 end;
 
 procedure TACLCalendarViewInfo.NextPage(ADirection: TACLMouseWheelDirection);
-const
-  ModeMap: array[TACLMouseWheelDirection] of TACLBitmapSlideAnimationMode = (samBottomToTop, samTopToBottom);
 var
-  AAnimation: TACLCustomBitmapAnimation;
+  LAnimation: TACLBitmapAnimation;
+  LAnimator: TACLFramesAnimator;
 begin
-  if acUIFadingEnabled then
+  if acUIAnimations then
   begin
-    AAnimation := TACLBitmapSlideAnimation.Create(ModeMap[ADirection], Self, acUIFadingTime);
-    PrepareAnimationFrame(AAnimation.AllocateFrame1(ActiveView.CellsArea), ActiveView.CellsArea.TopLeft);
+    if ADirection = mwdUp then
+      LAnimator := TACLAnimatorSlideTopToBottom.Create
+    else
+      LAnimator := TACLAnimatorSlideBottomToTop.Create;
+
+    LAnimation := TACLBitmapAnimation.Create(Self, ActiveView.CellsArea, LAnimator);
+    LAnimation.Tag := ContentSliding;
+    PrepareAnimationFrame(LAnimation.BuildFrame1, ActiveView.CellsArea.TopLeft);
     ActiveView.NextPage(ADirection);
-    PrepareAnimationFrame(AAnimation.AllocateFrame2(ActiveView.CellsArea), ActiveView.CellsArea.TopLeft);
-    AAnimation.Run;
+    PrepareAnimationFrame(LAnimation.BuildFrame2, ActiveView.CellsArea.TopLeft);
+    LAnimation.Run;
   end
   else
     ActiveView.NextPage(ADirection);
@@ -1067,24 +1073,25 @@ end;
 
 procedure TACLCalendarViewInfo.Select(const ADate: TDateTime);
 var
-  AAnimation: TACLCustomBitmapAnimation;
+  LAnimation: TACLBitmapAnimation;
 begin
   if ADate <> SubClass.Value then
   begin
-    if acUIFadingEnabled then
+    if acUIAnimations then
     begin
-      AAnimation := TACLBitmapFadingAnimation.Create(Self, acUIFadingTime);
-      PrepareAnimationFrame(AAnimation.AllocateFrame1(ActiveView.Bounds), Bounds.TopLeft);
+      LAnimation := TACLBitmapAnimation.Create(Self, ActiveView.Bounds, TACLAnimatorFadeIn.Create);
+      PrepareAnimationFrame(LAnimation.BuildFrame1, Bounds.TopLeft);
       SubClass.Value := ADate;
-      PrepareAnimationFrame(AAnimation.AllocateFrame2(ActiveView.Bounds), Bounds.TopLeft);
-      AAnimation.Run;
+      PrepareAnimationFrame(LAnimation.BuildFrame2, Bounds.TopLeft);
+      LAnimation.Run;
     end
     else
       SubClass.Value := ADate;
   end;
 end;
 
-procedure TACLCalendarViewInfo.DoActivateView(AView: TACLCalendarCustomViewViewInfo; const AInitialDate: TDate);
+procedure TACLCalendarViewInfo.DoActivateView(
+  AView: TACLCalendarCustomViewViewInfo; const AInitialDate: TDate);
 
   procedure DoActivateViewCore;
   begin
@@ -1093,20 +1100,24 @@ procedure TACLCalendarViewInfo.DoActivateView(AView: TACLCalendarCustomViewViewI
     FActiveView.InitialDate := AInitialDate;
   end;
 
-const
-  ModeMap: array[Boolean] of TACLBitmapZoomAnimationMode = (zamZoomIn, zamZoomOut);
 var
-  AAnimation: TACLCustomBitmapAnimation;
+  LAnimator: TACLFramesAnimator;
+  LAnimation: TACLBitmapAnimation;
 begin
   if ActiveView <> AView then
   begin
-    if acUIFadingEnabled then
+    if acUIAnimations then
     begin
-      AAnimation := TACLBitmapZoomAnimation.Create(ModeMap[AView = FMonthView], Self, acUIFadingTime);
-      PrepareAnimationFrame(AAnimation.AllocateFrame1(Bounds), Bounds.TopLeft);
+      if AView = FMonthView then
+        LAnimator := TACLAnimatorZoomOut.Create
+      else
+        LAnimator := TACLAnimatorZoomIn.Create;
+
+      LAnimation := TACLBitmapAnimation.Create(Self, Bounds, LAnimator);
+      PrepareAnimationFrame(LAnimation.BuildFrame1, Bounds.TopLeft);
       DoActivateViewCore;
-      PrepareAnimationFrame(AAnimation.AllocateFrame2(Bounds), Bounds.TopLeft);
-      AAnimation.Run;
+      PrepareAnimationFrame(LAnimation.BuildFrame2, Bounds.TopLeft);
+      LAnimation.Run;
     end
     else
       DoActivateViewCore;
@@ -1123,24 +1134,20 @@ var
   AAnimation: TACLAnimation;
   APrevRgn: TRegionHandle;
 begin
-  if AnimationManager.Find(Self, AAnimation) then
+  if AnimationManager.Find(Self, AAnimation, ContentSliding) then
   begin
-    if AAnimation is TACLBitmapSlideAnimation then
-    begin
-      APrevRgn := acSaveClipRegion(ACanvas.Handle);
-      try
-        AAnimation.Draw(ACanvas, ActiveView.CellsArea);
-        acExcludeFromClipRegion(ACanvas.Handle, ActiveView.CellsArea);
-        ActiveView.Draw(ACanvas);
-      finally
-        acRestoreClipRegion(ACanvas.Handle, APrevRgn);
-      end;
-    end
-    else
-      AAnimation.Draw(ACanvas, Bounds);
+    APrevRgn := acSaveClipRegion(ACanvas.Handle);
+    try
+      AAnimation.Draw(ACanvas, ActiveView.CellsArea);
+      acExcludeFromClipRegion(ACanvas.Handle, ActiveView.CellsArea);
+      ActiveView.Draw(ACanvas);
+    finally
+      acRestoreClipRegion(ACanvas.Handle, APrevRgn);
+    end;
   end
   else
-    ActiveView.Draw(ACanvas);
+    if not AnimationManager.Draw(Self, ACanvas, Bounds) then    
+      ActiveView.Draw(ACanvas);
 end;
 
 procedure TACLCalendarViewInfo.PrepareAnimationFrame(AFrame: TACLDib; const P: TPoint);

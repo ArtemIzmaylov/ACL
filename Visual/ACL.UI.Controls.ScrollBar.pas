@@ -491,17 +491,17 @@ end;
 
 procedure TACLScrollBarViewInfoItem.SetState(AState: TACLButtonState);
 var
-  AAnimator: TACLBitmapFadingAnimation;
+  LAnimation: TACLBitmapAnimation;
 begin
   if AState <> FState then
   begin
     if (State = absHover) and (AState = absNormal) and Owner.Owner.AllowFading then
     begin
-      AAnimator := TACLBitmapFadingAnimation.Create(Self, acUIFadingTime);
-      AAnimator.AllocateFrame1(DisplayBounds, InternalDraw);
+      LAnimation := TACLBitmapAnimation.Create(Self, DisplayBounds, TACLAnimatorFadeOut.Create);
+      LAnimation.BuildFrame1(InternalDraw);
       FState := AState;
-      AAnimator.AllocateFrame2(DisplayBounds, InternalDraw);
-      AAnimator.Run;
+      LAnimation.BuildFrame2(InternalDraw);
+      LAnimation.Run;
     end;
     FState := AState;
     Invalidate;
@@ -1053,7 +1053,7 @@ end;
 
 function TACLScrollBar.AllowFading: Boolean;
 begin
-  Result := acUIFadingEnabled;
+  Result := acUIAnimations;
 end;
 
 function TACLScrollBar.GetKind: TScrollBarKind;

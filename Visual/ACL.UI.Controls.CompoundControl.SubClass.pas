@@ -2181,19 +2181,19 @@ end;
 
 procedure TACLCompoundControlScrollBarPartViewInfo.SetState(AValue: TACLButtonState);
 var
-  AAnimator: TACLBitmapFadingAnimation;
+  LAnimation: TACLBitmapAnimation;
 begin
   if AValue <> FState then
   begin
     AnimationManager.RemoveOwner(Self);
 
-    if acUIFadingEnabled and (AValue = absNormal) and (FState = absHover) then
+    if acUIAnimations and (AValue = absNormal) and (FState = absHover) then
     begin
-      AAnimator := TACLBitmapFadingAnimation.Create(Self, acUIFadingTime);
-      DrawTo(AAnimator.AllocateFrame1(Bounds).Canvas, 0, 0);
+      LAnimation := TACLBitmapAnimation.Create(Self, Bounds, TACLAnimatorFadeOut.Create);
+      DrawTo(LAnimation.BuildFrame1.Canvas, 0, 0);
       FState := AValue;
-      DrawTo(AAnimator.AllocateFrame2(Bounds).Canvas, 0, 0);
-      AAnimator.Run;
+      DrawTo(LAnimation.BuildFrame2.Canvas, 0, 0);
+      LAnimation.Run;
     end
     else
       FState := AValue;

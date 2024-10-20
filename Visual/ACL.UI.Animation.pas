@@ -42,7 +42,8 @@ uses
   ACL.Utils.Common;
 
 type
-  TACLAnimation = class;
+
+{$REGION ' Engine '}
 
   { IACLAnimateControl }
 
@@ -52,9 +53,8 @@ type
   end;
 
   TACLAnimationDrawProc = procedure (ACanvas: TCanvas; const R: TRect) of object;
-
   TACLAnimationTransitionMode = (ateLinear, ateAccelerateDecelerate, ateTanh);
-  TACLAnimationTransitionModeProc = function (AProgress: Single): Single;
+  TACLAnimationTransitionProc = function (AProgress: Single): Single;
 
   { TACLAnimation }
 
@@ -71,17 +71,14 @@ type
     FTerminating: Boolean;
     FTime: Cardinal;
     FTimerInterval: Cardinal;
-    FTransitionModeProc: TACLAnimationTransitionModeProc;
-
-    class function AccelerateDecelerateTransition(AProgress: Single): Single; static;
-    class function LinearTransition(AProgress: Single): Single; static;
-    class function TanhTransition(AProgress: Single): Single; static;
+    FTransition: TACLAnimationTransitionProc;
 
     procedure SetFinished(AValue: Boolean);
   protected
     procedure Animate;
-    procedure InitializeTime;
+    procedure Initialize; virtual;
     function IsCompatible(AAnimation: TACLAnimation): Boolean; virtual;
+    function IsReady: Boolean; virtual;
     // Events
     procedure DoAnimate; virtual;
     //# Properties
@@ -89,10 +86,10 @@ type
     property FinishTime: Int64 read FFinishTime write FFinishTime;
     property StartTime: Int64 read FStartTime write FStartTime;
     property TimerInterval: Cardinal read FTimerInterval write FTimerInterval;
-    property TransitionModeProc: TACLAnimationTransitionModeProc read FTransitionModeProc;
+    property Transition: TACLAnimationTransitionProc read FTransition;
   public
     constructor Create(const AControl: IACLAnimateControl; ATime: Cardinal;
-      ATransitionMode: TACLAnimationTransitionMode = ateLinear); virtual;
+      ATransition: TACLAnimationTransitionMode = ateLinear); virtual;
     destructor Destroy; override;
     procedure Draw(ACanvas: TCanvas; const R: TRect); virtual;
     procedure Run;
@@ -107,22 +104,15 @@ type
     property Time: Cardinal read FTime;
   end;
 
-  { TACLAnimationText }
+  { TACLAnimationTransition }
 
-  TACLAnimationText = class(TACLAnimation)
-  strict private
-    FSourceText: string;
-    FTargetText: string;
-  private
-    function GetActualText: string;
+  TACLAnimationTransition = class
   public
-    constructor Create(const ASourceText, ATargetText: string;
-      const AControl: IACLAnimateControl; ATime: Cardinal;
-      ATransitionMode: TACLAnimationTransitionMode = ateLinear); reintroduce;
-    //# Properties
-    property ActualText: string read GetActualText;
-    property SourceText: string read FSourceText;
-    property TargetText: string read FTargetText;
+    class function Get(AMode: TACLAnimationTransitionMode): TACLAnimationTransitionProc;
+    // Procedures
+    class function AccelerateDecelerate(AProgress: Single): Single; static;
+    class function Linear(AProgress: Single): Single; static;
+    class function Tanh(AProgress: Single): Single; static;
   end;
 
   { TACLAnimationManager }
@@ -133,96 +123,138 @@ type
     procedure TimerObject(const AObject: TACLAnimation); override;
   public
     constructor Create; reintroduce;
-    function Find(AControl: IACLAnimateControl;
+    function Find(const AControl: IACLAnimateControl;
       out AAnimation: TACLAnimation; ATag: NativeInt = 0): Boolean;
-    function Draw(AControl: IACLAnimateControl;
-      ACanvas: TCanvas; const R: TRect; ATag: NativeInt = 0): Boolean;
+    function Draw(const AControl: IACLAnimateControl;
+      ACanvas: TCanvas; const ARect: TRect; ATag: NativeInt = 0): Boolean;
     procedure RemoveOwner(AOwnerObject: TObject);
   end;
 
-  { TACLCustomBitmapAnimation }
+{$ENDREGION}
 
-  TACLCustomBitmapAnimation = class(TACLAnimation)
+{$REGION ' Text Animation '}
+
+  { TACLAnimationText }
+
+  TACLAnimationText = class(TACLAnimation)
   strict private
-    FFrame1: TACLDib;
-    FFrame2: TACLDib;
-    function CanAnimate(const R: TRect): Boolean;
-  protected
-    function CreateDib: TACLDib; virtual;
-    procedure DrawCore(ACanvas: TCanvas; const R: TRect); virtual; abstract;
+    FSourceText: string;
+    FTargetText: string;
+    function GetActualText: string;
   public
-    constructor Create(const AControl: IACLAnimateControl; ATime: Cardinal;
-      ATransitionMode: TACLAnimationTransitionMode = ateLinear); override;
-    destructor Destroy; override;
-    function AllocateFrame1(const R: TRect): TACLDib; overload;
-    function AllocateFrame2(const R: TRect): TACLDib; overload;
-    procedure AllocateFrame1(const R: TRect; AProc: TACLAnimationDrawProc); overload;
-    procedure AllocateFrame2(const R: TRect; AProc: TACLAnimationDrawProc); overload;
-    procedure Draw(ACanvas: TCanvas; const R: TRect); override;
+    constructor Create(const ASourceText, ATargetText: string;
+      const AControl: IACLAnimateControl; ATime: Cardinal;
+      ATransition: TACLAnimationTransitionMode = ateLinear); reintroduce;
     //# Properties
-    property Frame1: TACLDib read FFrame1;
-    property Frame2: TACLDib read FFrame2;
+    property ActualText: string read GetActualText;
+    property SourceText: string read FSourceText;
+    property TargetText: string read FTargetText;
   end;
 
-  { TACLBitmapFadingAnimation }
+{$ENDREGION}
 
-  TACLBitmapFadingAnimation = class(TACLCustomBitmapAnimation)
-  strict private
-    FBuffer: TACLDib;
-  protected
-    function BuildFrame: TACLDib;
-    procedure DrawCore(ACanvas: TCanvas; const R: TRect); override;
+{$REGION ' Frame-based Animations '}
+
+  { TACLFramesAnimator }
+
+  TACLFramesAnimator = class
   public
-    destructor Destroy; override;
-  end;
-
-  { TACLCustomBitmapMoveAnimation }
-
-  TACLCustomBitmapMoveAnimation = class(TACLCustomBitmapAnimation)
-  protected
-    procedure CalcRects(const R: TRect;
+    procedure Calculate(AProgress: Single;
+      const AFrame: TSize; const ATargetRect: TRect;
       out AFrame1Rect, AFrame2Rect: TRect;
       out AFrame1Alpha, AFrame2Alpha: Byte); virtual; abstract;
-    procedure DrawCore(ACanvas: TCanvas; const R: TRect); override;
+    function ReverseOrder: Boolean; virtual;
   end;
 
-  { TACLBitmapSlideAnimation }
+  { TACLFrameBasedAnimation }
 
-  TACLBitmapSlideAnimationMode = (samLeftToRight, samRightToLeft, samTopToBottom, samBottomToTop);
-  TACLBitmapSlideAnimation = class(TACLCustomBitmapMoveAnimation)
+  TACLFrameBasedAnimation = class(TACLAnimation)
   strict private
-    FMode: TACLBitmapSlideAnimationMode;
+    FAnimator: TACLFramesAnimator;
   protected
-    procedure CalcRects(const R: TRect;
+    property Animator: TACLFramesAnimator read FAnimator;
+  public
+    constructor Create(const AControl: IACLAnimateControl;
+      ATime: Cardinal; AAnimator: TACLFramesAnimator;
+      ATransition: TACLAnimationTransitionMode = ateLinear); reintroduce;
+    destructor Destroy; override;
+  end;
+
+  { TACLAnimatorCrossFade }
+
+  TACLAnimatorCrossFade = class(TACLFramesAnimator)
+  public
+    procedure Calculate(AProgress: Single;
+      const AFrame: TSize; const ATargetRect: TRect;
       out AFrame1Rect, AFrame2Rect: TRect;
       out AFrame1Alpha, AFrame2Alpha: Byte); override;
-  public
-    constructor Create(AMode: TACLBitmapSlideAnimationMode; AControl: IACLAnimateControl;
-      ATime: Cardinal; ATransitionMode: TACLAnimationTransitionMode = ateLinear); reintroduce;
-    //# Properties
-    property Mode: TACLBitmapSlideAnimationMode read FMode;
   end;
 
-  { TACLBitmapZoomAnimation }
+  { TACLAnimatorFadeIn }
 
-  TACLBitmapZoomAnimationMode = (zamZoomIn, zamZoomOut);
-  TACLBitmapZoomAnimation = class(TACLCustomBitmapMoveAnimation)
-  strict private
-    FMode: TACLBitmapZoomAnimationMode;
-  protected
-    procedure CalcRects(const R: TRect;
+  TACLAnimatorFadeIn = class(TACLFramesAnimator)
+  public
+    procedure Calculate(AProgress: Single;
+      const AFrame: TSize; const ATargetRect: TRect;
       out AFrame1Rect, AFrame2Rect: TRect;
       out AFrame1Alpha, AFrame2Alpha: Byte); override;
-  public
-    constructor Create(AMode: TACLBitmapZoomAnimationMode; AControl: IACLAnimateControl;
-      ATime: Cardinal; ATransitionMode: TACLAnimationTransitionMode = ateLinear); reintroduce;
-    //# Properties
-    property Mode: TACLBitmapZoomAnimationMode read FMode;
   end;
 
-  { TACLBitmapPaperSlideAnimation }
+  { TACLAnimatorFadeOut }
 
-  TACLBitmapPaperSlideAnimation = class(TACLBitmapSlideAnimation)
+  TACLAnimatorFadeOut = class(TACLAnimatorFadeIn)
+  public
+    procedure Calculate(AProgress: Single;
+      const AFrame: TSize; const ATargetRect: TRect;
+      out AFrame1Rect, AFrame2Rect: TRect;
+      out AFrame1Alpha, AFrame2Alpha: Byte); override;
+    function ReverseOrder: Boolean; override;
+  end;
+
+  { TACLAnimatorSlideLeftToRight }
+
+  TACLAnimatorSlideLeftToRight = class(TACLFramesAnimator)
+  public
+    procedure Calculate(AProgress: Single;
+      const AFrame: TSize; const ATargetRect: TRect;
+      out AFrame1Rect, AFrame2Rect: TRect;
+      out AFrame1Alpha, AFrame2Alpha: Byte); override;
+  end;
+
+  { TACLAnimatorSlideRightToLeft }
+
+  TACLAnimatorSlideRightToLeft = class(TACLFramesAnimator)
+  public
+    procedure Calculate(AProgress: Single;
+      const AFrame: TSize; const ATargetRect: TRect;
+      out AFrame1Rect, AFrame2Rect: TRect;
+      out AFrame1Alpha, AFrame2Alpha: Byte); override;
+  end;
+
+  { TACLAnimatorSlideTopToBottom }
+
+  TACLAnimatorSlideTopToBottom = class(TACLFramesAnimator)
+  public
+    procedure Calculate(AProgress: Single;
+      const AFrame: TSize; const ATargetRect: TRect;
+      out AFrame1Rect, AFrame2Rect: TRect;
+      out AFrame1Alpha, AFrame2Alpha: Byte); override;
+  end;
+
+  { TACLAnimatorSlideBottomToTop }
+
+  TACLAnimatorSlideBottomToTop = class(TACLFramesAnimator)
+  public
+    procedure Calculate(AProgress: Single;
+      const AFrame: TSize; const ATargetRect: TRect;
+      out AFrame1Rect, AFrame2Rect: TRect;
+      out AFrame1Alpha, AFrame2Alpha: Byte); override;
+  end;
+
+  { TACLAnimatorPaperSlideTopToBottom }
+
+  TACLAnimatorPaperSlideClass = class of TACLAnimatorPaperSlideTopToBottom;
+  TACLAnimatorPaperSlideTopToBottom = class(TACLFramesAnimator)
   strict private
     FBackgroundOffsetInPercents: Single;
     FBackgroundOpacity: Single;
@@ -230,25 +262,94 @@ type
     FBackwardDirection: Boolean;
     FForegroundOpacity: Single;
     FForegroundOpacityAssigned: Boolean;
-
-    function GetBackgroundAlpha: Byte;
-    function GetForegroundAlpha: Byte;
-    function GetProgress: Single;
+    FModifiers: TPoint;
   protected
-    procedure CalcRects(const R: TRect;
+    function GetModifiers: TPoint; virtual;
+  public
+    constructor Create(ABackwardDirection: Boolean;
+      ABackgroundOpacity, AForegroundOpacity, ABackgroundOffsetInPercents: Single);
+    procedure Calculate(AProgress: Single;
+      const AFrame: TSize; const ATargetRect: TRect;
+      out AFrame1Rect, AFrame2Rect: TRect;
+      out AFrame1Alpha, AFrame2Alpha: Byte); override; final;
+    function ReverseOrder: Boolean; override;
+  end;
+
+  { TACLAnimatorPaperSlideBottomToTop }
+
+  TACLAnimatorPaperSlideBottomToTop = class(TACLAnimatorPaperSlideTopToBottom)
+  protected
+    function GetModifiers: TPoint; override;
+  end;
+
+  { TACLAnimatorPaperSlideLeftToRight }
+
+  TACLAnimatorPaperSlideLeftToRight = class(TACLAnimatorPaperSlideTopToBottom)
+  protected
+    function GetModifiers: TPoint; override;
+  end;
+
+  { TACLAnimatorPaperSlideRightToLeft }
+
+  TACLAnimatorPaperSlideRightToLeft = class(TACLAnimatorPaperSlideTopToBottom)
+  protected
+    function GetModifiers: TPoint; override;
+  end;
+
+  { TACLAnimatorZoomIn }
+
+  TACLAnimatorZoomIn = class(TACLFramesAnimator)
+  public
+    procedure Calculate(AProgress: Single;
+      const AFrame: TSize; const ATargetRect: TRect;
       out AFrame1Rect, AFrame2Rect: TRect;
       out AFrame1Alpha, AFrame2Alpha: Byte); override;
-  public
-    constructor Create(AMode: TACLBitmapSlideAnimationMode; AControl: IACLAnimateControl; ATime: Cardinal;
-      ABackwardDirection: Boolean; ABackgroundOpacity, AForegroundOpacity, ABackgroundOffsetInPercents: Single;
-      ATransitionMode: TACLAnimationTransitionMode = ateLinear); reintroduce;
-    //# Properties
-    property BackgroundOffsetInPercents: Single read FBackgroundOffsetInPercents;
-    property BackgroundOpacity: Single read FBackgroundOpacity;
-    property BackwardDirection: Boolean read FBackwardDirection;
-    property ForegroundOpacity: Single read FForegroundOpacity;
-    property Progress: Single read GetProgress;
   end;
+
+  { TACLAnimatorZoomOut }
+
+  TACLAnimatorZoomOut = class(TACLAnimatorZoomIn)
+  public
+    procedure Calculate(AProgress: Single;
+      const AFrame: TSize; const ATargetRect: TRect;
+      out AFrame1Rect, AFrame2Rect: TRect;
+      out AFrame1Alpha, AFrame2Alpha: Byte); override;
+    function ReverseOrder: Boolean; override;
+  end;
+
+{$ENDREGION}
+
+{$REGION ' Bitmap-based Animation '}
+
+  { TACLBitmapAnimation }
+
+  TACLBitmapAnimation = class(TACLFrameBasedAnimation)
+  protected
+    FFrame1: TACLDib;
+    FFrame2: TACLDib;
+    procedure Initialize; override;
+    function IsReady: Boolean; override;
+  public
+    constructor Create(
+      AControl: IACLAnimateControl; const ABounds: TRect;
+      AAnimator: TACLFramesAnimator; ATime: Integer = -1;
+      ATransition: TACLAnimationTransitionMode = ateLinear); reintroduce;
+    destructor Destroy; override;
+    function BuildFrame1: TACLDib; overload;
+    function BuildFrame2: TACLDib; overload;
+    procedure BuildFrame1(AProc: TACLAnimationDrawProc); overload;
+    procedure BuildFrame2(AProc: TACLAnimationDrawProc); overload;
+    procedure Draw(ACanvas: TCanvas; const R: TRect); override;
+  end;
+
+{$ENDREGION}
+
+const
+  acDefaultUIAnimations = True;
+
+var
+  acUIAnimations: Boolean = acDefaultUIAnimations;
+  acUIAnimationTime: Integer = 200;
 
 function AnimationManager: TACLAnimationManager;
 implementation
@@ -260,6 +361,7 @@ uses
   // VCL
   {Vcl.}Forms;
 
+{$REGION ' Engine '}
 var
   FAnimationManager: TACLAnimationManager;
 
@@ -273,19 +375,12 @@ end;
 { TACLAnimation }
 
 constructor TACLAnimation.Create(const AControl: IACLAnimateControl;
-  ATime: Cardinal; ATransitionMode: TACLAnimationTransitionMode = ateLinear);
+  ATime: Cardinal; ATransition: TACLAnimationTransitionMode = ateLinear);
 begin
   inherited Create;
   FTime := ATime;
   FControl := AControl;
-  case ATransitionMode of
-    ateAccelerateDecelerate:
-      FTransitionModeProc := AccelerateDecelerateTransition;
-    ateTanh:
-      FTransitionModeProc := TanhTransition;
-    else
-      FTransitionModeProc := LinearTransition;
-  end;
+  FTransition := TACLAnimationTransition.Get(ATransition);
   FFreeOnTerminate := True;
 end;
 
@@ -303,15 +398,23 @@ end;
 
 procedure TACLAnimation.Run;
 begin
-  InitializeTime;
-  AnimationManager.Add(Self);
+  if IsReady then
+  begin
+    Initialize;
+    AnimationManager.Add(Self);
+  end
+  else
+    Terminate;
 end;
 
 procedure TACLAnimation.RunImmediate;
 begin
-  InitializeTime;
-  while not Finished do
-    Animate;
+  if IsReady then
+  begin
+    Initialize;
+    while not Finished do
+      Animate;
+  end;
   Terminate;
 end;
 
@@ -332,11 +435,11 @@ begin
   FFinished := Finished or (CurrentTime >= FinishTime);
   if Finished then
     CurrentTime := FinishTime;
-  FProgress := TransitionModeProc((CurrentTime - StartTime) / (FinishTime - StartTime));
+  FProgress := Transition((CurrentTime - StartTime) / (FinishTime - StartTime));
   DoAnimate;
 end;
 
-procedure TACLAnimation.InitializeTime;
+procedure TACLAnimation.Initialize;
 begin
   if (CurrentTime <> 0) and not Finished then
   begin
@@ -357,29 +460,14 @@ begin
   Result := AAnimation.Control <> Control;
 end;
 
+function TACLAnimation.IsReady: Boolean;
+begin
+  Result := True;
+end;
+
 procedure TACLAnimation.DoAnimate;
 begin
   Control.Animate;
-end;
-
-class function TACLAnimation.AccelerateDecelerateTransition(AProgress: Single): Single;
-begin
-  Result := -Power(AProgress - 1, 6) + 1;
-end;
-
-class function TACLAnimation.LinearTransition(AProgress: Single): Single;
-begin
-  Result := AProgress;
-end;
-
-class function TACLAnimation.TanhTransition(AProgress: Single): Single;
-const
-  Exactitude = 3;
-var
-  ATanh: Double;
-begin
-  ATanh := Tanh(AProgress * (2 * Exactitude) - Exactitude);
-  Result := 1 / (2 * Tanh(Exactitude)) * (ATanh - Tanh(-Exactitude));
 end;
 
 procedure TACLAnimation.SetFinished(AValue: Boolean);
@@ -391,36 +479,44 @@ begin
     if not Finished then
     begin
       FCurrentTime := 0;
-      InitializeTime;
+      Initialize;
     end;
     Animate;
   end;
 end;
 
-{ TACLAnimationText }
+{ TACLAnimationTransition }
 
-constructor TACLAnimationText.Create(const ASourceText, ATargetText: string;
-  const AControl: IACLAnimateControl; ATime: Cardinal; ATransitionMode: TACLAnimationTransitionMode);
-var
-  ASourceTextLength: Integer;
-  ATargetTextLength: Integer;
+class function TACLAnimationTransition.Get(AMode: TACLAnimationTransitionMode): TACLAnimationTransitionProc;
 begin
-  inherited Create(AControl, ATime, ATransitionMode);
-
-  ASourceTextLength := Length(ASourceText);
-  ATargetTextLength := Length(ATargetText);
-  FSourceText := ASourceText + DupeString(' ', Max(ATargetTextLength, ASourceTextLength) - ASourceTextLength);
-  FTargetText := ATargetText + DupeString(' ', Max(ATargetTextLength, ASourceTextLength) - ATargetTextLength);
+  case AMode of
+    ateAccelerateDecelerate:
+      Result := AccelerateDecelerate;
+    ateTanh:
+      Result := Tanh;
+  else
+    Result := Linear;
+  end;
 end;
 
-function TACLAnimationText.GetActualText: string;
-var
-  I, L: Integer;
+class function TACLAnimationTransition.AccelerateDecelerate(AProgress: Single): Single;
 begin
-  L := Length(FSourceText);
-  SetLength(Result{%H-}, L);
-  for I := 1 to L do
-    Result[I] := Char(Trunc(Ord(FSourceText[I]) * Progress + Ord(FTargetText[I]) * (1 - Progress)));
+  Result := -Power(AProgress - 1, 6) + 1;
+end;
+
+class function TACLAnimationTransition.Linear(AProgress: Single): Single;
+begin
+  Result := AProgress;
+end;
+
+class function TACLAnimationTransition.Tanh(AProgress: Single): Single;
+const
+  Exactitude = 3;
+var
+  LTanh: Double;
+begin
+  LTanh := Math.Tanh(AProgress * (2 * Exactitude) - Exactitude);
+  Result := 1 / (2 * Math.Tanh(Exactitude)) * (LTanh - Math.Tanh(-Exactitude));
 end;
 
 { TACLAnimationManager }
@@ -431,7 +527,7 @@ begin
   Interval := 1;
 end;
 
-function TACLAnimationManager.Find(AControl: IACLAnimateControl;
+function TACLAnimationManager.Find(const AControl: IACLAnimateControl;
   out AAnimation: TACLAnimation; ATag: NativeInt = 0): Boolean;
 var
   I: Integer;
@@ -445,14 +541,14 @@ begin
   Result := False;
 end;
 
-function TACLAnimationManager.Draw(AControl: IACLAnimateControl;
-  ACanvas: TCanvas; const R: TRect; ATag: NativeInt = 0): Boolean;
+function TACLAnimationManager.Draw(const AControl: IACLAnimateControl;
+  ACanvas: TCanvas; const ARect: TRect; ATag: NativeInt = 0): Boolean;
 var
-  AAnimation: TACLAnimation;
+  LAnimation: TACLAnimation;
 begin
-  Result := Find(AControl, AAnimation, ATag);
+  Result := Find(AControl, LAnimation, ATag);
   if Result then
-    AAnimation.Draw(ACanvas, R)
+    LAnimation.Draw(ACanvas, ARect)
 end;
 
 procedure TACLAnimationManager.RemoveOwner(AOwnerObject: TObject);
@@ -488,294 +584,355 @@ begin
   end;
 end;
 
-{ TACLCustomBitmapAnimation }
+{$ENDREGION}
 
-constructor TACLCustomBitmapAnimation.Create(const AControl: IACLAnimateControl;
-  ATime: Cardinal; ATransitionMode: TACLAnimationTransitionMode);
-begin
-  inherited Create(AControl, ATime, ATransitionMode);
-  FFrame1 := CreateDib;
-  FFrame2 := CreateDib;
-end;
+{$REGION ' Text Animation '}
 
-function TACLCustomBitmapAnimation.CreateDib: TACLDib;
-begin
-  Result := TACLDib.Create(0, 0);
-end;
+{ TACLAnimationText }
 
-destructor TACLCustomBitmapAnimation.Destroy;
-begin
-  FreeAndNil(FFrame1);
-  FreeAndNil(FFrame2);
-  inherited Destroy;
-end;
-
-function TACLCustomBitmapAnimation.AllocateFrame1(const R: TRect): TACLDib;
-begin
-  Result := FFrame1;
-  Result.Resize(R);
-  Result.Reset;
-end;
-
-procedure TACLCustomBitmapAnimation.AllocateFrame1(const R: TRect; AProc: TACLAnimationDrawProc);
-begin
-  if not R.IsEmpty then
-  begin
-    with AllocateFrame1(R) do
-      AProc(Canvas, ClientRect);
-  end;
-end;
-
-function TACLCustomBitmapAnimation.AllocateFrame2(const R: TRect): TACLDib;
-begin
-  Result := FFrame2;
-  Result.Resize(R);
-  Result.Reset;
-end;
-
-procedure TACLCustomBitmapAnimation.AllocateFrame2(const R: TRect; AProc: TACLAnimationDrawProc);
-begin
-  if not R.IsEmpty then
-  begin
-    with AllocateFrame2(R) do
-      AProc(Canvas, ClientRect);
-  end;
-end;
-
-function TACLCustomBitmapAnimation.CanAnimate(const R: TRect): Boolean;
-begin
-  Result := not FFrame1.Empty and not FFrame2.Empty and
-    (R.Width = FFrame1.Width) and (R.Height = FFrame1.Height) and
-    (FFrame1.Width = FFrame2.Width) and (FFrame1.Height = FFrame2.Height)
-end;
-
-procedure TACLCustomBitmapAnimation.Draw(ACanvas: TCanvas; const R: TRect);
+constructor TACLAnimationText.Create(const ASourceText, ATargetText: string;
+  const AControl: IACLAnimateControl; ATime: Cardinal; ATransition: TACLAnimationTransitionMode);
 var
-  LSaveRgn: TRegionHandle;
+  ASourceTextLength: Integer;
+  ATargetTextLength: Integer;
 begin
-  if CanAnimate(R) then
-  begin
-    LSaveRgn := acSaveClipRegion(ACanvas.Handle);
-    try
-      if acIntersectClipRegion(ACanvas.Handle, R) then
-        DrawCore(ACanvas, R);
-    finally
-      acRestoreClipRegion(ACanvas.Handle, LSaveRgn);
-    end;
-  end
-  else
-    Finished := True;
+  inherited Create(AControl, ATime, ATransition);
+
+  ASourceTextLength := Length(ASourceText);
+  ATargetTextLength := Length(ATargetText);
+  FSourceText := ASourceText + DupeString(' ', Max(ATargetTextLength, ASourceTextLength) - ASourceTextLength);
+  FTargetText := ATargetText + DupeString(' ', Max(ATargetTextLength, ASourceTextLength) - ATargetTextLength);
 end;
 
-{ TACLBitmapFadingAnimation }
-
-destructor TACLBitmapFadingAnimation.Destroy;
+function TACLAnimationText.GetActualText: string;
+var
+  I, L: Integer;
 begin
-  FreeAndNil(FBuffer);
+  L := Length(FSourceText);
+  SetLength(Result{%H-}, L);
+  for I := 1 to L do
+    Result[I] := Char(Trunc(Ord(FSourceText[I]) * Progress + Ord(FTargetText[I]) * (1 - Progress)));
+end;
+
+{$ENDREGION}
+
+{$REGION ' Image-based Animations '}
+
+{ TACLFrameBasedAnimation }
+
+constructor TACLFrameBasedAnimation.Create(
+  const AControl: IACLAnimateControl; ATime: Cardinal;
+  AAnimator: TACLFramesAnimator; ATransition: TACLAnimationTransitionMode);
+begin
+  inherited Create(AControl, ATime, ATransition);
+  FAnimator := AAnimator;
+end;
+
+destructor TACLFrameBasedAnimation.Destroy;
+begin
+  FreeAndNil(FAnimator);
   inherited;
 end;
 
-function TACLBitmapFadingAnimation.BuildFrame: TACLDib;
-var
-  AAlpha: Byte;
-  I: Integer;
+{ TACLFramesAnimator }
+
+function TACLFramesAnimator.ReverseOrder: Boolean;
 begin
-  if FBuffer = nil then
-    FBuffer := CreateDib;
-  AAlpha := Trunc(MaxByte * Progress);
-  FBuffer.Assign(Frame1);
-  for I := 0 to FBuffer.ColorCount - 1 do
-    TACLColors.AlphaBlend(FBuffer.Colors^[I], Frame2.Colors^[I], AAlpha, False);
-  Result := FBuffer;
+  Result := False;
 end;
 
-procedure TACLBitmapFadingAnimation.DrawCore(ACanvas: TCanvas; const R: TRect);
+{ TACLAnimatorCrossFade }
+
+procedure TACLAnimatorCrossFade.Calculate(
+  AProgress: Single; const AFrame: TSize; const ATargetRect: TRect;
+  out AFrame1Rect, AFrame2Rect: TRect;
+  out AFrame1Alpha, AFrame2Alpha: Byte);
 begin
-  BuildFrame.DrawBlend(ACanvas, R);
+  AFrame1Rect := ATargetRect;
+  AFrame2Rect := ATargetRect;
+  AFrame1Alpha := Trunc(MaxByte * (1 - Max(0, 2 * AProgress - 1)));
+  AFrame2Alpha := Trunc(MaxByte * Min(1, 2 * AProgress));
 end;
 
-{ TACLCustomBitmapMoveAnimation }
+{ TACLAnimatorFadeIn }
 
-procedure TACLCustomBitmapMoveAnimation.DrawCore(ACanvas: TCanvas; const R: TRect);
-var
-  LAlpha1: Byte;
-  LAlpha2: Byte;
-  LRect1: TRect;
-  LRect2: TRect;
+procedure TACLAnimatorFadeIn.Calculate(
+  AProgress: Single; const AFrame: TSize; const ATargetRect: TRect;
+  out AFrame1Rect, AFrame2Rect: TRect;
+  out AFrame1Alpha, AFrame2Alpha: Byte);
 begin
-  CalcRects(R, LRect1, LRect2, LAlpha1, LAlpha2);
-  Frame1.DrawBlend(ACanvas, LRect1, LAlpha1);
-  Frame2.DrawBlend(ACanvas, LRect2, LAlpha2);
+  AFrame1Rect := ATargetRect;
+  AFrame2Rect := ATargetRect;
+  AFrame1Alpha := MaxByte;
+  AFrame2Alpha := Trunc(MaxByte * AProgress);
 end;
 
-{ TACLBitmapSlideAnimation }
+{ TACLAnimatorFadeOut }
 
-constructor TACLBitmapSlideAnimation.Create(AMode: TACLBitmapSlideAnimationMode;
-  AControl: IACLAnimateControl; ATime: Cardinal; ATransitionMode: TACLAnimationTransitionMode);
+procedure TACLAnimatorFadeOut.Calculate(AProgress: Single;
+  const AFrame: TSize; const ATargetRect: TRect;
+  out AFrame1Rect, AFrame2Rect: TRect;
+  out AFrame1Alpha, AFrame2Alpha: Byte);
 begin
-  inherited Create(AControl, ATime, ATransitionMode);
-  FMode := AMode;
+  AProgress := 1 - AProgress;
+  inherited;
 end;
 
-procedure TACLBitmapSlideAnimation.CalcRects(
-  const R: TRect;
+function TACLAnimatorFadeOut.ReverseOrder: Boolean;
+begin
+  Result := True;
+end;
+
+{ TACLAnimatorSlideLeftToRight }
+
+procedure TACLAnimatorSlideLeftToRight.Calculate(
+  AProgress: Single; const AFrame: TSize; const ATargetRect: TRect;
   out AFrame1Rect, AFrame2Rect: TRect;
   out AFrame1Alpha, AFrame2Alpha: Byte);
 var
   LOffset: Integer;
 begin
+  LOffset := Round(AProgress * AFrame.Width);
+  AFrame1Rect := ATargetRect.OffsetTo(LOffset, 0);
+  AFrame2Rect := ATargetRect.OffsetTo(LOffset - ATargetRect.Width, 0);
   AFrame1Alpha := 255;
   AFrame2Alpha := 255;
-  case Mode of
-    samLeftToRight:
-      begin
-        LOffset := Round(Progress * Frame1.Width);
-        AFrame1Rect := R.OffsetTo(LOffset, 0);
-        AFrame2Rect := R.OffsetTo(LOffset - R.Width, 0);
-      end;
-
-    samRightToLeft:
-      begin
-        LOffset := Round((1 - Progress) * Frame1.Width);
-        AFrame1Rect := R.OffsetTo(LOffset - R.Width, 0);
-        AFrame2Rect := R.OffsetTo(LOffset, 0);
-      end;
-
-    samTopToBottom:
-      begin
-        LOffset := Round(Progress * Frame1.Height);
-        AFrame1Rect := R.OffsetTo(0, LOffset);
-        AFrame2Rect := R.OffsetTo(0, LOffset - R.Height);
-      end;
-
-    samBottomToTop:
-      begin
-        LOffset := Round((1 - Progress) * Frame1.Height);
-        AFrame1Rect := R.OffsetTo(0, LOffset - R.Height);
-        AFrame2Rect := R.OffsetTo(0, LOffset);
-      end;
-  end;
 end;
 
-{ TACLBitmapZoomAnimation }
+{ TACLAnimatorSlideRightToLeft }
 
-constructor TACLBitmapZoomAnimation.Create(AMode: TACLBitmapZoomAnimationMode;
-  AControl: IACLAnimateControl; ATime: Cardinal; ATransitionMode: TACLAnimationTransitionMode);
-begin
-  inherited Create(AControl, ATime, ATransitionMode);
-  FMode := AMode;
-end;
-
-procedure TACLBitmapZoomAnimation.CalcRects(
-  const R: TRect;
+procedure TACLAnimatorSlideRightToLeft.Calculate(
+  AProgress: Single; const AFrame: TSize; const ATargetRect: TRect;
   out AFrame1Rect, AFrame2Rect: TRect;
   out AFrame1Alpha, AFrame2Alpha: Byte);
 var
-  LDeltaX: Integer;
-  LDeltaY: Integer;
-  LProgress: Single;
+  LOffset: Integer;
 begin
-  LProgress := Progress;
-  if Mode = zamZoomIn then
-    LProgress := 1 - LProgress;
-
-  LDeltaX := R.Width div 2;
-  LDeltaY := R.Height div 2;
-  AFrame1Rect := R.InflateTo(-Round(LDeltaX * LProgress), -Round(LDeltaY * LProgress));
-  AFrame1Alpha := Round(MaxByte * (1 - LProgress));
-  AFrame2Rect := R.InflateTo(Round(LDeltaX * (1 - LProgress)), Round(LDeltaY * (1 - LProgress)));
-  AFrame2Alpha := Round(MaxByte * LProgress);
-
-  if Mode = zamZoomIn then
-  begin
-    TACLMath.Exchange<TRect>(AFrame1Rect, AFrame2Rect);
-    TACLMath.Exchange<Byte>(AFrame1Alpha, AFrame2Alpha);
-  end;
+  LOffset := Round((1 - AProgress) * AFrame.Width);
+  AFrame1Rect := ATargetRect.OffsetTo(LOffset - ATargetRect.Width, 0);
+  AFrame2Rect := ATargetRect.OffsetTo(LOffset, 0);
+  AFrame1Alpha := 255;
+  AFrame2Alpha := 255;
 end;
 
-{ TACLBitmapPaperSlideAnimation }
+{ TACLAnimatorSlideTopToBottom }
 
-constructor TACLBitmapPaperSlideAnimation.Create(AMode: TACLBitmapSlideAnimationMode;
-  AControl: IACLAnimateControl; ATime: Cardinal; ABackwardDirection: Boolean;
-  ABackgroundOpacity, AForegroundOpacity, ABackgroundOffsetInPercents: Single;
-  ATransitionMode: TACLAnimationTransitionMode);
-begin
-  inherited Create(AMode, AControl, ATime, ATransitionMode);
-  FBackgroundOffsetInPercents := ABackgroundOffsetInPercents;
-  FBackwardDirection := ABackwardDirection;
-  FBackgroundOpacity := ABackgroundOpacity;
-  FBackgroundOpacityAssigned := not SameValue(BackgroundOpacity, 1);
-  FForegroundOpacity := AForegroundOpacity;
-  FForegroundOpacityAssigned := not SameValue(ForegroundOpacity, 1);
-end;
-
-procedure TACLBitmapPaperSlideAnimation.CalcRects(
-  const R: TRect;
+procedure TACLAnimatorSlideTopToBottom.Calculate(
+  AProgress: Single; const AFrame: TSize; const ATargetRect: TRect;
   out AFrame1Rect, AFrame2Rect: TRect;
   out AFrame1Alpha, AFrame2Alpha: Byte);
-
-  function GetFrame1Offset(const ASize: Integer): Integer;
-  begin
-    Result := Round(Progress * ASize);
-  end;
-
-  function GetFrame2Offset(const ASize: Integer): Integer;
-  begin
-    Result := Round((1 - Progress) * BackgroundOffsetInPercents * ASize);
-  end;
-
+var
+  LOffset: Integer;
 begin
-  AFrame1Alpha := GetForegroundAlpha;
-  AFrame2Alpha := GetBackgroundAlpha;
-  case Mode of
-    samLeftToRight:
-      begin
-        AFrame1Rect := R.OffsetTo(GetFrame1Offset(Frame1.Width), 0);
-        AFrame2Rect := R.OffsetTo(GetFrame2Offset(Frame2.Width), 0);
-      end;
-
-    samRightToLeft:
-      begin
-        AFrame1Rect := R.OffsetTo(-GetFrame1Offset(Frame1.Width), 0);
-        AFrame2Rect := R.OffsetTo(-GetFrame2Offset(Frame2.Width), 0);
-      end;
-
-    samTopToBottom:
-      begin
-        AFrame1Rect := R.OffsetTo(0, GetFrame1Offset(Frame1.Height));
-        AFrame2Rect := R.OffsetTo(0, GetFrame2Offset(Frame2.Height));
-      end;
-
-    samBottomToTop:
-      begin
-        AFrame1Rect := R.OffsetTo(0, -GetFrame1Offset(Frame1.Height));
-        AFrame2Rect := R.OffsetTo(0, -GetFrame2Offset(Frame2.Height));
-      end;
-  end;
+  LOffset := Round(AProgress * AFrame.Height);
+  AFrame1Rect := ATargetRect.OffsetTo(0, LOffset);
+  AFrame2Rect := ATargetRect.OffsetTo(0, LOffset - ATargetRect.Height);
+  AFrame1Alpha := 255;
+  AFrame2Alpha := 255;
 end;
 
-function TACLBitmapPaperSlideAnimation.GetBackgroundAlpha: Byte;
+{ TACLAnimatorSlideBottomToTop }
+
+procedure TACLAnimatorSlideBottomToTop.Calculate(
+  AProgress: Single; const AFrame: TSize; const ATargetRect: TRect;
+  out AFrame1Rect, AFrame2Rect: TRect;
+  out AFrame1Alpha, AFrame2Alpha: Byte);
+var
+  LOffset: Integer;
 begin
+  LOffset := Round((1 - AProgress) * AFrame.Height);
+  AFrame1Rect := ATargetRect.OffsetTo(0, LOffset - ATargetRect.Height);
+  AFrame2Rect := ATargetRect.OffsetTo(0, LOffset);
+  AFrame1Alpha := 255;
+  AFrame2Alpha := 255;
+end;
+
+{ TACLAnimatorPaperSlideTopToBottom }
+
+constructor TACLAnimatorPaperSlideTopToBottom.Create(ABackwardDirection: Boolean;
+  ABackgroundOpacity, AForegroundOpacity, ABackgroundOffsetInPercents: Single);
+begin
+  FBackwardDirection := ABackwardDirection;
+  FBackgroundOffsetInPercents := ABackgroundOffsetInPercents;
+  FBackgroundOpacity := ABackgroundOpacity;
+  FBackgroundOpacityAssigned := not SameValue(FBackgroundOpacity, 1);
+  FForegroundOpacity := AForegroundOpacity;
+  FForegroundOpacityAssigned := not SameValue(FForegroundOpacity, 1);
+  FModifiers := GetModifiers;
+end;
+
+procedure TACLAnimatorPaperSlideTopToBottom.Calculate(
+  AProgress: Single; const AFrame: TSize; const ATargetRect: TRect;
+  out AFrame1Rect, AFrame2Rect: TRect; out AFrame1Alpha, AFrame2Alpha: Byte);
+var
+  LFrame1Offset: Single;
+  LFrame2Offset: Single;
+begin
+  if FBackwardDirection then
+    AProgress := 1 - AProgress;
+
   if FBackgroundOpacityAssigned then
-    Result := Round(MaxByte * (Progress + BackgroundOpacity * (1 - Progress)))
+    AFrame1Alpha := Round(MaxByte * (AProgress + FBackgroundOpacity * (1 - AProgress)))
   else
-    Result := MaxByte;
-end;
+    AFrame1Alpha := MaxByte;
 
-function TACLBitmapPaperSlideAnimation.GetForegroundAlpha: Byte;
-begin
   if FForegroundOpacityAssigned then
-    Result := Round(MaxByte * ((1 - Progress) + ForegroundOpacity * Progress))
+    AFrame2Alpha := Round(MaxByte * ((1 - AProgress) + FForegroundOpacity * AProgress))
   else
-    Result := MaxByte;
+    AFrame2Alpha := MaxByte;
+
+  LFrame1Offset := FBackgroundOffsetInPercents * (1 - AProgress);
+  LFrame2Offset := AProgress;
+
+  AFrame1Rect := ATargetRect.OffsetTo(
+    FModifiers.X * Round(LFrame1Offset * AFrame.Width),
+    FModifiers.Y * Round(LFrame1Offset * AFrame.Height));
+  AFrame2Rect := ATargetRect.OffsetTo(
+    FModifiers.X * Round(LFrame2Offset * AFrame.Width),
+    FModifiers.Y * Round(LFrame2Offset * AFrame.Height));
 end;
 
-function TACLBitmapPaperSlideAnimation.GetProgress: Single;
+function TACLAnimatorPaperSlideTopToBottom.GetModifiers: TPoint;
 begin
-  Result := inherited Progress;
-  if BackwardDirection then
-    Result := 1.0 - Result;
+  Result := Point(0, 1);
 end;
+
+function TACLAnimatorPaperSlideTopToBottom.ReverseOrder: Boolean;
+begin
+  Result := True;
+end;
+
+{ TACLAnimatorPaperSlideBottomToTop }
+
+function TACLAnimatorPaperSlideBottomToTop.GetModifiers: TPoint;
+begin
+  Result := Point(0, -1);
+end;
+
+{ TACLAnimatorPaperSlideLeftToRight }
+
+function TACLAnimatorPaperSlideLeftToRight.GetModifiers: TPoint;
+begin
+  Result := Point(1, 0);
+end;
+
+{ TACLAnimatorPaperSlideRightToLeft }
+
+function TACLAnimatorPaperSlideRightToLeft.GetModifiers: TPoint;
+begin
+  Result := Point(-1, 0);
+end;
+
+{ TACLAnimatorZoomIn }
+
+procedure TACLAnimatorZoomIn.Calculate(
+  AProgress: Single; const AFrame: TSize; const ATargetRect: TRect;
+  out AFrame1Rect, AFrame2Rect: TRect;
+  out AFrame1Alpha, AFrame2Alpha: Byte);
+begin
+  AFrame1Rect := ATargetRect.InflateTo(
+    Round((ATargetRect.Width  div 2) * AProgress),
+    Round((ATargetRect.Height div 2) * AProgress));
+  AFrame2Rect := ATargetRect.InflateTo(
+    Round(-(ATargetRect.Width  div 2) * (1 - AProgress)),
+    Round(-(ATargetRect.Height div 2) * (1 - AProgress)));
+  AFrame1Alpha := MaxByte;
+  AFrame2Alpha := Round(MaxByte * AProgress);
+end;
+
+{ TACLAnimatorZoomOut }
+
+procedure TACLAnimatorZoomOut.Calculate(
+  AProgress: Single; const AFrame: TSize; const ATargetRect: TRect;
+  out AFrame1Rect, AFrame2Rect: TRect;
+  out AFrame1Alpha, AFrame2Alpha: Byte);
+begin
+  inherited Calculate(1 - AProgress, AFrame, ATargetRect,
+    AFrame1Rect, AFrame2Rect, AFrame1Alpha, AFrame2Alpha);
+end;
+
+function TACLAnimatorZoomOut.ReverseOrder: Boolean;
+begin
+  Result := True;
+end;
+{$ENDREGION}
+
+{$REGION ' Bitmap-based Animation '}
+
+constructor TACLBitmapAnimation.Create(AControl: IACLAnimateControl;
+  const ABounds: TRect; AAnimator: TACLFramesAnimator; ATime: Integer;
+  ATransition: TACLAnimationTransitionMode);
+begin
+  if ATime < 0 then ATime := acUIAnimationTime;
+  inherited Create(AControl, ATime, AAnimator, ATransition);
+  FFrame1 := TACLDib.Create(ABounds);
+  FFrame2 := TACLDib.Create(ABounds);
+end;
+
+destructor TACLBitmapAnimation.Destroy;
+begin
+  FreeAndNil(FFrame1);
+  FreeAndNil(FFrame2);
+  inherited;
+end;
+
+function TACLBitmapAnimation.BuildFrame1: TACLDib;
+begin
+  Result := FFrame1;
+  Result.Reset;
+end;
+
+function TACLBitmapAnimation.BuildFrame2: TACLDib;
+begin
+  Result := FFrame2;
+  Result.Reset;
+end;
+
+procedure TACLBitmapAnimation.BuildFrame1(AProc: TACLAnimationDrawProc);
+begin
+  if not FFrame1.Empty then
+    AProc(BuildFrame1.Canvas, FFrame1.ClientRect);
+end;
+
+procedure TACLBitmapAnimation.BuildFrame2(AProc: TACLAnimationDrawProc);
+begin
+  if not FFrame2.Empty then
+    AProc(BuildFrame2.Canvas, FFrame2.ClientRect);
+end;
+
+procedure TACLBitmapAnimation.Draw(ACanvas: TCanvas; const R: TRect);
+var
+  LAlpha1: Byte;
+  LAlpha2: Byte;
+  LRect1: TRect;
+  LRect2: TRect;
+  LSaveRgn: TRegionHandle;
+begin
+  LSaveRgn := acSaveClipRegion(ACanvas.Handle);
+  try
+    if acIntersectClipRegion(ACanvas.Handle, R) then
+    begin
+      Animator.Calculate(Progress, FFrame1.Size, R, LRect1, LRect2, LAlpha1, LAlpha2);
+      FFrame1.DrawBlend(ACanvas, LRect1, LAlpha1);
+      FFrame2.DrawBlend(ACanvas, LRect2, LAlpha2);
+    end;
+  finally
+    acRestoreClipRegion(ACanvas.Handle, LSaveRgn);
+  end;
+end;
+
+procedure TACLBitmapAnimation.Initialize;
+begin
+  if Animator.ReverseOrder then
+    TACLMath.ExchangePtr(FFrame1, FFrame2);
+  inherited;
+end;
+
+function TACLBitmapAnimation.IsReady: Boolean;
+begin
+  Result := not (FFrame1.Empty or FFrame2.Empty);
+end;
+{$ENDREGION}
 
 initialization
 

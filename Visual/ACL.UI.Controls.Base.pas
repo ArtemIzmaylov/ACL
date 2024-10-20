@@ -867,13 +867,6 @@ type
   TACLScrollToMode = (MakeVisible, MakeTop, MakeCenter);
   {$SCOPEDENUMS OFF}
 
-const
-  acDefaultUIFadingEnabled = True;
-
-var
-  acUIFadingEnabled: Boolean = acDefaultUIFadingEnabled;
-  acUIFadingTime: Integer = 200;
-
 function CallCustomDrawEvent(Sender: TObject;
   AEvent: TACLCustomDrawEvent; ACanvas: TCanvas; const R: TRect): Boolean;
 function CreateControl(AClass: TControlClass; AParent: TWinControl;

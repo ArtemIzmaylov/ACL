@@ -66,6 +66,7 @@ uses
   ACL.MUI,
   ACL.ObjectLinks,
   ACL.Threading,
+  ACL.UI.Animation,
   ACL.UI.Application,
   ACL.UI.Controls.Base,
   ACL.UI.Controls.ScrollBar,
@@ -2056,7 +2057,7 @@ end;
 
 function TACLMenuPopupWindow.AllowFading: Boolean;
 begin
-  Result := acUIFadingEnabled;
+  Result := acUIAnimations;
 end;
 
 function TACLMenuPopupWindow.CalculateAutoSize: TSize;

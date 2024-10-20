@@ -799,7 +799,7 @@ end;
 
 procedure TACLCustomButtonSubClass.RefreshState;
 var
-  AAnimator: TACLCustomBitmapAnimation;
+  LAnimation: TACLBitmapAnimation;
   ANewState: TACLButtonState;
 begin
   ANewState := CalculateState;
@@ -808,11 +808,11 @@ begin
     if AllowAnimation and not ButtonRect.IsEmpty and
       (FState = absHover) and (ANewState in [absActive, absNormal]) then
     begin
-      AAnimator := TACLBitmapFadingAnimation.Create(Self, acUIFadingTime);
-      AAnimator.AllocateFrame1(ButtonRect, DrawBackground);
+      LAnimation := TACLBitmapAnimation.Create(Self, ButtonRect, TACLAnimatorFadeOut.Create);
+      LAnimation.BuildFrame1(DrawBackground);
       FState := ANewState;
-      AAnimator.AllocateFrame2(ButtonRect, DrawBackground);
-      AAnimator.Run;
+      LAnimation.BuildFrame2(DrawBackground);
+      LAnimation.Run;
     end;
     FState := ANewState;
     StateChanged;
