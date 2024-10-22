@@ -59,6 +59,13 @@ function MulDiv(const AValue, ANumerator, ADenominator: Integer): Integer;
 function MulDiv64(const AValue, ANumerator, ADenominator: Int64): Int64;
 implementation
 
+uses
+{$IFDEF FPC}
+  LCLType;
+{$ELSE}
+  Windows;
+{$ENDIF}
+
 { MinMax / MaxMin }
 
 function MaxMin(const AValue, AMinValue, AMaxValue: Double): Double; overload;
@@ -157,7 +164,11 @@ end;
 
 function MulDiv(const AValue, ANumerator, ADenominator: Integer): Integer;
 begin
-  Result := (AValue * ANumerator) div ADenominator;
+{$IFDEF FPC}
+  Result := LCLType.MulDiv(AValue, ANumerator, ADenominator);
+{$ELSE}
+  Result := Windows.MulDiv(AValue, ANumerator, ADenominator);
+{$ENDIF}
 end;
 
 function MulDiv64(const AValue, ANumerator, ADenominator: Int64): Int64;

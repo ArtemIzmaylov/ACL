@@ -2455,7 +2455,10 @@ procedure TFontHelper.Assign(Source: TFont; SourceDpi, TargetDpi: Integer);
 begin
   Assign(Source);
   if SourceDpi <> TargetDpi then
-    Height := dpiApply(dpiRevert(Source.Height, SourceDpi), TargetDpi);
+    Height := dpiApply(dpiRevert(Source.Height, SourceDpi), TargetDpi)
+  else
+    // Height may be changed during Assign(), if the fonts has different PixelsPerInch
+    Height := Source.Height;
 end;
 
 function TFontHelper.Clone: TFont;
@@ -2492,8 +2495,8 @@ begin
   try
 {$ENDIF}
     Font.Assign(AFont);
-    if Font.PixelsPerInch <> AFont.PixelsPerInch then
-      Font.Height := AFont.Height;
+    // Height may be changed during Assign(), if the fonts has different PixelsPerInch
+    Font.Height := AFont.Height;
 {$IFDEF FPC}
   finally
     Font.EndUpdate;

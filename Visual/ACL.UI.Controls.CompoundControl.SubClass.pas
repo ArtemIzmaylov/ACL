@@ -22,9 +22,9 @@ uses
   LCLIntf,
   LCLType,
 {$ELSE}
-  {Winapi.}Messages,
-  {Winapi.}Windows,
+  Windows,
 {$ENDIF}
+  Messages,
   // System
   {System.}Classes,
   {System.}Generics.Collections,

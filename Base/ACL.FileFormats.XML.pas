@@ -1196,6 +1196,7 @@ var
   AReaderSettings: TACLXMLReaderSettings;
 begin
   Clear;
+  if AStream.Available < SizeOf(Integer) then Exit;
   AHeader := AStream.ReadInt32;
   if AHeader = TACLBinaryXML.HeaderID then
     TACLBinaryXMLParser.Parse(Self, AStream)

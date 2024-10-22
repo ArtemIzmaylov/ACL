@@ -48,7 +48,7 @@ type
   {$IF DEFINED(FPC)}
     FHandle: TRTLCriticalSection;
   {$ELSE}
-    FLocked: Byte;
+    FLocked: Integer;
     FOwningThreadID: Cardinal;
     FRecursionCount: Integer;
   {$IFEND}
@@ -56,8 +56,8 @@ type
     constructor Create({%H-}AOwner: TObject = nil; const {%H-}AName: string = '');
     destructor Destroy; override;
     procedure Enter; inline;
-    procedure Leave; inline;
     function TryEnter(AMaxTryCount: Integer = 15{~15 msec}): Boolean; inline;
+    procedure Leave; inline;
   end;
 
   { TACLEvent }
@@ -194,7 +194,6 @@ procedure CheckIsMainThread;
 function IsMainThread: Boolean;
 
 {$IFDEF MSWINDOWS}
-function LockCompareExchange(const ACompareValue, ANewValue: Byte; AReturnAddress: PByte): Byte; // public to be inlined
 function WaitForSyncObject(AHandle: TObjHandle; ATimeOut: Cardinal): TWaitResult;
 {$ENDIF}
 
@@ -222,25 +221,6 @@ function IsMainThread: Boolean;
 begin
   Result := GetCurrentThreadId = MainThreadID;
 end;
-
-{$IFDEF MSWINDOWS}
-function LockCompareExchange(const ACompareValue, ANewValue: Byte; AReturnAddress: PByte): Byte;
-asm
-{$IFDEF CPUX64}
-  // cl = CompareVal
-  // dl = NewVal
-  // r8 = AAddress
-  .noframe
-  mov rax, rcx
-  lock cmpxchg [r8], dl
-{$ELSE}
-  // al = ACompareValue,
-  // dl = ANewValue,
-  // ecx = AReturnAddress
-  lock cmpxchg [ecx], dl
-{$ENDIF}
-end;
-{$ENDIF}
 
 {$IFDEF MSWINDOWS}
 function WaitForSyncObject(AHandle: TObjHandle; ATimeOut: Cardinal): TWaitResult;
@@ -352,19 +332,21 @@ begin
 end;
 {$ELSE}
 var
-  AThreadId: Cardinal;
+  LThreadId: Cardinal;
 begin
-  AThreadId := GetCurrentThreadId;
-  if FOwningThreadId <> AThreadId then
+  LThreadId := GetCurrentThreadId;
+  if FOwningThreadId <> LThreadId then
   begin
-    while LockCompareExchange(0, 1, @FLocked) <> 0 do
+    while AtomicCmpExchange(FLocked, 1, 0) <> 0 do
     begin
       Sleep(0);
-      if LockCompareExchange(0, 1, @FLocked) = 0 then
+      if AtomicCmpExchange(FLocked, 1, 0) = 0 then
         Break;
       Sleep(1);
     end;
-    FOwningThreadId := AThreadId;
+    if FOwningThreadId <> 0 then
+      raise EInvalidOperation.CreateFmt('Section is locked by %d', [FOwningThreadId]);
+    FOwningThreadId := LThreadId;
   end;
   Inc(FRecursionCount);
 end;
@@ -376,11 +358,11 @@ begin
   LeaveCriticalSection(FHandle);
 {$ELSE}
   if FOwningThreadId <> GetCurrentThreadId then
-    raise EInvalidOperation.Create('Section is not owned');
+    raise EInvalidOperation.CreateFmt('Section is not owned (%d)', [FOwningThreadId]);
 
   Dec(FRecursionCount);
   if FRecursionCount < 0 then
-    raise EInvalidOperation.Create('RecursionCount < 0');
+    raise EInvalidOperation.Create('Section.RecursionCount < 0');
 
   if FRecursionCount = 0 then
   begin
@@ -397,19 +379,22 @@ begin
 end;
 {$ELSE}
 var
-  AThreadId: Cardinal;
+  LThreadId: Cardinal;
 begin
-  AThreadId := GetCurrentThreadId;
-  if FOwningThreadId <> AThreadId then
-    while LockCompareExchange(0, 1, @FLocked) <> 0 do
+  LThreadId := GetCurrentThreadId;
+  if FOwningThreadId <> LThreadId then
+  begin
+    while AtomicCmpExchange(FLocked, 1, 0) <> 0 do
     begin
       if AMaxTryCount = 0 then
         Exit(False);
       Dec(AMaxTryCount);
       Sleep(1);
     end;
-
-  FOwningThreadId := AThreadId;
+    if FOwningThreadId <> 0 then
+      raise EInvalidOperation.CreateFmt('Section is locked by %d', [FOwningThreadId]);
+    FOwningThreadId := LThreadId;
+  end;
   Inc(FRecursionCount);
   Result := True;
 end;

@@ -690,6 +690,9 @@ procedure DrawText32Duplicated(ACanvas: TCanvas; const R: TRect;
 implementation
 
 uses
+{$IFDEF ACL_CAIRO_TEXTOUT}
+  ACL.Graphics.Ex.Cairo,
+{$ENDIF}
   ACL.Graphics.Ex;
 
 type

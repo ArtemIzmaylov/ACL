@@ -445,7 +445,8 @@ begin
     else
     begin
     {$IFDEF MSWINDOWS}
-      var IL := ILCreateFromPathW(PWideChar(AFileName));
+      var WS := WideString(AFileName); // make a wide-string copy
+      var IL := ILCreateFromPathW(PWideChar(WS));
       if IL <> nil then
       try
         SHOpenFolderAndSelectItems(IL, 0, nil, 0);
