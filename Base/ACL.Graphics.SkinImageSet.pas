@@ -507,7 +507,7 @@ end;
 function TACLSkinImageSet.OptimalFill(const ASize: TSize; AFrameIndex: Integer): IACLImage;
 var
   I: Integer;
-  LBitmap: TACLBitmap;
+  LBitmap: TACLDib;
   LOptimal: TACLSkinImageSetItem;
   LOptimalScore: TSize;
   LSize: TSize;
@@ -532,9 +532,9 @@ begin
 
   if LOptimal <> nil then
   begin
-    LBitmap := TACLBitmap.CreateEx(LOptimal.FrameSize, pf32bit, True);
+    LBitmap := TACLDib.Create(LOptimal.FrameSize);
     try
-      LOptimal.Draw(LBitmap.Canvas, LBitmap.ClientRect, 0);
+      LOptimal.Draw(LBitmap.Canvas, LBitmap.ClientRect, AFrameIndex);
       Result := TACLImageKeeper.CreateFrom(LBitmap);
       if not InRange(LOptimal.FrameWidth / ASize.Width, 0.95, 1.05) then
         Result.Inst.Scale(ASize.Width, LOptimal.FrameWidth);

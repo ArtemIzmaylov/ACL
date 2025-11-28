@@ -3775,7 +3775,7 @@ end;
 procedure TDragImageListHelper.ShowDragImageEx;
 begin
   Self.ShowDragImage;
-{$IFDEF LCLGtk2}
+{$IFDEF LCLGtkX}
   SetDragImageListOpacity(128);
 {$ENDIF}
 end;

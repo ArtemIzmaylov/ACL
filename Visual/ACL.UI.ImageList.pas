@@ -49,6 +49,7 @@ uses
   ACL.MUI,
   ACL.ObjectLinks,
   ACL.Utils.Common,
+  ACL.Utils.Logger,
   ACL.Utils.Strings;
 
 type
@@ -577,15 +578,18 @@ end;
 
 procedure TACLImageList.Initialize;
 begin
-  inherited;
   FSourceDPI := acDefaultDPI;
-{$IFNDEF FPC}
   try
-    ColorDepth := cd32Bit;
+    inherited;
+  {$IFNDEF FPC}
+    // Set ColorDepth property forces to create Handle.
+    // So, setup it only for new instance of ImageList.
+    if (Owner = nil) or not (csReading in Owner.ComponentState) then
+      ColorDepth := cd32Bit;
+  {$ENDIF}
   except
-    ColorDepth := cdDeviceDependent;
+    raise ENotEnoughGraphicResources.Create('ImageList.Init', Width, Height);
   end;
-{$ENDIF}
 end;
 
 procedure TACLImageList.LoadImage(ABitmap: TBitmap);
@@ -711,7 +715,7 @@ begin
   {$IFDEF FPC}
     inherited ReadData(Stream);
   {$ELSE}
-    raise EInvalidGraphic.Create('LCL-imagelists are not supported.')
+    raise EInvalidGraphic.Create('LCL-ImageLists are not supported.')
   {$ENDIF}
   end
   else
@@ -774,7 +778,11 @@ begin
   end;
 {$ELSE}
 begin
-  inherited ReadData(AStream);
+  try
+    inherited ReadData(AStream);
+  except
+    raise ENotEnoughGraphicResources.Create('ImageList.' + Name, Width, Height);
+  end;
 {$ENDIF}
 end;
 

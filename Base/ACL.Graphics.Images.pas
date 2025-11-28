@@ -183,6 +183,7 @@ type
   public
     constructor Create; overload;
     constructor Create(AOwned: TACLImage); overload;
+    constructor CreateFrom(ASource: TACLBaseDib); overload;
     constructor CreateFrom(ASource: IACLDataContainer); overload;
     constructor CreateFrom(ASource: TBitmap); overload;
     constructor CreateFrom(ASource: TStream); overload;
@@ -1216,6 +1217,11 @@ end;
 constructor TACLImageKeeper.Create(AOwned: TACLImage);
 begin
   FOwned := AOwned;
+end;
+
+constructor TACLImageKeeper.CreateFrom(ASource: TACLBaseDib);
+begin
+  Create(TACLImage.Create(ASource.Colors, ASource.Width, ASource.Height));
 end;
 
 constructor TACLImageKeeper.CreateFrom(ASource: IACLDataContainer);

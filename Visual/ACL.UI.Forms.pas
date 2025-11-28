@@ -248,7 +248,7 @@ begin
   MouseCapture := False;
   if Visible then
   try
-  {$IFDEF LCLGtk2}
+  {$IFDEF LCLGtkX}
     TGtkApp.EndPopup(Self);
   {$ENDIF}
     Hide;
@@ -394,7 +394,7 @@ begin
     SendMessage(FOwnerFormWnd, WM_ENTERMENULOOP, 0, 0);
 
   Visible := True;
-{$IFDEF LCLGtk2}
+{$IFDEF LCLGtkX}
   try
     TGtkApp.BeginPopup(Self);
     if DropDownMode then

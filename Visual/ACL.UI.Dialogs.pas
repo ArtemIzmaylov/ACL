@@ -427,6 +427,8 @@ implementation
 uses
 {$IF DEFINED(MSWINDOWS)}
   ACL.UI.Dialogs.Impl.Win32;
+{$ELSEIF DEFINED(LCLGtk3)}
+  ACL.UI.Core.Impl.Gtk3;
 {$ELSEIF DEFINED(LCLGtk2)}
   ACL.UI.Core.Impl.Gtk2;
 {$ENDIF}

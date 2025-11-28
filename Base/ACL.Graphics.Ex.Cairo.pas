@@ -573,6 +573,7 @@ var
 begin
   ASavedContext := nil;
   ASurface := nil;
+{$IFDEF ACL_DIB_CANVAS_NO_DC}
   if ACanvas.ClassType = TACLDibCanvas then
   begin
     AOrigin := NullPoint;
@@ -601,6 +602,7 @@ begin
     end;
   end
   else
+{$ENDIF}
     Result := cairo_create_context(ACanvas.Handle, AOrigin, ASavedContext);
 end;
 
@@ -732,18 +734,17 @@ function cairo_set_clipping(ACairo: pcairo_t;
   ACanvas: TCanvas; ACanvasContext: PCairoContext): Boolean; overload;
 begin
   Result := True;
-  if ACanvas.HandleAllocated then
+{$IFDEF ACL_DIB_CANVAS_NO_DC}
+  if not ACanvas.HandleAllocated and (ACanvas.ClassType = TACLDibCanvas) then
   begin
-    if (ACanvasContext = nil) or (ACanvasContext.Ownership <> soReference) then
-      Result := cairo_set_clipping(ACairo, ACanvas.Handle);
+    with TACLDibCanvas(ACanvas).ClipRect do
+      cairo_rectangle(ACairo, Left, Top, Width, Height);
+    cairo_clip(ACairo);
   end
   else
-    if ACanvas.ClassType = TACLDibCanvas then
-    begin
-      with TACLDibCanvas(ACanvas).ClipRect do
-        cairo_rectangle(ACairo, Left, Top, Width, Height);
-      cairo_clip(ACairo);
-    end;
+{$ENDIF}
+    if (ACanvasContext = nil) or (ACanvasContext.Ownership <> soReference) then
+      Result := cairo_set_clipping(ACairo, ACanvas.Handle);
 end;
 
 procedure cairo_set_dash(ACairo: pcairo_t; const ADashes: array of Double); overload;

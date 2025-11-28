@@ -825,6 +825,7 @@ begin
     if (LForm = nil) or (LForm = Self) then
       PopupMode := pmAuto
     else
+    {$MESSAGE WARN 'LazGtk3 - проверить'}
     {$IFDEF LCLGtk2}
       // Мы должны попасть в ветку "Showing a non modal form with bsNone
       // above a modal form" TGtk2WSCustomForm.ShowHide. Иначе элементы формы
