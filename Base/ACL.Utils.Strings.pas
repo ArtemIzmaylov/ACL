@@ -460,6 +460,7 @@ function acCharCount(P: PChar; ALength: Integer; const ACharacters: string): Int
 function acCharLength(const P: PChar): Integer; overload;
 function acCharLength(const S: string; Index: Integer): Integer; overload;
 function acCharPrevLength(const S: string; Index: Integer): Integer;
+function acCharUCS4(const S: string; AIndex: Integer): UCS4Char;
 
 // Search
 function acContains(const AChar: AnsiChar; const AString: AnsiString): Boolean; inline; overload;
@@ -1403,6 +1404,19 @@ begin
     Dec(LPos);
   end;
   Result := 1;
+{$ENDIF}
+end;
+
+function acCharUCS4(const S: string; AIndex: Integer): UCS4Char;
+{$IFNDEF UNICODE}
+var
+  LCharLen: Integer;
+{$ENDIF}
+begin
+{$IFDEF UNICODE}
+  Result := Char.ConvertToUtf32(S, AIndex - 1{0-based});
+{$ELSE}
+  Result := UTF8CodepointToUnicode(@S[AIndex], LCharLen);
 {$ENDIF}
 end;
 

@@ -385,9 +385,12 @@ const
   LineBreaks = [#10, #13];
 
   function IsMeanfulCharacter(AIndex: Integer; AIsLetterOrDigit: Boolean): Boolean;
+  var
+    LChar: UCS4Char;
   begin
-    Result := not TCharacter.IsWhiteSpace(AText[AIndex]) and
-      ((TCharacter.IsLetterOrDigit(AText[AIndex]) = AIsLetterOrDigit) or
+    LChar := acCharUCS4(AText, AIndex);
+    Result := not TCharacter.IsWhiteSpace(LChar) and
+      ((TCharacter.IsLetterOrDigit(LChar) = AIsLetterOrDigit) or
         Assigned(AIsInsideTag) and AIsInsideTag(AIndex - 1{to 0-based}));
   end;
 
@@ -420,7 +423,12 @@ begin
   if ADirection <> 0 then
   begin
     while InRange(ACaret, 1, LLength) and IsSpaceOrTag(ACaret) do
-      Inc(ACaret, ADirection);
+    begin
+      if ADirection < 0 then
+        Dec(ACaret, Max(1, acCharPrevLength(AText, ACaret)))
+      else
+        Inc(ACaret, Max(1, acCharLength(AText, ACaret)));
+    end;
     if ACaret > LLength then
       Exit(TACLRange.Create(0, -1));
   end;
@@ -463,28 +471,40 @@ begin
     while (LRange2 <= LLength) and IsSpaceOrTag(LRange2) do
       Inc(LRange2);
     while (LRange1 >= 1) and IsSpaceOrTag(LRange1) do
-      Dec(LRange1);
+      Dec(LRange1, Max(1, acCharPrevLength(AText, LRange1)));
     while (LRange1 >= 1) and IsMeanfulCharacter(LRange1, True) do
-      Dec(LRange1);
+      Dec(LRange1, Max(1, acCharPrevLength(AText, LRange1)));
   end
   else
   begin
+    // Каретка у нас с нуля, а размер текущего символа не обязательно = 1
+    Inc(LRange1);
+    Dec(LRange1, acCharPrevLength(AText, LRange1));
+
     // Если мы попали в слово:
     // 1) сдвигаем диапазон влево до начала слова
     // 2) сдвигаем диапазон вправо до конца слова
     //    + захватываем все пробелы до следующего слова / конца строки
     LLetter := IsMeanfulCharacter(LRange1, True);
     while (LRange1 >= 1) and IsMeanfulCharacter(LRange1, LLetter) do
-      Dec(LRange1);
+      Dec(LRange1, Max(1, acCharPrevLength(AText, LRange1)));
     while (LRange2 <= LLength) and IsMeanfulCharacter(LRange2, LLetter) do
-      Inc(LRange2);
+      Inc(LRange2, Max(1, acCharLength(AText, LRange2)));
     while (LRange2 <= LLength) and IsSpaceOrTag(LRange2) do
       Inc(LRange2);
   end;
 
-  // LRange1 / LRange2 указывают на первые символы, которые НЕ попадают в диапазон
-  // Inc(LRange1); - каретка с 0, коррекция тут не нужна
-  Result := TACLRange.Create(LRange1, LRange2 - 1);
+  // ARange1 / ARange2 указывают на первые символы, которые НЕ попадают в диапазон.
+  // Корректируем их таким образом, чтобы они указывали на byte-диапазон искомого слова.
+  // Не забываем, что на выходе индексация у нас должна быть с 0, а не 1.
+  Dec(LRange2); // каретка с 0
+  if LRange1 > 0 then
+  begin
+    Inc(LRange1, acCharLength(AText, LRange1));
+    Dec(LRange1); // каретка с 0
+  end;
+
+  Result := TACLRange.Create(LRange1, LRange2);
 {$ENDREGION}
 {$WARN SYMBOL_DEPRECATED ON}
 end;
