@@ -238,14 +238,23 @@ type
 implementation
 
 uses
+{$IFDEF LCLGtkX}
+  glib2,
+{$ENDIF}
+{$IFDEF LCLGtk2}
+  gdk2pixbuf,
+  gtk2,
+  gtk2Def,
+{$ENDIF}
+{$IFDEF LCLGtk3}
+  LazGdkPixbuf2,
+  LazGdk3,
+  LazGtk3,
+{$ENDIF}
   ACL.Utils.Logger,
 {$IF DEFINED(MSWINDOWS)}
   ACL.Utils.Desktop,
-{$ELSEIF DEFINED(LCLGtk2)}
-  gdk2pixbuf,
-  glib2,
-  gtk2,
-  gtk2Def,
+{$ELSEIF DEFINED(LCLGtkX)}
   ACL.Utils.FileSystem.GIO,
 {$ENDIF}
   ACL.UI.Dialogs;
@@ -254,7 +263,9 @@ type
   TACLTreeListNodeAccess = class(TACLTreeListNode);
   TACLTreeListCustomOptionsAccess = class(TACLTreeListCustomOptions);
 
-{$IFDEF LCLGtk2}
+{$IF DEFINED(LCLGtk3)}
+  procedure gtk_icon_info_free(anObject:gpointer); cdecl; external gobjectlib name 'g_object_unref';
+{$ELSEIF DEFINED(LCLGtk2)}
   function gtk_icon_theme_lookup_by_gicon(icon_theme: PGtkIconTheme; icon: PGIcon;
     size: gint; flags: TGtkIconLookupFlags): PGtkIconInfo; cdecl; external gtklib;
 {$ENDIF}
@@ -290,7 +301,7 @@ begin
 end;
 
 function TACLShellImageList.GetImageIndex(AFolder: TACLShellFolder): Integer;
-{$IFDEF MSWINDOWS}
+{$IF DEFINED(MSWINDOWS)}
 var
   LFileInfo: TSHFileInfoW;
 begin
@@ -309,7 +320,7 @@ begin
       SizeOf(LFileInfo), SHGFI_USEFILEATTRIBUTES or SHGFI_SYSICONINDEX);
   end;
   Result := LFileInfo.iIcon;
-{$ELSE}
+{$ELSEIF DEFINED(LCLGtkX)}
 const
   RegularFolderImageIndex = 0;
 
@@ -373,7 +384,7 @@ const
                 if LIconData <> nil then
                 begin
                   Result := AddImage(LIconData);
-                  gdk_pixbuf_unref(LIconData);
+                  g_object_unref(LIconData);
                 end;
               end;
             finally
@@ -403,6 +414,9 @@ begin
     Result := FetchIcon(AFolder.Path)
   else
     Result := RegularFolderImageIndex;
+{$ELSE}
+begin
+  Result := -1;
 {$ENDIF}
 end;
 

@@ -34,6 +34,7 @@ type
   PGUnixMountPoint = Pointer;
   PGUnixMountEntry = Pointer;
 
+{$IFNDEF LCLGtk3}
   TGtkIconLookupFlag = (
     GTK_ICON_LOOKUP_NO_SVG = 0,
     GTK_ICON_LOOKUP_FORCE_SVG = 1,
@@ -47,6 +48,7 @@ type
     TGtkIconLookupFlagsIdxMaxValue = 31
   );
   TGtkIconLookupFlags = set of TGtkIconLookupFlag;
+{$ENDIF}
 
 const
   G_FILE_COPY_NONE = 0;
