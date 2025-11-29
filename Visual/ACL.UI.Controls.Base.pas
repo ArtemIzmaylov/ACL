@@ -957,6 +957,8 @@ type
     class function GetMargins(AControl: TControl; out AMargins: TACLMargins): Boolean;
     class procedure UpdateMargins(AControl: TControl; const AMargins: TRect);
     // Messages
+    class function IsMouseAtControl(AInvoker: TControl; AContainer: TWinControl): Boolean;
+    class function IsVisible(AControl: TControl): Boolean;
     class function NCHitTest(AControl: TWinControl; var Message: TWMMouse): Integer;
     class function WndProc(ACaller: TWinControl; var Message: TMessage): Boolean; inline;
   end;
@@ -2733,8 +2735,7 @@ end;
 
 function TACLGraphicControl.IsMouseAtControl: Boolean;
 begin
-  Result := Assigned(Parent) and Parent.HandleAllocated and ((GetCaptureControl = Self) or
-    PtInRect(ClientRect, CalcCursorPos) and (Perform(CM_HITTEST, 0, PointToLParam(CalcCursorPos)) <> 0));
+  Result := TACLControls.IsMouseAtControl(Self, Parent);
 end;
 
 procedure TACLGraphicControl.SetResourceCollection(AValue: TACLCustomResourceCollection);
@@ -3089,18 +3090,8 @@ begin
 end;
 
 function TACLCustomControl.IsMouseAtControl: Boolean;
-var
-  P: TPoint;
 begin
-  if HandleAllocated and IsWindowVisible(Handle) then
-  begin
-    if MouseCapture then
-      Exit(True);
-    P := CalcCursorPos;
-    Result := PtInRect(ClientRect, P) and (Perform(CM_HITTEST, 0, PointToLParam(P)) <> 0);
-  end
-  else
-    Result := False;
+  Result := TACLControls.IsMouseAtControl(Self, Self);
 end;
 
 procedure TACLCustomControl.Loaded;
@@ -3133,20 +3124,25 @@ end;
 
 procedure TACLCustomControl.MouseLeave;
 begin
-  FMouseInClient := False;
-  SubClasses.MouseLeave;
+  if MouseInClient then
+  begin
+    FMouseInClient := False;
+    SubClasses.MouseLeave;
+  end;
 end;
 
 procedure TACLCustomControl.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
   inherited;
-  SubClasses.MouseMove(Shift, Point(X, Y));
+  if MouseInClient then
+    SubClasses.MouseMove(Shift, Point(X, Y));
 end;
 
 procedure TACLCustomControl.MouseUp(
   Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
-  SubClasses.MouseUp(Button, Shift, Point(X, Y));
+  if MouseInClient then
+    SubClasses.MouseUp(Button, Shift, Point(X, Y));
   inherited;
 end;
 
@@ -3154,7 +3150,8 @@ procedure TACLCustomControl.MouseDown(
   Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   inherited MouseDown(Button, Shift, X, Y);
-  SubClasses.MouseDown(Button, Shift, Point(X, Y));
+  if MouseInClient then
+    SubClasses.MouseDown(Button, Shift, Point(X, Y));
 end;
 
 function TACLCustomControl.MouseWheel(Direction: TACLMouseWheelDirection;
@@ -3899,6 +3896,36 @@ begin
   finally
     EndPaint(ACaller.Handle, LPaintStruct);
   end;
+end;
+
+class function TACLControls.IsMouseAtControl(AInvoker: TControl; AContainer: TWinControl): Boolean;
+var
+  LPoint: TPoint;
+begin
+  Result := False;
+  if (AContainer <> nil) and AContainer.HandleAllocated then
+  begin
+    if GetCaptureControl = AInvoker then
+      Exit(True);
+    if IsVisible(AInvoker) then
+    begin
+      LPoint := AInvoker.CalcCursorPos;
+      Result := AInvoker.ClientRect.Contains(LPoint) and
+        (AInvoker.Perform(CM_HITTEST, 0, PointToLParam(LPoint)) <> 0);
+    end;
+  end;
+end;
+
+class function TACLControls.IsVisible(AControl: TControl): Boolean;
+begin
+{$IFDEF FPC}
+  Result := AControl.HandleObjectShouldBeVisible;
+{$ELSE}
+  if AControl is TWinControl then
+    Result := TWinControl(AControl).HandleAllocated and IsWindowVisible(TWinControl(AControl).Handle)
+  else
+    Result := AControl.Visible and ((AControl.Parent = nil) or IsVisible(AControl.Parent));
+{$ENDIF}
 end;
 
 class procedure TACLControls.ScaleChanging(AControl: TWinControl; var AState: TObject);

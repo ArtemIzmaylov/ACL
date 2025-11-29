@@ -2081,8 +2081,12 @@ begin
   Message.Result := Ord(
     PtInRect(SubClass.ButtonRect, P) or
     PtInRect(SubClass.FocusRect, P) or
-    ShowLine and PtInRect(SubClass.Bounds, P) or
-    MouseCapture);
+    ShowLine and PtInRect(SubClass.Bounds, P)
+  {$IFDEF LCLGtk2}
+    // Gtk2: не приходит MouseUp, если отвести мышь за пределы контрола
+    or MouseCapture
+  {$ENDIF}
+  );
 end;
 
 procedure TACLCustomCheckBox.CMTextChanged(var Message: TMessage);

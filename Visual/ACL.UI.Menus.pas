@@ -2956,8 +2956,7 @@ begin
   FDelayTimer.Enabled := False;
   try
     if (FDelayWnd <> nil) and FDelayWnd.HasSelection and
-       (FDelayWndIndex = FDelayWnd.SelectedItemIndex) and
-       (FDelayWnd.IsMouseAtControl)
+       (FDelayWndIndex = FDelayWnd.SelectedItemIndex)
     then
       DoShowPopup(FDelayWnd);
   finally
@@ -3446,7 +3445,7 @@ begin
   for I := 0 to Screen.CustomFormCount - 1 do
   begin
     LForm := Screen.CustomForms[I];
-    if LForm.HandleAllocated and IsWindowVisible(LForm.Handle) and IsWindowEnabled(LForm.Handle) then
+    if TACLControls.IsVisible(LForm) and IsWindowEnabled(LForm.Handle) then
       LForm.Perform(CM_UPDATEACTIONS, 0, 0);
   end;
 end;

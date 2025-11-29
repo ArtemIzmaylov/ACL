@@ -986,13 +986,11 @@ end;
 
 class function TACLUIInsightAdapterControl.GetBoundsOnScreen(AObject: TObject; out ABounds: TRect): Boolean;
 var
-  AControl: TControl absolute AObject;
-  AWinControl: TWinControl;
+  LControl: TControl absolute AObject;
 begin
-  AWinControl := AControl.Parent;
-  Result := AWinControl.HandleAllocated and IsWindowVisible(AWinControl.Handle);
+  Result := TACLControls.IsVisible(LControl.Parent);
   if Result then
-    ABounds := AControl.BoundsRect + AWinControl.ClientOrigin;
+    ABounds := LControl.BoundsRect + LControl.Parent.ClientOrigin;
 end;
 
 class function TACLUIInsightAdapterControl.GetCaption(AObject: TObject; out AValue: string): Boolean;
@@ -1009,14 +1007,11 @@ end;
 
 class function TACLUIInsightAdapterWinControl.GetBoundsOnScreen(AObject: TObject; out ABounds: TRect): Boolean;
 var
-  AWinControl: TWinControl absolute AObject;
+  LControl: TWinControl absolute AObject;
 begin
-  Result := AWinControl.HandleAllocated and IsWindowVisible(AWinControl.Handle);
+  Result := TACLControls.IsVisible(LControl);
   if Result then
-  begin
-    ABounds := Rect(0, 0, AWinControl.Width, AWinControl.Height);
-    ABounds := ABounds + AWinControl.ClientOrigin;
-  end;
+    ABounds := Rect(0, 0, LControl.Width, LControl.Height) + LControl.ClientOrigin;
 end;
 
 class procedure TACLUIInsightAdapterWinControl.GetChildren(AObject: TObject; ABuilder: TACLUIInsightSearchQueueBuilder);

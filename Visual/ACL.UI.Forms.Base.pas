@@ -409,8 +409,9 @@ var
 begin
   if acMenuLoopCount > 0 then
     Exit;
-  if (AForm <> nil) and not (csDesigning in AForm.ComponentState) and
-    AForm.HandleAllocated and IsWindowVisible(AForm.Handle) then
+  if AForm = nil then
+    Exit;
+  if not (csDesigning in AForm.ComponentState) and TACLControls.IsVisible(AForm) then
   begin
     LStayOnTop := (AForm.FormStyle in fsAllStayOnTop) or
       (Application.ModalLevel = 0) and AForm.ShouldBeStayOnTop;
@@ -1026,7 +1027,7 @@ begin
     end;
 
   {$IFDEF MSWINDOWS}
-    if Visible and HandleAllocated and not IsWindowVisible(WindowHandle) then
+    if TACLControls.IsVisible(Self) then
       Perform(CM_SHOWINGCHANGED, 0, 0)
     else
   {$ENDIF}
