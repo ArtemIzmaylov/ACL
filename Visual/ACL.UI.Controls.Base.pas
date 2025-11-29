@@ -722,6 +722,7 @@ type
     procedure WMKillFocus(var Message: TWMKillFocus); message WM_KILLFOCUS;
     procedure WMLButtonDown(var Message: TWMLButtonDown); message WM_LBUTTONDOWN;
     procedure WMLButtonUp(var Message: TWMLButtonUp); message WM_LBUTTONUP;
+    procedure WMRButtonDown(var Message: TWMLButtonDown); message WM_RBUTTONDOWN;
     procedure WMNCHitTest(var Message: TWMNCHitTest); message WM_NCHITTEST;
     procedure WMMouseMove(var Message: TWMMouseMove); message WM_MOUSEMOVE;
     procedure WMMouseWheelHorz(var Message: TWMMouseWheel); message WM_MOUSEHWHEEL;
@@ -3328,6 +3329,13 @@ begin
     PaintHandler(Message)
   else
     TACLControls.BufferedPaint(Self);
+end;
+
+procedure TACLCustomControl.WMRButtonDown(var Message: TWMLButtonDown);
+begin
+  if FocusOnClick then
+    SetFocusOnClick;
+  inherited;
 end;
 
 procedure TACLCustomControl.WMSetFocus(var Message: TWMSetFocus);

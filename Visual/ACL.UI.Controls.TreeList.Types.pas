@@ -1412,11 +1412,11 @@ end;
 
 procedure TACLTreeListNode.BeforeDestruction;
 begin
-  inherited BeforeDestruction;
+  inherited;
+  Clear; // первым, иначе GetObjectParent на валидации захватит нас после NodeRemoving
   if TreeList <> nil then
     TreeList.NodeRemoving(Self);
   TACLObjectLinks.Release(Self);
-  Clear;
 end;
 
 function TACLTreeListNode.AddChild(const AValues: array of string): TACLTreeListNode;
