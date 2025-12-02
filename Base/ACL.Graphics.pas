@@ -1036,7 +1036,10 @@ end;
 function acSaveClipRegion(DC: HDC): TRegionHandle;
 begin
   if not acGetClipRegion(DC, Result) then
-    Result := 0;
+  begin
+    Result := TACLRegionManager.Get;
+    SetRectRgn(Result, 0, 0, 0, 0);
+  end;
 end;
 
 function acStartClippedDraw(ACanvas: TCanvas; const R: TRect; out APrevRegion: TRegionHandle): Boolean;
@@ -1934,7 +1937,7 @@ begin
     try
       GetWindowOrgEx(LDC, LOrg);
       SetBrushOrgEx(LDC, LOrg.X, LOrg.Y, @LPrevOrg);
-      acExcludeFromClipRegion(LDC, ARect);
+      acExcludeFromClipRegion(LDC, ARect.InflateTo(-1));
       acDrawHatch(LDC, ARect, ACanvas.Pixels[ARect.Left, ARect.Top], AColor, 1);
       SetBrushOrgEx(LDC, LPrevOrg.X, LPrevOrg.Y, nil);
     finally
