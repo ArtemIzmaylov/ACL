@@ -217,6 +217,8 @@ implementation
 
 {$IF DEFINED(MSWINDOWS)}
   {$I ACL.UI.DropTarget.Win32.inc}
+{$ELSEIF DEFINED(LCLGtk3)}
+  {$I ACL.UI.DropTarget.Gtk3.inc}
 {$ELSEIF DEFINED(LCLGtk2)}
   {$I ACL.UI.DropTarget.Gtk2.inc}
 {$ENDIF}
