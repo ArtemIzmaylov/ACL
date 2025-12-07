@@ -1110,11 +1110,11 @@ var
 begin
   LEdit := FEditors.List[AIndex];
   if VarIsFloat(AValue) then
-    LEdit.InputMask := eimFloat
+    LEdit.NumbersOnly := DefaultNumbersOnlyFloat
   else if VarIsOrdinal(AValue) then
-    LEdit.InputMask := eimInteger
+    LEdit.NumbersOnly := DefaultNumbersOnlyInteger
   else
-    LEdit.InputMask := eimText;
+    LEdit.NumbersOnly := [];
 
   LEdit.Text := AValue;
   if ASelLength >= 0 then

@@ -117,7 +117,8 @@ type
     IACLEditActions,
     IACLUpdateLock)
   public type
-    TState = (esCaret, esChanged, esDragging, esFocused, esReadOnly, esIteract);
+    TState = (esCaret, esChanged, esDragging,
+      esFocused, esReadOnly, esIteract, esNoScrolling);
     TStates = set of TState;
   public type
     TDisplayFormatFunc = function: string of object;
@@ -176,6 +177,7 @@ type
     FSelectionRect: TRect;
 
     procedure AssignCanvasParameters(ACanvas: TCanvas); virtual;
+    procedure BlockScrolling(ALock: Boolean);
     function CanInput(var AText, APart1, APart2: string): Boolean; virtual;
     function GetDisplayText: string;
     function GetPart1(const AText: string): string; // text before selection
@@ -281,6 +283,7 @@ type
     procedure DoContextPopup(MousePos: TPoint; var Handled: Boolean); override;
     procedure FocusChanged; override;
     procedure InvalidateBorders;
+    procedure SetFocusOnClick; override;
     procedure SetTargetDPI(AValue: Integer); override;
     procedure TextChanged; reintroduce; virtual;
     //# Drawing
@@ -658,7 +661,7 @@ begin
 
   {$REGION ' Scrolling '}
     LMaxOffset := Max(FTextRect.Width - FTextArea.Width + FCaretRect.Width, 0);
-    if esFocused in State then
+    if [esFocused, esNoScrolling] * State = [esFocused] then
     begin
       if FCaretRect.Right - FOffset > FTextArea.Right then
         FOffset := FCaretRect.Right - FTextArea.Right + {Indent}FTextRect.Height;
@@ -706,7 +709,7 @@ begin
     eaCopy:
       Result := (SelLength > 0);
     eaPaste:
-      Result := not ReadOnly and Clipboard.HasFormat(CF_UNICODETEXT);
+      Result := not ReadOnly and Clipboard.HasText;
     eaUndo:
       Result := FUndo.IsAssigned;
     eaSelectAll:
@@ -774,6 +777,14 @@ end;
 procedure TACLEditSubClass.BeginUpdate;
 begin
   Inc(FUpdateCount);
+end;
+
+procedure TACLEditSubClass.BlockScrolling(ALock: Boolean);
+begin
+  if ALock then
+    Include(FState, esNoScrolling)
+  else
+    Exclude(FState, esNoScrolling);
 end;
 
 procedure TACLEditSubClass.EndUpdate;
@@ -1532,6 +1543,13 @@ begin
   if not (csLoading in ComponentState) then
     CanAutoSize(AWidth, AHeight);
   inherited SetBounds(ALeft, ATop, AWidth, AHeight);
+end;
+
+procedure TACLCustomEdit.SetFocusOnClick;
+begin
+  EditBox.BlockScrolling(True);
+  inherited;
+  EditBox.BlockScrolling(False);
 end;
 
 procedure TACLCustomEdit.SetStyle(AValue: TACLStyleEdit);

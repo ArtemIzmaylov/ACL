@@ -79,6 +79,7 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
   published
+    property Borders;
     property Buttons;
     property ButtonsImages;
     property Mode: TACLDateTimeEditMode read FMode write SetMode default dtmDateAndTime;

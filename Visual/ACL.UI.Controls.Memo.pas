@@ -566,7 +566,7 @@ begin
     eaCopy:
       Result := (SelLength > 0);
     eaPaste:
-      Result := not ReadOnly and Clipboard.HasFormat(CF_UNICODETEXT);
+      Result := not ReadOnly and Clipboard.HasText;
     eaUndo:
       Result := History.CanUndo;
     eaSelectAll:

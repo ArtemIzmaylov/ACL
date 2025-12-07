@@ -34,22 +34,26 @@ uses
   // Vcl
   {Vcl.}ActnList,
   {Vcl.}Controls,
+  {Vcl.}Forms,
   {Vcl.}ExtCtrls,
   {Vcl.}Graphics,
   {Vcl.}ImgList,
   // ACL
   ACL.FastCode,
   ACL.Geometry,
+  ACL.Geometry.Utils,
   ACL.Graphics,
   ACL.Graphics.Ex,
   ACL.Graphics.TextLayout,
   ACL.Graphics.SkinImage,
   ACL.Math,
   ACL.UI.Controls.Base,
+  ACL.UI.HintWindow,
   ACL.UI.Resources,
   ACL.Utils.Common,
   ACL.Utils.DPIAware,
-  ACL.Utils.Shell;
+  ACL.Utils.Shell,
+  ACL.Utils.Strings;
 
 type
 
@@ -88,8 +92,11 @@ type
 
   TACLCustomLabel = class(TACLGraphicControl)
   strict private
+    class var FHintData: TACLHintData;
+  strict private
     FAlignment: TAlignment;
     FAlignmentVert: TVerticalAlignment;
+    FEndEllipsis: Boolean;
     FStyle: TACLStyleLabel;
     FSubControl: TACLLabelSubControlOptions;
     FTransparent: Boolean;
@@ -105,10 +112,12 @@ type
     procedure SetSubControl(AValue: TACLLabelSubControlOptions);
     procedure SetTransparent(AValue: Boolean);
     // Messages
+    procedure CMHintShow(var Message: TCMHintShow); message CM_HINTSHOW;
     procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
     procedure CMVisibleChanged(var Message: TMessage); message CM_VISIBLECHANGED;
   protected
     FTextRect: TRect;
+    FTextTruncated: Boolean;
 
     procedure BoundsChanged; override;
     procedure Calculate(ABounds: TRect); virtual;
@@ -130,6 +139,7 @@ type
     // Properties
     property Alignment: TAlignment read FAlignment write SetAlignment default taLeftJustify;
     property AlignmentVert: TVerticalAlignment read FAlignmentVert write SetAlignmentVert default taVerticalCenter;
+    property EndEllipsis: Boolean read FEndEllipsis write FEndEllipsis default False;
     property Style: TACLStyleLabel read FStyle write SetStyle;
     property SubControl: TACLLabelSubControlOptions read FSubControl write SetSubControl;
     property Transparent: Boolean read FTransparent write SetTransparent default True;
@@ -173,6 +183,7 @@ type
     property Constraints;
     property Cursor;
     property Enabled;
+    property EndEllipsis;
     property Font;
     property Height;
     property ParentFont;
@@ -391,24 +402,31 @@ var
 begin
   SubControl.AlignControl(ABounds);
 
-  LTextSize := MeasureSize(ABounds.Width);
   FTextRect := ABounds;
+  LTextSize := MeasureSize(FTextRect.Width);
+  FTextTruncated := (LTextSize.cx > FTextRect.Width) or (LTextSize.cy > FTextRect.Height);
+  if FTextTruncated then
+  begin
+    LTextSize.cx := Min(LTextSize.cx, FTextRect.Width);
+    LTextSize.cy := Min(LTextSize.cy, FTextRect.Height);
+  end;
+
   case AlignmentVert of
     taAlignTop:
-      FTextRect.Height := LTextSize.cy;
+      FTextRect.Height := LTextSize.Height;
     taAlignBottom:
-      FTextRect.Top := FTextRect.Bottom - LTextSize.cy;
+      FTextRect.Top := FTextRect.Bottom - LTextSize.Height;
   else
-    FTextRect.CenterVert(LTextSize.cy);
+    FTextRect.CenterVert(LTextSize.Height);
   end;
 
   case Alignment of
     taLeftJustify:
-      FTextRect.Right := FTextRect.Left + LTextSize.cx;
+      FTextRect.Right := FTextRect.Left + LTextSize.Width;
     taRightJustify:
-      FTextRect.Left := FTextRect.Right - LTextSize.cx;
+      FTextRect.Left := FTextRect.Right - LTextSize.Width;
     taCenter:
-      FTextRect.CenterHorz(LTextSize.cx);
+      FTextRect.CenterHorz(LTextSize.Width);
   end;
 end;
 
@@ -444,6 +462,22 @@ begin
     CallHyperlink(Self, OnHyperlink, LUrl)
   else if not SubControl.TrySetFocus then
     inherited Click;
+end;
+
+procedure TACLCustomLabel.CMHintShow(var Message: TCMHintShow);
+begin
+  inherited;
+  if FTextTruncated and (Message.HintInfo^.HintStr = '') then
+  begin
+    FHintData.Area := ClientRect;
+    FHintData.Font := acFontToString(Font);
+    FHintData.Text := Text;
+    FHintData.TextRect := FTextRect;
+    Message.HintInfo^.HintPos := ClientToScreen(FTextRect.TopLeft);
+    Message.HintInfo^.HintStr := Text;
+    Message.HintInfo^.HintData := @FHintData;
+    Message.HintInfo^.HintWindowClass := TACLHintWindow;
+  end;
 end;
 
 procedure TACLCustomLabel.CMTextChanged(var Message: TMessage);
@@ -616,12 +650,17 @@ begin
 end;
 
 function TACLLabel.MeasureSize(AWidth: Integer = 0): TSize;
+var
+  LText: string;
 begin
+  LText := Caption;
   MeasureCanvas.SetScaledFont(Font);
-  if Style.WordWrap then
-    Result := acTextSizeMultiline(MeasureCanvas, Caption, AWidth)
+  if LText = '' then
+    Result := TSize.Create(0, acFontHeight(MeasureCanvas))
+  else if Style.WordWrap then
+    Result := acTextSizeMultiline(MeasureCanvas, LText, AWidth)
   else
-    Result := acTextSize(MeasureCanvas, Caption);
+    Result := acTextSize(MeasureCanvas, LText);
 end;
 
 procedure TACLLabel.MouseEnter;
@@ -640,10 +679,8 @@ procedure TACLLabel.PaintText;
 begin
   if Url <> '' then
     Canvas.Font.Style := [fsUnderline];
-  if Style.WordWrap then
-    acTextDraw(Canvas, Caption, FTextRect, taLeftJustify, taAlignTop, False, False, True)
-  else
-    acTextDraw(Canvas, Caption, FTextRect, taLeftJustify, taVerticalCenter, True, True);
+  acTextDraw(Canvas, Caption, FTextRect, taLeftJustify, taAlignTop,
+    EndEllipsis and FTextTruncated, False, Style.WordWrap);
 end;
 
 function TACLLabel.GetDefaultTextColor: TColor;
@@ -744,11 +781,16 @@ end;
 function TACLFormattedLabel.MeasureSize(AWidth: Integer): TSize;
 begin
   MeasureCanvas.SetScaledFont(Font);
-  FText.SetOption(atoEndEllipsis, not AutoSize);
-  FText.SetOption(atoWordWrap, Style.WordWrap);
-  FText.Bounds := Bounds(0, 0, IfThen(AWidth > 0, AWidth, MaxWord), MaxWord);
-  FText.Calculate(MeasureCanvas);
-  Result := FText.MeasureSize;
+  if FText.Text <> '' then
+  begin
+    FText.SetOption(atoEndEllipsis, EndEllipsis and not AutoSize);
+    FText.SetOption(atoWordWrap, Style.WordWrap);
+    FText.Bounds := Bounds(0, 0, IfThen(AWidth > 0, AWidth, MaxWord), MaxWord);
+    FText.Calculate(MeasureCanvas);
+    Result := FText.MeasureSize
+  end
+  else
+    Result := TSize.Create(0, acFontHeight(MeasureCanvas));
 end;
 
 procedure TACLFormattedLabel.PaintText;

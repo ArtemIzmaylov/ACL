@@ -315,7 +315,7 @@ type
     property Buttons;
     property ButtonsImages;
     property DropDownListSize;
-    property InputMask;
+    property NumbersOnly;
     property Items: TStrings read FItems write SetItems;
     property ItemIndex; // after Items
     property MaxLength;

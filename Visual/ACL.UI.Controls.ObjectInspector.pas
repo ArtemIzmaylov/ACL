@@ -695,7 +695,7 @@ end;
 function TACLObjectInspectorSubClass.DoEditCreate(
   const AParams: TACLInplaceInfo; AEditor: TACLPropertyEditor): TComponent;
 
-  function CreateEdit(AMask: TACLEditInputMask): TACLEdit;
+  function CreateEdit(AMask: TACLEditNumberOptions): TACLEdit;
   begin
     if OptionsBehavior.AllowExpressions then
       Result := TACLObjectInspectorExpressionEdit.CreateInplace(AParams)
@@ -706,7 +706,7 @@ function TACLObjectInspectorSubClass.DoEditCreate(
     Result.ReadOnly := AEditor.IsReadOnly;
     Result.Style := StyleInplaceEdit;
     Result.StyleButton := StyleInplaceEditButton;
-    Result.InputMask := AMask;
+    Result.NumbersOnly := AMask;
     Result.Value := AEditor.Value;
   end;
 
@@ -744,14 +744,14 @@ begin
     else
       case GetPropType(AEditor.Info).Kind of
         tkVariant:
-          Result := CreateEdit(eimText);
+          Result := CreateEdit([]);
         tkInteger, tkInt64:
-          Result := CreateEdit(eimInteger);
+          Result := CreateEdit(DefaultNumbersOnlyInteger);
         tkFloat:
-          Result := CreateEdit(eimFloat);
+          Result := CreateEdit(DefaultNumbersOnlyFloat);
       else
         if TRTTI.IsString(AEditor.Info) then
-          Result := CreateEdit(eimText);
+          Result := CreateEdit([]);
       end;
     if Supports(AEditor, IACLPropertyEditorDialog, ADialogIntf) and (Result is TACLCustomTextEdit) then
       TACLCustomTextEditAccess(Result).Buttons.Add(acEndEllipsis).OnClick := ShowExternalDialogHandler;
@@ -1164,19 +1164,20 @@ end;
 
 function TACLObjectInspectorExpressionEdit.IsExpressionMode: Boolean;
 begin
-  Result := InputMask in [eimInteger, eimFloat];
+  Result := NumbersOnly <> [];
 end;
 
 function TACLObjectInspectorExpressionEdit.TextToValue(const AText: string): Variant;
 begin
-  case InputMask of
-    eimInteger:
+  if TACLEditNumberOption.Digits in NumbersOnly then
+  begin
+    if TACLEditNumberOption.Decimals in NumbersOnly then
+      VarCast(Result{%H-}, Evaluate(AText), varDouble)
+    else
       VarCast(Result{%H-}, Evaluate(AText), varInteger);
-    eimFloat:
-      VarCast(Result{%H-}, Evaluate(AText), varDouble);
+  end
   else
     Result := inherited;
-  end;
 end;
 
 function TACLObjectInspectorExpressionEdit.ValueToText(const AValue: Variant): string;

@@ -53,8 +53,24 @@ uses
   ACL.Utils.Strings;
 
 type
+  {$SCOPEDENUMS ON}
+  TACLEditNumberOption = (Digits, Decimals, Signs, Zeros);
+  TACLEditNumberOptions = set of TACLEditNumberOption;
+  {$SCOPEDENUMS OFF}
+
+const
+  DefaultNumbersOnlyInteger = [
+    TACLEditNumberOption.Signs,
+    TACLEditNumberOption.Digits,
+    TACLEditNumberOption.Zeros];
+  DefaultNumbersOnlyFloat = [
+    TACLEditNumberOption.Signs,
+    TACLEditNumberOption.Digits,
+    TACLEditNumberOption.Decimals,
+    TACLEditNumberOption.Zeros];
+
+type
   TACLEditButtons = class;
-  TACLEditInputMask = (eimText, eimInteger, eimFloat);
   TACLCustomTextEdit = class;
 
   { IACLTextEdit }
@@ -148,8 +164,9 @@ type
     FButtons: TACLEditButtons;
     FButtonsImages: TCustomImageList;
     FButtonsImagesLink: TChangeLink;
-    FInputMask: TACLEditInputMask;
+    FNumbersOnly: TACLEditNumberOptions;
 
+    function CheckValue(const AText: string; out AValue: Variant): Boolean;
     function GetMaxLength: Integer;
     function GetPasswordChar: Boolean;
     function GetReadOnly: Boolean;
@@ -159,9 +176,10 @@ type
     function GetText: string;
     function GetTextHint: string;
     function GetValue: Variant;
+    procedure ReadInputMask(AReader: TReader);
     procedure SetButtons(AValue: TACLEditButtons);
     procedure SetButtonsImages(const AValue: TCustomImageList);
-    procedure SetInputMask(AValue: TACLEditInputMask);
+    procedure SetNumbersOnly(AValue: TACLEditNumberOptions);
     procedure SetMaxLength(AValue: Integer);
     procedure SetPasswordChar(AValue: Boolean);
     procedure SetReadOnly(AValue: Boolean);
@@ -176,9 +194,10 @@ type
   protected
     procedure CalculateButtons(var ARect: TRect; AIndent: Integer); override;
     function GetCursor(const P: TPoint): TCursor; override;
+    procedure DefineProperties(Filer: TFiler); override;
+    procedure HandlerImageChange(Sender: TObject); virtual;
     procedure Loaded; override;
     procedure Notification(AComponent: TComponent; AOperation: TOperation); override;
-    procedure HandlerImageChange(Sender: TObject); virtual;
 
     // Input
     procedure CheckInput(var AText, APart1, APart2: string; var AAccept: Boolean); virtual;
@@ -195,8 +214,8 @@ type
     //# Properties
     property Buttons: TACLEditButtons read FButtons write SetButtons;
     property ButtonsImages: TCustomImageList read FButtonsImages write SetButtonsImages;
-    property InputMask: TACLEditInputMask read FInputMask write SetInputMask default eimText;
     property MaxLength: Integer read GetMaxLength write SetMaxLength default 0;
+    property NumbersOnly: TACLEditNumberOptions read FNumbersOnly write SetNumbersOnly default [];
     property PasswordChar: Boolean read GetPasswordChar write SetPasswordChar default False;
     property ReadOnly: Boolean read GetReadOnly write SetReadOnly default False;
     property TextHint: string read GetTextHint write SetTextHint;
@@ -230,7 +249,7 @@ type
     property Borders;
     property Buttons;
     property ButtonsImages;
-    property InputMask;
+    property NumbersOnly;
     property MaxLength;
     property PasswordChar;
     property ReadOnly;
@@ -475,27 +494,56 @@ end;
 procedure TACLCustomTextEdit.CheckInput(
   var AText, APart1, APart2: string; var AAccept: Boolean);
 var
-  LUnused1: Integer;
-  LUnused2: Double;
-  LValue: string;
+  LString: string;
+  LUnused: Variant;
 begin
-  {.$MESSAGE 'TODO - возможно это стоит сделать подключаемым по опции'}
-  case InputMask of
-    eimFloat:
-      begin
-        AText := acReplaceChar(AText, '.', FormatSettings.DecimalSeparator);
-        LValue := APart1 + AText + APart2;
-        AAccept := acContains(LValue, ['-', '+']) or
-          TryStrToFloat(LValue, LUnused2) or
-          TryStrToFloat(LValue, LUnused2, InvariantFormatSettings);
-      end;
-
-    eimInteger:
-      begin
-        LValue := APart1 + AText + APart2;
-        AAccept := acContains(LValue, ['-', '+']) or TryStrToInt(LValue, LUnused1);
-      end;
+  if NumbersOnly = [] then
+    Exit;
+  if TACLEditNumberOption.Decimals in NumbersOnly then
+  begin
+    if FormatSettings.DecimalSeparator <> '.' then
+      AText := acReplaceChar(AText, '.', FormatSettings.DecimalSeparator);
   end;
+
+  LString := APart1 + AText + APart2;
+  AAccept := CheckValue(LString, LUnused) or
+    // If start entering the negative/positive number
+    (TACLEditNumberOption.Signs in NumbersOnly) and acContains(LString, ['-', '+']);
+end;
+
+function TACLCustomTextEdit.CheckValue(const AText: string; out AValue: Variant): Boolean;
+var
+  LValue1: Double;
+  LValue2: Integer;
+begin
+  if TACLEditNumberOption.Decimals in NumbersOnly then
+  begin
+    if TryStrToFloat(AText, LValue1) or
+       TryStrToFloat(AText, LValue1, InvariantFormatSettings)
+    then
+      AValue := LValue1
+    else
+      Exit(False);
+  end
+  else
+    if TryStrToInt(AText, LValue2) then
+      AValue := LValue2
+    else
+      Exit(False);
+
+  if not (TACLEditNumberOption.Signs in NumbersOnly) then
+  begin
+    if AValue < 0 then
+      Exit(False);
+  end;
+
+  if not (TACLEditNumberOption.Zeros in NumbersOnly) then
+  begin
+    if IsZero(AValue) then
+      Exit(False);
+  end;
+
+  Result := True;
 end;
 
 procedure TACLCustomTextEdit.CMHintShow(var Message: TCMHintShow);
@@ -506,6 +554,12 @@ begin
     Message.HintInfo^.HintStr := LItem.Hint
   else
     inherited;
+end;
+
+procedure TACLCustomTextEdit.DefineProperties(Filer: TFiler);
+begin
+  inherited;
+  Filer.DefineProperty('InputMask', ReadInputMask, nil, False);
 end;
 
 procedure TACLCustomTextEdit.Execute(AAction: TACLEditAction);
@@ -637,6 +691,19 @@ begin
   end;
 end;
 
+procedure TACLCustomTextEdit.ReadInputMask(AReader: TReader);
+var
+  LIdent: string;
+begin
+  LIdent := AReader.ReadIdent;
+  if LIdent = 'eimInteger' then
+    NumbersOnly := DefaultNumbersOnlyInteger
+  else if LIdent = 'eimFloat' then
+    NumbersOnly := DefaultNumbersOnlyFloat
+  else
+    NumbersOnly := [];
+end;
+
 procedure TACLCustomTextEdit.Select(AStart, ALength: Integer; AGoForward: Boolean);
 begin
   FEditBox.Select(AStart, ALength, AGoForward);
@@ -652,18 +719,20 @@ begin
   acSetImageList(AValue, FButtonsImages, FButtonsImagesLink, Self);
 end;
 
-procedure TACLCustomTextEdit.SetInputMask(AValue: TACLEditInputMask);
-begin
-  if FInputMask <> AValue then
-  begin
-    FInputMask := AValue;
-    SetTextCore(ValueToText(TextToValue(Text)));
-  end;
-end;
-
 procedure TACLCustomTextEdit.SetMaxLength(AValue: Integer);
 begin
   FEditBox.MaxLength := AValue;
+end;
+
+procedure TACLCustomTextEdit.SetNumbersOnly(AValue: TACLEditNumberOptions);
+begin
+  if not (TACLEditNumberOption.Digits in AValue) then
+    AValue := [];
+  if FNumbersOnly <> AValue then
+  begin
+    FNumbersOnly := AValue;
+    SetTextCore(ValueToText(TextToValue(Text)));
+  end;
 end;
 
 procedure TACLCustomTextEdit.SetPasswordChar(AValue: Boolean);
@@ -716,22 +785,17 @@ begin
 end;
 
 function TACLCustomTextEdit.TextToValue(const AText: string): Variant;
-var
-  LValue: Double;
 begin
-  case InputMask of
-    eimInteger:
-      Result := StrToIntDef(AText, 0);
-    eimFloat:
-      if TryStrToFloat(AText, LValue) or
-         TryStrToFloat(AText, LValue, InvariantFormatSettings)
-      then
-        Result := LValue
-      else
-        Result := 0;
+  if NumbersOnly = [] then
+    Result := AText
   else
-    Result := AText;
-  end;
+    if not CheckValue(AText, Result) then
+    begin
+      if TACLEditNumberOption.Zeros in NumbersOnly then
+        Result := 0
+      else
+        Result := 1;
+    end;
 end;
 
 function TACLCustomTextEdit.ValueToText(const AValue: Variant): string;

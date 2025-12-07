@@ -49,6 +49,7 @@ const
 
   InvalidPoint: TPoint = (X: -1; Y: -1);
   InvalidSize: TSize = (cx: -1; cy: -1);
+  InvalidRect: TRect = (Left: -1; Top: -1; Right: -1; Bottom: -1);
   NullPoint: TPoint = (X: 0; Y: 0);
   NullRect: TRect = (Left: 0; Top: 0; Right: 0; Bottom: 0);
   NullSize: TSize = (cx: 0; cy: 0);
