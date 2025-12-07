@@ -3188,8 +3188,10 @@ end;
 
 procedure TACLCustomControl.PaintWindow(DC: HDC);
 begin
+{$IFNDEF LCLGtk3}
   if not (csOpaque in ControlStyle) then
     acDrawTransparentControlBackground(Self, DC, ClientRect, False);
+{$ENDIF}
   inherited PaintWindow(DC);
 end;
 

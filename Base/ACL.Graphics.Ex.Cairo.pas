@@ -565,10 +565,12 @@ end;
 function cairo_create_context(ACanvas: TCanvas;
   out ASurface: Pcairo_surface_t; out AOrigin: TPoint;
   out ASavedContext: PCairoContext): pcairo_t;
+{$IFDEF ACL_DIB_CANVAS_NO_DC}
 var
   LDib: TACLBaseDib;
 {$IFDEF LCLGtk2}
   LDibHandle: HDC;
+{$ENDIF}
 {$ENDIF}
 begin
   ASavedContext := nil;
