@@ -99,6 +99,7 @@ type
     class procedure BeginPopup(APopupControl: TWinControl); overload;
     class procedure BeginPopup(APopupControl: TWinControl; ACallback: TGtkEventCallback); overload;
     class procedure EndPopup(AControl: TWinControl);
+    class function IsLooseFocusEvent(AEvent: PGdkEvent): Boolean;
     class function IsPopupAborted: Boolean;
 
     class procedure ProcessMessages;
@@ -618,6 +619,11 @@ begin
   end;
   if FPopupError <> '' then
     raise Exception.Create(FPopupError);
+end;
+
+class function TGtkApp.IsLooseFocusEvent(AEvent: PGdkEvent): Boolean;
+begin
+  Result := False;
 end;
 
 class procedure TGtkApp.Handler(event: PGdkEvent; data: gpointer); cdecl;

@@ -60,7 +60,7 @@ uses
   ACL.Geometry.Utils,
   ACL.Graphics,
   ACL.Graphics.Ex,
-{$IFDEF LCLGtk2}
+{$IFDEF LCLGtkX}
   ACL.Graphics.Ex.Cairo,
 {$ENDIF}
   ACL.Graphics.SkinImage,
@@ -616,12 +616,12 @@ type
 
   // Вынесено в отдельный класс из-за CS_DROPSHADOW
   TACLMenuPopupLayeredWindow = class(TACLMenuPopupWindow
-  {$IFDEF LCLGtk2}
+  {$IFDEF LCLGtkX}
     , IACLLayeredPaint
   {$ENDIF})
   protected
     procedure CreateParams(var Params: TCreateParams); override;
-  {$IFDEF LCLGtk2}
+  {$IFDEF LCLGtkX}
     procedure PaintTo(ACairo: Pcairo_t);
   {$ENDIF}
     procedure Resize; override;
@@ -759,6 +759,10 @@ implementation
 uses
 {$IF DEFINED(LCLGtk2)}
   Gdk2,
+  Gtk2,
+{$ELSEIF DEFINED(LCLGtk3)}
+  LazGdk3,
+  LazGtk3,
 {$ENDIF}
 {$IFDEF FPC}
   WSLCLClasses;
@@ -782,7 +786,7 @@ type
     procedure Run; override;
   end;
 
-{$ELSE IFDEF(LCLGtk2)}
+{$ELSE IFDEF(LCLGtkX)}
 
   { TACLMenuPopupLooperImpl }
 
@@ -2583,7 +2587,7 @@ var
   LWnd: TACLMenuWindow;
 begin
   if not (Button in FMousePressed) then
-    Exit;
+    Exit; // Gtk3
 
   Exclude(FMousePressed, Button);
   if (FScrollBar <> nil) and (FScrollBar.PressedPart <> sbpNone) then
@@ -2600,8 +2604,7 @@ end;
 
 procedure TACLMenuPopupWindow.Paint;
 begin
-  if not (csDestroying in ComponentState) then
-    PaintCore(Canvas);
+  PaintCore(Canvas);
 end;
 
 procedure TACLMenuPopupWindow.PaintCore(ACanvas: TCanvas);
@@ -2762,7 +2765,7 @@ begin
 {$ENDIF}
 end;
 
-{$IFDEF LCLGtk2}
+{$IFDEF LCLGtkX}
 procedure TACLMenuPopupLayeredWindow.PaintTo(ACairo: Pcairo_t);
 var
   LDib: TACLDib;
@@ -3421,160 +3424,6 @@ end;
 
 {$ENDREGION}
 
-{$REGION ' Looper Implementation '}
-
-{$IFDEF MSWINDOWS}
-
-constructor TACLMenuPopupLooperImpl.Create(AOwner: TACLMenuPopupWindow);
-begin
-  inherited;
-  FActionIdleTimer := TACLTimer.CreateEx(DoActionIdleTimerProc);
-end;
-
-destructor TACLMenuPopupLooperImpl.Destroy;
-begin
-  FreeAndNil(FActionIdleTimer);
-  inherited;
-end;
-
-procedure TACLMenuPopupLooperImpl.DoActionIdle;
-var
-  LForm: TCustomForm;
-  I: Integer;
-begin
-  for I := 0 to Screen.CustomFormCount - 1 do
-  begin
-    LForm := Screen.CustomForms[I];
-    if TACLControls.IsVisible(LForm) and IsWindowEnabled(LForm.Handle) then
-      LForm.Perform(CM_UPDATEACTIONS, 0, 0);
-  end;
-end;
-
-procedure TACLMenuPopupLooperImpl.DoActionIdleTimerProc(Sender: TObject);
-begin
-  try
-    FActionIdleTimer.Enabled := False;
-    DoActionIdle;
-  except
-    Application.HandleException(Application);
-  end;
-end;
-
-procedure TACLMenuPopupLooperImpl.DoIdle;
-var
-  LDone: Boolean;
-begin
-  inherited;
-
-  LDone := True;
-  try
-    if Assigned(Application.OnIdle) then
-      Application.OnIdle(Self, LDone);
-
-    if LDone then
-    begin
-      if Application.ActionUpdateDelay <= 0 then
-        DoActionIdle
-      else
-        if not FActionIdleTimer.Enabled then
-        begin
-          FActionIdleTimer.Interval := Application.ActionUpdateDelay;
-          FActionIdleTimer.Enabled := True;
-        end;
-    end;
-  except
-    Application.HandleException(Self);
-  end;
-
-  if IsMainThread and CheckSynchronize then
-    LDone := False;
-  if LDone then
-    WaitMessage;
-end;
-
-procedure TACLMenuPopupLooperImpl.Run;
-var
-  Msg: TMsg;
-begin
-  repeat
-    if PeekMessage(Msg, 0, 0, 0, PM_REMOVE) then
-    begin
-      case Msg.message of
-        CM_RELEASE, WM_CLOSE, WM_QUIT:
-          CloseMenu;
-        WM_KEYFIRST..WM_KEYLAST:
-          begin
-            Popups.Peek.Dispatch(Msg.Message);
-            Continue;
-          end;
-      end;
-      TranslateMessage(Msg);
-      DispatchMessage(Msg);
-    end
-    else
-      DoIdle;
-  until not IsInLoop;
-end;
-
-{$ELSE IFDEF(LCLGtk2)}
-
-procedure TACLMenuPopupLooperImpl.DoEvent(
-  AType: TGdkEventType; AEvent: PGdkEvent; var AHandled: Boolean);
-begin
-  // AI, ref.to:
-  // https://api.gtkd.org/gdk.c.types.GdkEventType.html
-  // https://docs.gtk.org/gdk3/struct.EventButton.html
-  case AType of
-    GDK_DELETE, GDK_DESTROY:
-      CloseMenu;
-    GDK_BUTTON_PRESS:
-      if PopupWindowAtCursor = nil then
-      begin
-        CloseMenu;
-        AHandled := True;
-      end;
-  end;
-end;
-
-procedure TACLMenuPopupLooperImpl.DoIdle;
-begin
-  inherited;
-  Application.Idle(True);
-end;
-
-procedure TACLMenuPopupLooperImpl.Run;
-begin
-  TGtkApp.BeginPopup(Wnd, DoEvent);
-  try
-    repeat
-      try
-        TGtkApp.ProcessMessages;
-      except
-        Application.HandleException(Self);
-      end;
-      if TGtkApp.IsPopupAborted then
-        Break;
-      DoIdle;
-    until not IsInLoop;
-  finally
-    TGtkApp.EndPopup(Wnd);
-  end;
-end;
-
-function TACLMenuPopupLooperImpl.WndProc(
-  AWnd: TACLMenuPopupWindow; var AMsg: TMessage): Boolean;
-begin
-  case AMsg.Msg of
-    LM_LBUTTONUP, LM_XBUTTONUP, LM_MBUTTONUP, LM_RBUTTONUP:
-      // AI: LCL-Gtk2 безусловно релизит кэпчу на button-up (см.gtkMouseBtnRelease)
-      PostMessage(Wnd.Handle, CM_MENUTRACKING, 0, 0);
-  end;
-  Result := inherited WndProc(AWnd, AMsg);
-end;
-{$ENDIF}
-
-{$ENDREGION}
-
 {$REGION ' Shortcuts '}
 
 { TACLShortCut }
@@ -3684,6 +3533,165 @@ begin
   if AShortCut and scShift <> 0 then
     Result :=  sKeyModifiersPrefix[kmShift] + Result;
 end;
+{$ENDREGION}
+
+{$REGION ' Looper Implementation '}
+
+{$IFDEF MSWINDOWS}
+
+constructor TACLMenuPopupLooperImpl.Create(AOwner: TACLMenuPopupWindow);
+begin
+  inherited;
+  FActionIdleTimer := TACLTimer.CreateEx(DoActionIdleTimerProc);
+end;
+
+destructor TACLMenuPopupLooperImpl.Destroy;
+begin
+  FreeAndNil(FActionIdleTimer);
+  inherited;
+end;
+
+procedure TACLMenuPopupLooperImpl.DoActionIdle;
+var
+  LForm: TCustomForm;
+  I: Integer;
+begin
+  for I := 0 to Screen.CustomFormCount - 1 do
+  begin
+    LForm := Screen.CustomForms[I];
+    if TACLControls.IsVisible(LForm) and IsWindowEnabled(LForm.Handle) then
+      LForm.Perform(CM_UPDATEACTIONS, 0, 0);
+  end;
+end;
+
+procedure TACLMenuPopupLooperImpl.DoActionIdleTimerProc(Sender: TObject);
+begin
+  try
+    FActionIdleTimer.Enabled := False;
+    DoActionIdle;
+  except
+    Application.HandleException(Application);
+  end;
+end;
+
+procedure TACLMenuPopupLooperImpl.DoIdle;
+var
+  LDone: Boolean;
+begin
+  inherited;
+
+  LDone := True;
+  try
+    if Assigned(Application.OnIdle) then
+      Application.OnIdle(Self, LDone);
+
+    if LDone then
+    begin
+      if Application.ActionUpdateDelay <= 0 then
+        DoActionIdle
+      else
+        if not FActionIdleTimer.Enabled then
+        begin
+          FActionIdleTimer.Interval := Application.ActionUpdateDelay;
+          FActionIdleTimer.Enabled := True;
+        end;
+    end;
+  except
+    Application.HandleException(Self);
+  end;
+
+  if IsMainThread and CheckSynchronize then
+    LDone := False;
+  if LDone then
+    WaitMessage;
+end;
+
+procedure TACLMenuPopupLooperImpl.Run;
+var
+  Msg: TMsg;
+begin
+  repeat
+    if PeekMessage(Msg, 0, 0, 0, PM_REMOVE) then
+    begin
+      case Msg.message of
+        CM_RELEASE, WM_CLOSE, WM_QUIT:
+          CloseMenu;
+        WM_KEYFIRST..WM_KEYLAST:
+          begin
+            Popups.Peek.Dispatch(Msg.Message);
+            Continue;
+          end;
+      end;
+      TranslateMessage(Msg);
+      DispatchMessage(Msg);
+    end
+    else
+      DoIdle;
+  until not IsInLoop;
+end;
+
+{$ELSE IFDEF(LCLGtkX)}
+
+procedure TACLMenuPopupLooperImpl.DoEvent(
+  AType: TGdkEventType; AEvent: PGdkEvent; var AHandled: Boolean);
+begin
+  // AI, ref.to:
+  // https://api.gtkd.org/gdk.c.types.GdkEventType.html
+  // https://docs.gtk.org/gdk3/struct.EventButton.html
+  case AType of
+    GDK_DELETE, GDK_DESTROY:
+      CloseMenu;
+    GDK_WINDOW_STATE:
+      if TGtkApp.IsLooseFocusEvent(AEvent) then
+        CloseMenu;
+    GDK_BUTTON_PRESS:
+      if PopupWindowAtCursor = nil then
+      begin
+        CloseMenu;
+        AHandled := True;
+      end;
+  end;
+end;
+
+procedure TACLMenuPopupLooperImpl.DoIdle;
+begin
+  inherited;
+  Application.Idle(True);
+end;
+
+procedure TACLMenuPopupLooperImpl.Run;
+begin
+  TGtkApp.BeginPopup(Wnd, DoEvent);
+  try
+    repeat
+      try
+        TGtkApp.ProcessMessages;
+      except
+        Application.HandleException(Self);
+      end;
+      if TGtkApp.IsPopupAborted then
+        Break;
+      DoIdle;
+    until not IsInLoop;
+  finally
+    TGtkApp.EndPopup(Wnd);
+  end;
+end;
+
+function TACLMenuPopupLooperImpl.WndProc(
+  AWnd: TACLMenuPopupWindow; var AMsg: TMessage): Boolean;
+begin
+{$IFDEF LCLGtk2}
+  case AMsg.Msg of
+    // AI: LCL-Gtk2 безусловно релизит кэпчу на button-up (см.gtkMouseBtnRelease)
+    LM_LBUTTONUP, LM_XBUTTONUP, LM_MBUTTONUP, LM_RBUTTONUP:
+      PostMessage(Wnd.Handle, CM_MENUTRACKING, 0, 0);
+  end;
+{$ENDIF}
+  Result := inherited WndProc(AWnd, AMsg);
+end;
+{$ENDIF}
+
 {$ENDREGION}
 
 initialization
