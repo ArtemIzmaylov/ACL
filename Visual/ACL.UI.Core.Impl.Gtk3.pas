@@ -18,10 +18,9 @@ unit ACL.UI.Core.Impl.Gtk3;
 {$SCOPEDENUMS ON}
 
 {.$DEFINE DEBUG_MESSAGELOOP}
-
-{$MESSAGE WARN 'LazGtk3 проверить:'}
-// TGtk3WSCustomForm.SetFormStyle - не реализовано
-// acRegionSetToWindow - проверить
+{$MESSAGE WARN 'Проверить:'}
+// В FlyWM (Astra Linux) при захвате клавиатурного хука, top-level форма
+// в режиме StayOnTop проваливается на задний план.
 interface
 
 uses
@@ -75,6 +74,7 @@ type
   { TGtkApp }
 
   TGtkEventCallback = procedure (AType: TGdkEventType; AEvent: PGdkEvent; var AHandled: Boolean) of object;
+
   TGtkApp = class
   strict private
     class var FFreeNotifier: TACLComponentFreeNotifier;
@@ -86,6 +86,7 @@ type
     class var FPopupCapturedDevice: PGdkDevice;
     class var FPopupControl: TWinControl;
     class var FPopupError: string;
+    class var FPopupWidget: PGtkWidget;
     class var FPopupWindow: PGdkWindow;
 
     class procedure Handler(event: PGdkEvent; data: gpointer); cdecl; static;
@@ -94,6 +95,7 @@ type
     class procedure HandlerOnDestroy(data: gpointer); cdecl; static;
     class procedure HandlerRemoving(Sender: TComponent);
     class procedure PopupEventHandler(AType: TGdkEventType; AEvent: PGdkEvent; var AHandled: Boolean);
+    class procedure TranslateCoords(ATarget: PGtkWidget; AEvent: PGdkEvent);
   public
     class constructor Create;
     class destructor Destroy;
@@ -140,7 +142,6 @@ type
       const AParams: TCreateParams): TLCLHandle; override;
   //  class procedure SetCallbacks(const AWidget: PGtkWidget;
   //    const AWidgetInfo: PWidgetInfo); override;
-  //  class procedure SetColor(const AWinControl: TWinControl); override;
   //  class procedure SetFormBorderStyle(const AForm: TCustomForm;
   //    const AFormBorderStyle: TFormBorderStyle); override;
     class procedure SetFormStyle(const AForm: TCustomform;
@@ -265,6 +266,8 @@ type
     function CreateWidget(const Params: TCreateParams): PGtkWidget; override;
     //function GetScrolledWindow: PGtkScrolledWindow; override;
     function GtkEventPaint(Sender: PGtkWidget; AContext: Pcairo_t): Boolean; override;
+    procedure OffsetMousePos(const aGlobalX, aGlobalY: double; APoint: PPoint); override;
+    procedure SetBounds(ALeft, ATop, AWidth, AHeight: integer); override;
     //procedure InitializeWidget; override;
   end;
 
@@ -274,7 +277,7 @@ type
   strict private
     FFirstMapRect: TRect;
     class function WidgetEvent(widget: PGtkWidget;
-      event: PGdkEvent; data: GPointer): gboolean; cdecl; static;
+      Event: PGdkEvent; Data: GPointer): gboolean; cdecl; static;
   public
     function ClientToScreen(var P: TPoint): Boolean; override;
     function CreateWidget(const {%H-}Params: TCreateParams):PGtkWidget; override;
@@ -560,6 +563,7 @@ begin
   LWidget := TGtk3Widget(APopupControl.Handle).Widget;
   LWindow := gdk_screen_get_root_window(gtk_widget_get_screen(LWidget));
   LWindow := gdk_window_new(LWindow, @LAttrs, [GDK_WA_X, GDK_WA_Y, GDK_WA_NOREDIR]);
+  gtk_widget_register_window(LWidget, LWindow);
   gdk_window_show(LWindow);
 
   // AI: ref.to: gtkmenu.c, gtk_menu_popup_internal
@@ -582,6 +586,7 @@ begin
     True, nil, nil, nil, nil);
   if LGrabResult <> GDK_GRAB_SUCCESS then
   begin
+    gtk_widget_unregister_window(LWidget, LWindow);
     gdk_window_destroy(LWindow);
     raise EInvalidOperation.CreateFmt('GTK3.Popup: unable to grap the pointer (%d)', [Ord(LGrabResult)]);
   end;
@@ -591,6 +596,7 @@ begin
   FPopupError := '';
   FPopupControl := APopupControl;
   FPopupCapturedDevice := LDevice;
+  FPopupWidget := LWidget;
   FPopupWindow := LWindow;
   try
     FOldExceptionHandler := Application.OnException;
@@ -617,9 +623,13 @@ begin
     if FPopupCapturedDevice <> nil then
       gdk_seat_ungrab(gdk_device_get_seat(FPopupCapturedDevice));
     if FPopupWindow <> nil then
+    begin
+      gtk_widget_unregister_window(FPopupWidget, FPopupWindow);
       gdk_window_destroy(FPopupWindow);
+    end;
   finally
     FPopupCapturedDevice := nil;
+    FPopupWidget := nil;
     FPopupWindow := nil;
   end;
 
@@ -668,6 +678,7 @@ begin
     GDK_SCROLL:
       if FInputTarget <> nil then
       begin
+        TranslateCoords(FInputTarget, event);
         gtk_widget_event(FInputTarget, event);
         Exit;
       end;
@@ -757,7 +768,10 @@ begin
         LWidget := gtk_get_event_widget(AEvent);
         LWidgetOfPopupWnd := TGtk3Widget(FPopupControl.Handle).Widget;
         if not IsChild(LWidget, LWidgetOfPopupWnd) then
+        begin
           LWidget := TGtk3Widget(FPopupControl.Handle).GetContainerWidget;
+          TranslateCoords(LWidget, AEvent);
+        end;
         gtk_widget_event(LWidget, AEvent);
       end;
     GDK_WINDOW_STATE:
@@ -781,6 +795,30 @@ begin
     FInputTarget := TGtk3Widget(AControl.Handle).GetContainerWidget;
   end;
   HandlerInit;
+end;
+
+class procedure TGtkApp.TranslateCoords(ATarget: PGtkWidget; AEvent: PGdkEvent);
+var
+  x1, y1, x2, y2: gint;
+begin
+  case AEvent.type_ of
+    GDK_BUTTON_PRESS,
+    GDK_BUTTON_RELEASE,
+    GDK_MOTION_NOTIFY:
+      if AEvent^.any.window <> ATarget^.window then // because of input-redirection
+      begin
+        x1 := 0; y1 := 0; x2 := 0; y2 := 0;
+        ATarget^.window^.get_origin(@x1, @y1);
+        AEvent^.any.window.get_origin(@x2, @y2);
+        AEvent^.motion.x := AEvent^.motion.x + x2 - x1;
+        AEvent^.motion.y := AEvent^.motion.y + y2 - y1;
+        AEvent^.motion.x_root := AEvent^.motion.x_root + x2 - x1;
+        AEvent^.motion.y_root := AEvent^.motion.y_root + y2 - y1;
+        g_object_unref(AEvent^.any.window);
+        AEvent^.any.window := ATarget^.window;
+        g_object_ref(AEvent^.any.window);
+      end;
+  end;
 end;
 
 { TACLGtk3CustomControl }
@@ -967,6 +1005,35 @@ begin
     Result := inherited;
 end;
 
+procedure TACLGtk3AdvancedWindow.OffsetMousePos(const aGlobalX, aGlobalY: double; APoint: PPoint);
+begin
+  with getClientOffset do
+  begin
+    dec(APoint^.x, x);
+    dec(APoint^.y, y);
+  end;
+end;
+
+procedure TACLGtk3AdvancedWindow.SetBounds(ALeft, ATop, AWidth, AHeight: integer);
+var
+  X, Y: Integer;
+  LWindow: PGtkWindow;
+begin
+  if Gtk3IsGtkWindow(Widget) then
+  begin
+    LWindow := PGtkWindow(Widget);
+    if not LWindow.get_decorated and (LWindow^.transient_for <> nil) then
+    begin
+      // Чтобы невилировать обратный код в предке
+      X := 0; Y := 0;
+      LWindow^.transient_for^.window^.get_origin(@x, @y);
+      Dec(ALeft, X);
+      Dec(ATop, Y);
+    end;
+  end;
+  inherited SetBounds(ALeft, ATop, AWidth, AHeight);
+end;
+
 //procedure TACLGtk3AdvancedWindow.InitializeWidget;
 //var
 //  LMethod: TMethod;
@@ -1045,7 +1112,7 @@ begin
 end;
 
 class function TACLGtk3PopupControl.WidgetEvent(
-  widget: PGtkWidget; event: PGdkEvent; data: GPointer): gboolean; cdecl;
+  Widget: PGtkWidget; Event: PGdkEvent; Data: GPointer): gboolean; cdecl;
 begin
   Result := True;
   case event^.type_ of

@@ -600,7 +600,7 @@ type
       AItem: TACLMenuWindow.TItemInfo); reintroduce; overload;
     constructor Create(ASource: TACLPopupMenu); reintroduce; overload;
     destructor Destroy; override;
-    procedure Invalidate; override;
+    procedure Invalidate; override; final;
     procedure InvalidateRect(const R: TRect); virtual;
     procedure Popup(const AControlRect: TRect);
     //# Properties
@@ -2159,7 +2159,7 @@ begin
   inherited Create(ASource);
   // Если у контрола нет флага csCaptureMouse - gtkMotionNotify не сгенерирует
   // событие, даже если capture была выставлена контролу вручную
-  ControlStyle := []{$IFDEF FPC} + [csCaptureMouse]{$ENDIF};
+  ControlStyle := []{$IFDEF LCLGtk2} + [csCaptureMouse]{$ENDIF};
   FScrollTimer := TACLTimer.CreateEx(ScrollTimer, 125);
   Visible := False;
 
@@ -2604,7 +2604,8 @@ end;
 
 procedure TACLMenuPopupWindow.Paint;
 begin
-  PaintCore(Canvas);
+  if not (csDestroying in ComponentState) then
+    PaintCore(Canvas);
 end;
 
 procedure TACLMenuPopupWindow.PaintCore(ACanvas: TCanvas);
@@ -2759,7 +2760,9 @@ procedure TACLMenuPopupLayeredWindow.InvalidateRect(const R: TRect);
 begin
 {$IFDEF MSWINDOWS}
   if HandleAllocated then
-    Perform(WM_PAINT, 0, 0);
+// TACLPopupMenu.DoSelect должен успеть отработать до перерисовки
+//  Perform(WM_PAINT, 0, 0);
+    PostMessage(Handle, WM_PAINT, 0, 0);
 {$ELSE}
   inherited;
 {$ENDIF}
