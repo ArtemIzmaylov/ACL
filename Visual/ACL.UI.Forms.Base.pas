@@ -702,13 +702,21 @@ end;
 {$IFDEF FPC}
 procedure TACLBasicForm.AutoAdjustLayout(AMode: TLayoutAdjustmentPolicy;
   const AFromPPI, AToPPI, AOldFormWidth, ANewFormWidth: Integer);
+var
+  LTargetDPI: Integer;
 begin
   if FIScaling or (AMode <> lapAutoAdjustForDPI) then
     inherited
   else
   begin
-    ScaleForPPI(AToPPI);
-    DesignTimePPI := AToPPI;
+    LTargetDPI := AToPPI;
+    if not (csDesigning in ComponentState) and (Parent = nil) then
+    begin
+      if TACLApplication.TargetDPI > 0 then
+        LTargetDPI := TACLApplication.TargetDPI;
+    end;
+    ScaleForPPI(LTargetDPI);
+    DesignTimePPI := LTargetDPI;
   end;
 end;
 
@@ -724,14 +732,11 @@ begin
   // Called from the TACLControls.WndProc
   Message.Result := Perform(CM_MOUSEWHEEL, Message.WParam, Message.LParam);
 end;
-
 {$ELSE}
-
 procedure TACLBasicForm.ChangeScale(M, D: Integer; IsDpiChange: Boolean);
 begin
   ScaleForPPI(MulDiv(FCurrentPPI, M, D));
 end;
-
 {$ENDIF}
 
 procedure TACLBasicForm.ScaleForPPI(ATargetPPI: Integer; AWindowRect: PRect);

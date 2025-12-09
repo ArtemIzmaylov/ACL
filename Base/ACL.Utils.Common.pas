@@ -259,6 +259,9 @@ function IsBadWritePtr(Ptr: Pointer; Size: Integer): Boolean; deprecated 'not im
 implementation
 
 uses
+{$IFDEF LINUX}
+  ACL.Parsers,
+{$ENDIF}
   ACL.Utils.FileSystem,
   ACL.Utils.Strings;
 
@@ -641,32 +644,76 @@ end;
 procedure InitializeFormatSettings;
 {$IFDEF LINUX}
 var
-  LData: string;
-begin
-  // todo: thousands_sep
-  // todo: locale -k LC_TIME LC_NUMERIC
+  LData: TStringList;
 
-  //FormatSettings.CurrencyString := TACLProcess.ExecuteToString('locale currency_symbol');
-  //if FormatSettings.CurrencyString = '' then
-  //  FormatSettings.CurrencyString := InvariantFormatSettings.CurrencyString;
-
-  LData := TACLProcess.ExecuteToString('locale decimal_point');
-  if LData <> '' then
+  function TryGet(const AKey: string; out AValue: string): Boolean;
   begin
-    if LData[1] = ',' then
-    begin
-      FormatSettings.DecimalSeparator := ',';
-      FormatSettings.ThousandSeparator := ' ';
-      FormatSettings.ListSeparator := ';';
-    end
-    else
-    begin
-      FormatSettings.DecimalSeparator := LData[1];
-      FormatSettings.ThousandSeparator := ',';
-      FormatSettings.ListSeparator := ',';
-    end;
+    AValue := LData.Values[AKey];
+    acUnquot(AValue);
+    Result := AValue <> '';
   end;
 
+var
+  I: Integer;
+  LValue: string;
+  LValues: TStringDynArray;
+begin
+  LData := TStringList.Create;
+  try
+    LData.Text := TACLProcess.ExecuteToString('locale -k LC_TIME LC_NUMERIC');
+
+    if TryGet('decimal_point', LValue) then
+    begin
+      if LValue[1] = ',' then
+      begin
+        FormatSettings.DecimalSeparator := ',';
+        FormatSettings.ThousandSeparator := ' ';
+        FormatSettings.ListSeparator := ';';
+        FormatSettings.DateSeparator := '.';
+      end
+      else
+      begin
+        FormatSettings.DecimalSeparator := LValue[1];
+        FormatSettings.ThousandSeparator := ',';
+        FormatSettings.ListSeparator := ',';
+        FormatSettings.DateSeparator := '-';
+      end;
+    end;
+
+    if TryGet('alt_mon', LValue) or TryGet('mon', LValue) then
+    begin
+      if acSplitString(LValue, ';', LValues) = 12 then
+      begin
+        for I := 0 to 11 do
+          FormatSettings.LongMonthNames[I + 1] := LValues[I];
+      end;
+    end;
+
+    if TryGet('ab_alt_mon', LValue) or TryGet('ab_mon', LValue) then
+    begin
+      if acSplitString(LValue, ';', LValues) = 12 then
+      begin
+        for I := 0 to 11 do
+          FormatSettings.ShortMonthNames[I + 1] := LValues[I];
+      end;
+    end;
+
+    if TryGet('abday', LValue) and (acSplitString(LValue, ';', LValues) = 7) then
+    begin
+      for I := 0 to 6 do
+        FormatSettings.ShortDayNames[I + 1] := LValues[I];
+    end;
+
+    if TryGet('day', LValue) and (acSplitString(LValue, ';', LValues) = 7) then
+    begin
+      for I := 0 to 6 do
+        FormatSettings.LongDayNames[I + 1] := LValues[I];
+    end;
+
+    FormatSettings.ShortDateFormat := 'dd/mm/yyyy';
+  finally
+    LData.Free;
+  end;
 {$ELSE}
 begin
 {$ENDIF}
