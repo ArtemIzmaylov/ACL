@@ -80,6 +80,28 @@ type
 type
   TShowMode = ACL.UI.Forms.Base.TShowMode;
 
+{$REGION ' Drag Image '}
+
+  { TACLDragImage }
+
+  TACLDragImage = class(TForm)
+  strict private
+    procedure CMDesignHitTest(var Message: TCMDesignHitTest); message CM_DESIGNHITTEST;
+    procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
+    procedure WMNCHitTest(var Message: TWMNCHitTest); message WM_NCHITTEST;
+  protected
+    procedure CreateParams(var Params: TCreateParams); override;
+    procedure Paint; override;
+  {$IFDEF FPC}
+    class procedure WSRegisterClass; override;
+  {$ENDIF}
+  public
+    constructor Create(AOwner: TComponent); override;
+    procedure Show;
+  end;
+
+{$ENDREGION}
+
 {$REGION ' Popup Window '}
 
   { TACLPopupWindow }
@@ -215,6 +237,65 @@ begin
     (AChild.Perform(CM_WANTSPECIALKEY, ACharCode, 0) <> 0) or
     (AChild.Perform(WM_GETDLGCODE, 0, 0) and DLGC_WANTALLKEYS <> 0));
 end;
+
+{$REGION ' Drag Image '}
+
+{ TACLDragImage }
+
+constructor TACLDragImage.Create(AOwner: TComponent);
+begin
+  CreateNew(AOwner);
+  AlphaBlend := True;
+  AlphaBlendValue := acDragImageAlpha;
+  Position := poDesigned;
+  BorderStyle := bsNone;
+  Scaled := False;
+end;
+
+procedure TACLDragImage.CreateParams(var Params: TCreateParams);
+begin
+  inherited;
+  Params.ExStyle := WS_EX_TOPMOST or WS_EX_TOOLWINDOW or WS_EX_NOACTIVATE;
+  Params.Style := WS_POPUP;
+end;
+
+procedure TACLDragImage.Paint;
+begin
+  acFillRect(Canvas, ClientRect, acDragImageColor);
+end;
+
+procedure TACLDragImage.CMDesignHitTest(var Message: TCMDesignHitTest);
+begin
+  Message.Result := 1;
+end;
+
+procedure TACLDragImage.WMEraseBkgnd(var Message: TWMEraseBkgnd);
+begin
+  Message.Result := 1;
+end;
+
+procedure TACLDragImage.WMNCHitTest(var Message: TWMNCHitTest);
+begin
+  Message.Result := HTTRANSPARENT;
+end;
+
+{$IFDEF FPC}
+class procedure TACLDragImage.WSRegisterClass;
+begin
+  RegisterWSComponent(TACLDragImage, TACLWSHintWindow);
+end;
+{$ENDIF}
+
+procedure TACLDragImage.Show;
+begin
+{$IFDEF FPC}
+  inherited;
+{$ELSE}
+  ShowWindow(Handle, SW_SHOWNA);
+{$ENDIF}
+end;
+
+{$ENDREGION}
 
 {$REGION ' Popup Window '}
 

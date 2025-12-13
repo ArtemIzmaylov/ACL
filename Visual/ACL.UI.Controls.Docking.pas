@@ -125,7 +125,7 @@ type
 
   { TACLDockZone }
 
-  TACLDockZone = class(TForm)
+  TACLDockZone = class(TACLDragImage)
   strict private
     FActive: Boolean;
     FSkin: TACLSkinImage;
@@ -135,10 +135,10 @@ type
     procedure SetActive(AValue: Boolean);
     //# Messages
     procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
+    procedure WMNCHitTest(var Message: TWMNCHitTest); message WM_NCHITTEST;
   protected
     function CalculateBounds: TRect; virtual;
     function CreateDockGroupForReplacement(AControl: TACLDockControl): TACLDockGroup;
-    procedure CreateParams(var Params: TCreateParams); override;
     function GetCurrentDpi: Integer;
     procedure Paint; override;
   {$IFDEF FPC}
@@ -220,18 +220,11 @@ type
 
   { TACLDragSelection }
 
-  TACLDragSelection = class(TForm)
-  strict private
-    //# Messages
-    procedure CMDesignHitTest(var Message: TCMDesignHitTest); message CM_DESIGNHITTEST;
-    procedure WMNCHitTest(var Message: TWMNCHitTest); message WM_NCHITTEST;
-  {$IFDEF FPC}
+  TACLDragSelection = class(TACLDragImage)
   protected
-    class procedure WSRegisterClass; override;
-  {$ENDIF}
+    procedure CreateParams(var Params: TCreateParams); override;
   public
     constructor Create(AOwner: TComponent); override;
-    procedure Show;
   end;
 
   { TACLDockEngine }
@@ -812,9 +805,8 @@ end;
 
 constructor TACLDockZone.Create(AOwner: TComponent);
 begin
-  CreateNew(AOwner);
-  Position := poDesigned;
-  BorderStyle := bsNone;
+  inherited;
+  AlphaBlend := False;
   DoubleBuffered := True;
   FSkin := TACLSkinImage.Create;
 end;
@@ -844,17 +836,6 @@ begin
   Result := TRect.Create(GetSkinSize);
   Inc(Result.Bottom, 2 * dpiApply(Padding, Parent.GetCurrentDpi));
   Inc(Result.Right, 2 * dpiApply(Padding, Parent.GetCurrentDpi));
-end;
-
-procedure TACLDockZone.CreateParams(var Params: TCreateParams);
-begin
-  inherited;
-{$IFDEF FPC}
-  Params.WndParent := Parent.Handle;
-{$ELSE}
-  Params.ExStyle := WS_EX_TOPMOST or WS_EX_TOOLWINDOW;
-{$ENDIF}
-  Params.Style := WS_POPUP;
 end;
 
 function TACLDockZone.CreateDockGroupForReplacement(AControl: TACLDockControl): TACLDockGroup;
@@ -923,12 +904,10 @@ begin
   Update;
 end;
 
-{$IFDEF FPC}
-class procedure TACLDockZone.WSRegisterClass;
+procedure TACLDockZone.WMNCHitTest(var Message: TWMNCHitTest);
 begin
-  RegisterWSComponent(TACLDockZone, TACLWSHintWindow);
+  Message.Result := HTCLIENT;
 end;
-{$ENDIF}
 
 { TACLDockZones }
 
@@ -1287,39 +1266,14 @@ end;
 
 constructor TACLDragSelection.Create(AOwner: TComponent);
 begin
-  CreateNew(AOwner);
-  AlphaBlend := True;
-  AlphaBlendValue := acDragImageAlpha;
-  Position := poDesigned;
-  BorderStyle := bsNone;
-  Color := acDragImageColor;
+  inherited;
   Cursor := crSizeAll;
 end;
 
-procedure TACLDragSelection.CMDesignHitTest(var Message: TCMDesignHitTest);
+procedure TACLDragSelection.CreateParams(var Params: TCreateParams);
 begin
-  Message.Result := 1;
-end;
-
-procedure TACLDragSelection.WMNCHitTest(var Message: TWMNCHitTest);
-begin
-  Message.Result := HTTRANSPARENT;
-end;
-
-{$IFDEF FPC}
-class procedure TACLDragSelection.WSRegisterClass;
-begin
-  RegisterWSComponent(TACLDragSelection, TACLWSHintWindow);
-end;
-{$ENDIF}
-
-procedure TACLDragSelection.Show;
-begin
-{$IFDEF FPC}
   inherited;
-{$ELSE}
-  ShowWindow(Handle, SW_SHOWNA);
-{$ENDIF}
+  Params.ExStyle := Params.ExStyle and not WS_EX_TOPMOST;
 end;
 
 { TACLDockEngine }
