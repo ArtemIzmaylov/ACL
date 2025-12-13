@@ -54,8 +54,8 @@ uses
   // ACL
   ACL.Classes,
   ACL.Graphics,
-  ACL.Utils.DPIAware,
   ACL.Utils.Common,
+  ACL.Utils.DPIAware,
   ACL.Utils.Logger,
   // VCL
   Graphics,
@@ -121,33 +121,29 @@ type
 
   TACLWSForm = class(TGtk3WSCustomForm)
   protected
+    class procedure CheckAndFixGeometry(AWinControl: TWinControl);
     class function ResolveWndParent(const AParams: TCreateParams): HWND;
+    class procedure SetAlphaExposing(AWidget: PGtkWidget);
   published
     class function CreateHandle(const AWinControl: TWinControl;
       const AParams: TCreateParams): TLCLHandle; override;
+    class procedure SetFormStyle(const AForm: TCustomform;
+      const AFormStyle, AOldFormStyle: TFormStyle); override;
+    class procedure SetIcon(const AForm: TCustomForm; const Small, Big: HICON); override;
+    class procedure SetRealPopupParent(const AForm, APopupParent: TCustomForm); override;
+    class procedure ShowHide(const AWinControl: TWinControl); override;
   end;
 
   { TACLWSAdvancedForm }
 
   TACLWSAdvancedForm = class(TACLWSForm)
   //  class function DoRealize(Widget: PGtkWidget; Data: Pointer): GBoolean; cdecl; static;
-  strict private
-    class function ModalFilter(xevent: PGdkXEvent;
-      event: PGdkEvent; data: gpointer): TGdkFilterReturn; static;
-  protected
-    class procedure CheckAndFixGeometry(AWinControl: TWinControl);
-    class procedure SetAlphaExposing(AWidget: PGtkWidget);
   published
-    class function CreateHandle(const AWinControl: TWinControl;
-      const AParams: TCreateParams): TLCLHandle; override;
   //  class procedure SetCallbacks(const AWidget: PGtkWidget;
   //    const AWidgetInfo: PWidgetInfo); override;
   //  class procedure SetFormBorderStyle(const AForm: TCustomForm;
   //    const AFormBorderStyle: TFormBorderStyle); override;
-    class procedure SetFormStyle(const AForm: TCustomform;
-      const AFormStyle, AOldFormStyle: TFormStyle); override;
   //  class procedure SetWindowCapabities(AForm: TCustomForm; AWidget: PGtkWidget);
-    class procedure ShowHide(const AWinControl: TWinControl); override;
   end;
 
   { TACLWSCustomControl }
@@ -157,6 +153,7 @@ type
     class function CreateHandle(
       const AControl: TWinControl;
       const AParams: TCreateParams): TLCLHandle; override;
+    class function GetText(const AWinControl: TWinControl; var AText: String): Boolean; override;
     class procedure SetBorderStyle(const AWinControl: TWinControl;
       const ABorderStyle: TBorderStyle); override;
   end;
@@ -255,6 +252,7 @@ type
     function CreateWidget(const {%H-}Params: TCreateParams):PGtkWidget; override;
     procedure SetBorderStyle(AValue: TBorderStyle);
   public
+    function ClientToScreen(var P: TPoint): boolean; override;
     function DeliverMessage(var Msg; const AIsInputEvent: Boolean=False): LRESULT; override;
     procedure InitializeWidget; override;
   end;
@@ -262,12 +260,15 @@ type
   { TACLGtk3AdvancedWindow }
 
   TACLGtk3AdvancedWindow = class(TGtk3Window)
+  strict private
+    FCreatingWorkaround: TProc;
   public
     function CreateWidget(const Params: TCreateParams): PGtkWidget; override;
     //function GetScrolledWindow: PGtkScrolledWindow; override;
     function GtkEventPaint(Sender: PGtkWidget; AContext: Pcairo_t): Boolean; override;
     procedure OffsetMousePos(const aGlobalX, aGlobalY: double; APoint: PPoint); override;
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: integer); override;
+    procedure SetText(const AValue: String); override;
     //procedure InitializeWidget; override;
   end;
 
@@ -295,27 +296,6 @@ begin
     AChild := AChild.parent;
   end;
   Result := False;
-end;
-
-function GetActiveGtkWindow: PGtkWindow;
-var
-  LTopLevels, LNode: PGList;
-  LWindow: PGtkWindow;
-begin
-  LTopLevels := gtk_window_list_toplevels;
-  try
-    LNode := LTopLevels;
-    while LNode <> nil do
-    begin
-      LWindow := PGtkWindow(LNode^.data);
-      if gtk_window_is_active(LWindow) then
-        Exit(LWindow);
-      LNode := LNode^.next;
-    end;
-    Result := nil;
-  finally
-    g_list_free(LTopLevels);
-  end;
 end;
 
 function GtkLoadStockIcon(AWidget: PGtkWidget; AName: PChar; ASize: Integer): TACLDib;
@@ -853,25 +833,12 @@ begin
   Result^.show_all;
 end;
 
-procedure TACLGtk3CustomControl.InitializeWidget;
+function TACLGtk3CustomControl.ClientToScreen(var P: TPoint): boolean;
 begin
-  inherited InitializeWidget;
-  SetBorderStyle(TWinControlAccess(LCLObject).BorderStyle);
-end;
-
-class procedure TACLGtk3CustomControl.DoSizeAllocate(
-  AWidget: PGtkLayout; AGdkRect: PGdkRectangle; AGtk3Widget: TGtk3Widget); cdecl;
-var
-  LWidth, LHeight: guint;
-begin
-  AWidget.get_size(@LWidth, @LHeight);
-  if (LWidth <> AGdkRect^.Width) or (LHeight <> AGdkRect^.Height) then
-    AWidget.set_size(AGdkRect^.Width, AGdkRect^.Height);
-  if not AGtk3Widget.InUpdate then
-  begin
-    if AGtk3Widget.LCLObject.ClientRectNeedsInterfaceUpdate then
-      AGtk3Widget.LCLObject.DoAdjustClientRectChange;
-  end;
+  if IsWidgetOk and (Widget^.window <> nil) then
+    Result := inherited ClientToScreen(P)
+  else
+    Result := False;
 end;
 
 function TACLGtk3CustomControl.DeliverMessage(
@@ -902,6 +869,28 @@ begin
   end;
 end;
 
+class procedure TACLGtk3CustomControl.DoSizeAllocate(
+  AWidget: PGtkLayout; AGdkRect: PGdkRectangle; AGtk3Widget: TGtk3Widget); cdecl;
+var
+  LWidth, LHeight: guint;
+begin
+  AWidget.get_size(@LWidth, @LHeight);
+  if (LWidth <> AGdkRect^.Width) or (LHeight <> AGdkRect^.Height) then
+    AWidget.set_size(AGdkRect^.Width, AGdkRect^.Height);
+  if not AGtk3Widget.InUpdate then
+  begin
+    if AGtk3Widget.LCLObject.ClientRectNeedsInterfaceUpdate then
+      AGtk3Widget.LCLObject.DoAdjustClientRectChange;
+  end;
+end;
+
+procedure TACLGtk3CustomControl.InitializeWidget;
+begin
+  inherited InitializeWidget;
+  SetBorderStyle(TWinControlAccess(LCLObject).BorderStyle);
+  SetVisible(LCLObject.Visible);
+end;
+
 procedure TACLGtk3CustomControl.SetBorderStyle(AValue: TBorderStyle);
 begin
   PGtkLayout(Widget)^.set_border_width(IfThen(AValue <> bsNone, 2));
@@ -911,88 +900,56 @@ end;
 
 function TACLGtk3AdvancedWindow.CreateWidget(const Params: TCreateParams): PGtkWidget;
 var
-  LForm: TCustomForm;
   LWindow: PGtkWindow;
-  LWndParent: HWND;
 begin
-  LForm := TCustomForm(LCLObject);
-  if LCLObject.Parent <> nil then
-    Exit(inherited);
+  FWidget := nil;
+  try
+    // TGtk3Window многое прячет у себя "под капотом", а нам нужно всего ничего
+    // - правильно настроить исходное окно. Всё остальное пойдёт неизменным.
+    // Можно было бы скопировать целый класс вместе с обвязкой...
+    // Но, к счастью, нашёлся обходной манёвр:
+    // Между созданием окна и его контентом вызывается SetText, на котором мы
+    // дёрнем наш callback и сделаем донастройку.
+    FCreatingWorkaround :=
+      procedure
+      var
+        LWindow: PGtkWindow;
+        LWndParent: HWND;
+      begin
+        LWindow := PGtkWindow(FWidget);
+        if LWindow = nil then
+        begin
+          if LCLObject.Parent = nil then
+            raise EInvalidOperation.Create('Gtk3: Window creation workaround failed');
+          Exit; // Dont worry, just Form get used as Frame
+        end;
 
-  FHasPaint := True;
-  FFirstMapRect := NullRect;
-  if Params.ExStyle and WS_EX_NOACTIVATE <> 0 then
-    LWindow := TGtkWindow.new(GTK_WINDOW_POPUP)
-  else
-    LWindow := TGtkWindow.new(GTK_WINDOW_TOPLEVEL);
+        if Params.ExStyle and WS_EX_NOACTIVATE <> 0 then
+        begin
+          Exclude(FWidgetType, wtHintWindow);
+          gtk_window_set_type_hint(LWindow, GDK_WINDOW_TYPE_HINT_UTILITY);
+        end;
 
-  LWindow^.set_events(GDK_DEFAULT_EVENTS_MASK);
-  LWindow^.set_decorated(False);
-  LWindow^.set_has_resize_grip(False);
-  LWindow^.set_resizable(LForm.BorderStyle in [bsSizeable, bsSizeToolWin]);
-  LWindow^.set_type_hint(GDK_WINDOW_TYPE_HINT_UTILITY); // not decorated
+        if LCLObject.Parent = nil then
+        begin
+          LWndParent := TACLWSForm.ResolveWndParent(Params);
+          if LWndParent <> 0 then
+            LWindow^.set_transient_for(PGtkWindow(TGtk3Widget(LWndParent).Widget))
+          else if TCustomForm(LCLObject).FormStyle in fsAllStayOnTop then
+            LWindow^.set_keep_above(true);
+        end;
 
-  LWndParent := TACLWSForm.ResolveWndParent(Params);
-  if LWndParent <> 0 then
-    LWindow^.set_transient_for(PGtkWindow(TGtk3Widget(LWndParent).Widget))
-  else
-    if LForm.FormStyle in fsAllStayOnTop then
-       LWindow^.set_keep_above(true);
+        FCreatingWorkaround := nil;
+      end;
 
-  if LForm.AlphaBlend then
-    LWindow^.set_opacity(LForm.AlphaBlendValue / 255);
+    if Params.ExStyle and WS_EX_NOACTIVATE <> 0 then
+      FWidgetType := [wtHintWindow]; // to force to the GTK_WINDOW_POPUP
 
-  FWidgetType := [wtWidget, wtLayout, wtWindow];
-  FWidget := LWindow;
-
-  if Params.ExStyle and WS_EX_LAYERED = 0 then
-  begin
-    FBox := TGtkVBox.new(GTK_ORIENTATION_VERTICAL, 0);
-
-    FScrollWin := PGtkScrolledWindow(TGtkScrolledWindow.new(nil, nil));
-    g_object_set_data(FScrollWin,'lclscrollingwindow',GPointer(1));
-    g_object_set_data(PGObject(FScrollWin), 'lclwidget', Self);
-
-    FCentralWidget := TGtkLayout.new(nil, nil);
-    FScrollWin^.add(FCentralWidget);
-    FScrollWin^.show;
-    FBox^.pack_end(FScrollWin, True, True, 0);
-    FBox^.show;
-
-    FScrollWin^.get_vscrollbar^.set_can_focus(False);
-    FScrollWin^.get_hscrollbar^.set_can_focus(False);
-    FScrollWin^.set_policy(GTK_POLICY_NEVER, GTK_POLICY_NEVER);
-    PGtkContainer(LWindow)^.add(FBox);
-
-    g_signal_connect_data(LWindow, 'window-state-event',
-      TGCallback(@WindowStateSignal), Self, nil, G_CONNECT_DEFAULT);
-
-    g_object_set(PGObject(FCentralWidget), 'resize-mode', [GTK_RESIZE_QUEUE, nil]);
-    gtk_layout_set_size(PGtkLayout(FCentralWidget), 1, 1);
-
-    g_signal_connect_data(FCentralWidget, 'size-allocate',
-      TGCallback(@ScrolledLayoutSizeAllocate), Self, nil, G_CONNECT_DEFAULT);
-
-    with PGtkScrolledWindow(FScrollWin)^.get_vadjustment^ do
-      LCLVAdj := gtk_adjustment_new(value, lower, upper, step_increment, page_increment, page_size);
-    with PGtkScrolledWindow(FScrollWin)^.get_hadjustment^ do
-      LCLHAdj := gtk_adjustment_new(value, lower, upper, step_increment, page_increment, page_size);
-
-    FWidgetType := FWidgetType + [wtScrollingWin, wtScrollingWinControl];
-  end
-  else
-    TACLWSAdvancedForm.SetAlphaExposing(FWidget);
-
-  gtk_widget_realize(FWidget);
-  UpdateWindowState;
-
-  Result := FWidget;
+    Result := inherited;
+  finally
+    FCreatingWorkaround := nil;
+  end;
 end;
-
-//function TACLGtk3AdvancedWindow.GetScrolledWindow: PGtkScrolledWindow;
-//begin
-//  Result := nil;
-//end;
 
 function TACLGtk3AdvancedWindow.GtkEventPaint(Sender: PGtkWidget; AContext: Pcairo_t): Boolean;
 var
@@ -1034,15 +991,12 @@ begin
   inherited SetBounds(ALeft, ATop, AWidth, AHeight);
 end;
 
-//procedure TACLGtk3AdvancedWindow.InitializeWidget;
-//var
-//  LMethod: TMethod;
-//begin
-//  // Проскакиваем InitializeWidget-ы, где безусловно идет обращение к GetScrolledWindow
-//  LMethod.Data := Self;
-//  LMethod.Code := @TGtk3ScrollableWin.InitializeWidget;
-//  TThreadMethod(LMethod)();
-//end;
+procedure TACLGtk3AdvancedWindow.SetText(const AValue: String);
+begin
+  // Эта хрень дергается между созданием Window и Layout. Cм.CreateHandle.
+  if Assigned(FCreatingWorkaround) then FCreatingWorkaround();
+  inherited SetText(AValue);
+end;
 
 { TACLGtk3PopupControl }
 
@@ -1134,6 +1088,12 @@ begin
   Result := TLCLHandle(TACLGtk3CustomControl.Create(AControl, AParams));
 end;
 
+class function TACLWSCustomControl.GetText(
+  const AWinControl: TWinControl; var AText: String): Boolean;
+begin
+  Result := False; // кастомные контролы не хранят текст на уровне Widget
+end;
+
 class procedure TACLWSCustomControl.SetBorderStyle(
   const AWinControl: TWinControl; const ABorderStyle: TBorderStyle);
 begin
@@ -1178,41 +1138,13 @@ class function TACLWSForm.CreateHandle(
   const AWinControl: TWinControl;
   const AParams: TCreateParams): TLCLHandle;
 var
-  LParams: TCreateParams;
-begin
-  LParams := AParams;
-  LParams.WndParent := ResolveWndParent(LParams);
-  Result := inherited CreateHandle(AWinControl, LParams);
-end;
-
-class function TACLWSForm.ResolveWndParent(const AParams: TCreateParams): HWND;
-var
-  LWndParent: TGtk3Widget;
-begin
-  if AParams.Style and WS_CHILD = 0 then
-  begin
-    LWndParent := TGtk3Widget(AParams.WndParent);
-    while (LWndParent <> nil) and not Gtk3IsGtkWindow(LWndParent.Widget) do
-      LWndParent := LWndParent.getParent;
-    Result := HWND(LWndParent);
-  end
-  else
-    Result := AParams.WndParent;
-end;
-
-{ TACLWSAdvancedForm }
-
-class function TACLWSAdvancedForm.CreateHandle(
-  const AWinControl: TWinControl;
-  const AParams: TCreateParams): TLCLHandle;
-var
   LAllocation: TGtkAllocation;
   LWindow: TGtk3Window;
 begin
   if (csDesigning in AWinControl.ComponentState) then
     Exit(inherited);
-  if (AParams.Style and WS_CHILD <> 0) then
-    Exit(inherited);
+  if (AParams.Style and WS_CHILD) <> 0 then
+    Exit(TACLWSCustomControl.CreateHandle(AWinControl, AParams));
 
   LAllocation.x := AWinControl.Left;
   LAllocation.y := AWinControl.Top;
@@ -1226,13 +1158,7 @@ begin
   Result := TLCLHandle(LWindow);
 end;
 
-class function TACLWSAdvancedForm.ModalFilter(
-  xevent: PGdkXEvent; event: PGdkEvent; data: gpointer): TGdkFilterReturn;
-begin
-  Result := GDK_FILTER_REMOVE;
-end;
-
-class procedure TACLWSAdvancedForm.CheckAndFixGeometry(AWinControl: TWinControl);
+class procedure TACLWSForm.CheckAndFixGeometry(AWinControl: TWinControl);
 const
   WaitDelay: gulong = 4000;
   WaitLoops: integer = 4;
@@ -1255,7 +1181,20 @@ begin
   //but LCL should be happy at this point.
 end;
 
-class procedure TACLWSAdvancedForm.SetAlphaExposing(AWidget: PGtkWidget);
+class function TACLWSForm.ResolveWndParent(const AParams: TCreateParams): HWND;
+var
+  LWndParent: TGtk3Widget;
+begin
+  if AParams.Style and WS_CHILD <> 0 then
+    Exit(AParams.WndParent);
+
+  LWndParent := TGtk3Widget(AParams.WndParent);
+  while (LWndParent <> nil) and not Gtk3IsGtkWindow(LWndParent.Widget) do
+    LWndParent := LWndParent.getParent;
+  Result := HWND(LWndParent);
+end;
+
+class procedure TACLWSForm.SetAlphaExposing(AWidget: PGtkWidget);
 var
   LScreen: PGdkScreen;
   LVisual: PGdkVisual;
@@ -1273,7 +1212,7 @@ begin
   end;
 end;
 
-class procedure TACLWSAdvancedForm.SetFormStyle(
+class procedure TACLWSForm.SetFormStyle(
   const AForm: TCustomform; const AFormStyle, AOldFormStyle: TFormStyle);
 var
   LForm: TACLCustomForm;
@@ -1284,258 +1223,37 @@ begin
     inherited;
 end;
 
-class procedure TACLWSAdvancedForm.ShowHide(const AWinControl: TWinControl);
-// Точная копия оригинальной функцией, но с правкой CheckAndFixGeometry
-{$REGION ' Copy-Paste '}
-var
-  AMask:TGdkEventMask;
-  AForm, OtherForm: TCustomForm;
-  AWindow, ATransient: PGtkWindow;
-  i: Integer;
-  AGeom: TGdkGeometry;
-  AGeomMask: TGdkWindowHints;
-  ShouldBeVisible: Boolean;
-  AGtk3Widget: TGtk3Widget;
-  OtherGtk3Window: TGtk3Window;
-begin
-  {$IFDEF GTK3DEBUGCORE}
-  DebugLn('TGtk3WSCustomForm.ShowHide handleAllocated=',dbgs(AWinControl.HandleAllocated));
-  {$ENDIF}
-  if not WSCheckHandleAllocated(AWinControl, 'ShowHide') then
-    Exit;
-  AForm := TCustomForm(AWinControl);
-  {$IFDEF GTK3DEBUGCORE}
-  writeln('>==== TGtk3WSCustomForm.ShowHide begin ');
-  DebugLn('TGtk3WSCustomForm.ShowHide visible=',dbgs(AWinControl.HandleObjectShouldBeVisible));
-  {$ENDIF}
-  AGtk3Widget:=TGtk3Widget(AForm.Handle);
-  if Gtk3IsGtkWindow(AGtk3Widget.Widget) then
-    AWindow := PGtkWindow(AGtk3Widget.Widget)
-  else
-    AWindow := nil;
-
-
-  ShouldBeVisible:=AForm.HandleObjectShouldBeVisible;
-
-  {$IFDEF GTK3DEBUGCORE}
-  //use this if pure SetCapture(0) does not work under wayland.
-  ReleaseInputGrab;
-  {$ENDIF}
-
-  Gtk3WidgetSet.SetCapture(0);
-
-  if ShouldBeVisible and not IsFormDesign(AForm) and (AForm.Parent = nil) then
-  begin
-    {note that gtk3 docs says that GDK_WINDOW_TYPE_HINT_UTILITY is for fsStayOnTop,
-     and set_keep_above() is for fsSystemStayOnTop, but it does not work, so
-     we use set_keep_above for both scenarios.}
-    if (AForm.FormStyle in fsAllStayOnTop) then
-      AWindow^.set_keep_above(True);
-
-    if (fsModal in AForm.FormState) then
-    begin
-      AWindow^.set_modal(True);
-      AWindow^.window^.set_modal_hint(true);
-    end;
-
-    AWindow^.realize;
-
-    if (AForm.BorderStyle = bsNone) then
-    begin
-      if AWindow^.transient_for = nil then
-      begin
-        if Assigned(AForm.PopupParent) then
-          ATransient := PGtkWindow(TGtk3Window(AForm.PopupParent.Handle).Widget)
-        else
-        if AForm.PopupMode = pmAuto then
-          ATransient := GetActiveGtkWindow
-        else
-          ATransient := nil;
-
-        {$IFDEF GTK3DEBUGCORE}
-        if Assigned(ATransient) then
-        begin
-          writeln('TGtk3WSCustomFOrm.ShowHide: ATransient (popupParent form) is ',dbgsName(TGtk3Window(HwndFromGtkWidget(ATransient)).LCLObject));
-          writeln(dbgsName(AForm),' bounds ',dbgs(Bounds(AForm.Left, AForm.Top, AForm.Width, AForm.Height)));
-        end;
-        {$ENDIF}
-
-        AWindow^.set_transient_for(ATransient);
-      end;
-      if Assigned(AGtk3Widget.Shape) then
-      begin
-        AWindow^.set_app_paintable(True);
-        AWindow^.set_visual(TGdkScreen.get_default^.get_rgba_visual);
-        AGtk3Widget.SetWindowShape(AGtk3Widget.Shape, AWindow^.window);
-      end;
-    end;
-  end;
-  AGtk3Widget.BeginUpdate;
-  AGtk3Widget.Visible := ShouldBeVisible;
-
-  if AGtk3Widget.Visible then
-  begin
-    if not IsFormDesign(AForm) and (fsModal in AForm.FormState) and (Application.ModalLevel > 0) then
-    begin
-      // DebugLn('TGtk3WSCustomForm.ShowHide ModalLevel=',dbgs(Application.ModalLevel),' Self=',dbgsName(AForm));
-      for i := 0 to Screen.CustomFormZOrderCount - 1 do
-      begin
-        OtherForm:=Screen.CustomFormsZOrdered[i];
-        // DebugLn('CustomFormZOrder[',dbgs(i),'].',dbgsName(OtherForm),' modal=',dbgs(fsModal in OtherForm.FormState));
-        if (OtherForm <> AForm) and
-          OtherForm.HandleAllocated then
-        begin
-          // DebugLn('TGtk3WSCustomForm.ShowHide setTransient for ',dbgsName(OtherForm));
-          OtherGtk3Window:=TGtk3Window(OtherForm.Handle);
-          if Gtk3IsGtkWindow(OtherGtk3Window.Widget) then
-          begin
-            if Gtk3IsGdkWindow(OtherGtk3Window.Widget^.window) then
-              gdk_window_add_filter(OtherGtk3Window.Widget^.window, TGdkFilterFunc(@ModalFilter), AGtk3Widget);
-            AWindow^.set_transient_for(PGtkWindow(OtherGtk3Window.Widget));
-            break;
-          end;
-        end;
-      end;
-    end;
-
-    if Assigned(AWinControl.Parent) then
-    begin
-      AGtk3Widget.EndUpdate;
-      exit;
-    end;
-
-    //See issue #41412
-    CheckAndFixGeometry(AWinControl);
-    AWindow^.show_all;
-    AMask := AWindow^.window^.get_events;
-    AWindow^.window^.set_events(GDK_ALL_EVENTS_MASK);
-    if not IsFormDesign(AForm) then
-      AWindow^.present;
-  end else
-  begin
-    if not IsFormDesign(AForm) and
-      ((fsModal in AForm.FormState) or (AForm.BorderStyle = bsNone)) then
-    begin
-      if AWindow^.transient_for <> nil then
-      begin
-        if (fsModal in AForm.FormState) and Gtk3IsGdkWindow(AWindow^.transient_for^.window) then
-          gdk_window_remove_filter(AWindow^.transient_for^.window, TGdkFilterFunc(@ModalFilter), AGtk3Widget);
-        AWindow^.set_transient_for(nil);
-      end;
-    end;
-  end;
-  AGtk3Widget.EndUpdate;
-  {$IFDEF GTK3DEBUGCORE}
-  writeln('<==== TGtk3WSCustomForm.ShowHide end ');
-  {$ENDIF}
-{$ENDREGION}
-end;
-
-(*
-class function TACLWSAdvancedForm.CreateHandle(
-  const AWinControl: TWinControl; const AParams: TCreateParams): TLCLHandle;
-var
-  LAllocation: TGtkAllocation;
-  LBox: PGtkWidget;
-  LForm: TCustomForm absolute AWinControl;
-  LWidgetInfo: PWidgetInfo;
-  LWnd: PGtkWidget;
-  LWndParent: HWND;
-  LWndType: TGtkWindowType;
-begin
-  if AParams.ExStyle and WS_EX_LAYERED = 0 then
-  begin
-    LBox := CreateFormContents(LForm, LWnd, LWidgetInfo);
-    gtk_container_add(PGtkContainer(LWnd), LBox);
-    gtk_widget_show(LBox);
-  end
-  else
-    // Без этого не будет работать MouseCapture
-    // ref.to: GetDefaultMouseCaptureWidget
-    LWidgetInfo^.ClientWidget := PGtkWidget(LWnd);
-
-  Set_RC_Name(LForm, LWnd);
-  SetCallbacks(LWnd, LWidgetInfo);
-  SetWindowCapabities(LForm, LWnd);
-
-  if AParams.ExStyle and WS_EX_LAYERED <> 0 then
-    TGtkControls.SetAlphaExposing(LWnd, LWidgetInfo);
-
-  SetWindowCapabities(LForm, LWnd);
-  Result := TLCLHandle({%H-}PtrUInt(LWnd));
-end;
-
-class function TACLWSAdvancedForm.DoRealize(Widget: PGtkWidget; Data: Pointer): GBoolean; cdecl;
-begin
-  // таким образом пытаемся добраться до метода RealizeAccelerator
-  Result := gtkRealizeCB(Widget, Data);
-  SetWindowCapabities(TCustomForm(Data), Widget);
-end;
-
-class procedure TACLWSAdvancedForm.SetCallbacks(
-  const AWidget: PGtkWidget; const AWidgetInfo: PWidgetInfo);
-var
-  LFixed: PGtkWidget;
-begin
-  inherited SetCallbacks(AWidget, AWidgetInfo);
-
-  if AWidgetInfo^.Style and WS_CHILD = 0 then
-  begin
-    // подменяем gtkRealizeCB нашим обработчиком, чтобы подсунуть окну правильную декорацию и функционал
-    g_signal_handlers_disconnect_by_func(AWidget, @gtkRealizeCB, AWidgetInfo^.LCLObject);
-    g_signal_connect(AWidget, 'realize', TGTKSignalFunc(@DoRealize), AWidgetInfo^.LCLObject);
-
-    LFixed := GetFixedWidget(AWidget);
-    if LFixed <> nil then
-    begin
-      g_signal_handlers_disconnect_by_func(LFixed, @gtkRealizeCB, AWidgetInfo^.LCLObject);
-      g_signal_connect(LFixed, 'realize', TGTKSignalFunc(@DoRealize), AWidgetInfo^.LCLObject);
-    end;
-  end;
-end;
-
-class procedure TACLWSAdvancedForm.SetColor(const AWinControl: TWinControl);
-var
-  LWidgetInfo: PWidgetInfo;
-begin
-  LWidgetInfo := GetWidgetInfo(Pointer(AWinControl.Handle));
-  if (LWidgetInfo = nil) or (LWidgetInfo^.ExStyle and WS_EX_LAYERED = 0) then
-    inherited;
-end;
-
-class procedure TACLWSAdvancedForm.SetFormBorderStyle(
-  const AForm: TCustomForm; const AFormBorderStyle: TFormBorderStyle);
-var
-  LWidget: PGtkWidget;
-  LWidgetInfo: PWidgetInfo;
-begin
-  if AForm.Parent <> nil then Exit;
-  LWidget := {%H-}PGtkWidget(AForm.Handle);
-  LWidgetInfo := GetWidgetInfo(LWidget);
-  if FormStyleMap[AFormBorderStyle] <> FormStyleMap[TFormBorderStyle(LWidgetInfo.FormBorderStyle)] then
-    RecreateWnd(AForm)
-  else
-  begin
-    SetWindowCapabities(AForm, LWidget);
-    LWidgetInfo^.FormBorderStyle := Ord(AFormBorderStyle);
-  end;
-end;
-
-class procedure TACLWSAdvancedForm.SetWindowCapabities(AForm: TCustomForm; AWidget: PGtkWidget);
-var
-  LWnd: PGdkWindow;
+class procedure TACLWSForm.SetIcon(
+  const AForm: TCustomForm; const Small, Big: HICON);
 begin
   if AForm.Parent = nil then
+    inherited SetIcon(AForm, Small, Big);
+end;
+
+class procedure TACLWSForm.SetRealPopupParent(const AForm, APopupParent: TCustomForm);
+begin
+  if AForm.Parent = nil then
+    inherited SetRealPopupParent(AForm, APopupParent);
+end;
+
+class procedure TACLWSForm.ShowHide(const AWinControl: TWinControl);
+var
+  LWidget: PGtkWidget;
+begin
+  if AWinControl.Parent <> nil then
+    TACLWSCustomControl.ShowHide(AWinControl)
+  else
   begin
-    LWnd := gtk_widget_get_toplevel(AWidget)^.window;
-    if LWnd <> nil then
+    inherited;
+    LWidget := TGtk3Widget(AWinControl.Handle).Widget;
+    if Gtk3IsGtkWindow(LWidget) and (PGtkWindow(LWidget)^.transient_for <> nil) then
     begin
-      gdk_window_set_decorations(LWnd, 0);
-      gdk_window_set_functions(LWnd, GetWindowFunction(AForm));
+      // Одноимённая функция из предка почему-то уносит наше окно хрен знает куда
+      // Возвращаем обратно...
+      CheckAndFixGeometry(AWinControl);
     end;
   end;
 end;
-*)
 
 { TACLWSScrollingControl }
 
