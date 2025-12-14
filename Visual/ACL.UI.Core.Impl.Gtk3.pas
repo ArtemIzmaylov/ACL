@@ -19,8 +19,10 @@ unit ACL.UI.Core.Impl.Gtk3;
 
 {.$DEFINE DEBUG_MESSAGELOOP}
 {$MESSAGE WARN 'Проверить:'}
-// В FlyWM (Astra Linux) при захвате клавиатурного хука, top-level форма
-// в режиме StayOnTop проваливается на задний план.
+// 1) В FlyWM (Astra Linux) при захвате клавиатурного хука, top-level форма в режиме StayOnTop проваливается на задний план.
+// 2) отключать прозрачность, если мышь за пределами окна - не работает, ибо мы не можем получить координаты мыши
+// 2) отключать прозрачность, если окно неактивно - не работает
+// 3) ui insight не работает
 interface
 
 uses
@@ -86,8 +88,6 @@ type
     class var FPopupCapturedDevice: PGdkDevice;
     class var FPopupControl: TWinControl;
     class var FPopupError: string;
-    class var FPopupWidget: PGtkWidget;
-    class var FPopupWindow: PGdkWindow;
 
     class procedure Handler(event: PGdkEvent; data: gpointer); cdecl; static;
     class procedure HandlerException(Sender: TObject; Error: Exception);
@@ -113,10 +113,6 @@ type
     class procedure SetInputRedirection(AControl: TWinControl);
   end;
 
-  { TACLWSHintWindow }
-
-  TACLWSHintWindow = class(TGtk3WSHintWindow);
-
   { TACLWSForm }
 
   TACLWSForm = class(TGtk3WSCustomForm)
@@ -127,6 +123,8 @@ type
   published
     class function CreateHandle(const AWinControl: TWinControl;
       const AParams: TCreateParams): TLCLHandle; override;
+    class procedure SetAlphaBlend(const ACustomForm: TCustomForm;
+      const AlphaBlend: Boolean; const Alpha: Byte); override;
     class procedure SetFormStyle(const AForm: TCustomform;
       const AFormStyle, AOldFormStyle: TFormStyle); override;
     class procedure SetIcon(const AForm: TCustomForm; const Small, Big: HICON); override;
@@ -136,14 +134,14 @@ type
 
   { TACLWSAdvancedForm }
 
-  TACLWSAdvancedForm = class(TACLWSForm)
-  //  class function DoRealize(Widget: PGtkWidget; Data: Pointer): GBoolean; cdecl; static;
+  TACLWSAdvancedForm = class(TACLWSForm);
+
+  { TACLWSHintWindow }
+
+  TACLWSHintWindow = class(TACLWSAdvancedForm)
   published
-  //  class procedure SetCallbacks(const AWidget: PGtkWidget;
-  //    const AWidgetInfo: PWidgetInfo); override;
-  //  class procedure SetFormBorderStyle(const AForm: TCustomForm;
-  //    const AFormBorderStyle: TFormBorderStyle); override;
-  //  class procedure SetWindowCapabities(AForm: TCustomForm; AWidget: PGtkWidget);
+    class function CreateHandle(const AWinControl: TWinControl;
+      const AParams: TCreateParams): TLCLHandle; override;
   end;
 
   { TACLWSCustomControl }
@@ -153,7 +151,8 @@ type
     class function CreateHandle(
       const AControl: TWinControl;
       const AParams: TCreateParams): TLCLHandle; override;
-    class function GetText(const AWinControl: TWinControl; var AText: String): Boolean; override;
+    class function GetText(
+      const AWinControl: TWinControl; var AText: String): Boolean; override;
     class procedure SetBorderStyle(const AWinControl: TWinControl;
       const ABorderStyle: TBorderStyle); override;
   end;
@@ -239,6 +238,7 @@ const
 type
   TFormAccess = class(TForm);
   TWinControlAccess = class(TWinControl);
+  TGtk3WidgetAccess = class(TGtk3Widget);
   TGtk3WidgetSetAccess = class(TGtk3WidgetSet);
 
   { TACLGtk3CustomControl }
@@ -263,13 +263,13 @@ type
   strict private
     FCreatingWorkaround: TProc;
   public
+    function ClientToScreen(var P: TPoint): boolean; override;
     function CreateWidget(const Params: TCreateParams): PGtkWidget; override;
-    //function GetScrolledWindow: PGtkScrolledWindow; override;
     function GtkEventPaint(Sender: PGtkWidget; AContext: Pcairo_t): Boolean; override;
     procedure OffsetMousePos(const aGlobalX, aGlobalY: double; APoint: PPoint); override;
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: integer); override;
     procedure SetText(const AValue: String); override;
-    //procedure InitializeWidget; override;
+    procedure SetVisible(AValue: Boolean); override;
   end;
 
   { TACLGtk3PopupControl }
@@ -411,6 +411,23 @@ begin
   Result := GtkLoadStockIcon(nil, Map[AType], ASize);
 end;
 
+procedure ReleaseInputGrab;
+var
+  LDisplay: PGdkDisplay;
+  LSeat: PGdkSeat;
+begin
+  LDisplay := gdk_display_get_default();
+  if LDisplay <> nil then
+  begin
+    LSeat := gdk_display_get_default_seat(LDisplay);
+    if LSeat <> nil then
+    begin
+      ReleaseCapture;
+      gdk_seat_ungrab(LSeat);
+    end;
+  end;
+end;
+
 procedure SetDragImageListOpacity(Opacity: Byte);
 var
   LWnd: PGtkWindow;
@@ -475,7 +492,10 @@ begin
       GDK_MOTION_NOTIFY:
         if not FDragTarget.Contains(Mouse.CursorPos) then
           FDragState := TDragState.Started;
-      GDK_BUTTON_RELEASE:
+      GDK_2BUTTON_PRESS,
+      GDK_3BUTTON_PRESS,
+      GDK_BUTTON_RELEASE,
+      GDK_TOUCH_END:
         FDragState := TDragState.Canceled;
     end;
 end;
@@ -513,44 +533,43 @@ const
     GDK_ENTER_NOTIFY_MASK, GDK_LEAVE_NOTIFY_MASK];
 var
 {$IFNDEF DEBUG_MESSAGELOOP}
-  LAttrs: TGdkWindowAttr;
-  LCurrTime: Integer;
-  LDisplay: PGdkDisplay;
+  //LAttrs: TGdkWindowAttr;
   LGrabResult: TGdkGrabStatus;
-  LWidget: PGtkWidget;
 {$ENDIF}
   LDevice: PGdkDevice;
+  LWidget: PGtkWidget;
   LWindow: PGdkWindow;
 begin
-  if FPopupWindow <> nil then
+  if FPopupCapturedDevice <> nil then
     raise EInvalidOperation.Create('Gtk3: recursive popups are not supported');
 
 {$IFDEF DEBUG_MESSAGELOOP}
   LDevice := nil;
+  LWidget := nil;
   LWindow := nil;
 {$ELSE}
   // AI: ref.to: gtkmenu.c, menu_grab_transfer_window_get
-  FillChar(LAttrs{%H-}, SizeOf(LAttrs), 0);
-  LAttrs.x := -100;
-  LAttrs.y := -100;
-  LAttrs.width := 10;
-  LAttrs.height := 10;
-  LAttrs.override_redirect := True;
-  LAttrs.window_type := GDK_WINDOW_TEMP;
-  LAttrs.wclass := GDK_INPUT_ONLY;
+  //FillChar(LAttrs{%H-}, SizeOf(LAttrs), 0);
+  //LAttrs.x := -100;
+  //LAttrs.y := -100;
+  //LAttrs.width := 10;
+  //LAttrs.height := 10;
+  //LAttrs.override_redirect := True;
+  //LAttrs.window_type := GDK_WINDOW_TEMP;
+  //LAttrs.wclass := GDK_INPUT_ONLY;
 
-  LCurrTime := gtk_get_current_event_time;
   LWidget := TGtk3Widget(APopupControl.Handle).Widget;
-  LWindow := gdk_screen_get_root_window(gtk_widget_get_screen(LWidget));
-  LWindow := gdk_window_new(LWindow, @LAttrs, [GDK_WA_X, GDK_WA_Y, GDK_WA_NOREDIR]);
-  gtk_widget_register_window(LWidget, LWindow);
-  gdk_window_show(LWindow);
+  // в таком ключе контекстные меню в скин-движке не реагируют на мышь
+  //LWindow := gdk_screen_get_root_window(gtk_widget_get_screen(LWidget));
+  //LWindow := gdk_window_new(LWindow, @LAttrs, [GDK_WA_X, GDK_WA_Y, GDK_WA_NOREDIR]);
+  //gtk_widget_register_window(LWidget, LWindow);
+  //gdk_window_show(LWindow);
+  LWindow := LWidget^.window;
 
   // AI: ref.to: gtkmenu.c, gtk_menu_popup_internal
-  LDisplay := gtk_widget_get_display(LWidget);
   LDevice := gtk_get_current_event_device;
   if LDevice = nil then
-    LDevice := gdk_seat_get_pointer(gdk_display_get_default_seat(LDisplay));
+    LDevice := gdk_seat_get_pointer(gdk_display_get_default_seat(gtk_widget_get_display(LWidget)));
   if gdk_device_get_source(LDevice) = GDK_SOURCE_KEYBOARD then
     LDevice := gdk_device_get_associated_device(LDevice);
 
@@ -562,12 +581,11 @@ begin
     //
     // Поверхостный тест показал, что в принципе-то граббинг клавиатуры нам
     // и не нужен - мы перехватываем нужные события через SetInputRedirection
-    GDK_SEAT_CAPABILITY_ALL_POINTING,
-    True, nil, nil, nil, nil);
+    GDK_SEAT_CAPABILITY_ALL_POINTING, True, nil, nil, nil, nil);
   if LGrabResult <> GDK_GRAB_SUCCESS then
   begin
-    gtk_widget_unregister_window(LWidget, LWindow);
-    gdk_window_destroy(LWindow);
+    //gtk_widget_unregister_window(LWidget, LWindow);
+    //gdk_window_destroy(LWindow);
     raise EInvalidOperation.CreateFmt('GTK3.Popup: unable to grap the pointer (%d)', [Ord(LGrabResult)]);
   end;
 {$ENDIF}
@@ -576,8 +594,8 @@ begin
   FPopupError := '';
   FPopupControl := APopupControl;
   FPopupCapturedDevice := LDevice;
-  FPopupWidget := LWidget;
-  FPopupWindow := LWindow;
+  //FPopupWidget := LWidget;
+  //FPopupWindow := LWindow;
   try
     FOldExceptionHandler := Application.OnException;
     Application.OnException := HandlerException;
@@ -602,15 +620,15 @@ begin
   try
     if FPopupCapturedDevice <> nil then
       gdk_seat_ungrab(gdk_device_get_seat(FPopupCapturedDevice));
-    if FPopupWindow <> nil then
-    begin
-      gtk_widget_unregister_window(FPopupWidget, FPopupWindow);
-      gdk_window_destroy(FPopupWindow);
-    end;
+    //if FPopupWindow <> nil then
+    //begin
+    //  gtk_widget_unregister_window(FPopupWidget, FPopupWindow);
+    //  gdk_window_destroy(FPopupWindow);
+    //end;
   finally
     FPopupCapturedDevice := nil;
-    FPopupWidget := nil;
-    FPopupWindow := nil;
+    //FPopupWidget := nil;
+    //FPopupWindow := nil;
   end;
 
   if FPopupError <> '' then
@@ -801,6 +819,14 @@ begin
   end;
 end;
 
+{ TACLWSHintWindow }
+
+class function TACLWSHintWindow.CreateHandle(
+  const AWinControl: TWinControl; const AParams: TCreateParams): TLCLHandle;
+begin
+  Result := TLCLHandle(TGtk3HintWindow.Create(AWinControl, AParams));
+end;
+
 { TACLGtk3CustomControl }
 
 function TACLGtk3CustomControl.CreateWidget(const Params: TCreateParams): PGtkWidget;
@@ -830,7 +856,6 @@ begin
   Result^.override_background_color([GTK_STATE_FLAG_FOCUSED], @LColor);
   Result^.override_background_color([GTK_STATE_FLAG_PRELIGHT], @LColor);
   Result^.override_background_color([GTK_STATE_FLAG_SELECTED], @LColor);
-  Result^.show_all;
 end;
 
 function TACLGtk3CustomControl.ClientToScreen(var P: TPoint): boolean;
@@ -888,7 +913,7 @@ procedure TACLGtk3CustomControl.InitializeWidget;
 begin
   inherited InitializeWidget;
   SetBorderStyle(TWinControlAccess(LCLObject).BorderStyle);
-  SetVisible(LCLObject.Visible);
+  SetVisible(LCLObject.HandleObjectShouldBeVisible);
 end;
 
 procedure TACLGtk3CustomControl.SetBorderStyle(AValue: TBorderStyle);
@@ -897,6 +922,22 @@ begin
 end;
 
 { TACLGtk3AdvancedWindow }
+
+function TACLGtk3AdvancedWindow.ClientToScreen(var P: TPoint): boolean;
+var
+  X, Y: Integer;
+begin
+  if IsWidgetOk and Gtk3IsGdkWindow(Widget^.window) and
+   (FParams.ExStyle and WS_EX_LAYERED <> 0) then
+  begin
+    X := 0; Y := 0;
+    Widget^.window^.get_origin(@X, @Y);
+    Inc(P.X, X);
+    Inc(P.Y, Y);
+    Exit(True);
+  end;
+  Result := inherited;
+end;
 
 function TACLGtk3AdvancedWindow.CreateWidget(const Params: TCreateParams): PGtkWidget;
 var
@@ -924,10 +965,12 @@ begin
           Exit; // Dont worry, just Form get used as Frame
         end;
 
+        if Params.ExStyle and WS_EX_LAYERED <> 0 then
+          TACLWSForm.SetAlphaExposing(FWidget);
         if Params.ExStyle and WS_EX_NOACTIVATE <> 0 then
         begin
           Exclude(FWidgetType, wtHintWindow);
-          gtk_window_set_type_hint(LWindow, GDK_WINDOW_TYPE_HINT_UTILITY);
+          LWindow^.set_type_hint(GDK_WINDOW_TYPE_HINT_UTILITY);
         end;
 
         if LCLObject.Parent = nil then
@@ -946,6 +989,13 @@ begin
       FWidgetType := [wtHintWindow]; // to force to the GTK_WINDOW_POPUP
 
     Result := inherited;
+
+    if (Params.ExStyle and WS_EX_LAYERED <> 0) and Gtk3IsGtkWindow(Widget) then
+    begin
+      PGtkWindow(Widget)^.set_app_paintable(True);
+      PGtkWindow(Widget)^.set_decorated(False);
+      PGtkWindow(Widget)^.window^.set_decorations([]);
+    end;
   finally
     FCreatingWorkaround := nil;
   end;
@@ -962,7 +1012,8 @@ begin
     Result := inherited;
 end;
 
-procedure TACLGtk3AdvancedWindow.OffsetMousePos(const aGlobalX, aGlobalY: double; APoint: PPoint);
+procedure TACLGtk3AdvancedWindow.OffsetMousePos(
+  const aGlobalX, aGlobalY: double; APoint: PPoint);
 begin
   with getClientOffset do
   begin
@@ -973,22 +1024,74 @@ end;
 
 procedure TACLGtk3AdvancedWindow.SetBounds(ALeft, ATop, AWidth, AHeight: integer);
 var
-  X, Y: Integer;
+  LForm: TCustomForm;
+  LFormSizeIsFixed: Boolean;
+
+  function GetActualSize(ASize, AConstraintSize, ADefaultSize: Integer): Integer;
+  begin
+    if LFormSizeIsFixed then
+      Result := ASize
+    else if AConstraintSize > 0 then
+      Result := AConstraintSize
+    else
+      Result := ADefaultSize;
+  end;
+
+var
+  LGeometry: TGdkGeometry;
+  LGeometryHints: TGdkWindowHints;
+  LRect: TGdkRectangle;
   LWindow: PGtkWindow;
 begin
-  if Gtk3IsGtkWindow(Widget) then
+  LWindow := PGtkWindow(Widget);
+
+  // Наша реализация решает сразу три проблемы:
+  // 1) Оригинальная функция зачем-то сдвигает окно c BorderStyle = bsNone на
+  //    Origin от Window.transient_for - это ломает наши дропдауны и меню.
+  // 2) Оригинальная функция не разруливает ситуацию, когда Constraints.MaxWidth
+  //    задан, а Constraints.MaxHeight нет (или наоборот)
+  // 3) При работе на X11-бэке заметил (Alt.Linux 11 Gnome), что окно ATE не
+  //    показывается на экране. Gtk+ Inspector показал, что CentralWidget формы
+  //    (Layout внутри ScrollWindow) не аллокирован (1x1 по -1,-1). Причём повторяется
+  //    это лишь на сложных формах. Что именно вызывает сбой - непонятно, но
+  //    нашёл обходной манёвр: пока WidgetMapped = False, выставляем форме все
+  //    Constraint-ы. После непосредственного показа формы - выставляем актуальные
+
+  LForm := TCustomForm(LCLObject);
+  LFormSizeIsFixed := not WidgetMapped or
+    (LForm.BorderStyle in [bsDialog, bsSingle, bsToolWindow]);
+
+  LRect.x := ALeft;
+  LRect.y := ATop;
+  LRect.width := AWidth;
+  LRect.Height := AHeight;
+  LWindow^.size_allocate(@LRect);
+
+  FillChar(LGeometry, SizeOf(LGeometry), 0);
+  LGeometry.max_aspect := 1;
+  LGeometry.height_inc := 1;
+  LGeometry.width_inc := 1;
+  LGeometry.base_width := LForm.Width;
+  LGeometry.base_height := LForm.Height;
+  LGeometry.win_gravity := LWindow^.get_gravity;
+  LGeometry.min_height := GetActualSize(LForm.Height, LForm.Constraints.MinHeight, 0);
+  LGeometry.max_height := GetActualSize(LForm.Height, LForm.Constraints.MaxHeight, MAXSHORT);
+  LGeometry.min_width := GetActualSize(LForm.Width, LForm.Constraints.MinWidth, 0);
+  LGeometry.max_width := GetActualSize(LForm.Width, LForm.Constraints.MaxWidth, MAXSHORT);
+  LGeometryHints := [GDK_HINT_POS, GDK_HINT_BASE_SIZE];
+  if (LForm.Constraints.MinWidth > 0) or (LForm.Constraints.MinHeight > 0) then
+    LGeometryHints := LGeometryHints + [GDK_HINT_MIN_SIZE];
+  if (LForm.Constraints.MaxWidth > 0) or (LForm.Constraints.MaxHeight > 0) then
+    LGeometryHints := LGeometryHints + [GDK_HINT_MAX_SIZE];
+  if LFormSizeIsFixed then
+    LGeometryHints := LGeometryHints + [GDK_HINT_MAX_SIZE, GDK_HINT_MIN_SIZE];
+  LWindow^.set_geometry_hints(nil, @LGeometry, LGeometryHints);
+
+  if LWindow^.window <> nil then
   begin
-    LWindow := PGtkWindow(Widget);
-    if not LWindow.get_decorated and (LWindow^.transient_for <> nil) then
-    begin
-      // Чтобы невилировать обратный код в предке
-      X := 0; Y := 0;
-      LWindow^.transient_for^.window^.get_origin(@x, @y);
-      Dec(ALeft, X);
-      Dec(ATop, Y);
-    end;
+    LWindow^.window^.move_resize(ALeft, ATop, AWidth, AHeight);
+    LWindow^.window^.process_updates(true);
   end;
-  inherited SetBounds(ALeft, ATop, AWidth, AHeight);
 end;
 
 procedure TACLGtk3AdvancedWindow.SetText(const AValue: String);
@@ -996,6 +1099,16 @@ begin
   // Эта хрень дергается между созданием Window и Layout. Cм.CreateHandle.
   if Assigned(FCreatingWorkaround) then FCreatingWorkaround();
   inherited SetText(AValue);
+end;
+
+procedure TACLGtk3AdvancedWindow.SetVisible(AValue: Boolean);
+var
+  LWasMapped: Boolean;
+begin
+  LWasMapped := WidgetMapped;
+  inherited SetVisible(AValue);
+  if not LWasMapped then // см. TACLGtk3AdvancedWindow.SetBounds
+    SetBounds(LCLObject.Left, LCLObject.Top, LCLObject.Width, LCLObject.Height);
 end;
 
 { TACLGtk3PopupControl }
@@ -1119,7 +1232,7 @@ begin
   LWidget := TGtk3Widget(AWinControl.Handle);
   if wtWindow in LWidget.WidgetType then
   begin
-    Gtk3WidgetSet.SetCapture(0);
+    ReleaseInputGrab;
     LWindow := PGtkWindow(LWidget.Widget);
     LWindow^.realize;
     // без вот этого вызова у нас будет флик фона на экран
@@ -1133,6 +1246,29 @@ begin
 end;
 
 { TACLWSForm }
+
+class procedure TACLWSForm.CheckAndFixGeometry(AWinControl: TWinControl);
+const
+  WaitDelay: gulong = 4000;
+  WaitLoops: integer = 4;
+var
+  LWnd: PGdkWindow;
+  I: integer;
+begin
+  LWnd := TGtk3Widget(AWinControl.Handle).Widget^.window;
+  LWnd^.move_resize(AWinControl.Left, AWinControl.Top, AWinControl.Width, AWinControl.Height);
+  LWnd^.process_updates(True);
+
+  //Give a little breath to WM.
+  for I := 0 to WaitLoops - 1 do
+  begin
+    g_usleep(WaitDelay);
+    g_main_context_iteration(nil, false);
+  end;
+
+  //Note that here may be still wrong geometry under x11,
+  //but LCL should be happy at this point.
+end;
 
 class function TACLWSForm.CreateHandle(
   const AWinControl: TWinControl;
@@ -1156,29 +1292,6 @@ begin
   if Gtk3IsGtkWindow(LWindow.Widget) then
     Gtk3WidgetSet.AddWindow(PGtkWindow(LWindow.Widget));
   Result := TLCLHandle(LWindow);
-end;
-
-class procedure TACLWSForm.CheckAndFixGeometry(AWinControl: TWinControl);
-const
-  WaitDelay: gulong = 4000;
-  WaitLoops: integer = 4;
-var
-  LWnd: PGdkWindow;
-  I: integer;
-begin
-  LWnd := TGtk3Widget(AWinControl.Handle).Widget^.window;
-  LWnd^.move_resize(AWinControl.Left, AWinControl.Top, AWinControl.Width, AWinControl.Height);
-  LWnd^.process_updates(True);
-
-  //Give a little breath to WM.
-  for I := 0 to WaitLoops - 1 do
-  begin
-    g_usleep(WaitDelay);
-    g_main_context_iteration(nil, false);
-  end;
-
-  //Note that here may be still wrong geometry under x11,
-  //but LCL should be happy at this point.
 end;
 
 class function TACLWSForm.ResolveWndParent(const AParams: TCreateParams): HWND;
@@ -1212,6 +1325,19 @@ begin
   end;
 end;
 
+class procedure TACLWSForm.SetAlphaBlend(
+  const ACustomForm: TCustomForm; const AlphaBlend: Boolean; const Alpha: Byte);
+var
+  LWindow: PGdkWindow;
+begin
+  if ACustomForm.HandleAllocated then
+  begin
+    LWindow := TGtk3Widget(ACustomForm.Handle).GetWindow;
+    if LWindow <> nil then
+      LWindow^.set_opacity(IfThen(AlphaBlend, Alpha / 255, 1.0));
+  end;
+end;
+
 class procedure TACLWSForm.SetFormStyle(
   const AForm: TCustomform; const AFormStyle, AOldFormStyle: TFormStyle);
 var
@@ -1238,20 +1364,29 @@ end;
 
 class procedure TACLWSForm.ShowHide(const AWinControl: TWinControl);
 var
-  LWidget: PGtkWidget;
+  LForm: TCustomForm absolute AWinControl;
+  LWidget: TGtk3WidgetAccess;
 begin
-  if AWinControl.Parent <> nil then
-    TACLWSCustomControl.ShowHide(AWinControl)
+  if LForm.Parent <> nil then
+    TACLWSCustomControl.ShowHide(LForm)
   else
   begin
-    inherited;
-    LWidget := TGtk3Widget(AWinControl.Handle).Widget;
-    if Gtk3IsGtkWindow(LWidget) and (PGtkWindow(LWidget)^.transient_for <> nil) then
+    LWidget := TGtk3WidgetAccess(LForm.Handle);
+    if wtWindow in LWidget.WidgetType then
     begin
+      // LCL: use this if pure SetCapture(0) does not work under wayland (commented)
+      // AIMP: DblClick -> ShowModal -> Modal form does not react on mouse
+      if LWidget.FParams.ExStyle and WS_EX_NOACTIVATE = 0 then // hint, drag-image, etc
+        ReleaseInputGrab;
+      inherited;
       // Одноимённая функция из предка почему-то уносит наше окно хрен знает куда
       // Возвращаем обратно...
-      CheckAndFixGeometry(AWinControl);
-    end;
+      if PGtkWindow(LWidget.Widget)^.transient_for <> nil then
+        CheckAndFixGeometry(LForm);
+      SetAlphaBlend(LForm, LForm.AlphaBlend, LForm.AlphaBlendValue);
+    end
+    else
+      inherited;
   end;
 end;
 
