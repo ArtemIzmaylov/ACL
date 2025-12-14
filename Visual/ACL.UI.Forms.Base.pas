@@ -1546,12 +1546,17 @@ end;
 
 procedure TACLCustomForm.CMShowingChanged(var Message: TCMDialogKey);
 var
-  AIsDefaultPositionCenter: Boolean;
+  LDefaultPositionIsCenter: Boolean;
 begin
-  AIsDefaultPositionCenter := Position in [poMainFormCenter, poOwnerFormCenter];
+  LDefaultPositionIsCenter := Position in [poMainFormCenter, poOwnerFormCenter];
   inherited;
-  if Visible and AIsDefaultPositionCenter then
-    MakeFullyVisible;
+  if Visible then
+  begin
+    if ShouldBeStayOnTop then
+      TACLStayOnTopHelper.Refresh(Self);
+    if LDefaultPositionIsCenter then
+      MakeFullyVisible;
+  end;
 end;
 
 procedure TACLCustomForm.WMEnterMenuLoop(var Msg: TMessage);

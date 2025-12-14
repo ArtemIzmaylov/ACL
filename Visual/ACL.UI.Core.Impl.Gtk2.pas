@@ -148,7 +148,6 @@ type
       AWidget: PGtkWidget; AWidgetInfo: PWidgetInfo);
     class procedure SetCallbacks(const AWidget: PGtkWidget;
       const AWidgetInfo: PWidgetInfo); override;
-    class procedure SetColor(const AWinControl: TWinControl); override;
     class procedure SetFormBorderStyle(const AForm: TCustomForm;
       const AFormBorderStyle: TFormBorderStyle); override;
     class procedure SetFormStyle(const AForm: TCustomform;
@@ -853,9 +852,8 @@ begin
   LWndParent := TACLWSForm.ResolveWndParent(AParams);
   if LWndParent <> 0 then
     gtk_window_set_transient_for(PGtkWindow(LWnd), PGtkWindow(LWndParent))
-  else
-    if LForm.FormStyle in fsAllStayOnTop then
-      gtk_window_set_keep_above(PGtkWindow(LWnd), true);
+  else if LForm.FormStyle in fsAllStayOnTop then
+    gtk_window_set_keep_above(PGtkWindow(LWnd), true);
 
   case LForm.WindowState of
     wsMaximized:
@@ -976,15 +974,6 @@ begin
   end;
 end;
 
-class procedure TACLWSAdvancedForm.SetColor(const AWinControl: TWinControl);
-var
-  LWidgetInfo: PWidgetInfo;
-begin
-  LWidgetInfo := GetWidgetInfo(Pointer(AWinControl.Handle));
-  if (LWidgetInfo = nil) or (LWidgetInfo^.ExStyle and WS_EX_LAYERED = 0) then
-    inherited;
-end;
-
 class procedure TACLWSAdvancedForm.SetFormBorderStyle(
   const AForm: TCustomForm; const AFormBorderStyle: TFormBorderStyle);
 var
@@ -1056,9 +1045,11 @@ begin
   end
   else
   begin
-    if LWidgetInfo^.ExStyle and WS_EX_NOACTIVATE <> 0 then
+    if LForm.HandleObjectShouldBeVisible then
     begin
-      if LForm.HandleObjectShouldBeVisible then
+      if LWidgetInfo^.ExStyle and WS_EX_TOOLWINDOW <> 0 then
+        gtk_window_set_type_hint(LWindow, GDK_WINDOW_TYPE_HINT_UTILITY);
+      if LWidgetInfo^.ExStyle and WS_EX_NOACTIVATE <> 0 then
         gtk_window_set_type_hint(LWindow, GDK_WINDOW_TYPE_HINT_TOOLTIP);
     end;
     inherited;

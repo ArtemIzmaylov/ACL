@@ -116,6 +116,8 @@ type
   { TACLWSForm }
 
   TACLWSForm = class(TGtk3WSCustomForm)
+  strict private
+    class procedure BlockTransientWindow(AWindow: PGtkWindow; AState: Boolean);
   protected
     class procedure CheckAndFixGeometry(AWinControl: TWinControl);
     class function ResolveWndParent(const AParams: TCreateParams): HWND;
@@ -774,7 +776,10 @@ begin
       end;
     GDK_WINDOW_STATE:
       if IsLooseFocusEvent(AEvent) then
-        FPopupControl.Perform(CM_CANCELMODE, 0, 0);
+      begin
+        if Screen.ActiveCustomForm <> FPopupControl then
+          FPopupControl.Perform(CM_CANCELMODE, 0, 0);
+      end;
   end;
 end;
 
@@ -965,6 +970,8 @@ begin
           Exit; // Dont worry, just Form get used as Frame
         end;
 
+        if Params.ExStyle and WS_EX_TOOLWINDOW <> 0 then
+          LWindow^.set_type_hint(GDK_WINDOW_TYPE_HINT_UTILITY);
         if Params.ExStyle and WS_EX_LAYERED <> 0 then
           TACLWSForm.SetAlphaExposing(FWidget);
         if Params.ExStyle and WS_EX_NOACTIVATE <> 0 then
@@ -1247,6 +1254,25 @@ end;
 
 { TACLWSForm }
 
+function ModalFilter(xevent: PGdkXEvent; event: PGdkEvent; data: gpointer): TGdkFilterReturn; cdecl;
+begin
+  Result := GDK_FILTER_REMOVE;
+end;
+
+class procedure TACLWSForm.BlockTransientWindow(AWindow: PGtkWindow; AState: Boolean);
+var
+  LTransient: PGtkWindow;
+begin
+  LTransient := AWindow^.transient_for;
+  if (LTransient <> nil) and Gtk3IsGdkWindow(LTransient^.window) then
+  begin
+    if AState then
+      gdk_window_add_filter(LTransient^.window, TGdkFilterFunc(@ModalFilter), AWindow)
+    else
+      gdk_window_remove_filter(LTransient^.window, TGdkFilterFunc(@ModalFilter), AWindow);
+  end;
+end;
+
 class procedure TACLWSForm.CheckAndFixGeometry(AWinControl: TWinControl);
 const
   WaitDelay: gulong = 4000;
@@ -1365,28 +1391,90 @@ end;
 class procedure TACLWSForm.ShowHide(const AWinControl: TWinControl);
 var
   LForm: TCustomForm absolute AWinControl;
+  LVisible: Boolean;
   LWidget: TGtk3WidgetAccess;
+  LWindow: PGtkWindow;
 begin
+  if not WSCheckHandleAllocated(AWinControl, 'ShowHide') then
+    Exit;
+
   if LForm.Parent <> nil then
-    TACLWSCustomControl.ShowHide(LForm)
-  else
   begin
-    LWidget := TGtk3WidgetAccess(LForm.Handle);
-    if wtWindow in LWidget.WidgetType then
+    TACLWSCustomControl.ShowHide(LForm);
+    Exit;
+  end;
+
+  LWidget := TGtk3WidgetAccess(LForm.Handle);
+  if {(csDesigning in LForm.compo) or }not (wtWindow in LWidget.WidgetType) then
+  begin
+    inherited;
+    Exit;
+  end;
+
+  if Gtk3IsGtkWindow(LWidget.Widget) then
+    LWindow := PGtkWindow(LWidget.Widget)
+  else
+    LWindow := nil;
+
+  LVisible := LForm.HandleObjectShouldBeVisible;
+
+  // LCL: use this if pure SetCapture(0) does not work under wayland (commented)
+  // AIMP: DblClick -> ShowModal -> Modal form does not react on mouse
+  if LWidget.FParams.ExStyle and WS_EX_NOACTIVATE = 0 then // hint, drag-image, etc
+    ReleaseInputGrab;
+
+  if LVisible then
+  begin
+    if LForm.FormStyle in fsAllStayOnTop then
+      LWindow^.set_keep_above(True);
+    if fsModal in LForm.FormState then
     begin
-      // LCL: use this if pure SetCapture(0) does not work under wayland (commented)
-      // AIMP: DblClick -> ShowModal -> Modal form does not react on mouse
-      if LWidget.FParams.ExStyle and WS_EX_NOACTIVATE = 0 then // hint, drag-image, etc
-        ReleaseInputGrab;
-      inherited;
-      // Одноимённая функция из предка почему-то уносит наше окно хрен знает куда
-      // Возвращаем обратно...
-      if PGtkWindow(LWidget.Widget)^.transient_for <> nil then
-        CheckAndFixGeometry(LForm);
+      LWindow^.set_modal(True);
+      LWindow^.window^.set_modal_hint(true);
+      SetRealPopupParent(LForm, Screen.ActiveCustomForm);
+    end;
+    LWindow^.realize;
+
+    if LForm.BorderStyle = bsNone then
+    begin
+      if LWindow^.transient_for = nil then
+      begin
+        if LForm.PopupParent <> nil then
+          SetRealPopupParent(LForm, LForm.PopupParent)
+        else
+          SetRealPopupParent(LForm, Screen.ActiveCustomForm);
+      end;
+      if LWidget.Shape <> nil then
+      begin
+        LWindow^.set_app_paintable(True);
+        LWindow^.set_visual(TGdkScreen.get_default^.get_rgba_visual);
+        LWidget.SetWindowShape(LWidget.Shape, LWindow^.window);
+      end;
+    end;
+  end;
+
+  LWidget.BeginUpdate;
+  try
+    LWidget.Visible := LVisible;
+    if LWidget.Visible then
+    begin
+      if (fsModal in LForm.FormState) and (Application.ModalLevel > 0) then
+        BlockTransientWindow(LWindow, True);
+      CheckAndFixGeometry(LForm); //See issue #41412
+      LWindow^.show_all;
+      LWindow^.window^.set_events(GDK_ALL_EVENTS_MASK);
+      LWindow^.present;
       SetAlphaBlend(LForm, LForm.AlphaBlend, LForm.AlphaBlendValue);
     end
-    else
-      inherited;
+    else // Hide
+    begin
+      if (fsModal in LForm.FormState) then
+        BlockTransientWindow(LWindow, False);
+      if (fsModal in LForm.FormState) or (LForm.BorderStyle = bsNone) then
+        LWindow^.set_transient_for(nil);
+    end;
+  finally
+    LWidget.EndUpdate;
   end;
 end;
 

@@ -365,9 +365,12 @@ begin
   inherited;
   if DropDownMode then
   begin
-    Params.Style := WS_POPUP;
     Params.ExStyle := Params.ExStyle or WS_EX_NOACTIVATE;
-  end;
+    Params.Style := WS_POPUP;
+  end
+  else
+    Params.ExStyle := Params.ExStyle or WS_EX_TOOLWINDOW;
+
   Params.WindowClass.Style := Params.WindowClass.Style or CS_HREDRAW or CS_VREDRAW or CS_DROPSHADOW;
 end;
 

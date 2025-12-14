@@ -3388,7 +3388,7 @@ end;
 
 procedure TACLCustomControl.WMCaptureChanged(var Message: TMessage);
 begin
-  if not (FSkipCaptureChanged or MouseCapture) then
+  if not FSkipCaptureChanged then
     Perform(CM_CANCELMODE, 0, 0);
   inherited;
 end;
