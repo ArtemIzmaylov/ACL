@@ -104,6 +104,10 @@ type
     property Time: Cardinal read FTime;
   end;
 
+  { TACLAnimationTimer }
+
+  TACLAnimationTimer = class(TACLTimer);
+
   { TACLAnimationTransition }
 
   TACLAnimationTransition = class
@@ -409,7 +413,7 @@ end;
 
 procedure TACLAnimation.Animate;
 begin
-  CurrentTime := Min(FinishTime, GetExactTickCount);
+  CurrentTime := Min(FinishTime, TACLTimerManager.ExactTickCount);
   FFinished := Finished or (CurrentTime >= FinishTime);
   if Finished then
     FProgress := 1.0
@@ -424,13 +428,13 @@ begin
   if (CurrentTime <> 0) and not Finished then
   begin
     CurrentTime := CurrentTime - StartTime;
-    StartTime := GetExactTickCount - CurrentTime;
+    StartTime := TACLTimerManager.ExactTickCount - CurrentTime;
     CurrentTime := StartTime + CurrentTime;
   end
   else
-    StartTime := GetExactTickCount;
+    StartTime := TACLTimerManager.ExactTickCount;
 
-  FinishTime := StartTime + TimeToTickCount(Time);
+  FinishTime := StartTime + Time;
   FTerminating := False;
   FFinished := False;
 end;

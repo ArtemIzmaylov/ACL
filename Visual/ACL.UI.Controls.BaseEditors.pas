@@ -384,14 +384,17 @@ type
 function EditGetWordSelection(const AText: string; ACaret, ADirection: Integer;
   AIsInsideTag: TFunc<Integer, Boolean> = nil): TACLRange; // 0-based
 {$WARN SYMBOL_DEPRECATED OFF}
+type
+  // Character.GetProcs(UCS4Char) has wrong implementation in FPC
+  TCharType = {$IFDEF FPC}WideChar{$ELSE}UCS4Char{$ENDIF};
 const
   LineBreaks = [#10, #13];
 
   function IsMeanfulCharacter(AIndex: Integer; AIsLetterOrDigit: Boolean): Boolean;
   var
-    LChar: UCS4Char;
+    LChar: TCharType;
   begin
-    LChar := acCharUCS4(AText, AIndex);
+    LChar := TCharType(acCharUCS4(AText, AIndex) and Ord(High(TCharType)));
     Result := not TCharacter.IsWhiteSpace(LChar) and
       ((TCharacter.IsLetterOrDigit(LChar) = AIsLetterOrDigit) or
         Assigned(AIsInsideTag) and AIsInsideTag(AIndex - 1{to 0-based}));
@@ -464,10 +467,10 @@ begin
 {$ENDREGION}
 
 {$REGION ' Выделение ближайшего слова '}
-  LRange1 := ACaret;
-  LRange2 := ACaret;
   if IsSpace(ACaret) then
   begin
+    LRange1 := ACaret;
+    LRange2 := ACaret;
     // Если мы попали на пробел:
     // 1) сдвигаем диапазон вправо до первого слова / конца строки
     // 2) сдвигаем диапазон влево до начала ближайшего слова / начала строки
@@ -480,9 +483,11 @@ begin
   end
   else
   begin
-    // Каретка у нас с нуля, а размер текущего символа не обязательно = 1
-    Inc(LRange1);
-    Dec(LRange1, acCharPrevLength(AText, LRange1));
+    // Каретка у нас с нуля
+    LRange1 := ACaret + 1;
+    // а размер текущего символа не обязательно = 1
+    LRange1 := LRange1 - acCharPrevLength(AText, LRange1);
+    LRange2 := LRange1;
 
     // Если мы попали в слово:
     // 1) сдвигаем диапазон влево до начала слова

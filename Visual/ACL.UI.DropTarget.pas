@@ -243,6 +243,23 @@ begin
   Target := nil;
 end;
 
+procedure TACLDropTarget.CheckContentScrolling(const P: TPoint);
+var
+  LDirection: TAlign;
+  LInterval: Integer;
+begin
+  LDirection := acCalculateAutoScroll(P, GetTargetClientRect, acGetCurrentDpi(Target), LInterval);
+  if not (LDirection in [alTop, alBottom]) then
+    Exit;
+  if TACLThread.IsTimeoutEx(FScrollTimestamp, LInterval) then
+  begin
+    if LDirection = alTop then
+      DoScroll(1, mwdUp, P)
+    else
+      DoScroll(1, mwdDown, P);
+  end;
+end;
+
 function TACLDropTarget.GetConfig(out AConfig: TACLIniFile): Boolean;
 var
   LMedium: TStgMedium;
@@ -338,6 +355,11 @@ begin
     GetDataAsString(CF_TEXT, AString);
 end;
 
+function TACLDropTarget.GetTargetClientRect: TRect;
+begin
+  Result := Target.ClientRect;
+end;
+
 function TACLDropTarget.HasData(AFormat: TClipboardFormat): Boolean;
 begin
   Result := (FHook <> nil) and FHook.HasData(AFormat);
@@ -356,46 +378,6 @@ begin
     HasData(CF_UNICODETEXT) or
   {$ENDIF}
     HasData(CF_TEXT);
-end;
-
-procedure TACLDropTarget.CheckContentScrolling(const P: TPoint);
-const
-  ScrollIndent = 24;
-  SpeedMap: array[Boolean] of Integer = (1, 4);
-
-  procedure DoAutoScroll(AFast: Boolean; ADirection: TACLMouseWheelDirection);
-  begin
-    if TACLThread.IsTimeoutEx(FScrollTimestamp, acAutoScrollInterval div SpeedMap[AFast]) then
-      DoScroll(1, ADirection, P);
-  end;
-
-var
-  LClient: TRect;
-  LIndent: Integer;
-begin
-  LClient := GetTargetClientRect;
-  if LClient.Contains(P) then
-  begin
-    LIndent := dpiApply(ScrollIndent, acGetCurrentDpi(Target));
-    LClient.Inflate(0, -LIndent);
-    if not LClient.Contains(P) then
-    begin
-      if P.Y < LClient.Top then
-        DoAutoScroll(P.Y < LClient.Top    - LIndent div 2, mwdUp)
-      else if P.Y > LClient.Bottom then
-        DoAutoScroll(P.Y > LClient.Bottom + LIndent div 2, mwdDown);
-    end;
-  end;
-end;
-
-function TACLDropTarget.GetTargetClientRect: TRect;
-begin
-  Result := Target.ClientRect;
-end;
-
-function TACLDropTarget.ScreenToClient(const P: TPoint): TPoint;
-begin
-  Result := Target.ScreenToClient(P)
 end;
 
 procedure TACLDropTarget.Notification(AComponent: TComponent; AOperation: TOperation);
@@ -433,19 +415,17 @@ end;
 
 procedure TACLDropTarget.DoScroll(ALines: Integer; ADirection: TACLMouseWheelDirection; const P: TPoint);
 var
-  AHandled: Boolean;
+  LHandled: Boolean;
 begin
-  AHandled := False;
+  LHandled := False;
   if Assigned(OnScroll) then
-    OnScroll(Self, P, ALines, ADirection, AHandled);
-  if not AHandled then
-  begin
+    OnScroll(Self, P, ALines, ADirection, LHandled);
+  if not LHandled then
     while ALines > 0 do
     begin
       Target.Perform(WM_VSCROLL, TACLMouseWheel.DirectionToScrollCodeI[ADirection], 0);
       Dec(ALines);
     end;
-  end;
 end;
 
 function TACLDropTarget.IsInTarget(const AScreenPoint: TPoint): Boolean;
@@ -456,6 +436,11 @@ end;
 function TACLDropTarget.GetMimeTypes: TStrings;
 begin
   Result := Options.MimeTypes;
+end;
+
+function TACLDropTarget.ScreenToClient(const P: TPoint): TPoint;
+begin
+  Result := Target.ScreenToClient(P)
 end;
 
 procedure TACLDropTarget.SetOptions(AValue: TACLDropTargetOptions);

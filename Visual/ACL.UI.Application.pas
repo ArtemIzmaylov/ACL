@@ -21,9 +21,6 @@ uses
 {$IFDEF FPC}
   LCLIntf,
   LCLType,
-{$ELSE}
-  {Winapi.}Messages,
-  {Winapi.}Windows,
 {$ENDIF}
   // System
   {System.}Classes,
@@ -40,7 +37,9 @@ uses
   ACL.FileFormats.INI,
   ACL.Graphics,
   ACL.Graphics.FontCache,
-  ACL.Utils.Common;
+  ACL.Timers,
+  ACL.Utils.Common,
+  ACL.Utils.DPIAware;
 
 type
   TACLApplicationChange = (acDarkMode, acDarkModeForSystem,
@@ -67,17 +66,18 @@ type
     class var FCatchExceptions: Boolean;
     class var FColorSchema: TACLColorSchema;
     class var FColorSchemaUseNative: Boolean;
+    class var FChangeAggregator: TACLTimer;
     class var FDarkMode: TACLBoolean;
     class var FDefaultFont: TFont;
+    class var FGlobalSettings: TObject;
     class var FListeners: TACLListenerList;
     class var FTargetDPI: Integer;
 
   {$IFDEF FPC}
     class procedure DefaultFontChanged(Sender: TObject);
   {$ENDIF}
+    class procedure DelayedChangeHandler(Sender: TObject);
     class function GetDefaultFont: TFont; static;
-    class function GetNativeColorAccent: TAlphaColor;
-    class procedure GetNativeDarkMode(out ADarkModeForApps, ADarkModeForSystem: Boolean);
     class procedure SetColorSchema(const AValue: TACLColorSchema); static;
     class procedure SetColorSchemaUseNative(AValue: Boolean); static;
     class procedure SetDarkMode(AValue: TACLBoolean); static;
@@ -94,7 +94,7 @@ type
     class procedure SetDefaultFont(AName: TFontName; AHeight: Integer);
     class procedure UpdateColorSet;
 
-    class function GetHandle: HWND;
+    class function GetHandle: TWndHandle;
     class function IsDestroying: Boolean;
     class function IsMinimized: Boolean;
     class procedure Minimize;
@@ -133,17 +133,17 @@ type
 
 implementation
 
-uses
-{$IFDEF MSWINDOWS}
-  ACL.Utils.Registry,
+{$IF DEFINED(MSWINDOWS)}
+  {$I ACL.UI.Application.Win32.inc}
+{$ELSEIF DEFINED(LCLGtkX)}
+  {$I ACL.UI.Application.GtkX.inc}
 {$ENDIF}
-  ACL.Utils.DPIAware;
 
 {$IFDEF FPC}
 type
   PModalLock = ^TModalLock;
   TModalLock = record
-    Focus: HWND;
+    Focus: TWndHandle;
     List: TList;
   end;
 {$ENDIF}
@@ -153,12 +153,25 @@ type
 class constructor TACLApplication.Create;
 begin
   CatchExceptions := DefaultCatchExceptions;
+  FChangeAggregator := TACLTimer.CreateEx(DelayedChangeHandler, 100);
+  FGlobalSettings := TGlobalSettings.Create(FChangeAggregator.Restart);
   UpdateColorSet;
 end;
 
 class destructor TACLApplication.Destroy;
 begin
+  FreeAndNil(FGlobalSettings);
+  FreeAndNil(FChangeAggregator);
   FreeAndNil(FDefaultFont);
+end;
+
+class procedure TACLApplication.Changed(AChanges: TACLApplicationChanges);
+var
+  LIntf: IACLApplicationListener;
+begin
+  if (FListeners <> nil) and (AChanges <> []) then
+    for LIntf in FListeners.Enumerate<IACLApplicationListener> do
+      LIntf.Changed(AChanges);
 end;
 
 class procedure TACLApplication.ConfigLoad(AConfig: TACLIniFile; const ASection: string);
@@ -180,6 +193,12 @@ begin
   AConfig.WriteInteger(ASection, 'HideHintPause', Application.HintHidePause, DefaultHideHintPause);
   AConfig.WriteBool(ASection, 'CatchExceptions', CatchExceptions, DefaultCatchExceptions);
   AConfig.WriteBool(ASection, 'UseNativeColorSchema', ColorSchemaUseNative, False);
+end;
+
+class procedure TACLApplication.DelayedChangeHandler(Sender: TObject);
+begin
+  FChangeAggregator.Stop;
+  UpdateColorSet;
 end;
 
 class function TACLApplication.GetActualColor(ALightColor, ADarkColor: TAlphaColor): TAlphaColor;
@@ -291,15 +310,6 @@ begin
 {$ENDIF}
 end;
 
-class procedure TACLApplication.Changed(AChanges: TACLApplicationChanges);
-var
-  LIntf: IACLApplicationListener;
-begin
-  if (FListeners <> nil) and (AChanges <> []) then
-    for LIntf in FListeners.Enumerate<IACLApplicationListener> do
-      LIntf.Changed(AChanges);
-end;
-
 class procedure TACLApplication.SetDefaultFont(AName: TFontName; AHeight: Integer);
 begin
   TACLFontCache.RemapFont(AName, AHeight);
@@ -331,7 +341,7 @@ var
 begin
   LChanges := [];
 
-  GetNativeDarkMode(LActualDarkMode, LActualDarkModeForSystem);
+  TGlobalSettings(FGlobalSettings).GetDarkMode(LActualDarkMode, LActualDarkModeForSystem);
   case DarkMode of
     TACLBoolean.True:
       LActualDarkMode := True;
@@ -340,7 +350,7 @@ begin
   else;
   end;
 
-  LActualAccentColor := GetNativeColorAccent;
+  LActualAccentColor := TGlobalSettings(FGlobalSettings).GetColorAccent;
   if LActualAccentColor <> FActualAccentColor then
   begin
     FActualAccentColor := LActualAccentColor;
@@ -428,47 +438,6 @@ begin
   Changed([acDefaultFont]);
 end;
 {$ENDIF}
-
-class function TACLApplication.GetNativeColorAccent: TAlphaColor;
-{$IFDEF MSWINDOWS}
-var
-  AKey: HKEY;
-{$ENDIF}
-begin
-{$IFDEF MSWINDOWS}
-  if acRegOpenRead(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\DWM\', AKey) then
-  try
-    Result := acRegReadInt(AKey, 'AccentColor');
-    Result := TAlphaColor.FromARGB(Result.A, Result.B, Result.G, Result.R);
-  finally
-    acRegClose(AKey);
-  end
-  else
-{$ENDIF}
-    Result := TAlphaColor.Default;
-end;
-
-class procedure TACLApplication.GetNativeDarkMode(out ADarkModeForApps, ADarkModeForSystem: Boolean);
-{$IFDEF MSWINDOWS}
-var
-  LKey: HKEY;
-{$ENDIF}
-begin
-{$IFDEF MSWINDOWS}
-  if acRegOpenRead(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Themes\Personalize', LKey) then
-  try
-    ADarkModeForApps := acRegReadInt(LKey, 'AppsUseLightTheme', 1) = 0;
-    ADarkModeForSystem := acRegReadInt(LKey, 'SystemUsesLightTheme', 1) = 0;
-  finally
-    acRegClose(LKey);
-  end
-  else
-{$ENDIF}
-  begin
-    ADarkModeForSystem := TACLColors.IsDark(ColorToRGB(clWindow));
-    ADarkModeForApps := ADarkModeForSystem;
-  end;
-end;
 
 class procedure TACLApplication.SetColorSchema(const AValue: TACLColorSchema);
 begin

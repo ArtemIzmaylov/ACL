@@ -60,9 +60,63 @@ const
 const
   WM_ACL_LANG = WM_USER + 101;
 
-  LANG_EN_US = 1033;//LANG_ENGLISH   or (SUBLANG_ENGLISH_US shl 10); // 1033
-  LANG_RU_RU = 1049;//LANG_RUSSIAN   or (SUBLANG_DEFAULT    shl 10); // 1049
-  LANG_UK_UA = 1058;//LANG_UKRAINIAN or (SUBLANG_DEFAULT    shl 10); // 1058
+{$IFDEF FPC}
+  SUBLANG_NEUTRAL                      = $00;    { language neutral }
+  SUBLANG_DEFAULT                      = $01;    { user default }
+  SUBLANG_ENGLISH_US                   = $01;    { English (USA) }
+  SUBLANG_ENGLISH_UK                   = $02;    { English (UK) }
+
+  LANG_NEUTRAL                         = $00;
+  LANG_INVARIANT                       = $7f;
+
+  LANG_AFRIKAANS                       = $36;
+  LANG_ALBANIAN                        = $1c;
+  LANG_ARABIC                          = $01;
+  LANG_BASQUE                          = $2d;
+  LANG_BELARUSIAN                      = $23;
+  LANG_BULGARIAN                       = $02;
+  LANG_CATALAN                         = $03;
+  LANG_CHINESE                         = $04;
+  LANG_CROATIAN                        = $1a;
+  LANG_CZECH                           = $05;
+  LANG_DANISH                          = $06;
+  LANG_DUTCH                           = $13;
+  LANG_ENGLISH                         = $09;
+  LANG_ESTONIAN                        = $25;
+  LANG_FAEROESE                        = $38;
+  LANG_FARSI                           = $29;
+  LANG_FINNISH                         = $0b;
+  LANG_FRENCH                          = $0c;
+  LANG_GERMAN                          = $07;
+  LANG_GREEK                           = $08;
+  LANG_HEBREW                          = $0d;
+  LANG_HUNGARIAN                       = $0e;
+  LANG_ICELANDIC                       = $0f;
+  LANG_INDONESIAN                      = $21;
+  LANG_ITALIAN                         = $10;
+  LANG_JAPANESE                        = $11;
+  LANG_KOREAN                          = $12;
+  LANG_LATVIAN                         = $26;
+  LANG_LITHUANIAN                      = $27;
+  LANG_NORWEGIAN                       = $14;
+  LANG_POLISH                          = $15;
+  LANG_PORTUGUESE                      = $16;
+  LANG_ROMANIAN                        = $18;
+  LANG_RUSSIAN                         = $19;
+  LANG_SERBIAN                         = $1a;
+  LANG_SLOVAK                          = $1b;
+  LANG_SLOVENIAN                       = $24;
+  LANG_SPANISH                         = $0a;
+  LANG_SWEDISH                         = $1d;
+  LANG_THAI                            = $1e;
+  LANG_TURKISH                         = $1f;
+  LANG_UKRAINIAN                       = $22;
+  LANG_VIETNAMESE                      = $2a;
+{$ENDIF}
+
+  LANG_MASK  = $FF;
+  LANG_EN_US = LANG_ENGLISH or (SUBLANG_ENGLISH_US shl 10); // 1033
+  LANG_RU_RU = LANG_RUSSIAN or (SUBLANG_DEFAULT    shl 10); // 1049
 
 type
 
@@ -105,7 +159,7 @@ type
 
   TACLLocalizationInfo = packed record
     Author: string;
-    LangID: Integer;
+    LangId: Cardinal;
     Name: string;
     VersionID: Integer;
   end;
@@ -117,9 +171,9 @@ type
   strict private
     FListeners: TACLListenerList;
 
-    function GetLangID: Integer;
+    function GetLangID: Cardinal;
     function GetShortFileName: string;
-    procedure SetLangID(const Value: Integer);
+    procedure SetLangID(AValue: Cardinal);
   protected
     procedure LangChanged;
   public
@@ -134,7 +188,7 @@ type
     class procedure ListenerAdd(const AListener: IACLLocalizationListener);
     class procedure ListenerRemove(const AListener: IACLLocalizationListener);
     // Properties
-    property LangID: Integer read GetLangID write SetLangID;
+    property LangID: Cardinal read GetLangID write SetLangID;
     property ShortFileName: string read GetShortFileName;
   end;
 
@@ -149,6 +203,7 @@ procedure LangApplyToItems(const ASection: string; AItems: TStrings);
 function LangExpandMacros(const AText: string; const ADefaultSection: string = ''): string;
 function LangExtractPart(const AValue: string; APartIndex: Integer): string;
 function LangGetComponentPath(const AComponent: TComponent): string;
+function LangGetDefaultFile: string;
 procedure LangGetFiles(AList: TACLStringList);
 
 function LangGet(const ASection, AItemName: string; const ADefaultValue: string = ''): string;
@@ -167,6 +222,10 @@ function LangGetInfo(const ALangFile: string;
 {$ENDIF}
 
 procedure LangSetFileClass(AClass: TACLLocalizationClass);
+
+{$IFDEF LINUX}
+function GetUserDefaultUILanguage: Cardinal;
+{$ENDIF}
 implementation
 
 uses
@@ -176,6 +235,7 @@ uses
   {Vcl.}Menus,
 {$ENDIF}
   // ACL
+  ACL.Utils.Common,
   ACL.Utils.FileSystem,
   ACL.Utils.Messaging,
   ACL.Utils.Strings;
@@ -183,6 +243,67 @@ uses
 var
   FLangFile: TACLLocalization;
   FLangFileClass: TACLLocalizationCLass = TACLLocalization;
+
+{$IFDEF LINUX}
+function GetUserDefaultUILanguage: Cardinal;
+const
+  LANG_DEFAULT_FLAGS = SUBLANG_DEFAULT shl 10;
+var
+  LData: TStringList;
+  LLang: string;
+begin
+  LData := TStringList.Create;
+  try
+    LData.Text := TACLProcess.ExecuteToString('locale');
+    LLang := LData.Values['Lang'];
+    // language_location[.Charset]
+    LLang := acLowerCase(Copy(LLang, 1, Pos('_', LLang) - 1));
+    if LLang = 'af' then Exit(LANG_DEFAULT_FLAGS or LANG_AFRIKAANS);
+    if LLang = 'ar' then Exit(LANG_DEFAULT_FLAGS or LANG_ARABIC);
+    if LLang = 'be' then Exit(LANG_DEFAULT_FLAGS or LANG_BELARUSIAN);
+    if LLang = 'bg' then Exit(LANG_DEFAULT_FLAGS or LANG_BULGARIAN);
+    if LLang = 'ca' then Exit(LANG_DEFAULT_FLAGS or LANG_CATALAN);
+    if LLang = 'cs' then Exit(LANG_DEFAULT_FLAGS or LANG_CZECH);
+    if LLang = 'da' then Exit(LANG_DEFAULT_FLAGS or LANG_DANISH);
+    if LLang = 'de' then Exit(LANG_DEFAULT_FLAGS or LANG_GERMAN);
+    if LLang = 'ee' then Exit(LANG_DEFAULT_FLAGS or LANG_ESTONIAN);
+    if LLang = 'el' then Exit(LANG_DEFAULT_FLAGS or LANG_GREEK);
+    if LLang = 'en' then Exit(LANG_DEFAULT_FLAGS or LANG_ENGLISH);
+    if LLang = 'es' then Exit(LANG_DEFAULT_FLAGS or LANG_SPANISH);
+    if LLang = 'fa' then Exit(LANG_DEFAULT_FLAGS or LANG_FARSI);
+    if LLang = 'fi' then Exit(LANG_DEFAULT_FLAGS or LANG_FINNISH);
+    if LLang = 'fr' then Exit(LANG_DEFAULT_FLAGS or LANG_FRENCH);
+    if LLang = 'he' then Exit(LANG_DEFAULT_FLAGS or LANG_HEBREW);
+    if LLang = 'hr' then Exit(LANG_DEFAULT_FLAGS or LANG_CROATIAN);
+    if LLang = 'hu' then Exit(LANG_DEFAULT_FLAGS or LANG_HUNGARIAN);
+    if LLang = 'in' then Exit(LANG_DEFAULT_FLAGS or LANG_INDONESIAN);
+    if LLang = 'it' then Exit(LANG_DEFAULT_FLAGS or LANG_ITALIAN);
+    if LLang = 'ja' then Exit(LANG_DEFAULT_FLAGS or LANG_JAPANESE);
+    if LLang = 'ko' then Exit(LANG_DEFAULT_FLAGS or LANG_KOREAN);
+    if LLang = 'lt' then Exit(LANG_DEFAULT_FLAGS or LANG_LITHUANIAN);
+    if LLang = 'lv' then Exit(LANG_DEFAULT_FLAGS or LANG_LATVIAN);
+    if LLang = 'nb' then Exit(LANG_DEFAULT_FLAGS or LANG_NORWEGIAN);
+    if LLang = 'nl' then Exit(LANG_DEFAULT_FLAGS or LANG_DUTCH);
+    if LLang = 'pl' then Exit(LANG_DEFAULT_FLAGS or LANG_POLISH);
+    if LLang = 'pt' then Exit(LANG_DEFAULT_FLAGS or LANG_PORTUGUESE);
+    if LLang = 'ro' then Exit(LANG_DEFAULT_FLAGS or LANG_ROMANIAN);
+    if LLang = 'ru' then Exit(LANG_DEFAULT_FLAGS or LANG_RUSSIAN);
+    if LLang = 'sk' then Exit(LANG_DEFAULT_FLAGS or LANG_SLOVAK);
+    if LLang = 'sl' then Exit(LANG_DEFAULT_FLAGS or LANG_SLOVENIAN);
+    if LLang = 'sq' then Exit(LANG_DEFAULT_FLAGS or LANG_ALBANIAN);
+    if LLang = 'sr' then Exit(LANG_DEFAULT_FLAGS or LANG_SERBIAN);
+    if LLang = 'sv' then Exit(LANG_DEFAULT_FLAGS or LANG_SWEDISH);
+    if LLang = 'th' then Exit(LANG_DEFAULT_FLAGS or LANG_THAI);
+    if LLang = 'tr' then Exit(LANG_DEFAULT_FLAGS or LANG_TURKISH);
+    if LLang = 'uk' then Exit(LANG_DEFAULT_FLAGS or LANG_UKRAINIAN);
+    if LLang = 'vi' then Exit(LANG_DEFAULT_FLAGS or LANG_VIETNAMESE);
+    if LLang = 'zh' then Exit(LANG_DEFAULT_FLAGS or LANG_CHINESE);
+    Result := LANG_NEUTRAL;
+  finally
+    LData.Free;
+  end;
+end;
+{$ENDIF}
 
 function LangGetComponentPath(const AComponent: TComponent): string;
 var
@@ -343,6 +464,38 @@ begin
   if APos < 0 then
     APos := Length(Result);
   Result := Copy(Result, 1, APos);
+end;
+
+function LangGetDefaultFile: string;
+var
+  LCandidate1: string;
+  LCandidate2: string;
+  LSystemLangId: Cardinal;
+begin
+  LCandidate1 := '';
+  LCandidate2 := '';
+  LSystemLangId := GetUserDefaultUILanguage;
+
+  acEnumFiles(LangFilePath, '*' + sLangExt + ';', [ffoFile],
+    procedure (const AInfo: TACLFindFileInfo)
+    var
+      LInfo: TACLLocalizationInfo;
+    begin
+      if LangGetInfo(AInfo.FullFileName, LInfo) then
+      begin
+        if (LInfo.LangID = LSystemLangId) then
+          LCandidate1 := AInfo.FileName;
+        if (LInfo.LangID and LANG_MASK) = (LSystemLangId and LANG_MASK) then
+          LCandidate2 := AInfo.FileName;
+      end;
+    end, False);
+
+  if LCandidate1 <> '' then
+    Result := LCandidate1
+  else if LCandidate2 <> '' then
+    Result := LCandidate2
+  else
+    Result := '';
 end;
 
 procedure LangGetFiles(AList: TACLStringList);
@@ -527,7 +680,7 @@ begin
     LIntf1.LangChanged;
 end;
 
-function TACLLocalization.GetLangID: Integer;
+function TACLLocalization.GetLangID: Cardinal;
 begin
   Result := ReadInteger(sLangMainSection, sLangID);
 end;
@@ -537,9 +690,9 @@ begin
   Result := acExtractFileName(FileName);
 end;
 
-procedure TACLLocalization.SetLangID(const Value: Integer);
+procedure TACLLocalization.SetLangID(AValue: Cardinal);
 begin
-  WriteInteger(sLangMainSection, sLangID, Value);
+  WriteInteger(sLangMainSection, sLangID, AValue);
 end;
 
 initialization

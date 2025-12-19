@@ -1179,11 +1179,11 @@ end;
 
 procedure TACLCustomTabControl.CMChildKey(var Message: TCMChildKey);
 var
-  AShiftState: TShiftState;
+  LShift: TShiftState;
 begin
   case Message.CharCode of
     VK_PRIOR, VK_NEXT:
-      if [ssCtrl, ssAlt, ssShift] * acGetShiftState = [ssCtrl] then
+      if acIsShiftPressed([ssCtrl]) then
       begin
         FIsUserAction := True;
         try
@@ -1196,12 +1196,12 @@ begin
 
     VK_TAB:
       begin
-        AShiftState := acGetShiftState;
-        if [ssCtrl, ssAlt] * AShiftState = [ssCtrl] then
+        LShift := acGetShiftState;
+        if [ssCtrl, ssAlt] * LShift = [ssCtrl] then
         begin
           FIsUserAction := True;
           try
-            JumpToNextPage(not (ssShift in AShiftState));
+            JumpToNextPage(not (ssShift in LShift));
           finally
             FIsUserAction := False;
           end;

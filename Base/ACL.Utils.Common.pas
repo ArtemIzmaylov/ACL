@@ -1220,6 +1220,7 @@ end;
 
 class procedure Safe.Call(AMethod: TThreadMethod);
 begin
+  if Assigned(AMethod) then
   try
     AMethod();
   except

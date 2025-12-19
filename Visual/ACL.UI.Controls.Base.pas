@@ -132,7 +132,6 @@ type
 {$ENDIF}
 
 const
-  acAutoScrollInterval =  300;
   acIndentBetweenElements = 5;
   acResizeHitTestAreaSize = 6;
 
@@ -996,13 +995,18 @@ function CreateControl(AClass: TControlClass; AParent: TWinControl;
 procedure CreateControl(out Obj; AClass: TControlClass; AParent: TWinControl;
   const R: TRect; AAlign: TAlign = alNone; AAnchors: TAnchors = [akLeft, akTop]); overload;
 
+// Scrolling
+function acCalculateAutoScroll(const ACursorPos: TPoint;
+  const AContentArea: TRect; ADpi: Integer; out AInterval: Integer): TAlign;
 function acCalculateNextPageIndex(AFocusedIndex: Integer;
   AFirstVisibleIndex, ALastVisibleIndex: Integer; AGoForward: Boolean): Integer;
 function acCalculateScrollToDelta(
   const AObjectBounds, AAreaBounds: TRect; AScrollToMode: TACLScrollToMode): TPoint; overload;
 function acCalculateScrollToDelta(AObjectTopValue, AObjectBottomValue: Integer;
   AAreaTopValue, AAreaBottomValue: Integer; AScrollToMode: TACLScrollToMode): Integer; overload;
-function acElementRectIncludeOffset(const R: TRect; ATargetDpi: Integer): TRect;
+function acCanStartDragging(AControl: TWinControl; X, Y: Integer): Boolean; overload;
+function acCanStartDragging(const ADeltaX, ADeltaY, ATargetDpi: Integer): Boolean; overload;
+function acCanStartDragging(const APoint1, APoint2: TPoint; ATargetDpi: Integer): Boolean; overload;
 
 procedure acDrawTransparentControlBackground(AControl: TWinControl;
   DC: HDC; R: TRect; APaintWithChildren: Boolean = True);
@@ -1010,15 +1014,13 @@ procedure acInvalidateBorders(AControl: TWinControl;
   const ARect, ABorderWidths: TRect; AErase: Boolean = True);
 procedure acInvalidateRect(AControl: TWinControl;
   const ARect: TRect; AErase: Boolean = True);
-
-function acCanStartDragging(AControl: TWinControl; X, Y: Integer): Boolean; overload;
-function acCanStartDragging(const ADeltaX, ADeltaY, ATargetDpi: Integer): Boolean; overload;
-function acCanStartDragging(const P0, P1: TPoint; ATargetDpi: Integer): Boolean; overload;
-procedure acDesignerSetModified(AInvoker: TPersistent);
-function acGetContainer(AControl: TControl): TControl;
-function acIsChildOrSelf(AControl, AChildToTest: TControl): Boolean;
-function acIsSemitransparentFill(AContentColor1, AContentColor2: TACLResourceColor): Boolean;
+function acIsSemitransparentFill(
+  AContentColor1, AContentColor2: TACLResourceColor): Boolean;
 function acOpacityToAlphaBlendValue(AOpacity: Integer): Byte;
+
+procedure acDesignerSetModified(AInvoker: TPersistent);
+function acElementRectIncludeOffset(const R: TRect; ATargetDpi: Integer): TRect;
+function acIsChildOrSelf(AControl, AChildToTest: TControl): Boolean;
 
 function acSaveDC(ACanvas: TCanvas): Integer;
 procedure acRestoreDC(ACanvas: TCanvas; ASaveIndex: Integer);
@@ -1034,10 +1036,9 @@ function acMapRect(ASource, ATarget: TWinControl; const R: TRect): TRect;
 
 // Keyboard
 function acGetShiftState: TShiftState;
-function acIsAltKeyPressed: Boolean;
-function acIsCtrlKeyPressed: Boolean;
 function acIsDropDownCommand(Key: Word; Shift: TShiftState): Boolean;
-function acIsShiftPressed(ATest, AState: TShiftState): Boolean;
+function acIsShiftPressed(ATest: TShiftState): Boolean; overload;
+function acIsShiftPressed(ATest, AState: TShiftState): Boolean; overload;
 function acShiftStateToKeys(AShift: TShiftState): Word;
 
 procedure acMessageBeep(AType: TMsgDlgType);
@@ -1059,49 +1060,6 @@ type
   TPersistentAccess = class(TPersistent);
   TControlAccess = class(TControl);
   TWinControlAccess = class(TWinControl);
-
-function acGetShiftState: TShiftState;
-begin
-  //#AI: We must ask use the GetKeyState instead of the GetKeyboardState,
-  // because second doesn't return real information after next actions:
-  // 1. Focus main form of application
-  // 2. Alt+Click on window of another application
-  // 3. Click on taskbar button of our application, click again
-  // 4. Try to get GetKeyboardState in the SC_MINIMIZE handler
-  Result := [];
-  if GetKeyState(VK_SHIFT) < 0 then
-    Include(Result, ssShift);
-  if GetKeyState(VK_CONTROL) < 0 then
-    Include(Result, ssCtrl);
-  if GetKeyState(VK_MENU) < 0 then
-    Include(Result, ssAlt);
-  if GetKeyState(VK_LBUTTON) < 0 then
-    Include(Result, ssLeft);
-  if GetKeyState(VK_MBUTTON) < 0 then
-    Include(Result, ssMiddle);
-  if GetKeyState(VK_RBUTTON) < 0 then
-    Include(Result, ssRight);
-end;
-
-function acIsAltKeyPressed: Boolean;
-begin
-  Result := GetKeyState(VK_MENU) < 0;
-end;
-
-function acIsCtrlKeyPressed: Boolean;
-begin
-  Result := GetKeyState(VK_CONTROL) < 0;
-end;
-
-function acShiftStateToKeys(AShift: TShiftState): Word;
-begin
-  Result := 0;
-  if ssShift in AShift then Inc(Result, MK_SHIFT);
-  if ssCtrl in AShift then Inc(Result, MK_CONTROL);
-  if ssLeft in AShift then Inc(Result, MK_LBUTTON);
-  if ssRight in AShift then Inc(Result, MK_RBUTTON);
-  if ssMiddle in AShift then Inc(Result, MK_MBUTTON);
-end;
 
 function acOpacityToAlphaBlendValue(AOpacity: Integer): Byte;
 begin
@@ -1252,76 +1210,6 @@ begin
   end;
 end;
 
-function acCalculateNextPageIndex(AFocusedIndex: Integer;
-  AFirstVisibleIndex, ALastVisibleIndex: Integer; AGoForward: Boolean): Integer;
-begin
-  if (AFirstVisibleIndex < 0) or (ALastVisibleIndex < 0) then
-    Exit(AFocusedIndex);
-  if not AGoForward and (AFocusedIndex <> AFirstVisibleIndex) then
-    Exit(AFirstVisibleIndex);
-  if AGoForward and (AFocusedIndex <> ALastVisibleIndex) then
-    Exit(ALastVisibleIndex);
-  Result := AFocusedIndex + Signs[AGoForward] * (ALastVisibleIndex - AFirstVisibleIndex);
-end;
-
-function acCalculateScrollToDelta(const AObjectBounds, AAreaBounds: TRect;
-  AScrollToMode: TACLScrollToMode): TPoint;
-begin
-  Result.X := acCalculateScrollToDelta(AObjectBounds.Left,
-    AObjectBounds.Right, AAreaBounds.Left, AAreaBounds.Right, AScrollToMode);
-  Result.Y := acCalculateScrollToDelta(AObjectBounds.Top,
-    AObjectBounds.Bottom, AAreaBounds.Top, AAreaBounds.Bottom, AScrollToMode);
-end;
-
-function acCalculateScrollToDelta(AObjectTopValue, AObjectBottomValue: Integer;
-  AAreaTopValue, AAreaBottomValue: Integer; AScrollToMode: TACLScrollToMode): Integer;
-begin
-  case AScrollToMode of
-    TACLScrollToMode.MakeTop:
-      Result := AObjectTopValue - AAreaTopValue;
-
-    TACLScrollToMode.MakeCenter:
-      if AAreaBottomValue - AAreaTopValue > AObjectBottomValue - AObjectTopValue then
-        Result := (AObjectBottomValue + AObjectTopValue) div 2 - (AAreaTopValue + AAreaBottomValue) div 2
-      else
-        Result := AObjectTopValue - AAreaTopValue;
-
-  else // MakeVisible
-    if AObjectTopValue < AAreaTopValue then
-      Result := AObjectTopValue - AAreaTopValue
-    else if AObjectBottomValue > AAreaBottomValue then
-      Result := Min(AObjectBottomValue - AAreaBottomValue, AObjectTopValue - AAreaTopValue)
-    else
-      Result := 0;
-  end;
-end;
-
-function acCanStartDragging(AControl: TWinControl; X, Y: Integer): Boolean;
-begin
-  Result := TACLStartDragHelper.Check(AControl, X, Y,
-    dpiApply(Mouse.DragThreshold, acGetCurrentDpi(AControl)));
-end;
-
-function acCanStartDragging(const ADeltaX, ADeltaY, ATargetDpi: Integer): Boolean;
-begin
-  Result := Max(Abs(ADeltaX), Abs(ADeltaY)) >= dpiApply(Mouse.DragThreshold, ATargetDpi);
-end;
-
-function acCanStartDragging(const P0, P1: TPoint; ATargetDpi: Integer): Boolean;
-begin
-  Result := acCanStartDragging(P1.X - P0.X, P1.Y - P0.Y, ATargetDpi);
-end;
-
-function acGetContainer(AControl: TControl): TControl;
-var
-  AIntf: IACLInnerControl;
-begin
-  if Supports(AControl, IACLInnerControl, AIntf) then
-    Result := AIntf.GetInnerContainer
-  else
-    Result := AControl;
-end;
-
 function acElementRectIncludeOffset(const R: TRect; ATargetDpi: Integer): TRect;
 begin
   if not R.IsEmpty then
@@ -1347,20 +1235,6 @@ begin
       Exit(True);
     AChildToTest := AChildToTest.Parent;
   end;
-end;
-
-function acIsDropDownCommand(Key: Word; Shift: TShiftState): Boolean;
-const
-  Modificators = [ssAlt, ssShift, ssCtrl];
-begin
-  Result :=
-    (Key = VK_F4) and (Modificators * Shift = []) or
-    (Key = VK_DOWN) and (Modificators * Shift = [ssAlt]);
-end;
-
-function acIsShiftPressed(ATest, AState: TShiftState): Boolean;
-begin
-  Result := ([ssAlt, ssShift, ssCtrl] * (AState - ATest) = []) and (AState * ATest = ATest);
 end;
 
 function acIsSemitransparentFill(AContentColor1, AContentColor2: TACLResourceColor): Boolean;
@@ -1513,6 +1387,186 @@ begin
   end;
 end;
 {$ENDIF}
+
+{$REGION ' Keyboard '}
+
+function acGetShiftState: TShiftState;
+begin
+  //#AI: We must ask use the GetKeyState instead of the GetKeyboardState,
+  // because second doesn't return real information after next actions:
+  // 1. Focus main form of application
+  // 2. Alt+Click on window of another application
+  // 3. Click on taskbar button of our application, click again
+  // 4. Try to get GetKeyboardState in the SC_MINIMIZE handler
+  Result := [];
+  if GetKeyState(VK_SHIFT) < 0 then
+    Include(Result, ssShift);
+  if GetKeyState(VK_CONTROL) < 0 then
+    Include(Result, ssCtrl);
+  if GetKeyState(VK_MENU) < 0 then
+    Include(Result, ssAlt);
+  if GetKeyState(VK_LBUTTON) < 0 then
+    Include(Result, ssLeft);
+  if GetKeyState(VK_MBUTTON) < 0 then
+    Include(Result, ssMiddle);
+  if GetKeyState(VK_RBUTTON) < 0 then
+    Include(Result, ssRight);
+end;
+
+function acShiftStateToKeys(AShift: TShiftState): Word;
+begin
+  Result := 0;
+  if ssShift in AShift then Inc(Result, MK_SHIFT);
+  if ssCtrl in AShift then Inc(Result, MK_CONTROL);
+  if ssLeft in AShift then Inc(Result, MK_LBUTTON);
+  if ssRight in AShift then Inc(Result, MK_RBUTTON);
+  if ssMiddle in AShift then Inc(Result, MK_MBUTTON);
+end;
+
+function acIsDropDownCommand(Key: Word; Shift: TShiftState): Boolean;
+const
+  Modificators = [ssAlt, ssShift, ssCtrl];
+begin
+  Result :=
+    (Key = VK_F4) and (Modificators * Shift = []) or
+    (Key = VK_DOWN) and (Modificators * Shift = [ssAlt]);
+end;
+
+function acIsShiftPressed(ATest, AState: TShiftState): Boolean;
+begin
+  Result := ([ssAlt, ssShift, ssCtrl] * (AState - ATest) = []) and (AState * ATest = ATest);
+end;
+
+function acIsShiftPressed(ATest: TShiftState): Boolean;
+begin
+  Result := acIsShiftPressed(ATest, acGetShiftState);
+end;
+
+{$ENDREGION}
+
+{$REGION ' Drag/Scrolling '}
+
+function acCalculateAutoScroll(const ACursorPos: TPoint;
+  const AContentArea: TRect; ADpi: Integer; out AInterval: Integer): TAlign;
+const
+  acAutoScrollArea = 32;
+  acAutoScrollIntervalMax = 300;
+  acAutoScrollIntervalMin = 10;
+
+  function CalculateInterval(X, MinX, MaxX: Integer): Integer;
+  begin
+    if MinX > MaxX then
+    begin
+      TACLMath.Exchange<Integer>(MinX, MaxX);
+      X := MaxX - EnsureRange(X, MinX, MaxX);
+    end
+    else
+      X := EnsureRange(X, MinX, MaxX) - MinX;
+
+    Result := acAutoScrollIntervalMax - acAutoScrollIntervalMin;
+    Result := acAutoScrollIntervalMin + MulDiv(Result, X, MaxX - MinX);
+  end;
+
+var
+  LRect: TRect;
+  LVertPriority: Boolean;
+begin
+  LVertPriority :=
+    Max(AContentArea.Top - ACursorPos.Y, ACursorPos.Y - AContentArea.Bottom) >
+    Max(AContentArea.Left - ACursorPos.X, ACursorPos.X - AContentArea.Right);
+
+  LRect := AContentArea;
+  LRect.Inflate(-dpiApply(acAutoScrollArea, ADpi));
+  if (ACursorPos.Y < LRect.Top) and LVertPriority then
+    Result := alTop
+  else if (ACursorPos.Y > LRect.Bottom) and LVertPriority then
+    Result := alBottom
+  else if (ACursorPos.X < LRect.Left) then
+    Result := alLeft
+  else if (ACursorPos.X > LRect.Right) then
+    Result := alRight
+  else if (ACursorPos.Y < LRect.Top) and not LVertPriority then
+    Result := alTop
+  else if (ACursorPos.Y > LRect.Bottom) and not LVertPriority then
+    Result := alBottom
+  else
+    Result := alNone;
+
+  case Result of
+    alLeft:
+      AInterval := CalculateInterval(ACursorPos.X, AContentArea.Left, LRect.Left);
+    alRight:
+      AInterval := CalculateInterval(ACursorPos.X, AContentArea.Right, LRect.Right);
+    alTop:
+      AInterval := CalculateInterval(ACursorPos.Y, AContentArea.Top, LRect.Top);
+    alBottom:
+      AInterval := CalculateInterval(ACursorPos.Y, AContentArea.Bottom, LRect.Bottom);
+  else
+    AInterval := acAutoScrollIntervalMax;
+  end;
+end;
+
+function acCalculateNextPageIndex(AFocusedIndex: Integer;
+  AFirstVisibleIndex, ALastVisibleIndex: Integer; AGoForward: Boolean): Integer;
+begin
+  if (AFirstVisibleIndex < 0) or (ALastVisibleIndex < 0) then
+    Exit(AFocusedIndex);
+  if not AGoForward and (AFocusedIndex <> AFirstVisibleIndex) then
+    Exit(AFirstVisibleIndex);
+  if AGoForward and (AFocusedIndex <> ALastVisibleIndex) then
+    Exit(ALastVisibleIndex);
+  Result := AFocusedIndex + Signs[AGoForward] * (ALastVisibleIndex - AFirstVisibleIndex);
+end;
+
+function acCalculateScrollToDelta(const AObjectBounds, AAreaBounds: TRect;
+  AScrollToMode: TACLScrollToMode): TPoint;
+begin
+  Result.X := acCalculateScrollToDelta(AObjectBounds.Left,
+    AObjectBounds.Right, AAreaBounds.Left, AAreaBounds.Right, AScrollToMode);
+  Result.Y := acCalculateScrollToDelta(AObjectBounds.Top,
+    AObjectBounds.Bottom, AAreaBounds.Top, AAreaBounds.Bottom, AScrollToMode);
+end;
+
+function acCalculateScrollToDelta(AObjectTopValue, AObjectBottomValue: Integer;
+  AAreaTopValue, AAreaBottomValue: Integer; AScrollToMode: TACLScrollToMode): Integer;
+begin
+  case AScrollToMode of
+    TACLScrollToMode.MakeTop:
+      Result := AObjectTopValue - AAreaTopValue;
+
+    TACLScrollToMode.MakeCenter:
+      if AAreaBottomValue - AAreaTopValue > AObjectBottomValue - AObjectTopValue then
+        Result := (AObjectBottomValue + AObjectTopValue) div 2 - (AAreaTopValue + AAreaBottomValue) div 2
+      else
+        Result := AObjectTopValue - AAreaTopValue;
+
+  else // MakeVisible
+    if AObjectTopValue < AAreaTopValue then
+      Result := AObjectTopValue - AAreaTopValue
+    else if AObjectBottomValue > AAreaBottomValue then
+      Result := Min(AObjectBottomValue - AAreaBottomValue, AObjectTopValue - AAreaTopValue)
+    else
+      Result := 0;
+  end;
+end;
+
+function acCanStartDragging(AControl: TWinControl; X, Y: Integer): Boolean;
+begin
+  Result := TACLStartDragHelper.Check(AControl, X, Y,
+    dpiApply(Mouse.DragThreshold, acGetCurrentDpi(AControl)));
+end;
+
+function acCanStartDragging(const ADeltaX, ADeltaY, ATargetDpi: Integer): Boolean;
+begin
+  Result := Max(Abs(ADeltaX), Abs(ADeltaY)) >= dpiApply(Mouse.DragThreshold, ATargetDpi);
+end;
+
+function acCanStartDragging(const APoint1, APoint2: TPoint; ATargetDpi: Integer): Boolean;
+begin
+  Result := acCanStartDragging(APoint2.X - APoint1.X, APoint2.Y - APoint1.Y, ATargetDpi);
+end;
+
+{$ENDREGION}
 
 {$REGION ' Positioning '}
 
@@ -3388,7 +3442,7 @@ end;
 
 procedure TACLCustomControl.WMCaptureChanged(var Message: TMessage);
 begin
-  if not FSkipCaptureChanged then
+  if not (FSkipCaptureChanged or MouseCapture) then
     Perform(CM_CANCELMODE, 0, 0);
   inherited;
 end;

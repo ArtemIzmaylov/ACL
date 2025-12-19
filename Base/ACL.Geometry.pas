@@ -640,55 +640,66 @@ end;
 
 procedure TACLAutoSizeCalculator.Calculate;
 var
-  LInfo: PACLAutoSizeItem;
-  LPrevSize: Integer;
-  LSize: Integer;
-  LStep: Integer;
   I: Integer;
+  LItem: PACLAutoSizeItem;
+  LLeftSize: Integer;
+  LPrevSize: Integer;
+  LStep: Integer;
 begin
-  // Step 1: Adjust all items
-  LSize := 0;
-  repeat
-    LPrevSize := LSize;
-    LSize := AvailableSize;
+  if AvailableSize <= 0 then
+  begin
     for I := 0 to Count - 1 do
-      Dec(LSize, Items[I].Size);
+    begin
+      LItem := @Items[I];
+      LItem^.Size := LItem.MinSize;
+    end;
+    Exit;
+  end;
 
-    if LSize < Count then
+  // Step 1: Adjust all items
+  LLeftSize := 0;
+  repeat
+    LPrevSize := LLeftSize;
+    LLeftSize := AvailableSize;
+    for I := 0 to Count - 1 do
+      Dec(LLeftSize, Items[I].Size);
+
+    if Abs(LLeftSize) < Count then
       Break
     else
       for I := 0 to Count - 1 do
       begin
-        LInfo := @Items[I];
-        LInfo.Size := Min(LInfo.Size + MulDiv(LInfo.Size, LSize, AvailableSize), LInfo.MaxSize);
+        LItem := @Items[I];
+        LItem.Size := LItem.Size + MulDiv(LItem.Size, LLeftSize, AvailableSize);
+        LItem.Size := EnsureRange(LItem.Size, LItem.MinSize, LItem.MaxSize);
       end;
 
-  until (LSize = 0) or (LSize = LPrevSize);
+  until (LLeftSize = 0) or (LLeftSize = LPrevSize);
 
   // Step 2: Put left data to last adjustable item
-  LSize := 0;
+  LLeftSize := 0;
   repeat
-    LPrevSize := LSize;
-    LSize := AvailableSize;
+    LPrevSize := LLeftSize;
+    LLeftSize := AvailableSize;
     for I := 0 to Count - 1 do
-      Dec(LSize, Items[I].Size);
+      Dec(LLeftSize, Items[I].Size);
 
-    LStep := Sign(LSize);
+    LStep := Sign(LLeftSize);
     if LStep <> 0 then
       for I := Count - 1 downto 0 do
       begin
-        LInfo := @Items[I];
-        Inc(LInfo.Size, LStep);
-        if InRange(LInfo.Size, LInfo.MinSize, LInfo.MaxSize) then
-          Dec(LSize, LStep)
+        LItem := @Items[I];
+        Inc(LItem.Size, LStep);
+        if InRange(LItem.Size, LItem.MinSize, LItem.MaxSize) then
+          Dec(LLeftSize, LStep)
         else
-          Dec(LInfo.Size, LStep);
+          Dec(LItem.Size, LStep);
 
-        if LSize = 0 then
+        if LLeftSize = 0 then
           Break;
       end;
 
-  until (LSize = 0) or (LSize = LPrevSize);
+  until (LLeftSize = 0) or (LLeftSize = LPrevSize);
 end;
 
 function TACLAutoSizeCalculator.GetUsedSize: Integer;

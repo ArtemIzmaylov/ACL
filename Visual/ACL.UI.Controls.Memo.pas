@@ -496,7 +496,6 @@ end;
 function TACLMemoDragObject.DragStart: Boolean;
 begin
   FCaretPos := FSubClass.CaretPos;
-  CreateAutoScrollTimer(50);
   Result := True;
 end;
 

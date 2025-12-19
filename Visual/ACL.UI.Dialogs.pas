@@ -1474,15 +1474,12 @@ end;
 
 procedure TACLCustomLanguageDialog.SelectDefaultLanguage;
 var
-  AItem: TACLImageComboBoxItem;
+  LItem: TACLImageComboBoxItem;
 begin
-  if
-  {$IFDEF MSWINDOWS}
-     FEditor.Items.FindByData(Pointer(GetUserDefaultUILanguage), AItem) or
-  {$ENDIF}
-     FEditor.Items.FindByData(Pointer(LANG_EN_US), AItem)
+  if FEditor.Items.FindByData(Pointer(GetUserDefaultUILanguage), LItem) or
+     FEditor.Items.FindByData(Pointer(LANG_EN_US), LItem)
   then
-    FEditor.ItemIndex := AItem.Index
+    FEditor.ItemIndex := LItem.Index
   else
     FEditor.ItemIndex := 0;
 end;

@@ -142,6 +142,7 @@ type
     FCaption: string;
     FCompareMode: TACLTreeListCompareMode;
     FImageIndex: TImageIndex;
+    FMinWidth: Integer;
     FTag: NativeInt;
     FTextAlign: TAlignment;
     FTextVisible: Boolean;
@@ -163,6 +164,7 @@ type
     procedure SetCompareMode(AValue: TACLTreeListCompareMode);
     procedure SetDrawIndex(AValue: Integer);
     procedure SetImageIndex(AValue: TImageIndex);
+    procedure SetMinWidth(AValue: Integer);
     procedure SetTextAlign(AAlign: TAlignment);
     procedure SetTextVisible(AValue: Boolean);
     procedure SetVisible(AValue: Boolean);
@@ -194,6 +196,7 @@ type
     property DrawIndex: Integer read GetDrawIndex write SetDrawIndex stored IsDrawIndexStored;
     property ImageIndex: TImageIndex read FImageIndex write SetImageIndex default -1;
     property Index stored False;
+    property MinWidth: Integer read FMinWidth write SetMinWidth default 0;
     property Tag: NativeInt read FTag write FTag default 0;
     property TextAlign: TAlignment read FTextAlign write SetTextAlign default taLeftJustify;
     property TextVisible: Boolean read FTextVisible write SetTextVisible default True;
@@ -745,6 +748,12 @@ begin
   end;
 end;
 
+procedure TACLTreeListColumn.SetMinWidth(AValue: Integer);
+begin
+  FMinWidth := Max(AValue, 0);
+  Width := Max(Width, MinWidth);
+end;
+
 procedure TACLTreeListColumn.SetCompareMode(AValue: TACLTreeListCompareMode);
 begin
   if AValue <> FCompareMode then
@@ -797,6 +806,7 @@ end;
 
 procedure TACLTreeListColumn.SetWidthCore(AValue: Integer);
 begin
+  AValue := Max(AValue, MinWidth);
   AValue := Max(AValue, tlColumnMinWidth);
   if AValue <> FWidth then
   begin

@@ -276,7 +276,6 @@ type
     FContentArea: TRect;
     FSavedSelLength: Int64;
     FSavedSelStart: Int64;
-    FScrollableArea: TRect;
     FStartPosition: Int64;
     FSubClass: TACLHexViewSubClass;
 
@@ -1264,19 +1263,15 @@ begin
     AHitPoint.Y := EnsureRange(P.Y, FContentArea.Top, FContentArea.Bottom - 1);
     SubClass.UpdateHitTest(AHitPoint);
   end;
-
-  UpdateAutoScrollDirection(P, FScrollableArea);
+  UpdateAutoScrollDirection(P, FContentArea);
   UpdateSelection;
 end;
 
 function TACLHexViewSelectionDragObject.DragStart: Boolean;
 begin
-  CreateAutoScrollTimer;
   FSavedSelStart := SubClass.SelStart;
   FSavedSelLength := SubClass.SelLength;
   FContentArea := SubClass.ViewInfo.RowsArea;
-  FScrollableArea := FContentArea;
-  FScrollableArea.Inflate(0, -SubClass.ViewInfo.RowHeight);
   Result := True;
 end;
 

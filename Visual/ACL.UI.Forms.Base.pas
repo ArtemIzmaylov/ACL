@@ -131,8 +131,6 @@ type
     procedure CMShowingChanged(var Message: TMessage); message CM_SHOWINGCHANGED;
     procedure WMAppCommand(var Message: TMessage); message WM_APPCOMMAND;
     procedure WMDPIChanged(var Message: TWMDpi); message WM_DPICHANGED;
-    procedure WMSettingsChanged(var Message: TWMSettingChange); message WM_SETTINGCHANGE;
-    procedure WMSysColorChanged(var Message: TMessage); message WM_SYSCOLORCHANGE;
     procedure WMSysUp(var Message: TWMKeyUp); message WM_SYSKEYUP;
   {$ENDIF}
   {$IFDEF FPC}
@@ -1170,20 +1168,6 @@ begin
     end;
     Message.Result := 0;
   end;
-end;
-
-procedure TACLBasicForm.WMSettingsChanged(var Message: TWMSettingChange);
-begin
-  inherited;
-  FSystemDpiCache := 0;
-  if (Message.Section <> nil) and (Message.Section = 'ImmersiveColorSet') then
-    TACLApplication.UpdateColorSet;
-end;
-
-procedure TACLBasicForm.WMSysColorChanged(var Message: TMessage);
-begin
-  inherited;
-  TACLApplication.UpdateColorSet;
 end;
 
 procedure TACLBasicForm.WMSysUp(var Message: TWMKeyUp);

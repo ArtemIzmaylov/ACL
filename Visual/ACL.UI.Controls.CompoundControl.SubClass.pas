@@ -266,7 +266,6 @@ type
   protected
     FController: TACLCompoundControlDragAndDropController;
 
-    procedure CreateAutoScrollTimer(AInterval: Integer = 0);
     procedure DoAutoScroll(ADirection: TAlign); virtual;
     procedure InitializePreview(ASourceViewInfo: TACLCompoundControlCustomViewInfo);
     procedure StartDropSource(AActions: TACLDropSourceActions;
@@ -310,6 +309,7 @@ type
     FIsStarted: Boolean;
     FLastPoint: TPoint;
     FMouseCapturePoint: TPoint;
+    FShiftState: TShiftState;
 
     procedure AutoScrollTimerHandler(Sender: TObject);
     function GetHitTest: TACLHitTestInfo; inline;
@@ -322,8 +322,7 @@ type
     procedure UpdateCursor(AValue: TCursor);
 
     // AutoScrollTimer
-    procedure CreateAutoScrollTimer(AInterval: Integer = 0); virtual;
-    procedure UpdateAutoScrollDirection(ADirection: TAlign);
+    procedure UpdateAutoScrollDirection(ADirection: TAlign; AInterval: Integer);
 
     // DropSource
     function CanStartDropSource(var AActions: TACLDropSourceActions;
@@ -365,6 +364,7 @@ type
     property IsDropping: Boolean read FIsDropping write FIsDropping;
     property IsDropSourceOperation: Boolean read GetIsDropSourceOperation;
     property IsPressed: Boolean read FIsPressed;
+    property ShiftState: TShiftState read FShiftState;
   end;
 
 {$ENDREGION}
@@ -1148,16 +1148,6 @@ begin
   // do nothing
 end;
 
-function TACLCompoundControlDragObject.TransformPoint(const P: TPoint): TPoint;
-begin
-  Result := P;
-end;
-
-procedure TACLCompoundControlDragObject.CreateAutoScrollTimer(AInterval: Integer = 0);
-begin
-  FController.CreateAutoScrollTimer(AInterval);
-end;
-
 procedure TACLCompoundControlDragObject.DoAutoScroll(ADirection: TAlign);
 begin
   case ADirection of
@@ -1181,6 +1171,7 @@ begin
   FPreview := TACLBitmap.CreateEx(ASourceViewInfo.Bounds);
   LStyle := TACLStyleHint.Create(nil);
   try
+    LStyle.Collection := SubClass.ResourceCollection;
     LStyle.Draw(Preview.Canvas, Preview.ClientRect);
   finally
     LStyle.Free;
@@ -1194,25 +1185,19 @@ begin
   FController.StartDropSource(AActions, ASource, ASourceObject);
 end;
 
+function TACLCompoundControlDragObject.TransformPoint(const P: TPoint): TPoint;
+begin
+  Result := P;
+end;
+
 procedure TACLCompoundControlDragObject.UpdateAutoScrollDirection(
   const P: TPoint; const AArea: TRect);
 var
-  LVertPriority: Boolean;
+  LDirection: TAlign;
+  LInterval: Integer;
 begin
-  LVertPriority :=
-    Max(AArea.Top - P.Y, P.Y - AArea.Bottom) >
-    Max(AArea.Left - P.X, P.X - AArea.Right);
-
-  if (P.Y < AArea.Top) and LVertPriority then
-    FController.UpdateAutoScrollDirection(alTop)
-  else if (P.Y > AArea.Bottom) and LVertPriority then
-    FController.UpdateAutoScrollDirection(alBottom)
-  else if P.X < AArea.Left then
-    FController.UpdateAutoScrollDirection(alLeft)
-  else if P.X > AArea.Right then
-    FController.UpdateAutoScrollDirection(alRight)
-  else
-    FController.UpdateAutoScrollDirection(alNone);
+  LDirection := acCalculateAutoScroll(P, AArea, CurrentDpi, LInterval);
+  FController.UpdateAutoScrollDirection(LDirection, LInterval);
 end;
 
 procedure TACLCompoundControlDragObject.UpdateDropTarget(ADropTarget: TACLDropTarget);
@@ -1261,6 +1246,20 @@ begin
   inherited Destroy;
 end;
 
+procedure TACLCompoundControlDragAndDropController.AutoScrollTimerHandler(Sender: TObject);
+begin
+  if DragObject <> nil then
+  begin
+    SubClass.BeginUpdate;
+    try
+      DragObject.DoAutoScroll(FAutoScrollDirection);
+    finally
+      SubClass.EndUpdate; // prevent from update;
+    end;
+    SubClass.UpdateHotTrack;
+  end;
+end;
+
 procedure TACLCompoundControlDragAndDropController.DoBeforeDragStarted;
 begin
   // do nothing
@@ -1293,6 +1292,7 @@ begin
   FIsStarted := False;
   MouseCapturePoint := APoint;
   LastPoint := MouseCapturePoint;
+  FShiftState := AShift;
 end;
 
 procedure TACLCompoundControlDragAndDropController.MouseMove(
@@ -1310,6 +1310,7 @@ begin
       FIsStarted := True;
       DoBeforeDragStarted;
       SubClass.UpdateHitTest(LastPoint);
+      FShiftState := AShift;
       if (SubClass.PressedObject = HitTest.HitObject) and DragStart then
       begin
         FIsActive := True; // first
@@ -1349,30 +1350,14 @@ begin
   // do nothing
 end;
 
-procedure TACLCompoundControlDragAndDropController.AutoScrollTimerHandler(Sender: TObject);
+procedure TACLCompoundControlDragAndDropController.UpdateAutoScrollDirection(
+  ADirection: TAlign; AInterval: Integer);
 begin
-  if DragObject <> nil then
-  begin
-    DragObject.DoAutoScroll(FAutoScrollDirection);
-    SubClass.UpdateHotTrack;
-  end;
-end;
-
-procedure TACLCompoundControlDragAndDropController.CreateAutoScrollTimer(AInterval: Integer = 0);
-begin
-  if AInterval = 0 then
-    AInterval := acAutoScrollInterval;
   if AutoScrollTimer = nil then
-    FAutoScrollTimer := TACLTimer.CreateEx(AutoScrollTimerHandler, AInterval);
-end;
-
-procedure TACLCompoundControlDragAndDropController.UpdateAutoScrollDirection(ADirection: TAlign);
-begin
-  if AutoScrollTimer <> nil then
-  begin
-    FAutoScrollDirection := ADirection;
-    FAutoScrollTimer.Enabled := ADirection in [alLeft, alTop, alRight, alBottom];
-  end;
+    FAutoScrollTimer := TACLTimer.CreateEx(AutoScrollTimerHandler);
+  FAutoScrollDirection := ADirection;
+  FAutoScrollTimer.Interval := AInterval;
+  FAutoScrollTimer.Enabled := ADirection in [alLeft, alTop, alRight, alBottom];
 end;
 
 function TACLCompoundControlDragAndDropController.CanStartDropSource(
@@ -3175,7 +3160,8 @@ begin
     ViewInfo.Calculate(Bounds, AChanges);
     UpdateHitTest;
   end;
-  Invalidate;
+  if AChanges <> [] then
+    Invalidate;
 end;
 
 procedure TACLCompoundControlSubClass.ToggleChecked(AObject: TObject);

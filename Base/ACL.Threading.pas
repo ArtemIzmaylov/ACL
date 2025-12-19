@@ -18,6 +18,11 @@ unit ACL.Threading;
 interface
 
 uses
+{$IF DEFINED(LCLGtk3)}
+  LazGlib2,
+{$ELSEIF DEFINED(LCLGtk2)}
+  Glib2,
+{$ENDIF}
 {$IFDEF FPC}
   LCLIntf,
   LCLType,
@@ -196,6 +201,7 @@ type
     class procedure RunPostponed(AProc: TThreadMethod; AReceiver: Pointer = nil); overload;
     class procedure Unsubscribe(AProc: TThreadMethod); overload;
     class procedure Unsubscribe(AReceiver: Pointer); overload;
+    class procedure Wake;
   end;
 
 procedure CheckIsMainThread;
@@ -879,6 +885,17 @@ begin
   finally
     FQueue.UnlockList;
   end;
+end;
+
+class procedure TACLMainThread.Wake;
+begin
+  // Wake main message loop
+{$IF DEFINED(LCLGtkX)}
+  g_main_context_wakeup(g_main_context_default);
+{$ENDIF}
+  // Wake main thread
+  if Assigned(WakeMainThread) then
+    WakeMainThread(nil);
 end;
 
 {$IFDEF ACL_THREADING_USE_MESSAGES}
