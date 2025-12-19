@@ -48,7 +48,7 @@ uses
   ACL.MUI,
   ACL.UI.Controls.Base,
   ACL.UI.Controls.Buttons,
-  ACL.UI.Insight,
+  ACL.UI.Insight.Core,
   ACL.UI.Menus,
   ACL.UI.Resources,
   ACL.Utils.Common,
@@ -379,6 +379,8 @@ type
 
   TACLPageControlPageUIInsightAdapter = class(TACLUIInsightAdapterWinControl)
   public
+    class function GetPosition(AObject: TObject;
+      out ABounds: TRect; out AParent: TWinControl): Boolean; override;
     class function MakeVisible(AObject: TObject): Boolean; override;
   end;
 
@@ -1582,26 +1584,37 @@ end;
 class procedure TACLPageControlUIInsightAdapter.GetChildren(
   AObject: TObject; ABuilder: TACLUIInsightSearchQueueBuilder);
 var
-  APage: TACLPageControlPage;
-  APageControl: TACLPageControl absolute AObject;
+  LPage: TACLPageControlPage;
+  LPageControl: TACLPageControl absolute AObject;
   I: Integer;
 begin
-  for I := 0 to APageControl.PageCount - 1 do
+  for I := 0 to LPageControl.PageCount - 1 do
   begin
-    APage := APageControl.Pages[I];
-    if APage.PageVisible then
-      ABuilder.Add(APage);
+    LPage := LPageControl.Pages[I];
+    if LPage.PageVisible then
+      ABuilder.Add(LPage);
   end;
 end;
 
 { TACLPageControlPageUIInsightAdapter }
 
+class function TACLPageControlPageUIInsightAdapter.GetPosition(
+  AObject: TObject; out ABounds: TRect; out AParent: TWinControl): Boolean;
+begin
+  Result := inherited;
+  if Result and (AParent is TACLPageControl) then
+  begin
+    ABounds := ABounds + AParent.BoundsRect.TopLeft;
+    AParent := AParent.Parent;
+  end;
+end;
+
 class function TACLPageControlPageUIInsightAdapter.MakeVisible(AObject: TObject): Boolean;
 var
-  APage: TACLPageControlPage absolute AObject;
+  LPage: TACLPageControlPage absolute AObject;
 begin
-  APage.PageControl.ActivePage := APage;
-  Result := APage.Active;
+  LPage.PageControl.ActivePage := LPage;
+  Result := LPage.Active;
 end;
 
 initialization

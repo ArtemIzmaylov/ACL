@@ -20,9 +20,9 @@ unit ACL.UI.Core.Impl.Gtk3;
 {.$DEFINE DEBUG_MESSAGELOOP}
 {$MESSAGE WARN 'Проверить:'}
 // 1) В FlyWM (Astra Linux) при захвате клавиатурного хука, top-level форма в режиме StayOnTop проваливается на задний план.
-// 2) отключать прозрачность, если мышь за пределами окна - не работает, ибо мы не можем получить координаты мыши
-// 2) отключать прозрачность, если окно неактивно - не работает
-// 3) ui insight не работает
+{$MESSAGE WARN 'Gtk3: DragImage has wrong position'}
+{$MESSAGE WARN 'Gtk3: проблемы с кэпчей - неправильные координаты'}
+{$MESSAGE WARN 'Gtk3: проблемы с меню - неправильные координаты, если оно открывается вниз'}
 interface
 
 uses
@@ -157,6 +157,7 @@ type
       const AWinControl: TWinControl; var AText: String): Boolean; override;
     class procedure SetBorderStyle(const AWinControl: TWinControl;
       const ABorderStyle: TBorderStyle); override;
+    class procedure SetOpacity(const AWinControl: TWinControl; AOpacity: Byte);
   end;
 
   { TACLWSPopupControl }
@@ -1218,6 +1219,12 @@ class procedure TACLWSCustomControl.SetBorderStyle(
   const AWinControl: TWinControl; const ABorderStyle: TBorderStyle);
 begin
   TACLGtk3CustomControl(AWinControl.Handle).SetBorderStyle(ABorderStyle);
+end;
+
+class procedure TACLWSCustomControl.SetOpacity(
+  const AWinControl: TWinControl; AOpacity: Byte);
+begin
+  TGtk3WidgetAccess(AWinControl.Handle).Widget^.set_opacity(AOpacity / 255);
 end;
 
 { TACLWSPopupControl }

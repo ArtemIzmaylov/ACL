@@ -52,158 +52,90 @@ uses
   ACL.Graphics,
   ACL.Graphics.Images,
   ACL.Threading,
+{$I ACL.UI.Core.Impl.inc},
   ACL.UI.Controls.Base,
-  ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.Buttons,
-  ACL.UI.Controls.DropDown,
+  ACL.UI.Controls.ComboBox,
   ACL.UI.Controls.ScrollBar,
   ACL.UI.Controls.SearchBox,
   ACL.UI.Controls.TextEdit,
   ACL.UI.Controls.TreeList,
   ACL.UI.Controls.TreeList.SubClass,
   ACL.UI.Controls.TreeList.Types,
-  ACL.UI.Menus,
   ACL.UI.Forms,
+  ACL.UI.Insight.Core,
   ACL.UI.Resources,
   ACL.Utils.Common,
   ACL.Utils.DPIAware,
   ACL.Utils.Strings;
 
 type
-  TACLUIInsightSearchQueueBuilder = class;
 
-  TACLUIInsightAdapter = class;
-  TACLUIInsightAdapterClass = class of TACLUIInsightAdapter;
+  { TACLUIInsightSearchBox }
 
-  { TACLUIInsightCandidate }
-
-  TACLUIInsightCandidate = class
-  protected
-    FLocation: TArray<TObject>;
-    FLocationText: string;
-    FText: string;
-  public
-    function Clone: TACLUIInsightCandidate;
-    // Properties
-    property Location: TArray<TObject> read FLocation;
-    property LocationText: string read FLocationText;
-    property Text: string read FText;
-  end;
-
-  { TACLUIInsightCandidates }
-
-  TACLUIInsightCandidates = class(TACLObjectListOf<TACLUIInsightCandidate>);
-
-  { TACLUIInsightSearchQueueBuilder }
-
-  TACLUIInsightSearchQueueBuilder = class
-  strict private
-    FCandidates: TACLUIInsightCandidates;
-    FNestedCaptions: TStack<string>;
-    FNestedObjects: TStack<TObject>;
-
-    function GetCurrentLocation: string;
-  public
-    constructor Create(ATarget: TACLUIInsightCandidates);
-    destructor Destroy; override;
-    procedure Add(AObject: TObject);
-    procedure AddCandidate(AObject: TObject; const AValue: string);
-    procedure AddChildren(AObject: TObject);
-  end;
-
-  { TACLUIInsightButton }
-
-  TACLUIInsightButtonSearchQueryEvent = procedure (
+  TACLUIInsightSearchEditMode = (isemIcon, isemEdit);
+  TACLUIInsightSearchQueryEvent = procedure (
     Sender: TObject; Sources: TACLUIInsightSearchQueueBuilder) of object;
 
-  TACLUIInsightButton = class(TACLCustomDropDown)
-  protected const
+  TACLUIInsightSearchBox = class(TACLSearchEdit)
+  strict private const
+    DefaultWidthEdit = 121;
     WM_POSTSELECT = WM_USER;
   strict private
-    FActionList: TActionList;
-    FShortCut: TShortCut;
-    FStyleSearchEdit: TACLStyleEdit;
-    FStyleSearchEditButton: TACLStyleEditButton;
-    FStyleSearchResults: TACLStyleTreeList;
-    FStyleSearchResultsScrollBox: TACLStyleScrollBox;
+    FCandidates: TACLUIInsightCandidates;
+    FHighlight: TWinControl;
+    FMode: TACLUIInsightSearchEditMode;
+    FState: TACLUIInsightSearchEditMode;
+    FStyleIcon: TACLStyleButton;
+    FStyleResults: TACLStyleTreeList;
+    FStyleResultsScrollBox: TACLStyleScrollBox;
+    FWidthEdit: Integer;
 
-    FOnSearchQuery: TACLUIInsightButtonSearchQueryEvent;
+    FOnSearchQuery: TACLUIInsightSearchQueryEvent;
 
-    procedure SetStyleSearchEdit(const Value: TACLStyleEdit);
-    procedure SetStyleSearchEditButton(const Value: TACLStyleEditButton);
-    procedure SetStyleSearchResults(const Value: TACLStyleTreeList);
-    procedure SetStyleSearchResultsScrollBox(const Value: TACLStyleScrollBox);
-    procedure SetShortCut(AValue: TShortCut);
-    procedure HandlerStartSearch(Sender: TObject);
+    procedure HideHighlightion;
+    procedure SetMode(AValue: TACLUIInsightSearchEditMode);
+    procedure SetState(AState: TACLUIInsightSearchEditMode);
+    procedure SetStyleIcon(AValue: TACLStyleButton);
+    procedure SetStyleResults(AValue: TACLStyleTreeList);
+    procedure SetStyleResultsScrollBox(AValue: TACLStyleScrollBox);
+    procedure SetWidthEdit(AValue: Integer);
+    //# Messages
     procedure WMPostSelect(var Message: TMessage); message WM_POSTSELECT;
   protected
-    FLastSearchString: string;
-
     function CreateDropDownWindow: TACLPopupWindow; override;
-    procedure DoGetHint(const P: TPoint; var AHint: string); override;
-    procedure PopulateCandidates(ACandidates: TACLUIInsightCandidates); virtual;
-    procedure SelectCandidate(ACandidate: TACLUIInsightCandidate); virtual;
+    procedure DoEnter; override;
+    procedure DoExit; override;
+    procedure DoPrepareDropDownList(AList: TACLBasicDropDownList); override;
+    procedure DoSearch; override;
+    procedure InvalidateBorders; override;
+    procedure KeyDown(var Key: Word; Shift: TShiftState); override;
+    procedure Paint; override;
+    procedure PostValue(ANode: TACLTreeListNode); override;
     procedure SetTargetDPI(AValue: Integer); override;
     procedure ShowDropDownWindow; override;
+    procedure TextChanged; override;
+    //# IACLCursorProvider
+    function GetCursor(const P: TPoint): TCursor; override;
+    //# Properties
+    property Candidates: TACLUIInsightCandidates read FCandidates;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    procedure AdjustSize; override;
+    //# Properties
+    property State: TACLUIInsightSearchEditMode read FState;
   published
-    property ShortCut: TShortCut read FShortCut write SetShortCut default scNone;
-    property StyleSearchEdit: TACLStyleEdit read FStyleSearchEdit write SetStyleSearchEdit;
-    property StyleSearchEditButton: TACLStyleEditButton
-      read FStyleSearchEditButton write SetStyleSearchEditButton;
-    property StyleSearchResults: TACLStyleTreeList
-      read FStyleSearchResults write SetStyleSearchResults;
-    property StyleSearchResultsScrollBox: TACLStyleScrollBox
-      read FStyleSearchResultsScrollBox write SetStyleSearchResultsScrollBox;
-    // Events
-    property OnSearchQuery: TACLUIInsightButtonSearchQueryEvent read FOnSearchQuery write FOnSearchQuery;
-  end;
-
-  { TACLUIInsight }
-
-  TACLUIInsight = class
-  strict private
-    class var FClassAdapters: TACLClassMap<TACLUIInsightAdapterClass>;
-    class var FObjectAdapters: TACLDictionary<TObject, TACLUIInsightAdapterClass>;
-  public
-    class constructor Create;
-    class destructor Destroy;
-    class function GetAdapter(AObject: TObject; out AAdapter: TACLUIInsightAdapterClass): Boolean;
-    class procedure Register(AClass: TClass; AAdapter: TACLUIInsightAdapterClass); overload;
-    class procedure Register(AObject: TObject; AAdapter: TACLUIInsightAdapterClass); overload;
-    class procedure Unregister(AClass: TClass); overload;
-    class procedure Unregister(AObject: TObject); overload;
-  end;
-
-  { TACLUIInsightAdapter }
-
-  TACLUIInsightAdapter = class
-  public
-    class function GetBoundsOnScreen(AObject: TObject; out ABounds: TRect): Boolean; virtual;
-    class function GetCaption(AObject: TObject; out AValue: string): Boolean; virtual;
-    class procedure GetChildren(AObject: TObject; ABuilder: TACLUIInsightSearchQueueBuilder); virtual;
-    class function GetGroupCaption(AObject: TObject; out AValue: string): Boolean; virtual;
-    class function GetKeywors(AObject: TObject; out AValue: string): Boolean; virtual;
-    class function MakeVisible(AObject: TObject): Boolean; virtual;
-  end;
-
-  { TACLUIInsightAdapterControl }
-
-  TACLUIInsightAdapterControl = class(TACLUIInsightAdapter)
-  public
-    class function GetBoundsOnScreen(AObject: TObject; out ABounds: TRect): Boolean; override;
-    class function GetCaption(AObject: TObject; out AValue: string): Boolean; override;
-    class function GetKeywors(AObject: TObject; out AValue: string): Boolean; override;
-  end;
-
-  { TACLUIInsightAdapterWinControl }
-
-  TACLUIInsightAdapterWinControl = class(TACLUIInsightAdapterControl)
-  public
-    class function GetBoundsOnScreen(AObject: TObject; out ABounds: TRect): Boolean; override;
-    class procedure GetChildren(AObject: TObject; ABuilder: TACLUIInsightSearchQueueBuilder); override;
+    //# Properties
+    property Caption;
+    property Mode: TACLUIInsightSearchEditMode read FMode write SetMode default isemIcon;
+    property StyleIcon: TACLStyleButton read FStyleIcon write SetStyleIcon;
+    property StyleResults: TACLStyleTreeList read FStyleResults write SetStyleResults;
+    property StyleResultsScrollBox: TACLStyleScrollBox read FStyleResultsScrollBox write SetStyleResultsScrollBox;
+    property TabStop stored False;
+    property WidthEdit: Integer read FWidthEdit write SetWidthEdit default DefaultWidthEdit;
+    //# Events
+    property OnSearchQuery: TACLUIInsightSearchQueryEvent read FOnSearchQuery write FOnSearchQuery;
   end;
 
 implementation
@@ -213,649 +145,338 @@ uses
 
 type
 
-  { TACLUIInsightHighlightWindow }
+  { TACLUIInsightSearchResults }
 
-  TACLUIInsightHighlightWindow = class(TACLPopupWindow)
-  strict private const
-    Alpha = 40;
-    HideDelay = 1000; // msec
-    FlashTimerId = 42;
+  TACLUIInsightSearchResults = class(TACLBasicComboBoxDropDown)
   strict private
-    FTimestamp: Cardinal;
-    procedure UpdateAlpha;
-    procedure WMTimer(var Message: TWMTimer); message WM_TIMER;
-  protected
-    procedure CreateParams(var Params: TCreateParams); override;
-    procedure DoPopup; override;
-    procedure DoPopupClosed; override;
-    procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
-  public
-    constructor Create(AOwner: TComponent); override;
-    procedure DestroyWnd; override;
-  end;
-
-  { TACLUIInsightSearchBox }
-
-  TACLUIInsightSearchBox = class(TACLSearchEdit)
-  protected
-    procedure CMWantSpecialKey(var Message: TCMWantSpecialKey); message CM_WANTSPECIALKEY;
-  end;
-
-  { TACLUIInsightSearchPopupWindow }
-
-  TACLUIInsightSearchPopupWindow = class(TACLPopupWindow)
-  public const
-    BeakSize = 8;
-  strict private
-    FBorderColor: TColor;
-    FCandidates: TACLUIInsightCandidates;
-    FCapturedObject: TObject;
-    FContentMargins: TRect;
     FHintFont: TFont;
-    FOwner: TACLUIInsightButton;
-    FPolyline: array of TPoint;
-    FSearchEdit: TACLSearchEdit;
-    FSearchResults: TACLTreeList;
-
-    procedure HandlerSearch(Sender: TObject);
-    procedure HandlerSearchResultsDrawEntry(Sender: TObject;
-      ACanvas: TCanvas; const R: TRect; ANode: TACLTreeListNode; var AHandled: Boolean);
-    procedure HandlerSearchResultsKeyUp(
-      Sender: TObject; var Key: Word; ShiftState: TShiftState);
-    procedure HandlerSearchResultsMouseDown(
-      Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
-    procedure HandlerSearchResultsMouseUp(
-      Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+    procedure HandlerDrawEntry(Sender: TObject; ACanvas: TCanvas;
+      const R: TRect; ANode: TACLTreeListNode; var AHandled: Boolean);
   protected
-    procedure AdjustClientRect(var Rect: TRect); override;
-    procedure Calculate;
     procedure DoPopup; override;
-    procedure Paint; override;
-    procedure PopulateCandidates; virtual;
-    procedure Resize; override;
-    procedure SelectCandidate(const ANode: TACLTreeListNode); virtual;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    procedure AfterConstruction; override;
-    // Properties
-    property Owner: TACLUIInsightButton read FOwner;
-    property SearchEdit: TACLSearchEdit read FSearchEdit;
-    property SearchResults: TACLTreeList read FSearchResults;
   end;
 
-function TryGetPropValue(AObject: TObject; const APropName: string; out AValue: string): Boolean;
-var
-  APropInfo: PPropInfo;
-begin
-  APropInfo := GetPropInfo(AObject, APropName);
-  if APropInfo <> nil then
-  begin
-    AValue := GetStrProp(AObject, APropInfo);
-    Result := AValue <> '';
-  end
-  else
-    Result := False;
-end;
+  { TACLUIInsightHighlightWindow }
+
+  TACLUIInsightHighlightWindow = class(TACLCustomControl)
+  strict private const
+    HideDelay = 1000; // msec
+  strict private
+    FTimestamp: Cardinal;
+    procedure CMCancelMode(var Msg: TMessage); message CM_CANCELMODE;
+    procedure CMShowingChanged(var Msg: TMessage); message CM_SHOWINGCHANGED;
+    procedure WMGetDlgCode(var Message: TWMGetDlgCode); message WM_GETDLGCODE;
+  protected
+    procedure BoundsChanged; override;
+    procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+    procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
+  public
+    constructor Create(AOwner: TComponent); override;
+  end;
 
 { TACLUIInsightSearchBox }
 
-procedure TACLUIInsightSearchBox.CMWantSpecialKey(var Message: TCMWantSpecialKey);
-begin
-  if Message.CharCode = VK_ESCAPE then
-    Message.Result := Ord(Text <> '')
-  else
-    inherited;
-end;
-
-{ TACLUIInsightCandidate }
-
-function TACLUIInsightCandidate.Clone: TACLUIInsightCandidate;
-begin
-  Result := TACLUIInsightCandidate.Create;
-  Result.FLocation := FLocation;
-  Result.FLocationText := FLocationText;
-  Result.FText := FText;
-end;
-
-{ TACLUIInsightSearchQueueBuilder }
-
-constructor TACLUIInsightSearchQueueBuilder.Create(ATarget: TACLUIInsightCandidates);
-begin
-  FCandidates := ATarget;
-  FNestedCaptions := TStack<string>.Create;
-  FNestedObjects := TStack<TObject>.Create;
-end;
-
-destructor TACLUIInsightSearchQueueBuilder.Destroy;
-begin
-  FreeAndNil(FNestedObjects);
-  FreeAndNil(FNestedCaptions);
-  inherited;
-end;
-
-procedure TACLUIInsightSearchQueueBuilder.Add(AObject: TObject);
-var
-  AAdapter: TACLUIInsightAdapterClass;
-  AValue: string;
-begin
-  if TACLUIInsight.GetAdapter(AObject, AAdapter) then
-  begin
-    FNestedObjects.Push(AObject);
-    try
-      if AAdapter.GetCaption(AObject, AValue) then
-        AddCandidate(AObject, AValue);
-      if AAdapter.GetKeywors(AObject, AValue) then
-        AddCandidate(AObject, AValue);
-      if AAdapter.GetGroupCaption(AObject, AValue) and (AValue <> '') then
-      begin
-        FNestedCaptions.Push(AValue);
-        try
-          AAdapter.GetChildren(AObject, Self);
-        finally
-          FNestedCaptions.Pop;
-        end;
-      end
-      else
-        AAdapter.GetChildren(AObject, Self);
-    finally
-      FNestedObjects.Pop;
-    end;
-  end;
-end;
-
-procedure TACLUIInsightSearchQueueBuilder.AddChildren(AObject: TObject);
-var
-  AAdapter: TACLUIInsightAdapterClass;
-begin
-  if TACLUIInsight.GetAdapter(AObject, AAdapter) then
-    AAdapter.GetChildren(AObject, Self);
-end;
-
-function TACLUIInsightSearchQueueBuilder.GetCurrentLocation: string;
-var
-  B: TACLStringBuilder;
-{$IFNDEF DELPHI110ALEXANDRIA}
-  C: TArray<string>;
-{$ENDIF}
-  I: Integer;
-begin
-  Result := '';
-  if FNestedCaptions.Count > 0 then
-  begin
-    B := TACLStringBuilder.Get;
-    try
-    {$IFNDEF DELPHI110ALEXANDRIA}
-      C := FNestedCaptions.ToArray;
-    {$ENDIF}
-      for I := 0 to FNestedCaptions.Count - 1 do
-      begin
-        if B.Length > 0 then
-          B.Append(' » ');
-      {$IFDEF DELPHI110ALEXANDRIA}
-        B.Append(FNestedCaptions.List[I]);
-      {$ELSE}
-        B.Append(C[I]);
-      {$ENDIF}
-      end;
-      Result := B.ToString;
-    finally
-      B.Release;
-    end;
-  end;
-end;
-
-procedure TACLUIInsightSearchQueueBuilder.AddCandidate(AObject: TObject; const AValue: string);
-var
-  ACandidate: TACLUIInsightCandidate;
-begin
-  if AValue <> '' then
-  begin
-    ACandidate := TACLUIInsightCandidate.Create;
-    ACandidate.FLocation := FNestedObjects.ToArray;
-    ACandidate.FLocationText := GetCurrentLocation;
-    ACandidate.FText := AValue;
-    FCandidates.Add(ACandidate);
-  end;
-end;
-
-{ TACLUIInsightButton }
-
-constructor TACLUIInsightButton.Create(AOwner: TComponent);
+constructor TACLUIInsightSearchBox.Create(AOwner: TComponent);
 begin
   inherited;
-  DropDownButton.HasArrow := False;
-  FStyleSearchEdit := TACLStyleEdit.Create(Self);
-  FStyleSearchEditButton := TACLSearchEditStyleButton.Create(Self);
-  FStyleSearchResults := TACLStyleTreeList.Create(Self);
-  FStyleSearchResultsScrollBox := TACLStyleScrollBox.Create(Self);
+  FWidthEdit := DefaultWidthEdit;
+  FDefaultSize := TSize.Create(DefaultButtonHeight);
+  FStyleIcon := TACLStyleButton.Create(Self);
+  FStyleResults := TACLStyleTreeList.Create(Self);
+  FStyleResultsScrollBox := TACLStyleScrollBox.Create(Self);
+  FCandidates := TACLUIInsightCandidates.Create;
+  FCandidates.Capacity := 10240;
+  SetMode(isemIcon);
+
   if (AOwner <> nil) and ([csLoading, csReading, csDesigning] * AOwner.ComponentState = [csDesigning]) then
     Caption := '💡';
 end;
 
-destructor TACLUIInsightButton.Destroy;
+destructor TACLUIInsightSearchBox.Destroy;
 begin
-  FreeAndNil(FActionList);
-  FreeAndNil(FStyleSearchResultsScrollBox);
-  FreeAndNil(FStyleSearchResults);
-  FreeAndNil(FStyleSearchEditButton);
-  FreeAndNil(FStyleSearchEdit);
+  FreeAndNil(FCandidates);
+  FreeAndNil(FStyleResultsScrollBox);
+  FreeAndNil(FStyleResults);
+  FreeAndNil(FStyleIcon);
   inherited;
 end;
 
-procedure TACLUIInsightButton.DoGetHint(const P: TPoint; var AHint: string);
-begin
-  inherited;
-  AHint := acMenuAppendShortCut(AHint, ShortCut);
-end;
-
-function TACLUIInsightButton.CreateDropDownWindow: TACLPopupWindow;
-begin
-  Result := TACLUIInsightSearchPopupWindow.Create(Self);
-end;
-
-procedure TACLUIInsightButton.PopulateCandidates(ACandidates: TACLUIInsightCandidates);
+procedure TACLUIInsightSearchBox.AdjustSize;
 var
-  ABuilder: TACLUIInsightSearchQueueBuilder;
+  LRect: TRect;
+  LWidth: Integer;
 begin
-  ABuilder := TACLUIInsightSearchQueueBuilder.Create(ACandidates);
-  try
-    if Assigned(FOnSearchQuery) then
-      FOnSearchQuery(Self, ABuilder)
-    else
-      ABuilder.AddChildren(GetParentForm(Self));
-  finally
-    ABuilder.Free;
-  end;
-end;
+  if not HandleAllocated then Exit; // fpc
 
-procedure TACLUIInsightButton.SelectCandidate(ACandidate: TACLUIInsightCandidate);
-
-  function GetLastVisibleObject: TObject;
-  var
-    AAdapter: TACLUIInsightAdapterClass;
-    AObject: TObject;
-    I: Integer;
-  begin
-    for I := 0 to Length(ACandidate.Location) - 1 do
-    begin
-      AObject := ACandidate.Location[I];
-      if not TACLUIInsight.GetAdapter(AObject, AAdapter) then
-        raise EInvalidOperation.CreateFmt('Adapter was not found for "%s"', [AObject.ClassName]);
-      if not AAdapter.MakeVisible(AObject) then
-        Exit(AObject);
-    end;
-    Result := ACandidate.Location[High(ACandidate.Location)];
-  end;
-
-var
-  AAdapter: TACLUIInsightAdapterClass;
-  ABounds: TRect;
-  AObject: TObject;
-begin
-  try
-    AObject := GetLastVisibleObject;
-    if TACLUIInsight.GetAdapter(AObject, AAdapter) then
-    begin
-      if not AAdapter.GetBoundsOnScreen(AObject, ABounds) then
-        raise EInvalidOperation.CreateFmt('Cannot find the "%s" object on screen', [AObject.ClassName]);
-      TACLUIInsightHighlightWindow.Create(Self).Popup(ABounds);
-    end;
-  finally
-    ACandidate.Free;
-  end;
-end;
-
-procedure TACLUIInsightButton.SetTargetDPI(AValue: Integer);
-begin
-  inherited;
-  StyleSearchEdit.TargetDPI := AValue;
-  StyleSearchEditButton.TargetDPI := AValue;
-  StyleSearchResults.TargetDPI := AValue;
-  StyleSearchResultsScrollBox.TargetDPI := AValue;
-end;
-
-procedure TACLUIInsightButton.ShowDropDownWindow;
-var
-  LAlignment: TAlignment;
-  LBounds: TRect;
-  LThreshold: Integer;
-begin
-  LThreshold := Parent.Width div 4;
-  if Left > Parent.Width - LThreshold then
-    LAlignment := taRightJustify
-  else if Left < LThreshold then
-    LAlignment := taLeftJustify
+  LRect := BoundsRect;
+  if State = isemIcon then
+    LWidth := LRect.Height
   else
-    LAlignment := taCenter;
+    LWidth := WidthEdit;
 
-  LBounds := ClientToScreen(ClientRect);
-  LBounds.Inflate(
-    dpiApply(TACLUIInsightSearchPopupWindow.BeakSize, FCurrentPPI) div 2,
-    dpiApply(acTextIndent, FCurrentPPI));
-  DropDownWindow.PopupUnderControl(LBounds, LAlignment);
+  if akRight in Anchors then
+    LRect.Left := LRect.Right - LWidth
+  else
+    LRect.Width := LWidth;
+
+  BoundsRect := LRect;
 end;
 
-procedure TACLUIInsightButton.SetShortCut(AValue: TShortCut);
+function TACLUIInsightSearchBox.CreateDropDownWindow: TACLPopupWindow;
+begin
+  Result := TACLUIInsightSearchResults.Create(Self);
+end;
+
+procedure TACLUIInsightSearchBox.DoEnter;
+begin
+  SetState(isemEdit);
+  inherited;
+end;
+
+procedure TACLUIInsightSearchBox.DoExit;
+begin
+  SetState(Mode);
+  inherited;
+end;
+
+procedure TACLUIInsightSearchBox.DoPrepareDropDownList(AList: TACLBasicDropDownList);
 var
-  AAction: TAction;
+  LBuilder: TACLUIInsightSearchQueueBuilder;
+  LCandidate: TACLUIInsightCandidate;
+  LNode: TACLTreeListNode;
 begin
-  if FShortCut <> AValue then
+  Candidates.Count := 0;
+  LBuilder := TACLUIInsightSearchQueueBuilder.Create(Candidates);
+  try
+    if Assigned(OnSearchQuery) then
+      OnSearchQuery(Self, LBuilder)
+    else
+      LBuilder.AddChildren(GetParentForm(Self));
+  finally
+    LBuilder.Free;
+  end;
+  for LCandidate in Candidates do
   begin
-    FreeAndNil(FActionList);
-    FShortCut := AValue;
-    if FShortCut <> 0 then
-    begin
-      FActionList := TActionList.Create(Self);
-      AAction := TAction.Create(FActionList);
-      AAction.OnExecute := HandlerStartSearch;
-      AAction.ActionList := FActionList;
-      AAction.ShortCut := FShortCut;
-    end;
+    LNode := AList.RootNode.AddChild;
+    LNode.AddValue(LCandidate.Text);
+    LNode.AddValue(LCandidate.LocationText);
+    LNode.Data := LCandidate;
   end;
 end;
 
-procedure TACLUIInsightButton.SetStyleSearchEdit(const Value: TACLStyleEdit);
+procedure TACLUIInsightSearchBox.DoSearch;
+var
+  LDropDownList: TACLBasicDropDownList;
 begin
-  FStyleSearchEdit.Assign(Value);
+  DroppedDown := (State = isemEdit) and (Text <> '');
+  if GetDropDownList(LDropDownList) then
+    LDropDownList.IncSearch.Text := Text;
 end;
 
-procedure TACLUIInsightButton.SetStyleSearchEditButton(const Value: TACLStyleEditButton);
+function TACLUIInsightSearchBox.GetCursor(const P: TPoint): TCursor;
 begin
-  FStyleSearchEditButton.Assign(Value);
+  if State = isemIcon then
+    Result := crHandPoint
+  else
+    Result := inherited;
 end;
 
-procedure TACLUIInsightButton.SetStyleSearchResults(const Value: TACLStyleTreeList);
+procedure TACLUIInsightSearchBox.HideHighlightion;
 begin
-  FStyleSearchResults.Assign(Value);
+  if FHighlight <> nil then
+    FHighlight.Hide;
 end;
 
-procedure TACLUIInsightButton.SetStyleSearchResultsScrollBox(const Value: TACLStyleScrollBox);
+procedure TACLUIInsightSearchBox.InvalidateBorders;
 begin
-  FStyleSearchResultsScrollBox.Assign(Value);
+  if State = isemIcon then
+    Invalidate
+  else
+    inherited;
 end;
 
-procedure TACLUIInsightButton.HandlerStartSearch(Sender: TObject);
+procedure TACLUIInsightSearchBox.KeyDown(var Key: Word; Shift: TShiftState);
 begin
-  if CanFocus then
+  if (Key = vkDown) and (Text <> '') and not DroppedDown then
   begin
-    SetFocus;
-    DroppedDown := True;
-  end;
-end;
-
-procedure TACLUIInsightButton.WMPostSelect(var Message: TMessage);
-begin
-  SelectCandidate(TACLUIInsightCandidate(Message.LParam));
-end;
-
-{ TACLUIInsightHighlightWindow }
-
-constructor TACLUIInsightHighlightWindow.Create(AOwner: TComponent);
-begin
-  inherited Create(AOwner);
-  AlphaBlend := True;
-  Color := clRed;
-end;
-
-procedure TACLUIInsightHighlightWindow.CreateParams(var Params: TCreateParams);
-begin
-  inherited;
-  Params.ExStyle := Params.ExStyle or WS_EX_TOPMOST;
-  Params.WindowClass.style := Params.WindowClass.style and not CS_DROPSHADOW;
-end;
-
-procedure TACLUIInsightHighlightWindow.DestroyWnd;
-begin
-  KillTimer(Handle, FlashTimerId);
-  inherited DestroyWnd;
-end;
-
-procedure TACLUIInsightHighlightWindow.DoPopup;
-begin
-  FTimestamp := TACLThread.Timestamp;
-  AlphaBlendValue := Alpha;
-  SetTimer(Handle, FlashTimerId, GetCaretBlinkTime, nil);
-  inherited;
-  TACLMainThread.RunPostponed(UpdateAlpha, Self);
-end;
-
-procedure TACLUIInsightHighlightWindow.DoPopupClosed;
-begin
-  inherited;
-  TACLMainThread.RunPostponed(Free, Self);
-end;
-
-procedure TACLUIInsightHighlightWindow.MouseMove(Shift: TShiftState; X, Y: Integer);
-begin
-  if TACLThread.IsTimeout(FTimestamp, HideDelay) and IsMouseInControl then
-    ClosePopup;
-end;
-
-procedure TACLUIInsightHighlightWindow.UpdateAlpha;
-begin
-  AlphaBlendValue := MulDiv(Tag + 1, Alpha, 2);
-end;
-
-procedure TACLUIInsightHighlightWindow.WMTimer(var Message: TWMTimer);
-begin
-  if Message.TimerID = FlashTimerId then
-  begin
-    Tag := (Tag + 1) mod 2;
-    UpdateAlpha;
+    DoSearch;
+    Key := 0;
   end
   else
     inherited;
 end;
 
-{ TACLUIInsightSearchPopupWindow }
-
-constructor TACLUIInsightSearchPopupWindow.Create(AOwner: TComponent);
+procedure TACLUIInsightSearchBox.Paint;
+var
+  LState: TACLButtonState;
 begin
-  FOwner := AOwner as TACLUIInsightButton;
-  inherited;
-  FHintFont := TFont.Create;
-  FCandidates := TACLUIInsightCandidates.Create;
-  FCandidates.Capacity := 10240;
-  Constraints.MinWidth := 600;
+  if State = isemIcon then
+  begin
+    if not Enabled then
+      LState := absDisabled
+    else if MouseInClient then
+      LState := absHover
+    else
+      LState := absNormal;
 
-  FSearchEdit := TACLUIInsightSearchBox.Create(Self);
-  FSearchEdit.Parent := Self;
-  FSearchEdit.Align := alTop;
-  FSearchEdit.Margins.All := TACLMargins.Default;
-  FSearchEdit.Style := Owner.StyleSearchEdit;
-  FSearchEdit.StyleButton := Owner.StyleSearchEditButton;
-  FSearchEdit.OnChange := HandlerSearch;
-
-  FSearchResults := TACLTreeList.Create(Self);
-  FSearchResults.Parent := Self;
-  FSearchResults.Align := alClient;
-  FSearchResults.Margins.All := TACLMargins.Default;
-  FSearchResults.BeginUpdate;
-  try
-    FSearchResults.OptionsView.Columns.Visible := False;
-    FSearchResults.OptionsView.Nodes.GridLines := [];
-    FSearchResults.OptionsBehavior.HotTrack := True;
-    FSearchResults.Style := Owner.StyleSearchResults;
-    FSearchResults.StyleScrollBox := Owner.StyleSearchResultsScrollBox;
-  finally
-    FSearchResults.EndUpdate;
-  end;
-
-  FSearchResults.OnCustomDrawNode := HandlerSearchResultsDrawEntry;
-  FSearchResults.OnMouseDown := HandlerSearchResultsMouseDown;
-  FSearchResults.OnMouseUp := HandlerSearchResultsMouseUp;
-  FSearchResults.OnKeyUp := HandlerSearchResultsKeyUp;
-
-  FSearchEdit.FocusControl := FSearchResults;
-  FSearchEdit.Text := Owner.FLastSearchString;
+    StyleIcon.Draw(Canvas, ClientRect, LState);
+    Canvas.Brush.Style := bsClear;
+    Canvas.Font.Color := StyleIcon.TextColors[LState];
+    acTextDraw(Canvas, Caption, ClientRect.InflateTo(-acTextIndent), taCenter, taVerticalCenter);
+  end
+  else
+    inherited;
 end;
 
-destructor TACLUIInsightSearchPopupWindow.Destroy;
+procedure TACLUIInsightSearchBox.PostValue(ANode: TACLTreeListNode);
+//var
+//  PrevOnChange: TThreadMethod;
+begin
+// наверное стоит оставить именно то, что ввёл пользователь
+//  PrevOnChange := EditBox.OnChange;
+//  EditBox.OnChange := nil;
+//  Text := ANode.Caption;
+//  EditBox.OnChange := PrevOnChange;
+  PostMessage(Handle, WM_POSTSELECT, 0, LPARAM(TACLUIInsightCandidate(ANode.Data).Clone));
+end;
+
+procedure TACLUIInsightSearchBox.SetMode(AValue: TACLUIInsightSearchEditMode);
+begin
+  FMode := AValue;
+  TabStop := Mode = isemEdit;
+  SetState(Mode);
+end;
+
+procedure TACLUIInsightSearchBox.SetState(AState: TACLUIInsightSearchEditMode);
+begin
+  EditBox.Iteract := AState = isemEdit;
+  Transparent := AState <> isemEdit;
+  if FState <> AState then
+  begin
+    FState := AState;
+    DroppedDown := False;
+    HideHighlightion;
+    AdjustSize;
+    UpdateCursor;
+    Invalidate;
+  end;
+end;
+
+procedure TACLUIInsightSearchBox.SetStyleIcon(AValue: TACLStyleButton);
+begin
+  FStyleIcon.Assign(AValue);
+end;
+
+procedure TACLUIInsightSearchBox.SetStyleResults(AValue: TACLStyleTreeList);
+begin
+  FStyleResults.Assign(AValue);
+end;
+
+procedure TACLUIInsightSearchBox.SetStyleResultsScrollBox(AValue: TACLStyleScrollBox);
+begin
+  FStyleResultsScrollBox.Assign(AValue);
+end;
+
+procedure TACLUIInsightSearchBox.SetTargetDPI(AValue: Integer);
+begin
+  inherited;
+  StyleIcon.TargetDPI := AValue;
+  StyleResults.TargetDPI := AValue;
+  StyleResultsScrollBox.TargetDPI := AValue;
+end;
+
+procedure TACLUIInsightSearchBox.SetWidthEdit(AValue: Integer);
+begin
+  AValue := Max(AValue, DefaultButtonHeight);
+  if FWidthEdit <> AValue then
+  begin
+    FWidthEdit := AValue;
+    if State = isemEdit then
+      AdjustSize;
+  end;
+end;
+
+procedure TACLUIInsightSearchBox.ShowDropDownWindow;
+var
+  LThreshold: Integer;
+begin
+  LThreshold := Parent.Width div 4;
+  if Left + Width > Parent.Width - LThreshold then
+    DropDownAlignment := taRightJustify
+  else if Left < LThreshold then
+    DropDownAlignment := taLeftJustify
+  else
+    DropDownAlignment := taCenter;
+
+  inherited;
+end;
+
+procedure TACLUIInsightSearchBox.TextChanged;
+begin
+  HideHighlightion;
+  inherited;
+end;
+
+procedure TACLUIInsightSearchBox.WMPostSelect(var Message: TMessage);
+var
+  LAdapter: TACLUIInsightAdapterClass;
+  LBounds: TRect;
+  LObject: TObject;
+  LParent: TWinControl;
+begin
+  LObject := TObject(Message.LParam);
+  if LObject is TACLUIInsightCandidate then
+  try
+    PostMessage(Handle, WM_POSTSELECT, 0, LPARAM(TACLUIInsightCandidate(LObject).GetLastVisibleObject));
+  finally
+    LObject.Free;
+  end
+  else
+    if TACLUIInsight.GetAdapter(LObject, LAdapter) then
+    begin
+      if not LAdapter.GetPosition(LObject, LBounds, LParent) then
+        raise EInvalidOperation.CreateFmt('Cannot find the "%s" object on screen', [LObject.ClassName]);
+      if FHighlight = nil then
+        FHighlight := TACLUIInsightHighlightWindow.Create(Self);
+      FHighlight.BoundsRect := LBounds;
+      FHighlight.Parent := LParent;
+      FHighlight.Show;
+      FHighlight.BoundsRect := LBounds;
+    end;
+end;
+
+{ TACLUIInsightSearchResults }
+
+constructor TACLUIInsightSearchResults.Create(AOwner: TComponent);
+begin
+  inherited;
+  FHintFont := TFont.Create;
+  Constraints.MinWidth := 600;
+  List.OnCustomDrawNode := HandlerDrawEntry;
+end;
+
+destructor TACLUIInsightSearchResults.Destroy;
 begin
   TACLMainThread.Unsubscribe(Self);
-  FreeAndNil(FCandidates);
   FreeAndNil(FHintFont);
   inherited;
 end;
 
-procedure TACLUIInsightSearchPopupWindow.AfterConstruction;
+procedure TACLUIInsightSearchResults.DoPopup;
 begin
   inherited;
-  PopulateCandidates;
-end;
-
-procedure TACLUIInsightSearchPopupWindow.Calculate;
-var
-  ABeakSize: TSize;
-  ABounds: TRect;
-  AButtonCenter: TPoint;
-  AContentMargins: TRect;
-  ARegion: TRegionHandle;
-begin
-  ABounds := ClientRect;
-  ABeakSize.cy := dpiApply(BeakSize, FCurrentPPI);
-  ABeakSize.cx := {2 * }ABeakSize.cy;
-  AButtonCenter := acMapRect(Owner, Self, Owner.ClientRect).CenterPoint;
-  AContentMargins := TRect.CreateMargins(dpiApply(acIndentBetweenElements, FCurrentPPI));
-
-  if (AButtonCenter.X < ABounds.Left + ABeakSize.cx) or (AButtonCenter.X > ABounds.Right - ABeakSize.cx) then
-  begin
-    SetLength(FPolyline, 5);
-    FPolyline[0] := Point(ABounds.Left, ABounds.Top);
-    FPolyline[1] := Point(ABounds.Right, ABounds.Top);
-    FPolyline[2] := Point(ABounds.Right, ABounds.Bottom);
-    FPolyline[3] := Point(ABounds.Left, ABounds.Bottom);
-    FPolyline[4] := Point(ABounds.Left, ABounds.Top);
-  end
-  else
-    if AButtonCenter.Y < ABounds.Top then
-    begin
-      SetLength(FPolyline, 8);
-      FPolyline[0] := Point(ABounds.Left, ABounds.Top + ABeakSize.cy);
-      FPolyline[1] := Point(AButtonCenter.X - ABeakSize.cx, ABounds.Top + ABeakSize.cy);
-      FPolyline[2] := Point(AButtonCenter.X, ABounds.Top);
-      FPolyline[3] := Point(AButtonCenter.X + ABeakSize.cx, ABounds.Top + ABeakSize.cy);
-      FPolyline[4] := Point(ABounds.Right, ABounds.Top + ABeakSize.cy);
-      FPolyline[5] := Point(ABounds.Right, ABounds.Bottom);
-      FPolyline[6] := Point(ABounds.Left, ABounds.Bottom);
-      FPolyline[7] := Point(ABounds.Left, ABounds.Top + ABeakSize.cy);
-      Inc(AContentMargins.Top, ABeakSize.cy);
-    end
-    else
-    begin
-      SetLength(FPolyline, 8);
-      FPolyline[0] := Point(ABounds.Left, ABounds.Top);
-      FPolyline[1] := Point(ABounds.Right, ABounds.Top);
-      FPolyline[2] := Point(ABounds.Right, ABounds.Bottom - ABeakSize.cy);
-      FPolyline[3] := Point(AButtonCenter.X + ABeakSize.cx, ABounds.Bottom - ABeakSize.cy);
-      FPolyline[4] := Point(AButtonCenter.X, ABounds.Bottom);
-      FPolyline[5] := Point(AButtonCenter.X - ABeakSize.cx, ABounds.Bottom - ABeakSize.cy);
-      FPolyline[6] := Point(ABounds.Left, ABounds.Bottom - ABeakSize.cy);
-      FPolyline[7] := Point(ABounds.Left, ABounds.Top);
-      Inc(AContentMargins.Bottom, ABeakSize.cy);
-    end;
-
-  ARegion := CreatePolygonRgn({$IFDEF FPC}@{$ENDIF}FPolyline[0], Length(FPolyline), WINDING);
-  acRegionSetToWindow(Handle, ARegion, True);
-  //DeleteObject(ARegion);
-
-  if AContentMargins <> FContentMargins then
-  begin
-    FContentMargins := AContentMargins;
-    Realign;
-  end;
-end;
-
-procedure TACLUIInsightSearchPopupWindow.AdjustClientRect(var Rect: TRect);
-begin
-  Rect.Content(FContentMargins);
-end;
-
-procedure TACLUIInsightSearchPopupWindow.DoPopup;
-var
-  LColor: TACLResourceColor;
-begin
-  if TACLRootResourceCollection.GetResource('Common.Colors.Background1', TACLResourceColor, nil, LColor) then
-    Color := LColor.AsColor;
-  if TACLRootResourceCollection.GetResource('Common.Colors.Border3', TACLResourceColor, nil, LColor) then
-    FBorderColor := LColor.AsColor;
   Font.ResolveHeight;
   FHintFont.Assign(Font);
   FHintFont.Size := FHintFont.Size - 1;
-  FSearchResults.OptionsView.Nodes.Height := 3 * acTextIndent +
+  List.OptionsView.Nodes.Height := 3 * acTextIndent +
     dpiRevert(acFontHeight(Font) + acFontHeight(FHintFont), FCurrentPPI);
-  inherited;
-{$IFDEF FPC}
-  TACLMainThread.RunPostponed(Calculate, Self);
-{$ENDIF}
+  AdjustSize;
 end;
 
-procedure TACLUIInsightSearchPopupWindow.Paint;
-begin
-  ExPainter.BeginPaint(Canvas);
-  try
-    ExPainter.SetPixelOffsetMode(ipomHalf);
-    ExPainter.SetGeometrySmoothing(TACLBoolean.False);
-    ExPainter.FillRectangle(ClientRect, TAlphaColor.FromColor(Color));
-    ExPainter.Line(FPolyline, TAlphaColor.FromColor(FBorderColor), 2);
-  finally
-    ExPainter.EndPaint;
-  end;
-end;
-
-procedure TACLUIInsightSearchPopupWindow.PopulateCandidates;
-begin
-  Owner.PopulateCandidates(FCandidates);
-  HandlerSearch(nil);
-end;
-
-procedure TACLUIInsightSearchPopupWindow.Resize;
-begin
-  inherited;
-  Calculate;
-end;
-
-procedure TACLUIInsightSearchPopupWindow.SelectCandidate(const ANode: TACLTreeListNode);
-begin
-  if ANode <> nil then
-    PostMessage(Owner.Handle, TACLUIInsightButton.WM_POSTSELECT, 0, LPARAM(TACLUIInsightCandidate(ANode.Data).Clone));
-end;
-
-procedure TACLUIInsightSearchPopupWindow.HandlerSearch(Sender: TObject);
-var
-  ACandidate: TACLUIInsightCandidate;
-  ANode: TACLTreeListNode;
-  ASearchString: TACLSearchString;
-  I: Integer;
-begin
-  SearchResults.BeginUpdate;
-  try
-    SearchResults.Clear;
-    ASearchString := TACLSearchString.Create(SearchEdit.Text);
-    try
-      Owner.FLastSearchString := SearchEdit.Text;
-      if not ASearchString.Empty then
-        for I := 0 to FCandidates.Count - 1 do
-        begin
-          ACandidate := FCandidates.List[I];
-          if ASearchString.Compare(ACandidate.Text) then
-          begin
-            ANode := SearchResults.RootNode.AddChild;
-            ANode.Caption := ACandidate.Text;
-            ANode.AddValue(ACandidate.LocationText);
-            ANode.Data := ACandidate;
-          end;
-        end;
-    finally
-      ASearchString.Free;
-    end;
-  finally
-    SearchResults.EndUpdate;
-  end;
-end;
-
-procedure TACLUIInsightSearchPopupWindow.HandlerSearchResultsDrawEntry(Sender: TObject;
+procedure TACLUIInsightSearchResults.HandlerDrawEntry(Sender: TObject;
   ACanvas: TCanvas; const R: TRect; ANode: TACLTreeListNode; var AHandled: Boolean);
 var
   LRect: TRect;
@@ -864,168 +485,76 @@ begin
   LRect.Inflate(-dpiApply(acTextIndent, FCurrentPPI));
 
   ACanvas.Font := Font;
-  ACanvas.Font.Color := SearchResults.Style.RowColorsText[True];
+  ACanvas.Font.Color := List.Style.RowColorsText[True];
   acSysDrawText(ACanvas, LRect, ANode.Values[0], DT_TOP or DT_SINGLELINE or DT_END_ELLIPSIS);
 
   ACanvas.Font := FHintFont;
-  ACanvas.Font.Color := SearchResults.Style.RowColorsText[ANode.Selected];
+  ACanvas.Font.Color := List.Style.RowColorsText[ANode.Selected];
   acSysDrawText(ACanvas, LRect, ANode.Values[1], DT_BOTTOM or DT_SINGLELINE or DT_END_ELLIPSIS);
 
   AHandled := True;
 end;
 
-procedure TACLUIInsightSearchPopupWindow.HandlerSearchResultsKeyUp(
-  Sender: TObject; var Key: Word; ShiftState: TShiftState);
+{ TACLUIInsightHighlightWindow }
+
+constructor TACLUIInsightHighlightWindow.Create(AOwner: TComponent);
 begin
-  if Key = VK_RETURN then
+  inherited Create(AOwner);
+{$IFNDEF MSWINDOWS}
+  Transparent := True;
+{$ENDIF}
+  Visible := False;
+  Color := clRed;
+end;
+
+procedure TACLUIInsightHighlightWindow.BoundsChanged;
+var
+  LRegion: TRegionHandle;
+begin
+  inherited;
+  if HandleAllocated then
   begin
-    SelectCandidate(SearchResults.FocusedNode);
-    ClosePopup;
+  {$IFDEF LCLGtk3}
+    TACLWSCustomControl.SetOpacity(Self, 128);
+  {$ELSE}
+    LRegion := CreateRectRgnIndirect(ClientRect);
+    acRegionCombine(LRegion, ClientRect.InflateTo(-dpiApply(4, FCurrentPPI)), RGN_DIFF);
+    acRegionSetToWindow(Handle, LRegion, True);
+  {$ENDIF}
   end;
 end;
 
-procedure TACLUIInsightSearchPopupWindow.HandlerSearchResultsMouseDown(
-  Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+procedure TACLUIInsightHighlightWindow.CMCancelMode(var Msg: TMessage);
 begin
-  FCapturedObject := SearchResults.ObjectAtPos(X, Y);
+  inherited;
+  Hide;
 end;
 
-procedure TACLUIInsightSearchPopupWindow.HandlerSearchResultsMouseUp(
-  Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+procedure TACLUIInsightHighlightWindow.CMShowingChanged(var Msg: TMessage);
 begin
-  if FCapturedObject = SearchResults.ObjectAtPos(X, Y) then
-  begin
-    if FCapturedObject is TACLTreeListNode then
-      SelectCandidate(TACLTreeListNode(FCapturedObject));
-    ClosePopup;
-  end;
+  inherited;
+  MouseCapture := Showing;
+  if Showing then
+    FTimestamp := TACLThread.Timestamp;
+  BoundsChanged;
 end;
 
-{ TACLUIInsight }
-
-class constructor TACLUIInsight.Create;
+procedure TACLUIInsightHighlightWindow.MouseDown(
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
-  Register(TControl, TACLUIInsightAdapterControl);
-  Register(TWinControl, TACLUIInsightAdapterWinControl);
+  Hide;
+  inherited;
 end;
 
-class destructor TACLUIInsight.Destroy;
+procedure TACLUIInsightHighlightWindow.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
-  FreeAndNil(FObjectAdapters);
-  FreeAndNil(FClassAdapters);
+  if ClientRect.Contains(Point(X, Y)) and TACLThread.IsTimeout(FTimestamp, HideDelay) then
+    Hide;
 end;
 
-class function TACLUIInsight.GetAdapter(AObject: TObject; out AAdapter: TACLUIInsightAdapterClass): Boolean;
+procedure TACLUIInsightHighlightWindow.WMGetDlgCode(var Message: TWMGetDlgCode);
 begin
-  if (FObjectAdapters <> nil) and FObjectAdapters.TryGetValue(AObject, AAdapter) then
-    Exit(True);
-  if (FClassAdapters <> nil) and FClassAdapters.TryGetValue(AObject, AAdapter) then
-    Exit(True);
-  Result := False;
-end;
-
-class procedure TACLUIInsight.Register(AObject: TObject; AAdapter: TACLUIInsightAdapterClass);
-begin
-  if FObjectAdapters = nil then
-    FObjectAdapters := TACLDictionary<TObject, TACLUIInsightAdapterClass>.Create;
-  FObjectAdapters.Add(AObject, AAdapter);
-end;
-
-class procedure TACLUIInsight.Register(AClass: TClass; AAdapter: TACLUIInsightAdapterClass);
-begin
-  if FClassAdapters = nil then
-    FClassAdapters := TACLClassMap<TACLUIInsightAdapterClass>.Create;
-  FClassAdapters.Add(AClass, AAdapter);
-end;
-
-class procedure TACLUIInsight.Unregister(AClass: TClass);
-begin
-  if FClassAdapters <> nil then
-    FClassAdapters.Remove(AClass);
-end;
-
-class procedure TACLUIInsight.Unregister(AObject: TObject);
-begin
-  if FObjectAdapters <> nil then
-    FObjectAdapters.Remove(AObject);
-end;
-
-{ TACLUIInsightAdapter }
-
-class function TACLUIInsightAdapter.GetBoundsOnScreen(AObject: TObject; out ABounds: TRect): Boolean;
-begin
-  Result := False;
-end;
-
-class function TACLUIInsightAdapter.GetCaption(AObject: TObject; out AValue: string): Boolean;
-begin
-  Result := False;
-end;
-
-class procedure TACLUIInsightAdapter.GetChildren(AObject: TObject; ABuilder: TACLUIInsightSearchQueueBuilder);
-begin
-  // do nothing
-end;
-
-class function TACLUIInsightAdapter.GetGroupCaption(AObject: TObject; out AValue: string): Boolean;
-begin
-  Result := GetCaption(AObject, AValue);
-end;
-
-class function TACLUIInsightAdapter.GetKeywors(AObject: TObject; out AValue: string): Boolean;
-begin
-  Result := False;
-end;
-
-class function TACLUIInsightAdapter.MakeVisible(AObject: TObject): Boolean;
-begin
-  Result := True;
-end;
-
-{ TACLUIInsightAdapterControl }
-
-class function TACLUIInsightAdapterControl.GetBoundsOnScreen(AObject: TObject; out ABounds: TRect): Boolean;
-var
-  LControl: TControl absolute AObject;
-begin
-  Result := TACLControls.IsVisible(LControl.Parent);
-  if Result then
-    ABounds := LControl.BoundsRect + LControl.Parent.ClientOrigin;
-end;
-
-class function TACLUIInsightAdapterControl.GetCaption(AObject: TObject; out AValue: string): Boolean;
-begin
-  Result := TryGetPropValue(AObject, 'Caption', AValue);
-end;
-
-class function TACLUIInsightAdapterControl.GetKeywors(AObject: TObject; out AValue: string): Boolean;
-begin
-  Result := TryGetPropValue(AObject, 'Hint', AValue);
-end;
-
-{ TACLUIInsightAdapterWinControl }
-
-class function TACLUIInsightAdapterWinControl.GetBoundsOnScreen(AObject: TObject; out ABounds: TRect): Boolean;
-var
-  LControl: TWinControl absolute AObject;
-begin
-  Result := TACLControls.IsVisible(LControl);
-  if Result then
-    ABounds := Rect(0, 0, LControl.Width, LControl.Height) + LControl.ClientOrigin;
-end;
-
-class procedure TACLUIInsightAdapterWinControl.GetChildren(AObject: TObject; ABuilder: TACLUIInsightSearchQueueBuilder);
-var
-  AControl: TControl;
-  AWinControl: TWinControl absolute AObject;
-  I: Integer;
-begin
-  for I := 0 to AWinControl.ControlCount - 1 do
-  begin
-    AControl := AWinControl.Controls[I];
-    if AControl.Visible then
-      ABuilder.Add(AControl);
-  end;
+  Message.Result := DLGC_WANTALLKEYS or DLGC_WANTARROWS or DLGC_WANTTAB;
 end;
 
 end.

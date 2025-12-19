@@ -1,4 +1,7 @@
-﻿{$R-} { Range-Checking }
+﻿{$IFNDEF ACL_CONFIG_INC}
+{$DEFINE ACL_CONFIG_INC}
+
+{$R-} { Range-Checking }
 {$Q-} { Overflow checking }
 {$Z1} { Minumum enum size = 1}
 
@@ -91,10 +94,6 @@
 {$DEFINE ACL_ALPHACOMPOSED_POPUPMENUS}
 {$DEFINE ACL_TEXTLAYOUT_RTL}   // support for right-to-left text direction
 
-{$IFDEF LCLGtk2}
-  {$DEFINE ACL_DIB_CANVAS_NO_DC}
-{$ENDIF}
-
 {$IFDEF LCLGtkX}
   {$DEFINE ACL_CAIRO}
   {$DEFINE ACL_CAIRO_RENDER}
@@ -108,3 +107,5 @@
 {$IFDEF LINUX}
   {.$DEFINE ACL_USE_SKINNED_FORM} // Experimental!
 {$ENDIF}
+
+{$ENDIF} // ACL_CONFIG_INC

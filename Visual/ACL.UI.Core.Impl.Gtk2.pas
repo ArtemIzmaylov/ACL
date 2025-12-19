@@ -158,7 +158,10 @@ type
 
   { TACLWSCustomControl }
 
-  TACLWSCustomControl = class(TGtk2WSWinControl);
+  TACLWSCustomControl = class(TGtk2WSWinControl)
+  published
+    class procedure SetOpacity(const AWinControl: TWinControl; AOpacity: Byte);
+  end;
 
   { TACLWSPopupWindow }
 
@@ -1155,6 +1158,14 @@ begin
   end
   else
     inherited SetBounds(AWinControl, ALeft, ATop, AWidth, AHeight);
+end;
+
+{ TACLWSCustomControl }
+
+class procedure TACLWSCustomControl.SetOpacity(
+  const AWinControl: TWinControl; AOpacity: Byte);
+begin
+  // unavailable
 end;
 
 { TACLWSScrollingControl }

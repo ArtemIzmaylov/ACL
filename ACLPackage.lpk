@@ -535,6 +535,10 @@
         <UnitName Value="ACL.UI.Insight"/>
       </Item>
       <Item>
+        <Filename Value="Visual/ACL.UI.Insight.Core.pas"/>
+        <UnitName Value="ACL.UI.Insight.Core"/>
+      </Item>
+      <Item>
         <Filename Value="Visual/ACL.UI.Menus.pas"/>
         <UnitName Value="ACL.UI.Menus"/>
       </Item>

@@ -295,6 +295,7 @@
         <DCCReference Include="Visual\ACL.UI.HintWindow.pas"/>
         <DCCReference Include="Visual\ACL.UI.ImageList.pas"/>
         <DCCReference Include="Visual\ACL.UI.Insight.pas"/>
+        <DCCReference Include="Visual\ACL.UI.Insight.Core.pas"/>
         <DCCReference Include="Visual\ACL.UI.Menus.pas"/>
         <DCCReference Include="Visual\ACL.UI.Resources.pas"/>
         <DCCReference Include="Visual\ACL.UI.TrayIcon.pas"/>

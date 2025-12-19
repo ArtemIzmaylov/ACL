@@ -168,6 +168,7 @@ contains
   ACL.UI.HintWindow in 'Visual\ACL.UI.HintWindow.pas',
   ACL.UI.ImageList in 'Visual\ACL.UI.ImageList.pas',
   ACL.UI.Insight in 'Visual\ACL.UI.Insight.pas',
+  ACL.UI.Insight.Core in 'Visual\ACL.UI.Insight.Core.pas',
   ACL.UI.Menus in 'Visual\ACL.UI.Menus.pas',
   ACL.UI.Resources in 'Visual\ACL.UI.Resources.pas',
   ACL.UI.TrayIcon in 'Visual\ACL.UI.TrayIcon.pas',

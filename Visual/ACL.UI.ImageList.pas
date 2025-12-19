@@ -87,6 +87,9 @@ type
     function AddImage(const AImage: TACLImage): Integer; overload;
     function AddImage(const AImage: TACLSkinImage): Integer; overload;
     function AddIconFromResource(AInstance: HINST; const AName: string): Integer;
+  {$IFDEF FPC}
+    procedure GetIcon(AIndex: Integer; AIcon: TIcon); reintroduce;
+  {$ENDIF}
     function GetImage(AIndex: Integer; AEnabled: Boolean = True): TACLDib;
     procedure ReplaceBitmap(AIndex: Integer; ABitmap: TBitmap);
     //# Clear and Add the Image
@@ -531,6 +534,21 @@ begin
     LIcon.Free;
   end;
 end;
+
+{$IFDEF FPC}
+procedure TACLImageList.GetIcon(AIndex: Integer; AIcon: TIcon);
+var
+  LBitmap: TBitmap;
+begin
+  LBitmap := TBitmap.Create;
+  try
+    GetBitmap(AIndex, LBitmap);
+    AIcon.Assign(LBitmap);
+  finally
+    LBitmap.Free;
+  end;
+end;
+{$ENDIF}
 
 function TACLImageList.ConvertTo32Bit(ASource: TBitmap): TACLBitmap;
 begin

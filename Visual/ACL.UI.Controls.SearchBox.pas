@@ -46,6 +46,7 @@ uses
   ACL.UI.Controls.Base,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.Buttons,
+  ACL.UI.Controls.ComboBox,
   ACL.UI.Controls.TextEdit,
   ACL.UI.Resources,
   ACL.Utils.Strings;
@@ -64,7 +65,7 @@ type
 
   { TACLSearchEdit }
 
-  TACLSearchEdit = class(TACLCustomTextEdit)
+  TACLSearchEdit = class(TACLBasicComboBox)
   strict private
     FDelayTimer: TACLTimer;
     FFocusControl: TWinControl;
@@ -80,6 +81,11 @@ type
     procedure CMWantSpecialKey(var Message: TCMWantSpecialKey); message CM_WANTSPECIALKEY;
   protected
     function CreateStyleButton: TACLStyleButton; override;
+    procedure DoPrepareDropDownList(AList: TACLBasicDropDownList); override;
+    procedure DoSearch; virtual;
+    function GetCount: Integer; override;
+    function IsDropDownKey(Key: WideChar): Boolean; override;
+    function IsDropDownKey(Key: Word; Shift: TShiftState): Boolean; override;
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     procedure MoveFocusToFirstSearchResult;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
@@ -97,8 +103,13 @@ type
     property ResourceCollection;
     property Style;
     property StyleButton;
+// lookup is not yet implemented
+//    property StyleDropDownList;
+//    property StyleDropDownListScrollBox;
     property Text;
     property TextHint;
+//    //# Events
+//    property OnPrepareDropDownList;
   end;
 
 implementation
@@ -106,14 +117,13 @@ implementation
 { TACLSearchEdit }
 
 constructor TACLSearchEdit.Create(AOwner: TComponent);
-var
-  LButton: TACLEditButton;
 begin
   inherited Create(AOwner);
   FDelayTimer := TACLTimer.CreateEx(HandlerDelayTimer, acSearchDelay);
-  LButton := Buttons.Add;
-  LButton.OnClick := HandlerCancel;
-  LButton.Visible := False;
+  DropDownButton.Part := abpButton;
+  DropDownButton.OnClick := HandlerCancel;
+  DropDownButtonVisible := False;
+  EditBox.Iteract := True;
 end;
 
 destructor TACLSearchEdit.Destroy;
@@ -152,8 +162,37 @@ begin
   Result := TACLSearchEditStyleButton.Create(Self);
 end;
 
-procedure TACLSearchEdit.KeyDown(var Key: Word; Shift: TShiftState);
+procedure TACLSearchEdit.DoPrepareDropDownList(AList: TACLBasicDropDownList);
 begin
+  AList.IncSearch.Mode := ismFilter;
+  inherited;
+end;
+
+procedure TACLSearchEdit.DoSearch;
+begin
+  inherited TextChanged;
+end;
+
+function TACLSearchEdit.IsDropDownKey(Key: WideChar): Boolean;
+begin
+  Result := Ord(Key) in [{vkUp, vkDown, }vkEscape, vkReturn];
+end;
+
+function TACLSearchEdit.IsDropDownKey(Key: Word; Shift: TShiftState): Boolean;
+begin
+  Result := Key in [vkUp, vkDown, vkEscape, vkReturn];
+end;
+
+procedure TACLSearchEdit.KeyDown(var Key: Word; Shift: TShiftState);
+var
+  LDropDownList: TACLBasicDropDownList;
+begin
+  if GetDropDownList(LDropDownList) and IsDropDownKey(Key, Shift) then
+  begin
+    LDropDownList.KeyDown(Key, Shift);
+    Exit;
+  end;
+
   case Key of
     vkDown:
       MoveFocusToFirstSearchResult;
@@ -196,7 +235,7 @@ end;
 
 procedure TACLSearchEdit.Notification(AComponent: TComponent; Operation: TOperation);
 begin
-  inherited Notification(AComponent, Operation);
+  inherited;
   if (Operation = opRemove) and (AComponent = FocusControl) then
     FocusControl := nil;
 end;
@@ -204,6 +243,11 @@ end;
 function TACLSearchEdit.GetChangeDelay: Integer;
 begin
   Result := FDelayTimer.Interval;
+end;
+
+function TACLSearchEdit.GetCount: Integer;
+begin
+  Result := 0;
 end;
 
 procedure TACLSearchEdit.HandlerCancel(Sender: TObject);
@@ -214,7 +258,7 @@ end;
 procedure TACLSearchEdit.HandlerDelayTimer(Sender: TObject);
 begin
   FDelayTimer.Enabled := False;
-  inherited TextChanged;
+  DoSearch;
 end;
 
 procedure TACLSearchEdit.SetChangeDelay(AValue: Integer);
@@ -229,7 +273,7 @@ end;
 
 procedure TACLSearchEdit.TextChanged;
 begin
-  Buttons[0].Visible := Text <> '';
+  DropDownButtonVisible := Text <> '';
   if not (csLoading in ComponentState) then
     FDelayTimer.Restart;
 end;

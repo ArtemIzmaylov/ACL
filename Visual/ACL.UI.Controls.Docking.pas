@@ -141,10 +141,6 @@ type
     function CreateDockGroupForReplacement(AControl: TACLDockControl): TACLDockGroup;
     function GetCurrentDpi: Integer;
     procedure Paint; override;
-  {$IFDEF FPC}
-  protected
-    class procedure WSRegisterClass; override;
-  {$ENDIF}
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
