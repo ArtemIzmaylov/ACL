@@ -211,13 +211,6 @@ type
 
 {$REGION ' In-placing '}
 
-  { IACLInnerControl }
-
-  IACLInnerControl = interface
-  ['{8F98096E-7A0D-4D77-82AB-B9724B3C6596}']
-    function GetInnerContainer: TWinControl;
-  end;
-
   { IACLInplaceControl }
 
   IACLInplaceControl = interface
@@ -1282,14 +1275,10 @@ begin
 end;
 
 function acSaveFocus: TWndHandle;
-var
-  AIntf: IACLInnerControl;
 begin
   Result := GetFocus;
   if Result = 0 then
     Result := GetForegroundWindow;
-  if Supports(FindControl(Result), IACLInnerControl, AIntf) then
-    Result := AIntf.GetInnerContainer.Handle;
 end;
 
 function acSafeSetFocus(AControl: TWinControl): Boolean;

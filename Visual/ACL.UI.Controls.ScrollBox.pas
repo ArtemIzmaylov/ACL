@@ -612,28 +612,24 @@ end;
 
 procedure TACLCustomScrollBox.MakeVisible(AControl: TControl);
 var
-  AInnerControl: IACLInnerControl;
   AParent: TWinControl;
   ARect: TRect;
 begin
-  if Supports(AControl, IACLInnerControl, AInnerControl) then
-    MakeVisible(AInnerControl.GetInnerContainer)
-  else
-    if AControl <> nil then
+  if AControl <> nil then
+  begin
+    HandleNeeded;
+    ARect := AControl.BoundsRect;
+
+    AParent := AControl.Parent;
+    while (AParent <> nil) and (AParent <> Self) do
     begin
-      HandleNeeded;
-      ARect := AControl.BoundsRect;
-
-      AParent := AControl.Parent;
-      while (AParent <> nil) and (AParent <> Self) do
-      begin
-        ARect.Offset(AParent.BoundsRect.TopLeft);
-        AParent := AParent.Parent;
-      end;
-
-      if AParent = Self then
-        MakeVisible(ARect);
+      ARect.Offset(AParent.BoundsRect.TopLeft);
+      AParent := AParent.Parent;
     end;
+
+    if AParent = Self then
+      MakeVisible(ARect);
+  end;
 end;
 
 procedure TACLCustomScrollBox.MakeVisible(ARect: TRect);
