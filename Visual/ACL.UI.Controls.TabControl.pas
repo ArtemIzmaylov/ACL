@@ -1198,7 +1198,7 @@ begin
 
     VK_TAB:
       begin
-        LShift := acGetShiftState;
+        LShift := GetKeyShiftState;
         if [ssCtrl, ssAlt] * LShift = [ssCtrl] then
         begin
           FIsUserAction := True;

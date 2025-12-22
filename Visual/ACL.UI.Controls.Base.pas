@@ -146,7 +146,7 @@ type
 {$REGION ' General Types '}
 
   TTabOrderList = {$IFDEF FPC}TFPList{$ELSE}TList{$ENDIF};
-  TWideKeyEvent = procedure(var Key: WideChar) of object;
+  TWideCharProc = procedure(var Key: WideChar) of object;
 
   TACLControlActionType = (ccatNone, ccatMouse, ccatGesture, ccatKeyboard);
 
@@ -1028,7 +1028,6 @@ function acMapPoint(ASource, ATarget: TWinControl; const P: TPoint): TPoint;
 function acMapRect(ASource, ATarget: TWinControl; const R: TRect): TRect;
 
 // Keyboard
-function acGetShiftState: TShiftState;
 function acIsDropDownCommand(Key: Word; Shift: TShiftState): Boolean;
 function acIsShiftPressed(ATest: TShiftState): Boolean; overload;
 function acIsShiftPressed(ATest, AState: TShiftState): Boolean; overload;
@@ -1038,7 +1037,9 @@ procedure acMessageBeep(AType: TMsgDlgType);
 
 {$IFDEF FPC}
 function PointToLParam(const P: TPoint): LPARAM;
-procedure ProcessUtf8KeyPress(var Key: TUTF8Char; AEvent: TWideKeyEvent);
+procedure ProcessUtf8KeyPress(var Key: TUTF8Char; AKeyCharProc: TWideCharProc);
+{$ELSE}
+function GetKeyShiftState: TShiftState;
 {$ENDIF}
 implementation
 
@@ -1361,17 +1362,17 @@ begin
   Result := LPARAM((P.X and $0000ffff) or (P.Y shl 16));
 end;
 
-procedure ProcessUtf8KeyPress(var Key: TUTF8Char; AEvent: TWideKeyEvent);
+procedure ProcessUtf8KeyPress(var Key: TUTF8Char; AKeyCharProc: TWideCharProc);
 var
   LKey: WideChar;
-  LStr: UnicodeString;
+  LKeyString: UnicodeString;
 begin
-  LStr := UTF8ToString(Key);
-  if Length(LStr) = 1 then
+  LKeyString := UTF8ToString(Key);
+  if Length(LKeyString) = 1 then
   begin
-    LKey := LStr[1];
-    AEvent(LKey);
-    if LKey <> LStr[1] then
+    LKey := LKeyString[1];
+    AKeyCharProc(LKey);
+    if LKey <> LKeyString[1] then
       Key := UTF8Encode(LKey);
   end;
 end;
@@ -1379,7 +1380,8 @@ end;
 
 {$REGION ' Keyboard '}
 
-function acGetShiftState: TShiftState;
+{$IFNDEF FPC}
+function GetKeyShiftState: TShiftState;
 begin
   //#AI: We must ask use the GetKeyState instead of the GetKeyboardState,
   // because second doesn't return real information after next actions:
@@ -1401,6 +1403,7 @@ begin
   if GetKeyState(VK_RBUTTON) < 0 then
     Include(Result, ssRight);
 end;
+{$ENDIF}
 
 function acShiftStateToKeys(AShift: TShiftState): Word;
 begin
@@ -1428,7 +1431,7 @@ end;
 
 function acIsShiftPressed(ATest: TShiftState): Boolean;
 begin
-  Result := acIsShiftPressed(ATest, acGetShiftState);
+  Result := acIsShiftPressed(ATest, GetKeyShiftState);
 end;
 
 {$ENDREGION}
@@ -3653,7 +3656,6 @@ end;
 {$IFDEF FPC}
 procedure TACLCustomControl.Utf8KeyPress(var Key: TUTF8Char);
 begin
-  inherited;
   ProcessUtf8KeyPress(Key, KeyChar);
 end;
 {$ENDIF}
