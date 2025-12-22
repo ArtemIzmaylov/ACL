@@ -356,8 +356,12 @@ type
       'f', 'h', 'ts', 'ch', 'sh', 'sch', #39, 'y', #39, 'e', 'yu', 'ya'
     );
   public
-    class function Decode(const S: UnicodeString): UnicodeString;
-    class function Encode(const S: UnicodeString): UnicodeString;
+  {$IFNDEF UNICODE}
+    class function Decode(const S: string): string; overload;
+    class function Encode(const S: string): string; overload;
+  {$ENDIF}
+    class function Decode(const S: UnicodeString): UnicodeString; overload;
+    class function Encode(const S: UnicodeString): UnicodeString; overload;
   end;
 
   { TACLEncodings }
@@ -497,8 +501,8 @@ function acSplitStringAsIntegerArray(const S: string;
   ADelimiter: Char; AArray: PInteger; AArrayLength: Integer): Integer;
 
 // Case
-function acAllWordsWithCaptialLetter(const S: UnicodeString; IgnoreSourceCase: Boolean = False): UnicodeString;
-function acFirstWordWithCaptialLetter(const S: UnicodeString): UnicodeString;
+function acAllWordsWithCaptialLetter(const S: string; IgnoreSourceCase: Boolean = False): string;
+function acFirstWordWithCaptialLetter(const S: string): string;
 function acLowerCase(const S: string): string; overload; inline;
 function acLowerCase(const S: AnsiChar): AnsiChar; overload; inline;
 function acLowerCase(const S: WideChar): WideChar; overload; inline;
@@ -610,8 +614,9 @@ function acURLEscape(const S: string): string;
 implementation
 
 uses
-  // System
+{$IFDEF UNICODE}
   System.AnsiStrings,
+{$ENDIF}
   {System.}RTLConsts,
   // ACL
   ACL.Classes.Collections,
@@ -1603,51 +1608,55 @@ end;
 //  Test('there''s nothing to do', 'There''s Nothing To Do');
 //  Test('21th', '21th');
 //  Test('dear monsters, be patient', 'Dear Monsters, Be Patient');
-function acAllWordsWithCaptialLetter(const S: UnicodeString; IgnoreSourceCase: Boolean = False): UnicodeString;
+function acAllWordsWithCaptialLetter(const S: string; IgnoreSourceCase: Boolean = False): string;
 var
-  AChar1: WideChar;
-  ADelims: UnicodeString;
-  AEndOfWordFound: Boolean;
-  APos, ALen: Cardinal;
+  LChar: WideChar;
+  LDelims: UnicodeString;
+  LEndOfWordFound: Boolean;
+  LPos, LLen: Cardinal;
+  LStr: UnicodeString;
 begin
-  APos := 1;
-  ALen := Length(S);
+  LPos := 1;
+  LLen := Length(LStr);
   if IgnoreSourceCase then
-    Result := S
+    LStr := acUString(S)
   else
-    Result := S.ToLower;
+    LStr := acUString(acLowerCase(S));
 
-  ADelims := acParserDefaultDelimiterChars;
-  AEndOfWordFound := True;
-  while APos <= ALen do
+  LDelims := acParserDefaultDelimiterChars;
+  LEndOfWordFound := True;
+  while LPos <= LLen do
   begin
-    AChar1 := Result[APos];
-    if AEndOfWordFound then
-      Result[APos] := acUpperCase(AChar1);
-    AEndOfWordFound := (AChar1 <> #39) and acContains(AChar1, ADelims);
-    Inc(APos);
+    LChar := LStr[LPos];
+    if LEndOfWordFound then
+      LStr[LPos] := acUpperCase(LChar);
+    LEndOfWordFound := (LChar <> #39) and acContains(LChar, LDelims);
+    Inc(LPos);
   end;
+  Result := acString(LStr);
 end;
 
-function acFirstWordWithCaptialLetter(const S: UnicodeString): UnicodeString;
+function acFirstWordWithCaptialLetter(const S: string): string;
 var
-  APos, ALen: Cardinal;
   Ch1, Ch2: WideChar;
+  Pos, Len: Cardinal;
+  Str: UnicodeString;
 begin
-  Result := S.ToLower;
-  ALen := Length(Result);
-  APos := 0;
-  if ALen > 0 then
+  Str := acUString(acLowerCase(S));
+  Len := Length(Str);
+  Pos := 0;
+  if Len > 0 then
   repeat
-    Inc(APos);
-    Ch1 := Result[APos];
+    Inc(Pos);
+    Ch1 := Str[Pos];
     Ch2 := acUpperCase(Ch1);
     if Ch1 <> Ch2 then
     begin
-      Result[APos] := Ch2;
+      Str[Pos] := Ch2;
       Break;
     end;
-  until (APos + 1 > ALen);
+  until Pos + 1 > Len;
+  Result := acString(Str);
 end;
 
 function acLowerCase(const S: string): string;
@@ -4011,7 +4020,7 @@ begin
       A := acMakeString(ACursorStart, ACursorFinish);
       if AResult <> '' then
         AResult := AResult + '.';
-      if System.AnsiStrings.SameText(Copy(A, 1, 4), 'xn--') then
+      if {$IFDEF UNICODE}System.AnsiStrings.{$ENDIF}SameText(Copy(A, 1, 4), 'xn--') then
         AResult := AResult + Decode(Copy(A, 5, MaxInt))
       else
         AResult := AResult + UnicodeString(A);
@@ -4215,6 +4224,18 @@ end;
 
 { TACLTranslit }
 
+{$IFNDEF UNICODE}
+class function TACLTranslit.Decode(const S: string): string;
+begin
+  Result := acString(Decode(acUString(S)));
+end;
+
+class function TACLTranslit.Encode(const S: string): string;
+begin
+  Result := acString(Encode(acUString(S)));
+end;
+{$ENDIF}
+
 class function TACLTranslit.Decode(const S: UnicodeString): UnicodeString;
 var
   I, ID: Integer;
@@ -4290,15 +4311,12 @@ begin
     C := acLowerCase(S[I]);
     IsUpper := C <> S[I];
     P := acPos(C, RArrayL);
-    if P <> 0 then
-    begin
-      if IsUpper then
-        Result := Result + acFirstWordWithCaptialLetter(Translit[p])
-      else
-        Result := Result + Translit[p];
-    end
+    if P = 0 then
+      Result := Result + S[I]
+    else if IsUpper then
+      Result := Result + acUString(acFirstWordWithCaptialLetter(acString(Translit[p])))
     else
-      Result := Result + S[I];
+      Result := Result + Translit[p];
   end;
 end;
 

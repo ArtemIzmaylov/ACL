@@ -745,6 +745,7 @@ type
     FCapacity: Integer;
     FComparer: IEqualityComparer<TKey>;
     FData: TACLDictionary<TKey, TValue>;
+    FOwnsValues: Boolean;
     FQueue: array of TQueueItem;
     FQueueCursor: Integer;
 
@@ -755,7 +756,9 @@ type
     procedure DoRemove(const Item: TValue); virtual;
   public
     constructor Create(ACapacity: Integer = 256); overload;
-    constructor Create(ACapacity: Integer; AEqualityComparer: IEqualityComparer<TKey>); overload;
+    constructor Create(ACapacity: Integer;
+      AEqualityComparer: IEqualityComparer<TKey>;
+      AOwnsValues: Boolean = False); overload;
     destructor Destroy; override;
     procedure Add(const Key: TKey; const Value: TValue);
     procedure Clear;
@@ -815,6 +818,7 @@ resourcestring
 
 function GrowCollection(OldCapacity, NewCount: Integer): Integer;
 {$ENDIF}
+procedure EnsureTypeIsObject(ATypeInfo: PTypeInfo);
 implementation
 
 // FPC:
@@ -838,6 +842,12 @@ begin
   until Result >= NewCount;
 end;
 {$ENDIF}
+
+procedure EnsureTypeIsObject(ATypeInfo: PTypeInfo);
+begin
+  if (ATypeInfo = nil) or (ATypeInfo^.Kind <> tkClass) then
+    raise EInvalidCast.CreateRes(@SInvalidCast);
+end;
 
 { TACLEnumerable<T> }
 
@@ -960,10 +970,7 @@ constructor TACLLinkedListOf<T>.Create(AOwnValues: Boolean);
 begin
   FOwnValues := AOwnValues;
   if AOwnValues then
-  begin
-    if (TypeInfo(T) = nil) or (PTypeInfo(TypeInfo(T))^.Kind <> tkClass) then
-      raise EInvalidCast.CreateRes(@SInvalidCast);
-  end;
+    EnsureTypeIsObject(TypeInfo(T));
 end;
 
 function TACLLinkedListOf<T>.Add(const AItem: TACLLinkedListItem<T>): TACLLinkedListItem<T>;
@@ -1779,19 +1786,10 @@ constructor TACLDictionary<TKey, TValue>.Create(
   AComparer: IEqualityComparer<TKey>);
 begin
   Create(ACapacity, AComparer);
-
   if doOwnsKeys in AOwnerships then
-  begin
-    if (TypeInfo(TKey) = nil) or (PTypeInfo(TypeInfo(TKey))^.Kind <> tkClass) then
-      raise EInvalidCast.CreateRes(@SInvalidCast);
-  end;
-
+    EnsureTypeIsObject(TypeInfo(TKey));
   if doOwnsValues in AOwnerships then
-  begin
-    if (TypeInfo(TValue) = nil) or (PTypeInfo(TypeInfo(TValue))^.Kind <> tkClass) then
-      raise EInvalidCast.CreateRes(@SInvalidCast);
-  end;
-
+    EnsureTypeIsObject(TypeInfo(TValue));
   FOwnerships := AOwnerships;
 end;
 
@@ -3263,8 +3261,13 @@ begin
 end;
 
 constructor TACLValueCacheManager<TKey, TValue>.Create(
-  ACapacity: Integer; AEqualityComparer: IEqualityComparer<TKey>);
+  ACapacity: Integer; AEqualityComparer: IEqualityComparer<TKey>;
+  AOwnsValues: Boolean = False);
 begin
+  if AOwnsValues then
+    EnsureTypeIsObject(TypeInfo(TValue));
+
+  FOwnsValues := AOwnsValues;
   FCapacity := Max(ACapacity, 4);
   FComparer := AEqualityComparer;
   if FComparer = nil then
@@ -3283,20 +3286,20 @@ end;
 
 procedure TACLValueCacheManager<TKey, TValue>.Add(const Key: TKey; const Value: TValue);
 var
-  AQueueItem: PQueueItem;
+  LQueueItem: PQueueItem;
 begin
-  AQueueItem := @FQueue[FQueueCursor];
+  LQueueItem := @FQueue[FQueueCursor];
 
-  if AQueueItem^.Value then
+  if LQueueItem^.Value then
   begin
-    FData.Remove(AQueueItem^.Key);
-    AQueueItem^.Key := Default(TKey);
-    AQueueItem^.Value := False;
+    FData.Remove(LQueueItem^.Key);
+    LQueueItem^.Key := Default(TKey);
+    LQueueItem^.Value := False;
   end;
 
   FData.Add(Key, Value);
-  AQueueItem^.Key := Key;
-  AQueueItem^.Value := True;
+  LQueueItem^.Key := Key;
+  LQueueItem^.Value := True;
 
   FQueueCursor := (FQueueCursor + 1) mod FCapacity;
 end;
@@ -3323,17 +3326,17 @@ end;
 
 procedure TACLValueCacheManager<TKey, TValue>.Remove(const Key: TKey);
 var
-  AQueueItem: PQueueItem;
+  LQueueItem: PQueueItem;
   I: Integer;
 begin
   for I := 0 to Length(FQueue) - 1 do
   begin
-    AQueueItem := @FQueue[I];
-    if AQueueItem^.Value and FComparer.Equals(AQueueItem^.Key, Key) then
+    LQueueItem := @FQueue[I];
+    if LQueueItem^.Value and FComparer.Equals(LQueueItem^.Key, Key) then
     begin
-      FData.Remove(AQueueItem^.Key);
-      AQueueItem^.Key := Default(TKey);
-      AQueueItem^.Value := False;
+      FData.Remove(LQueueItem^.Key);
+      LQueueItem^.Key := Default(TKey);
+      LQueueItem^.Value := False;
       Break;
     end;
   end;
@@ -3342,7 +3345,9 @@ end;
 procedure TACLValueCacheManager<TKey, TValue>.DoRemove(const Item: TValue);
 begin
   if Assigned(OnRemove) then
-    OnRemove(Self, Item);
+    OnRemove(Self, Item)
+  else if FOwnsValues then
+    PObject(@Item)^.Free;
 end;
 
 procedure TACLValueCacheManager<TKey, TValue>.ValueHandler(

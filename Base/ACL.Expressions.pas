@@ -233,8 +233,6 @@ type
   TACLExpressionCache = class(TACLValueCacheManager<string, TACLExpression>)
   strict private
     FFactory: TACLCustomExpressionFactory;
-  protected
-    procedure DoRemove(const AExpression: TACLExpression); override;
   public
     constructor Create(AFactory: TACLCustomExpressionFactory; ACapacity: Integer);
     function Evaluate(const AExpression: string; AContext: TObject): Variant;
@@ -755,13 +753,8 @@ end;
 
 constructor TACLExpressionCache.Create(AFactory: TACLCustomExpressionFactory; ACapacity: Integer);
 begin
-  inherited Create(ACapacity);
+  inherited Create(ACapacity, nil, True);
   FFactory := AFactory;
-end;
-
-procedure TACLExpressionCache.DoRemove(const AExpression: TACLExpression);
-begin
-  AExpression.Free;
 end;
 
 function TACLExpressionCache.Evaluate(const AExpression: string; AContext: TObject): Variant;
