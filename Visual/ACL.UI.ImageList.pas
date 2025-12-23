@@ -602,7 +602,7 @@ begin
   {$IFNDEF FPC}
     // Set ColorDepth property forces to create Handle.
     // So, setup it only for new instance of ImageList.
-    if (Owner = nil) or not (csReading in Owner.ComponentState) then
+    if (Owner = nil) or ([csDesigning, csReading] * Owner.ComponentState <> [csReading]) then
       ColorDepth := cd32Bit;
   {$ENDIF}
   except

@@ -46,6 +46,7 @@ uses
   ACL.UI.Controls.Base,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.Buttons,
+  ACL.UI.HintWindow,
   ACL.UI.ImageList,
   ACL.UI.Resources,
   ACL.Utils.Common,
@@ -551,7 +552,10 @@ var
   LItem: TACLEditButton;
 begin
   if Buttons.Find(Message.HintInfo^.CursorPos, LItem) and (LItem.Hint <> '') then
-    Message.HintInfo^.HintStr := LItem.Hint
+  begin
+    Message.HintInfo^.HintStr := LItem.Hint;
+    Message.HintInfo^.HintWindowClass := TACLHintWindow;
+  end
   else
     inherited;
 end;

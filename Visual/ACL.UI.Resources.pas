@@ -323,10 +323,6 @@ type
     procedure SetQuality(const Value: TFontQuality);
     procedure SetSize(const Value: Integer);
     procedure SetStyle(const Value: TFontStyles);
-
-    procedure ReadID(Reader: TReader);
-    procedure WriteID(Writer: TWriter);
-
     // IACLResourceProvider
     function GetResource(const ID: string; AResourceClass: TClass; ASender: TObject = nil): TObject;
   protected
@@ -340,7 +336,6 @@ type
     procedure DoResetValues(AValues: TACLResourceFontAssignedValues);
     procedure DoResourceChanged(Sender: TObject; Resource: TACLResource = nil); override;
 
-    procedure DefineProperties(Filer: TFiler); override;
     function EqualsValuesCore(AResource: TACLResource): Boolean; override;
     procedure Initialize; override;
     function IsValueStored: Boolean; override;
@@ -353,7 +348,7 @@ type
     // IACLColorSchema
     procedure ApplyColorSchema(const AValue: TACLColorSchema);
   published
-    property ID; // must be first
+    property ID stored IsIDStored; // must be first
     property AllowColoration: Boolean read GetAllowColoration write SetAllowColoration default True;
     property Color: TAlphaColor read GetColor write SetColor stored IsColorStored;
     property ColorID: string read GetColorID write SetColorID stored IsColorIDStored;
@@ -666,7 +661,7 @@ type
   public
     destructor Destroy; override;
     procedure Assign(Source: TPersistent); override;
-    //
+    // Properties
     property Collection: TACLResourceCollectionItems read GetCollection;
   published
     property ID: string read FID write SetID;
@@ -772,12 +767,13 @@ type
   strict private
     FMasterCollection: TACLCustomResourceCollection;
 
-    procedure SetMasterCollection(const AValue: TACLCustomResourceCollection);
+    procedure SetMasterCollection(AValue: TACLCustomResourceCollection);
   protected
     function GetDefaultResource(const ID: string;
       AResourceClass: TClass; ASender: TObject = nil): TObject; override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
   public
+    procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
   published
     property MasterCollection: TACLCustomResourceCollection read FMasterCollection write SetMasterCollection;
@@ -1600,12 +1596,6 @@ begin
   end;
 end;
 
-procedure TACLResourceFont.DefineProperties(Filer: TFiler);
-begin
-  inherited DefineProperties(Filer);
-  Filer.DefineProperty('ID', ReadID, WriteID, IsIDStored);
-end;
-
 function TACLResourceFont.EqualsValuesCore(AResource: TACLResource): Boolean;
 begin
   Result :=
@@ -1855,16 +1845,6 @@ begin
   finally
     EndUpdate;
   end;
-end;
-
-procedure TACLResourceFont.ReadID(Reader: TReader);
-begin
-  ID := Reader.ReadString;
-end;
-
-procedure TACLResourceFont.WriteID(Writer: TWriter);
-begin
-  Writer.WriteString(ID);
 end;
 
 function TACLResourceFont.GetResource(const ID: string; AResourceClass: TClass; ASender: TObject = nil): TObject;
@@ -2296,20 +2276,8 @@ procedure TACLResourceTexture.SetImage(AImage: TACLSkinImageSetItem);
 begin
   BeginUpdate;
   try
-    if AImage <> FImage then
-    begin
-      if FImage <> nil then
-      begin
-        FImage.ReferenceRemove;
-        FImage := nil;
-      end;
-      if AImage <> nil then
-      begin
-        FImage := AImage;
-        FImage.ReferenceAdd;
-      end;
+    if acSetSkinImageSetItemField(FImage, AImage) then
       Changed;
-    end;
     UpdateImageScaleFactor;
   finally
     EndUpdate;
@@ -2835,12 +2803,28 @@ begin
   Result := TACLResourceCollectionItems(inherited Collection);
 end;
 
+function TACLResourceCollectionItem.GetCollectionEx: TACLCustomResourceCollection;
+begin
+  Result := Collection.Owner;
+end;
+
 function TACLResourceCollectionItem.GetResourceClassName: string;
 begin
   if FResource <> nil then
     Result := FResource.ClassName
   else
     Result := '';
+end;
+
+function TACLResourceCollectionItem.GetResource(
+  const ID: string; AResourceClass: TClass; ASender: TObject = nil): TObject;
+begin
+  Result := Collection.Owner.GetResource(ID, AResourceClass, ASender);
+end;
+
+procedure TACLResourceCollectionItem.ResourceChanged(Sender: TObject; Resource: TACLResource = nil);
+begin
+  Changed(False);
 end;
 
 procedure TACLResourceCollectionItem.SetID(const Value: string);
@@ -2873,21 +2857,6 @@ begin
     raise EInvalidCast.CreateFmt('The %s is not valid resource', [AValue]);
   FreeAndNil(FResource);
   FResource := TACLResourceClass(AClass).Create(Self);
-  Changed(False);
-end;
-
-function TACLResourceCollectionItem.GetCollectionEx: TACLCustomResourceCollection;
-begin
-  Result := Collection.Owner;
-end;
-
-function TACLResourceCollectionItem.GetResource(const ID: string; AResourceClass: TClass; ASender: TObject = nil): TObject;
-begin
-  Result := Collection.Owner.GetResource(ID, AResourceClass, ASender);
-end;
-
-procedure TACLResourceCollectionItem.ResourceChanged(Sender: TObject; Resource: TACLResource = nil);
-begin
   Changed(False);
 end;
 
@@ -3289,13 +3258,20 @@ end;
 
 { TACLResourceCollection }
 
+procedure TACLResourceCollection.AfterConstruction;
+begin
+  inherited;
+  MasterCollection := nil;
+end;
+
 procedure TACLResourceCollection.BeforeDestruction;
 begin
   inherited;
   MasterCollection := nil;
 end;
 
-function TACLResourceCollection.GetDefaultResource(const ID: string; AResourceClass: TClass; ASender: TObject = nil): TObject;
+function TACLResourceCollection.GetDefaultResource(
+  const ID: string; AResourceClass: TClass; ASender: TObject = nil): TObject;
 begin
   if MasterCollection <> nil then
     Result := MasterCollection.GetResource(ID, AResourceClass, ASender)
@@ -3310,10 +3286,13 @@ begin
     MasterCollection := nil;
 end;
 
-procedure TACLResourceCollection.SetMasterCollection(const AValue: TACLCustomResourceCollection);
+procedure TACLResourceCollection.SetMasterCollection(AValue: TACLCustomResourceCollection);
 begin
+  TACLRootResourceCollection.ListenerRemove(Self);
   if acResourceCollectionFieldSet(FMasterCollection, Self, Self, AValue) then
     ResourceChanged;
+  if (MasterCollection = nil) and not IsDestroying then
+    TACLRootResourceCollection.ListenerAdd(Self);
 end;
 
 { TACLRootResourceCollection }

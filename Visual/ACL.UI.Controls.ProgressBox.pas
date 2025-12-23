@@ -128,7 +128,7 @@ type
     destructor Destroy; override;
     procedure Cancel(AWaitForStop: Boolean);
     function Progress(AProgress: Single): Boolean; overload;
-    function Progress(ACurrentIndex, ATotalIndexCount: Integer): Boolean; overload;
+    function Progress(APosition, ATotal: Integer): Boolean; overload;
     procedure StartProgress(AShowBoxNow: Boolean; AOptions: TACLProgressBoxOptions); overload;
     procedure StartProgress(AShowBoxNow: Boolean = False); overload;
     procedure StopProgress;
@@ -394,9 +394,9 @@ begin
   Result := not FCancelled;
 end;
 
-function TACLProgressBox.Progress(ACurrentIndex, ATotalIndexCount: Integer): Boolean;
+function TACLProgressBox.Progress(APosition, ATotal: Integer): Boolean;
 begin
-  Result := Progress(100 * (ACurrentIndex + 1) / ATotalIndexCount);
+  Result := Progress(100 * APosition / ATotal);
 end;
 
 procedure TACLProgressBox.StartProgress(AShowBoxNow: Boolean; AOptions: TACLProgressBoxOptions);

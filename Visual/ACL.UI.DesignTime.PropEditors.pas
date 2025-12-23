@@ -1076,7 +1076,7 @@ begin
       ACollection := Designer.GetComponent(ACollectionName) as TACLCustomResourceCollection;
     {$IFDEF DESIGNER_CAN_CREATECOMPONENT}
       if ACollection = nil then
-        ACollection := Designer.CreateComponent(TACLCustomResourceCollection, Designer.Root, 0, 0, 0, 0) as TACLCustomResourceCollection;
+        ACollection := Designer.CreateComponent(TACLResourceCollection, Designer.Root, 0, 0, 0, 0) as TACLCustomResourceCollection;
     {$ENDIF}
       if Supports(GetCollectionOwner(Resource), IACLResourceCollectionSetter, ACollectionSetter) then
         ACollectionSetter.SetCollection(ACollection);

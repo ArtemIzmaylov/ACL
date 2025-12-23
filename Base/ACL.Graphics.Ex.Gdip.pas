@@ -75,7 +75,7 @@ const
 
 const
   InterpolationModeMap: array[TACLBoolean] of TInterpolationMode = (
-    InterpolationModeDefault, InterpolationModeLowQuality, InterpolationModeHighQuality
+    InterpolationModeDefault, InterpolationModeNearestNeighbor, InterpolationModeHighQuality
   );
   PixelOffsetModeMap: array[TACLImagePixelOffsetMode] of PixelOffsetMode = (
     PixelOffsetModeDefault, PixelOffsetModeHalf, PixelOffsetModeNone

@@ -152,6 +152,7 @@ type
 var
   acSkinImageSetDormantUnusedImages: Boolean = True;
 
+function acSetSkinImageSetItemField(var AField: TACLSkinImageSetItem; ANewValue: TACLSkinImageSetItem): Boolean;
 implementation
 
 const
@@ -196,6 +197,25 @@ type
       AColorSchema: TACLColorSchema): TACLSkinImageSetTintedItem; overload;
     procedure Release;
   end;
+
+function acSetSkinImageSetItemField(
+  var AField: TACLSkinImageSetItem; ANewValue: TACLSkinImageSetItem): Boolean;
+begin
+  Result := AField <> ANewValue;
+  if Result then
+  begin
+    if AField <> nil then
+    begin
+      AField.ReferenceRemove;
+      AField := nil;
+    end;
+    if ANewValue <> nil then
+    begin
+      AField := ANewValue;
+      AField.ReferenceAdd;
+    end;
+  end;
+end;
 
 function MakeSignature(AColor: TAlphaColor; AMode: TACLSkinImageColorationMode): Int64; overload;
 begin
