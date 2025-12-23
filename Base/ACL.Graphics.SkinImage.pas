@@ -412,10 +412,9 @@ type
     class var FMemBmpInfo: TBitmapInfo;
     class var FPrevBmp: HBITMAP;
 
-    class procedure doAlphaBlend(const R, SrcR: TRect); inline;
-    class procedure doAlphaBlendTile(const R, SrcR: TRect);
-    class procedure doWinDraw(const ATarget, ASource: TRect);
+    class procedure doWinDraw(const R, SrcR: TRect); inline;
     class procedure doWinDrawOpaque(const ATarget, ASource: TRect);
+    class procedure doWinDrawTile(const R, SrcR: TRect);
     class procedure doWinFill(const ATarget: TRect; AColor: TAlphaColor);
     class procedure doWinFinish;
   {$ENDIF}
@@ -453,8 +452,8 @@ type
 procedure acCalculateTiledAreas(const R: TRect; const AParams: TACLSkinImageTiledAreas;
   ATextureWidth, ATextureHeight: Integer; ATiledAreasMode: TACLSkinImageTiledAreasMode;
   out AParts: TACLSkinImageTiledAreasPartBounds);
-
-  procedure CalculateHorizontalMode;
+begin
+  if ATiledAreasMode = tpmHorizontal then
   begin
     AParts[tpzPart1Fixed] := R;
     AParts[tpzPart1Fixed].Right := AParts[tpzPart1Fixed].Left + AParams.Part1TileStart;
@@ -490,9 +489,8 @@ procedure acCalculateTiledAreas(const R: TRect; const AParams: TACLSkinImageTile
     AParts[tpzPart2Tile] := R;
     AParts[tpzPart2Tile].Left := AParts[tpzCenter].Right;
     AParts[tpzPart2Tile].Right := AParts[tpzPart2Fixed].Left;
-  end;
-
-  procedure CalculateVerticalMode;
+  end
+  else
   begin
     AParts[tpzPart1Fixed] := R;
     AParts[tpzPart1Fixed].Bottom := AParts[tpzPart1Fixed].Top + AParams.Part1TileStart;
@@ -529,12 +527,6 @@ procedure acCalculateTiledAreas(const R: TRect; const AParams: TACLSkinImageTile
     AParts[tpzPart2Tile].Top := AParts[tpzCenter].Bottom;
     AParts[tpzPart2Tile].Bottom := AParts[tpzPart2Fixed].Top;
   end;
-
-begin
-  if ATiledAreasMode = tpmHorizontal then
-    CalculateHorizontalMode
-  else
-    CalculateVerticalMode;
 end;
 
 { EZLibError }
@@ -718,6 +710,8 @@ begin
   AStream.WriteBuffer(DataSize, SizeOf(Cardinal));
   AStream.WriteBuffer(Data^, DataSize);
 end;
+
+{$REGION ' TACLSkinImage '}
 
 { TACLSkinImage }
 
@@ -1838,9 +1832,10 @@ end;
 procedure TACLSkinImage.SetFrameSize(const AValue: TSize);
 var
   LBitmap: TACLDib;
+  LBitsState: TACLSkinImageBitsState;
   LFrameBitmap: TACLDib;
-  LFrameRect: TRect;
   LFrameCount: Integer;
+  LFrameRect: TRect;
   I: Integer;
 begin
   if not (Empty or AValue.isEmpty) and (AValue <> FrameSize) then
@@ -1850,7 +1845,6 @@ begin
       LFrameCount := FrameCount;
       LBitmap := TACLDib.Create(AValue.cx, AValue.cy * FrameCount);
       try
-        //LBitmap.AlphaFormat := afPremultiplied;
         LFrameRect := TRect.Create(AValue);
         LFrameBitmap := TACLDib.Create(FrameWidth, FrameHeight);
         try
@@ -1864,9 +1858,11 @@ begin
         finally
           LFrameBitmap.Free;
         end;
+        LBitsState := FBitsState;
         LoadFromBitmap(LBitmap);
         Layout := ilVertical;
         FrameCount := LFrameCount;
+        FBitsState := LBitsState;
       finally
         LBitmap.Free;
       end;
@@ -2325,6 +2321,7 @@ begin
     Dec(ACount);
   end;
 end;
+{$ENDREGION}
 
 { TRenderer }
 
@@ -2359,68 +2356,59 @@ begin
 end;
 
 {$IFDEF MSWINDOWS}
-class procedure TRenderer.doAlphaBlend(const R, SrcR: TRect);
+class procedure TRenderer.doWinDraw(const R, SrcR: TRect);
 begin
-  AlphaBlend(FDstCanvas.Handle,
-    R.Left, R.Top, R.Right - R.Left, R.Bottom - R.Top, FMemDC,
-    SrcR.Left, SrcR.Top, SrcR.Right - SrcR.Left, SrcR.Bottom - SrcR.Top, FFunc);
+  if not (R.IsEmpty or SrcR.IsEmpty) then
+    AlphaBlend(FDstCanvas.Handle,
+      R.Left, R.Top, R.Right - R.Left, R.Bottom - R.Top, FMemDC,
+      SrcR.Left, SrcR.Top, SrcR.Right - SrcR.Left, SrcR.Bottom - SrcR.Top, FFunc);
 end;
 
-class procedure TRenderer.doAlphaBlendTile(const R, SrcR: TRect);
+class procedure TRenderer.doWinDrawTile(const R, SrcR: TRect);
 var
-  AClipRgn: TRegionHandle;
-  ALayer: TACLDib;
-  R1: TRect;
+  LClipping: TRegionHandle;
+  LLayer: TACLDib;
   W, H: Integer;
-  X, Y, XCount, YCount: Integer;
+  X, Xi, XCount: Integer;
+  Y, Yi, YCount: Integer;
 begin
+  if R.IsEmpty or SrcR.IsEmpty then
+    Exit;
+
   W := SrcR.Right - SrcR.Left;
   H := SrcR.Bottom - SrcR.Top;
-  R1 := R;
-  R1.Height := H;
-  XCount := acCalcPatternCount(R.Right - R.Left, W);
-  YCount := acCalcPatternCount(R.Bottom - R.Top, H);
+
+  XCount := acCalcPatternCount(R.Width, W);
+  YCount := acCalcPatternCount(R.Height, H);
 
   if XCount * YCount > 10 then
   begin
-    ALayer := TACLDib.Create(R);
+    LLayer := TACLDib.Create(R);
     try
-      acTileBlt(ALayer.Handle, FMemDC, ALayer.ClientRect, SrcR);
-      AlphaBlend(FDstCanvas.Handle, R.Left, R.Top, R.Right - R.Left, R.Bottom - R.Top,
-        ALayer.Handle, 0, 0, ALayer.Width, ALayer.Height, FFunc);
+      acTileBlt(LLayer.Handle, FMemDC, LLayer.ClientRect, SrcR);
+      AlphaBlend(FDstCanvas.Handle, R.Left, R.Top, R.Width, R.Height,
+        LLayer.Handle, 0, 0, LLayer.Width, LLayer.Height, FFunc);
     finally
-      ALayer.Free;
+      LLayer.Free;
     end;
   end
   else
-    if acStartClippedDraw(FDstCanvas, R, AClipRgn) then
+    if acStartClippedDraw(FDstCanvas, R, LClipping) then
     try
-      for Y := 1 to YCount do
+      Y := R.Top;
+      for Yi := 1 to YCount do
       begin
-        R1.Left := R.Left;
-        R1.Right := R.Left + W;
-        for X := 1 to XCount do
+        X := R.Left;
+        for Xi := 1 to XCount do
         begin
-          doAlphaBlend(R1, SrcR);
-          Inc(R1.Left, W);
-          Inc(R1.Right, W);
+          AlphaBlend(FDstCanvas.Handle, X, Y, W, H, FMemDC, SrcR.Left, SrcR.Top, W, H, FFunc);
+          Inc(X, W);
         end;
-        Inc(R1.Top, H);
-        Inc(R1.Bottom, H);
+        Inc(Y, H);
       end;
     finally
-      acEndClippedDraw(FDstCanvas, AClipRgn);
+      acEndClippedDraw(FDstCanvas, LClipping);
     end;
-end;
-
-class procedure TRenderer.doWinDraw(const ATarget, ASource: TRect);
-begin
-  if ATarget.IsEmpty or ASource.IsEmpty then
-    Exit;
-  if FImage.StretchMode = isTile then
-    doAlphaBlendTile(ATarget, ASource)
-  else
-    doAlphaBlend(ATarget, ASource);
 end;
 
 class procedure TRenderer.doWinDrawOpaque(const ATarget, ASource: TRect);
@@ -2494,6 +2482,8 @@ begin
 
   if (AAlpha = 255) and FImage.FrameInfo[AFrameIndex].IsOpaque then
     doInit(doWinFinish, doWinFill, doWinDrawOpaque)
+  else if FImage.StretchMode = isTile then
+    doInit(doWinFinish, doWinFill, doWinDrawTile)
   else
     doInit(doWinFinish, doWinFill, doWinDraw);
 {$ELSE}
