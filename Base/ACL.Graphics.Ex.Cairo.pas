@@ -565,17 +565,14 @@ end;
 function cairo_create_context(ACanvas: TCanvas;
   out ASurface: Pcairo_surface_t; out AOrigin: TPoint;
   out ASavedContext: PCairoContext): pcairo_t;
-{$IFDEF ACL_DIB_CANVAS_NO_DC}
 var
   LDib: TACLBaseDib;
 {$IFDEF LCLGtk2}
   LDibHandle: HDC;
 {$ENDIF}
-{$ENDIF}
 begin
   ASavedContext := nil;
   ASurface := nil;
-{$IFDEF ACL_DIB_CANVAS_NO_DC}
   if ACanvas.ClassType = TACLDibCanvas then
   begin
     AOrigin := NullPoint;
@@ -597,14 +594,13 @@ begin
       Result := cairo_create_context(ACanvas.Handle, AOrigin, ASavedContext);
     {$ENDIF}
     end
-    else
+    else // multi-threading
     begin
       ASurface := cairo_create_surface(LDib.Colors, LDib.Width, LDib.Height);
       Result := cairo_create(ASurface);
     end;
   end
   else
-{$ENDIF}
     Result := cairo_create_context(ACanvas.Handle, AOrigin, ASavedContext);
 end;
 
@@ -736,7 +732,6 @@ function cairo_set_clipping(ACairo: pcairo_t;
   ACanvas: TCanvas; ACanvasContext: PCairoContext): Boolean; overload;
 begin
   Result := True;
-{$IFDEF ACL_DIB_CANVAS_NO_DC}
   if not ACanvas.HandleAllocated and (ACanvas.ClassType = TACLDibCanvas) then
   begin
     with TACLDibCanvas(ACanvas).ClipRect do
@@ -744,7 +739,6 @@ begin
     cairo_clip(ACairo);
   end
   else
-{$ENDIF}
     if (ACanvasContext = nil) or (ACanvasContext.Ownership <> soReference) then
       Result := cairo_set_clipping(ACairo, ACanvas.Handle);
 end;

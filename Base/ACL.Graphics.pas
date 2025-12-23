@@ -963,23 +963,23 @@ function acCombineWithClipRegion(DC: HDC; ARegion: TRegionHandle; AOperation: In
 var
   LClipRegion: TRegionHandle;
   LOrigin: TPoint;
-  LResult: Integer;
 begin
   Result := False;
   if acGetClipRegion(DC, LClipRegion) then
   try
+    if LClipRegion = 0 then
+      LClipRegion := CreateRectRgn(-MaxShort, -MaxShort, MaxShort, MaxShort);
   {$IFNDEF LCLGtk3}
     GetWindowOrgEx(DC, LOrigin{%H-});
     OffsetRgn(ARegion, -LOrigin.X, -LOrigin.Y);
   {$ENDIF}
-    LResult := CombineRgn(LClipRegion, LClipRegion, ARegion, AOperation);
+    Result := CombineRgn(LClipRegion, LClipRegion, ARegion, AOperation) <> NULLREGION;
   {$IFNDEF LCLGtk3}
     OffsetRgn(ARegion, LOrigin.X, LOrigin.Y);
   {$ENDIF}
     SelectClipRgn(DC, LClipRegion);
-    Result := LResult <> NULLREGION;
   finally
-    DeleteObject(LClipRegion);
+    acRegionFree(LClipRegion);
   end;
 end;
 
@@ -1020,10 +1020,8 @@ function acRectVisible(ACanvas: TCanvas; const R: TRect): Boolean;
 begin
   if R.IsEmpty then
     Exit(False);
-{$IFDEF ACL_DIB_CANVAS_NO_DC}
   if not ACanvas.HandleAllocated and (ACanvas.ClassType = TACLDibCanvas) then
     Exit(R.IntersectsWith(TACLDibCanvas(ACanvas).ClipRect));
-{$ENDIF}
   Result := RectVisible(ACanvas.Handle, R);
 end;
 
@@ -1044,7 +1042,6 @@ end;
 
 function acStartClippedDraw(ACanvas: TCanvas; const R: TRect; out APrevRegion: TRegionHandle): Boolean;
 begin
-{$IFDEF ACL_DIB_CANVAS_NO_DC}
   if not ACanvas.HandleAllocated and (ACanvas.ClassType = TACLDibCanvas) then
   begin
     Result := TACLDibCanvas(ACanvas).ClipRect.IntersectsWith(R);
@@ -1055,7 +1052,6 @@ begin
     end;
     Exit;
   end;
-{$ENDIF}
 
 {$IFNDEF LCLGtk2} // Под Gtk2 это не имеет смысла, т.к. там идет такая же работа с регионом, как ниже
   if not RectVisible(ACanvas.Handle, R) then
@@ -1069,24 +1065,20 @@ begin
 end;
 
 procedure acEndClippedDraw(ACanvas: TCanvas; ASavedRegion: TRegionHandle);
-{$IFDEF ACL_DIB_CANVAS_NO_DC}
 var
   LBox: TRect;
-{$ENDIF}
 begin
   if ACanvas.HandleAllocated then
     acRestoreClipRegion(ACanvas.Handle, ASavedRegion)
   else
   begin
-  {$IFDEF ACL_DIB_CANVAS_NO_DC}
     if ACanvas.ClassType = TACLDibCanvas then
     begin
-      if GetRgnBox(ASavedRegion, @LBox) = NULLREGION then
+      if GetRgnBox(ASavedRegion, {$IFDEF FPC}@{$ENDIF}LBox) = NULLREGION then
         TACLDibCanvas(ACanvas).ClipRect := NullRect
       else
         TACLDibCanvas(ACanvas).ClipRect := LBox;
     end;
-  {$ENDIF}
     DeleteObject(ASavedRegion);
   end;
 end;
