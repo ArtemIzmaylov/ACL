@@ -61,6 +61,7 @@ type
   public
     Owner: TACLTrayIcon;
     constructor Create(AIcon: TACLTrayIcon);
+    function ActualIcon: TIcon;
     procedure BalloonHint(const ATitle, AText: string; AIcon: TACLTrayBalloonIcon); virtual; abstract;
     procedure Update; virtual; abstract;
   end;
@@ -161,8 +162,8 @@ implementation
   {$I ACL.UI.TrayIcon.Win32.inc}
 {$ENDIF}
 
-{$IFDEF LCLGtk2}
-  {$I ACL.UI.TrayIcon.Gtk2.inc}
+{$IFDEF LCLGtkX}
+  {$I ACL.UI.TrayIcon.GtkX.inc}
 {$ENDIF}
 
 var
@@ -173,6 +174,19 @@ var
 constructor TACLTrayIconIntf.Create(AIcon: TACLTrayIcon);
 begin
   Owner := AIcon;
+end;
+
+function TACLTrayIconIntf.ActualIcon: TIcon;
+var
+  LForm: TForm;
+begin
+  Result := Owner.Icon;
+  if Result.Empty and Safe.Cast(Owner.Owner, TForm, LForm) then
+    Result := LForm.Icon;
+  if Result.Empty and (Application.MainForm <> nil) then
+    Result := Application.MainForm.Icon;
+  if Result.Empty then
+    Result := Application.Icon;
 end;
 
 { TACLTrayIcon }

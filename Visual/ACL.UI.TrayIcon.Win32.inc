@@ -72,7 +72,7 @@ type
   begin
     ZeroMemory(@FIconData, SizeOf(FIconData));
     FIconData.cbSize := TNotifyIconData.SizeOf;
-    FIconData.hIcon := Owner.Icon.Handle;
+    FIconData.hIcon := ActualIcon.Handle;
     FIconData.Wnd := FHandle;
     FIconData.uCallbackMessage := WM_TRAYNOTIFY;
     FIconData.uFlags := NIF_ICON or NIF_MESSAGE or NIF_TIP;

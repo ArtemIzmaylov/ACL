@@ -153,7 +153,6 @@ type
     FBalloonHandle: Pointer;
   public
     destructor Destroy; override;
-    function ActualIcon: TIcon;
     procedure BalloonHint(const ATitle, AText: string; AIconType: TACLTrayBalloonIcon); override;
   end;
 
@@ -195,15 +194,6 @@ type
   begin
     TACLLibNotify.Free(FBalloonHandle);
     inherited Destroy;
-  end;
-
-  function TACLTrayIconImplBase.ActualIcon: TIcon;
-  begin
-    Result := Owner.Icon;
-    if Result.Empty then
-      Result := Application.Icon;
-    if Result.Empty and (Application.MainForm <> nil) then
-      Result := Application.MainForm.Icon;
   end;
 
   procedure TACLTrayIconImplBase.BalloonHint(
