@@ -142,6 +142,7 @@ type
     property Icon: TIcon read FIcon write SetIcon;
     property IconVisible: Boolean read FIconVisible write SetIconVisible default False;
     property ID: string read FID write SetID;
+    // Gtk3: required (!), PopupMenu.OnPopup not supported!
     property PopupMenu: TPopupMenu read FPopupMenu write FPopupMenu;
     // Events
     property OnBallonHintClick: TNotifyEvent read FOnBallonHintClick write FOnBallonHintClick;

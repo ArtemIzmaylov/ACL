@@ -3,14 +3,30 @@
 
 uses
   GLib2,
+{$IF DEFINED(LCLGtk3)}
+  Gtk3Objects,
+  Gtk3Widgets,
+  LazGtk3,
+  LazGdk3,
+  LazGdkPixbuf2,
+{$ELSEIF DEFINED(LCLGtk2)}
   Gtk2,
   Gdk2,
   Gtk2Int,
   Gtk2Def,
   Gtk2Ext,
   Gdk2Pixbuf,
+{$ENDIF}
   // ACL
   ACL.Utils.FileSystem.GIO;
+
+{$IFDEF LCLGtk3}
+const Available_GtkStatusIcon_2_10 = True;
+function gtk_status_icon_new: PGtkStatusIcon; cdecl; external LazGtk3_library;
+procedure gtk_status_icon_set_from_pixbuf(status_icon: PGtkStatusIcon; pixbuf: PGdkPixbuf); cdecl; external LazGtk3_library;
+procedure gtk_status_icon_set_tooltip_text(status_icon: PGtkStatusIcon; text: Pgchar); cdecl; external LazGtk3_library;
+procedure gtk_status_icon_set_visible(status_icon: PGtkStatusIcon; visible: gboolean); cdecl; external LazGtk3_library;
+{$ENDIF}
 
 {$REGION ' Notifications '}
 type
@@ -185,7 +201,11 @@ type
     if (AIcon = nil) or AIcon.Empty then
       Result := nil
     else
-      Result := {%H-}PGdkPixbuf(AIcon.Handle);
+    {$IF DEFINED(LCLGtk3)}
+      Result := TGtk3Image(AIcon.Handle).Handle;
+    {$ELSEIF DEFINED(LCLGtk2)}
+      Result := PGdkPixbuf(AIcon.Handle);
+    {$ENDIF}
   end;
 
   { TACLTrayIconImplBase }
@@ -247,7 +267,11 @@ type
     // + buttonpress2
     // + buttonrelease
     // So, generate 2nd button release to be consistent
+  {$IFDEF LCLGtk3}
+    if Event^.type_ = GDK_2BUTTON_PRESS then
+  {$ELSE}
     if Event^._type = GDK_2BUTTON_PRESS then
+  {$ENDIF}
       HandlerButtonRelease(Icon, Event, Self);
 
     Result := gTRUE;
