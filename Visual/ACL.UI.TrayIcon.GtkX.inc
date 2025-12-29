@@ -44,9 +44,11 @@ type
       action, label_: PChar; callback: TNotifyActionCallback;
       user_data: gpointer; free_funch: TFreeFunc); cdecl;
     notify_notification_close_t = function (handle: PNotify; error: PPGError): gboolean; cdecl;
-    notify_notification_new_t = function (summary, body, icon: PChar) : PNotify; cdecl;
+    notify_notification_new_t = function (summary, body, icon: PChar): PNotify; cdecl;
+    notify_notification_set_image_from_pixbuf_t = procedure (handle: PNotify; image: PGdkPixbuf); cdecl;
     notify_notification_set_timeout_t = procedure (handle: PNotify; timeout: gint); cdecl;
     notify_notification_show_t = function(handle: PNotify; error: PPGError): gboolean; cdecl;
+    notify_notification_update_t = function (handle: PNotify; summary, body, icon: PChar): gboolean; cdecl;
     notify_init_t = function (app_name: PChar): gboolean; cdecl;
     notify_uninit_t = procedure; cdecl;
   strict private
@@ -192,9 +194,49 @@ type
     procedure Update; override;
   end;
 
+  { TACLAppIndicatorImpl }
+
+  TACLAppIndicatorImpl = class(TACLTrayIconImplBase)
+  strict private const
+    libAppIndicator = 'libappindicator3.so.1';              // Unity or Canonical libappindicator3-1
+    libAppIndicatorAyatana = 'libayatana-appindicator3.so.1'; // Ayatana - typically called libayatana-appindicator3-1
+  strict private type
+    PAppIndicator = Pointer;
+    TAppIndicatorCategory = (
+      APP_INDICATOR_CATEGORY_APPLICATION_STATUS,
+      APP_INDICATOR_CATEGORY_COMMUNICATIONS,
+      APP_INDICATOR_CATEGORY_SYSTEM_SERVICES,
+      APP_INDICATOR_CATEGORY_HARDWARE,
+      APP_INDICATOR_CATEGORY_OTHER
+    );
+    TAppIndicatorStatus = (
+      APP_INDICATOR_STATUS_PASSIVE,
+      APP_INDICATOR_STATUS_ACTIVE,
+      APP_INDICATOR_STATUS_ATTENTION
+    );
+  strict private
+    class var app_indicator_new: function(id, icon_name: PGChar; category: TAppIndicatorCategory): PAppIndicator; cdecl;
+    class var app_indicator_set_icon: procedure(self: PAppIndicator; icon_name: PGChar); cdecl;
+    class var app_indicator_set_menu: procedure(self: PAppIndicator; menu: PGtkMenu); cdecl;
+    class var app_indicator_set_status: procedure (self: PAppIndicator; status: TAppIndicatorStatus); cdecl;
+    class var app_indicator_state: Integer;
+  strict private
+    FHandle: PAppIndicator;
+    FIconFileName: string;
+    FIconId: string;
+  public
+    class function CheckInit: Boolean;
+    constructor Create(AIcon: TACLTrayIcon);
+    destructor Destroy; override;
+    procedure Update; override;
+  end;
+
   { TACLTrayIconImpl }
 
-  TACLTrayIconImpl = class(TACLStatusIconImpl);
+  TACLTrayIconImpl = class
+  public
+    class function Create(AIcon: TACLTrayIcon): TACLTrayIconIntf;
+  end;
 
   function GetPixbuf(AIcon: TIcon): PGdkPixbuf;
   begin
@@ -343,10 +385,86 @@ type
     end;
   end;
 
+  { TACLAppIndicatorImpl }
+
+  constructor TACLAppIndicatorImpl.Create(AIcon: TACLTrayIcon);
+  begin
+    inherited;
+    FIconId := 'appin-' + IfThenW(Owner.ID, IntToHex(NativeUInt(Owner)));
+    FIconFileName := GetTempDir + FIconId + '.png';
+    Update;
+  end;
+
+  destructor TACLAppIndicatorImpl.Destroy;
+  begin
+    if FHandle <> nil then
+    try
+      app_indicator_set_status(FHandle, APP_INDICATOR_STATUS_PASSIVE);
+      g_object_unref(FHandle);
+    finally
+      FHandle := nil;
+    end;
+    if FIconFileName <> '' then
+      DeleteFile(FIconFileName);
+    inherited;
+  end;
+
+  class function TACLAppIndicatorImpl.CheckInit: Boolean;
+  var
+    LLibHandle: HModule;
+  begin
+    if app_indicator_state = 0 then
+    begin
+      LLibHandle := acLoadLibrary(libAppIndicator);
+      if LLibHandle = 0 then
+        LLibHandle := acLoadLibrary(libAppIndicatorAyatana);
+      Result := LLibHandle <> 0;
+      app_indicator_new := acGetProcAddress(LLibHandle, 'app_indicator_new', Result);
+      app_indicator_set_icon := acGetProcAddress(LLibHandle, 'app_indicator_set_icon', Result);
+      app_indicator_set_menu := acGetProcAddress(LLibHandle, 'app_indicator_set_menu', Result);
+      app_indicator_set_status := acGetProcAddress(LLibHandle, 'app_indicator_set_status', Result);
+      app_indicator_state := IfThen(Result, 1, -1);
+    end;
+    Result := app_indicator_state > 0;
+  end;
+
+  procedure TACLAppIndicatorImpl.Update;
+  begin
+    if (FHandle = nil) and CheckInit then
+    begin
+      FHandle := app_indicator_new(PChar(FIconId),
+        PChar(FIconFileName), APP_INDICATOR_CATEGORY_APPLICATION_STATUS);
+
+      // It seems to me you can only set the menu once for an AppIndicator
+      if Owner.PopupMenu <> nil then
+      begin
+        if Assigned(Owner.PopupMenu.OnPopup) then
+          WriteLn('[!] WARNING: AppIndicator does not support for dynamic menus.');
+      {$IFDEF LCLGtk3}
+        app_indicator_set_menu(FHandle, {%H-}PGtkMenu(TGTK3Menu(Owner.PopupMenu.Handle).Widget));
+      {$ELSE}
+        app_indicator_set_menu(FHandle, {%H-}PGtkMenu(Owner.PopupMenu.Handle));
+      {$ENDIF}
+      end
+      else
+        WriteLn('[!] WARNING: AppIndicator requires for popup menu.');
+    end;
+
+    if FHandle <> nil then
+    begin
+      ActualIcon.SaveToFile(FIconFileName);
+      app_indicator_set_icon(FHandle, PChar(FIconFileName));
+      app_indicator_set_status(FHandle, APP_INDICATOR_STATUS_ACTIVE);
+    end;
+  end;
+
   { TACLTrayIcon }
 
   class function TACLTrayIcon.Capabilities: TACLTrayIconCapabilities;
   begin
+    if TACLAppIndicatorImpl.CheckInit then
+      Exit([]); // app-indicator умеет показывать только встроенное меню.
+
     // TACLStatusIconImpl:
     // Проверил Cinnamon, Fly, Mate, XFCE, KDE, Gnome и выяснилось:
     // 1) query-tooltip не работает на Gnome и KDE
@@ -359,4 +477,16 @@ type
     else
         Result := [ticClick, ticWheel, ticMove];
     end;
+  end;
+
+  { TACLTrayIconImpl }
+
+  class function TACLTrayIconImpl.Create(AIcon: TACLTrayIcon): TACLTrayIconIntf;
+  begin
+  {$IFDEF LCLGtk3}
+    if TACLAppIndicatorImpl.CheckInit then
+      Result := TACLAppIndicatorImpl.Create(AIcon)
+    else
+  {$ENDIF}
+      Result := TACLStatusIconImpl.Create(AIcon);
   end;
