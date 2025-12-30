@@ -415,9 +415,15 @@ type
   begin
     if app_indicator_state = 0 then
     begin
-      LLibHandle := acLoadLibrary(libAppIndicator);
-      if LLibHandle = 0 then
-        LLibHandle := acLoadLibrary(libAppIndicatorAyatana);
+      LLibHandle := 0;
+      // Unlike AppIndicator, StatusIcon is more flexible and powerful.
+      // So, using AppIndicator only on systems where StatusIcon is not available
+      if ShellDesktopEnv = sdeGnome then
+      begin
+        LLibHandle := acLoadLibrary(libAppIndicator);
+        if LLibHandle = 0 then
+          LLibHandle := acLoadLibrary(libAppIndicatorAyatana);
+      end;
       Result := LLibHandle <> 0;
       app_indicator_new := acGetProcAddress(LLibHandle, 'app_indicator_new', Result);
       app_indicator_set_icon := acGetProcAddress(LLibHandle, 'app_indicator_set_icon', Result);
@@ -462,8 +468,10 @@ type
 
   class function TACLTrayIcon.Capabilities: TACLTrayIconCapabilities;
   begin
+  {$IFDEF LCLGtk3}
     if TACLAppIndicatorImpl.CheckInit then
       Exit([]); // app-indicator умеет показывать только встроенное меню.
+  {$ENDIF}
 
     // TACLStatusIconImpl:
     // Проверил Cinnamon, Fly, Mate, XFCE, KDE, Gnome и выяснилось:
