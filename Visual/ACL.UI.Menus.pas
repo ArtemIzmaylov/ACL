@@ -268,8 +268,8 @@ type
     function AddSeparator: TMenuItem;
     function CanBeParent(AParent: TMenuItem): Boolean;
     function FindByTag(const ATag: NativeInt): TMenuItem;
+    function FirstVisible: TMenuItem;
     procedure DeleteWithTag(const ATag: NativeInt);
-    function HasVisibleSubItems: Boolean;
     function IsCheckable: Boolean;
 
     property DefaultItem: TMenuItem read GetDefaultItem;
@@ -891,6 +891,20 @@ begin
   Result := nil;
 end;
 
+function TMenuItemHelper.FirstVisible: TMenuItem;
+var
+  LItem: TMenuItem;
+  I: Integer;
+begin
+  for I := 0 to Count - 1 do
+  begin
+    LItem := Items[I];
+    if LItem.Visible and not LItem.IsLine then
+      Exit(LItem);
+  end;
+  Result := nil;
+end;
+
 procedure TMenuItemHelper.DeleteWithTag(const ATag: NativeInt);
 var
   I: Integer;
@@ -900,20 +914,6 @@ begin
     if Items[I].Tag = ATag then
       Delete(I);
   end;
-end;
-
-function TMenuItemHelper.HasVisibleSubItems: Boolean;
-var
-  LItem: TMenuItem;
-  I: Integer;
-begin
-  for I := 0 to Count - 1 do
-  begin
-    LItem := Items[I];
-    if not LItem.IsLine and LItem.Visible then
-      Exit(True);
-  end;
-  Result := False;
 end;
 
 procedure TMenuItemHelper.InitiateActions;
@@ -1112,7 +1112,7 @@ begin
   if Link is TMenuItem then
     Result := TMenuItem(Link).Visible
   else if Link is TPopupMenu then
-    Result := TPopupMenu(Link).Items.HasVisibleSubItems
+    Result := TPopupMenu(Link).Items.FirstVisible <> nil
   else
     Result := False;
 end;
