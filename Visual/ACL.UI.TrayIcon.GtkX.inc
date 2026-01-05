@@ -1,6 +1,10 @@
 ﻿{%MainUnit ACL.UI.TrayIcon.pas}
 {.$DEFINE ACL_TRAYICON_DEBUGLOG}
 
+{$IFDEF LCLGtk3}
+  {$DEFINE ACL_TRAYICON_ALLOW_APP_INDICATOR}
+{$ENDIF}
+
 uses
   GLib2,
 {$IF DEFINED(LCLGtk3)}
@@ -18,11 +22,13 @@ uses
   Gdk2Pixbuf,
 {$ENDIF}
   // ACL
+  ACL.UI.Menus,
   ACL.Utils.FileSystem.GIO;
 
 {$IFDEF LCLGtk3}
 const Available_GtkStatusIcon_2_10 = True;
 function gtk_status_icon_new: PGtkStatusIcon; cdecl; external LazGtk3_library;
+procedure gtk_status_icon_set_from_file(status_icon:PGtkStatusIcon; filename:Pgchar); cdecl; external LazGtk3_library;
 procedure gtk_status_icon_set_from_pixbuf(status_icon: PGtkStatusIcon; pixbuf: PGdkPixbuf); cdecl; external LazGtk3_library;
 procedure gtk_status_icon_set_tooltip_text(status_icon: PGtkStatusIcon; text: Pgchar); cdecl; external LazGtk3_library;
 procedure gtk_status_icon_set_visible(status_icon: PGtkStatusIcon; visible: gboolean); cdecl; external LazGtk3_library;
@@ -85,9 +91,11 @@ type
     FNotifyClose := acGetProcAddress(FLibHandle, 'notify_notification_close', Result);
     FNotifyInit := acGetProcAddress(FLibHandle, 'notify_init', Result);
     FNotifyNew := acGetProcAddress(FLibHandle, 'notify_notification_new', Result);
+    //FNotifySetImage := acGetProcAddress(FLibHandle, 'notify_notification_set_image_from_pixbuf', Result);
     FNotifySetTimeOut := acGetProcAddress(FLibHandle, 'notify_notification_set_timeout', Result);
     FNotifyShow := acGetProcAddress(FLibHandle, 'notify_notification_show', Result);
     FNotifyUninit := acGetProcAddress(FLibHandle, 'notify_uninit', Result);
+    //FNotifyUpdate := acGetProcAddress(FLibHandle, 'notify_notification_update', Result);
 
     // Init the library
     if Result then
@@ -169,9 +177,18 @@ type
   TACLTrayIconImplBase = class(TACLTrayIconIntf)
   strict private
     FBalloonHandle: Pointer;
+    FIconFileName: string;
+    FIconId: string;
+  protected
+    procedure Log(const AMessage: string);
+    // Properties
+    property IconFileName: string read FIconFileName;
+    property IconId: string read FIconId;
   public
+    constructor Create(AIcon: TACLTrayIcon);
     destructor Destroy; override;
     procedure BalloonHint(const ATitle, AText: string; AIconType: TACLTrayBalloonIcon); override;
+    procedure Update; override;
   end;
 
   { TACLStatusIconImpl }
@@ -189,17 +206,17 @@ type
     class function HandlerQueryTooltip({%H-}status_icon: PGtkStatusIcon; x, y: guint;
       {%H-}keyboard_mode: gboolean; {%H-}tooltip: gpointer; self: TACLStatusIconImpl): gboolean; cdecl; static;
   public
-    constructor Create(AIcon: TACLTrayIcon);
     destructor Destroy; override;
     procedure Update; override;
   end;
 
   { TACLAppIndicatorImpl }
 
+  // https://lazka.github.io/pgi-docs/AyatanaAppIndicator3-0.1/classes/Indicator.html
   TACLAppIndicatorImpl = class(TACLTrayIconImplBase)
   strict private const
-    libAppIndicator = 'libappindicator3.so.1';              // Unity or Canonical libappindicator3-1
-    libAppIndicatorAyatana = 'libayatana-appindicator3.so.1'; // Ayatana - typically called libayatana-appindicator3-1
+    libAppIndicator = 'libappindicator3.so.1';                // Unity or Canonical
+    libAppIndicatorAyatana = 'libayatana-appindicator3.so.1'; // Ayatana
   strict private type
     PAppIndicator = Pointer;
     TAppIndicatorCategory = (
@@ -216,17 +233,17 @@ type
     );
   strict private
     class var app_indicator_new: function(id, icon_name: PGChar; category: TAppIndicatorCategory): PAppIndicator; cdecl;
+    class var app_indicator_set_label: procedure(self: PAppIndicator; lbl, guide: PGChar); cdecl;
+    class var app_indicator_set_title: procedure(self: PAppIndicator; title: PGChar); cdecl;
     class var app_indicator_set_icon: procedure(self: PAppIndicator; icon_name: PGChar); cdecl;
     class var app_indicator_set_menu: procedure(self: PAppIndicator; menu: PGtkMenu); cdecl;
+    class var app_indicator_set_secondary_activate_target: procedure(self: PAppIndicator; menuItem: PGtkWidget); cdecl;
     class var app_indicator_set_status: procedure (self: PAppIndicator; status: TAppIndicatorStatus); cdecl;
     class var app_indicator_state: Integer;
   strict private
     FHandle: PAppIndicator;
-    FIconFileName: string;
-    FIconId: string;
   public
     class function CheckInit: Boolean;
-    constructor Create(AIcon: TACLTrayIcon);
     destructor Destroy; override;
     procedure Update; override;
   end;
@@ -238,23 +255,31 @@ type
     class function Create(AIcon: TACLTrayIcon): TACLTrayIconIntf;
   end;
 
-  function GetPixbuf(AIcon: TIcon): PGdkPixbuf;
+  function GetWidget(AHandle: TObjHandle): Pointer;
   begin
-    if (AIcon = nil) or AIcon.Empty then
-      Result := nil
-    else
-    {$IF DEFINED(LCLGtk3)}
-      Result := TGtk3Image(AIcon.Handle).Handle;
-    {$ELSEIF DEFINED(LCLGtk2)}
-      Result := PGdkPixbuf(AIcon.Handle);
-    {$ENDIF}
+  {$IF DEFINED(LCLGtk2)}
+    Result := PGtkWidget(AHandle);
+  {$ELSEIF DEFINED(LCLGtk3)}
+    Result := TGtk3Widget(AHandle).Widget;
+  {$ELSE}
+    Result := nil;
+  {$ENDIF}
   end;
 
   { TACLTrayIconImplBase }
 
+  constructor TACLTrayIconImplBase.Create(AIcon: TACLTrayIcon);
+  begin
+    inherited;
+    FIconId := 'appin-' + IfThenW(Owner.ID, IntToHex(NativeUInt(Owner)));
+    Update;
+  end;
+
   destructor TACLTrayIconImplBase.Destroy;
   begin
     TACLLibNotify.Free(FBalloonHandle);
+    if FIconFileName <> '' then
+      DeleteFile(FIconFileName);
     inherited Destroy;
   end;
 
@@ -268,13 +293,44 @@ type
     end;
   end;
 
-  { TACLStatusIconImpl }
-
-  constructor TACLStatusIconImpl.Create(AIcon: TACLTrayIcon);
+  procedure TACLTrayIconImplBase.Log(const AMessage: string);
   begin
-    inherited;
-    Update;
+    LogEntry(acGeneralLogFileName, 'Tray', AMessage + ' (' + IconId + ')');
   end;
+
+  procedure TACLTrayIconImplBase.Update;
+  var
+    LIcon: TIcon;
+    LIconIndex: Integer;
+    LIconSize: Integer;
+    LPng: TFPImageBitmap;
+  begin
+    LIcon := ActualIcon;
+    if LIcon.Empty then
+    begin
+      Log('[!] WARNING: an empty icon was specified');
+      Exit;
+    end;
+
+    if FIconFileName <> '' then
+      DeleteFile(FIconFileName);
+    // Главное, чтобы имя файла отличалось от предыдущего, иначе
+    // API будет думать, что мы пытаемся назначить туже самую иконку.
+    FIconFileName := GetTempDir + FIconId + '-' +
+      IfThenW(FIconFileName.EndsWith('0.png'), '1', '0') + '.png';
+
+    LIconIndex := 0;
+    if ShellDesktopEnv = sdeXFCE then
+      LIconIndex := LIcon.GetBestIndexForSize(TSize.Create(48, 48));
+    LPng := LIcon.ExportImage(LIconIndex, TPortableNetworkGraphic);
+    try
+      LPng.SaveToFile(FIconFileName);
+    finally
+      LPng.Free;
+    end;
+  end;
+
+  { TACLStatusIconImpl }
 
   destructor TACLStatusIconImpl.Destroy;
   begin
@@ -367,6 +423,7 @@ type
 
   procedure TACLStatusIconImpl.Update;
   begin
+    inherited;
     if (FHandle = nil) and Available_GtkStatusIcon_2_10 then
     begin
       FHandle := gtk_status_icon_new();
@@ -378,7 +435,7 @@ type
     end;
     if FHandle <> nil then
     begin
-      gtk_status_icon_set_from_pixbuf(FHandle, GetPixbuf(ActualIcon));
+      gtk_status_icon_set_from_file(FHandle, Pgchar(IconFileName));
       gtk_status_icon_set_tooltip_text(FHandle, PChar(Owner.Hint));
       g_object_set(PGObject(FHandle), 'has-tooltip', gTRUE, nil);
       gtk_status_icon_set_visible(FHandle, True);
@@ -386,14 +443,6 @@ type
   end;
 
   { TACLAppIndicatorImpl }
-
-  constructor TACLAppIndicatorImpl.Create(AIcon: TACLTrayIcon);
-  begin
-    inherited;
-    FIconId := 'appin-' + IfThenW(Owner.ID, IntToHex(NativeUInt(Owner)));
-    FIconFileName := GetTempDir + FIconId + '.png';
-    Update;
-  end;
 
   destructor TACLAppIndicatorImpl.Destroy;
   begin
@@ -404,8 +453,6 @@ type
     finally
       FHandle := nil;
     end;
-    if FIconFileName <> '' then
-      DeleteFile(FIconFileName);
     inherited;
   end;
 
@@ -428,7 +475,11 @@ type
       app_indicator_new := acGetProcAddress(LLibHandle, 'app_indicator_new', Result);
       app_indicator_set_icon := acGetProcAddress(LLibHandle, 'app_indicator_set_icon', Result);
       app_indicator_set_menu := acGetProcAddress(LLibHandle, 'app_indicator_set_menu', Result);
+      app_indicator_set_label := acGetProcAddress(LLibHandle, 'app_indicator_set_label', Result);
+      app_indicator_set_title := acGetProcAddress(LLibHandle, 'app_indicator_set_title', Result);
       app_indicator_set_status := acGetProcAddress(LLibHandle, 'app_indicator_set_status', Result);
+      app_indicator_set_secondary_activate_target := acGetProcAddress(
+        LLibHandle, 'app_indicator_set_secondary_activate_target', Result);
       app_indicator_state := IfThen(Result, 1, -1);
     end;
     Result := app_indicator_state > 0;
@@ -436,30 +487,27 @@ type
 
   procedure TACLAppIndicatorImpl.Update;
   begin
+    inherited;
+
     if (FHandle = nil) and CheckInit then
     begin
-      FHandle := app_indicator_new(PChar(FIconId),
-        PChar(FIconFileName), APP_INDICATOR_CATEGORY_APPLICATION_STATUS);
-
       // It seems to me you can only set the menu once for an AppIndicator
       if Owner.PopupMenu <> nil then
       begin
         if Assigned(Owner.PopupMenu.OnPopup) then
-          WriteLn('[!] WARNING: AppIndicator does not support for dynamic menus.');
-      {$IFDEF LCLGtk3}
-        app_indicator_set_menu(FHandle, {%H-}PGtkMenu(TGTK3Menu(Owner.PopupMenu.Handle).Widget));
-      {$ELSE}
-        app_indicator_set_menu(FHandle, {%H-}PGtkMenu(Owner.PopupMenu.Handle));
-      {$ENDIF}
+          Log('[!] WARNING: AppIndicator does not support for dynamic menus');
+        FHandle := app_indicator_new(PChar(IconId), PChar(IconFileName), APP_INDICATOR_CATEGORY_APPLICATION_STATUS);
+        app_indicator_set_menu(FHandle, GetWidget(Owner.PopupMenu.Handle));
       end
       else
-        WriteLn('[!] WARNING: AppIndicator requires for popup menu.');
+        Log('[!] WARNING: AppIndicator requires for popup menu');
     end;
 
     if FHandle <> nil then
     begin
-      ActualIcon.SaveToFile(FIconFileName);
-      app_indicator_set_icon(FHandle, PChar(FIconFileName));
+      app_indicator_set_icon(FHandle, PChar(IconFileName));
+      app_indicator_set_label(FHandle, PChar(Owner.Hint), 'XXXX');
+      app_indicator_set_title(FHandle, PChar(Owner.Hint));
       app_indicator_set_status(FHandle, APP_INDICATOR_STATUS_ACTIVE);
     end;
   end;
@@ -468,9 +516,9 @@ type
 
   class function TACLTrayIcon.Capabilities: TACLTrayIconCapabilities;
   begin
-  {$IFDEF LCLGtk3}
+  {$IFDEF ACL_TRAYICON_ALLOW_APP_INDICATOR}
     if TACLAppIndicatorImpl.CheckInit then
-      Exit([]); // app-indicator умеет показывать только встроенное меню.
+      Exit([]); // app-indicator умеет только встроенное меню показывать ...
   {$ENDIF}
 
     // TACLStatusIconImpl:
@@ -491,7 +539,7 @@ type
 
   class function TACLTrayIconImpl.Create(AIcon: TACLTrayIcon): TACLTrayIconIntf;
   begin
-  {$IFDEF LCLGtk3}
+  {$IFDEF ACL_TRAYICON_ALLOW_APP_INDICATOR}
     if TACLAppIndicatorImpl.CheckInit then
       Result := TACLAppIndicatorImpl.Create(AIcon)
     else

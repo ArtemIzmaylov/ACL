@@ -159,14 +159,11 @@ type
 
 implementation
 
-{$IFDEF MSWINDOWS}
+{$IF DEFINED(MSWINDOWS)}
   {$I ACL.UI.TrayIcon.Win32.inc}
-{$ENDIF}
-
-{$IFDEF LCLGtkX}
+{$ELSEIF DEFINED(LCLGtkX)}
   {$I ACL.UI.TrayIcon.GtkX.inc}
 {$ENDIF}
-
 var
   FTrayIconIsMouseAtIcon: Integer;
 
