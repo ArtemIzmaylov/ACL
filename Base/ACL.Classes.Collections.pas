@@ -677,6 +677,10 @@ type
     function GetEnumerator: IACLEnumerator<T>; override;
   end;
 
+  { TACLHashSetOfPointer }
+
+  TACLHashSetOfPointer = class(TACLHashSet<Pointer>);
+
   { TACLStringSet }
 
   TACLStringSet = class(TACLHashSet<string>)

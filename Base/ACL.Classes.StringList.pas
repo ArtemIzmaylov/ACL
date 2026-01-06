@@ -24,6 +24,7 @@ uses
   {System.}Types,
   // ACL
   ACL.Classes,
+  ACL.Classes.Collections,
   ACL.Math,
   ACL.Utils.Common,
   ACL.Utils.Strings;
@@ -53,7 +54,7 @@ type
     FCapacity: Integer;
     FCount: Integer;
     FData: Pointer;
-    FDelimiter: Char;
+    FDelimiter: string;
     FIgnoryCase: Boolean;
     FList: PACLStringListItemList;
 
@@ -138,7 +139,7 @@ type
     function Remove(const AObject: NativeUInt): Integer; overload;
     function Remove(const AObject: TObject): Integer; overload;
     function Remove(const S: string): Integer; overload;
-    function RemoveDuplicates: Integer;
+    procedure RemoveDuplicates;
 
     // Sorting
     procedure Sort; overload;
@@ -149,7 +150,7 @@ type
     property Capacity: Integer read FCapacity write SetCapacity;
     property Count: Integer read FCount;
     property Data: Pointer read FData write FData;
-    property Delimiter: Char read FDelimiter write FDelimiter;
+    property Delimiter: string read FDelimiter write FDelimiter;
     property IgnoryCase: Boolean read FIgnoryCase write FIgnoryCase;
     property Text: string read GetText write SetText;
 
@@ -653,20 +654,22 @@ begin
     Delete(Result);
 end;
 
-function TACLStringList.RemoveDuplicates: Integer;
+procedure TACLStringList.RemoveDuplicates;
 var
   I: Integer;
+  LSet: TACLStringSet;
 begin
   BeginUpdate;
   try
-    Result := 0;
-    for I := Count - 1 downto 0 do
-    begin
-      if IndexOf(Strings[I]) < I then
+    LSet := TACLStringSet.Create(IgnoryCase, Count);
+    try
+      for I := Count - 1 downto 0 do
       begin
-        Inc(Result);
-        Delete(I);
+        if not LSet.Include(Strings[I]) then
+          Delete(I);
       end;
+    finally
+      LSet.Free;
     end;
   finally
     EndUpdate;
@@ -811,18 +814,18 @@ end;
 function TACLStringList.GetValue(AIndex: Integer): string;
 begin
   Result := GetString(AIndex);
-  Result := Copy(Result, acPos(Delimiter, Result) + 1, MAXINT);
+  Result := Copy(Result, acPos(Delimiter, Result) + 1);
 end;
 
 function TACLStringList.GetValueFromName(const S: string): string;
 var
-  AIndex: Integer;
+  LIndex: Integer;
 begin
-  AIndex := IndexOfName(S);
-  if AIndex < 0 then
+  LIndex := IndexOfName(S);
+  if LIndex < 0 then
     Result := ''
   else
-    Result := ValueFromIndex[AIndex];
+    Result := ValueFromIndex[LIndex];
 end;
 
 function TACLStringList.GetText: string;
