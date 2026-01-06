@@ -479,6 +479,10 @@ end;
 procedure TACLDropSource.ExecuteSafeFree;
 begin
   try
+  {$IFDEF ACL_THREADING_DEBUG}
+    if not IsMainThread then
+      TThread.NameThreadForDebugging(ClassName + 'Thread');
+  {$ENDIF}
     try
       Execute;
     except

@@ -66,6 +66,7 @@ type
   procedure TACLDropSourceImpl.ExecuteCore;
   var
     LActions: TGdkDragAction;
+    LControl: TWinControl;
     LEntries: TACLListOf<TGtkTargetEntry>;
     LEntry: TGtkTargetEntry;
     LList: PGtkTargetList;
@@ -80,6 +81,12 @@ type
     if dsaLink in AllowedActions then
       LActions := LActions or GDK_ACTION_LINK;
 
+    LControl := Control;
+    while (LControl <> nil) and not LControl.Visible do
+      LControl := LControl.Parent;
+    if LControl = nil then
+      raise EInvalidArgument.Create('Cannot start drop-source operation on invisible control');
+
     LList := gtk_target_list_new(nil, 0);
     for I := 0 to DataProviders.Count - 1 do
     begin
@@ -89,7 +96,7 @@ type
 
     FEvent := TACLEvent.Create(True, False);
     try
-      LWidget := PGtkWidget(Control.Handle);
+      LWidget := PGtkWidget(LControl.Handle);
       ConnectSignal(PGtkObject(LWidget), 'drag_data_get', @doGtkDropGetData, Self);
       ConnectSignal(PGtkObject(LWidget), 'drag_end', @doGtkDropEnd, Self);
       try

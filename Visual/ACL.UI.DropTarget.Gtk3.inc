@@ -159,11 +159,12 @@ type
     begin
       LMimeTypes := TACLStringList.Create;
       try
-        LMimeTypes.Add(acMimeConfig);
-        LMimeTypes.Add(acMimeInternalFileList);
-        LMimeTypes.Add(acMimeLinuxFileList);
+        // keep the order
         for I := 0 to FTargets.Count - 1 do
           LMimeTypes.Append(FTargets.List[I].GetMimeTypes);
+        LMimeTypes.Add(acMimeInternalFileList);
+        LMimeTypes.Add(acMimeLinuxFileList);
+        LMimeTypes.Add(acMimeConfig);
         LMimeTypes.RemoveDuplicates;
 
         SetLength(LFormats{%H-}, LMimeTypes.Count);
