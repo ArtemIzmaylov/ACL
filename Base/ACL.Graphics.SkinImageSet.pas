@@ -6,7 +6,7 @@
 //  Purpose:   Set of Skinned Images
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -127,6 +127,7 @@ type
     function GetHashCode: TObjHashCode; override;
     function IsEmpty: Boolean;
     procedure MakeUnique;
+    procedure Optimize;
 
     // Find optimal resolution for target rect and use it to raster the frame
     // Return nil if image set is empty
@@ -566,6 +567,14 @@ begin
     Result := nil;
 end;
 
+procedure TACLSkinImageSet.Optimize;
+var
+  I: Integer;
+begin
+  for I := 0 to Count - 1 do
+    Items[I].Optimize;
+end;
+
 procedure TACLSkinImageSet.ReleaseItems;
 begin
   FItems.Clear;
@@ -663,13 +672,13 @@ end;
 
 procedure TACLSkinImageSet.SaveToFile(const AFileName: string);
 var
-  AStream: TStream;
+  LStream: TStream;
 begin
-  AStream := TFileStream.Create(AFileName, fmCreate);
+  LStream := TFileStream.Create(AFileName, fmCreate);
   try
-    SaveToStream(AStream);
+    SaveToStream(LStream);
   finally
-    AStream.Free;
+    LStream.Free;
   end;
 end;
 
