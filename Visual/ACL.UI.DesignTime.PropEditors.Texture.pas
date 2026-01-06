@@ -6,7 +6,7 @@
 //  Purpose:   Design Time Routines
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2024
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -227,7 +227,10 @@ end;
 procedure TACLTextureEditorDialog.btnExportClick(Sender: TObject);
 begin
   if ImportExportDialog.Execute(True, Handle) then
+  begin
+    ImageSet.Optimize;
     ImageSet.SaveToFile(ImportExportDialog.FileName);
+  end;
 end;
 
 procedure TACLTextureEditorDialog.btnImportClick(Sender: TObject);
