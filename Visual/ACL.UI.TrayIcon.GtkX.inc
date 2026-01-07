@@ -318,8 +318,7 @@ type
       DeleteFile(FIconFileName);
     // Главное, чтобы имя файла отличалось от предыдущего, иначе
     // API будет думать, что мы пытаемся назначить туже самую иконку.
-    FIconFileName := GetTempDir + FIconId + '-' +
-      IfThenW(FIconFileName.EndsWith('0.png'), '1', '0') + '.png';
+    FIconFileName := GetTempDir + FIconId + '-' + IntToStr(TACLThread.Timestamp) + '.png';
 
     LIconIndex := 0;
     if ShellDesktopEnv = sdeXFCE then
@@ -524,7 +523,7 @@ type
         app_indicator_set_secondary_activate_target(FHandle, GetWidget(LDefaultItem.Handle));
       end;
       app_indicator_set_icon(FHandle, PChar(IconFileName));
-      app_indicator_set_label(FHandle, PChar(Owner.Hint), 'XXXX');
+      //app_indicator_set_label(FHandle, PChar(Owner.Hint), 'XXXX');
       app_indicator_set_title(FHandle, PChar(Owner.Hint));
       app_indicator_set_status(FHandle, APP_INDICATOR_STATUS_ACTIVE);
     end;
