@@ -6,7 +6,7 @@
 //  Purpose:   FileSystem Utilities
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -637,31 +637,31 @@ end;
 
 function acValidateSubPath(const Path: string): string;
 var
-  AArr: TStringDynArray;
-  ABuilder: TACLStringBuilder;
-  AHasPathDelimeter: Boolean;
+  LArr: TStringDynArray;
+  LBuffer: TACLStringBuilder;
+  LHasPathDelim: Boolean;
   I: Integer;
 begin
   Result := '';
   if Path <> '' then
   begin
-    AHasPathDelimeter := Path[Length(Path)] = PathDelim;
-    acSplitString(Path, PathDelim, AArr);
-    for I := 0 to Length(AArr) - 1 do
-      AArr[I] := acValidateFileName(AArr[I]);
+    LHasPathDelim := Path[Length(Path)] = PathDelim;
+    acSplitString(Path, PathDelim, LArr);
+    for I := 0 to Length(LArr) - 1 do
+      LArr[I] := acValidateFileName(LArr[I]);
 
-    ABuilder := TACLStringBuilder.Get(Length(Path));
+    LBuffer := TACLStringBuilder.Get(Length(Path));
     try
-      for I := 0 to Length(AArr) - 1 do
+      for I := 0 to Length(LArr) - 1 do
       begin
-        if AArr[I] <> '' then
-          ABuilder.Append(AArr[I]).Append(PathDelim);
+        if LArr[I] <> '' then
+          LBuffer.Append(LArr[I]).Append(PathDelim);
       end;
-      if not AHasPathDelimeter then
-        ABuilder.Length := ABuilder.Length - 1;
-      Result := ABuilder.ToString;
+      if (LBuffer.Length > 0) and not LHasPathDelim then
+        LBuffer.Length := LBuffer.Length - 1;
+      Result := LBuffer.ToString;
     finally
-      ABuilder.Release;
+      LBuffer.Release;
     end;
   end;
 end;
