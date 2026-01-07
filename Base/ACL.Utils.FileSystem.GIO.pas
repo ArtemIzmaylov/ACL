@@ -6,7 +6,7 @@
 //  Purpose:   Wrappers for Gnome IO Library
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -18,7 +18,7 @@ unit ACL.Utils.FileSystem.GIO;
 interface
 
 uses
-  Contnrs, glib2;
+  GLib2, Contnrs, Types;
 
 const
   libGio2 = 'libgio-2.0.so.0';
@@ -30,10 +30,61 @@ type
   PGFileEnumerator = Pointer;
   PGFileMonitor = Pointer;
   PGCancellable = Pointer;
+  PGDBusConnection = Pointer;
+  PGDBusMethodInvocation = Pointer;
+  PGDBusInterfaceInfo = Pointer;
+  PGDBusProxy = Pointer;
+  PGVariant = Pointer;
+  PGVariantBuilder = Pointer;
+  PGVariantType = Pointer;
   PGUnixMountMonitor = Pointer;
   PGUnixMountPoint = Pointer;
   PGUnixMountEntry = Pointer;
 
+type
+  TGBusNameOwnerFlagsIdx = (
+    G_BUS_NAME_OWNER_FLAGS_ALLOW_REPLACEMENT = 0,
+    G_BUS_NAME_OWNER_FLAGS_REPLACE = 1,
+    G_BUS_NAME_OWNER_FLAGS_DO_NOT_QUEUE = 2,
+    TGBusNameOwnerFlagsIdxMaxValue = 31
+  );
+  TGBusNameOwnerFlags = Set of TGBusNameOwnerFlagsIdx;
+
+  TGDBusInterfaceMethodCallFunc = procedure(connection: PGDBusConnection;
+    sender, object_path, interface_name, method_name: Pgchar;
+    parameters: PGVariant; invocation: PGDBusMethodInvocation; user_data: gpointer); cdecl;
+  TGDBusInterfaceGetPropertyFunc = function(connection: PGDBusConnection;
+    sender, object_path, interface_name, property_name: Pgchar;
+    error: PPGError; user_data: gpointer): PGVariant; cdecl;
+  TGDBusInterfaceSetPropertyFunc = function(connection: PGDBusConnection;
+    sender, object_path, interface_name, property_name: Pgchar;
+    value: PGVariant; error: PPGError; user_data: gpointer): gboolean; cdecl;
+
+  PPGDBusInterfaceInfo = ^PGDBusInterfaceInfo;
+  PPGVariant = ^PGVariant;
+
+  PGDBusInterfaceVTable = ^TGDBusInterfaceVTable;
+  TGDBusInterfaceVTable = record
+    method_call: TGDBusInterfaceMethodCallFunc;
+    get_property: TGDBusInterfaceGetPropertyFunc;
+    set_property: TGDBusInterfaceSetPropertyFunc;
+    padding: array [0..7] of gpointer;
+  end;
+
+  PGDBusNodeInfo = ^TGDBusNodeInfo;
+  TGDBusNodeInfo = object
+    ref_count: gint;
+    path: Pgchar;
+    interfaces: PPGDBusInterfaceInfo;
+    //nodes: PPGDBusNodeInfo;
+    //annotations: PPGDBusAnnotationInfo;
+  end;
+
+const
+  G_BUS_NAME_OWNER_FLAGS_NONE = []; {0 = $00000000}
+
+{$IFNDEF LCLGtk3}
+type
   TGtkIconLookupFlag = (
     GTK_ICON_LOOKUP_NO_SVG = 0,
     GTK_ICON_LOOKUP_FORCE_SVG = 1,
@@ -49,6 +100,15 @@ type
   TGtkIconLookupFlags = set of TGtkIconLookupFlag;
 
 const
+  G_CONNECT_DEFAULT = 0;
+{$ENDIF}
+
+const
+  G_BUS_TYPE_SESSION = 2;
+  G_DBUS_CALL_FLAGS_NONE = 0;
+  G_DBUS_PROXY_FLAGS_NONE = 0;
+  G_DBUS_ERROR_NOT_SUPPORTED = 7;
+
   G_FILE_COPY_NONE = 0;
   G_FILE_COPY_OVERWRITE = 1;
   G_FILE_COPY_BACKUP = 2;
@@ -64,6 +124,8 @@ const
   G_FILE_MONITOR_WATCH_MOVES  = 8;
 
 type
+  TGBusNameCallback = procedure(connection: PGDBusConnection; name: Pgchar; user_data: gpointer); cdecl;
+
   PPGFileProgressCallback = ^PGFileProgressCallback;
   PGFileProgressCallback = ^TGFileProgressCallback;
   TGFileProgressCallback = procedure(current_num_bytes, total_num_bytes: gint64; user_data: gpointer); cdecl;
@@ -176,6 +238,63 @@ procedure g_cancellable_cancel(cancellable: PGCancellable); cdecl; external libG
 function g_cancellable_is_cancelled(cancellable: PGCancellable): gboolean; cdecl; external libGio2;
 function g_cancellable_new: PGCancellable; cdecl; external libGio2;
 
+function g_variant_builder_new(type_: PGVariantType): PGVariantBuilder; cdecl; external gobjectlib;
+procedure g_variant_builder_add(builder: PGVariantBuilder; format_string: Pgchar; args: array of const); cdecl; external gobjectlib;
+procedure g_variant_builder_add_pair(builder: PGVariantBuilder; const key: string; value: PGVariant); overload;
+function g_variant_builder_end(builder: PGVariantBuilder): PGVariant; cdecl; external gobjectlib;
+procedure g_variant_builder_unref(builder: PGVariantBuilder); cdecl; external gobjectlib;
+function g_variant_equal(one, two: PGVariant): gboolean; cdecl; external gobjectlib;
+function g_variant_new(fmt: Pgchar; args: array of const): PGVariant; cdecl; external gobjectlib;
+function g_variant_new_boolean(value: gboolean): PGVariant; cdecl; external gobjectlib;
+function g_variant_new_double(value: gdouble): PGVariant; cdecl; external gobjectlib;
+function g_variant_new_int32(value: gint32): PGVariant; cdecl; external gobjectlib;
+function g_variant_new_int64(value: gint64): PGVariant; cdecl; external gobjectlib;
+function g_variant_new_string(string_: Pgchar): PGVariant; cdecl; external gobjectlib;
+function g_variant_new_string_(const string_: string): PGVariant; cdecl;
+function g_variant_new_string_array(const strings: TStringDynArray): PGVariant;
+function g_variant_new_strv(strv: PPgchar; length: gssize): PGVariant; cdecl; external gobjectlib;
+function g_variant_new_tuple(children: PPGVariant; n_children: gsize): PGVariant; cdecl; external gobjectlib;
+procedure g_variant_get(value: PGVariant; format_string: Pgchar; args: array of const); cdecl; external gobjectlib;
+function g_variant_get_boolean(value: PGVariant): gboolean; cdecl; external gobjectlib;
+function g_variant_get_child_value(value: PGVariant; index_: gsize): PGVariant; cdecl; external gobjectlib;
+function g_variant_get_double(value: PGVariant): gdouble; cdecl; external gobjectlib;
+function g_variant_get_type_string(value: PGVariant): Pgchar; cdecl; external gobjectlib;
+function g_variant_get_int32(value: PGVariant): guint32; cdecl; external gobjectlib;
+function g_variant_get_int64(value: PGVariant): guint32; cdecl; external gobjectlib;
+function g_variant_get_uint32(value: PGVariant): guint32; cdecl; external gobjectlib;
+function g_variant_get_uint64(value: PGVariant): guint32; cdecl; external gobjectlib;
+function g_variant_get_variant(value: PGVariant): PGVariant; cdecl; external gobjectlib;
+function g_variant_type_new(type_string: Pgchar): PGVariantType; cdecl; external gobjectlib;
+procedure g_variant_type_free(type_: PGVariantType); cdecl; external gobjectlib;
+procedure g_variant_replace(var ATarget: PGVariant; ANewValue: PGVariant);
+procedure g_variant_unref(value: PGVariant); cdecl; external gobjectlib;
+
+function g_bus_own_name(bus_type: gint32; name: Pgchar;
+  flags: TGBusNameOwnerFlags; bus_acquired_handler: TGBusNameCallback;
+  name_acquired_handler: TGBusNameCallback; name_lost_handler: TGBusNameCallback;
+  user_data: gpointer; user_data_free_func: TGDestroyNotify): guint; cdecl; external libGio2;
+procedure g_bus_unown_name(owner_id: guint); cdecl; external libGio2;
+function g_dbus_connection_emit_signal(connection: PGDBusConnection;
+  destination_bus_name, object_path, interface_name, signal_name: Pgchar;
+  parameters: PGVariant; error: PPGError): gboolean; cdecl; external libGio2;
+function g_dbus_connection_register_object(connection: PGDBusConnection;
+  object_path: Pgchar; interface_info: PGDBusInterfaceInfo; vtable: PGDBusInterfaceVTable;
+  user_data: gpointer; user_data_free_func: TGDestroyNotify; error: PPGError): guint; cdecl; external libGio2;
+function g_dbus_error_quark: TGQuark; cdecl; external libGio2;
+procedure g_dbus_method_invocation_return_error(
+  invocation: PGDBusMethodInvocation; domain: TGQuark; code: gint; format: Pgchar; args: array of const); cdecl; external libGio2;
+procedure g_dbus_method_invocation_return_value(
+  invocation: PGDBusMethodInvocation; parameters: PGVariant); cdecl; external libGio2;
+procedure g_dbus_node_info_unref(info: PGDBusNodeInfo); cdecl; external libGio2;
+function g_dbus_node_info_new_for_xml(
+  xml_data: Pgchar; error: PPGError): PGDBusNodeInfo; cdecl; external libGio2;
+function g_dbus_proxy_new_for_bus_sync(bus_type: gint32; flags: gint32;
+  info: PGDBusInterfaceInfo; name: Pgchar; object_path: Pgchar;
+  interface_name: Pgchar; cancellable: PGCancellable; error: PPGError): PGDBusProxy; cdecl; external libGio2;
+function g_dbus_proxy_call_sync(proxy: PGDBusProxy; method_name: Pgchar;
+  parameters: PGVariant; flags: gint32{TGDBusCallFlags}; timeout_msec: gint;
+  cancellable: PGCancellable; error: PPGError): PGVariant; cdecl; external libGio2;
+
 function g_unix_mount_monitor_get: PGUnixMountMonitor; cdecl; external libGio2;
 function g_unix_mount_for(file_path: Pgchar; time_read: Pguint64): PGUnixMountEntry; cdecl; external libGio2;
 function g_unix_mount_get_device_path(mount_entry: PGUnixMountEntry): Pgchar; cdecl; external libGio2;
@@ -203,6 +322,39 @@ uses
   // ACL
   ACL.Utils.Common,
   ACL.Utils.Strings;
+
+procedure g_variant_builder_add_pair(
+  builder: PGVariantBuilder; const key: string; value: PGVariant); overload;
+begin
+  g_variant_builder_add(builder, '{sv}', [Pgchar(key), value]);
+end;
+
+function g_variant_new_string_(const string_: string): PGVariant; cdecl;
+begin
+  Result := g_variant_new('s', [Pgchar(string_)]);
+end;
+
+function g_variant_new_string_array(const strings: TStringDynArray): PGVariant;
+var
+  LBuilder: PGVariantBuilder;
+  LType: PGVariantType;
+  I: Integer;
+begin
+  LType := g_variant_type_new('as');
+  LBuilder := g_variant_builder_new(LType);
+  for I := Low(strings) to High(strings) do
+    g_variant_builder_add(LBuilder, 's', [pgchar(strings[I])]);
+  Result := g_variant_builder_end(LBuilder);
+  g_variant_builder_unref(LBuilder);
+  g_variant_type_free(LType);
+end;
+
+procedure g_variant_replace(var ATarget: PGVariant; ANewValue: PGVariant);
+begin
+  if ATarget <> nil then
+    g_variant_unref(ATarget);
+  ATarget := ANewValue;
+end;
 
 function gioDecodeFileUri(Uri: Pgchar): string;
 var

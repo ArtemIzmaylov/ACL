@@ -16,33 +16,6 @@ uses
   ACL.Utils.FileSystem.GIO,
   ACL.Utils.Logger;
 
-{$IFDEF LCLGtk2}
-const
-  G_CONNECT_DEFAULT = 0;
-  G_DBUS_CALL_FLAGS_NONE = 0;
-  G_DBUS_PROXY_FLAGS_NONE = 0;
-  G_BUS_TYPE_SESSION = 2;
-
-type
-  PGDBusProxy = Pointer;
-  PGVariant = Pointer;
-
-  function g_dbus_proxy_new_for_bus_sync(bus_type: gint32;
-    flags: gint32; info: {PGDBusInterfaceInfo}Pointer; name: Pgchar;
-    object_path: Pgchar; interface_name: Pgchar; cancellable: PGCancellable;
-    error: PPGError): PGDBusProxy; cdecl; external libGio2;
-  function g_dbus_proxy_call_sync(proxy: PGDBusProxy; method_name: Pgchar;
-    parameters: PGVariant; flags: gint32; timeout_msec: gint;
-    cancellable: PGCancellable; error: PPGError): PGVariant; cdecl; external libGio2;
-  function g_variant_new(fmt: Pgchar; args: array of const): PGVariant; cdecl; external gobjectlib;
-  function g_variant_get_child_value(value: PGVariant; index_: gsize): PGVariant; cdecl; external gobjectlib;
-  function g_variant_get_double(value: PGVariant): gdouble; cdecl; external gobjectlib;
-  function g_variant_get_type_string(value: PGVariant): Pgchar; cdecl; external gobjectlib;
-  function g_variant_get_uint32(value: PGVariant): guint32; cdecl; external gobjectlib;
-  function g_variant_get_variant(value: PGVariant): PGVariant; cdecl; external gobjectlib;
-  procedure g_variant_unref(value: PGVariant); cdecl; external gobjectlib;
-{$ENDIF}
-
 type
 
   { TGlobalSettings }
@@ -69,13 +42,6 @@ type
       [G_SIGNAL_MATCH_FUNC, G_SIGNAL_MATCH_DATA], 0, 0, nil, func, data);
   end;
 {$ENDIF}
-
-  procedure g_variant_replace(var ATarget: PGVariant; ANewValue: PGVariant);
-  begin
-    if ATarget <> nil then
-      g_variant_unref(ATarget);
-    ATarget := ANewValue;
-  end;
 
   { TGlobalSettings }
 
