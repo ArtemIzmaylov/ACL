@@ -6,7 +6,7 @@
 //  Purpose:   String Utilities
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -481,6 +481,9 @@ function acPos(const ASubStr, AString: string;
   AIgnoreCase: Boolean = False; AOffset: Integer = 1): Integer; overload; inline;
 function acPos(const ASubStr, AString: string;
   AIgnoreCase, AWholeWords: Boolean; AOffset: Integer = 1): Integer; overload;
+
+// Join
+function acJoinStrings(const AValues: array of string; const ADelimiter: string): string;
 
 // Split
 function acSplitString(AScan: PAnsiChar; AScanCount: Integer;
@@ -1426,8 +1429,35 @@ begin
 end;
 
 // -----------------------------------------------------------------------------
-// ExplodeString
+// Join / Split String
 // -----------------------------------------------------------------------------
+
+function acJoinStrings(const AValues: array of string; const ADelimiter: string): string;
+var
+  LBuilder: TACLStringBuilder;
+  I: Integer;
+begin
+  if Length(AValues) = 0 then
+    Exit('');
+  if Length(AValues) = 1 then
+    Exit(AValues[0]);
+
+  LBuilder := TACLStringBuilder.Get;
+  try
+    for I := Low(AValues) to High(AValues) do
+    begin
+      if AValues[I] <> '' then
+      begin
+        if LBuilder.Length > 0 then
+          LBuilder.Append(ADelimiter);
+        LBuilder.Append(AValues[I]);
+      end;
+    end;
+    Result := LBuilder.ToString;
+  finally
+    LBuilder.Release;
+  end;
+end;
 
 function acSplitString(AScan: PAnsiChar; AScanCount: Integer;
   const ADelimiters: AnsiString; ACallback: TAnsiSplitStringCallback;
