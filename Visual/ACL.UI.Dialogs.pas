@@ -396,6 +396,8 @@ type
     FolderBrowserRecursive: string;
     MsgDlgButtons: array[TMsgDlgBtn] of string;
     MsgDlgCaptions: array[TMsgDlgType] of string;
+    SearchHint: string;
+    SearchNoResults: string;
   public
     class constructor Create;
     class procedure ApplyLocalization;
@@ -560,6 +562,9 @@ begin
   FolderBrowserNewFolder := LSection.ReadString('B3', FolderBrowserNewFolder);
   ButtonApply := LSection.ReadString('B4', ButtonApply);
 
+  SearchHint := LSection.ReadString('Search', SearchHint);
+  SearchNoResults := LSection.ReadString('SearchNoResults', SearchNoResults);
+
   LValue := LSection.ReadString('BS');
   for LButton := Low(LButton) to High(LButton) do
     MsgDlgButtons[LButton] := IfThenW(LangExtractPart(LValue, Ord(LButton)), MsgDlgButtons[LButton]);
@@ -615,6 +620,9 @@ begin
   acLangSizeSuffixKB := 'KB';
   acLangSizeSuffixMB := 'MB';
   acLangSizeSuffixGB := 'GB';
+
+  SearchHint := 'Type here to search';
+  SearchNoResults := 'No results matching your search query';
 end;
 
 {$REGION ' FileDialogs '}

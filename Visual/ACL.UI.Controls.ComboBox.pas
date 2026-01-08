@@ -211,7 +211,6 @@ type
     FList: TACLBasicDropDownList;
     FOwner: TACLBasicComboBox;
 
-    function CalculateHeight: Integer;
     procedure IncSearchChanged(Sender: TObject);
     // IACLControl
     function GetFont: TFont;
@@ -225,6 +224,7 @@ type
     procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
   protected
     procedure AlignControls(AControl: TControl; var Rect: TRect); override;
+    function CalculateHeight: Integer; virtual;
     procedure DoShow; override;
     procedure DpiChanged; override;
     //# Mouse

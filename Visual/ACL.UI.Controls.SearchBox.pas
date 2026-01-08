@@ -41,8 +41,8 @@ uses
   ACL.Classes,
   ACL.Classes.Collections,
   ACL.Graphics,
-  ACL.Timers,
   ACL.Threading,
+  ACL.Timers,
   ACL.UI.Controls.Base,
   ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.Buttons,
@@ -94,6 +94,7 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure CancelSearch;
+    procedure Localize(const ASection, AName: string); override;
   published
     property AutoSize;
     property Borders;
@@ -113,6 +114,9 @@ type
   end;
 
 implementation
+
+uses
+  ACL.UI.Dialogs;
 
 { TACLSearchEdit }
 
@@ -218,6 +222,13 @@ begin
     Exit;
   end;
   Key := 0;
+end;
+
+procedure TACLSearchEdit.Localize(const ASection, AName: string);
+begin
+  inherited;
+  if TextHint = '' then
+    TextHint := TACLDialogsStrs.SearchHint;
 end;
 
 procedure TACLSearchEdit.MoveFocusToFirstSearchResult;

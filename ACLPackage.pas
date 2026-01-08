@@ -51,7 +51,7 @@ uses
   ACL.UI.DesignTime.Reg, ACL.UI.Dialogs, ACL.UI.Dialogs.ColorPicker, 
   ACL.UI.Dialogs.FontPicker, ACL.UI.DropSource, ACL.UI.DropTarget, 
   ACL.UI.Forms, ACL.UI.HintWindow, ACL.UI.ImageList, ACL.UI.Insight, 
-  ACL.UI.Menus, ACL.UI.Resources, ACL.UI.TrayIcon, ACL.UI.Insight.Core, 
+  ACL.UI.Insight.Core, ACL.UI.Menus, ACL.UI.Resources, ACL.UI.TrayIcon, 
   LazarusPackageIntf;
 
 implementation

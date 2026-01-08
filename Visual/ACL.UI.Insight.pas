@@ -50,6 +50,7 @@ uses
   ACL.Geometry,
   ACL.Geometry.Utils,
   ACL.Graphics,
+  ACL.Graphics.Ex,
   ACL.Graphics.Images,
   ACL.Threading,
 {$I ACL.UI.Core.Impl.inc},
@@ -141,7 +142,7 @@ type
 implementation
 
 uses
-  ACL.Graphics.Ex;
+  ACL.UI.Dialogs;
 
 type
 
@@ -153,7 +154,9 @@ type
     procedure HandlerDrawEntry(Sender: TObject; ACanvas: TCanvas;
       const R: TRect; ANode: TACLTreeListNode; var AHandled: Boolean);
   protected
+    function CalculateHeight: Integer; override;
     procedure DoPopup; override;
+    procedure Paint; override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -340,7 +343,8 @@ begin
 //  EditBox.OnChange := nil;
 //  Text := ANode.Caption;
 //  EditBox.OnChange := PrevOnChange;
-  PostMessage(Handle, WM_POSTSELECT, 0, LPARAM(TACLUIInsightCandidate(ANode.Data).Clone));
+  if ANode.Data <> nil then
+    PostMessage(Handle, WM_POSTSELECT, 0, LPARAM(TACLUIInsightCandidate(ANode.Data).Clone));
 end;
 
 procedure TACLUIInsightSearchBox.SetMode(AValue: TACLUIInsightSearchEditMode);
@@ -465,6 +469,14 @@ begin
   inherited;
 end;
 
+function TACLUIInsightSearchResults.CalculateHeight: Integer;
+begin
+  if List.AbsoluteVisibleNodes.Count > 0 then
+    Result := inherited
+  else
+    Result := dpiApply(List.OptionsView.Nodes.Height, FCurrentPPI);
+end;
+
 procedure TACLUIInsightSearchResults.DoPopup;
 begin
   inherited;
@@ -493,6 +505,20 @@ begin
   acSysDrawText(ACanvas, LRect, ANode.Values[1], DT_BOTTOM or DT_SINGLELINE or DT_END_ELLIPSIS);
 
   AHandled := True;
+end;
+
+procedure TACLUIInsightSearchResults.Paint;
+var
+  LRect: TRect;
+begin
+  inherited;
+  if List.AbsoluteVisibleNodes.Count = 0 then
+  begin
+    LRect := List.Bounds;
+    Canvas.Font := FHintFont;
+    Canvas.Font.Color := List.Style.RowColorsText[False];
+    acSysDrawText(Canvas, LRect, TACLDialogsStrs.SearchNoResults, DT_VCENTER or DT_CENTER or DT_SINGLELINE);
+  end;
 end;
 
 { TACLUIInsightHighlightWindow }
