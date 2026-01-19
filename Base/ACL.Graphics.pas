@@ -3923,19 +3923,29 @@ end;
 function TACLDib.GetDC: HDC;
 {$IFDEF LCLGtk3}
 var
-  LDC: TGtk3DC;
+  LCairo: Pcairo_t;
+  LContext: TGtk3DC;
+  LSurface: Pcairo_surface_t;
 {$ENDIF}
 begin
   CheckIsMainThread;
   if FHandle = 0 then
   begin
   {$IFDEF LCLGtk3}
-    LDC := TGtk3DC.Create(PGtkWidget(nil));
-    cairo_destroy(Pcairo_t(LDC.FCairo));
-    cairo_surface_destroy(Pcairo_surface_t(LDC.CairoSurface));
-    LDC.CairoSurface := Pointer(cairo_create_surface(FColors, Width, Height));
-    LDC.FCairo := Pointer(cairo_create(Pcairo_surface_t(LDC.CairoSurface)));
-    FHandle := HDC(LDC);
+    LContext := TGtk3DC.Create(PGtkWidget(nil));
+    cairo_destroy(Pointer(LContext.FCairo));
+    cairo_surface_destroy(Pointer(LContext.CairoSurface));
+    LSurface := cairo_create_surface(FColors, Width, Height);
+    LCairo := cairo_create(LSurface);
+    //#AI, 17.01.2026
+    // Такой же режим используется по умолчанию у gtk3-виджетов.
+    // Если режимы не синхронизировать, то PixelOffset, что используется
+    // в обвязке LCLGtk3 будет давать мыльцо на краях картинки при отрисовке
+    // её части (CopyRect)
+    cairo_set_antialias(LCairo, CAIRO_ANTIALIAS_NONE);
+    LContext.CairoSurface := Pointer(LSurface);
+    LContext.FCairo := Pointer(LCairo);
+    FHandle := HDC(LContext);
   {$ELSE}
     FHandle := CreateCompatibleDC(0);
     FBitmap := CreateCompatibleBitmap(FHandle, Width, Height);
