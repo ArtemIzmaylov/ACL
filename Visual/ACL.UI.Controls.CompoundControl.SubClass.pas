@@ -6,7 +6,7 @@
 //  Purpose:   CompoundControl Classes
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -1383,7 +1383,8 @@ begin
     FDropSourceOperation := ASource;
     FDropSource := TACLDropSource.Create(Self, SubClass.Container.GetControl);
     FDropSource.AllowedActions := AActions;
-    if not DropSourceConfig.IsEmpty then
+    // Без DataProviders DropSource в Linux не стартанёт в принципе
+    if (FDropSource.DataProviders.Count = 0) or not DropSourceConfig.IsEmpty then
       FDropSource.DataProviders.Add(TACLDragDropDataProviderConfig.Create(DropSourceConfig));
     SubClass.DoDropSourceGetData(FDropSource, FDropSourceObject);
     FDropSource.ExecuteInThread;

@@ -6,7 +6,7 @@
 //  Purpose:   General Utilities and Types
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -278,46 +278,73 @@ var
   FWineGetVersion: TWineGetVersion = nil;
 {$ENDIF}
 
+var
+  fOSDescription: string = '';
+
 function acOSGetDescription: string;
 var
   LBuilder: TACLStringBuilder;
 {$IFDEF LINUX}
+  LData: TStrings;
   LDescription: string;
   LRelease: string;
+  I: Integer;
 {$ENDIF}
 begin
-  LBuilder := TACLStringBuilder.Get(32);
-  try
-    LBuilder.Append(TOSVersion.Name);
-    LBuilder.Append(' / ');
-  {$IFDEF LINUX}
-    // Description
-    LDescription := TACLProcess.ExecuteToString('lsb_release -d');
-    LDescription := acTrim(Copy(LDescription, Pos(':', LDescription) + 1));
-    LBuilder.Append(LDescription);
-    // Release
-    LRelease := TACLProcess.ExecuteToString('lsb_release -r');
-    LRelease := acTrim(Copy(LRelease, Pos(':', LRelease) + 1));
-    if not LDescription.Contains(LRelease) then
-      LBuilder.Append(' ').Append(LRelease);
-  {$ENDIF}
-  {$IFDEF MSWINDOWS}
-    LBuilder.Append(TOSVersion.Major);
-    LBuilder.Append('.');
-    LBuilder.Append(TOSVersion.Minor);
-    LBuilder.Append('.');
-    LBuilder.Append(TOSVersion.Build);
-    if Assigned(FWineGetVersion) and Assigned(FWineGetBuildId) then
-    begin
-      LBuilder.Append(' / Wine: ');
-      LBuilder.Append(acString(FWineGetVersion));
-      LBuilder.AppendFormat(' (%s)', [FWineGetBuildId]);
+  if fOSDescription = '' then
+  begin
+    LBuilder := TACLStringBuilder.Get(32);
+    try
+      LBuilder.Append(TOSVersion.Name);
+      LBuilder.Append(' / ');
+
+    {$IFDEF LINUX}
+      LData := TStringList.Create;
+      try
+        LData.NameValueSeparator := ':';
+        // Fetch the data
+        if ExeSearch('lsb_release') <> '' then
+          LData.Text := TACLProcess.ExecuteToString('lsb_release -a')
+        else
+          LData.Text := TACLProcess.ExecuteToString('hostnamectl');
+        for I := 0 to LData.Count - 1 do
+          LData.Strings[I] := Trim(LData.Strings[I]);
+
+        // Description
+        LDescription := Trim(LData.Values['Description']);
+        if LDescription = '' then
+          LDescription := Trim(LData.Values['Operating System']); // hostnamectl
+        LBuilder.Append(LDescription);
+
+        // Release
+        LRelease := Trim(LData.Values['Release']);
+        if (LRelease <> '') and not LDescription.Contains(LRelease) then
+          LBuilder.Append(' ').Append(LRelease);
+      finally
+        LData.Free;
+      end;
+    {$ENDIF}
+
+    {$IFDEF MSWINDOWS}
+      LBuilder.Append(TOSVersion.Major);
+      LBuilder.Append('.');
+      LBuilder.Append(TOSVersion.Minor);
+      LBuilder.Append('.');
+      LBuilder.Append(TOSVersion.Build);
+      if Assigned(FWineGetVersion) and Assigned(FWineGetBuildId) then
+      begin
+        LBuilder.Append(' / Wine: ');
+        LBuilder.Append(acString(FWineGetVersion));
+        LBuilder.AppendFormat(' (%s)', [FWineGetBuildId]);
+      end;
+    {$ENDIF}
+
+      fOSDescription := LBuilder.ToString;
+    finally
+      LBuilder.Release;
     end;
-  {$ENDIF}
-    Result := LBuilder.ToString;
-  finally
-    LBuilder.Release;
   end;
+  Result := fOSDescription;
 end;
 
 function acOSCheckVersion(AMajor, AMinor: Integer; ABuild: Integer = -1): Boolean;

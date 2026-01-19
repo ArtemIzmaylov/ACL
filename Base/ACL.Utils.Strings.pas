@@ -1646,13 +1646,13 @@ var
   LPos, LLen: Cardinal;
   LStr: UnicodeString;
 begin
-  LPos := 1;
-  LLen := Length(LStr);
   if IgnoreSourceCase then
     LStr := acUString(S)
   else
     LStr := acUString(acLowerCase(S));
 
+  LPos := 1;
+  LLen := Length(LStr);
   LDelims := acParserDefaultDelimiterChars;
   LEndOfWordFound := True;
   while LPos <= LLen do
