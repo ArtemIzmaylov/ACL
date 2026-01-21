@@ -900,6 +900,7 @@ begin
   LWindow.Widget^.set_allocation(@LAllocation);
   if Gtk3IsGtkWindow(LWindow.Widget) then
     Gtk3WidgetSet.AddWindow(PGtkWindow(LWindow.Widget));
+
   Result := TLCLHandle(LWindow);
 end;
 
@@ -992,7 +993,8 @@ begin
       end;
     end;
 
-    CheckAndFixGeometry(LForm); // !!! Manjaro26 (X11)
+    if not GTK3WidgetSet.IsWayland then
+      CheckAndFixGeometry(LForm); // !!! Manjaro26 (X11)
 
     LWidget.BeginUpdate;
     try

@@ -319,7 +319,17 @@ begin
     end;
   finally
     FCreatingWorkaround := nil;
+function TACLGtk3AdvancedWindow.DeliverMessage(var Msg; const AIsInput: Boolean): LRESULT;
+var
+  LMsg: TMessage absolute Msg;
+begin
+  // Положение DropDown-окна сбрасывается в (0,0) при инициализации показа на Wayland.
+  if (LMsg.Msg = LM_MOVE) and (wtWindow in WidgetType) and (BorderStyle = bsNone) then
+  begin
+    if InUpdate and GTK3WidgetSet.IsWayland then
+      Exit(0);
   end;
+  Result := inherited DeliverMessage(Msg, AIsInput);
 end;
 
 function TACLGtk3AdvancedWindow.GtkEventPaint(Sender: PGtkWidget; AContext: Pcairo_t): Boolean;
