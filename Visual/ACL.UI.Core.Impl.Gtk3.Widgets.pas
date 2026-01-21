@@ -84,10 +84,14 @@ type
   TACLGtk3AdvancedWindow = class(TGtk3Window)
   strict private
     FCreatingWorkaround: TProc;
+    class function OnMapped(AWindow: PGtkWindow; AEvent: PGdkEventAny;
+      AImpl: TACLGtk3AdvancedWindow): gboolean; cdecl; static;
   public
     function ClientToScreen(var P: TPoint): boolean; override;
     function CreateWidget(const Params: TCreateParams): PGtkWidget; override;
+    function DeliverMessage(var Msg; const AIsInput: Boolean = False): LRESULT; override;
     function GtkEventPaint(Sender: PGtkWidget; AContext: Pcairo_t): Boolean; override;
+    procedure InitializeWidget; override;
     procedure OffsetMousePos(const aGlobalX, aGlobalY: double; APoint: PPoint); override;
     procedure Repaint(const ARect: PRect=nil); override;
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: integer); override;
@@ -329,6 +333,23 @@ begin
     Result := inherited;
 end;
 
+procedure TACLGtk3AdvancedWindow.InitializeWidget;
+begin
+  inherited;
+  g_signal_connect_data(Widget, 'map-event', TGCallback(@OnMapped), Self, nil, G_CONNECT_DEFAULT);
+end;
+
+class function TACLGtk3AdvancedWindow.OnMapped(AWindow: PGtkWindow;
+  AEvent: PGdkEventAny; AImpl: TACLGtk3AdvancedWindow): gboolean; cdecl;
+begin
+  if AImpl.LCLObject = Application.MainForm then
+    LogEntry(acGeneralLogFileName, 'Main', 'WindowMapped');
+  AImpl.SetBounds(
+    AImpl.LCLObject.Left, AImpl.LCLObject.Top,
+    AImpl.LCLObject.Width, AImpl.LCLObject.Height);
+  Result := False;
+end;
+
 procedure TACLGtk3AdvancedWindow.OffsetMousePos(
   const aGlobalX, aGlobalY: double; APoint: PPoint);
 begin
@@ -370,9 +391,18 @@ begin
     //    Origin от Window.transient_for - это ломает наши дропдауны и меню.
     // 2) Оригинальная функция не разруливает ситуацию, когда Constraints.MaxWidth
     //    задан, а Constraints.MaxHeight нет (или наоборот)
+    // 3) При работе на X11-бэке заметил (Alt.Linux 11 Gnome), что окно ATE не
+    //    показывается на экране. Gtk+ Inspector показал, что CentralWidget формы
+    //    (Layout внутри ScrollWindow) не аллокирован (1x1 по -1,-1). Причём повторяется
+    //    это лишь на сложных формах. Что именно вызывает сбой - непонятно, но
+    //    нашёл обходной манёвр: пока WidgetMapped = False, выставляем форме все
+    //    Constraint-ы. После непосредственного показа формы - выставляем актуальные
+    //    Похожая проблема была замечена на Manjaro 26, но там это решение не сработало
+    //    - см. TACLWSForm.CheckAndFixGeometry
 
     LForm := TCustomForm(LCLObject);
-    LFormSizeIsFixed := LForm.BorderStyle in [bsDialog, bsSingle, bsToolWindow];
+    LFormSizeIsFixed := not WidgetMapped or
+      (LForm.BorderStyle in [bsDialog, bsSingle, bsToolWindow]);
 
     LRect.x := ALeft;
     LRect.y := ATop;
