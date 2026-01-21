@@ -18,11 +18,7 @@ unit ACL.UI.Core.Impl.Gtk3;
 {$SCOPEDENUMS ON}
 
 {.$DEFINE DEBUG_MESSAGELOOP}
-{$MESSAGE WARN 'Проверить:'}
-// 1) В FlyWM (Astra Linux) при захвате клавиатурного хука, top-level форма в режиме StayOnTop проваливается на задний план.
-{$MESSAGE WARN 'Gtk3: DragImage has wrong position'}
 {$MESSAGE WARN 'Gtk3: проблемы с кэпчей - неправильные координаты'}
-{$MESSAGE WARN 'Gtk3: проблемы с меню - неправильные координаты, если оно открывается вниз'}
 interface
 
 uses
@@ -56,7 +52,6 @@ uses
   // ACL
   ACL.Classes,
   ACL.Graphics,
-  ACL.Graphics.Ex.Cairo,
   ACL.Geometry,
   ACL.Geometry.Utils,
   ACL.Utils.Common,
@@ -115,9 +110,7 @@ type
   strict private
     class procedure BlockTransientWindow(AWindow: PGtkWindow; AState: Boolean);
   protected
-    class procedure CheckAndFixGeometry(AWinControl: TWinControl);
-    class function ResolveWndParent(const AParams: TCreateParams): HWND;
-    class procedure SetAlphaExposing(AWidget: PGtkWidget);
+    class procedure CheckAndFixGeometry(ACtrl: TWinControl);
   published
     class function CreateHandle(const AWinControl: TWinControl;
       const AParams: TCreateParams): TLCLHandle; override;
@@ -140,6 +133,8 @@ type
   published
     class function CreateHandle(const AWinControl: TWinControl;
       const AParams: TCreateParams): TLCLHandle; override;
+    class procedure SetRealPopupParent(
+      const AForm, APopupParent: TCustomForm); override;
   end;
 
   { TACLWSCustomControl }
@@ -203,86 +198,13 @@ implementation
 
 uses
   ACL.UI.Controls.Base,
+  ACL.UI.Core.Impl.Gtk3.Widgets,
   ACL.UI.Forms.Base;
-
-const
-  GDK_DEFAULT_EVENTS_MASK = [
-    GDK_EXPOSURE_MASK, {2}
-    GDK_POINTER_MOTION_MASK, {4}
-    GDK_POINTER_MOTION_HINT_MASK, {8}
-    GDK_BUTTON_MOTION_MASK, {16}
-    GDK_BUTTON1_MOTION_MASK, {32}
-    GDK_BUTTON2_MOTION_MASK, {64}
-    GDK_BUTTON3_MOTION_MASK, {128}
-    GDK_BUTTON_PRESS_MASK, {256}
-    GDK_BUTTON_RELEASE_MASK, {512}
-    GDK_KEY_PRESS_MASK, {1024}
-    GDK_KEY_RELEASE_MASK, {2048}
-    GDK_ENTER_NOTIFY_MASK, {4096}
-    GDK_LEAVE_NOTIFY_MASK, {8192}
-    GDK_FOCUS_CHANGE_MASK, {16384}
-    GDK_STRUCTURE_MASK, {32768}
-    GDK_PROPERTY_CHANGE_MASK, {65536}
-    GDK_VISIBILITY_NOTIFY_MASK, {131072}
-    GDK_PROXIMITY_IN_MASK, {262144}
-    GDK_PROXIMITY_OUT_MASK, {524288}
-    GDK_SUBSTRUCTURE_MASK, {1048576}
-    GDK_SCROLL_MASK, {2097152}
-    GDK_TOUCH_MASK {4194304}
- // GDK_SMOOTH_SCROLL_MASK {8388608} //there is a bug in GTK3, see https://stackoverflow.com/questions/11775161/gtk3-get-mouse-scroll-direction
-  ];
 
 type
   TFormAccess = class(TForm);
-  TWinControlAccess = class(TWinControl);
   TGtk3WidgetAccess = class(TGtk3Widget);
   TGtk3WidgetSetAccess = class(TGtk3WidgetSet);
-
-  { TACLGtk3CustomControl }
-
-  // based on TGtk3Panel
-  TACLGtk3CustomControl = class(TGtk3Bin)
-  strict private
-    class procedure DoSizeAllocate(AWidget: PGtkLayout;
-      AGdkRect: PGdkRectangle; AGtk3Widget: TGtk3Widget); cdecl; static;
-  protected
-    function CreateWidget(const {%H-}Params: TCreateParams):PGtkWidget; override;
-    procedure SetBorderStyle(AValue: TBorderStyle);
-  public
-    function ClientToScreen(var P: TPoint): boolean; override;
-    function DeliverMessage(var Msg; const AIsInputEvent: Boolean=False): LRESULT; override;
-    procedure InitializeWidget; override;
-  end;
-
-  { TACLGtk3AdvancedWindow }
-
-  TACLGtk3AdvancedWindow = class(TGtk3Window)
-  strict private
-    FCreatingWorkaround: TProc;
-  public
-    function ClientToScreen(var P: TPoint): boolean; override;
-    function CreateWidget(const Params: TCreateParams): PGtkWidget; override;
-    function GtkEventPaint(Sender: PGtkWidget; AContext: Pcairo_t): Boolean; override;
-    procedure OffsetMousePos(const aGlobalX, aGlobalY: double; APoint: PPoint); override;
-    procedure SetBounds(ALeft, ATop, AWidth, AHeight: integer); override;
-    procedure SetText(const AValue: String); override;
-    procedure SetVisible(AValue: Boolean); override;
-  end;
-
-  { TACLGtk3PopupControl }
-
-  TACLGtk3PopupControl = class(TGtk3Widget)
-  strict private
-    FFirstMapRect: TRect;
-    class function WidgetEvent(widget: PGtkWidget;
-      Event: PGdkEvent; Data: GPointer): gboolean; cdecl; static;
-  public
-    function ClientToScreen(var P: TPoint): Boolean; override;
-    function CreateWidget(const {%H-}Params: TCreateParams):PGtkWidget; override;
-    procedure InitializeWidget; override;
-    function GtkEventPaint(Sender: PGtkWidget; AContext: Pcairo_t): Boolean; override;
-    procedure SetBounds(ALeft, ATop, AWidth, AHeight: integer); override;
-  end;
 
 function IsChild(AChild, AParent: PGtkWidget): Boolean;
 begin
@@ -803,18 +725,23 @@ begin
     GDK_BUTTON_PRESS,
     GDK_BUTTON_RELEASE,
     GDK_MOTION_NOTIFY:
-      if AEvent^.any.window <> ATarget^.window then // because of input-redirection
       begin
-        x1 := 0; y1 := 0; x2 := 0; y2 := 0;
-        ATarget^.window^.get_origin(@x1, @y1);
-        AEvent^.any.window.get_origin(@x2, @y2);
-        AEvent^.motion.x := AEvent^.motion.x + x2 - x1;
-        AEvent^.motion.y := AEvent^.motion.y + y2 - y1;
-        AEvent^.motion.x_root := AEvent^.motion.x_root + x2 - x1;
-        AEvent^.motion.y_root := AEvent^.motion.y_root + y2 - y1;
-        g_object_unref(AEvent^.any.window);
-        AEvent^.any.window := ATarget^.window;
-        g_object_ref(AEvent^.any.window);
+        if AEvent^.any.window <> ATarget^.window then // because of input-redirection
+        begin
+          x1 := 0; y1 := 0; x2 := 0; y2 := 0;
+          ATarget^.window^.get_origin(@x1, @y1);
+          AEvent^.any.window.get_origin(@x2, @y2);
+          AEvent^.motion.x := AEvent^.motion.x + x2 - x1;
+          AEvent^.motion.y := AEvent^.motion.y + y2 - y1;
+          AEvent^.motion.x_root := AEvent^.motion.x_root + x2 - x1;
+          AEvent^.motion.y_root := AEvent^.motion.y_root + y2 - y1;
+          g_object_unref(AEvent^.any.window);
+          AEvent^.any.window := ATarget^.window;
+          g_object_ref(AEvent^.any.window);
+        end;
+        // mark motion data as untrusted, ref.to. TGtk3Widget.GtkEventMouseMove
+        if AEvent.type_ = GDK_MOTION_NOTIFY then
+          AEvent^.motion.is_hint := 1;
       end;
   end;
 end;
@@ -827,371 +754,10 @@ begin
   Result := TLCLHandle(TGtk3HintWindow.Create(AWinControl, AParams));
 end;
 
-{ TACLGtk3CustomControl }
-
-function TACLGtk3CustomControl.CreateWidget(const Params: TCreateParams): PGtkWidget;
-var
-  LColor: TGdkRGBA;
+class procedure TACLWSHintWindow.SetRealPopupParent(
+  const AForm, APopupParent: TCustomForm);
 begin
-  FHasPaint := True;
-  FWidgetType := [wtWidget, wtLayout, wtPanel];
-
-  Result := TGtkLayout.new(nil, nil);
-  Result^.set_can_focus(True);
-  Result^.set_app_paintable(True);
-  Result^.set_has_window(True);
-  // as GtkFixed have no child control here - nobody triggers resizing
-  // GNOME takes care of it, but other WM - not
-  // this is here to make TGtk3Panel shown under Plasma
-  //Result^.set_size_request(LCLObject.Width,LCLObject.Height);
-  PGtkLayout(Result)^.set_size(1, 1);
-
-  if not (csDesigning in LCLObject.ComponentState) then
-    g_object_set(PGObject(Result), 'resize-mode', [GTK_RESIZE_QUEUE, nil]);
-  g_signal_connect_data(Result, 'size-allocate', TGCallback(@DoSizeAllocate), Self, nil, G_CONNECT_DEFAULT);
-
-  FillChar(LColor, SizeOf(LColor), 0);
-  Result^.override_background_color(GTK_STATE_FLAG_NORMAL, @LColor);
-  Result^.override_background_color([GTK_STATE_FLAG_ACTIVE], @LColor);
-  Result^.override_background_color([GTK_STATE_FLAG_FOCUSED], @LColor);
-  Result^.override_background_color([GTK_STATE_FLAG_PRELIGHT], @LColor);
-  Result^.override_background_color([GTK_STATE_FLAG_SELECTED], @LColor);
-end;
-
-function TACLGtk3CustomControl.ClientToScreen(var P: TPoint): boolean;
-begin
-  if IsWidgetOk and (Widget^.window <> nil) then
-    Result := inherited ClientToScreen(P)
-  else
-    Result := False;
-end;
-
-function TACLGtk3CustomControl.DeliverMessage(
-  var Msg; const AIsInputEvent: Boolean): LRESULT;
-var
-  LControl: TWinControl;
-  LMessage: TLMessage absolute Msg;
-begin
-  Result := 0;
-  try
-    if LMessage.Msg = LM_MOUSEWHEEL then
-    begin
-      LControl := LCLObject;
-      while (LControl <> nil) and LControl.HandleAllocated do
-      begin
-        LControl.WindowProc(LMessage);
-        if LMessage.Result <> 0 then
-          Exit(LMessage.Result);
-        Inc(TLMMouse(Msg).XPos, LControl.Left);
-        Inc(TLMMouse(Msg).YPos, LControl.Top);
-        LControl := LControl.Parent;
-      end;
-    end
-    else
-      Result := inherited;
-  except
-    Application.HandleException(nil);
-  end;
-end;
-
-class procedure TACLGtk3CustomControl.DoSizeAllocate(
-  AWidget: PGtkLayout; AGdkRect: PGdkRectangle; AGtk3Widget: TGtk3Widget); cdecl;
-var
-  LWidth, LHeight: guint;
-begin
-  AWidget.get_size(@LWidth, @LHeight);
-  if (LWidth <> AGdkRect^.Width) or (LHeight <> AGdkRect^.Height) then
-    AWidget.set_size(AGdkRect^.Width, AGdkRect^.Height);
-  if not AGtk3Widget.InUpdate then
-  begin
-    if AGtk3Widget.LCLObject.ClientRectNeedsInterfaceUpdate then
-      AGtk3Widget.LCLObject.DoAdjustClientRectChange;
-  end;
-end;
-
-procedure TACLGtk3CustomControl.InitializeWidget;
-begin
-  inherited InitializeWidget;
-  SetBorderStyle(TWinControlAccess(LCLObject).BorderStyle);
-  SetVisible(LCLObject.HandleObjectShouldBeVisible);
-end;
-
-procedure TACLGtk3CustomControl.SetBorderStyle(AValue: TBorderStyle);
-begin
-  PGtkLayout(Widget)^.set_border_width(IfThen(AValue <> bsNone, 2));
-end;
-
-{ TACLGtk3AdvancedWindow }
-
-function TACLGtk3AdvancedWindow.ClientToScreen(var P: TPoint): boolean;
-var
-  X, Y: Integer;
-begin
-  if IsWidgetOk and Gtk3IsGdkWindow(Widget^.window) and
-   (FParams.ExStyle and WS_EX_LAYERED <> 0) then
-  begin
-    X := 0; Y := 0;
-    Widget^.window^.get_origin(@X, @Y);
-    Inc(P.X, X);
-    Inc(P.Y, Y);
-    Exit(True);
-  end;
-  Result := inherited;
-end;
-
-function TACLGtk3AdvancedWindow.CreateWidget(const Params: TCreateParams): PGtkWidget;
-var
-  LWindow: PGtkWindow;
-begin
-  FWidget := nil;
-  try
-    // TGtk3Window многое прячет у себя "под капотом", а нам нужно всего ничего
-    // - правильно настроить исходное окно. Всё остальное пойдёт неизменным.
-    // Можно было бы скопировать целый класс вместе с обвязкой...
-    // Но, к счастью, нашёлся обходной манёвр:
-    // Между созданием окна и его контентом вызывается SetText, на котором мы
-    // дёрнем наш callback и сделаем донастройку.
-    FCreatingWorkaround :=
-      procedure
-      var
-        LWindow: PGtkWindow;
-        LWndParent: HWND;
-      begin
-        LWindow := PGtkWindow(FWidget);
-        if LWindow = nil then
-        begin
-          if LCLObject.Parent = nil then
-            raise EInvalidOperation.Create('Gtk3: Window creation workaround failed');
-          Exit; // Dont worry, just Form get used as Frame
-        end;
-
-        if Params.ExStyle and WS_EX_TOOLWINDOW <> 0 then
-          LWindow^.set_type_hint(GDK_WINDOW_TYPE_HINT_UTILITY);
-        if Params.ExStyle and WS_EX_LAYERED <> 0 then
-          TACLWSForm.SetAlphaExposing(FWidget);
-        if Params.ExStyle and WS_EX_NOACTIVATE <> 0 then
-        begin
-          Exclude(FWidgetType, wtHintWindow);
-          LWindow^.set_type_hint(GDK_WINDOW_TYPE_HINT_UTILITY);
-        end;
-
-        if LCLObject.Parent = nil then
-        begin
-          LWndParent := TACLWSForm.ResolveWndParent(Params);
-          if LWndParent <> 0 then
-            LWindow^.set_transient_for(PGtkWindow(TGtk3Widget(LWndParent).Widget))
-          else if TCustomForm(LCLObject).FormStyle in fsAllStayOnTop then
-            LWindow^.set_keep_above(true);
-        end;
-
-        FCreatingWorkaround := nil;
-      end;
-
-    if Params.ExStyle and WS_EX_NOACTIVATE <> 0 then
-      FWidgetType := [wtHintWindow]; // to force to the GTK_WINDOW_POPUP
-
-    Result := inherited;
-
-    if (Params.ExStyle and WS_EX_LAYERED <> 0) and Gtk3IsGtkWindow(Widget) then
-    begin
-      PGtkWindow(Widget)^.set_app_paintable(True);
-      PGtkWindow(Widget)^.set_decorated(False);
-      PGtkWindow(Widget)^.window^.set_decorations([]);
-    end;
-  finally
-    FCreatingWorkaround := nil;
-  end;
-end;
-
-function TACLGtk3AdvancedWindow.GtkEventPaint(Sender: PGtkWidget; AContext: Pcairo_t): Boolean;
-var
-  LPainter: ICairoPainter;
-begin
-  Result := True;
-  if Supports(LCLObject, ICairoPainter, LPainter) then
-    LPainter.PaintTo(Cairo.Pcairo_t(AContext))
-  else
-    Result := inherited;
-end;
-
-procedure TACLGtk3AdvancedWindow.OffsetMousePos(
-  const aGlobalX, aGlobalY: double; APoint: PPoint);
-begin
-  with getClientOffset do
-  begin
-    dec(APoint^.x, x);
-    dec(APoint^.y, y);
-  end;
-end;
-
-procedure TACLGtk3AdvancedWindow.SetBounds(ALeft, ATop, AWidth, AHeight: integer);
-var
-  LForm: TCustomForm;
-  LFormSizeIsFixed: Boolean;
-
-  function GetActualSize(ASize, AConstraintSize, ADefaultSize: Integer): Integer;
-  begin
-    if LFormSizeIsFixed then
-      Result := ASize
-    else if AConstraintSize > 0 then
-      Result := AConstraintSize
-    else
-      Result := ADefaultSize;
-  end;
-
-var
-  LGeometry: TGdkGeometry;
-  LGeometryHints: TGdkWindowHints;
-  LRect: TGdkRectangle;
-  LWindow: PGtkWindow;
-begin
-  LWindow := PGtkWindow(Widget);
-
-  // Наша реализация решает сразу три проблемы:
-  // 1) Оригинальная функция зачем-то сдвигает окно c BorderStyle = bsNone на
-  //    Origin от Window.transient_for - это ломает наши дропдауны и меню.
-  // 2) Оригинальная функция не разруливает ситуацию, когда Constraints.MaxWidth
-  //    задан, а Constraints.MaxHeight нет (или наоборот)
-  // 3) При работе на X11-бэке заметил (Alt.Linux 11 Gnome), что окно ATE не
-  //    показывается на экране. Gtk+ Inspector показал, что CentralWidget формы
-  //    (Layout внутри ScrollWindow) не аллокирован (1x1 по -1,-1). Причём повторяется
-  //    это лишь на сложных формах. Что именно вызывает сбой - непонятно, но
-  //    нашёл обходной манёвр: пока WidgetMapped = False, выставляем форме все
-  //    Constraint-ы. После непосредственного показа формы - выставляем актуальные
-
-  LForm := TCustomForm(LCLObject);
-  LFormSizeIsFixed := not WidgetMapped or
-    (LForm.BorderStyle in [bsDialog, bsSingle, bsToolWindow]);
-
-  LRect.x := ALeft;
-  LRect.y := ATop;
-  LRect.width := AWidth;
-  LRect.Height := AHeight;
-  LWindow^.size_allocate(@LRect);
-
-  FillChar(LGeometry, SizeOf(LGeometry), 0);
-  LGeometry.max_aspect := 1;
-  LGeometry.height_inc := 1;
-  LGeometry.width_inc := 1;
-  LGeometry.base_width := LForm.Width;
-  LGeometry.base_height := LForm.Height;
-  LGeometry.win_gravity := LWindow^.get_gravity;
-  LGeometry.min_height := GetActualSize(LForm.Height, LForm.Constraints.MinHeight, 0);
-  LGeometry.max_height := GetActualSize(LForm.Height, LForm.Constraints.MaxHeight, MAXSHORT);
-  LGeometry.min_width := GetActualSize(LForm.Width, LForm.Constraints.MinWidth, 0);
-  LGeometry.max_width := GetActualSize(LForm.Width, LForm.Constraints.MaxWidth, MAXSHORT);
-  LGeometryHints := [GDK_HINT_POS, GDK_HINT_BASE_SIZE];
-  if (LForm.Constraints.MinWidth > 0) or (LForm.Constraints.MinHeight > 0) then
-    LGeometryHints := LGeometryHints + [GDK_HINT_MIN_SIZE];
-  if (LForm.Constraints.MaxWidth > 0) or (LForm.Constraints.MaxHeight > 0) then
-    LGeometryHints := LGeometryHints + [GDK_HINT_MAX_SIZE];
-  if LFormSizeIsFixed then
-    LGeometryHints := LGeometryHints + [GDK_HINT_MAX_SIZE, GDK_HINT_MIN_SIZE];
-  LWindow^.set_geometry_hints(nil, @LGeometry, LGeometryHints);
-
-  if LWindow^.window <> nil then
-  begin
-    LWindow^.window^.move_resize(ALeft, ATop, AWidth, AHeight);
-    LWindow^.window^.process_updates(true);
-  end;
-end;
-
-procedure TACLGtk3AdvancedWindow.SetText(const AValue: String);
-begin
-  // Эта хрень дергается между созданием Window и Layout. Cм.CreateHandle.
-  if Assigned(FCreatingWorkaround) then FCreatingWorkaround();
-  inherited SetText(AValue);
-end;
-
-procedure TACLGtk3AdvancedWindow.SetVisible(AValue: Boolean);
-var
-  LWasMapped: Boolean;
-begin
-  LWasMapped := WidgetMapped;
-  inherited SetVisible(AValue);
-  if not LWasMapped then // см. TACLGtk3AdvancedWindow.SetBounds
-    SetBounds(LCLObject.Left, LCLObject.Top, LCLObject.Width, LCLObject.Height);
-end;
-
-{ TACLGtk3PopupControl }
-
-function TACLGtk3PopupControl.ClientToScreen(var P: TPoint): Boolean;
-var
-  x, y: gint;
-begin
-  Widget^.window^.get_origin(@x, @y);
-  Inc(P.X, X);
-  Inc(P.Y, Y);
-  Result := True;
-end;
-
-function TACLGtk3PopupControl.CreateWidget(const Params: TCreateParams): PGtkWidget;
-var
-  LWindow: PGtkWindow;
-  LWndParent: HWND;
-begin
-  FHasPaint := True;
-  FFirstMapRect := NullRect;
-  LWindow := TGtkWindow.new(GTK_WINDOW_POPUP);
-  LWindow^.set_app_paintable(True);
-  LWindow^.set_events(GDK_DEFAULT_EVENTS_MASK);
-  LWindow^.set_decorated(False);
-  LWindow^.set_has_resize_grip(False);
-  LWindow^.set_resizable(true);
-  LWindow^.set_type_hint(GDK_WINDOW_TYPE_HINT_POPUP_MENU); // not decorated
-  FWidgetType := [wtWidget, wtWindow];
-  FWidget := LWindow;
-
-  LWndParent := TACLWSForm.ResolveWndParent(Params);
-  if LWndParent <> 0 then
-    LWindow^.set_transient_for(PGtkWindow(TGtk3Widget(LWndParent).Widget));
-  if Params.ExStyle and WS_EX_LAYERED <> 0 then
-    TACLWSAdvancedForm.SetAlphaExposing(FWidget);
-  FWidget^.realize;
-
-  Result := FWidget;
-end;
-
-procedure TACLGtk3PopupControl.InitializeWidget;
-begin
-  inherited InitializeWidget;
-  g_signal_connect_data(FWidget, 'event', TGCallback(@WidgetEvent), Self, nil, G_CONNECT_DEFAULT);
-end;
-
-function TACLGtk3PopupControl.GtkEventPaint(Sender: PGtkWidget; AContext: Pcairo_t): Boolean;
-var
-  LPainter: ICairoPainter;
-begin
-  Result := True;
-  if Supports(LCLObject, ICairoPainter, LPainter) then
-    LPainter.PaintTo(Cairo.Pcairo_t(AContext))
-  else
-    Result := inherited;
-end;
-
-procedure TACLGtk3PopupControl.SetBounds(ALeft, ATop, AWidth, AHeight: integer);
-begin
-  BeginUpdate;
-  try
-    inherited;
-    Move(ALeft, ATop);
-  finally
-    EndUpdate;
-  end;
-end;
-
-class function TACLGtk3PopupControl.WidgetEvent(
-  Widget: PGtkWidget; Event: PGdkEvent; Data: GPointer): gboolean; cdecl;
-begin
-  Result := True;
-  case event^.type_ of
-    GDK_KEY_PRESS, GDK_KEY_RELEASE:
-      TACLGtk3PopupControl(data).GtkEventKey(widget, event, event^.type_ = GDK_KEY_PRESS);
-    GDK_MOTION_NOTIFY:
-      TACLGtk3PopupControl(data).GtkEventMouseMove(widget, event);
-  else
-    Result := False;
-  end;
+  // to prevent incorrect drag-image & hint positioning if popup-parent is set
 end;
 
 { TACLWSCustomControl }
@@ -1217,8 +783,17 @@ end;
 
 class procedure TACLWSCustomControl.SetOpacity(
   const AWinControl: TWinControl; AOpacity: Byte);
+var
+  LWidget: PGtkWidget;
 begin
-  TGtk3WidgetAccess(AWinControl.Handle).Widget^.set_opacity(AOpacity / 255);
+  if AWinControl.HandleAllocated then
+  begin
+    LWidget := TGtk3Widget(AWinControl.Handle).Widget;
+    if Gtk3IsGtkWindow(LWidget) and (LWidget^.window <> nil) then
+      LWidget^.window^.set_opacity(AOpacity / 255)
+    else
+      LWidget^.set_opacity(AOpacity / 255);
+  end;
 end;
 
 { TACLWSPopupControl }
@@ -1238,13 +813,13 @@ var
   LWindow: PGtkWindow;
 begin
   LWidget := TGtk3Widget(AWinControl.Handle);
-  if wtWindow in LWidget.WidgetType then
+  if (wtWindow in LWidget.WidgetType) and AWinControl.HandleObjectShouldBeVisible then
   begin
     ReleaseInputGrab;
     LWindow := PGtkWindow(LWidget.Widget);
     LWindow^.realize;
     // без вот этого вызова у нас будет флик фона на экран
-    TACLWSAdvancedForm.CheckAndFixGeometry(AWinControl);
+    TACLWSForm.CheckAndFixGeometry(AWinControl);
     LWindow^.show_all;
     LWindow^.window^.set_events(GDK_ALL_EVENTS_MASK);
     LWindow^.present;
@@ -1274,27 +849,34 @@ begin
   end;
 end;
 
-class procedure TACLWSForm.CheckAndFixGeometry(AWinControl: TWinControl);
+class procedure TACLWSForm.CheckAndFixGeometry(ACtrl: TWinControl);
 const
   WaitDelay: gulong = 4000;
   WaitLoops: integer = 4;
 var
-  LWnd: PGdkWindow;
   I: integer;
+  LWnd: PGdkWindow;
 begin
-  LWnd := TGtk3Widget(AWinControl.Handle).Widget^.window;
-  LWnd^.move_resize(AWinControl.Left, AWinControl.Top, AWinControl.Width, AWinControl.Height);
+  LWnd := TGtk3Widget(ACtrl.Handle).Widget^.window;
+  LWnd^.move_resize(ACtrl.Left, ACtrl.Top, ACtrl.Width, ACtrl.Height);
   LWnd^.process_updates(True);
 
   //Give a little breath to WM.
   for I := 0 to WaitLoops - 1 do
   begin
     g_usleep(WaitDelay);
-    g_main_context_iteration(nil, false);
-  end;
+    // оригинал:
+    //g_main_context_iteration(nil, false);
 
-  //Note that here may be still wrong geometry under x11,
-  //but LCL should be happy at this point.
+    // Arch Linux (Manjaro 26) на KDE.
+    // При форсированом использовании X11 бэка посредством XWayland,
+    // окна не показываются на экране при запуске приложения без следующего трюка.
+    // Этот метод вызывается в нескольких местах - не просто так. Не убирать!
+    while g_main_context_pending(nil) do
+      g_main_context_iteration(nil, false);
+    // Схожая проблема наблюдалась в Alt.Linux 11 на Gnome (тоже на XWayland), но
+    // там это решение не сработало - см. TACLGtk3AdvancedWindow.SetBounds
+  end;
 end;
 
 class function TACLWSForm.CreateHandle(
@@ -1321,48 +903,10 @@ begin
   Result := TLCLHandle(LWindow);
 end;
 
-class function TACLWSForm.ResolveWndParent(const AParams: TCreateParams): HWND;
-var
-  LWndParent: TGtk3Widget;
-begin
-  if AParams.Style and WS_CHILD <> 0 then
-    Exit(AParams.WndParent);
-
-  LWndParent := TGtk3Widget(AParams.WndParent);
-  while (LWndParent <> nil) and not Gtk3IsGtkWindow(LWndParent.Widget) do
-    LWndParent := LWndParent.getParent;
-  Result := HWND(LWndParent);
-end;
-
-class procedure TACLWSForm.SetAlphaExposing(AWidget: PGtkWidget);
-var
-  LScreen: PGdkScreen;
-  LVisual: PGdkVisual;
-begin
-  LScreen := AWidget^.get_screen;
-  if LScreen <> nil then
-  begin
-    LVisual := LScreen^.get_rgba_visual;
-    if LVisual = nil then
-    begin
-      LogEntry(acGeneralLogFileName, 'Gtk3', 'Alpha-composing is unavailable');
-      Exit;
-    end;
-    AWidget^.set_visual(LVisual);
-  end;
-end;
-
 class procedure TACLWSForm.SetAlphaBlend(
   const ACustomForm: TCustomForm; const AlphaBlend: Boolean; const Alpha: Byte);
-var
-  LWindow: PGdkWindow;
 begin
-  if ACustomForm.HandleAllocated then
-  begin
-    LWindow := TGtk3Widget(ACustomForm.Handle).GetWindow;
-    if LWindow <> nil then
-      LWindow^.set_opacity(IfThen(AlphaBlend, Alpha / 255, 1.0));
-  end;
+  TACLWSCustomControl.SetOpacity(ACustomForm, IfThen(AlphaBlend, Alpha, 255));
 end;
 
 class procedure TACLWSForm.SetFormStyle(
@@ -1386,13 +930,12 @@ end;
 class procedure TACLWSForm.SetRealPopupParent(const AForm, APopupParent: TCustomForm);
 begin
   if AForm.Parent = nil then
-    inherited SetRealPopupParent(AForm, APopupParent);
+    inherited SetRealPopupParent(AForm, GetParentForm(APopupParent));
 end;
 
 class procedure TACLWSForm.ShowHide(const AWinControl: TWinControl);
 var
   LForm: TCustomForm absolute AWinControl;
-  LVisible: Boolean;
   LWidget: TGtk3WidgetAccess;
   LWindow: PGtkWindow;
 begin
@@ -1406,26 +949,23 @@ begin
   end;
 
   LWidget := TGtk3WidgetAccess(LForm.Handle);
-  if {(csDesigning in LForm.compo) or }not (wtWindow in LWidget.WidgetType) then
+  if not (wtWindow in LWidget.WidgetType) then
   begin
     inherited;
     Exit;
   end;
 
-  if Gtk3IsGtkWindow(LWidget.Widget) then
-    LWindow := PGtkWindow(LWidget.Widget)
-  else
-    LWindow := nil;
-
-  LVisible := LForm.HandleObjectShouldBeVisible;
-
+  LWindow := PGtkWindow(LWidget.Widget);
   // LCL: use this if pure SetCapture(0) does not work under wayland (commented)
   // AIMP: DblClick -> ShowModal -> Modal form does not react on mouse
   if LWidget.FParams.ExStyle and WS_EX_NOACTIVATE = 0 then // hint, drag-image, etc
     ReleaseInputGrab;
 
-  if LVisible then
+  if LForm.HandleObjectShouldBeVisible then
   begin
+    if LForm = Application.MainForm then
+      LogEntry(acGeneralLogFileName, 'Main', 'WindowShow');
+
     if LForm.FormStyle in fsAllStayOnTop then
       LWindow^.set_keep_above(True);
     if fsModal in LForm.FormState then
@@ -1447,35 +987,36 @@ begin
       end;
       if LWidget.Shape <> nil then
       begin
-        LWindow^.set_app_paintable(True);
-        LWindow^.set_visual(TGdkScreen.get_default^.get_rgba_visual);
+        TACLGtk3AdvancedWindow.SetAlphaExposing(LWidget.Widget);
         LWidget.SetWindowShape(LWidget.Shape, LWindow^.window);
       end;
     end;
-  end;
 
-  LWidget.BeginUpdate;
-  try
-    LWidget.Visible := LVisible;
-    if LWidget.Visible then
-    begin
+    CheckAndFixGeometry(LForm); // !!! Manjaro26 (X11)
+
+    LWidget.BeginUpdate;
+    try
+      LWidget.Visible := True;
       if (fsModal in LForm.FormState) and (Application.ModalLevel > 0) then
         BlockTransientWindow(LWindow, True);
+      SetAlphaBlend(LForm, LForm.AlphaBlend, LForm.AlphaBlendValue);
       CheckAndFixGeometry(LForm); //See issue #41412
       LWindow^.show_all;
       LWindow^.window^.set_events(GDK_ALL_EVENTS_MASK);
       LWindow^.present;
-      SetAlphaBlend(LForm, LForm.AlphaBlend, LForm.AlphaBlendValue);
-    end
-    else // Hide
-    begin
-      if (fsModal in LForm.FormState) then
-        BlockTransientWindow(LWindow, False);
-      if (fsModal in LForm.FormState) or (LForm.BorderStyle = bsNone) then
-        LWindow^.set_transient_for(nil);
+    finally
+      LWidget.EndUpdate;
     end;
-  finally
-    LWidget.EndUpdate;
+  end
+  else // Hide
+  begin
+    LWidget.Visible := False;
+    if LForm = Application.MainForm then
+      LogEntry(acGeneralLogFileName, 'Main', 'WindowHide');
+    if (fsModal in LForm.FormState) then
+      BlockTransientWindow(LWindow, False);
+    if (fsModal in LForm.FormState) or (LForm.BorderStyle = bsNone) then
+      LWindow^.set_transient_for(nil);
   end;
 end;
 
