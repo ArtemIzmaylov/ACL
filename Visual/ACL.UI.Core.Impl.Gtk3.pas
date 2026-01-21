@@ -6,7 +6,7 @@
 //  Purpose:   Gtk3 Adapters and Helpers
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -56,6 +56,9 @@ uses
   // ACL
   ACL.Classes,
   ACL.Graphics,
+  ACL.Graphics.Ex.Cairo,
+  ACL.Geometry,
+  ACL.Geometry.Utils,
   ACL.Utils.Common,
   ACL.Utils.DPIAware,
   ACL.Utils.Logger,
@@ -65,13 +68,6 @@ uses
   Forms;
 
 type
-
-  { IACLLayeredPaint }
-
-  IACLLayeredPaint = interface
-  ['{3FE006F2-67DE-4317-B402-D872A77373E4}']
-    procedure PaintTo(ACairo: Cairo.Pcairo_t);
-  end;
 
   { TGtkApp }
 
@@ -206,8 +202,6 @@ function GtkLoadStockIcon(AWidget: PGtkWidget; AName: PChar; ASize: Integer): TA
 implementation
 
 uses
-  ACL.Geometry,
-  ACL.Geometry.Utils,
   ACL.UI.Controls.Base,
   ACL.UI.Forms.Base;
 
@@ -1011,10 +1005,10 @@ end;
 
 function TACLGtk3AdvancedWindow.GtkEventPaint(Sender: PGtkWidget; AContext: Pcairo_t): Boolean;
 var
-  LPainter: IACLLayeredPaint;
+  LPainter: ICairoPainter;
 begin
   Result := True;
-  if Supports(LCLObject, IACLLayeredPaint, LPainter) then
+  if Supports(LCLObject, ICairoPainter, LPainter) then
     LPainter.PaintTo(Cairo.Pcairo_t(AContext))
   else
     Result := inherited;
@@ -1166,10 +1160,10 @@ end;
 
 function TACLGtk3PopupControl.GtkEventPaint(Sender: PGtkWidget; AContext: Pcairo_t): Boolean;
 var
-  LPainter: IACLLayeredPaint;
+  LPainter: ICairoPainter;
 begin
   Result := True;
-  if Supports(LCLObject, IACLLayeredPaint, LPainter) then
+  if Supports(LCLObject, ICairoPainter, LPainter) then
     LPainter.PaintTo(Cairo.Pcairo_t(AContext))
   else
     Result := inherited;

@@ -6,7 +6,7 @@
 //  Purpose:   Gtk2 Adapters and Helpers
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -52,6 +52,7 @@ uses
   // ACL
   ACL.Classes,
   ACL.Graphics,
+  ACL.Graphics.Ex.Cairo,
   ACL.Utils.DPIAware,
   ACL.Utils.Common,
   // VCL
@@ -60,13 +61,6 @@ uses
   Forms;
 
 type
-
-  { IACLLayeredPaint }
-
-  IACLLayeredPaint = interface
-  ['{3FE006F2-67DE-4317-B402-D872A77373E4}']
-    procedure PaintTo(ACairo: Pcairo_t);
-  end;
 
   { TGtkApp }
 
@@ -915,10 +909,10 @@ class function TACLWSAdvancedForm.DoAlphaExposing(
   Widget: PGtkWidget; Event: PGDKEventExpose; Data: gPointer): GBoolean;
 var
   LCairo: pcairo_t;
-  LPainter: IACLLayeredPaint;
+  LPainter: ICairoPainter;
 begin
   Result := False;
-  if Supports(TObject(Data), IACLLayeredPaint, LPainter) then
+  if Supports(TObject(Data), ICairoPainter, LPainter) then
   begin
     LCairo := gdk_cairo_create(Widget^.window);
     try

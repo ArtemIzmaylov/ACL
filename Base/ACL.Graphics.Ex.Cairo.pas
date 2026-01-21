@@ -68,6 +68,13 @@ type
   PCairoGlyphArray = ^TCairoGlyphArray;
   TCairoGlyphArray = array[0..0] of cairo_glyph_t;
 
+  { ICairoPainter }
+
+  ICairoPainter = interface
+  ['{3FE006F2-67DE-4317-B402-D872A77373E4}']
+    procedure PaintTo(ACairo: Cairo.Pcairo_t);
+  end;
+
   { EGSCairoError }
 
   EGSCairoError = class(Exception);

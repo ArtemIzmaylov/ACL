@@ -6,7 +6,7 @@
 //  Purpose:   Menus
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -617,7 +617,7 @@ type
   // Вынесено в отдельный класс из-за CS_DROPSHADOW
   TACLMenuPopupLayeredWindow = class(TACLMenuPopupWindow
   {$IFDEF LCLGtkX}
-    , IACLLayeredPaint
+    , ICairoPainter
   {$ENDIF})
   protected
     procedure CreateParams(var Params: TCreateParams); override;
