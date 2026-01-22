@@ -111,6 +111,7 @@ type
     class procedure BlockTransientWindow(AWindow: PGtkWindow; AState: Boolean);
   protected
     class procedure CheckAndFixGeometry(ACtrl: TWinControl);
+    class function IsTopLevel(AForm: TCustomForm): Boolean;
   published
     class function CreateHandle(const AWinControl: TWinControl;
       const AParams: TCreateParams): TLCLHandle; override;
@@ -904,6 +905,12 @@ begin
   Result := TLCLHandle(LWindow);
 end;
 
+class function TACLWSForm.IsTopLevel(AForm: TCustomForm): Boolean;
+begin
+  // ref.to: TACLWSForm.CreateHandle
+  Result := TGtk3Widget(AForm.Handle) is TGtk3Window;
+end;
+
 class procedure TACLWSForm.SetAlphaBlend(
   const ACustomForm: TCustomForm; const AlphaBlend: Boolean; const Alpha: Byte);
 begin
@@ -924,13 +931,13 @@ end;
 class procedure TACLWSForm.SetIcon(
   const AForm: TCustomForm; const Small, Big: HICON);
 begin
-  if AForm.Parent = nil then
+  if IsTopLevel(AForm) then
     inherited SetIcon(AForm, Small, Big);
 end;
 
 class procedure TACLWSForm.SetRealPopupParent(const AForm, APopupParent: TCustomForm);
 begin
-  if AForm.Parent = nil then
+  if IsTopLevel(AForm) then
     inherited SetRealPopupParent(AForm, GetParentForm(APopupParent));
 end;
 
