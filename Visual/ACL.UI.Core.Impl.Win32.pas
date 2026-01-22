@@ -6,7 +6,7 @@
 //  Purpose:   Win32 Adapters and Helpers
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -46,8 +46,14 @@ type
       AControl: TWinControl; var AMessage: TMessage); static;
   end;
 
+function IsAlphaComposingSupports: Boolean;
 procedure SetWindowStayOnTop(AWnd: HWND; AValue: Boolean);
 implementation
+
+function IsAlphaComposingSupports: Boolean;
+begin
+  Result := True;
+end;
 
 class function TACLStartDragHelper.Check(AControl: TWinControl; X, Y, AThreshold: Integer): Boolean;
 var

@@ -186,6 +186,7 @@ type
     class function Check(AControl: TWinControl; X, Y, AThreshold: Integer): Boolean;
   end;
 
+function IsAlphaComposingSupports: Boolean;
 function LoadDialogIcon(AOwnerWnd: TWndHandle; AType: TMsgDlgType; ASize: Integer): TACLDib;
 procedure SetDragImageListOpacity(Opacity: Byte);
 procedure SetWindowStayOnTop(AWnd: TWndHandle; AValue: Boolean);
@@ -216,6 +217,11 @@ begin
     AChild := AChild.parent;
   end;
   Result := False;
+end;
+
+function IsAlphaComposingSupports: Boolean;
+begin
+  Result := TGdkScreen.get_default^.is_composited;
 end;
 
 function GtkLoadStockIcon(AWidget: PGtkWidget; AName: PChar; ASize: Integer): TACLDib;

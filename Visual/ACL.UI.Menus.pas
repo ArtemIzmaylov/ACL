@@ -1668,6 +1668,8 @@ end;
 function TACLStylePopupMenu.UseAlphaComposing: Boolean;
 begin
 {$IFDEF ACL_ALPHACOMPOSED_POPUPMENUS}
+  if not IsAlphaComposingSupports then
+    Exit(False);
   if CornerRadius.Value > 0 then
     Exit(True);
   if ColorBorder2.IsEmpty then

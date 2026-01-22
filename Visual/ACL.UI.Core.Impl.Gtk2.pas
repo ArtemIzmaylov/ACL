@@ -215,6 +215,13 @@ type
   TGtk2WidgetSetAccess = class(TGtk2WidgetSet);
   TWinControlAccess = class(TWinControl);
 
+function gdk_screen_is_composited(screen: PGdkScreen): gboolean; cdecl; external gdklib; // since v2.10
+
+function IsAlphaComposingSupports: Boolean;
+begin
+  Result := gdk_screen_is_composited(gdk_screen_get_default);
+end;
+
 procedure SetDragImageListOpacity(Opacity: Byte);
 var
   LWnd: PGtkWindow;
@@ -933,16 +940,16 @@ end;
 class procedure TACLWSAdvancedForm.SetAlphaExposing(AWidget: PGtkWidget; AWidgetInfo: PWidgetInfo);
 var
   LColorMap: PGdkColormap;
-  LScreen: PGdkScreen;
 begin
   // Включаем AlphaComposing, если оконный менеджер поддерживает его
-  LScreen := gtk_widget_get_screen(AWidget);
-  if LScreen <> nil then
+  if IsAlphaComposingSupports then
   begin
-    LColorMap := gdk_screen_get_rgba_colormap(LScreen);
+    LColorMap := gdk_screen_get_rgba_colormap(gdk_screen_get_default);
     if LColorMap <> nil then
       gtk_widget_set_colormap(AWidget, LColorMap);
-  end;
+  end
+  else
+    LogEntry(acGeneralLogFileName, 'Gtk2', 'alpha-composing is unavailable');
 
   // подменяем gtkExpose нашим обработчиком
   g_signal_handlers_disconnect_by_func(AWidget, @gtkExposeEvent, AWidgetInfo^.LCLObject);

@@ -485,7 +485,7 @@ begin
   if (LVisual <> nil) and LScreen^.is_composited then
     AWidget^.set_visual(LVisual)
   else
-    LogEntry(acGeneralLogFileName, 'Gtk3', 'Alpha-composing is unavailable')
+    LogEntry(acGeneralLogFileName, 'Gtk3', 'alpha-composing is unavailable')
 end;
 
 { TACLGtk3PopupControl }
