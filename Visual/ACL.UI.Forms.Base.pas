@@ -6,7 +6,7 @@
 //  Purpose:   Basic Form things
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -1500,6 +1500,10 @@ begin
     VK_ESCAPE:
       if [ssCtrl, ssAlt, ssShift] * KeyDataToShiftState(Message.KeyData) = [] then
       begin
+      {$IFDEF FPC}
+        if acWantSpecialKey(ActiveControl, VK_ESCAPE, []) then
+          Exit(inherited);
+      {$ENDIF}
         if fsModal in FormState then
         begin
           ModalResult := mrCancel;

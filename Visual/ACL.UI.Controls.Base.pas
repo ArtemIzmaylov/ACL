@@ -6,7 +6,7 @@
 //  Purpose:   Base classes for controls
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -1032,6 +1032,7 @@ function acIsDropDownCommand(Key: Word; Shift: TShiftState): Boolean;
 function acIsShiftPressed(ATest: TShiftState): Boolean; overload;
 function acIsShiftPressed(ATest, AState: TShiftState): Boolean; overload;
 function acShiftStateToKeys(AShift: TShiftState): Word;
+function acWantSpecialKey(AChild: TControl; ACharCode: Word; AShift: TShiftState): Boolean;
 
 procedure acMessageBeep(AType: TMsgDlgType);
 
@@ -1405,16 +1406,6 @@ begin
 end;
 {$ENDIF}
 
-function acShiftStateToKeys(AShift: TShiftState): Word;
-begin
-  Result := 0;
-  if ssShift in AShift then Inc(Result, MK_SHIFT);
-  if ssCtrl in AShift then Inc(Result, MK_CONTROL);
-  if ssLeft in AShift then Inc(Result, MK_LBUTTON);
-  if ssRight in AShift then Inc(Result, MK_RBUTTON);
-  if ssMiddle in AShift then Inc(Result, MK_MBUTTON);
-end;
-
 function acIsDropDownCommand(Key: Word; Shift: TShiftState): Boolean;
 const
   Modificators = [ssAlt, ssShift, ssCtrl];
@@ -1432,6 +1423,23 @@ end;
 function acIsShiftPressed(ATest: TShiftState): Boolean;
 begin
   Result := acIsShiftPressed(ATest, GetKeyShiftState);
+end;
+
+function acShiftStateToKeys(AShift: TShiftState): Word;
+begin
+  Result := 0;
+  if ssShift in AShift then Inc(Result, MK_SHIFT);
+  if ssCtrl in AShift then Inc(Result, MK_CONTROL);
+  if ssLeft in AShift then Inc(Result, MK_LBUTTON);
+  if ssRight in AShift then Inc(Result, MK_RBUTTON);
+  if ssMiddle in AShift then Inc(Result, MK_MBUTTON);
+end;
+
+function acWantSpecialKey(AChild: TControl; ACharCode: Word; AShift: TShiftState): Boolean;
+begin
+  Result := (AChild <> nil) and ([ssCtrl, ssAlt, ssShift] * AShift = []) and (
+    (AChild.Perform(CM_WANTSPECIALKEY, ACharCode, 0) <> 0) or
+    (AChild.Perform(WM_GETDLGCODE, 0, 0) and DLGC_WANTALLKEYS <> 0));
 end;
 
 {$ENDREGION}

@@ -6,7 +6,7 @@
 //  Purpose:   Forms and Top-level Windows
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -229,13 +229,6 @@ begin
   if LCtrl <> nil then
     LCtrl.Text := AText;
 {$ENDIF}
-end;
-
-function acWantSpecialKey(AChild: TControl; ACharCode: Word; AShift: TShiftState): Boolean;
-begin
-  Result := (AChild <> nil) and ([ssCtrl, ssAlt, ssShift] * AShift = []) and (
-    (AChild.Perform(CM_WANTSPECIALKEY, ACharCode, 0) <> 0) or
-    (AChild.Perform(WM_GETDLGCODE, 0, 0) and DLGC_WANTALLKEYS <> 0));
 end;
 
 {$REGION ' Drag Image '}
