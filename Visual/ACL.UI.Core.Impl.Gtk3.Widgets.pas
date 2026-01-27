@@ -84,13 +84,14 @@ type
   TACLGtk3AdvancedWindow = class(TGtk3Window)
   strict private
     FCreatingWorkaround: TProc;
+    class function OnAlphaExpose(AWidget: PGtkWindow;
+      AContext: Pcairo_t; AImpl: TGtk3Widget): gboolean; cdecl; static;
     class function OnMapped(AWindow: PGtkWindow; AEvent: PGdkEventAny;
       AImpl: TACLGtk3AdvancedWindow): gboolean; cdecl; static;
   public
     function ClientToScreen(var P: TPoint): boolean; override;
     function CreateWidget(const Params: TCreateParams): PGtkWidget; override;
     function DeliverMessage(var Msg; const AIsInput: Boolean = False): LRESULT; override;
-    function GtkEventPaint(Sender: PGtkWidget; AContext: Pcairo_t): Boolean; override;
     procedure InitializeWidget; override;
     procedure OffsetMousePos(const aGlobalX, aGlobalY: double; APoint: PPoint); override;
     procedure Repaint(const ARect: PRect=nil); override;
@@ -98,7 +99,7 @@ type
     procedure SetText(const AValue: String); override;
   public
     class function ResolveWndParent(const AParams: TCreateParams): PGtkWindow;
-    class procedure SetAlphaExposing(AWidget: PGtkWidget);
+    class procedure SetAlphaExposing(AWidget: TGtk3Widget);
   end;
 
   { TACLGtk3PopupControl }
@@ -112,7 +113,6 @@ type
     function ClientToScreen(var P: TPoint): Boolean; override;
     function CreateWidget(const {%H-}Params: TCreateParams):PGtkWidget; override;
     procedure InitializeWidget; override;
-    function GtkEventPaint(Sender: PGtkWidget; AContext: Pcairo_t): Boolean; override;
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: integer); override;
   end;
 
@@ -122,6 +122,7 @@ uses
   ACL.UI.Forms.Base;
 
 type
+  TGtk3WidgetAccess = class(TGtk3Widget);
   TWinControlAccess = class(TWinControl);
 
 const
@@ -158,6 +159,38 @@ begin
     AWidget^.window^.get_origin(@Result.X, @Result.Y);
 end;
 
+function GetWindowFunction(AForm: TCustomForm): TGdkWMFunction;
+var
+  LBorderIcons: TBorderIcons;
+  LBorderStyle: TFormBorderStyle;
+begin
+  if csDesigning in AForm.ComponentState then
+    LBorderStyle := AForm.BorderStyle
+  else
+    LBorderStyle := bsSizeable;
+
+  LBorderIcons := AForm.BorderIcons;
+  if not (LBorderStyle in [bsSizeable]) then
+    Exclude(LBorderIcons, biMaximize);
+  if not (LBorderStyle in [bsSizeable, bsSingle]) then
+    Exclude(LBorderIcons, biMinimize);
+
+  Result := [GDK_FUNC_MOVE];
+  if (LBorderStyle in [bsNone, bsSizeable, bsSizeToolWin]) then
+    Include(Result, GDK_FUNC_RESIZE);
+  if biSystemMenu in LBorderIcons then
+    Include(Result, GDK_FUNC_CLOSE);
+  if biMinimize in LBorderIcons then
+    Include(Result, GDK_FUNC_MINIMIZE);
+  if biMaximize in LBorderIcons then
+    Include(Result, GDK_FUNC_MAXIMIZE);
+
+  if (AForm.Constraints.MinWidth  > 0) and (AForm.Constraints.MinWidth  = AForm.Constraints.MaxWidth) and
+     (AForm.Constraints.MinHeight > 0) and (AForm.Constraints.MinHeight = AForm.Constraints.MaxHeight)
+  then
+    Exclude(Result, GDK_FUNC_RESIZE);
+end;
+
 { TACLGtk3CustomControl }
 
 function TACLGtk3CustomControl.CreateWidget(const Params: TCreateParams): PGtkWidget;
@@ -181,7 +214,7 @@ begin
     g_object_set(PGObject(Result), 'resize-mode', [GTK_RESIZE_QUEUE, nil]);
   g_signal_connect_data(Result, 'size-allocate', TGCallback(@DoSizeAllocate), Self, nil, G_CONNECT_DEFAULT);
 
-  FillChar(LColor, SizeOf(LColor), 0);
+  LColor := Default(TGdkRGBA);
   Result^.override_background_color(GTK_STATE_FLAG_NORMAL, @LColor);
   Result^.override_background_color([GTK_STATE_FLAG_ACTIVE], @LColor);
   Result^.override_background_color([GTK_STATE_FLAG_FOCUSED], @LColor);
@@ -259,8 +292,6 @@ begin
 end;
 
 function TACLGtk3AdvancedWindow.CreateWidget(const Params: TCreateParams): PGtkWidget;
-var
-  LWindow: PGtkWindow;
 begin
   FWidget := nil;
   try
@@ -287,7 +318,7 @@ begin
         if Params.ExStyle and WS_EX_TOOLWINDOW <> 0 then
           LWindow^.set_type_hint(GDK_WINDOW_TYPE_HINT_UTILITY);
         if Params.ExStyle and WS_EX_LAYERED <> 0 then
-          TACLGtk3AdvancedWindow.SetAlphaExposing(FWidget);
+          TACLGtk3AdvancedWindow.SetAlphaExposing(Self);
         if Params.ExStyle and WS_EX_NOACTIVATE <> 0 then
         begin
           Exclude(FWidgetType, wtHintWindow);
@@ -310,15 +341,23 @@ begin
       FWidgetType := [wtHintWindow]; // to force to the GTK_WINDOW_POPUP
 
     Result := inherited;
+  finally
+    FCreatingWorkaround := nil;
+  end;
 
-    if (Params.ExStyle and WS_EX_LAYERED <> 0) and Gtk3IsGtkWindow(Widget) then
+  if Gtk3IsGtkWindow(Widget) then
+  begin
+    if Params.ExStyle and WS_EX_LAYERED <> 0 then
     begin
-      PGtkWindow(Widget)^.set_app_paintable(True);
       PGtkWindow(Widget)^.set_decorated(False);
       PGtkWindow(Widget)^.window^.set_decorations([]);
     end;
-  finally
-    FCreatingWorkaround := nil;
+    // 1) без этого не работает на Fly DM (Astra Linux)
+    // 2) без этого не работают команды в системно меню для WS_EX_LAYERED
+    PGtkWindow(Widget)^.window^.set_functions(GetWindowFunction(TForm(LCLObject)));
+  end;
+end;
+
 function TACLGtk3AdvancedWindow.DeliverMessage(var Msg; const AIsInput: Boolean): LRESULT;
 var
   LMsg: TMessage absolute Msg;
@@ -332,21 +371,22 @@ begin
   Result := inherited DeliverMessage(Msg, AIsInput);
 end;
 
-function TACLGtk3AdvancedWindow.GtkEventPaint(Sender: PGtkWidget; AContext: Pcairo_t): Boolean;
-var
-  LPainter: ICairoPainter;
-begin
-  Result := True;
-  if Supports(LCLObject, ICairoPainter, LPainter) then
-    LPainter.PaintTo(Cairo.Pcairo_t(AContext))
-  else
-    Result := inherited;
-end;
-
 procedure TACLGtk3AdvancedWindow.InitializeWidget;
 begin
   inherited;
   g_signal_connect_data(Widget, 'map-event', TGCallback(@OnMapped), Self, nil, G_CONNECT_DEFAULT);
+end;
+
+class function TACLGtk3AdvancedWindow.OnAlphaExpose(
+  AWidget: PGtkWindow; AContext: Pcairo_t; AImpl: TGtk3Widget): gboolean; cdecl;
+var
+  LPainter: ICairoPainter;
+begin
+  Result := True;
+  if Supports(AImpl.LCLObject, ICairoPainter, LPainter) then
+    LPainter.PaintTo(Cairo.Pcairo_t(AContext))
+  else
+    Result := AImpl.GtkEventPaint(AWidget, AContext);
 end;
 
 class function TACLGtk3AdvancedWindow.OnMapped(AWindow: PGtkWindow;
@@ -420,7 +460,7 @@ begin
     LRect.Height := AHeight;
     LWindow^.size_allocate(@LRect);
 
-    FillChar(LGeometry, SizeOf(LGeometry), 0);
+    LGeometry := Default(TGdkGeometry);
     LGeometry.win_gravity := GDK_GRAVITY_NORTH_WEST;
     LGeometry.max_aspect := 1;
     LGeometry.height_inc := 1;
@@ -474,18 +514,23 @@ begin
     Result := nil;
 end;
 
-class procedure TACLGtk3AdvancedWindow.SetAlphaExposing(AWidget: PGtkWidget);
+class procedure TACLGtk3AdvancedWindow.SetAlphaExposing(AWidget: TGtk3Widget);
 var
   LScreen: PGdkScreen;
+  LWidget: PGtkWidget;
   LVisual: PGdkVisual;
 begin
-  AWidget^.set_app_paintable(True);
+  LWidget := AWidget.Widget;
+  LWidget^.set_app_paintable(True);
   LScreen := TGdkScreen.get_default;
   LVisual := LScreen^.get_rgba_visual;
   if (LVisual <> nil) and LScreen^.is_composited then
-    AWidget^.set_visual(LVisual)
+    LWidget^.set_visual(LVisual)
   else
-    LogEntry(acGeneralLogFileName, 'Gtk3', 'alpha-composing is unavailable')
+    LogEntry(acGeneralLogFileName, 'Gtk3', 'alpha-composing is unavailable');
+
+  if TGtk3WidgetAccess(AWidget).FParams.ExStyle and WS_EX_LAYERED <> 0 then
+    g_signal_connect_data(LWidget, 'draw', TGCallback(@OnAlphaExpose), AWidget, nil, G_CONNECT_DEFAULT);
 end;
 
 { TACLGtk3PopupControl }
@@ -517,7 +562,7 @@ begin
   if LWndParent <> nil then
     LWindow^.set_transient_for(LWndParent);
   if Params.ExStyle and WS_EX_LAYERED <> 0 then
-    TACLGtk3AdvancedWindow.SetAlphaExposing(FWidget);
+    TACLGtk3AdvancedWindow.SetAlphaExposing(Self);
   FWidget^.realize;
 
   Result := FWidget;
@@ -527,17 +572,6 @@ procedure TACLGtk3PopupControl.InitializeWidget;
 begin
   inherited InitializeWidget;
   g_signal_connect_data(FWidget, 'event', TGCallback(@WidgetEvent), Self, nil, G_CONNECT_DEFAULT);
-end;
-
-function TACLGtk3PopupControl.GtkEventPaint(Sender: PGtkWidget; AContext: Pcairo_t): Boolean;
-var
-  LPainter: ICairoPainter;
-begin
-  Result := True;
-  if Supports(LCLObject, ICairoPainter, LPainter) then
-    LPainter.PaintTo(Cairo.Pcairo_t(AContext))
-  else
-    Result := inherited;
 end;
 
 procedure TACLGtk3PopupControl.SetBounds(ALeft, ATop, AWidth, AHeight: integer);
@@ -551,8 +585,8 @@ begin
   end;
 end;
 
-class function TACLGtk3PopupControl.WidgetEvent(
-  Widget: PGtkWidget; Event: PGdkEvent; Data: GPointer): gboolean; cdecl;
+class function TACLGtk3PopupControl.WidgetEvent(widget: PGtkWidget;
+  Event: PGdkEvent; Data: GPointer): gboolean; cdecl;
 begin
   Result := True;
   case event^.type_ of

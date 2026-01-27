@@ -1001,7 +1001,7 @@ begin
       end;
       if LWidget.Shape <> nil then
       begin
-        TACLGtk3AdvancedWindow.SetAlphaExposing(LWidget.Widget);
+        TACLGtk3AdvancedWindow.SetAlphaExposing(LWidget);
         LWidget.SetWindowShape(LWidget.Shape, LWindow^.window);
       end;
     end;
