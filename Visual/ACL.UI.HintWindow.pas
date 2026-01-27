@@ -6,7 +6,7 @@
 //  Purpose:   Tooltips
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -21,6 +21,7 @@ uses
 {$IFDEF FPC}
   LCLIntf,
   LCLType,
+  WSLCLClasses,
 {$ELSE}
   {Winapi.}DwmApi,
   {Winapi.}Windows,
@@ -36,12 +37,15 @@ uses
   {Vcl.}Graphics,
   {Vcl.}Forms,
   // ACL
+  ACL.Classes,
   ACL.Geometry,
   ACL.Geometry.Utils,
   ACL.Graphics,
   ACL.Graphics.TextLayout,
   ACL.Timers,
   ACL.UI.Resources,
+  ACL.Utils.Common,
+  ACL.Utils.Desktop,
   ACL.Utils.DPIAware,
   ACL.Utils.Strings;
 
@@ -110,7 +114,7 @@ type
   protected
   {$IFDEF FPC}
     FCurrentPPI: Integer;
-    procedure DoSendShowHideToInterface; override;
+    class procedure WSRegisterClass; override;
   {$ENDIF}
 
     procedure CreateParams(var Params: TCreateParams); override;
@@ -160,10 +164,8 @@ type
 implementation
 
 uses
-  ACL.Classes,
-  ACL.UI.Controls.Base,
-  ACL.Utils.Common,
-  ACL.Utils.Desktop;
+  {$I ACL.UI.Core.Impl.inc},
+  ACL.UI.Controls.Base;
 
 { TACLHintData }
 
@@ -322,21 +324,20 @@ end;
 
 procedure TACLHintWindow.CreateParams(var Params: TCreateParams);
 begin
-  inherited CreateParams(Params);
+  inherited;
   Params.Style := WS_POPUP;
   if Owner is TWinControl then
     Params.WndParent := TWinControl(Owner).Handle;
 end;
 
 {$IFDEF FPC}
-procedure TACLHintWindow.DoSendShowHideToInterface;
-var
-  LCapture: TControl;
+class procedure TACLHintWindow.WSRegisterClass;
+const
+  Done: Boolean = False;
 begin
-  LCapture := GetCaptureControl;
-  inherited;
-  if LCapture <> nil then
-    SetCaptureControl(LCapture);
+  if Done then Exit;
+  RegisterWSComponent(TACLHintWindow, TACLWSHintWindow);
+  Done := True;
 end;
 {$ENDIF}
 
@@ -439,6 +440,7 @@ begin
       LHintPos.X := (AScreenRect.Right - LHintSize.cx);
     hwhaCenter:
       LHintPos.X := (AScreenRect.Right + AScreenRect.Left - LHintSize.cx) div 2;
+  else;
   end;
 
   AScreenRect.Inflate(0, dpiApply(IndentFromControl, FCurrentPPI));

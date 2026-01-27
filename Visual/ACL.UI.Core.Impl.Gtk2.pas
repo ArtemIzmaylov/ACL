@@ -53,8 +53,9 @@ uses
   ACL.Classes,
   ACL.Graphics,
   ACL.Graphics.Ex.Cairo,
-  ACL.Utils.DPIAware,
   ACL.Utils.Common,
+  ACL.Utils.DPIAware,
+  ACL.Utils.Logger,
   // VCL
   Graphics,
   Controls,
@@ -102,7 +103,10 @@ type
 
   { TACLWSHintWindow }
 
-  TACLWSHintWindow = class(TGtk2WSHintWindow);
+  TACLWSHintWindow = class(TGtk2WSHintWindow)
+  published
+    class procedure ShowHide(const AWinControl: TWinControl); override;
+  end;
 
   { TACLWSPopupControl }
 
@@ -193,6 +197,7 @@ type
     class function Check(AControl: TWinControl; X, Y, AThreshold: Integer): Boolean;
   end;
 
+function IsAlphaComposingSupports: Boolean;
 function LoadDialogIcon(AOwnerWnd: TWndHandle; AType: TMsgDlgType; ASize: Integer): TACLDib;
 procedure SetDragImageListOpacity(Opacity: Byte);
 procedure SetWindowStayOnTop(AWnd: TWndHandle; AValue: Boolean);
@@ -781,6 +786,22 @@ begin
     FInputTarget := GetFixedWidget({%H-}PGtkWidget(AControl.Handle));
   end;
   HandlerInit;
+end;
+
+{ TACLWSHintWindow }
+
+class procedure TACLWSHintWindow.ShowHide(const AWinControl: TWinControl);
+var
+  LCapture: TControl;
+begin
+  LCapture := GetCaptureControl;
+  inherited ShowHide(AWinControl);
+  // WTF???
+  //    if not ACustomForm.ClassNameIs('TDockImageWindow') then
+  //      ReleaseMouseCapture;
+  // ref.to: TGtk2WidgetSet.SetVisible
+  if LCapture <> nil then
+    SetCaptureControl(LCapture);
 end;
 
 { TACLWSForm }

@@ -963,9 +963,17 @@ begin
   end;
 
   LWidget := TGtk3WidgetAccess(LForm.Handle);
+
   if not (wtWindow in LWidget.WidgetType) then
   begin
     inherited;
+    Exit;
+  end;
+
+  if wtHintWindow in LWidget.WidgetType then
+  begin
+    SetRealPopupParent(LForm, Screen.ActiveCustomForm);
+    LWidget.Visible := AWinControl.HandleObjectShouldBeVisible;
     Exit;
   end;
 
