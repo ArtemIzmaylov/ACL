@@ -16,3 +16,7 @@ https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/41962
 https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/41964
 https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/41965
 https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42025
+https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42031
+https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42032
+https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42033
+https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42034

@@ -99,7 +99,6 @@ type
     HeightCorrection = 4;
   strict private
     FAutoHideTimer: TACLTimer;
-    FClickable: Boolean;
     FLayout: TACLTextLayout;
     FOnHide: TThreadMethod;
     FStyle: TACLStyleHint;
@@ -155,7 +154,6 @@ type
       const APoint: TPoint; ATimeOut: Integer = 0); overload;
 
     //# Properties
-    property Clickable: Boolean read FClickable write FClickable;
     property Style: TACLStyleHint read FStyle write SetStyle;
     //# Events
     property OnHide: TThreadMethod read FOnHide write FOnHide;
@@ -489,12 +487,6 @@ begin
   end;
 end;
 
-procedure TACLHintWindow.UpdateRegion;
-begin
-  if HandleAllocated then
-    acRegionSetToWindow(Handle, Style.CreateRegion(Rect(0, 0, Width, Height)), True);
-end;
-
 procedure TACLHintWindow.CMTextChanged(var Message: TMessage);
 begin
   Layout.SetText(Caption, TACLTextFormatSettings.Formatted);
@@ -502,10 +494,7 @@ end;
 
 procedure TACLHintWindow.WMNCHitTest(var Message: TMessage);
 begin
-  if Clickable then
-    Message.Result := HTCLIENT
-  else
-    Message.Result := HTTRANSPARENT;
+  Message.Result := HTTRANSPARENT;
 end;
 
 procedure TACLHintWindow.WMMouseWheel(var Message: TMessage);
@@ -516,8 +505,14 @@ end;
 procedure TACLHintWindow.WMSize(var Message: TWMSize);
 begin
   inherited;
-{$IFNDEF FPC}
   UpdateRegion;
+end;
+
+procedure TACLHintWindow.UpdateRegion;
+begin
+{$IFDEF MSWINDOWS}
+  if HandleAllocated then
+    acRegionSetToWindow(Handle, Style.CreateRegion(Rect(0, 0, Width, Height)), True);
 {$ENDIF}
 end;
 
