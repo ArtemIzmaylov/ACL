@@ -117,6 +117,8 @@ type
       const AParams: TCreateParams): TLCLHandle; override;
     class procedure SetAlphaBlend(const ACustomForm: TCustomForm;
       const AlphaBlend: Boolean; const Alpha: Byte); override;
+    class procedure SetBorderIcons(const AForm: TCustomForm;
+      const ABorderIcons: TBorderIcons); override;
     class procedure SetFormStyle(const AForm: TCustomform;
       const AFormStyle, AOldFormStyle: TFormStyle); override;
     class procedure SetIcon(const AForm: TCustomForm; const Small, Big: HICON); override;
@@ -921,6 +923,13 @@ class procedure TACLWSForm.SetAlphaBlend(
   const ACustomForm: TCustomForm; const AlphaBlend: Boolean; const Alpha: Byte);
 begin
   TACLWSCustomControl.SetOpacity(ACustomForm, IfThen(AlphaBlend, Alpha, 255));
+end;
+
+class procedure TACLWSForm.SetBorderIcons(
+  const AForm: TCustomForm; const ABorderIcons: TBorderIcons);
+begin
+  if IsTopLevel(AForm) then
+    inherited;
 end;
 
 class procedure TACLWSForm.SetFormStyle(

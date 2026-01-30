@@ -97,6 +97,7 @@ type
     procedure Repaint(const ARect: PRect=nil); override;
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: integer); override;
     procedure SetText(const AValue: String); override;
+    procedure UpdateWindowFunctions; override;
   public
     class function ResolveWndParent(const AParams: TCreateParams): PGtkWindow;
     class procedure SetAlphaExposing(AWidget: TGtk3Widget);
@@ -157,38 +158,6 @@ begin
   Result := NullPoint;
   if (AWidget <> nil) and (AWidget^.window <> nil) and AWidget^.get_realized then
     AWidget^.window^.get_origin(@Result.X, @Result.Y);
-end;
-
-function GetWindowFunction(AForm: TCustomForm): TGdkWMFunction;
-var
-  LBorderIcons: TBorderIcons;
-  LBorderStyle: TFormBorderStyle;
-begin
-  if csDesigning in AForm.ComponentState then
-    LBorderStyle := AForm.BorderStyle
-  else
-    LBorderStyle := bsSizeable;
-
-  LBorderIcons := AForm.BorderIcons;
-  if not (LBorderStyle in [bsSizeable]) then
-    Exclude(LBorderIcons, biMaximize);
-  if not (LBorderStyle in [bsSizeable, bsSingle]) then
-    Exclude(LBorderIcons, biMinimize);
-
-  Result := [GDK_FUNC_MOVE];
-  if (LBorderStyle in [bsNone, bsSizeable, bsSizeToolWin]) then
-    Include(Result, GDK_FUNC_RESIZE);
-  if biSystemMenu in LBorderIcons then
-    Include(Result, GDK_FUNC_CLOSE);
-  if biMinimize in LBorderIcons then
-    Include(Result, GDK_FUNC_MINIMIZE);
-  if biMaximize in LBorderIcons then
-    Include(Result, GDK_FUNC_MAXIMIZE);
-
-  if (AForm.Constraints.MinWidth  > 0) and (AForm.Constraints.MinWidth  = AForm.Constraints.MaxWidth) and
-     (AForm.Constraints.MinHeight > 0) and (AForm.Constraints.MinHeight = AForm.Constraints.MaxHeight)
-  then
-    Exclude(Result, GDK_FUNC_RESIZE);
 end;
 
 { TACLGtk3CustomControl }
@@ -345,16 +314,10 @@ begin
     FCreatingWorkaround := nil;
   end;
 
-  if Gtk3IsGtkWindow(Widget) then
+  if Gtk3IsGtkWindow(Widget) and (Params.ExStyle and WS_EX_LAYERED <> 0) then
   begin
-    if Params.ExStyle and WS_EX_LAYERED <> 0 then
-    begin
-      PGtkWindow(Widget)^.set_decorated(False);
-      PGtkWindow(Widget)^.window^.set_decorations([]);
-    end;
-    // 1) без этого не работает на Fly DM (Astra Linux)
-    // 2) без этого не работают команды в системно меню для WS_EX_LAYERED
-    PGtkWindow(Widget)^.window^.set_functions(GetWindowFunction(TForm(LCLObject)));
+    PGtkWindow(Widget)^.set_decorated(False);
+    PGtkWindow(Widget)^.window^.set_decorations([]);
   end;
 end;
 
@@ -480,7 +443,7 @@ begin
       LGeometryHints := LGeometryHints + [GDK_HINT_MAX_SIZE, GDK_HINT_MIN_SIZE];
     LWindow^.set_geometry_hints(nil, @LGeometry, LGeometryHints);
 
-    if LWindow^.window <> nil then
+    if GetWindow <> nil then
     begin
       LWindow^.set_resizable(True);
       LWindow^.resize(AWidth, AHeight);
@@ -496,6 +459,17 @@ begin
   // Эта хрень дергается между созданием Window и Layout. Cм.CreateHandle.
   if Assigned(FCreatingWorkaround) then FCreatingWorkaround();
   inherited SetText(AValue);
+end;
+
+procedure TACLGtk3AdvancedWindow.UpdateWindowFunctions;
+begin
+  if FParams.ExStyle and WS_EX_LAYERED <> 0 then
+  begin
+    if Gtk3IsGtkWindow(Widget) then
+      GetWindow^.set_functions(GetWindowFunction(TCustomForm(LCLObject)));
+  end
+  else
+    inherited;
 end;
 
 class function TACLGtk3AdvancedWindow.ResolveWndParent(const AParams: TCreateParams): PGtkWindow;
