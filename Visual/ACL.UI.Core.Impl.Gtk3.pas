@@ -210,6 +210,40 @@ type
   TGtk3WidgetAccess = class(TGtk3Widget);
   TGtk3WidgetSetAccess = class(TGtk3WidgetSet);
 
+procedure InitGtk3;
+var
+  LCss: string;
+  LCssProvider: PGtkCssProvider;
+  LOption: gboolean;
+begin
+  // Возвращаемся к скроллбарам старого стиля, потому что:
+  // 1) Старые скроллбары не висят поверх контента, загораживая его собой при работе
+  // 2) Старые скроллбары не прячутся при потере фокуса (этот механизм вообще не работает в дроп-листах)
+  // 3) Старые скроллбары не требуют принудительной отрисовки фона под собой (пробовал для решения п.1)
+  // 4) ApplyCustomScrollbarStyles из GTK3WidgetSet.AppInit делает дырку под size-grip,
+  //    тем самым ломая ситуации, когда скроллбар в контроле только один.
+  if AppInitialized in Application.Flags then
+    WriteLn('Gtk3: setup failed, app is already initialized');
+  LOption := False;
+  GTK3WidgetSet.OverlayScrolling := LOption;
+  g_object_get(gtk_settings_get_default, 'gtk-overlay-scrolling', [@LOption, nil]);
+
+  // Hide ugly dashed lines around ScrolledWindow (affected to all CustomControls and Forms)
+  // https://askubuntu.com/questions/1071005/xubuntu-18-04-lts-ugly-lines-when-scrollbar-active/1071108#1071108
+  // https://unix.stackexchange.com/questions/251743/dashed-line-on-top-and-below-a-window-when-window-scrolling-is-required
+  LCss :=
+   'scrolledwindow undershoot.top, ' +
+   'scrolledwindow undershoot.right, ' +
+   'scrolledwindow undershoot.bottom, ' +
+   'scrolledwindow undershoot.left { background-image: none; } ';
+  //Format('scrollbar.horizontal, scrollbar.vertical, scrolledwindow junction { border-color: %0:s; background-color: %0:s; }', ['white']);
+  // // scrollbar slider
+  LCssProvider := gtk_css_provider_new();
+  gtk_css_provider_load_from_data(LCssProvider, PgChar(LCss), Length(LCss), nil);
+  gtk_style_context_add_provider_for_screen(gdk_screen_get_default(),
+    PGtkStyleProvider(LCssProvider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+end;
+
 function IsChild(AChild, AParent: PGtkWidget): Boolean;
 begin
   while AChild <> nil do
@@ -1036,6 +1070,7 @@ begin
       LWindow^.show_all;
       LWindow^.window^.set_events(GDK_ALL_EVENTS_MASK);
       LWindow^.present;
+     // LWindow^.set_interactive_debugging(true);
     finally
       LWidget.EndUpdate;
     end;
@@ -1060,4 +1095,6 @@ begin
   // do nothing
 end;
 
+initialization
+  InitGtk3;
 end.
