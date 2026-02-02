@@ -2476,7 +2476,9 @@ function TACLMenuPopupWindow.GetTargetMenuWnd(
 var
   LPoint: TPoint;
 begin
-  AWnd := Looper.PopupWindowAtCursor;
+  AWnd := nil;
+  if Looper <> nil then
+    AWnd := Looper.PopupWindowAtCursor;
   if (AWnd = nil) and (MainMenu <> nil) and MainMenu.IsMouseAtControl then
     AWnd := MainMenu;
   if (AWnd = Self) then
@@ -2679,13 +2681,15 @@ begin
   Visible := True;
 
   if Looper = nil then
-  begin
+  try
     FLooper := TACLMenuPopupLooperImpl.Create(Self);
     try
       Looper.Run;
     finally
       FreeAndNil(FLooper);
     end;
+  finally
+    Hide;
   end;
 end;
 
@@ -3644,7 +3648,7 @@ begin
   // https://api.gtkd.org/gdk.c.types.GdkEventType.html
   // https://docs.gtk.org/gdk3/struct.EventButton.html
   case AType of
-    GDK_DELETE, GDK_DESTROY:
+    GDK_DELETE, GDK_DESTROY, GDK_GRAB_BROKEN:
       CloseMenu;
     GDK_WINDOW_STATE:
       if TGtkApp.IsLooseFocusEvent(AEvent) then
