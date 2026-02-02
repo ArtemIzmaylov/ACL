@@ -1,9 +1,9 @@
 ﻿{%MainUnit ACL.UI.TrayIcon.pas}
 {.$DEFINE ACL_TRAYICON_DEBUGLOG}
 
-{$IFDEF LCLGtk3}
+{.$IFDEF LCLGtk3}
   {$DEFINE ACL_TRAYICON_ALLOW_APP_INDICATOR}
-{$ENDIF}
+{.$ENDIF}
 
 uses
   GLib2,
@@ -51,10 +51,8 @@ type
       user_data: gpointer; free_funch: TFreeFunc); cdecl;
     notify_notification_close_t = function (handle: PNotify; error: PPGError): gboolean; cdecl;
     notify_notification_new_t = function (summary, body, icon: PChar): PNotify; cdecl;
-    notify_notification_set_image_from_pixbuf_t = procedure (handle: PNotify; image: PGdkPixbuf); cdecl;
     notify_notification_set_timeout_t = procedure (handle: PNotify; timeout: gint); cdecl;
     notify_notification_show_t = function(handle: PNotify; error: PPGError): gboolean; cdecl;
-    notify_notification_update_t = function (handle: PNotify; summary, body, icon: PChar): gboolean; cdecl;
     notify_init_t = function (app_name: PChar): gboolean; cdecl;
     notify_uninit_t = procedure; cdecl;
   strict private
@@ -171,6 +169,7 @@ type
 {$ENDREGION}
 
 type
+  TPopupMenuAccess = class(TPopupMenu);
 
   { TACLTrayIconImplBase }
 
@@ -196,6 +195,7 @@ type
   TACLStatusIconImpl = class(TACLTrayIconImplBase)
   strict private
     FHandle: PGtkStatusIcon;
+    FPopupMenu: TPopupMenu;
   strict private
     class function HandlerButtonPress(Icon: PGtkStatusIcon;
       Event: PGdkEventButton; Self: TACLStatusIconImpl): gboolean; cdecl; static;
@@ -207,6 +207,7 @@ type
       {%H-}keyboard_mode: gboolean; {%H-}tooltip: gpointer; self: TACLStatusIconImpl): gboolean; cdecl; static;
   public
     destructor Destroy; override;
+    procedure ShowMenu(const APoint: TPoint); override;
     procedure Update; override;
   end;
 
@@ -304,7 +305,6 @@ type
   var
     LIcon: TIcon;
     LIconIndex: Integer;
-    LIconSize: Integer;
     LPng: TFPImageBitmap;
   begin
     LIcon := ActualIcon;
@@ -342,38 +342,61 @@ type
     finally
       FHandle := nil;
     end;
+    FreeAndNil(FPopupMenu);
     inherited;
+  end;
+
+  procedure TACLStatusIconImpl.ShowMenu(const APoint: TPoint);
+  begin
+    if Owner.PopupMenu = nil then Exit;
+    // TODO: Custom menus in gtk3 requires for transient_for window
+    // In AIMP, main form (and any other) can be minimized to tray.
+    // So, no way window to specify to transient_for property.
+  {$IFDEF LCLGtk3}
+    if FPopupMenu = nil then
+      FPopupMenu := TPopupMenu.Create(nil);
+    TPopupMenuAccess(Owner.PopupMenu).DoPopup(Owner.PopupMenu);
+    FPopupMenu.Images := Owner.PopupMenu.Images;
+    FPopupMenu.Items.Assign(Owner.PopupMenu.Items);
+    FPopupMenu.PopUp(APoint.X, APoint.Y);
+  {$ELSE}
+    inherited;
+  {$ENDIF}
   end;
 
   class function TACLStatusIconImpl.HandlerButtonPress(Icon: PGtkStatusIcon;
     Event: PGdkEventButton; Self: TACLStatusIconImpl): gboolean; cdecl;
   begin
-  {$IFDEF ACL_TRAYICON_DEBUGLOG}
-    // x, y are local coordinates
-    WriteLn('Tray:ButtonDown ', Event^.button, ' ',
-      Round(Event.x), ' ', Round(Event.y), ' ',
-      Round(Event.x_root), ' ', Round(Event.y_root));
-  {$ENDIF}
-
-    case Event^.button of
-      1: Self.Owner.MouseDown(mbLeft);
-      2: Self.Owner.MouseDown(mbMiddle);
-      3: Self.Owner.MouseDown(mbRight);
-    end;
-
-    // Events order:
-    // + buttonpress
-    // + buttonpress2
-    // + buttonrelease
-    // So, generate 2nd button release to be consistent
-  {$IFDEF LCLGtk3}
-    if Event^.type_ = GDK_2BUTTON_PRESS then
-  {$ELSE}
-    if Event^._type = GDK_2BUTTON_PRESS then
-  {$ENDIF}
-      HandlerButtonRelease(Icon, Event, Self);
-
     Result := gTRUE;
+    try
+    {$IFDEF ACL_TRAYICON_DEBUGLOG}
+      // x, y are local coordinates
+      WriteLn('Tray:ButtonDown ', Event^.button, ' ',
+        Round(Event.x), ' ', Round(Event.y), ' ',
+        Round(Event.x_root), ' ', Round(Event.y_root));
+    {$ENDIF}
+
+      case Event^.button of
+        1: Self.Owner.MouseDown(mbLeft);
+        2: Self.Owner.MouseDown(mbMiddle);
+        3: Self.Owner.MouseDown(mbRight);
+      end;
+
+      // Events order:
+      // + buttonpress
+      // + buttonpress2
+      // + buttonrelease
+      // So, generate 2nd button release to be consistent
+    {$IFDEF LCLGtk3}
+      if Event^.type_ = GDK_2BUTTON_PRESS then
+    {$ELSE}
+      if Event^._type = GDK_2BUTTON_PRESS then
+    {$ENDIF}
+        HandlerButtonRelease(Icon, Event, Self);
+    except
+      if Assigned(ApplicationHandleException) then
+        ApplicationHandleException(Self);
+    end;
   end;
 
   class function TACLStatusIconImpl.HandlerButtonRelease(Icon: PGtkStatusIcon;
@@ -382,29 +405,38 @@ type
     LPoint: TPoint;
   begin
     Result := gTRUE;
+    try
+    {$IFDEF ACL_TRAYICON_DEBUGLOG}
+      WriteLn('Tray:ButtonUp ', Event^.button, ' ',
+        Round(Event.x), ' ', Round(Event.y), ' ',
+        Round(Event.x_root), ' ', Round(Event.y_root));
+    {$ENDIF}
 
-  {$IFDEF ACL_TRAYICON_DEBUGLOG}
-    WriteLn('Tray:ButtonUp ', Event^.button, ' ',
-      Round(Event.x), ' ', Round(Event.y), ' ',
-      Round(Event.x_root), ' ', Round(Event.y_root));
-  {$ENDIF}
-
-    LPoint.X := Round(Event.x_root + Event.x);
-    LPoint.Y := Round(Event.y_root + Event.y);
-    case Event^.button of
-      1: Self.Owner.MouseUp(mbLeft, LPoint);
-      2: Self.Owner.MouseUp(mbMiddle, LPoint);
-      3: Self.Owner.MouseUp(mbRight, LPoint);
+      LPoint.X := Round(Event.x_root + Event.x);
+      LPoint.Y := Round(Event.y_root + Event.y);
+      case Event^.button of
+        1: Self.Owner.MouseUp(mbLeft, LPoint);
+        2: Self.Owner.MouseUp(mbMiddle, LPoint);
+        3: Self.Owner.MouseUp(mbRight, LPoint);
+      end;
+    except
+      if Assigned(ApplicationHandleException) then
+        ApplicationHandleException(Self);
     end;
   end;
 
   class function TACLStatusIconImpl.HandlerScroll(Icon: PGtkStatusIcon;
     Event: PGdkEventScroll; Self: TACLStatusIconImpl): gboolean; cdecl;
   begin
-  {$IFDEF ACL_TRAYICON_DEBUGLOG}
-    WriteLn('Tray:Scroll: ', Integer(Event^.direction));
-  {$ENDIF}
-    Self.Owner.MouseWheel(Event^.direction in [GDK_SCROLL_UP, GDK_SCROLL_LEFT]);
+    try
+    {$IFDEF ACL_TRAYICON_DEBUGLOG}
+      WriteLn('Tray:Scroll: ', Integer(Event^.direction));
+    {$ENDIF}
+      Self.Owner.MouseWheel(Event^.direction in [GDK_SCROLL_UP, GDK_SCROLL_LEFT]);
+    except
+      if Assigned(ApplicationHandleException) then
+        ApplicationHandleException(Self);
+    end;
     Result := gTRUE;
   end;
 
@@ -412,14 +444,19 @@ type
     status_icon: PGtkStatusIcon; x, y: guint; keyboard_mode: gboolean;
     tooltip: gpointer; self: TACLStatusIconImpl): gboolean; cdecl;
   begin
-  {$IFDEF ACL_TRAYICON_DEBUGLOG}
-    WriteLn('Tray:Query ', x, ' ', y);
-  {$ENDIF}
-    // На Gnome query-tooltip приходит при клике на иконку, дабы не
-    // генерировать ложных событий - форсированно отключаем это дело
-    if ticMove in TACLTrayIcon.Capabilities then
-      Self.Owner.MouseMove;
     Result := gFALSE;
+    try
+    {$IFDEF ACL_TRAYICON_DEBUGLOG}
+      WriteLn('Tray:Query ', x, ' ', y);
+    {$ENDIF}
+      // На Gnome query-tooltip приходит при клике на иконку, дабы не
+      // генерировать ложных событий - форсированно отключаем это дело
+      if ticMove in TACLTrayIcon.Capabilities then
+        Self.Owner.MouseMove;
+    except
+      if Assigned(ApplicationHandleException) then
+        ApplicationHandleException(Self);
+    end;
   end;
 
   procedure TACLStatusIconImpl.Update;
@@ -465,15 +502,9 @@ type
   begin
     if app_indicator_state = 0 then
     begin
-      LLibHandle := 0;
-      // Unlike AppIndicator, StatusIcon is more flexible and powerful.
-      // So, using AppIndicator only on systems where StatusIcon is not available
-      if ShellDesktopEnv = sdeGnome then
-      begin
-        LLibHandle := acLoadLibrary(libAppIndicator);
-        if LLibHandle = 0 then
-          LLibHandle := acLoadLibrary(libAppIndicatorAyatana);
-      end;
+      LLibHandle := acLoadLibrary(libAppIndicator);
+      if LLibHandle = 0 then
+        LLibHandle := acLoadLibrary(libAppIndicatorAyatana);
       Result := LLibHandle <> 0;
       app_indicator_new := acGetProcAddress(LLibHandle, 'app_indicator_new', Result);
       app_indicator_set_icon := acGetProcAddress(LLibHandle, 'app_indicator_set_icon', Result);

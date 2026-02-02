@@ -6,7 +6,7 @@
 //  Purpose:   Tray Icon
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -63,6 +63,7 @@ type
     constructor Create(AIcon: TACLTrayIcon);
     function ActualIcon: TIcon;
     procedure BalloonHint(const ATitle, AText: string; AIcon: TACLTrayBalloonIcon); virtual; abstract;
+    procedure ShowMenu(const APoint: TPoint); virtual;
     procedure Update; virtual; abstract;
   end;
 
@@ -130,7 +131,6 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure BalloonHint(const ATitle, AText: string; AIconType: TACLTrayBalloonIcon);
-    procedure PopupAt(const AScreenPoint: TPoint);
     //# Properties
     property WantDoubleClicks: Boolean read FWantDoubleClicks write FWantDoubleClicks;
   public
@@ -185,6 +185,16 @@ begin
     Result := Application.MainForm.Icon;
   if Result.Empty then
     Result := Application.Icon;
+end;
+
+procedure TACLTrayIconIntf.ShowMenu(const APoint: TPoint);
+begin
+  if Owner.PopupMenu <> nil then
+  begin
+    Owner.PopupMenu.AutoPopup := False;
+    Owner.PopupMenu.PopupComponent := Owner;
+    Owner.PopupMenu.Popup(APoint.X, APoint.Y);
+  end;
 end;
 
 { TACLTrayIcon }
@@ -311,7 +321,8 @@ begin
         DoClick;
 
     mbRight:
-      PopupAt(P);
+      if FIconImpl <> nil then
+        FIconImpl.ShowMenu(P);
 
     mbMiddle:
       DoMidClick;
@@ -326,19 +337,6 @@ begin
   begin
     if AComponent = PopupMenu then
       PopupMenu := nil;
-  end;
-end;
-
-procedure TACLTrayIcon.PopupAt(const AScreenPoint: TPoint);
-begin
-  if Assigned(PopupMenu) then
-  begin
-  {$IFDEF MSWINDOWS}
-    SetForegroundWindow(Application.{%H-}Handle);
-  {$ENDIF}
-    FPopupMenu.AutoPopup := False;
-    FPopupMenu.PopupComponent := Self;
-    FPopupMenu.Popup(AScreenPoint.x, AScreenPoint.y);
   end;
 end;
 
