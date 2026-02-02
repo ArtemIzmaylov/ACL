@@ -675,7 +675,8 @@ procedure acExcludeFromClipRegion(DC: HDC; const R: TRect); overload;
 procedure acExcludeFromClipRegion(DC: HDC; ARegion: TRegionHandle); overload; inline;
 function acIntersectClipRegion(DC: HDC; const R: TRect): Boolean; overload;
 function acIntersectClipRegion(DC: HDC; ARegion: TRegionHandle): Boolean; overload; inline;
-function acRectVisible(ACanvas: TCanvas; const R: TRect): Boolean;
+function acRectVisible(DC: HDC; const ARect: TRect): Boolean; overload; {$IFDEF MSWINDOWS}inline;{$ENDIF}
+function acRectVisible(ACanvas: TCanvas; const ARect: TRect): Boolean; overload;
 function acSaveClipRegion(DC: HDC): TRegionHandle;
 procedure acRestoreClipRegion(DC: HDC; ARegion: TRegionHandle);
 function acStartClippedDraw(ACanvas: TCanvas; const R: TRect; out APrevRegion: TRegionHandle): Boolean;
@@ -1016,13 +1017,33 @@ begin
   Result := acCombineWithClipRegion(DC, ARegion, RGN_AND);
 end;
 
-function acRectVisible(ACanvas: TCanvas; const R: TRect): Boolean;
+function acRectVisible(DC: HDC; const ARect: TRect): Boolean;
+{$IFDEF LCLGtk3}
+var
+  LRegion: TRegionHandle;
 begin
-  if R.IsEmpty then
+  Result := False;
+  if ARect.IsEmpty then
+    Exit;
+  if acGetClipRegion(DC, LRegion) then
+  try
+    Result := (LRegion = 0) or RectInRegion(LRegion, ARect);
+  finally
+    acRegionFree(LRegion);
+  end;
+{$ELSE}
+begin
+  Result := RectVisible(DC, ARect);
+{$ENDIF}
+end;
+
+function acRectVisible(ACanvas: TCanvas; const ARect: TRect): Boolean;
+begin
+  if ARect.IsEmpty then
     Exit(False);
   if not ACanvas.HandleAllocated and (ACanvas.ClassType = TACLDibCanvas) then
-    Exit(R.IntersectsWith(TACLDibCanvas(ACanvas).ClipRect));
-  Result := RectVisible(ACanvas.Handle, R);
+    Exit(ARect.IntersectsWith(TACLDibCanvas(ACanvas).ClipRect));
+  Result := acRectVisible(ACanvas.Handle, ARect);
 end;
 
 procedure acRestoreClipRegion(DC: HDC; ARegion: TRegionHandle);
@@ -1042,6 +1063,8 @@ end;
 
 function acStartClippedDraw(ACanvas: TCanvas; const R: TRect; out APrevRegion: TRegionHandle): Boolean;
 begin
+  if R.IsEmpty then
+    Exit(False);
   if not ACanvas.HandleAllocated and (ACanvas.ClassType = TACLDibCanvas) then
   begin
     Result := TACLDibCanvas(ACanvas).ClipRect.IntersectsWith(R);
@@ -1053,7 +1076,7 @@ begin
     Exit;
   end;
 
-{$IFNDEF LCLGtk2} // Под Gtk2 это не имеет смысла, т.к. там идет такая же работа с регионом, как ниже
+{$IFNDEF LCLGtkX} // в RectVisible идёт такая же работа с регионом, как ниже
   if not RectVisible(ACanvas.Handle, R) then
     Exit(False);
 {$ENDIF}
@@ -2060,7 +2083,7 @@ var
   W, H: Integer;
   X, Y, XCount, YCount: Integer;
 begin
-  if not (ADest.IsEmpty or ASource.IsEmpty) and RectVisible(DC, ADest) then
+  if not (ADest.IsEmpty or ASource.IsEmpty) and acRectVisible(DC, ADest) then
   begin
     W := ASource.Right - ASource.Left;
     H := ASource.Bottom - ASource.Top;

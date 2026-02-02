@@ -7,7 +7,7 @@
 //  Purpose:   Cairo Wrappers
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       Gtk2/Gtk3
@@ -554,6 +554,7 @@ begin
   SavedContext^.Ownership := soReference;
   Result := Pcairo_t(LContext.pcr);
   cairo_save(Result);
+  cairo_set_operator(Result, CAIRO_OPERATOR_OVER);
   Origin := NullPoint;
 {$ELSEIF DEFINED(LCLGtk2)}
 var
@@ -838,7 +839,8 @@ begin
     Exit;
 
   LPrevOperator := cairo_get_operator(ACairo);
-  cairo_set_operator(ACairo, AOperator);
+  if LPrevOperator <> AOperator then
+    cairo_set_operator(ACairo, AOperator);
   if ATileMode then
   begin
     LSurface := cairo_create_surface(LSourceW, LSourceH);
@@ -875,7 +877,8 @@ begin
     else
       cairo_fill(ACairo);
   end;
-  cairo_set_operator(ACairo, LPrevOperator);
+  if LPrevOperator <> AOperator then
+    cairo_set_operator(ACairo, LPrevOperator);
 end;
 
 procedure cairo_reset_rect(ACairo: pcairo_t; const R: TRect);

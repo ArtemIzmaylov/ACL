@@ -93,7 +93,9 @@ const
   VK_MEDIA_KEYS_LAST  = VK_LAUNCH_APP2;
 
 type
+
 {$REGION ' General '}
+
   TMenuItemClass = class of TMenuItem;
   TMenuItemEnumProc = reference to procedure (AMenuItem: TMenuItem);
 
@@ -1377,60 +1379,6 @@ begin
   end;
 end;
 
-procedure TACLStylePopupMenu.DrawCheckMark(ACanvas: TCanvas;
-  ARect: TRect; AChecked, AIsRadioItem, ASelected, AEnabled: Boolean);
-const
-  Indexes: array[Boolean, Boolean] of Integer = ((6, 2), (8, 4));
-  NameMap: array[Boolean] of string = ('Buttons.Textures.CheckBox', 'Buttons.Textures.RadioBox');
-var
-  LClipping: TRegionHandle;
-  LImageIndex: Integer;
-  LTexture: TACLResourceTexture;
-  LTextureDPI: Integer;
-begin
-  ARect.Width := ItemGutterWidth;
-  if acStartClippedDraw(ACanvas, ARect, LClipping) then
-  try
-    if TextureGutter.FrameCount > 2 then
-    begin
-      LImageIndex := Indexes[AIsRadioItem, AChecked] + Ord(ASelected);
-      if LImageIndex < TextureGutter.FrameCount then
-        TextureGutter.Draw(ACanvas, ARect.CenterTo(TextureGutter.FrameSize), LImageIndex);
-    end
-    else
-    begin // for backward compatibility with old skins.
-      LTexture := TACLResourceTexture(GetResource(NameMap[AIsRadioItem], TACLResourceTexture));
-      if LTexture <> nil then
-      begin
-        LTexture.BeginUpdate;
-        try
-          LTextureDPI := LTexture.TargetDPI;
-          try
-            LTexture.TargetDPI := TargetDPI;
-            ARect.Content(TextureGutter.ContentOffsets);
-            ARect.Center(LTexture.FrameSize);
-
-            if not AEnabled then
-              LImageIndex := 3 // disabled
-            else if ASelected then
-              LImageIndex := 1 // hover
-            else
-              LImageIndex := 4;// active
-
-            LTexture.Draw(ACanvas, ARect, Ord(AChecked) * 5 + LImageIndex);
-          finally
-            LTexture.TargetDPI := LTextureDPI;
-          end;
-        finally
-          LTexture.CancelUpdate;
-        end;
-      end;
-    end;
-  finally
-    acEndClippedDraw(ACanvas, LClipping);
-  end;
-end;
-
 procedure TACLStylePopupMenu.DoAssign(Source: TPersistent);
 begin
   inherited DoAssign(Source);
@@ -1520,6 +1468,60 @@ begin
       ACanvas.RoundRect(ARect, LRadius * 2, LRadius * 2)
     else
       ACanvas.Rectangle(ARect);
+  end;
+end;
+
+procedure TACLStylePopupMenu.DrawCheckMark(ACanvas: TCanvas;
+  ARect: TRect; AChecked, AIsRadioItem, ASelected, AEnabled: Boolean);
+const
+  Indexes: array[Boolean, Boolean] of Integer = ((6, 2), (8, 4));
+  NameMap: array[Boolean] of string = ('Buttons.Textures.CheckBox', 'Buttons.Textures.RadioBox');
+var
+  LClipping: TRegionHandle;
+  LImageIndex: Integer;
+  LTexture: TACLResourceTexture;
+  LTextureDPI: Integer;
+begin
+  ARect.Width := ItemGutterWidth;
+  if acStartClippedDraw(ACanvas, ARect, LClipping) then
+  try
+    if TextureGutter.FrameCount > 2 then
+    begin
+      LImageIndex := Indexes[AIsRadioItem, AChecked] + Ord(ASelected);
+      if LImageIndex < TextureGutter.FrameCount then
+        TextureGutter.Draw(ACanvas, ARect.CenterTo(TextureGutter.FrameSize), LImageIndex);
+    end
+    else
+    begin // for backward compatibility with old skins.
+      LTexture := TACLResourceTexture(GetResource(NameMap[AIsRadioItem], TACLResourceTexture));
+      if LTexture <> nil then
+      begin
+        LTexture.BeginUpdate;
+        try
+          LTextureDPI := LTexture.TargetDPI;
+          try
+            LTexture.TargetDPI := TargetDPI;
+            ARect.Content(TextureGutter.ContentOffsets);
+            ARect.Center(LTexture.FrameSize);
+
+            if not AEnabled then
+              LImageIndex := 3 // disabled
+            else if ASelected then
+              LImageIndex := 1 // hover
+            else
+              LImageIndex := 4;// active
+
+            LTexture.Draw(ACanvas, ARect, Ord(AChecked) * 5 + LImageIndex);
+          finally
+            LTexture.TargetDPI := LTextureDPI;
+          end;
+        finally
+          LTexture.CancelUpdate;
+        end;
+      end;
+    end;
+  finally
+    acEndClippedDraw(ACanvas, LClipping);
   end;
 end;
 
@@ -1832,6 +1834,9 @@ end;
 
 procedure TACLPopupMenu.ScaleForDpi(ATargetDpi: Integer);
 begin
+  // Textures downscales with poor quality.
+  // Need to port downscaling engine from SE
+  ATargetDpi := Max(ATargetDpi, 96);
   if FCurrentDpi <> ATargetDpi then
   begin
     FCurrentDpi := ATargetDpi;
@@ -2071,7 +2076,7 @@ begin
   if FPrevMousePos <> Point(X, Y) then
   begin
     FPrevMousePos := Point(X, Y);
-    if PtInRect(ClientRect, FPrevMousePos) then
+    if ClientRect.Contains(FPrevMousePos) then
       SelectItemOnMouseMove(HitTest(FPrevMousePos))
     else
       SelectItemOnMouseMove(HitTestNoWhere);
