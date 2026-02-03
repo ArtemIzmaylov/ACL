@@ -109,6 +109,8 @@ type
   TACLGtk3PopupControl = class(TGtk3Widget)
   strict private
     FFirstMapRect: TRect;
+    class function WidgetFocus(aWidget: PGtkWidget;
+      aDirection: TGtkDirectionType; aData: gPointer): gBoolean; cdecl; static;
     class function WidgetEvent(widget: PGtkWidget;
       Event: PGdkEvent; Data: GPointer): gboolean; cdecl; static;
   public
@@ -559,6 +561,7 @@ begin
     LWindow^.set_transient_for(LWndParent);
   if Params.ExStyle and WS_EX_LAYERED <> 0 then
     TACLGtk3AdvancedWindow.SetAlphaExposing(Self);
+  g_signal_connect_data(FWidget, 'focus', TGCallback(@WidgetFocus), Self, nil, G_CONNECT_DEFAULT);
   FWidget^.realize;
 
   Result := FWidget;
@@ -567,6 +570,7 @@ end;
 procedure TACLGtk3PopupControl.InitializeWidget;
 begin
   inherited InitializeWidget;
+  g_signal_connect_data(FWidget, 'focus', TGCallback(@WidgetFocus), Self, nil, G_CONNECT_DEFAULT);
   g_signal_connect_data(FWidget, 'event', TGCallback(@WidgetEvent), Self, nil, G_CONNECT_DEFAULT);
 end;
 
@@ -579,6 +583,12 @@ begin
   finally
     EndUpdate;
   end;
+end;
+
+class function TACLGtk3PopupControl.WidgetFocus(aWidget: PGtkWidget;
+  aDirection: TGtkDirectionType; aData: gPointer): gBoolean; cdecl;
+begin
+  Result := True;
 end;
 
 class function TACLGtk3PopupControl.WidgetEvent(widget: PGtkWidget;
