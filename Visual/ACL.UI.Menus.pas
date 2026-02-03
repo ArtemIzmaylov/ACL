@@ -3653,7 +3653,7 @@ begin
   // https://api.gtkd.org/gdk.c.types.GdkEventType.html
   // https://docs.gtk.org/gdk3/struct.EventButton.html
   case AType of
-    GDK_DELETE, GDK_DESTROY, GDK_GRAB_BROKEN:
+    GDK_DELETE, GDK_DESTROY{$IFDEF LCLGtk3}, GDK_GRAB_BROKEN{$ENDIF}:
       CloseMenu;
     GDK_WINDOW_STATE:
       if TGtkApp.IsLooseFocusEvent(AEvent) then
