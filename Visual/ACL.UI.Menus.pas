@@ -2159,8 +2159,6 @@ end;
 { TACLMenuPopupWindow }
 
 constructor TACLMenuPopupWindow.Create(ASource: TACLPopupMenu);
-var
-  LParentWnd: HWND;
 begin
   FSource := ASource;
   inherited Create(ASource);
@@ -2170,14 +2168,18 @@ begin
   FScrollTimer := TACLTimer.CreateEx(ScrollTimer, 125);
   Visible := False;
 
-  if Screen.FocusedForm <> nil then
-    LParentWnd := Screen.FocusedForm.Handle
-  else if GetActiveWindow <> 0 then
-    LParentWnd := GetActiveWindow
+{$IFDEF MSWINDOWS}
+  // это может быть наше окно или системное
+  // (например, в случае вызова меню для TrayIcon)
+  ParentWindow := GetForegroundWindow;
+  if ParentWindow = 0 then
+{$ENDIF}
+  if Screen.ActiveCustomForm <> nil then
+    ParentWindow := Screen.ActiveCustomForm.Handle
+  else if Screen.FocusedForm <> nil then
+    ParentWindow := Screen.FocusedForm.Handle
   else
-    LParentWnd := Application.MainFormHandle;
-
-  ParentWindow := LParentWnd;
+    ParentWindow := Application.MainFormHandle;
 end;
 
 constructor TACLMenuPopupWindow.Create(
