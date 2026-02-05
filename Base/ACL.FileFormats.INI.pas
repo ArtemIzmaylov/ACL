@@ -1192,16 +1192,16 @@ end;
 
 procedure TACLIniFile.LoadFromFile(const AFileName: string);
 var
-  AStream: TStream;
+  LStream: TStream;
 begin
   BeginUpdate;
   try
     Clear;
-    if StreamCreateReader(AFileName, AStream) then
+    if TACLBufferedFileStream.TryCreate(AFileName, fmOpenReadOnly, LStream) then
     try
-      LoadFromStream(AStream);
+      LoadFromStream(LStream);
     finally
-      AStream.Free;
+      LStream.Free;
     end;
   finally
     EndUpdate;
@@ -1233,15 +1233,15 @@ end;
 
 function TACLIniFile.SaveToFile(const AFileName: string; AEncoding: TEncoding = nil): Boolean;
 var
-  AStream: TStream;
+  LStream: TStream;
 begin
   acFileSetAttr(AFileName, 0);
-  Result := StreamCreateWriter(AFileName, AStream);
+  Result := TACLBufferedFileStream.TryCreate(AFileName, fmCreateShared, LStream);
   if Result then
   try
-    SaveToStream(AStream, AEncoding);
+    SaveToStream(LStream, AEncoding);
   finally
-    AStream.Free;
+    LStream.Free;
   end;
 end;
 

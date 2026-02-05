@@ -1286,7 +1286,7 @@ end;
 function acSafeSetFocus(AControl: TWinControl): Boolean;
 begin
   try
-    Result := (AControl <> nil) and AControl.CanFocus;
+    Result := TACLControls.IsVisible(AControl) and AControl.CanFocus;
     if Result then
       AControl.SetFocus;
   except
@@ -3973,6 +3973,7 @@ end;
 
 class function TACLControls.IsVisible(AControl: TControl): Boolean;
 begin
+  if AControl = nil then Exit(False);
 {$IFDEF FPC}
   Result := AControl.HandleObjectShouldBeVisible;
 {$ELSE}

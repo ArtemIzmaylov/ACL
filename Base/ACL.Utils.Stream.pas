@@ -6,7 +6,7 @@
 //  Purpose:   Stream Utilities
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2024
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -23,6 +23,7 @@ uses
 {$ENDIF}
   // System
   {System.}Classes,
+  {System.}Math,
   {System.}SysUtils,
   {System.}Types,
   {System.}Variants,
@@ -281,10 +282,6 @@ procedure StreamCopy(ATargetStream, ASourceStream: TStream; ASize: Int64); overl
 procedure StreamCopy(ATargetStream, ASourceStream: TStream; const AOffset, ASize: Int64); overload;
 
 // I/O Tools
-function StreamCreateReader(const AFileName: string): TStream; overload;
-function StreamCreateReader(const AFileName: string; out AStream: TStream): Boolean; overload;
-function StreamCreateWriter(const AFileName: string): TStream; overload;
-function StreamCreateWriter(const AFileName: string; out AStream: TStream): Boolean; overload;
 procedure StreamLoad(AProc: TACLStreamMethod; AStreamContainer: IACLStreamContainer); overload; inline;
 procedure StreamLoad(AProc: TACLStreamProc; AStreamContainer: IACLStreamContainer); overload; inline;
 procedure StreamLoad(AProc: TACLStreamProc; AStream: TStream; AFreeStream: Boolean = True); overload; inline;
@@ -295,8 +292,6 @@ function StreamSaveToFile(const AStream: TStream; const AFileName: string): Bool
 implementation
 
 uses
-  {System.}Math,
-  // ACL
   ACL.Math,
   ACL.FastCode,
   ACL.Utils.FileSystem;
@@ -417,36 +412,6 @@ end;
 // I/O Tools
 // ---------------------------------------------------------------------------------------------------------------------
 
-function StreamCreateReader(const AFileName: string; out AStream: TStream): Boolean; overload;
-begin
-  try
-    AStream := StreamCreateReader(AFileName);
-    Result := AStream <> nil;
-  except
-    Result := False;
-  end;
-end;
-
-function StreamCreateReader(const AFileName: string): TStream; overload;
-begin
-  Result := TACLBufferedFileStream.Create(AFileName, fmOpenReadOnly);
-end;
-
-function StreamCreateWriter(const AFileName: string): TStream;
-begin
-  Result := TACLBufferedFileStream.Create(AFileName, fmCreate or fmShareDenyNone);
-end;
-
-function StreamCreateWriter(const AFileName: string; out AStream: TStream): Boolean;
-begin
-  try
-    AStream := StreamCreateWriter(AFileName);
-    Result := AStream <> nil;
-  except
-    Result := False;
-  end;
-end;
-
 procedure StreamLoad(AProc: TACLStreamMethod; AStreamContainer: IACLStreamContainer);
 var
   LStream: TStream;
@@ -491,15 +456,15 @@ end;
 
 function StreamLoadFromFile(AStream: TStream; const AFileName: string): Boolean;
 var
-  AFileStream: TStream;
+  LStream: TStream;
 begin
-  Result := StreamCreateReader(AFileName, AFileStream);
+  Result := TACLBufferedFileStream.TryCreate(AFileName, fmOpenReadOnly, LStream);
   if Result then
   try
-    StreamCopy(AStream, AFileStream, AFileStream.Size);
+    StreamCopy(AStream, LStream, LStream.Size);
     AStream.Position := 0;
   finally
-    AFileStream.Free;
+    LStream.Free;
   end;
 end;
 
@@ -517,14 +482,14 @@ end;
 
 function StreamSaveToFile(const AStream: TStream; const AFileName: string): Boolean;
 var
-  AFileStream: TStream;
+  LStream: TStream;
 begin
-  Result := StreamCreateWriter(AFileName, AFileStream);
+  Result := TACLBufferedFileStream.TryCreate(AFileName, fmCreateShared, LStream);
   if Result then
   try
-    StreamCopy(AFileStream, AStream, 0, AStream.Size);
+    StreamCopy(LStream, AStream, 0, AStream.Size);
   finally
-    AFileStream.Free;
+    LStream.Free;
   end;
 end;
 

@@ -147,7 +147,7 @@ end;
 
 function TACLSearchEdit.CanSelectFocusControl: Boolean;
 begin
-  Result := Focused and (FocusControl <> nil) and FocusControl.CanFocus;
+  Result := Focused and TACLControls.IsVisible(FocusControl) and FocusControl.CanFocus;
 end;
 
 procedure TACLSearchEdit.CMWantSpecialKey(var Message: TCMWantSpecialKey);
@@ -199,7 +199,10 @@ begin
 
   case Key of
     vkDown:
-      MoveFocusToFirstSearchResult;
+      if CanSelectFocusControl then
+        MoveFocusToFirstSearchResult
+      else
+        inherited;
 
     vkReturn:
       if FDelayTimer.Enabled then
@@ -213,7 +216,7 @@ begin
       if Text <> '' then
         CancelSearch
       else if CanSelectFocusControl then
-        FocusControl.SetFocus
+        acSafeSetFocus(FocusControl)
       else
         inherited;
 
@@ -240,7 +243,7 @@ begin
     if Supports(FocusControl, IACLFocusableControl2, LIntf) then
       LIntf.SetFocusOnSearchResult
     else
-      FocusControl.SetFocus;
+      acSafeSetFocus(FocusControl);
   end;
 end;
 

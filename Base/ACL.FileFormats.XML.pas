@@ -6,7 +6,7 @@
 //  Purpose:   XML Document-Object-Model
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -35,6 +35,7 @@ uses
   ACL.Parsers,
   ACL.Utils.Common,
   ACL.Utils.Date,
+  ACL.Utils.FileSystem,
   ACL.Utils.Stream,
   ACL.Utils.Strings;
 
@@ -1218,13 +1219,13 @@ end;
 
 procedure TACLXMLDocument.LoadFromFile(const AFileName: string; AEncoding: TEncoding = nil);
 var
-  AStream: TStream;
+  LStream: TStream;
 begin
-  if StreamCreateReader(AFileName, AStream) then
+  if TACLBufferedFileStream.TryCreate(AFileName, fmOpenReadOnly, LStream) then
   try
-    LoadFromStream(AStream, AEncoding);
+    LoadFromStream(LStream, AEncoding);
   finally
-    AStream.Free;
+    LStream.Free;
   end
   else
     Clear;
@@ -1232,13 +1233,13 @@ end;
 
 procedure TACLXMLDocument.LoadFromResource(AInst: HMODULE; const AName, AType: string);
 var
-  AStream: TStream;
+  LStream: TStream;
 begin
-  AStream := TResourceStream.Create(AInst, AName, PChar(AType));
+  LStream := TResourceStream.Create(AInst, AName, PChar(AType));
   try
-    LoadFromStream(AStream);
+    LoadFromStream(LStream);
   finally
-    AStream.Free;
+    LStream.Free;
   end;
 end;
 
@@ -1329,13 +1330,13 @@ end;
 
 procedure TACLXMLDocument.SaveToFile(const AFileName: string; const ASettings: TACLXMLDocumentFormatSettings);
 var
-  AStream: TStream;
+  LStream: TStream;
 begin
-  AStream := StreamCreateWriter(AFileName);
+  LStream := TACLBufferedFileStream.Create(AFileName, fmCreateShared);
   try
-    SaveToStream(AStream, ASettings);
+    SaveToStream(LStream, ASettings);
   finally
-    AStream.Free;
+    LStream.Free;
   end;
 end;
 

@@ -57,8 +57,8 @@ const
     Каким оно было известно у нас в Delphi / Windows:
     + fmShareExclusive		Другие приложения не могут открывать файл ни в каком режиме
     + fmShareDenyWrite		Другие приложения могут открывать файл только для чтения
-    + fmShareDenyRead		  Другие приложения могут открывать файл только для записи
-    + fmShareDenyNone		  Полный доступ для других приложений
+    + fmShareDenyRead		Другие приложения могут открывать файл только для записи
+    + fmShareDenyNone		Полный доступ для других приложений
 
     Однако в линуксе есть только два режима блокировки:
     https://www.gnu.org/software/libc/manual/html_node/File-Locks.html
@@ -79,6 +79,7 @@ const
 {$ENDIF}
   fmOpenReadOnly = fmOpenRead or fmShareDenyNone;
 {$ENDREGION}
+  fmCreateShared = fmCreate or fmShareDenyNone;
 
 type
   TFileLongPath = array [0..MAX_LONG_PATH - 1] of Char;
@@ -224,11 +225,12 @@ type
     function GetSize: Int64; override;
   {$ENDIF}
   public
-    constructor Create(const AHandle: THandle); overload;
-    constructor Create(const AFileName: string; Mode: Word); overload;
-    constructor Create(const AFileName: string; Mode: Word; Rights: Cardinal); overload;
+    constructor Create(const AHandle: THandle; const AFileName: string = ''); reintroduce; overload;
+    constructor Create(const AFileName: string; Mode: Word); reintroduce; overload;
+    constructor Create(const AFileName: string; Mode: Word; Rights: Cardinal); reintroduce; overload;
     destructor Destroy; override;
     class function GetFileName(AStream: TStream; out AFileName: string): Boolean;
+    class function TryCreate(const AFileName: string; AMode: Word; out AStream: TStream): Boolean;
     //# Properties
     property FileName: string read FFileName;
   end;
@@ -238,9 +240,13 @@ type
   TACLBufferedFileStream = class(TACLBufferedStream)
   strict private
     function GetFileName: string;
+  protected
+    constructor CreateCore(const AFileStream: TACLFileStream;
+      ABufferSize: Integer = TACLBufferedStream.DefaultBufferSize);
   public
     constructor Create(const AFileName: string; AMode: Word;
       ABufferSize: Integer = TACLBufferedStream.DefaultBufferSize); reintroduce;
+    class function TryCreate(const AFileName: string; AMode: Word; out AStream: TStream): Boolean;
     // Properties
     property FileName: string read GetFileName;
   end;
@@ -1856,9 +1862,10 @@ end;
 
 { TACLFileStream }
 
-constructor TACLFileStream.Create(const AHandle: THandle);
+constructor TACLFileStream.Create(const AHandle: THandle; const AFileName: string = '');
 begin
   inherited Create(AHandle);
+  FFileName := AFileName;
   if Handle = THandle(INVALID_HANDLE_VALUE) then
     raise EFOpenError.CreateResFmt(@SFOpenErrorEx, [FileName, acLastSystemErrorMessage]);
 end;
@@ -1870,8 +1877,7 @@ end;
 
 constructor TACLFileStream.Create(const AFileName: string; Mode: Word; Rights: Cardinal);
 begin
-  FFileName := AFileName;
-  Create(acFileOpen(AFileName, Mode, Rights, False));
+  Create(acFileOpen(AFileName, Mode, Rights, False), AFileName);
 end;
 
 destructor TACLFileStream.Destroy;
@@ -1892,6 +1898,17 @@ begin
     Result := False;
 end;
 
+class function TACLFileStream.TryCreate(
+  const AFileName: string; AMode: Word; out AStream: TStream): Boolean;
+var
+  LHandle: THandle;
+begin
+  LHandle := acFileOpen(AFileName, AMode, TACLFileStream.DefaultRights, False);
+  Result := LHandle <> THandle(INVALID_HANDLE_VALUE);
+  if Result then
+    AStream := TACLFileStream.Create(LHandle, AFileName);
+end;
+
 {$IFDEF MSWINDOWS}
 function TACLFileStream.GetSize: Int64;
 var
@@ -1904,9 +1921,26 @@ end;
 
 { TACLBufferedFileStream }
 
-constructor TACLBufferedFileStream.Create(const AFileName: string; AMode: Word; ABufferSize: Integer);
+constructor TACLBufferedFileStream.Create(
+  const AFileName: string; AMode: Word; ABufferSize: Integer);
 begin
-  inherited Create(TACLFileStream.Create(AFileName, AMode), soOwned, ABufferSize);
+  CreateCore(TACLFileStream.Create(AFileName, AMode), ABufferSize);
+end;
+
+constructor TACLBufferedFileStream.CreateCore(
+  const AFileStream: TACLFileStream; ABufferSize: Integer);
+begin
+  inherited Create(AFileStream, soOwned, ABufferSize);
+end;
+
+class function TACLBufferedFileStream.TryCreate(
+  const AFileName: string; AMode: Word; out AStream: TStream): Boolean;
+var
+  LStream: TStream;
+begin
+  Result := TACLFileStream.TryCreate(AFileName, AMode, LStream);
+  if Result then
+    AStream := TACLBufferedFileStream.CreateCore(LStream as TACLFileStream);
 end;
 
 function TACLBufferedFileStream.GetFileName: string;

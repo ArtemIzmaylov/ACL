@@ -345,14 +345,14 @@ end;
 
 function TACLStringList.LoadFromFile(const AFileName: string; AEncoding: TEncoding = nil): Boolean;
 var
-  AFileStream: TStream;
+  LStream: TStream;
 begin
-  Result := StreamCreateReader(AFileName, AFileStream);
+  Result := TACLBufferedFileStream.TryCreate(AFileName, fmOpenReadOnly, LStream);
   if Result then
   try
-    LoadFromStream(AFileStream, AEncoding);
+    LoadFromStream(LStream, AEncoding);
   finally
-    AFileStream.Free;
+    LStream.Free;
   end;
 end;
 
@@ -375,15 +375,15 @@ end;
 
 function TACLStringList.SaveToFile(const AFileName: string; AEncoding: TEncoding = nil): Boolean;
 var
-  AStream: TStream;
+  LStream: TStream;
 begin
   acFileSetAttr(AFileName, 0);
-  Result := StreamCreateWriter(AFileName, AStream);
+  Result := TACLBufferedFileStream.TryCreate(AFileName, fmCreateShared, LStream);
   if Result then
   try
-    SaveToStream(AStream, AEncoding);
+    SaveToStream(LStream, AEncoding);
   finally
-    AStream.Free;
+    LStream.Free;
   end;
 end;
 

@@ -1962,7 +1962,7 @@ function acLoadString(const AFileName: string; AEncoding: TEncoding = nil): stri
 var
   LStream: TStream;
 begin
-  if StreamCreateReader(AFileName, LStream) then
+  if TACLBufferedFileStream.TryCreate(AFileName, fmOpenReadOnly, LStream) then
   try
     Result := acLoadString(LStream, AEncoding);
   finally
@@ -1985,7 +1985,7 @@ procedure acSaveString(const AFileName: string; const AString: UnicodeString;
 var
   LStream: TStream;
 begin
-  LStream := StreamCreateWriter(AFileName);
+  LStream := TACLBufferedFileStream.Create(AFileName, fmCreateShared);
   try
     acSaveString(LStream, AString, AEncoding, AWriteBOM);
   finally
@@ -2011,7 +2011,7 @@ procedure acSaveString(const AFileName: string; const AString: string;
 var
   LStream: TStream;
 begin
-  LStream := StreamCreateWriter(AFileName);
+  LStream := TACLBufferedFileStream.Create(AFileName, fmCreateShared);
   try
     acSaveString(LStream, AString, AEncoding, AWriteBOM);
   finally
