@@ -6,7 +6,7 @@
 //  Purpose:   General Dialogs
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -1484,8 +1484,8 @@ procedure TACLCustomLanguageDialog.SelectDefaultLanguage;
 var
   LItem: TACLImageComboBoxItem;
 begin
-  if FEditor.Items.FindByData(Pointer(GetUserDefaultUILanguage), LItem) or
-     FEditor.Items.FindByData(Pointer(LANG_EN_US), LItem)
+  if FEditor.Items.FindByData({%H-}Pointer(GetUserDefaultUILanguage), LItem) or
+     FEditor.Items.FindByData({%H-}Pointer(LANG_EN_US), LItem)
   then
     FEditor.ItemIndex := LItem.Index
   else

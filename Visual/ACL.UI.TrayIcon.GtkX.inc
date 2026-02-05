@@ -169,7 +169,9 @@ type
 {$ENDREGION}
 
 type
+{$IFDEF LCLGtk3}
   TPopupMenuAccess = class(TPopupMenu);
+{$ENDIF}
 
   { TACLTrayIconImplBase }
 
@@ -261,7 +263,7 @@ type
   function GetWidget(AHandle: TObjHandle): Pointer;
   begin
   {$IF DEFINED(LCLGtk2)}
-    Result := PGtkWidget(AHandle);
+    Result := {%H-}PGtkWidget(AHandle);
   {$ELSEIF DEFINED(LCLGtk3)}
     Result := TGtk3Widget(AHandle).Widget;
   {$ELSE}
