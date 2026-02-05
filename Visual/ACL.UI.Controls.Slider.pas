@@ -6,7 +6,7 @@
 //  Purpose:   Slider (TrackBar)
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -20,6 +20,7 @@ interface
 uses
   Messages,
 {$IFDEF FPC}
+  LMessages,
   LCLIntf,
   LCLType,
 {$ELSE}
@@ -324,6 +325,7 @@ type
 
     FMoving: Boolean;
     FMovingHint: TACLHintWindow;
+    FMovingOldPosition: Single;
 
     FOnChange: TNotifyEvent;
     FOnDrawBackground: TACLCustomDrawEvent;
@@ -372,6 +374,7 @@ type
     procedure UpdateThumbState(const P: TPoint);
 
     // Moving Hint
+    procedure CancelMoving;
     procedure HideMovingHint;
     procedure ShowMovingHint(APosition: Single; AAutoHide: Boolean);
 
@@ -390,8 +393,10 @@ type
     procedure InvalidateThumb;
 
     // Messages
+    procedure CMCancelMode(var Message: TMessage); message CM_CANCELMODE;
     procedure CMEnabledChanged(var Message: TMessage); message CM_ENABLEDCHANGED;
     procedure CMHintShow(var Message: TCMHintShow); message CM_HINTSHOW;
+    procedure CMWantSpecialKey(var Message: TCMWantSpecialKey); message CM_WANTSPECIALKEY;
     procedure WMGetDlgCode(var Message: TWMGetDlgCode); message WM_GETDLGCODE;
 
     property TempPosition: Single read FTempPosition;
@@ -1496,22 +1501,28 @@ end;
 
 procedure TACLSlider.KeyDown(var Key: Word; Shift: TShiftState);
 begin
-  inherited KeyDown(Key, Shift);
+  inherited;
 
   case Key of
-    VK_PRIOR:
+    vkPrior:
       NextPage(Orientation = oVertical, OptionsValue.Page);
-    VK_NEXT:
+    vkNext:
       NextPage(Orientation = oHorizontal, OptionsValue.Page);
-    VK_HOME, VK_END:
+    vkHome, vkEnd:
       SetPosition(IfThen(OptionsValue.Reverse = (Key = VK_HOME), OptionsValue.Max, OptionsValue.Min), True);
-    VK_RIGHT, VK_UP:
+    vkRight, vkUp:
       NextPage(True, IfThen(OptionsValue.Paginate, OptionsValue.Page, OptionsValue.SmallChange));
-    VK_LEFT, VK_DOWN:
+    vkLeft, vkDown:
       NextPage(False, IfThen(OptionsValue.Paginate, OptionsValue.Page, OptionsValue.SmallChange));
-    VK_DELETE:
+    vkDelete:
       if OptionsValue.IsDefaultAssigned then
         SetPosition(OptionsValue.Default, True);
+    vkEscape:
+      begin
+        CancelMoving;
+        Key := 0;
+        Exit;
+      end;
   else
     Exit;
   end;
@@ -1542,7 +1553,7 @@ end;
 
 procedure TACLSlider.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 var
-  ANewPosition: Single;
+  LPosition: Single;
 begin
   inherited MouseDown(Button, Shift, X, Y);
 
@@ -1551,34 +1562,35 @@ begin
     FMoving := PtInRect(ViewInfo.ThumbBarRect, Point(X, Y));
     if FMoving then
     begin
-      ANewPosition := CalculatePosition(X, Y);
-      if ANewPosition <> Position then
-        InternalSetPosition(ANewPosition);
-      ShowMovingHint(ANewPosition, False);
+      FMovingOldPosition := Position;
+      LPosition := CalculatePosition(X, Y);
+      if LPosition <> Position then
+        InternalSetPosition(LPosition);
+      ShowMovingHint(LPosition, False);
     end;
     UpdateThumbState(Point(X, Y));
-  end;
+  end
+  else
+    CancelMoving;
 end;
 
 procedure TACLSlider.MouseLeave;
 begin
-  inherited MouseLeave;
-
+  inherited;
   if not Moving then
     UpdateThumbState(InvalidPoint);
 end;
 
 procedure TACLSlider.MouseMove(Shift: TShiftState; X: Integer; Y: Integer);
 var
-  ANewPosition: Single;
+  LPosition: Single;
 begin
-  inherited MouseMove(Shift, X, Y);
-
+  inherited;
   if Moving then
   begin
-    ANewPosition := CalculatePosition(X, Y);
-    InternalSetPosition(ANewPosition);
-    ShowMovingHint(ANewPosition, False);
+    LPosition := CalculatePosition(X, Y);
+    InternalSetPosition(LPosition);
+    ShowMovingHint(LPosition, False);
   end
   else
     UpdateThumbState(Point(X, Y));
@@ -1599,7 +1611,7 @@ begin
       SetPosition(OptionsValue.Default, True);
   end;
   UpdateThumbState(Point(X, Y));
-  inherited MouseUp(Button, Shift, X, Y);
+  inherited;
 end;
 
 procedure TACLSlider.ShowMovingHint(APosition: Single; AAutoHide: Boolean);
@@ -1720,8 +1732,15 @@ begin
   end;
 end;
 
+procedure TACLSlider.CMCancelMode(var Message: TMessage);
+begin
+  CancelMoving;
+  inherited;
+end;
+
 procedure TACLSlider.CMEnabledChanged(var Message: TMessage);
 begin
+  CancelMoving;
   inherited;
   if HandleAllocated then
   begin
@@ -1741,6 +1760,14 @@ begin
     inherited;
 end;
 
+procedure TACLSlider.CMWantSpecialKey(var Message: TCMWantSpecialKey);
+begin
+  if Message.CharCode = vkEscape then
+    Message.Result := Ord(Moving);
+  if Message.Result = 0 then
+    inherited;
+end;
+
 procedure TACLSlider.WMGetDlgCode(var Message: TWMGetDlgCode);
 begin
   Message.Result := DLGC_WANTARROWS;
@@ -1754,6 +1781,18 @@ end;
 function TACLSlider.GetStyleSlider: TACLStyleSlider;
 begin
   Result := TACLStyleSlider(inherited Style);
+end;
+
+procedure TACLSlider.CancelMoving;
+begin
+  if Moving then
+  begin
+    FMoving := False;
+    MouseCapture := False;
+    SetPosition(FMovingOldPosition);
+    UpdateThumbState(InvalidPoint);
+  end;
+  HideMovingHint;
 end;
 
 procedure TACLSlider.HideMovingHint;

@@ -133,7 +133,7 @@
         <VerInfo_Locale>1033</VerInfo_Locale>
         <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName)</VerInfo_Keys>
         <DCC_Description>Artem&apos;s Components Library v7.0</DCC_Description>
-        <Debugger_HostApplication>C:\Development\Delphi\12.3\bin\bds.exe</Debugger_HostApplication>
+        <Debugger_HostApplication>C:\Development\Delphi\13\bin\bds.exe</Debugger_HostApplication>
         <DCC_DebugDCUs>true</DCC_DebugDCUs>
         <DCC_Inlining>off</DCC_Inlining>
         <DCC_DebugInfoInExe>true</DCC_DebugInfoInExe>
@@ -295,6 +295,7 @@
         <DCCReference Include="Visual\ACL.UI.HintWindow.pas"/>
         <DCCReference Include="Visual\ACL.UI.ImageList.pas"/>
         <DCCReference Include="Visual\ACL.UI.Insight.pas"/>
+        <DCCReference Include="Visual\ACL.UI.Insight.Core.pas"/>
         <DCCReference Include="Visual\ACL.UI.Menus.pas"/>
         <DCCReference Include="Visual\ACL.UI.Resources.pas"/>
         <DCCReference Include="Visual\ACL.UI.TrayIcon.pas"/>

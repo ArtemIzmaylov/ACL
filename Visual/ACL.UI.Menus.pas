@@ -6,7 +6,7 @@
 //  Purpose:   Menus
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -60,7 +60,7 @@ uses
   ACL.Geometry.Utils,
   ACL.Graphics,
   ACL.Graphics.Ex,
-{$IFDEF LCLGtk2}
+{$IFDEF LCLGtkX}
   ACL.Graphics.Ex.Cairo,
 {$ENDIF}
   ACL.Graphics.SkinImage,
@@ -93,7 +93,9 @@ const
   VK_MEDIA_KEYS_LAST  = VK_LAUNCH_APP2;
 
 type
+
 {$REGION ' General '}
+
   TMenuItemClass = class of TMenuItem;
   TMenuItemEnumProc = reference to procedure (AMenuItem: TMenuItem);
 
@@ -268,8 +270,8 @@ type
     function AddSeparator: TMenuItem;
     function CanBeParent(AParent: TMenuItem): Boolean;
     function FindByTag(const ATag: NativeInt): TMenuItem;
+    function FirstVisible: TMenuItem;
     procedure DeleteWithTag(const ATag: NativeInt);
-    function HasVisibleSubItems: Boolean;
     function IsCheckable: Boolean;
 
     property DefaultItem: TMenuItem read GetDefaultItem;
@@ -600,7 +602,7 @@ type
       AItem: TACLMenuWindow.TItemInfo); reintroduce; overload;
     constructor Create(ASource: TACLPopupMenu); reintroduce; overload;
     destructor Destroy; override;
-    procedure Invalidate; override;
+    procedure Invalidate; override; final;
     procedure InvalidateRect(const R: TRect); virtual;
     procedure Popup(const AControlRect: TRect);
     //# Properties
@@ -616,12 +618,12 @@ type
 
   // Вынесено в отдельный класс из-за CS_DROPSHADOW
   TACLMenuPopupLayeredWindow = class(TACLMenuPopupWindow
-  {$IFDEF LCLGtk2}
-    , IACLLayeredPaint
+  {$IFDEF LCLGtkX}
+    , ICairoPainter
   {$ENDIF})
   protected
     procedure CreateParams(var Params: TCreateParams); override;
-  {$IFDEF LCLGtk2}
+  {$IFDEF LCLGtkX}
     procedure PaintTo(ACairo: Pcairo_t);
   {$ENDIF}
     procedure Resize; override;
@@ -759,6 +761,10 @@ implementation
 uses
 {$IF DEFINED(LCLGtk2)}
   Gdk2,
+  Gtk2,
+{$ELSEIF DEFINED(LCLGtk3)}
+  LazGdk3,
+  LazGtk3,
 {$ENDIF}
 {$IFDEF FPC}
   WSLCLClasses;
@@ -782,7 +788,7 @@ type
     procedure Run; override;
   end;
 
-{$ELSE IFDEF(LCLGtk2)}
+{$ELSE IFDEF(LCLGtkX)}
 
   { TACLMenuPopupLooperImpl }
 
@@ -887,6 +893,20 @@ begin
   Result := nil;
 end;
 
+function TMenuItemHelper.FirstVisible: TMenuItem;
+var
+  LItem: TMenuItem;
+  I: Integer;
+begin
+  for I := 0 to Count - 1 do
+  begin
+    LItem := Items[I];
+    if LItem.Visible and not LItem.IsLine then
+      Exit(LItem);
+  end;
+  Result := nil;
+end;
+
 procedure TMenuItemHelper.DeleteWithTag(const ATag: NativeInt);
 var
   I: Integer;
@@ -896,20 +916,6 @@ begin
     if Items[I].Tag = ATag then
       Delete(I);
   end;
-end;
-
-function TMenuItemHelper.HasVisibleSubItems: Boolean;
-var
-  LItem: TMenuItem;
-  I: Integer;
-begin
-  for I := 0 to Count - 1 do
-  begin
-    LItem := Items[I];
-    if not LItem.IsLine and LItem.Visible then
-      Exit(True);
-  end;
-  Result := False;
 end;
 
 procedure TMenuItemHelper.InitiateActions;
@@ -1108,7 +1114,7 @@ begin
   if Link is TMenuItem then
     Result := TMenuItem(Link).Visible
   else if Link is TPopupMenu then
-    Result := TPopupMenu(Link).Items.HasVisibleSubItems
+    Result := TPopupMenu(Link).Items.FirstVisible <> nil
   else
     Result := False;
 end;
@@ -1373,60 +1379,6 @@ begin
   end;
 end;
 
-procedure TACLStylePopupMenu.DrawCheckMark(ACanvas: TCanvas;
-  ARect: TRect; AChecked, AIsRadioItem, ASelected, AEnabled: Boolean);
-const
-  Indexes: array[Boolean, Boolean] of Integer = ((6, 2), (8, 4));
-  NameMap: array[Boolean] of string = ('Buttons.Textures.CheckBox', 'Buttons.Textures.RadioBox');
-var
-  LClipping: TRegionHandle;
-  LImageIndex: Integer;
-  LTexture: TACLResourceTexture;
-  LTextureDPI: Integer;
-begin
-  ARect.Width := ItemGutterWidth;
-  if acStartClippedDraw(ACanvas, ARect, LClipping) then
-  try
-    if TextureGutter.FrameCount > 2 then
-    begin
-      LImageIndex := Indexes[AIsRadioItem, AChecked] + Ord(ASelected);
-      if LImageIndex < TextureGutter.FrameCount then
-        TextureGutter.Draw(ACanvas, ARect.CenterTo(TextureGutter.FrameSize), LImageIndex);
-    end
-    else
-    begin // for backward compatibility with old skins.
-      LTexture := TACLResourceTexture(GetResource(NameMap[AIsRadioItem], TACLResourceTexture));
-      if LTexture <> nil then
-      begin
-        LTexture.BeginUpdate;
-        try
-          LTextureDPI := LTexture.TargetDPI;
-          try
-            LTexture.TargetDPI := TargetDPI;
-            ARect.Content(TextureGutter.ContentOffsets);
-            ARect.Center(LTexture.FrameSize);
-
-            if not AEnabled then
-              LImageIndex := 3 // disabled
-            else if ASelected then
-              LImageIndex := 1 // hover
-            else
-              LImageIndex := 4;// active
-
-            LTexture.Draw(ACanvas, ARect, Ord(AChecked) * 5 + LImageIndex);
-          finally
-            LTexture.TargetDPI := LTextureDPI;
-          end;
-        finally
-          LTexture.CancelUpdate;
-        end;
-      end;
-    end;
-  finally
-    acEndClippedDraw(ACanvas, LClipping);
-  end;
-end;
-
 procedure TACLStylePopupMenu.DoAssign(Source: TPersistent);
 begin
   inherited DoAssign(Source);
@@ -1516,6 +1468,60 @@ begin
       ACanvas.RoundRect(ARect, LRadius * 2, LRadius * 2)
     else
       ACanvas.Rectangle(ARect);
+  end;
+end;
+
+procedure TACLStylePopupMenu.DrawCheckMark(ACanvas: TCanvas;
+  ARect: TRect; AChecked, AIsRadioItem, ASelected, AEnabled: Boolean);
+const
+  Indexes: array[Boolean, Boolean] of Integer = ((6, 2), (8, 4));
+  NameMap: array[Boolean] of string = ('Buttons.Textures.CheckBox', 'Buttons.Textures.RadioBox');
+var
+  LClipping: TRegionHandle;
+  LImageIndex: Integer;
+  LTexture: TACLResourceTexture;
+  LTextureDPI: Integer;
+begin
+  ARect.Width := ItemGutterWidth;
+  if acStartClippedDraw(ACanvas, ARect, LClipping) then
+  try
+    if TextureGutter.FrameCount > 2 then
+    begin
+      LImageIndex := Indexes[AIsRadioItem, AChecked] + Ord(ASelected);
+      if LImageIndex < TextureGutter.FrameCount then
+        TextureGutter.Draw(ACanvas, ARect.CenterTo(TextureGutter.FrameSize), LImageIndex);
+    end
+    else
+    begin // for backward compatibility with old skins.
+      LTexture := TACLResourceTexture(GetResource(NameMap[AIsRadioItem], TACLResourceTexture));
+      if LTexture <> nil then
+      begin
+        LTexture.BeginUpdate;
+        try
+          LTextureDPI := LTexture.TargetDPI;
+          try
+            LTexture.TargetDPI := TargetDPI;
+            ARect.Content(TextureGutter.ContentOffsets);
+            ARect.Center(LTexture.FrameSize);
+
+            if not AEnabled then
+              LImageIndex := 3 // disabled
+            else if ASelected then
+              LImageIndex := 1 // hover
+            else
+              LImageIndex := 4;// active
+
+            LTexture.Draw(ACanvas, ARect, Ord(AChecked) * 5 + LImageIndex);
+          finally
+            LTexture.TargetDPI := LTextureDPI;
+          end;
+        finally
+          LTexture.CancelUpdate;
+        end;
+      end;
+    end;
+  finally
+    acEndClippedDraw(ACanvas, LClipping);
   end;
 end;
 
@@ -1664,6 +1670,8 @@ end;
 function TACLStylePopupMenu.UseAlphaComposing: Boolean;
 begin
 {$IFDEF ACL_ALPHACOMPOSED_POPUPMENUS}
+  if not IsAlphaComposingSupports then
+    Exit(False);
   if CornerRadius.Value > 0 then
     Exit(True);
   if ColorBorder2.IsEmpty then
@@ -1826,6 +1834,9 @@ end;
 
 procedure TACLPopupMenu.ScaleForDpi(ATargetDpi: Integer);
 begin
+  // Textures downscales with poor quality.
+  // Need to port downscaling engine from SE
+  ATargetDpi := Max(ATargetDpi, 96);
   if FCurrentDpi <> ATargetDpi then
   begin
     FCurrentDpi := ATargetDpi;
@@ -2065,7 +2076,7 @@ begin
   if FPrevMousePos <> Point(X, Y) then
   begin
     FPrevMousePos := Point(X, Y);
-    if PtInRect(ClientRect, FPrevMousePos) then
+    if ClientRect.Contains(FPrevMousePos) then
       SelectItemOnMouseMove(HitTest(FPrevMousePos))
     else
       SelectItemOnMouseMove(HitTestNoWhere);
@@ -2148,25 +2159,27 @@ end;
 { TACLMenuPopupWindow }
 
 constructor TACLMenuPopupWindow.Create(ASource: TACLPopupMenu);
-var
-  LParentWnd: HWND;
 begin
   FSource := ASource;
   inherited Create(ASource);
   // Если у контрола нет флага csCaptureMouse - gtkMotionNotify не сгенерирует
   // событие, даже если capture была выставлена контролу вручную
-  ControlStyle := []{$IFDEF FPC} + [csCaptureMouse]{$ENDIF};
+  ControlStyle := []{$IFDEF LCLGtk2} + [csCaptureMouse]{$ENDIF};
   FScrollTimer := TACLTimer.CreateEx(ScrollTimer, 125);
   Visible := False;
 
-  if Screen.FocusedForm <> nil then
-    LParentWnd := Screen.FocusedForm.Handle
-  else if GetActiveWindow <> 0 then
-    LParentWnd := GetActiveWindow
+{$IFDEF MSWINDOWS}
+  // это может быть наше окно или системное
+  // (например, в случае вызова меню для TrayIcon)
+  ParentWindow := GetForegroundWindow;
+  if ParentWindow = 0 then
+{$ENDIF}
+  if Screen.ActiveCustomForm <> nil then
+    ParentWindow := Screen.ActiveCustomForm.Handle
+  else if Screen.FocusedForm <> nil then
+    ParentWindow := Screen.FocusedForm.Handle
   else
-    LParentWnd := Application.MainFormHandle;
-
-  ParentWindow := LParentWnd;
+    ParentWindow := Application.MainFormHandle;
 end;
 
 constructor TACLMenuPopupWindow.Create(
@@ -2470,7 +2483,9 @@ function TACLMenuPopupWindow.GetTargetMenuWnd(
 var
   LPoint: TPoint;
 begin
-  AWnd := Looper.PopupWindowAtCursor;
+  AWnd := nil;
+  if Looper <> nil then
+    AWnd := Looper.PopupWindowAtCursor;
   if (AWnd = nil) and (MainMenu <> nil) and MainMenu.IsMouseAtControl then
     AWnd := MainMenu;
   if (AWnd = Self) then
@@ -2583,7 +2598,7 @@ var
   LWnd: TACLMenuWindow;
 begin
   if not (Button in FMousePressed) then
-    Exit;
+    Exit; // Gtk3
 
   Exclude(FMousePressed, Button);
   if (FScrollBar <> nil) and (FScrollBar.PressedPart <> sbpNone) then
@@ -2673,13 +2688,15 @@ begin
   Visible := True;
 
   if Looper = nil then
-  begin
+  try
     FLooper := TACLMenuPopupLooperImpl.Create(Self);
     try
       Looper.Run;
     finally
       FreeAndNil(FLooper);
     end;
+  finally
+    Hide;
   end;
 end;
 
@@ -2756,13 +2773,15 @@ procedure TACLMenuPopupLayeredWindow.InvalidateRect(const R: TRect);
 begin
 {$IFDEF MSWINDOWS}
   if HandleAllocated then
-    Perform(WM_PAINT, 0, 0);
+// TACLPopupMenu.DoSelect должен успеть отработать до перерисовки
+//  Perform(WM_PAINT, 0, 0);
+    PostMessage(Handle, WM_PAINT, 0, 0);
 {$ELSE}
   inherited;
 {$ENDIF}
 end;
 
-{$IFDEF LCLGtk2}
+{$IFDEF LCLGtkX}
 procedure TACLMenuPopupLayeredWindow.PaintTo(ACairo: Pcairo_t);
 var
   LDib: TACLDib;
@@ -2956,8 +2975,7 @@ begin
   FDelayTimer.Enabled := False;
   try
     if (FDelayWnd <> nil) and FDelayWnd.HasSelection and
-       (FDelayWndIndex = FDelayWnd.SelectedItemIndex) and
-       (FDelayWnd.IsMouseAtControl)
+       (FDelayWndIndex = FDelayWnd.SelectedItemIndex)
     then
       DoShowPopup(FDelayWnd);
   finally
@@ -3422,160 +3440,6 @@ end;
 
 {$ENDREGION}
 
-{$REGION ' Looper Implementation '}
-
-{$IFDEF MSWINDOWS}
-
-constructor TACLMenuPopupLooperImpl.Create(AOwner: TACLMenuPopupWindow);
-begin
-  inherited;
-  FActionIdleTimer := TACLTimer.CreateEx(DoActionIdleTimerProc);
-end;
-
-destructor TACLMenuPopupLooperImpl.Destroy;
-begin
-  FreeAndNil(FActionIdleTimer);
-  inherited;
-end;
-
-procedure TACLMenuPopupLooperImpl.DoActionIdle;
-var
-  LForm: TCustomForm;
-  I: Integer;
-begin
-  for I := 0 to Screen.CustomFormCount - 1 do
-  begin
-    LForm := Screen.CustomForms[I];
-    if LForm.HandleAllocated and IsWindowVisible(LForm.Handle) and IsWindowEnabled(LForm.Handle) then
-      LForm.Perform(CM_UPDATEACTIONS, 0, 0);
-  end;
-end;
-
-procedure TACLMenuPopupLooperImpl.DoActionIdleTimerProc(Sender: TObject);
-begin
-  try
-    FActionIdleTimer.Enabled := False;
-    DoActionIdle;
-  except
-    Application.HandleException(Application);
-  end;
-end;
-
-procedure TACLMenuPopupLooperImpl.DoIdle;
-var
-  LDone: Boolean;
-begin
-  inherited;
-
-  LDone := True;
-  try
-    if Assigned(Application.OnIdle) then
-      Application.OnIdle(Self, LDone);
-
-    if LDone then
-    begin
-      if Application.ActionUpdateDelay <= 0 then
-        DoActionIdle
-      else
-        if not FActionIdleTimer.Enabled then
-        begin
-          FActionIdleTimer.Interval := Application.ActionUpdateDelay;
-          FActionIdleTimer.Enabled := True;
-        end;
-    end;
-  except
-    Application.HandleException(Self);
-  end;
-
-  if IsMainThread and CheckSynchronize then
-    LDone := False;
-  if LDone then
-    WaitMessage;
-end;
-
-procedure TACLMenuPopupLooperImpl.Run;
-var
-  Msg: TMsg;
-begin
-  repeat
-    if PeekMessage(Msg, 0, 0, 0, PM_REMOVE) then
-    begin
-      case Msg.message of
-        CM_RELEASE, WM_CLOSE, WM_QUIT:
-          CloseMenu;
-        WM_KEYFIRST..WM_KEYLAST:
-          begin
-            Popups.Peek.Dispatch(Msg.Message);
-            Continue;
-          end;
-      end;
-      TranslateMessage(Msg);
-      DispatchMessage(Msg);
-    end
-    else
-      DoIdle;
-  until not IsInLoop;
-end;
-
-{$ELSE IFDEF(LCLGtk2)}
-
-procedure TACLMenuPopupLooperImpl.DoEvent(
-  AType: TGdkEventType; AEvent: PGdkEvent; var AHandled: Boolean);
-begin
-  // AI, ref.to:
-  // https://api.gtkd.org/gdk.c.types.GdkEventType.html
-  // https://docs.gtk.org/gdk3/struct.EventButton.html
-  case AType of
-    GDK_DELETE, GDK_DESTROY:
-      CloseMenu;
-    GDK_BUTTON_PRESS:
-      if PopupWindowAtCursor = nil then
-      begin
-        CloseMenu;
-        AHandled := True;
-      end;
-  end;
-end;
-
-procedure TACLMenuPopupLooperImpl.DoIdle;
-begin
-  inherited;
-  Application.Idle(True);
-end;
-
-procedure TACLMenuPopupLooperImpl.Run;
-begin
-  TGtkApp.BeginPopup(Wnd, DoEvent);
-  try
-    repeat
-      try
-        TGtkApp.ProcessMessages;
-      except
-        Application.HandleException(Self);
-      end;
-      if TGtkApp.IsPopupAborted then
-        Break;
-      DoIdle;
-    until not IsInLoop;
-  finally
-    TGtkApp.EndPopup(Wnd);
-  end;
-end;
-
-function TACLMenuPopupLooperImpl.WndProc(
-  AWnd: TACLMenuPopupWindow; var AMsg: TMessage): Boolean;
-begin
-  case AMsg.Msg of
-    LM_LBUTTONUP, LM_XBUTTONUP, LM_MBUTTONUP, LM_RBUTTONUP:
-      // AI: LCL-Gtk2 безусловно релизит кэпчу на button-up (см.gtkMouseBtnRelease)
-      PostMessage(Wnd.Handle, CM_MENUTRACKING, 0, 0);
-  end;
-  Result := inherited WndProc(AWnd, AMsg);
-end;
-{$ENDIF}
-
-{$ENDREGION}
-
 {$REGION ' Shortcuts '}
 
 { TACLShortCut }
@@ -3685,6 +3549,165 @@ begin
   if AShortCut and scShift <> 0 then
     Result :=  sKeyModifiersPrefix[kmShift] + Result;
 end;
+{$ENDREGION}
+
+{$REGION ' Looper Implementation '}
+
+{$IFDEF MSWINDOWS}
+
+constructor TACLMenuPopupLooperImpl.Create(AOwner: TACLMenuPopupWindow);
+begin
+  inherited;
+  FActionIdleTimer := TACLTimer.CreateEx(DoActionIdleTimerProc);
+end;
+
+destructor TACLMenuPopupLooperImpl.Destroy;
+begin
+  FreeAndNil(FActionIdleTimer);
+  inherited;
+end;
+
+procedure TACLMenuPopupLooperImpl.DoActionIdle;
+var
+  LForm: TCustomForm;
+  I: Integer;
+begin
+  for I := 0 to Screen.CustomFormCount - 1 do
+  begin
+    LForm := Screen.CustomForms[I];
+    if TACLControls.IsVisible(LForm) and IsWindowEnabled(LForm.Handle) then
+      LForm.Perform(CM_UPDATEACTIONS, 0, 0);
+  end;
+end;
+
+procedure TACLMenuPopupLooperImpl.DoActionIdleTimerProc(Sender: TObject);
+begin
+  try
+    FActionIdleTimer.Enabled := False;
+    DoActionIdle;
+  except
+    Application.HandleException(Application);
+  end;
+end;
+
+procedure TACLMenuPopupLooperImpl.DoIdle;
+var
+  LDone: Boolean;
+begin
+  inherited;
+
+  LDone := True;
+  try
+    if Assigned(Application.OnIdle) then
+      Application.OnIdle(Self, LDone);
+
+    if LDone then
+    begin
+      if Application.ActionUpdateDelay <= 0 then
+        DoActionIdle
+      else
+        if not FActionIdleTimer.Enabled then
+        begin
+          FActionIdleTimer.Interval := Application.ActionUpdateDelay;
+          FActionIdleTimer.Enabled := True;
+        end;
+    end;
+  except
+    Application.HandleException(Self);
+  end;
+
+  if IsMainThread and CheckSynchronize then
+    LDone := False;
+  if LDone then
+    WaitMessage;
+end;
+
+procedure TACLMenuPopupLooperImpl.Run;
+var
+  Msg: TMsg;
+begin
+  repeat
+    if PeekMessage(Msg, 0, 0, 0, PM_REMOVE) then
+    begin
+      case Msg.message of
+        CM_RELEASE, WM_CLOSE, WM_QUIT:
+          CloseMenu;
+        WM_KEYFIRST..WM_KEYLAST:
+          begin
+            Popups.Peek.Dispatch(Msg.Message);
+            Continue;
+          end;
+      end;
+      TranslateMessage(Msg);
+      DispatchMessage(Msg);
+    end
+    else
+      DoIdle;
+  until not IsInLoop;
+end;
+
+{$ELSE IFDEF(LCLGtkX)}
+
+procedure TACLMenuPopupLooperImpl.DoEvent(
+  AType: TGdkEventType; AEvent: PGdkEvent; var AHandled: Boolean);
+begin
+  // AI, ref.to:
+  // https://api.gtkd.org/gdk.c.types.GdkEventType.html
+  // https://docs.gtk.org/gdk3/struct.EventButton.html
+  case AType of
+    GDK_DELETE, GDK_DESTROY{$IFDEF LCLGtk3}, GDK_GRAB_BROKEN{$ENDIF}:
+      CloseMenu;
+    GDK_WINDOW_STATE:
+      if TGtkApp.IsLooseFocusEvent(AEvent) then
+        CloseMenu;
+    GDK_BUTTON_PRESS:
+      if PopupWindowAtCursor = nil then
+      begin
+        CloseMenu;
+        AHandled := True;
+      end;
+  end;
+end;
+
+procedure TACLMenuPopupLooperImpl.DoIdle;
+begin
+  inherited;
+  Application.Idle(True);
+end;
+
+procedure TACLMenuPopupLooperImpl.Run;
+begin
+  TGtkApp.BeginPopup(Wnd, DoEvent);
+  try
+    repeat
+      try
+        TGtkApp.ProcessMessages;
+      except
+        Application.HandleException(Self);
+      end;
+      if TGtkApp.IsPopupAborted then
+        Break;
+      DoIdle;
+    until not IsInLoop;
+  finally
+    TGtkApp.EndPopup(Wnd);
+  end;
+end;
+
+function TACLMenuPopupLooperImpl.WndProc(
+  AWnd: TACLMenuPopupWindow; var AMsg: TMessage): Boolean;
+begin
+{$IFDEF LCLGtk2}
+  case AMsg.Msg of
+    // AI: LCL-Gtk2 безусловно релизит кэпчу на button-up (см.gtkMouseBtnRelease)
+    LM_LBUTTONUP, LM_XBUTTONUP, LM_MBUTTONUP, LM_RBUTTONUP:
+      PostMessage(Wnd.Handle, CM_MENUTRACKING, 0, 0);
+  end;
+{$ENDIF}
+  Result := inherited WndProc(AWnd, AMsg);
+end;
+{$ENDIF}
+
 {$ENDREGION}
 
 initialization

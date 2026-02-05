@@ -6,7 +6,7 @@
 //  Purpose:   Tray Icon
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -61,7 +61,9 @@ type
   public
     Owner: TACLTrayIcon;
     constructor Create(AIcon: TACLTrayIcon);
+    function ActualIcon: TIcon;
     procedure BalloonHint(const ATitle, AText: string; AIcon: TACLTrayBalloonIcon); virtual; abstract;
+    procedure ShowMenu(const APoint: TPoint); virtual;
     procedure Update; virtual; abstract;
   end;
 
@@ -129,7 +131,6 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure BalloonHint(const ATitle, AText: string; AIconType: TACLTrayBalloonIcon);
-    procedure PopupAt(const AScreenPoint: TPoint);
     //# Properties
     property WantDoubleClicks: Boolean read FWantDoubleClicks write FWantDoubleClicks;
   public
@@ -141,6 +142,7 @@ type
     property Icon: TIcon read FIcon write SetIcon;
     property IconVisible: Boolean read FIconVisible write SetIconVisible default False;
     property ID: string read FID write SetID;
+    // Gtk3: required (!), PopupMenu.OnPopup not supported!
     property PopupMenu: TPopupMenu read FPopupMenu write FPopupMenu;
     // Events
     property OnBallonHintClick: TNotifyEvent read FOnBallonHintClick write FOnBallonHintClick;
@@ -157,14 +159,11 @@ type
 
 implementation
 
-{$IFDEF MSWINDOWS}
+{$IF DEFINED(MSWINDOWS)}
   {$I ACL.UI.TrayIcon.Win32.inc}
+{$ELSEIF DEFINED(LCLGtkX)}
+  {$I ACL.UI.TrayIcon.GtkX.inc}
 {$ENDIF}
-
-{$IFDEF LCLGtk2}
-  {$I ACL.UI.TrayIcon.Gtk2.inc}
-{$ENDIF}
-
 var
   FTrayIconIsMouseAtIcon: Integer;
 
@@ -173,6 +172,29 @@ var
 constructor TACLTrayIconIntf.Create(AIcon: TACLTrayIcon);
 begin
   Owner := AIcon;
+end;
+
+function TACLTrayIconIntf.ActualIcon: TIcon;
+var
+  LForm: TForm;
+begin
+  Result := Owner.Icon;
+  if Result.Empty and Safe.Cast(Owner.Owner, TForm, LForm) then
+    Result := LForm.Icon;
+  if Result.Empty and (Application.MainForm <> nil) then
+    Result := Application.MainForm.Icon;
+  if Result.Empty then
+    Result := Application.Icon;
+end;
+
+procedure TACLTrayIconIntf.ShowMenu(const APoint: TPoint);
+begin
+  if Owner.PopupMenu <> nil then
+  begin
+    Owner.PopupMenu.AutoPopup := False;
+    Owner.PopupMenu.PopupComponent := Owner;
+    Owner.PopupMenu.Popup(APoint.X, APoint.Y);
+  end;
 end;
 
 { TACLTrayIcon }
@@ -299,7 +321,8 @@ begin
         DoClick;
 
     mbRight:
-      PopupAt(P);
+      if FIconImpl <> nil then
+        FIconImpl.ShowMenu(P);
 
     mbMiddle:
       DoMidClick;
@@ -314,19 +337,6 @@ begin
   begin
     if AComponent = PopupMenu then
       PopupMenu := nil;
-  end;
-end;
-
-procedure TACLTrayIcon.PopupAt(const AScreenPoint: TPoint);
-begin
-  if Assigned(PopupMenu) then
-  begin
-  {$IFDEF MSWINDOWS}
-    SetForegroundWindow(Application.{%H-}Handle);
-  {$ENDIF}
-    FPopupMenu.AutoPopup := False;
-    FPopupMenu.PopupComponent := Self;
-    FPopupMenu.Popup(AScreenPoint.x, AScreenPoint.y);
   end;
 end;
 

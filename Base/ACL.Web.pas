@@ -6,7 +6,7 @@
 //  Purpose:   Web Utilities
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -656,7 +656,7 @@ end;
 
 function TACLWebErrorInfo.ToString: string;
 begin
-  Result := Format('Error: %d %s%s', [ErrorCode, IFThenW(ErrorMessage <> '', acCRLF), ErrorMessage]);
+  Result := Format('Error: %d. %s', [ErrorCode, ErrorMessage]);
 end;
 
 { EACLWebError }

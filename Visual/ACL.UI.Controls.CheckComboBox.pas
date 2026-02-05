@@ -78,12 +78,10 @@ type
 
   { TACLCheckComboBoxDropDown }
 
-  TACLCheckComboBoxDropDown = class(TACLBasicImageComboBoxDropDown)
+  TACLCheckComboBoxDropDown = class(TACLBasicComboBoxDropDown)
   strict private
     procedure HandlerItemCheck(Sender: TObject; AItem: TACLTreeListNode);
     procedure HandlerUpdateState(Sender: TObject);
-  protected
-    procedure DoInit; override;
   public
     constructor Create(AOwner: TComponent); override;
   end;
@@ -100,6 +98,7 @@ type
     procedure SetSeparator(AValue: Char);
   protected
     function CreateDropDownWindow: TACLPopupWindow; override;
+    procedure DoPrepareDropDownList(AList: TACLBasicDropDownList); override;
     procedure SetTextCore(const AText: string); override;
     procedure UpdateText;
   public
@@ -215,29 +214,6 @@ begin
   List.OnUpdateState := HandlerUpdateState;
 end;
 
-procedure TACLCheckComboBoxDropDown.DoInit;
-var
-  LItem: TACLCheckComboBoxItem;
-  LNode: TACLTreeListNode;
-  I: Integer;
-begin
-  List.OptionsView.CheckBoxes := True;
-  for I := 0 to Owner.Count - 1 do
-  begin
-    LItem := TACLCheckComboBox(Owner).Items.Items[I];
-    LNode := AddItem(LItem.Text);
-    LNode.ImageIndex := LItem.ImageIndex;
-    LNode.Checked := LItem.Checked;
-    LNode.Data := LItem;
-  end;
-  if List.RootNode.ChildrenCount > 1 then
-  begin
-    List.OptionsView.Columns.AutoWidth := True;
-    List.OptionsView.Columns.Visible := True;
-    List.Columns.Add;
-  end;
-end;
-
 procedure TACLCheckComboBoxDropDown.HandlerItemCheck(Sender: TObject; AItem: TACLTreeListNode);
 begin
   TACLCheckComboBoxItem(AItem.Data).Checked := AItem.Checked;
@@ -266,14 +242,40 @@ begin
   inherited Destroy;
 end;
 
-function TACLCheckComboBox.GetItems: TACLCheckComboBoxItems;
-begin
-  Result := TACLCheckComboBoxItems(FItems);
-end;
-
 function TACLCheckComboBox.CreateDropDownWindow: TACLPopupWindow;
 begin
   Result := TACLCheckComboBoxDropDown.Create(Self);
+end;
+
+procedure TACLCheckComboBox.DoPrepareDropDownList(AList: TACLBasicDropDownList);
+var
+  LIndex: Integer;
+  LItem: TACLCheckComboBoxItem;
+  LNode: TACLTreeListNode;
+begin
+  AList.OptionsView.CheckBoxes := True;
+  AList.OptionsView.Nodes.Images := Images;
+  for LIndex := 0 to Count - 1 do
+  begin
+    LItem := Items.Items[LIndex];
+    LNode := AList.Add(DoGetItemDisplayName(LIndex, LItem.Text));
+    LNode.ImageIndex := LItem.ImageIndex;
+    LNode.Checked := LItem.Checked;
+    LNode.Data := LItem;
+  end;
+  if AList.RootNode.ChildrenCount > 1 then
+  begin
+    AList.OptionsView.Columns.AutoWidth := True;
+    AList.OptionsView.Columns.Visible := True;
+    AList.Columns.Add;
+  end;
+  if Assigned(OnPrepareDropDownList) then
+    OnPrepareDropDownList(Self, AList);
+end;
+
+function TACLCheckComboBox.GetItems: TACLCheckComboBoxItems;
+begin
+  Result := TACLCheckComboBoxItems(FItems);
 end;
 
 procedure TACLCheckComboBox.SetTextCore(const AText: string);
@@ -297,24 +299,6 @@ begin
   end;
 end;
 
-procedure TACLCheckComboBox.UpdateText;
-var
-  LBuilder: TACLStringBuilder;
-begin
-  LBuilder := TACLStringBuilder.Get;
-  try
-    Items.EnumChecked(
-      procedure (const Item: TACLCheckComboBoxItem)
-      begin
-        LBuilder.Append(Item.Text).Append(Separator);
-      end);
-    FEditBox.Text := LBuilder.ToString;
-  finally
-    LBuilder.Release;
-  end;
-  Invalidate;
-end;
-
 function TACLCheckComboBox.IsSeparatorStored: Boolean;
 begin
   Result := FSeparator <> ';';
@@ -332,6 +316,24 @@ begin
     FSeparator := AValue;
     UpdateText;
   end;
+end;
+
+procedure TACLCheckComboBox.UpdateText;
+var
+  LBuilder: TACLStringBuilder;
+begin
+  LBuilder := TACLStringBuilder.Get;
+  try
+    Items.EnumChecked(
+      procedure (const Item: TACLCheckComboBoxItem)
+      begin
+        LBuilder.Append(Item.Text).Append(Separator);
+      end);
+    FEditBox.Text := LBuilder.ToString;
+  finally
+    LBuilder.Release;
+  end;
+  Invalidate;
 end;
 
 end.

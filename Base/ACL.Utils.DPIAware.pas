@@ -87,10 +87,11 @@ function dpiRevert(const AValue: TSize; ASourceDpi: Integer): TSize; overload;
 implementation
 
 uses
-{$IFDEF LCLGtk2}
-  gdk2,
-{$ENDIF}
-{$IFDEF MSWINDOWS}
+{$IF DEFINED(LCLGtk3)}
+  LazGdk3,
+{$ELSEIF DEFINED(LCLGtk2)}
+  Gdk2,
+{$ELSEIF DEFINED(MSWINDOWS)}
   ACL.Utils.Common,
 {$ENDIF}
   {System.}SysUtils;
@@ -172,7 +173,7 @@ begin
     // Screen.PixelsPerInch / Monitor.PixelsPerInch будут возвращать минимально допустимый ppi - 72
     if not (AppInitialized in Application.Flags) then
     begin
-    {$IFDEF LCLGtk2}
+    {$IF DEFINED(LCLGtk3) OR DEFINED(LCLGtk2)}
       FSystemDpiCache := Round(gdk_screen_get_resolution(gdk_screen_get_default));
     {$ELSE}
       FSystemDpiCache := acDefaultDpi;

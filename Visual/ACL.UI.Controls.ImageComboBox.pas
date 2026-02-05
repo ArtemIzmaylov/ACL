@@ -49,7 +49,7 @@ uses
   ACL.UI.Controls.TreeList.Types,
   ACL.UI.Forms,
   ACL.UI.ImageList,
-  ACL.UI.Insight,
+  ACL.UI.Insight.Core,
   ACL.UI.Resources;
 
 type
@@ -111,6 +111,7 @@ type
   protected
     FItems: TACLImageComboBoxItems;
 
+    procedure DoPrepareDropDownList(AList: TACLBasicDropDownList); override;
     function GetCount: Integer; override;
     procedure HandlerImageList(Sender: TObject); virtual;
     procedure Notification(AComponent: TComponent; AOperation: TOperation); override;
@@ -139,13 +140,6 @@ type
     property OnSelect;
   end;
 
-  { TACLBasicImageComboBoxDropDown }
-
-  TACLBasicImageComboBoxDropDown = class(TACLBasicComboBoxDropDown)
-  protected
-    procedure DoInit; override;
-  end;
-
   { TACLBasicImageComboBoxUIInsightAdapter }
 
   TACLBasicImageComboBoxUIInsightAdapter = class(TACLBasicComboBoxUIInsightAdapter)
@@ -162,12 +156,9 @@ type
     procedure SetItems(AValue: TACLImageComboBoxItems);
   protected
     FImageRect: TRect;
-
     procedure CalculateContent(ARect: TRect); override;
-    function CreateDropDownWindow: TACLPopupWindow; override;
     procedure ItemIndexChanged; override;
     procedure PaintCore; override;
-
     //# Properties
     property ImageSize: TSize read GetImageSize;
   public
@@ -328,6 +319,20 @@ begin
   inherited Destroy;
 end;
 
+procedure TACLBasicImageComboBox.DoPrepareDropDownList(AList: TACLBasicDropDownList);
+var
+  LIndex: Integer;
+  LItem: TACLImageComboBoxItem;
+begin
+  AList.OptionsView.Nodes.Images := Images;
+  for LIndex := 0 to FItems.Count - 1 do
+  begin
+    LItem := FItems[LIndex];
+    AList.Add(DoGetItemDisplayName(LIndex, LItem.Text)).ImageIndex := LItem.ImageIndex;
+  end;
+  inherited;
+end;
+
 procedure TACLBasicImageComboBox.HandlerImageList(Sender: TObject);
 begin
   FullRefresh;
@@ -348,21 +353,6 @@ end;
 procedure TACLBasicImageComboBox.SetImages(AValue: TCustomImageList);
 begin
   acSetImageList(AValue, FImages, FImagesLink, Self);
-end;
-
-{ TACLBasicImageComboBoxDropDown }
-
-procedure TACLBasicImageComboBoxDropDown.DoInit;
-var
-  LItem: TACLImageComboBoxItem;
-  I: Integer;
-begin
-  List.OptionsView.Nodes.Images := TACLBasicImageComboBox(Owner).Images;
-  for I := 0 to TACLBasicImageComboBox(Owner).FItems.Count - 1 do
-  begin
-    LItem := TACLBasicImageComboBox(Owner).FItems[I];
-    AddItem(LItem.Text).ImageIndex := LItem.ImageIndex;
-  end;
 end;
 
 { TACLBasicImageComboBoxUIInsightAdapter }
@@ -397,11 +387,6 @@ begin
     ARect.Left := ImageRect.Right + dpiApply(acIndentBetweenElements, FCurrentPPI) - TextPadding.cx;
   end;
   inherited;
-end;
-
-function TACLImageComboBox.CreateDropDownWindow: TACLPopupWindow;
-begin
-  Result := TACLBasicImageComboBoxDropDown.Create(Self);
 end;
 
 function TACLImageComboBox.GetImageSize: TSize;

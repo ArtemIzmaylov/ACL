@@ -6,7 +6,7 @@
 //  Purpose:   Basic Form things
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -407,8 +407,9 @@ var
 begin
   if acMenuLoopCount > 0 then
     Exit;
-  if (AForm <> nil) and not (csDesigning in AForm.ComponentState) and
-    AForm.HandleAllocated and IsWindowVisible(AForm.Handle) then
+  if AForm = nil then
+    Exit;
+  if not (csDesigning in AForm.ComponentState) and TACLControls.IsVisible(AForm) then
   begin
     LStayOnTop := (AForm.FormStyle in fsAllStayOnTop) or
       (Application.ModalLevel = 0) and AForm.ShouldBeStayOnTop;
@@ -1028,7 +1029,7 @@ begin
     end;
 
   {$IFDEF MSWINDOWS}
-    if Visible and HandleAllocated and not IsWindowVisible(WindowHandle) then
+    if TACLControls.IsVisible(Self) then
       Perform(CM_SHOWINGCHANGED, 0, 0)
     else
   {$ENDIF}
@@ -1499,6 +1500,10 @@ begin
     VK_ESCAPE:
       if [ssCtrl, ssAlt, ssShift] * KeyDataToShiftState(Message.KeyData) = [] then
       begin
+      {$IFDEF FPC}
+        if acWantSpecialKey(ActiveControl, VK_ESCAPE, []) then
+          Exit(inherited);
+      {$ENDIF}
         if fsModal in FormState then
         begin
           ModalResult := mrCancel;
@@ -1529,12 +1534,17 @@ end;
 
 procedure TACLCustomForm.CMShowingChanged(var Message: TCMDialogKey);
 var
-  AIsDefaultPositionCenter: Boolean;
+  LDefaultPositionIsCenter: Boolean;
 begin
-  AIsDefaultPositionCenter := Position in [poMainFormCenter, poOwnerFormCenter];
+  LDefaultPositionIsCenter := Position in [poMainFormCenter, poOwnerFormCenter];
   inherited;
-  if Visible and AIsDefaultPositionCenter then
-    MakeFullyVisible;
+  if Visible then
+  begin
+    if ShouldBeStayOnTop then
+      TACLStayOnTopHelper.Refresh(Self);
+    if LDefaultPositionIsCenter then
+      MakeFullyVisible;
+  end;
 end;
 
 procedure TACLCustomForm.WMEnterMenuLoop(var Msg: TMessage);

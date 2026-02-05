@@ -23,9 +23,12 @@ uses
 {$IFDEF ACL_CAIRO}
   Cairo,
 {$ENDIF}
-{$IFDEF LCLGtk2}
+{$IF DEFINED(LCLGtk2)}
   Gdk2pixbuf,
-{$ENDIF}
+{$ELSEIF DEFINED(LCLGtk3)}
+  LazGdkPixbuf2,
+  LazGtk3,
+{$IFEND}
 {$IFDEF FPC}
   GraphType,
   IntfGraphics,
@@ -323,7 +326,8 @@ type
     constructor CreateFromHandle(ARgn: TRegionHandle);
     destructor Destroy; override;
     function BoundingBox: TRect;
-    function CreateHandle(const ABoundingBox: TRect): TRegionHandle;
+    function CreateHandle: TRegionHandle; overload;
+    function CreateHandle(const ABoundingBox: TRect): TRegionHandle; overload;
     //# Properties
     property Rects: PRectArray read FRects;
     property Count: Integer read FCount write SetCount;
@@ -383,7 +387,7 @@ type
 
     procedure Assign(AColors: PACLPixel32; AWidth, AHeight: Integer); overload;
     procedure Assign(ASource: TACLBaseDib); overload;
-  {$IFDEF LCLGtk2}
+  {$IFDEF LCLGtkX}
     procedure Assign(ASource: PGdkPixbuf); overload;
   {$ENDIF}
   {$IFDEF FPC}
@@ -448,7 +452,12 @@ type
     FHandle: HDC;
 
     function GetCanvas: TCanvas;
+  {$IFDEF ACL_CAIRO}
+    function GetSurface(out AOwned: Boolean): Pcairo_surface_t;
+  {$ENDIF}
   {$IFDEF FPC}
+  strict private const
+    NativeCairoDC = {$IFDEF LCLGtk3}True{$ELSE}False{$ENDIF};
   strict private
     FCanvasChanged: Boolean;
     FColorsChanged: Boolean;
@@ -469,7 +478,10 @@ type
   {$IFNDEF FPC}
     procedure AssignTo(ATarget: TBitmap); override; // optimization
   {$ENDIF}
-    procedure CopyRect(const ATargetRect: TRect; ASource: TACLDib; const ASourceRect: TRect);
+    procedure CopyRect(const ATargetRect: TRect;
+      ASource: TACLDib; const ASourceRect: TRect); overload;
+    procedure CopyRect(const ATargetRect: TRect;
+      ASource: TCanvas; const ASourceRect: TRect); overload;
 
     procedure DrawBlend(ACanvas: HDC;
       const ATargetRect, ASourceRect: TRect; AAlpha: Byte = MaxByte); overload;
@@ -630,7 +642,7 @@ procedure acDrawColorPreview(ACanvas: TCanvas; R: TRect; AColor: TAlphaColor); o
 procedure acDrawColorPreview(ACanvas: TCanvas; R: TRect; AColor: TAlphaColor;
   ABorderColor, AHatchColor1, AHatchColor2: TColor); overload;
 procedure acDrawExpandButton(ACanvas: TCanvas; const R: TRect; ABorderColor, AColor: TColor; AExpanded: Boolean);
-procedure acDrawFocusRect(ACanvas: TCanvas; const R: TRect; AColor: TColor = clDefault);
+procedure acDrawFocusRect(ACanvas: TCanvas; ARect: TRect; AColor: TColor = clDefault);
 procedure acDrawFrame(ACanvas: TCanvas; const ARect: TRect;
   AColor: TColor; AThickness: Integer = 1); overload;
 procedure acDrawFrame(ACanvas: TCanvas; const ARect: TRect;
@@ -658,13 +670,13 @@ procedure acStretchDraw(DC, SourceDC: HDC; const ADest, ASource: TRect; AMode: T
 procedure acTileBlt(DC, SourceDC: HDC; const ADest, ASource: TRect);
 
 // Clippping
-function acCombineWithClipRegion(DC: HDC; ARegion: TRegionHandle;
-  AOperation: Integer; AConsiderWindowOrg: Boolean = True): Boolean;
+function acCombineWithClipRegion(DC: HDC; ARegion: TRegionHandle; AOperation: Integer): Boolean;
 procedure acExcludeFromClipRegion(DC: HDC; const R: TRect); overload;
-procedure acExcludeFromClipRegion(DC: HDC; ARegion: TRegionHandle; AConsiderWindowOrg: Boolean = True); overload;
+procedure acExcludeFromClipRegion(DC: HDC; ARegion: TRegionHandle); overload; inline;
 function acIntersectClipRegion(DC: HDC; const R: TRect): Boolean; overload;
-function acIntersectClipRegion(DC: HDC; ARegion: TRegionHandle; AConsiderWindowOrg: Boolean = True): Boolean; overload;
-function acRectVisible(ACanvas: TCanvas; const R: TRect): Boolean;
+function acIntersectClipRegion(DC: HDC; ARegion: TRegionHandle): Boolean; overload; inline;
+function acRectVisible(DC: HDC; const ARect: TRect): Boolean; overload; {$IFDEF MSWINDOWS}inline;{$ENDIF}
+function acRectVisible(ACanvas: TCanvas; const ARect: TRect): Boolean; overload;
 function acSaveClipRegion(DC: HDC): TRegionHandle;
 procedure acRestoreClipRegion(DC: HDC; ARegion: TRegionHandle);
 function acStartClippedDraw(ACanvas: TCanvas; const R: TRect; out APrevRegion: TRegionHandle): Boolean;
@@ -745,6 +757,9 @@ uses
   Gtk2Def,
   Gtk2Int,
 {$ENDIF}
+{$IFDEF LCLGtk3}
+  Gtk3Objects,
+{$ENDIF}
   ACL.Math,
   ACL.Graphics.Ex,
 {$IFDEF MSWINDOWS}
@@ -759,6 +774,9 @@ uses
   ACL.Utils.Strings;
 
 type
+{$IFDEF LCLGtk3}
+  TGtk3DC = class(TGtk3DeviceContext);
+{$ENDIF}
 {$IFDEF FPC}
   TFontAccess = class(TFont);
 {$ELSE}
@@ -912,40 +930,81 @@ end;
 // Clipping
 //----------------------------------------------------------------------------------------------------------------------
 
-function acCombineWithClipRegion(DC: HDC; ARegion: TRegionHandle;
-  AOperation: Integer; AConsiderWindowOrg: Boolean = True): Boolean;
+function acGetClipRegion(DC: HDC; out ARegion: TRegionHandle): Boolean;
+{$IFDEF LCLGtk3}
 var
-  AClipRegion: TRegionHandle;
-  AOrigin: TPoint;
+  LData: TACLRegionData;
 begin
-  AClipRegion := CreateRectRgnIndirect(NullRect);
+  LData := TACLRegionData.CreateFromDC(DC);
   try
-    GetClipRgn(DC, AClipRegion);
-
-    if AConsiderWindowOrg then
-    begin
-      GetWindowOrgEx(DC, AOrigin{%H-});
-      OffsetRgn(ARegion, -AOrigin.X, -AOrigin.Y);
-      CombineRgn(AClipRegion, AClipRegion, ARegion, AOperation);
-      OffsetRgn(ARegion, AOrigin.X, AOrigin.Y);
-    end
-    else
-      CombineRgn(AClipRegion, AClipRegion, ARegion, AOperation);
-
-    Result := SelectClipRgn(DC, AClipRegion) <> NULLREGION;
+    ARegion := LData.CreateHandle;
+    Result := True;
   finally
-    DeleteObject(AClipRegion);
+    LData.Free;
+  end;
+{$ELSE}
+var
+  LResult: Integer;
+begin
+  ARegion := TACLRegionManager.Get;
+  LResult := GetClipRgn(DC, ARegion);
+  // -1 - error
+  //  0 - no clipping
+  // +1 - clipping
+  if LResult <= 0 then
+  begin
+    TACLRegionManager.Release(ARegion);
+    ARegion := 0;
+  end;
+  Result := LResult >= 0;
+{$ENDIF}
+end;
+
+function acCombineWithClipRegion(DC: HDC; ARegion: TRegionHandle; AOperation: Integer): Boolean;
+var
+  LClipRegion: TRegionHandle;
+  LOrigin: TPoint;
+begin
+  Result := False;
+  if acGetClipRegion(DC, LClipRegion) then
+  try
+    if LClipRegion = 0 then
+      LClipRegion := CreateRectRgn(-MaxShort, -MaxShort, MaxShort, MaxShort);
+  {$IFNDEF LCLGtk3}
+    GetWindowOrgEx(DC, LOrigin{%H-});
+    OffsetRgn(ARegion, -LOrigin.X, -LOrigin.Y);
+  {$ENDIF}
+    Result := CombineRgn(LClipRegion, LClipRegion, ARegion, AOperation) <> NULLREGION;
+  {$IFNDEF LCLGtk3}
+    OffsetRgn(ARegion, LOrigin.X, LOrigin.Y);
+  {$ENDIF}
+    SelectClipRgn(DC, LClipRegion);
+  finally
+    acRegionFree(LClipRegion);
   end;
 end;
 
 procedure acExcludeFromClipRegion(DC: HDC; const R: TRect);
+{$IFDEF LCLGtk3}
+var
+  LRegion: TRegionHandle;
+{$ENDIF}
 begin
-  ExcludeClipRect(DC, R.Left, R.Top, R.Right, R.Bottom);
+  if not R.IsEmpty then
+  begin
+  {$IFDEF LCLGtk3}
+    LRegion := CreateRectRgnIndirect(R);
+    acCombineWithClipRegion(DC, LRegion, RGN_DIFF);
+    acRegionFree(LRegion);
+  {$ELSE}
+    ExcludeClipRect(DC, R.Left, R.Top, R.Right, R.Bottom);
+  {$ENDIF}
+  end;
 end;
 
-procedure acExcludeFromClipRegion(DC: HDC; ARegion: TRegionHandle; AConsiderWindowOrg: Boolean = True);
+procedure acExcludeFromClipRegion(DC: HDC; ARegion: TRegionHandle);
 begin
-  acCombineWithClipRegion(DC, ARegion, RGN_DIFF, AConsiderWindowOrg);
+  acCombineWithClipRegion(DC, ARegion, RGN_DIFF);
 end;
 
 function acIntersectClipRegion(DC: HDC; const R: TRect): Boolean;
@@ -953,20 +1012,38 @@ begin
   Result := IntersectClipRect(DC, R.Left, R.Top, R.Right, R.Bottom) <> NULLREGION;
 end;
 
-function acIntersectClipRegion(DC: HDC; ARegion: TRegionHandle; AConsiderWindowOrg: Boolean = True): Boolean;
+function acIntersectClipRegion(DC: HDC; ARegion: TRegionHandle): Boolean;
 begin
-  Result := acCombineWithClipRegion(DC, ARegion, RGN_AND, AConsiderWindowOrg);
+  Result := acCombineWithClipRegion(DC, ARegion, RGN_AND);
 end;
 
-function acRectVisible(ACanvas: TCanvas; const R: TRect): Boolean;
+function acRectVisible(DC: HDC; const ARect: TRect): Boolean;
+{$IFDEF LCLGtk3}
+var
+  LRegion: TRegionHandle;
 begin
-  if R.IsEmpty then
-    Exit(False);
-{$IFDEF FPC}
-  if not ACanvas.HandleAllocated and (ACanvas.ClassType = TACLDibCanvas) then
-    Exit(R.IntersectsWith(TACLDibCanvas(ACanvas).ClipRect));
+  Result := False;
+  if ARect.IsEmpty then
+    Exit;
+  if acGetClipRegion(DC, LRegion) then
+  try
+    Result := (LRegion = 0) or RectInRegion(LRegion, ARect);
+  finally
+    acRegionFree(LRegion);
+  end;
+{$ELSE}
+begin
+  Result := RectVisible(DC, ARect);
 {$ENDIF}
-  Result := RectVisible(ACanvas.Handle, R);
+end;
+
+function acRectVisible(ACanvas: TCanvas; const ARect: TRect): Boolean;
+begin
+  if ARect.IsEmpty then
+    Exit(False);
+  if not ACanvas.HandleAllocated and (ACanvas.ClassType = TACLDibCanvas) then
+    Exit(ARect.IntersectsWith(TACLDibCanvas(ACanvas).ClipRect));
+  Result := acRectVisible(ACanvas.Handle, ARect);
 end;
 
 procedure acRestoreClipRegion(DC: HDC; ARegion: TRegionHandle);
@@ -977,20 +1054,17 @@ end;
 
 function acSaveClipRegion(DC: HDC): TRegionHandle;
 begin
-  Result := TACLRegionManager.Get;
-  if GetClipRgn(DC, Result) = 0 then
+  if not acGetClipRegion(DC, Result) then
   begin
-    TACLRegionManager.Release(Result);
-    Result := 0;
+    Result := TACLRegionManager.Get;
+    SetRectRgn(Result, 0, 0, 0, 0);
   end;
 end;
 
 function acStartClippedDraw(ACanvas: TCanvas; const R: TRect; out APrevRegion: TRegionHandle): Boolean;
 begin
-{$IFDEF MSWINDOWS} // под Linux это не имеет смысла, т.к. там идет такая же работа с регионом, как ниже
-  if not RectVisible(ACanvas.Handle, R) then
+  if R.IsEmpty then
     Exit(False);
-{$ELSE}
   if not ACanvas.HandleAllocated and (ACanvas.ClassType = TACLDibCanvas) then
   begin
     Result := TACLDibCanvas(ACanvas).ClipRect.IntersectsWith(R);
@@ -999,36 +1073,35 @@ begin
       APrevRegion := CreateRectRgnIndirect(TACLDibCanvas(ACanvas).ClipRect);
       TACLDibCanvas(ACanvas).ClipRect.Intersect(R);
     end;
-  end
-  else
-{$ENDIF}
-  begin
-    APrevRegion := acSaveClipRegion(ACanvas.Handle);
-    Result := IntersectClipRect(ACanvas.Handle, R.Left, R.Top, R.Right, R.Bottom) <> NULLREGION;
-    if not Result then
-      acRestoreClipRegion(ACanvas.Handle, APrevRegion);
+    Exit;
   end;
+
+{$IFNDEF LCLGtkX} // в RectVisible идёт такая же работа с регионом, как ниже
+  if not RectVisible(ACanvas.Handle, R) then
+    Exit(False);
+{$ENDIF}
+
+  APrevRegion := acSaveClipRegion(ACanvas.Handle);
+  Result := IntersectClipRect(ACanvas.Handle, R.Left, R.Top, R.Right, R.Bottom) <> NULLREGION;
+  if not Result then
+    acRestoreClipRegion(ACanvas.Handle, APrevRegion);
 end;
 
 procedure acEndClippedDraw(ACanvas: TCanvas; ASavedRegion: TRegionHandle);
-{$IFDEF LINUX}
 var
   LBox: TRect;
-{$ENDIF}
 begin
   if ACanvas.HandleAllocated then
     acRestoreClipRegion(ACanvas.Handle, ASavedRegion)
   else
   begin
-  {$IFDEF LINUX}
     if ACanvas.ClassType = TACLDibCanvas then
     begin
-      if GetRgnBox(ASavedRegion, @LBox) = NULLREGION then
+      if GetRgnBox(ASavedRegion, {$IFDEF FPC}@{$ENDIF}LBox) = NULLREGION then
         TACLDibCanvas(ACanvas).ClipRect := NullRect
       else
         TACLDibCanvas(ACanvas).ClipRect := LBox;
     end;
-  {$ENDIF}
     DeleteObject(ASavedRegion);
   end;
 end;
@@ -1121,8 +1194,8 @@ end;
 
 procedure acRegionSetToWindow(AWnd: TWndHandle; ARegion: TRegionHandle; ARedraw: Boolean);
 begin
-{$IFDEF FPC}
-  // LclGtk не умеет делать Redraw для окна, если регион = 0:
+{$IFDEF LCLGtk2}
+  // Gtk2 не умеет делать Redraw для окна, если регион = 0:
   //    gdk_region_empty: assertion 'region != NULL' failed
   if ARedraw and (ARegion = 0) then
   begin
@@ -1859,11 +1932,11 @@ begin
   acExcludeFromClipRegion(ACanvas.Handle, R.InflateTo(2));
 end;
 
-procedure acDrawFocusRect(ACanvas: TCanvas; const R: TRect; AColor: TColor);
-var
-  LClipping: TRegionHandle;
-  LDC: HDC;
+procedure acDrawFocusRect(ACanvas: TCanvas; ARect: TRect; AColor: TColor);
 {$IFDEF MSWINDOWS}
+var
+  LDC: HDC;
+  LClipping: TRegionHandle;
   LOrg, LPrevOrg: TPoint;
 {$ENDIF}
 begin
@@ -1873,21 +1946,28 @@ begin
     AColor := clWindowText;
   if AColor <> clNone then
   begin
+  {$IFDEF MSWINDOWS}
     LDC := ACanvas.Handle;
     LClipping := acSaveClipRegion(LDC);
-  {$IFDEF MSWINDOWS}
-    GetWindowOrgEx(LDC, LOrg);
-    SetBrushOrgEx(LDC, LOrg.X, LOrg.Y, @LPrevOrg);
-  {$ENDIF}
     try
-      acExcludeFromClipRegion(LDC, R.InflateTo(-1));
-      acDrawHatch(LDC, R, ACanvas.Pixels[R.Left, R.Top], AColor, 1);
-    finally
-   {$IFDEF MSWINDOWS}
+      GetWindowOrgEx(LDC, LOrg);
+      SetBrushOrgEx(LDC, LOrg.X, LOrg.Y, @LPrevOrg);
+      acExcludeFromClipRegion(LDC, ARect.InflateTo(-1));
+      acDrawHatch(LDC, ARect, ACanvas.Pixels[ARect.Left, ARect.Top], AColor, 1);
       SetBrushOrgEx(LDC, LPrevOrg.X, LPrevOrg.Y, nil);
-   {$ENDIF}
+    finally
       acRestoreClipRegion(LDC, LClipping);
     end;
+  {$ELSE}
+    CairoPainter.BeginPaint(ACanvas);
+    try
+      Inc(ARect.Left); Inc(ARect.Top);
+      CairoPainter.SetGeometrySmoothing(TACLBoolean.False);
+      CairoPainter.DrawRectangle(ARect, TAlphaColor.FromColor(AColor), 1, ssDot);
+    finally
+      CairoPainter.EndPaint;
+    end;
+  {$ENDIF}
   end;
 end;
 
@@ -1897,30 +1977,36 @@ begin
 end;
 
 procedure acDrawHatch(DC: HDC; const R: TRect; AColor1, AColor2: TColor; ASize: Integer);
+{$IFDEF MSWINDOWS}
 var
   LBrush: HBRUSH;
   LBrushBitmap: TBitmap;
-{$IFDEF MSWINDOWS}
   LOrigin: TPoint;
-{$ENDIF}
 begin
   LBrushBitmap := acHatchCreatePattern(ASize, AColor1, AColor2);
   try
-  {$IFDEF MSWINDOWS}
     GetWindowOrgEx(DC, LOrigin);
     SetBrushOrgEx(DC, R.Left - LOrigin.X, R.Top - LOrigin.Y, @LOrigin);
-  {$ENDIF}
 
     LBrush := CreatePatternBrush(LBrushBitmap.Handle);
     FillRect(DC, R, LBrush);
     DeleteObject(LBrush);
 
-  {$IFDEF MSWINDOWS}
     SetBrushOrgEx(DC, LOrigin.X, LOrigin.Y, nil);
-  {$ENDIF}
   finally
     LBrushBitmap.Free;
   end;
+{$ELSE}
+begin
+  CairoPainter.BeginPaint(DC);
+  try
+    CairoPainter.FillHatchRectangle(R,
+      TAlphaColor.FromColor(AColor1),
+      TAlphaColor.FromColor(AColor2), ASize);
+  finally
+    CairoPainter.EndPaint;
+  end;
+{$ENDIF}
 end;
 
 function acHatchCreatePattern(ASize: Integer; AColor1, AColor2: TColor): TBitmap;
@@ -1997,7 +2083,7 @@ var
   W, H: Integer;
   X, Y, XCount, YCount: Integer;
 begin
-  if not (ADest.IsEmpty or ASource.IsEmpty) and RectVisible(DC, ADest) then
+  if not (ADest.IsEmpty or ASource.IsEmpty) and acRectVisible(DC, ADest) then
   begin
     W := ASource.Right - ASource.Left;
     H := ASource.Bottom - ASource.Top;
@@ -2474,7 +2560,7 @@ begin
   if Height = 0 then
   begin
     if GetObject(Handle, SizeOf(LLogFont), @LLogFont) <> 0 then
-      Height := {$IFDEF LCLGtk2}-{$ENDIF}LLogFont.lfHeight;
+      Height := {$IFDEF LCLGtkX}-{$ENDIF}LLogFont.lfHeight;
   end;
 end;
 
@@ -2651,16 +2737,22 @@ end;
 
 constructor TACLRegion.CreateFromDC(DC: HDC);
 var
+  LHandle: TRegionHandle;
   LPoint: TPoint;
 begin
-  Create;
-  if GetClipRgn(DC, Handle) = 1 then
+  if acGetClipRegion(DC, LHandle) then
   begin
-    GetWindowOrgEx(DC, LPoint{%H-});
-    Offset(LPoint.X, LPoint.Y);
+    if LHandle <> 0 then
+    begin
+      CreateFromHandle(LHandle);
+      GetWindowOrgEx(DC, LPoint{%H-});
+      Offset(LPoint.X, LPoint.Y);
+    end
+    else
+      CreateRect(Rect(0, 0, MaxRegionSize, MaxRegionSize));
   end
   else
-    SetRectRgn(Handle, 0, 0, MaxRegionSize, MaxRegionSize);
+    CreateRect(NullRect);
 end;
 
 constructor TACLRegion.CreateFromHandle(AHandle: TRegionHandle);
@@ -2712,15 +2804,14 @@ end;
 
 procedure TACLRegion.Combine(const R: TRect; ACombineFunc: TACLRegionCombineFunc);
 var
-  ARgn: TRegionHandle;
+  LRegion: TRegionHandle;
 begin
-  ARgn := CreateRectRgnIndirect(R);
+  LRegion := CreateRectRgnIndirect(R);
   if ACombineFunc <> rcmCopy then
-    CombineRgn(Handle, Handle, ARgn, CombineFuncMap[ACombineFunc])
+    CombineRgn(Handle, Handle, LRegion, CombineFuncMap[ACombineFunc])
   else
-    TACLMath.Exchange<TRegionHandle>(FHandle, ARgn);
-
-  DeleteObject(ARgn)
+    TACLMath.Exchange<TRegionHandle>(FHandle, LRegion);
+  DeleteObject(LRegion)
 end;
 
 function TACLRegion.Contains(const R: TRect): Boolean;
@@ -2766,7 +2857,30 @@ begin
 end;
 
 constructor TACLRegionData.CreateFromDC(DC: HDC);
-{$IF DEFINED(LCLGtk2)}
+{$IF DEFINED(LCLGtk3)}
+var
+  LDC: TGtk3DeviceContext absolute DC;
+  LRect: cairo_rectangle_t;
+  LRects: Pcairo_rectangle_list_t;
+  I: Integer;
+begin
+  LRects := cairo_copy_clip_rectangle_list(Pcairo_t(LDC.pcr)); // ! always not null !
+  try
+    if LRects^.status = CAIRO_STATUS_SUCCESS then
+    begin
+      DataAllocate(LRects^.num_rectangles);
+      for I := 0 to LRects^.num_rectangles - 1 do
+      begin
+        LRect := Pcairo_rectangle_t(LRects^.rectangles)[I];
+        Rects^[I] := Bounds(
+          Round(LRect.x), Round(LRect.y),
+          Round(LRect.width), Round(LRect.height));
+      end;
+    end;
+  finally
+    cairo_rectangle_list_destroy(LRects);
+  end;
+{$ELSEIF DEFINED(LCLGtk2)}
 var
   LRegion: PGdiObject;
 begin
@@ -2793,7 +2907,15 @@ begin
 end;
 
 constructor TACLRegionData.CreateFromHandle(ARgn: TRegionHandle);
-{$IF DEFINED(LCLGtk2)}
+{$IF DEFINED(LCLGtk3)}
+var
+  LRect: TRect;
+begin
+  case GetRgnBox(ARgn, @LRect) of
+    SimpleRegion, ComplexRegion:
+      DataAllocateFromNativeHandle(TGtk3Region(ARgn).Handle);
+  end;
+{$ELSEIF DEFINED(LCLGtk2)}
 var
   LRect: TRect;
 begin
@@ -2834,6 +2956,15 @@ begin
     Result.Add(Rects[I]);
 end;
 
+function TACLRegionData.CreateHandle: TRegionHandle;
+begin
+  if Count = 0 then
+    Exit(CreateRectRgnIndirect(NullRect));
+  if Count = 1 then
+    Exit(CreateRectRgnIndirect(Rects^[0]));
+  Result := CreateHandle(BoundingBox);
+end;
+
 function TACLRegionData.CreateHandle(const ABoundingBox: TRect): TRegionHandle;
 {$IFDEF LCLGtk2}
 var
@@ -2849,6 +2980,9 @@ begin
 {$IF DEFINED(MSWINDOWS)}
   PRgnData(FData)^.rdh.rcBound := ABoundingBox;
   Result := ExtCreateRegion(nil, FDataSize, PRgnData(FData)^);
+{$ELSEIF DEFINED(LCLGtk3)}
+  TGtk3Region(Result) := TGtk3Region.Create(False);
+  TGtk3Region(Result).Handle := Pointer(cairo_create_region_ex(Rects, Count));
 {$ELSEIF DEFINED(LCLGtk2)}
   Result := CreateRectRgnIndirect(NullRect);
   for I := 0 to Count - 1 do
@@ -2886,7 +3020,23 @@ begin
 end;
 
 procedure TACLRegionData.DataAllocateFromNativeHandle(APtr: Pointer);
-{$IF DEFINED(LCLGtk2)}
+{$IF DEFINED(LCLGtk3)}
+var
+  LCount: Integer;
+  LRect: cairo_rectangle_int_t;
+  I: Integer;
+begin
+  LCount := cairo_region_num_rectangles(APtr);
+  if LCount > 0 then
+  begin
+    DataAllocate(LCount);
+    for I := 0 to LCount - 1 do
+    begin
+      cairo_region_get_rectangle(APtr, I, @LRect);
+      Rects^[I] := Bounds(LRect.x, LRect.y, LRect.width, LRect.height);
+    end;
+  end;
+{$ELSEIF DEFINED(LCLGtk2)}
 type
   PGdkRectangleArray = ^TGdkRectangleArray;
   TGdkRectangleArray = array[0..0] of TGdkRectangle;
@@ -3020,7 +3170,7 @@ begin
   end;
 end;
 
-{$IFDEF LCLGtk2}
+{$IFDEF LCLGtkX}
 procedure TACLBaseDib.Assign(ASource: PGdkPixbuf);
 var
   LImage: TRawImage;
@@ -3402,7 +3552,7 @@ end;
 
 procedure TACLDib.CreateHandles;
 begin
-{$IFDEF LCLGtk2}
+{$IFDEF LCLGtkX}
   FColors := AllocMem(ColorCount * SizeOf(TACLPixel32));
 {$ELSE}
   FHandle := CreateCompatibleDC(0);
@@ -3456,22 +3606,24 @@ end;
 {$ENDIF}
 
 procedure TACLDib.CopyRect(const ATargetRect: TRect; ASource: TACLDib; const ASourceRect: TRect);
-{$IFNDEF MSWINDOWS}
+{$IFDEF LCLGtk2}
 var
   LSurface: Pcairo_surface_t;
+  LSurfaceOwned: Boolean;
 {$ENDIF}
 begin
-{$IFNDEF MSWINDOWS}
+{$IFDEF LCLGtk2}
   if (FHandle = 0) and (ASource.FHandle = 0) then
   begin
     CairoPainter.BeginPaint(Self);
     try
-      LSurface := cairo_create_surface(ASource.Colors, ASource.Width, ASource.Height);
+      LSurface := ASource.GetSurface(LSurfaceOwned);
       try
         cairo_fill_surface(CairoPainter.Handle, LSurface,
           ATargetRect, ASourceRect, NullPoint, 1.0, False, CAIRO_OPERATOR_SOURCE);
       finally
-        cairo_surface_destroy(LSurface);
+        if LSurfaceOwned then
+          cairo_surface_destroy(LSurface);
       end;
     finally
       CairoPainter.EndPaint;
@@ -3479,7 +3631,19 @@ begin
   end
   else
 {$ENDIF}
-    acStretchBlt(Handle, ASource.Handle, ATargetRect, ASourceRect);
+    CopyRect(ATargetRect, ASource.Canvas, ASourceRect);
+end;
+
+procedure TACLDib.CopyRect(const ATargetRect: TRect; ASource: TCanvas; const ASourceRect: TRect);
+begin
+  StretchBlt(Handle,
+    ATargetRect.Left, ATargetRect.Top,
+    ATargetRect.Right - ATargetRect.Left,
+    ATargetRect.Bottom - ATargetRect.Top,
+    ASource.Handle,
+    ASourceRect.Left, ASourceRect.Top,
+    ASourceRect.Right - ASourceRect.Left,
+    ASourceRect.Bottom - ASourceRect.Top, SRCCOPY);
 end;
 
 procedure TACLDib.DrawBlend(ACanvas: TCanvas; const P: TPoint; AMode: TACLBlendMode; AAlpha: Byte);
@@ -3492,7 +3656,7 @@ begin
   begin
     LDib := TACLDib.Create(Width, Height);
     try
-      acBitBlt(LDib.Handle, ACanvas.Handle, LDib.ClientRect, P);
+      LDib.CopyRect(LDib.ClientRect, ACanvas, TRect.Create(P, Width, Height));
       BlendFunctions[AMode](LDib, Self, AAlpha);
       LDib.DrawCopy(ACanvas, P);
     finally
@@ -3505,12 +3669,15 @@ end;
 procedure TACLDib.DrawCopy(ACairo: Pcairo_t; const ATargetRect: TRect);
 var
   LSurface: Pcairo_surface_t;
+  LSurfaceOwned: Boolean;
 begin
-  LSurface := cairo_create_surface(Colors, Width, Height);
+  LSurface := GetSurface(LSurfaceOwned);
   try
-    cairo_fill_surface(ACairo, LSurface, ATargetRect, ClientRect, NullPoint, 1.0, False, CAIRO_OPERATOR_SOURCE);
+    cairo_fill_surface(ACairo, LSurface, ATargetRect,
+      ClientRect, NullPoint, 1.0, False, CAIRO_OPERATOR_SOURCE);
   finally
-    cairo_surface_destroy(LSurface);
+    if LSurfaceOwned then
+      cairo_surface_destroy(LSurface);
   end;
 end;
 
@@ -3518,12 +3685,14 @@ procedure TACLDib.DrawBlend(ACairo: Pcairo_t;
   const ATargetRect, ASourceRect: TRect; AAlpha: Byte = MaxByte);
 var
   LSurface: Pcairo_surface_t;
+  LSurfaceOwned: Boolean;
 begin
-  LSurface := cairo_create_surface(Colors, Width, Height);
+  LSurface := GetSurface(LSurfaceOwned);
   try
     cairo_fill_surface(ACairo, LSurface, ATargetRect, ASourceRect, NullPoint, AAlpha / 255, False);
   finally
-    cairo_surface_destroy(LSurface);
+    if LSurfaceOwned then
+      cairo_surface_destroy(LSurface);
   end;
 end;
 {$ENDIF}
@@ -3546,14 +3715,16 @@ begin
 {$ELSE}
 var
   LSurface: Pcairo_surface_t;
+  LSurfaceOwned: Boolean;
 begin
-  LSurface := cairo_create_surface(Colors, Width, Height);
+  LSurface := GetSurface(LSurfaceOwned);
   try
     CairoPainter.BeginPaint(ACanvas);
     CairoPainter.FillSurface(ATargetRect, ASourceRect, LSurface, AAlpha / 255, False);
     CairoPainter.EndPaint;
   finally
-    cairo_surface_destroy(LSurface);
+    if LSurfaceOwned then
+      cairo_surface_destroy(LSurface);
   end;
 {$ENDIF}
 end;
@@ -3606,7 +3777,7 @@ end;
 procedure TACLDib.DrawCopy(ACanvas: TCanvas; const P: TPoint);
 begin
 {$IFDEF FPC}
-  if not FCanvasChanged then
+  if NativeCairoDC or not FCanvasChanged then
     CairoDraw(ACanvas, ClientRect + P, ClientRect, 1.0, False, CAIRO_OPERATOR_SOURCE)
   else
 {$ENDIF}
@@ -3619,7 +3790,7 @@ var
 begin
   ASmoothStretch := ASmoothStretch and not R.EqualSizes(ClientRect);
 {$IFDEF FPC}
-  if not FCanvasChanged or ASmoothStretch then
+  if NativeCairoDC or not FCanvasChanged or ASmoothStretch then
     CairoDraw(ACanvas, R, ClientRect, 1.0, ASmoothStretch, CAIRO_OPERATOR_SOURCE)
   else
 {$ENDIF}
@@ -3643,6 +3814,22 @@ begin
   Result := FCanvas;
 end;
 
+{$IFDEF ACL_CAIRO}
+function TACLDib.GetSurface(out AOwned: Boolean): Pcairo_surface_t;
+begin
+{$IFDEF LCLGtk3}
+  if FHandle <> 0 then
+  begin
+    AOwned := False;
+    Result := Pcairo_surface_t(TGtk3DeviceContext(FHandle).CairoSurface);
+    if Result <> nil then Exit;
+  end;
+{$ENDIF}
+  AOwned := True;
+  Result := cairo_create_surface(Colors, Width, Height);
+end;
+{$ENDIF}
+
 procedure TACLDib.FreeHandles;
 begin
   FreeAndNil(FCanvas);
@@ -3656,7 +3843,7 @@ begin
     DeleteObject(FBitmap);
     FBitmap := 0;
   end;
-{$IFDEF LCLGtk2}
+{$IFDEF LCLGtkX}
   if FColors <> nil then
     FreeMem(FColors);
 {$ENDIF}
@@ -3670,8 +3857,9 @@ procedure TACLDib.CairoDraw(
   AOperator: cairo_operator_t = CAIRO_OPERATOR_OVER);
 var
   LSurface: Pcairo_surface_t;
+  LSurfaceOwned: Boolean;
 begin
-  LSurface := cairo_create_surface(Colors, Width, Height);
+  LSurface := GetSurface(LSurfaceOwned);
   try
     CairoPainter.BeginPaint(ACanvas);
     try
@@ -3681,7 +3869,8 @@ begin
       CairoPainter.EndPaint;
     end;
   finally
-    cairo_surface_destroy(LSurface);
+    if LSurfaceOwned then
+      cairo_surface_destroy(LSurface);
   end;
 end;
 
@@ -3691,18 +3880,18 @@ var
   LImg: PGdkImage;
 begin
   if FHandle = 0 then
-    raise EInvalidGraphicOperation.Create('TACLDib: CopyCanvasToColors failed');
+    raise EInvalidGraphicOperation.Create('DIB: CopyCanvasToColors failed');
 
   LImg := gdk_drawable_get_image(TGtkDeviceContext(FHandle).Drawable, 0, 0, Width, Height);
   if LImg = nil then
-    raise EInvalidGraphicOperation.CreateFmt('TACLDib: drawable has no image data (%d,%d)', [Width, Height]);
+    raise EInvalidGraphicOperation.CreateFmt('DIB: drawable has no image data (%d,%d)', [Width, Height]);
   try
     if (LImg^.bpp <> 4) or
        (LImg^.bpl <> Width * SizeOf(TACLPixel32)) or
        (LImg^.height <> Height)
     then
       raise EInvalidGraphicOperation.CreateFmt(
-        'FastDib: drawable has wrong params (%d,%d,%d,%d)',
+        'DIB: drawable has wrong params (%d,%d,%d,%d)',
         [LImg^.bpp, LImg^.bpl, LImg^.width, LImg^.height]);
 
     Move(LImg.mem^, FColors^, Width * Height * SizeOf(TACLPixel32));
@@ -3729,7 +3918,7 @@ begin
   FCanvasChanged := False;
 {$IFDEF LCLGtk2}
   if FHandle = 0 then
-    raise EInvalidGraphicOperation.Create('TACLDib: CopyColorsToCanvas failed');
+    raise EInvalidGraphicOperation.Create('DIB: CopyColorsToCanvas failed');
   //gdk_draw_rgb_32_image(LCtx.Drawable, LCtx.GC,
   //  0, 0, Width, Height, GDK_RGB_DITHER_NONE,
   //  Pguchar(FColors), Width * SizeOf(TACLPixel32));
@@ -3755,13 +3944,36 @@ begin
 end;
 
 function TACLDib.GetDC: HDC;
+{$IFDEF LCLGtk3}
+var
+  LCairo: Pcairo_t;
+  LContext: TGtk3DC;
+  LSurface: Pcairo_surface_t;
+{$ENDIF}
 begin
   CheckIsMainThread;
   if FHandle = 0 then
   begin
+  {$IFDEF LCLGtk3}
+    LContext := TGtk3DC.Create(PGtkWidget(nil));
+    cairo_destroy(Pointer(LContext.FCairo));
+    cairo_surface_destroy(Pointer(LContext.CairoSurface));
+    LSurface := cairo_create_surface(FColors, Width, Height);
+    LCairo := cairo_create(LSurface);
+    //#AI, 17.01.2026
+    // Такой же режим используется по умолчанию у gtk3-виджетов.
+    // Если режимы не синхронизировать, то PixelOffset, что используется
+    // в обвязке LCLGtk3 будет давать мыльцо на краях картинки при отрисовке
+    // её части (CopyRect)
+    cairo_set_antialias(LCairo, CAIRO_ANTIALIAS_NONE);
+    LContext.CairoSurface := Pointer(LSurface);
+    LContext.FCairo := Pointer(LCairo);
+    FHandle := HDC(LContext);
+  {$ELSE}
     FHandle := CreateCompatibleDC(0);
     FBitmap := CreateCompatibleBitmap(FHandle, Width, Height);
     SelectObject(FHandle, FBitmap);
+  {$ENDIF}
   end;
   if FColorsChanged then
     CopyColorsToCanvas;
@@ -3775,7 +3987,7 @@ var
   LPrevPoint: TPoint;
 begin
 {$IFDEF FPC}
-  if not FCanvasChanged then
+  if NativeCairoDC or not FCanvasChanged then
     inherited
   else
 {$ENDIF}
@@ -3789,7 +4001,7 @@ end;
 procedure TACLDib.Reset(const ARect: TRect);
 begin
 {$IFDEF FPC}
-  if not FCanvasChanged then
+  if NativeCairoDC or not FCanvasChanged then
     inherited
   else
 {$ENDIF}

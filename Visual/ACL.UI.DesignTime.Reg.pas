@@ -142,7 +142,7 @@ begin
 {$ENDIF}
 
   // General
-  RegisterComponents(sACLComponentsPage, [TACLApplicationController, TACLUIInsightButton]);
+  RegisterComponents(sACLComponentsPage, [TACLApplicationController, TACLUIInsightSearchBox]);
   RegisterPropertyEditor(TypeInfo(Integer), TACLApplicationController, 'TargetDPI', TACLDPIPropertyEditor);
   RegisterComponents(sACLComponentsPage, [TACLTrayIcon, TACLDropTarget, TACLTimer]);
   HideProperties(TACLCustomControl, ['AlignWithMargins']);

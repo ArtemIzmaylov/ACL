@@ -7,7 +7,7 @@
 //  Purpose:   Cairo Wrappers
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       Gtk2/Gtk3
@@ -67,6 +67,13 @@ uses
 type
   PCairoGlyphArray = ^TCairoGlyphArray;
   TCairoGlyphArray = array[0..0] of cairo_glyph_t;
+
+  { ICairoPainter }
+
+  ICairoPainter = interface
+  ['{3FE006F2-67DE-4317-B402-D872A77373E4}']
+    procedure PaintTo(ACairo: Cairo.Pcairo_t);
+  end;
 
   { EGSCairoError }
 
@@ -547,6 +554,7 @@ begin
   SavedContext^.Ownership := soReference;
   Result := Pcairo_t(LContext.pcr);
   cairo_save(Result);
+  cairo_set_operator(Result, CAIRO_OPERATOR_OVER);
   Origin := NullPoint;
 {$ELSEIF DEFINED(LCLGtk2)}
 var
@@ -594,7 +602,7 @@ begin
       Result := cairo_create_context(ACanvas.Handle, AOrigin, ASavedContext);
     {$ENDIF}
     end
-    else
+    else // multi-threading
     begin
       ASurface := cairo_create_surface(LDib.Colors, LDib.Width, LDib.Height);
       Result := cairo_create(ASurface);
@@ -732,18 +740,15 @@ function cairo_set_clipping(ACairo: pcairo_t;
   ACanvas: TCanvas; ACanvasContext: PCairoContext): Boolean; overload;
 begin
   Result := True;
-  if ACanvas.HandleAllocated then
+  if not ACanvas.HandleAllocated and (ACanvas.ClassType = TACLDibCanvas) then
   begin
-    if (ACanvasContext = nil) or (ACanvasContext.Ownership <> soReference) then
-      Result := cairo_set_clipping(ACairo, ACanvas.Handle);
+    with TACLDibCanvas(ACanvas).ClipRect do
+      cairo_rectangle(ACairo, Left, Top, Width, Height);
+    cairo_clip(ACairo);
   end
   else
-    if ACanvas.ClassType = TACLDibCanvas then
-    begin
-      with TACLDibCanvas(ACanvas).ClipRect do
-        cairo_rectangle(ACairo, Left, Top, Width, Height);
-      cairo_clip(ACairo);
-    end;
+    if (ACanvasContext = nil) or (ACanvasContext.Ownership <> soReference) then
+      Result := cairo_set_clipping(ACairo, ACanvas.Handle);
 end;
 
 procedure cairo_set_dash(ACairo: pcairo_t; const ADashes: array of Double); overload;
@@ -834,7 +839,8 @@ begin
     Exit;
 
   LPrevOperator := cairo_get_operator(ACairo);
-  cairo_set_operator(ACairo, AOperator);
+  if LPrevOperator <> AOperator then
+    cairo_set_operator(ACairo, AOperator);
   if ATileMode then
   begin
     LSurface := cairo_create_surface(LSourceW, LSourceH);
@@ -871,7 +877,8 @@ begin
     else
       cairo_fill(ACairo);
   end;
-  cairo_set_operator(ACairo, LPrevOperator);
+  if LPrevOperator <> AOperator then
+    cairo_set_operator(ACairo, LPrevOperator);
 end;
 
 procedure cairo_reset_rect(ACairo: pcairo_t; const R: TRect);

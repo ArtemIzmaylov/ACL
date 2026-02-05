@@ -160,7 +160,7 @@ uses
 {$IFNDEF FPC}
   ACL.Graphics.SkinImageSet, // inlining
 {$ENDIF}
-  ACL.UI.Insight;
+  ACL.UI.Insight.Core;
 
 type
 

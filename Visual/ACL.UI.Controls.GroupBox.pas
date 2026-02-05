@@ -94,12 +94,12 @@ type
     destructor Destroy; override;
     // Properties
     property CaptionSubClass: TACLCheckBoxSubClass read FCaptionSubClass;
-    property Description: string read FDescription write SetDescription;
   published
     property Anchors;
     property AutoSize;
     property Borders;
     property Caption: string read GetCaption write SetCaption;
+    property Description: string read FDescription write SetDescription;
     property DoubleBuffered default True;
     property Padding;
     property StyleCaption: TACLStyleCheckBox read FStyleCaption write SetStyleCaption;
@@ -167,7 +167,8 @@ type
     property Minimized: Boolean read FMinimized write SetMinimized;
   published
     property CheckBox: TACLGroupBoxCheckBox read FCheckBox write SetCheckBox;
-    property OnCheckBoxStateChanged: TNotifyEvent read FOnCheckBoxStateChanged write FOnCheckBoxStateChanged;
+    property OnCheckBoxStateChanged: TNotifyEvent
+      read FOnCheckBoxStateChanged write FOnCheckBoxStateChanged;
   end;
 
   { TACLGroupBoxCaptionStyle }
@@ -180,7 +181,7 @@ type
 implementation
 
 uses
-  ACL.UI.Insight;
+  ACL.UI.Insight.Core;
 
 type
 

@@ -279,6 +279,8 @@ implementation
 
 {$IF DEFINED(MSWINDOWS)}
   {$I ACL.UI.DropSource.Win32.inc}
+{$ELSEIF DEFINED(LCLGtk3)}
+  {$I ACL.UI.DropSource.Gtk3.inc}
 {$ELSEIF DEFINED(LCLGtk2)}
   {$I ACL.UI.DropSource.Gtk2.inc}
 {$ENDIF}
@@ -477,6 +479,10 @@ end;
 procedure TACLDropSource.ExecuteSafeFree;
 begin
   try
+  {$IFDEF ACL_THREADING_DEBUG}
+    if not IsMainThread then
+      TThread.NameThreadForDebugging(ClassName + 'Thread');
+  {$ENDIF}
     try
       Execute;
     except

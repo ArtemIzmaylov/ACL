@@ -282,7 +282,7 @@ type
   {$ENDIF}
     procedure DoContextPopup(MousePos: TPoint; var Handled: Boolean); override;
     procedure FocusChanged; override;
-    procedure InvalidateBorders;
+    procedure InvalidateBorders; virtual;
     procedure SetFocusOnClick; override;
     procedure SetTargetDPI(AValue: Integer); override;
     procedure TextChanged; reintroduce; virtual;

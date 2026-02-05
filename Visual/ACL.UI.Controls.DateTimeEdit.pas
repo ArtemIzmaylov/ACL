@@ -6,7 +6,7 @@
 //  Purpose:   DateTimeEdit
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -213,6 +213,7 @@ begin
   FTimeEdit.Time := TDateTime(FOwner.Value);
   FTimeEdit.Style := FOwner.Style;
   FTimeEdit.StyleButton := FOwner.StyleSpinButton;
+  FTimeEdit.Width := dpiApply(150, FCurrentPPI);
   FTimeEdit.Visible := FOwner.Mode = dtmDateAndTime;
 
   CreateControl(TACLButton, FButtonOk);

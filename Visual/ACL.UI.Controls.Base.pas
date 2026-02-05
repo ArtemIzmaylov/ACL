@@ -6,7 +6,7 @@
 //  Purpose:   Base classes for controls
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -146,7 +146,7 @@ type
 {$REGION ' General Types '}
 
   TTabOrderList = {$IFDEF FPC}TFPList{$ELSE}TList{$ENDIF};
-  TWideKeyEvent = procedure(var Key: WideChar) of object;
+  TWideCharProc = procedure(var Key: WideChar) of object;
 
   TACLControlActionType = (ccatNone, ccatMouse, ccatGesture, ccatKeyboard);
 
@@ -210,13 +210,6 @@ type
 {$ENDREGION}
 
 {$REGION ' In-placing '}
-
-  { IACLInnerControl }
-
-  IACLInnerControl = interface
-  ['{8F98096E-7A0D-4D77-82AB-B9724B3C6596}']
-    function GetInnerContainer: TWinControl;
-  end;
 
   { IACLInplaceControl }
 
@@ -956,6 +949,8 @@ type
     class function GetMargins(AControl: TControl; out AMargins: TACLMargins): Boolean;
     class procedure UpdateMargins(AControl: TControl; const AMargins: TRect);
     // Messages
+    class function IsMouseAtControl(AInvoker: TControl; AContainer: TWinControl): Boolean;
+    class function IsVisible(AControl: TControl): Boolean;
     class function NCHitTest(AControl: TWinControl; var Message: TWMMouse): Integer;
     class function WndProc(ACaller: TWinControl; var Message: TMessage): Boolean; inline;
   end;
@@ -1033,17 +1028,19 @@ function acMapPoint(ASource, ATarget: TWinControl; const P: TPoint): TPoint;
 function acMapRect(ASource, ATarget: TWinControl; const R: TRect): TRect;
 
 // Keyboard
-function acGetShiftState: TShiftState;
 function acIsDropDownCommand(Key: Word; Shift: TShiftState): Boolean;
 function acIsShiftPressed(ATest: TShiftState): Boolean; overload;
 function acIsShiftPressed(ATest, AState: TShiftState): Boolean; overload;
 function acShiftStateToKeys(AShift: TShiftState): Word;
+function acWantSpecialKey(AChild: TControl; ACharCode: Word; AShift: TShiftState): Boolean;
 
 procedure acMessageBeep(AType: TMsgDlgType);
 
 {$IFDEF FPC}
 function PointToLParam(const P: TPoint): LPARAM;
-procedure ProcessUtf8KeyPress(var Key: TUTF8Char; AEvent: TWideKeyEvent);
+procedure ProcessUtf8KeyPress(var Key: TUTF8Char; AKeyCharProc: TWideCharProc);
+{$ELSE}
+function GetKeyShiftState: TShiftState;
 {$ENDIF}
 implementation
 
@@ -1280,14 +1277,10 @@ begin
 end;
 
 function acSaveFocus: TWndHandle;
-var
-  AIntf: IACLInnerControl;
 begin
   Result := GetFocus;
   if Result = 0 then
     Result := GetForegroundWindow;
-  if Supports(FindControl(Result), IACLInnerControl, AIntf) then
-    Result := AIntf.GetInnerContainer.Handle;
 end;
 
 function acSafeSetFocus(AControl: TWinControl): Boolean;
@@ -1370,17 +1363,17 @@ begin
   Result := LPARAM((P.X and $0000ffff) or (P.Y shl 16));
 end;
 
-procedure ProcessUtf8KeyPress(var Key: TUTF8Char; AEvent: TWideKeyEvent);
+procedure ProcessUtf8KeyPress(var Key: TUTF8Char; AKeyCharProc: TWideCharProc);
 var
   LKey: WideChar;
-  LStr: UnicodeString;
+  LKeyString: UnicodeString;
 begin
-  LStr := UTF8ToString(Key);
-  if Length(LStr) = 1 then
+  LKeyString := UTF8ToString(Key);
+  if Length(LKeyString) = 1 then
   begin
-    LKey := LStr[1];
-    AEvent(LKey);
-    if LKey <> LStr[1] then
+    LKey := LKeyString[1];
+    AKeyCharProc(LKey);
+    if LKey <> LKeyString[1] then
       Key := UTF8Encode(LKey);
   end;
 end;
@@ -1388,7 +1381,8 @@ end;
 
 {$REGION ' Keyboard '}
 
-function acGetShiftState: TShiftState;
+{$IFNDEF FPC}
+function GetKeyShiftState: TShiftState;
 begin
   //#AI: We must ask use the GetKeyState instead of the GetKeyboardState,
   // because second doesn't return real information after next actions:
@@ -1410,16 +1404,7 @@ begin
   if GetKeyState(VK_RBUTTON) < 0 then
     Include(Result, ssRight);
 end;
-
-function acShiftStateToKeys(AShift: TShiftState): Word;
-begin
-  Result := 0;
-  if ssShift in AShift then Inc(Result, MK_SHIFT);
-  if ssCtrl in AShift then Inc(Result, MK_CONTROL);
-  if ssLeft in AShift then Inc(Result, MK_LBUTTON);
-  if ssRight in AShift then Inc(Result, MK_RBUTTON);
-  if ssMiddle in AShift then Inc(Result, MK_MBUTTON);
-end;
+{$ENDIF}
 
 function acIsDropDownCommand(Key: Word; Shift: TShiftState): Boolean;
 const
@@ -1437,7 +1422,24 @@ end;
 
 function acIsShiftPressed(ATest: TShiftState): Boolean;
 begin
-  Result := acIsShiftPressed(ATest, acGetShiftState);
+  Result := acIsShiftPressed(ATest, GetKeyShiftState);
+end;
+
+function acShiftStateToKeys(AShift: TShiftState): Word;
+begin
+  Result := 0;
+  if ssShift in AShift then Inc(Result, MK_SHIFT);
+  if ssCtrl in AShift then Inc(Result, MK_CONTROL);
+  if ssLeft in AShift then Inc(Result, MK_LBUTTON);
+  if ssRight in AShift then Inc(Result, MK_RBUTTON);
+  if ssMiddle in AShift then Inc(Result, MK_MBUTTON);
+end;
+
+function acWantSpecialKey(AChild: TControl; ACharCode: Word; AShift: TShiftState): Boolean;
+begin
+  Result := (AChild <> nil) and ([ssCtrl, ssAlt, ssShift] * AShift = []) and (
+    (AChild.Perform(CM_WANTSPECIALKEY, ACharCode, 0) <> 0) or
+    (AChild.Perform(WM_GETDLGCODE, 0, 0) and DLGC_WANTALLKEYS <> 0));
 end;
 
 {$ENDREGION}
@@ -2787,8 +2789,7 @@ end;
 
 function TACLGraphicControl.IsMouseAtControl: Boolean;
 begin
-  Result := Assigned(Parent) and Parent.HandleAllocated and ((GetCaptureControl = Self) or
-    PtInRect(ClientRect, CalcCursorPos) and (Perform(CM_HITTEST, 0, PointToLParam(CalcCursorPos)) <> 0));
+  Result := TACLControls.IsMouseAtControl(Self, Parent);
 end;
 
 procedure TACLGraphicControl.SetResourceCollection(AValue: TACLCustomResourceCollection);
@@ -3143,18 +3144,8 @@ begin
 end;
 
 function TACLCustomControl.IsMouseAtControl: Boolean;
-var
-  P: TPoint;
 begin
-  if HandleAllocated and IsWindowVisible(Handle) then
-  begin
-    if MouseCapture then
-      Exit(True);
-    P := CalcCursorPos;
-    Result := PtInRect(ClientRect, P) and (Perform(CM_HITTEST, 0, PointToLParam(P)) <> 0);
-  end
-  else
-    Result := False;
+  Result := TACLControls.IsMouseAtControl(Self, Self);
 end;
 
 procedure TACLCustomControl.Loaded;
@@ -3187,20 +3178,25 @@ end;
 
 procedure TACLCustomControl.MouseLeave;
 begin
-  FMouseInClient := False;
-  SubClasses.MouseLeave;
+  if MouseInClient then
+  begin
+    FMouseInClient := False;
+    SubClasses.MouseLeave;
+  end;
 end;
 
 procedure TACLCustomControl.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
   inherited;
-  SubClasses.MouseMove(Shift, Point(X, Y));
+  if MouseInClient then
+    SubClasses.MouseMove(Shift, Point(X, Y));
 end;
 
 procedure TACLCustomControl.MouseUp(
   Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
-  SubClasses.MouseUp(Button, Shift, Point(X, Y));
+  if MouseInClient then
+    SubClasses.MouseUp(Button, Shift, Point(X, Y));
   inherited;
 end;
 
@@ -3208,7 +3204,8 @@ procedure TACLCustomControl.MouseDown(
   Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   inherited MouseDown(Button, Shift, X, Y);
-  SubClasses.MouseDown(Button, Shift, Point(X, Y));
+  if MouseInClient then
+    SubClasses.MouseDown(Button, Shift, Point(X, Y));
 end;
 
 function TACLCustomControl.MouseWheel(Direction: TACLMouseWheelDirection;
@@ -3245,8 +3242,10 @@ end;
 
 procedure TACLCustomControl.PaintWindow(DC: HDC);
 begin
+{$IFNDEF LCLGtk3}
   if not (csOpaque in ControlStyle) then
     acDrawTransparentControlBackground(Self, DC, ClientRect, False);
+{$ENDIF}
   inherited PaintWindow(DC);
 end;
 
@@ -3665,7 +3664,6 @@ end;
 {$IFDEF FPC}
 procedure TACLCustomControl.Utf8KeyPress(var Key: TUTF8Char);
 begin
-  inherited;
   ProcessUtf8KeyPress(Key, KeyChar);
 end;
 {$ENDIF}
@@ -3837,7 +3835,7 @@ end;
 procedure TDragImageListHelper.ShowDragImageEx;
 begin
   Self.ShowDragImage;
-{$IFDEF LCLGtk2}
+{$IFDEF LCLGtkX}
   SetDragImageListOpacity(128);
 {$ENDIF}
 end;
@@ -3953,6 +3951,36 @@ begin
   finally
     EndPaint(ACaller.Handle, LPaintStruct);
   end;
+end;
+
+class function TACLControls.IsMouseAtControl(AInvoker: TControl; AContainer: TWinControl): Boolean;
+var
+  LPoint: TPoint;
+begin
+  Result := False;
+  if (AContainer <> nil) and AContainer.HandleAllocated then
+  begin
+    if GetCaptureControl = AInvoker then
+      Exit(True);
+    if IsVisible(AInvoker) then
+    begin
+      LPoint := AInvoker.CalcCursorPos;
+      Result := AInvoker.ClientRect.Contains(LPoint) and
+        (AInvoker.Perform(CM_HITTEST, 0, PointToLParam(LPoint)) <> 0);
+    end;
+  end;
+end;
+
+class function TACLControls.IsVisible(AControl: TControl): Boolean;
+begin
+{$IFDEF FPC}
+  Result := AControl.HandleObjectShouldBeVisible;
+{$ELSE}
+  if AControl is TWinControl then
+    Result := TWinControl(AControl).HandleAllocated and IsWindowVisible(TWinControl(AControl).Handle)
+  else
+    Result := AControl.Visible and ((AControl.Parent = nil) or IsVisible(AControl.Parent));
+{$ENDIF}
 end;
 
 class procedure TACLControls.ScaleChanging(AControl: TWinControl; var AState: TObject);

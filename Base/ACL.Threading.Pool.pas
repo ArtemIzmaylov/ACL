@@ -6,7 +6,7 @@
 //  Purpose:   Thread Pool
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -61,6 +61,7 @@ type
     FCanceled: Integer;
     FEvent: IACLTaskEvent;
     FOwner: TACLTaskDispatcher;
+    FOwnerTask: TACLTask;
     FThreadID: Cardinal;
 
     FOnComplete: TThreadMethod;
@@ -74,7 +75,7 @@ type
     function GetPriority: TACLTaskPriority; virtual;
   public
     procedure Cancel;
-    function IsCanceled: Boolean; virtual;
+    function IsCanceled: Boolean;
     //# Properties
     property Caption: string read GetCaption;
     property Handle: TObjHandle read GetHandle;
@@ -273,7 +274,7 @@ end;
 
 function TACLTask.IsCanceled: Boolean;
 begin
-  Result := FCanceled <> 0;
+  Result := (FCanceled <> 0) or (FOwnerTask <> nil) and FOwnerTask.IsCanceled;
 end;
 
 { TACLTaskGroup }
@@ -568,6 +569,7 @@ class function TACLTaskDispatcher.RunInCurrentThread(ATask: TACLTask): TObjHandl
 begin
   Result := 0;
   try
+    ATask.FOwnerTask := TaskDispatcher.CurrentTask;
     try
       ATask.Execute;
     finally

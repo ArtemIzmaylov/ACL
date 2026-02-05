@@ -1,12 +1,12 @@
 ﻿{%MainUnit ACL.UI.DropTarget.pas}
 
 uses
-  glib2,
-  Gdk2,
-  Gtk2,
-  Gtk2Def,
-  Gtk2Int,
-  Gtk2Proc;
+  Glib2,
+  Gtk3Objects,
+  Gtk3Widgets,
+  LazGObject2,
+  LazGdk3,
+  LazGtk3;
 
 type
 
@@ -30,23 +30,28 @@ type
     procedure UpdateRegistration(AHandle: TWndHandle; ARegister: Boolean); override;
   end;
 
+  function GetWidgetClientOrigin(w: PGtkWidget): TPoint;
+  var
+    x, y: gint;
+  begin
+    gdk_window_get_origin(gtk_widget_get_window(w), @x, @y);
+    Result := Point(X, Y);
+  end;
+
   function doGtkGetAction(context: PGdkDragContext): TACLDropAction;
   begin
-    case context^.action of
-      GDK_ACTION_LINK:
-        Result := daLink;
-      GDK_ACTION_MOVE:
-        Result := daMove;
-    else
-      Result := daCopy;
-    end;
+    Result := daCopy;
+    if GDK_ACTION_LINK in context^.get_actions then
+      Result := daLink;
+    if GDK_ACTION_MOVE in context^.get_actions then
+      Result := daMove;
   end;
 
   procedure doGtkDragOver(w: PGtkWidget; context: PGdkDragContext;
     x, y, time: guint; impl: TACLDropTargetHookImpl); cdecl;
   const
     Map: array[TACLDropAction] of TGdkDragAction = (
-      GDK_ACTION_COPY, GDK_ACTION_MOVE, GDK_ACTION_LINK
+      [GDK_ACTION_COPY], [GDK_ACTION_MOVE], [GDK_ACTION_LINK]
     );
   var
     LAllow: Boolean;
@@ -64,7 +69,7 @@ type
       if LAllow then
         gdk_drag_status(context, Map[LAction], time)
       else
-        gdk_drag_status(context, 0, time);
+        gdk_drag_status(context, [], time);
     finally
       Dec(impl.FRecursion);
     end;
@@ -107,11 +112,13 @@ type
 
   function TACLDropTargetHookImpl.GetData(AFormat: TClipboardFormat; out AMedium: TStgMedium): Boolean;
   begin
-    Result := (FData <> nil) and (FData^.target = AFormat) and (FData^.length >= 0);
+    Result := (FData <> nil) and
+      (TClipboardFormat(FData.get_target) = AFormat) and
+      (FData^.get_length >= 0);
     if Result then
     begin
-      AMedium.Data := FData^.data;
-      AMedium.Size := FData.length;
+      AMedium.Data := FData^.get_data;
+      AMedium.Size := FData^.get_length;
       AMedium.Owned := False;
     end;
   end;
@@ -123,7 +130,7 @@ type
     //  gtk_drag_get_data(FWidget, FContext, AFormat, GDK_CURRENT_TIME);
     if FRecursion > 0{drag-motion?} then
       Exit(True); // на дропе разберемся...
-    Result := (FData <> nil) and (FData^.target = AFormat);
+    Result := (FData <> nil) and (TClipboardFormat(FData.get_target) = AFormat);
   end;
 
   procedure TACLDropTargetHookImpl.UpdateContext(
@@ -147,7 +154,7 @@ type
     LMimeTypes: TACLStringList;
     LWidget: PGtkWidget;
   begin
-    LWidget := PGtkWidget(AHandle);
+    LWidget := PGtkWidget(TGtk3WIdget(AHandle).Widget);
     if ARegister then
     begin
       LMimeTypes := TACLStringList.Create;
@@ -169,12 +176,12 @@ type
         end;
 
         gtk_drag_dest_set(LWidget, GTK_DEST_DEFAULT_ALL,
-          @LFormats[0], Length(LFormats), GDK_ACTION_COPY or GDK_ACTION_MOVE);
+          @LFormats[0], Length(LFormats), [GDK_ACTION_COPY, GDK_ACTION_MOVE]);
         gtk_drag_dest_add_text_targets(LWidget);
 
-        ConnectSignal(PGtkObject(LWidget), 'drag_data_received', @doGtkDragDrop, Self);
-        ConnectSignal(PGtkObject(LWidget), 'drag_motion', @doGtkDragOver, Self);
-        ConnectSignal(PGtkObject(LWidget), 'drag_leave', @doGtkDragLeave, Self);
+        g_signal_connect_data(LWidget, 'drag_data_received', @doGtkDragDrop, Self, nil, G_CONNECT_DEFAULT);
+        g_signal_connect_data(LWidget, 'drag_motion', @doGtkDragOver, Self, nil, G_CONNECT_DEFAULT);
+        g_signal_connect_data(LWidget, 'drag_leave', @doGtkDragLeave, Self, nil, G_CONNECT_DEFAULT);
       finally
         LMimeTypes.Free;
       end;

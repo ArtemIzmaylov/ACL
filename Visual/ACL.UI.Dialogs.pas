@@ -6,7 +6,7 @@
 //  Purpose:   General Dialogs
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -396,6 +396,8 @@ type
     FolderBrowserRecursive: string;
     MsgDlgButtons: array[TMsgDlgBtn] of string;
     MsgDlgCaptions: array[TMsgDlgType] of string;
+    SearchHint: string;
+    SearchNoResults: string;
   public
     class constructor Create;
     class procedure ApplyLocalization;
@@ -427,6 +429,8 @@ implementation
 uses
 {$IF DEFINED(MSWINDOWS)}
   ACL.UI.Dialogs.Impl.Win32;
+{$ELSEIF DEFINED(LCLGtk3)}
+  ACL.UI.Core.Impl.Gtk3;
 {$ELSEIF DEFINED(LCLGtk2)}
   ACL.UI.Core.Impl.Gtk2;
 {$ENDIF}
@@ -558,6 +562,9 @@ begin
   FolderBrowserNewFolder := LSection.ReadString('B3', FolderBrowserNewFolder);
   ButtonApply := LSection.ReadString('B4', ButtonApply);
 
+  SearchHint := LSection.ReadString('Search', SearchHint);
+  SearchNoResults := LSection.ReadString('SearchNoResults', SearchNoResults);
+
   LValue := LSection.ReadString('BS');
   for LButton := Low(LButton) to High(LButton) do
     MsgDlgButtons[LButton] := IfThenW(LangExtractPart(LValue, Ord(LButton)), MsgDlgButtons[LButton]);
@@ -613,6 +620,9 @@ begin
   acLangSizeSuffixKB := 'KB';
   acLangSizeSuffixMB := 'MB';
   acLangSizeSuffixGB := 'GB';
+
+  SearchHint := 'Type here to search';
+  SearchNoResults := 'No results matching your search query';
 end;
 
 {$REGION ' FileDialogs '}
@@ -1474,8 +1484,8 @@ procedure TACLCustomLanguageDialog.SelectDefaultLanguage;
 var
   LItem: TACLImageComboBoxItem;
 begin
-  if FEditor.Items.FindByData(Pointer(GetUserDefaultUILanguage), LItem) or
-     FEditor.Items.FindByData(Pointer(LANG_EN_US), LItem)
+  if FEditor.Items.FindByData({%H-}Pointer(GetUserDefaultUILanguage), LItem) or
+     FEditor.Items.FindByData({%H-}Pointer(LANG_EN_US), LItem)
   then
     FEditor.ItemIndex := LItem.Index
   else

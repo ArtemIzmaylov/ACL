@@ -6,7 +6,7 @@
 //  Purpose:   Gtk2 Adapters and Helpers
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -52,21 +52,16 @@ uses
   // ACL
   ACL.Classes,
   ACL.Graphics,
-  ACL.Utils.DPIAware,
+  ACL.Graphics.Ex.Cairo,
   ACL.Utils.Common,
+  ACL.Utils.DPIAware,
+  ACL.Utils.Logger,
   // VCL
   Graphics,
   Controls,
   Forms;
 
 type
-
-  { IACLLayeredPaint }
-
-  IACLLayeredPaint = interface
-  ['{3FE006F2-67DE-4317-B402-D872A77373E4}']
-    procedure PaintTo(ACairo: Pcairo_t);
-  end;
 
   { TGtkApp }
 
@@ -99,6 +94,7 @@ type
     class procedure BeginPopup(APopupControl: TWinControl); overload;
     class procedure BeginPopup(APopupControl: TWinControl; ACallback: TGtkEventCallback); overload;
     class procedure EndPopup(AControl: TWinControl);
+    class function IsLooseFocusEvent(AEvent: PGdkEvent): Boolean;
     class function IsPopupAborted: Boolean;
 
     class procedure ProcessMessages;
@@ -107,7 +103,10 @@ type
 
   { TACLWSHintWindow }
 
-  TACLWSHintWindow = class(TGtk2WSHintWindow);
+  TACLWSHintWindow = class(TGtk2WSHintWindow)
+  published
+    class procedure ShowHide(const AWinControl: TWinControl); override;
+  end;
 
   { TACLWSPopupControl }
 
@@ -147,7 +146,6 @@ type
       AWidget: PGtkWidget; AWidgetInfo: PWidgetInfo);
     class procedure SetCallbacks(const AWidget: PGtkWidget;
       const AWidgetInfo: PWidgetInfo); override;
-    class procedure SetColor(const AWinControl: TWinControl); override;
     class procedure SetFormBorderStyle(const AForm: TCustomForm;
       const AFormBorderStyle: TFormBorderStyle); override;
     class procedure SetFormStyle(const AForm: TCustomform;
@@ -158,7 +156,10 @@ type
 
   { TACLWSCustomControl }
 
-  TACLWSCustomControl = class(TGtk2WSWinControl);
+  TACLWSCustomControl = class(TGtk2WSWinControl)
+  published
+    class procedure SetOpacity(const AWinControl: TWinControl; AOpacity: Byte);
+  end;
 
   { TACLWSPopupWindow }
 
@@ -196,6 +197,7 @@ type
     class function Check(AControl: TWinControl; X, Y, AThreshold: Integer): Boolean;
   end;
 
+function IsAlphaComposingSupports: Boolean;
 function LoadDialogIcon(AOwnerWnd: TWndHandle; AType: TMsgDlgType; ASize: Integer): TACLDib;
 procedure SetDragImageListOpacity(Opacity: Byte);
 procedure SetWindowStayOnTop(AWnd: TWndHandle; AValue: Boolean);
@@ -217,6 +219,13 @@ type
   TFormAccess = class(TForm);
   TGtk2WidgetSetAccess = class(TGtk2WidgetSet);
   TWinControlAccess = class(TWinControl);
+
+function gdk_screen_is_composited(screen: PGdkScreen): gboolean; cdecl; external gdklib; // since v2.10
+
+function IsAlphaComposingSupports: Boolean;
+begin
+  Result := gdk_screen_is_composited(gdk_screen_get_default);
+end;
 
 procedure SetDragImageListOpacity(Opacity: Byte);
 var
@@ -620,6 +629,11 @@ begin
     raise Exception.Create(FPopupError);
 end;
 
+class function TGtkApp.IsLooseFocusEvent(AEvent: PGdkEvent): Boolean;
+begin
+  Result := False;
+end;
+
 class procedure TGtkApp.Handler(event: PGdkEvent; data: gpointer); cdecl;
 var
   LCallback: TGtkEventCallback;
@@ -774,6 +788,22 @@ begin
   HandlerInit;
 end;
 
+{ TACLWSHintWindow }
+
+class procedure TACLWSHintWindow.ShowHide(const AWinControl: TWinControl);
+var
+  LCapture: TControl;
+begin
+  LCapture := GetCaptureControl;
+  inherited ShowHide(AWinControl);
+  // WTF???
+  //    if not ACustomForm.ClassNameIs('TDockImageWindow') then
+  //      ReleaseMouseCapture;
+  // ref.to: TGtk2WidgetSet.SetVisible
+  if LCapture <> nil then
+    SetCaptureControl(LCapture);
+end;
+
 { TACLWSForm }
 
 class function TACLWSForm.CreateHandle(
@@ -847,9 +877,8 @@ begin
   LWndParent := TACLWSForm.ResolveWndParent(AParams);
   if LWndParent <> 0 then
     gtk_window_set_transient_for(PGtkWindow(LWnd), PGtkWindow(LWndParent))
-  else
-    if LForm.FormStyle in fsAllStayOnTop then
-      gtk_window_set_keep_above(PGtkWindow(LWnd), true);
+  else if LForm.FormStyle in fsAllStayOnTop then
+    gtk_window_set_keep_above(PGtkWindow(LWnd), true);
 
   case LForm.WindowState of
     wsMaximized:
@@ -908,10 +937,10 @@ class function TACLWSAdvancedForm.DoAlphaExposing(
   Widget: PGtkWidget; Event: PGDKEventExpose; Data: gPointer): GBoolean;
 var
   LCairo: pcairo_t;
-  LPainter: IACLLayeredPaint;
+  LPainter: ICairoPainter;
 begin
   Result := False;
-  if Supports(TObject(Data), IACLLayeredPaint, LPainter) then
+  if Supports(TObject(Data), ICairoPainter, LPainter) then
   begin
     LCairo := gdk_cairo_create(Widget^.window);
     try
@@ -932,16 +961,16 @@ end;
 class procedure TACLWSAdvancedForm.SetAlphaExposing(AWidget: PGtkWidget; AWidgetInfo: PWidgetInfo);
 var
   LColorMap: PGdkColormap;
-  LScreen: PGdkScreen;
 begin
   // Включаем AlphaComposing, если оконный менеджер поддерживает его
-  LScreen := gtk_widget_get_screen(AWidget);
-  if LScreen <> nil then
+  if IsAlphaComposingSupports then
   begin
-    LColorMap := gdk_screen_get_rgba_colormap(LScreen);
+    LColorMap := gdk_screen_get_rgba_colormap(gdk_screen_get_default);
     if LColorMap <> nil then
       gtk_widget_set_colormap(AWidget, LColorMap);
-  end;
+  end
+  else
+    LogEntry(acGeneralLogFileName, 'Gtk2', 'alpha-composing is unavailable');
 
   // подменяем gtkExpose нашим обработчиком
   g_signal_handlers_disconnect_by_func(AWidget, @gtkExposeEvent, AWidgetInfo^.LCLObject);
@@ -968,15 +997,6 @@ begin
       g_signal_connect(LFixed, 'realize', TGTKSignalFunc(@DoRealize), AWidgetInfo^.LCLObject);
     end;
   end;
-end;
-
-class procedure TACLWSAdvancedForm.SetColor(const AWinControl: TWinControl);
-var
-  LWidgetInfo: PWidgetInfo;
-begin
-  LWidgetInfo := GetWidgetInfo(Pointer(AWinControl.Handle));
-  if (LWidgetInfo = nil) or (LWidgetInfo^.ExStyle and WS_EX_LAYERED = 0) then
-    inherited;
 end;
 
 class procedure TACLWSAdvancedForm.SetFormBorderStyle(
@@ -1050,9 +1070,11 @@ begin
   end
   else
   begin
-    if LWidgetInfo^.ExStyle and WS_EX_NOACTIVATE <> 0 then
+    if LForm.HandleObjectShouldBeVisible then
     begin
-      if LForm.HandleObjectShouldBeVisible then
+      if LWidgetInfo^.ExStyle and WS_EX_TOOLWINDOW <> 0 then
+        gtk_window_set_type_hint(LWindow, GDK_WINDOW_TYPE_HINT_UTILITY);
+      if LWidgetInfo^.ExStyle and WS_EX_NOACTIVATE <> 0 then
         gtk_window_set_type_hint(LWindow, GDK_WINDOW_TYPE_HINT_TOOLTIP);
     end;
     inherited;
@@ -1158,6 +1180,14 @@ begin
   end
   else
     inherited SetBounds(AWinControl, ALeft, ATop, AWidth, AHeight);
+end;
+
+{ TACLWSCustomControl }
+
+class procedure TACLWSCustomControl.SetOpacity(
+  const AWinControl: TWinControl; AOpacity: Byte);
+begin
+  // unavailable
 end;
 
 { TACLWSScrollingControl }

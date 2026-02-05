@@ -1,4 +1,7 @@
-﻿{$R-} { Range-Checking }
+﻿{$IFNDEF ACL_CONFIG_INC}
+{$DEFINE ACL_CONFIG_INC}
+
+{$R-} { Range-Checking }
 {$Q-} { Overflow checking }
 {$Z1} { Minumum enum size = 1}
 
@@ -25,6 +28,10 @@
   {$ENDIF}
 
   {$DEFINE DEBUG}
+{$ENDIF}
+
+{$IF DEFINED(LCLGtk2) OR DEFINED(LCLGtk3)}
+  {$DEFINE LCLGtkX}
 {$ENDIF}
 
 {$IF DEFINED(CPUX64) OR DEFINED(CPU64)}
@@ -86,7 +93,8 @@
 
 {$DEFINE ACL_ALPHACOMPOSED_POPUPMENUS}
 {$DEFINE ACL_TEXTLAYOUT_RTL}   // support for right-to-left text direction
-{$IFDEF LCLGtk2}
+
+{$IFDEF LCLGtkX}
   {$DEFINE ACL_CAIRO}
   {$DEFINE ACL_CAIRO_RENDER}
   {$DEFINE ACL_CAIRO_TEXTOUT}
@@ -99,3 +107,5 @@
 {$IFDEF LINUX}
   {.$DEFINE ACL_USE_SKINNED_FORM} // Experimental!
 {$ENDIF}
+
+{$ENDIF} // ACL_CONFIG_INC

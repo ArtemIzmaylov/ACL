@@ -2,11 +2,12 @@
 
 uses
   Glib2,
-  Gdk2,
-  Gtk2,
-  Gtk2Def,
-  Gtk2Int,
-  Gtk2Proc;
+  Gtk3Objects,
+  Gtk3Widgets,
+  LazGObject2,
+  LazGdk3,
+  LazGtk3,
+  LCLType;
 
 type
 
@@ -23,19 +24,26 @@ type
     procedure Cancel; override;
   end;
 
+  procedure gtk_signal_disconnect_by_func(w: PGtkWidget; proc, data: Pointer);
+  begin
+    g_signal_handlers_disconnect_matched(w,
+      [G_SIGNAL_MATCH_FUNC, G_SIGNAL_MATCH_DATA], 0, 0, nil, proc, data);
+  end;
+
   { TACLDropSourceImpl }
 
   procedure doGtkDropEnd(w: PGtkWidget; ctx: PGdkDragContext; impl: TACLDropSourceImpl); cdecl;
+  var
+    LActions: TGdkDragAction;
   begin
+    LActions := ctx^.get_actions;
     impl.FDropResult := [];
-    case ctx^.action of
-      GDK_ACTION_COPY:
-        impl.FDropResult := [dsaCopy];
-      GDK_ACTION_MOVE:
-        impl.FDropResult := [dsaMove];
-      GDK_ACTION_LINK:
-        impl.FDropResult := [dsaLink];
-    end;
+    if GDK_ACTION_COPY in LActions then
+      Include(impl.FDropResult, dsaCopy);
+    if GDK_ACTION_MOVE in LActions then
+      Include(impl.FDropResult, dsaMove);
+    if GDK_ACTION_LINK in LActions then
+      Include(impl.FDropResult, dsaLink);
     if impl.fEvent <> nil then
       impl.fEvent.Signal;
   end;
@@ -47,14 +55,14 @@ type
     LMedium: TStgMedium;
     I: Integer;
   begin
-    LFormat := MakeFormat(data^.target);
+    LFormat := MakeFormat(TClipboardFormat(data^.get_target));
     for I := 0 to src.DataProviders.Count - 1 do
     begin
       if src.DataProviders[I].IsSupported(LFormat) then
       begin
         if src.DataProviders[I].Store(LMedium, LFormat) then
         try
-          gtk_selection_data_set(data, data^.target, 8, LMedium.Data, LMedium.Size);
+          gtk_selection_data_set(data, data^.get_target, 8, LMedium.Data, LMedium.Size);
         finally
           ReleaseStgMedium(LMedium)
         end;
@@ -73,13 +81,13 @@ type
     LWidget: PGtkWidget;
     I: Integer;
   begin
-    LActions := 0;
+    LActions := [];
     if dsaCopy in AllowedActions then
-      LActions := LActions or GDK_ACTION_COPY;
+      LActions := LActions + [GDK_ACTION_COPY];
     if dsaMove in AllowedActions then
-      LActions := LActions or GDK_ACTION_MOVE;
+      LActions := LActions + [GDK_ACTION_MOVE];
     if dsaLink in AllowedActions then
-      LActions := LActions or GDK_ACTION_LINK;
+      LActions := LActions + [GDK_ACTION_LINK];
 
     LControl := Control;
     while (LControl <> nil) and not LControl.Visible do
@@ -91,27 +99,27 @@ type
     for I := 0 to DataProviders.Count - 1 do
     begin
       if DataProviders[I].HasData then
-        gtk_target_list_add(LList, DataProviders[I].GetFormat.cfFormat, 0, 0);
+        gtk_target_list_add(LList, PGdkAtom(DataProviders[I].GetFormat.cfFormat), 0, 0);
     end;
 
     FEvent := TACLEvent.Create(True, False);
     try
-      LWidget := PGtkWidget(LControl.Handle);
-      ConnectSignal(PGtkObject(LWidget), 'drag_data_get', @doGtkDropGetData, Self);
-      ConnectSignal(PGtkObject(LWidget), 'drag_end', @doGtkDropEnd, Self);
+      LWidget := TGtk3Widget(LControl.Handle).Widget;
+      g_signal_connect_data(LWidget, 'drag_data_get', @doGtkDropGetData, Self, nil, G_CONNECT_DEFAULT);
+      g_signal_connect_data(LWidget, 'drag_end', @doGtkDropEnd, Self, nil, G_CONNECT_DEFAULT);
       try
-        FContext := gtk_drag_begin(LWidget, LList, LActions, 1, nil);
+        FContext := LWidget.drag_begin_with_coordinates(LList, LActions, 1, nil, -1, -1);
         FEvent.WaitFor;
         FContext := nil;
         //* Bug in GTK.  If a drag is initiated using gtk_drag_begin and the
         //* mouse is released immediately, the mouse and keyboard remain
         //* grabbed.  The fix is to release the grab on the mouse and keyboard
         //* whenever the drag is terminated.
-        gdk_keyboard_ungrab(GDK_CURRENT_TIME);
+        //gdk_keyboard_ungrab(GDK_CURRENT_TIME);
         gdk_pointer_ungrab(GDK_CURRENT_TIME);
       finally
-        gtk_signal_disconnect_by_func(PGtkObject(LWidget), @doGtkDropGetData, Self);
-        gtk_signal_disconnect_by_func(PGtkObject(LWidget), @doGtkDropEnd, Self);
+        gtk_signal_disconnect_by_func(LWidget, @doGtkDropGetData, Self);
+        gtk_signal_disconnect_by_func(LWidget, @doGtkDropEnd, Self);
       end;
     finally
       FreeAndNil(FEvent);

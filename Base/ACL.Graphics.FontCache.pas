@@ -45,8 +45,9 @@ uses
   ACL.Threading,
   ACL.Threading.Pool,
   ACL.Utils.Common,
-  ACL.Utils.Logger,
-  ACL.Utils.DPIAware;
+  ACL.Utils.FileSystem,
+  ACL.Utils.DPIAware,
+  ACL.Utils.Logger;
 
 type
 
@@ -136,6 +137,7 @@ type
     class constructor Create;
     class destructor Destroy;
     class function Enumerate: IACLEnumerable<string>;
+    class procedure Flush;
     class function Get(const AName: string; AStyle: TFontStyles;
       AHeight: Integer; ATargetDPI: Integer; AQuality: TFontQuality): TFont; overload;
     class function Get(const AFontData: TACLFontData): TFont; overload;
@@ -144,6 +146,12 @@ type
     //# Remap
     class procedure RemapFont(var AName: TFontName; var AHeight: Integer);
     class property RemapFontProc: TACLFontRemapProc read FRemapFontProc write FRemapFontProc;
+    //# LocalFonts (TTF-only!!!)
+    // <AppId> get used as name for local fonts folder (Linux only)
+    // <FontId> is name without path and extension of font file, for example: "FluentSystemIcons-Regular" (Linux only)
+    // !! DO NOT FORGET to call the Flush after registering all fonts
+    class function RegisterFont(AData: TMemoryStream; const AAppId, AFontId: string): TObjHandle;
+    class procedure UnregisterFont(AHandle: TObjHandle);
   end;
 
 function acResolveFontHeight(AFont: TFont; AHeight: Integer): Integer;
@@ -156,6 +164,12 @@ uses
 
 {$IFNDEF MSWINDOWS}
   {$DEFINE USE_METRICS_CACHE}
+{$ENDIF}
+
+{$IFDEF MSWINDOWS}
+function AddFontMemResourceEx(AMem: Pointer; AMemSize: DWORD;
+  AVector: PDesignVector; ANumInstalled: LPDWORD): THandle; stdcall; external gdi32;
+function RemoveFontMemResourceEx(AFontHandle: THandle): BOOL; stdcall; external gdi32;
 {$ENDIF}
 
 {$REGION ' Metrics Cache '}
@@ -698,6 +712,14 @@ begin
   Result := TACLLockedEnumerable<string>.Create(FFonts, FLock);
 end;
 
+class procedure TACLFontCache.Flush;
+begin
+  LogEntry(acGeneralLogFileName, 'FontCache', 'Flush');
+{$IFDEF LINUX}
+  TACLProcess.Execute('fc-cache -f');
+{$ENDIF}
+end;
+
 class function TACLFontCache.Get(const AFontData: TACLFontData): TFont;
 begin
   FLock.Enter;
@@ -750,6 +772,37 @@ begin
   end;
 end;
 
+class function TACLFontCache.RegisterFont(
+  AData: TMemoryStream; const AAppId, AFontId: string): TObjHandle;
+{$IFDEF MSWINDOWS}
+var
+  LCount: DWORD;
+begin
+  LCount := 0;
+  Result := AddFontMemResourceEx(AData.Memory, AData.Size, nil, @LCount);
+  if (Result = 0) or (LCount = 0) then
+    LogEntry(acGeneralLogFileName, 'FontCache', 'RegisterFont(%s) failed', [AFontId]);
+{$ELSE}
+var
+  LPath: string;
+begin
+  Result := 0;
+  LPath := acIncludeTrailingPathDelimiter(GetUserDir) + '.local/share/fonts/ttf/' + AAppId + '/';
+  if ForceDirectories(LPath) then
+  begin
+    LPath := LPath + AFontId + '.ttf';
+    try
+      AData.SaveToFile(LPath);
+      Result := TObjHandle(acAllocStr(LPath));
+    except
+      DeleteFile(LPath);
+    end;
+  end;
+  if Result = 0 then
+    LogEntry(acGeneralLogFileName, 'FontCache', 'RegisterFont(%s) failed', [AFontId]);
+{$ENDIF}
+end;
+
 class procedure TACLFontCache.RemapFont(var AName: TFontName; var AHeight: Integer);
 begin
   if Assigned(RemapFontProc) then
@@ -769,10 +822,21 @@ begin
   {$IFDEF MSWINDOWS}
     FLoaderHandle := TaskDispatcher.Run(AsyncFontLoader);
   {$ELSE}
-    // В Линуксе API потоконезащищенное
-    AsyncFontLoader(nil);
+    AsyncFontLoader(nil); // LCL API is not thread-safe
   {$ENDIF}
   end;
+end;
+
+class procedure TACLFontCache.UnregisterFont(AHandle: TObjHandle);
+begin
+  if AHandle = 0 then Exit;
+{$IFDEF MSWINDOWS}
+  RemoveFontMemResourceEx(AHandle);
+{$ELSE}
+  //#AI: lead to AV in libfontconfig
+  //DeleteFile(PAnsiChar(AHandle));
+  FreeMem(Pointer(AHandle));
+{$ENDIF}
 end;
 
 class procedure TACLFontCache.WaitForLoader(ACancel: Boolean);

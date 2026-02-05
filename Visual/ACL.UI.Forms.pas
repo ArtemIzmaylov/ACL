@@ -6,7 +6,7 @@
 //  Purpose:   Forms and Top-level Windows
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -79,6 +79,28 @@ type
 {$ENDIF}
 type
   TShowMode = ACL.UI.Forms.Base.TShowMode;
+
+{$REGION ' Drag Image '}
+
+  { TACLDragImage }
+
+  TACLDragImage = class(TForm)
+  strict private
+    procedure CMDesignHitTest(var Message: TCMDesignHitTest); message CM_DESIGNHITTEST;
+    procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
+    procedure WMNCHitTest(var Message: TWMNCHitTest); message WM_NCHITTEST;
+  protected
+    procedure CreateParams(var Params: TCreateParams); override;
+    procedure Paint; override;
+  {$IFDEF FPC}
+    class procedure WSRegisterClass; override;
+  {$ENDIF}
+  public
+    constructor Create(AOwner: TComponent); override;
+    procedure Show;
+  end;
+
+{$ENDREGION}
 
 {$REGION ' Popup Window '}
 
@@ -209,12 +231,64 @@ begin
 {$ENDIF}
 end;
 
-function acWantSpecialKey(AChild: TControl; ACharCode: Word; AShift: TShiftState): Boolean;
+{$REGION ' Drag Image '}
+
+{ TACLDragImage }
+
+constructor TACLDragImage.Create(AOwner: TComponent);
 begin
-  Result := (AChild <> nil) and ([ssCtrl, ssAlt, ssShift] * AShift = []) and (
-    (AChild.Perform(CM_WANTSPECIALKEY, ACharCode, 0) <> 0) or
-    (AChild.Perform(WM_GETDLGCODE, 0, 0) and DLGC_WANTALLKEYS <> 0));
+  CreateNew(AOwner);
+  AlphaBlend := True;
+  AlphaBlendValue := acDragImageAlpha;
+  Position := poDesigned;
+  BorderStyle := bsNone;
+  Scaled := False;
 end;
+
+procedure TACLDragImage.CreateParams(var Params: TCreateParams);
+begin
+  inherited;
+  Params.ExStyle := WS_EX_TOPMOST or WS_EX_TOOLWINDOW or WS_EX_NOACTIVATE;
+  Params.Style := WS_POPUP;
+end;
+
+procedure TACLDragImage.Paint;
+begin
+  acFillRect(Canvas, ClientRect, acDragImageColor);
+end;
+
+procedure TACLDragImage.CMDesignHitTest(var Message: TCMDesignHitTest);
+begin
+  Message.Result := 1;
+end;
+
+procedure TACLDragImage.WMEraseBkgnd(var Message: TWMEraseBkgnd);
+begin
+  Message.Result := 1;
+end;
+
+procedure TACLDragImage.WMNCHitTest(var Message: TWMNCHitTest);
+begin
+  Message.Result := HTTRANSPARENT;
+end;
+
+{$IFDEF FPC}
+class procedure TACLDragImage.WSRegisterClass;
+begin
+  RegisterWSComponent(TACLDragImage, TACLWSHintWindow);
+end;
+{$ENDIF}
+
+procedure TACLDragImage.Show;
+begin
+{$IFDEF FPC}
+  inherited;
+{$ELSE}
+  ShowWindow(Handle, SW_SHOWNA);
+{$ENDIF}
+end;
+
+{$ENDREGION}
 
 {$REGION ' Popup Window '}
 
@@ -248,7 +322,7 @@ begin
   MouseCapture := False;
   if Visible then
   try
-  {$IFDEF LCLGtk2}
+  {$IFDEF LCLGtkX}
     TGtkApp.EndPopup(Self);
   {$ENDIF}
     Hide;
@@ -284,9 +358,12 @@ begin
   inherited;
   if DropDownMode then
   begin
-    Params.Style := WS_POPUP;
     Params.ExStyle := Params.ExStyle or WS_EX_NOACTIVATE;
-  end;
+    Params.Style := WS_POPUP;
+  end
+  else
+    Params.ExStyle := Params.ExStyle or WS_EX_TOOLWINDOW;
+
   Params.WindowClass.Style := Params.WindowClass.Style or CS_HREDRAW or CS_VREDRAW or CS_DROPSHADOW;
 end;
 
@@ -394,7 +471,7 @@ begin
     SendMessage(FOwnerFormWnd, WM_ENTERMENULOOP, 0, 0);
 
   Visible := True;
-{$IFDEF LCLGtk2}
+{$IFDEF LCLGtkX}
   try
     TGtkApp.BeginPopup(Self);
     if DropDownMode then
