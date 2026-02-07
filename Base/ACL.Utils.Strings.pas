@@ -394,6 +394,10 @@ type
 
   TACLFontData = array[0..3] of string;
 
+  {$SCOPEDENUMS ON}
+  TACLTestCaseResult = (Neutral, Lower, Upper, Mixed, FirstUpper);
+  {$SCOPEDENUMS OFF}
+
 var
   DefaultCodePage: Integer = CP_ACP;
 
@@ -506,11 +510,12 @@ function acSplitStringAsIntegerArray(const S: string;
 // Case
 function acAllWordsWithCaptialLetter(const S: string; IgnoreSourceCase: Boolean = False): string;
 function acFirstWordWithCaptialLetter(const S: string): string;
-function acLowerCase(const S: string): string; overload; inline;
 function acLowerCase(const S: AnsiChar): AnsiChar; overload; inline;
+function acLowerCase(const S: string): string; overload; inline;
 function acLowerCase(const S: WideChar): WideChar; overload; inline;
-function acUpperCase(const S: string): string; overload; inline;
+function acTestCase(const S: string): TACLTestCaseResult;
 function acUpperCase(const S: AnsiChar): AnsiChar; overload; inline;
+function acUpperCase(const S: string): string; overload; inline;
 function acUpperCase(const S: WideChar): WideChar; overload; inline;
 
 // Comparing
@@ -1687,6 +1692,47 @@ begin
     end;
   until Pos + 1 > Len;
   Result := acString(Str);
+end;
+
+function acTestCase(const S: string): TACLTestCaseResult;
+var
+  L, U, N: Integer;
+  Len: Cardinal;
+  Scn: PWideChar;
+  Str: UnicodeString;
+begin
+  if S = '' then
+    Exit(TACLTestCaseResult.Neutral);
+
+  Str := acUString(S);
+  Scn := PWideChar(Str);
+  Len := Length(Str);
+  L := 0; N := 0; U := 0;
+  while Len > 0 do
+  begin
+    if Scn^ <> acUpperCase(Scn^) then // lower
+      Inc(L)
+    else if Scn^ = acLowerCase(Scn^) then // neutral
+      Inc(N)
+    else
+    begin
+      Inc(U);
+      if (L > 0) or (N > 0) then // upper after lower or neutral
+        Exit(TACLTestCaseResult.Mixed);
+    end;
+    Inc(Scn);
+    Dec(Len);
+  end;
+
+  if (U > 0) and (L = 0) and (N = 0) then
+    Exit(TACLTestCaseResult.Upper);
+  if (L > 0) and (U = 0) {and (N = 0)} then
+    Exit(TACLTestCaseResult.Lower);
+  if (N > 0) and (L = 0) and (U = 0) then
+    Exit(TACLTestCaseResult.Neutral);
+  if (U = 1) then
+    Exit(TACLTestCaseResult.FirstUpper);
+  Result := TACLTestCaseResult.Mixed;
 end;
 
 function acLowerCase(const S: string): string;

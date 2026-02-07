@@ -6,7 +6,7 @@
 //  Purpose:   Base classes for editors
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -252,9 +252,10 @@ type
     FInplace: Boolean;
     FStyle: TACLStyleEdit;
     FStyleButton: TACLStyleButton;
-    FTextPadding: TSize;
+    FTextPadding: TRect;
 
     FOnChange: TNotifyEvent;
+    FOnPaint: TNotifyEvent;
 
     procedure CalculateTextPadding;
     //# Setters
@@ -300,9 +301,10 @@ type
     property Inplace: Boolean read FInplace;
     property Style: TACLStyleEdit read FStyle write SetStyle;
     property StyleButton: TACLStyleButton read FStyleButton write SetStyleButton;
-    property TextPadding: TSize read FTextPadding;
+    property TextPadding: TRect read FTextPadding;
     //# Events
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
+    property OnPaint: TNotifyEvent read FOnPaint write FOnPaint;
   public
     constructor Create(AOwner: TComponent); override;
     constructor CreateInplace(const AParams: TACLInplaceInfo); virtual;
@@ -1362,8 +1364,8 @@ begin
   OnKeyDown := AParams.OnKeyDown;
   OnExit := AParams.OnApply;
   Parent := AParams.Parent;
-  FTextPadding.cy := 0;
-  FTextPadding.cx := AParams.TextBounds.Left - AParams.Bounds.Left;
+  FTextPadding := NullRect;
+  FTextPadding.Left := AParams.TextBounds.Left - AParams.Bounds.Left;
   BoundsRect := AParams.Bounds;
 end;
 
@@ -1419,7 +1421,7 @@ end;
 
 procedure TACLCustomEdit.CalculateContent(ARect: TRect);
 begin
-  ARect.Inflate(-FTextPadding.cx, -FTextPadding.cy);
+  ARect.Content(TextPadding);
   FEditBox.BeginUpdate;
   try
     FEditBox.Changed; // force recalculate
@@ -1431,14 +1433,14 @@ end;
 
 procedure TACLCustomEdit.CalculateTextPadding;
 begin
-  FTextPadding := TSize.Create(dpiApply(acTextIndent, FCurrentPPI));
+  FTextPadding := TRect.CreateMargins(dpiApply(acTextIndent, FCurrentPPI));
 end;
 
 function TACLCustomEdit.CanAutoSize(var NewWidth, NewHeight: Integer): Boolean;
 begin
   if AutoSize then
   begin
-    NewHeight := FEditBox.AutoHeight + 2 * FTextPadding.Height;
+    NewHeight := FEditBox.AutoHeight + FTextPadding.MarginsHeight;
     if Borders then
       Inc(NewHeight, 2 * BorderSize);
   end;
@@ -1521,6 +1523,7 @@ begin
       not (csDesigning in ComponentState) and MouseInClient,
       not (csDesigning in ComponentState) and Focused);
   PaintCore;
+  CallNotifyEvent(Self, OnPaint);
 end;
 
 procedure TACLCustomEdit.PaintCore;

@@ -6,7 +6,7 @@
 //  Purpose:   Memo
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -248,6 +248,7 @@ type
   public
     constructor Create(AOwner: IACLCompoundControlSubClassContainer);
     destructor Destroy; override;
+    procedure MakeVisible; overload;
     procedure MakeVisible(const ARect: TRect); overload;
     procedure MakeVisible(const ARow: Integer); overload;
     procedure Select(AStart, ALength: Integer; AGoForward: Boolean = True);
@@ -714,6 +715,11 @@ begin
       Result.InTextFinish := LRow.LineEndPosition - LBase;
     end;
   end;
+end;
+
+procedure TACLMemoSubClass.MakeVisible;
+begin
+  Changed([mcnMakeVisible]);
 end;
 
 procedure TACLMemoSubClass.MakeVisible(const ARow: Integer);

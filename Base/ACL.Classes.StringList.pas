@@ -113,6 +113,7 @@ type
     function AddPair(const Name, Value: string;
       AObject: TObject = nil; AInterface: IUnknown = nil): Integer;
     procedure AddEx(const S: string);
+    procedure AddIfAbsent(const S: string);
     procedure Append(const ASource: string); overload;
     procedure Append(const ASource: TACLStringList); overload;
     procedure Append(const ASource: TStringDynArray); overload;
@@ -413,6 +414,11 @@ end;
 procedure TACLStringList.AddEx(const S: string);
 begin
   Add(S);
+end;
+
+procedure TACLStringList.AddIfAbsent(const S: string);
+begin
+  if not Contains(S) then Add(S);
 end;
 
 procedure TACLStringList.Append(const ASource: TACLStringList);

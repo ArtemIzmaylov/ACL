@@ -3301,7 +3301,7 @@ begin
     LQueueItem^.Value := False;
   end;
 
-  FData.Add(Key, Value);
+  FData.AddOrSetValue(Key, Value);
   LQueueItem^.Key := Key;
   LQueueItem^.Value := True;
 

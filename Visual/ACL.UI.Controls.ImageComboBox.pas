@@ -6,7 +6,7 @@
 //  Purpose:   ImageComboBox
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -384,7 +384,7 @@ begin
     FImageRect := ARect.Split(srLeft, ImageSize.cx);
     FImageRect.Offset(dpiApply(StyleDropDownList.RowContentOffsets.Left, FCurrentPPI), 0);
     FImageRect.CenterVert(ImageSize.cy);
-    ARect.Left := ImageRect.Right + dpiApply(acIndentBetweenElements, FCurrentPPI) - TextPadding.cx;
+    ARect.Left := ImageRect.Right + dpiApply(acIndentBetweenElements, FCurrentPPI) - TextPadding.Left;
   end;
   inherited;
 end;

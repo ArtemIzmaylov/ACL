@@ -68,8 +68,9 @@ type
     Start: Integer;
     Finish: Integer;
     class function Create(AStart, AFinish: Integer): TACLRange; static;
-    procedure Inflate(AValue: Integer); inline;
     function Contains(AValue: Integer): Boolean; inline;
+    function Equals(const ASource: TACLRange): Boolean; inline;
+    procedure Inflate(AValue: Integer); inline;
     function Length: Integer; inline;
   end;
 
@@ -596,15 +597,20 @@ begin
   Result.Finish := AFinish;
 end;
 
+function TACLRange.Contains(AValue: Integer): Boolean;
+begin
+  Result := InRange(AValue, Start, Finish);
+end;
+
+function TACLRange.Equals(const ASource: TACLRange): Boolean;
+begin
+  Result := (Start = ASource.Start) and (Finish = ASource.Finish);
+end;
+
 procedure TACLRange.Inflate(AValue: Integer);
 begin
   Finish := Max(Finish, AValue);
   Start := Min(Start, AValue);
-end;
-
-function TACLRange.Contains(AValue: Integer): Boolean;
-begin
-  Result := InRange(AValue, Start, Finish);
 end;
 
 function TACLRange.Length: Integer;
