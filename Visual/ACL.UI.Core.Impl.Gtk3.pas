@@ -599,17 +599,15 @@ end;
 
 class function TGtkApp.IsLooseFocusEvent(AEvent: PGdkEvent): Boolean;
 var
-  LWidget: PGtkWidget;
+  LWidget: TGtk3Widget;
 begin
   Result := False;
   if AEvent^.type_ = GDK_WINDOW_STATE then
   begin
-    LWidget := gtk_get_event_widget(AEvent);
-    if (LWidget <> nil) and (LWidget^.window <> nil) then
-    begin
-      if not (GDK_WINDOW_STATE_FOCUSED in LWidget^.window^.get_state) then
-        Result := True;
-    end;
+    LWidget := Gtk3WidgetFromGtkWidget(gtk_get_event_widget(AEvent));
+    Result := (LWidget <> nil) and
+     (GDK_WINDOW_STATE_FOCUSED in AEvent^.window_state.changed_mask) and not
+     (GDK_WINDOW_STATE_FOCUSED in AEvent^.window_state.new_window_state);
   end;
 end;
 

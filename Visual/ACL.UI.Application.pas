@@ -6,7 +6,7 @@
 //  Purpose:   Application Controller
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -72,6 +72,7 @@ type
     class var FGlobalSettings: TObject;
     class var FListeners: TACLListenerList;
     class var FTargetDPI: Integer;
+    class var FVersion: string;
 
   {$IFDEF FPC}
     class procedure DefaultFontChanged(Sender: TObject);
@@ -116,6 +117,7 @@ type
     class property DarkMode: TACLBoolean read FDarkMode write SetDarkMode;
     class property DefaultFont: TFont read GetDefaultFont;
     class property TargetDPI: Integer read FTargetDPI write SetTargetDPI;
+    class property Version: string read FVersion write FVersion;
   end;
 
   { TACLApplicationController }

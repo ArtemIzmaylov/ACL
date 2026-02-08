@@ -6,7 +6,7 @@
 //  Purpose:   GroupBox
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -117,9 +117,9 @@ type
 
     function GetChecked: Boolean;
     function GetVisible: Boolean;
-    procedure SetAction(const Value: TACLGroupBoxCheckBoxAction);
-    procedure SetChecked(const Value: Boolean);
-    procedure SetVisible(const Value: Boolean);
+    procedure SetAction(AValue: TACLGroupBoxCheckBoxAction);
+    procedure SetChecked(AValue: Boolean);
+    procedure SetVisible(AValue: Boolean);
   protected
     procedure AssignTo(ATarget: TPersistent); override;
   public
@@ -152,16 +152,18 @@ type
     procedure EnableChildren;
   protected
     procedure AdjustClientRect(var Rect: TRect); override;
-    procedure ApplyCheckBoxState;
+    procedure ApplyCheckBoxState(AFireEvent: Boolean = True);
     function CanAutoSize(var NewWidth, NewHeight: Integer): Boolean; override;
     function CreateStyleCaption: TACLStyleCheckBox; override;
     procedure DefineProperties(Filer: TFiler); override;
     procedure DoCheckBoxClick; override;
     procedure DoCheckBoxStateChanged;
+    procedure DoLoaded; override;
     function GetMinimizeStateHeight: Integer;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    procedure GetTabOrderList(List: TTabOrderList); override;
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
     //# Properties
     property Minimized: Boolean read FMinimized write SetMinimized;
@@ -438,22 +440,22 @@ begin
   Result := FOwner.CaptionSubClass.ShowCheckMark;
 end;
 
-procedure TACLGroupBoxCheckBox.SetAction(const Value: TACLGroupBoxCheckBoxAction);
+procedure TACLGroupBoxCheckBox.SetAction(AValue: TACLGroupBoxCheckBoxAction);
 begin
-  if Value <> FAction then
+  if AValue <> FAction then
   begin
-    FAction := Value;
+    FAction := AValue;
     FOwner.EnableChildren;
     FOwner.Minimized := False;
     FOwner.ApplyCheckBoxState;
   end;
 end;
 
-procedure TACLGroupBoxCheckBox.SetChecked(const Value: Boolean);
+procedure TACLGroupBoxCheckBox.SetChecked(AValue: Boolean);
 begin
-  if Checked <> Value then
+  if Checked <> AValue then
   begin
-    if Value then
+    if AValue then
       FOwner.CaptionSubClass.CheckState := cbChecked
     else
       FOwner.CaptionSubClass.CheckState := cbUnchecked;
@@ -462,11 +464,11 @@ begin
   end;
 end;
 
-procedure TACLGroupBoxCheckBox.SetVisible(const Value: Boolean);
+procedure TACLGroupBoxCheckBox.SetVisible(AValue: Boolean);
 begin
-  if Visible <> Value then
+  if Visible <> AValue then
   begin
-    FOwner.CaptionSubClass.ShowCheckMark := Value;
+    FOwner.CaptionSubClass.ShowCheckMark := AValue;
     FOwner.BoundsChanged; // recalculate
     FOwner.ApplyCheckBoxState;
   end;
@@ -504,9 +506,11 @@ begin
   end;
 end;
 
-procedure TACLGroupBox.ApplyCheckBoxState;
+procedure TACLGroupBox.ApplyCheckBoxState(AFireEvent: Boolean = True);
 begin
   if (csDesigning in ComponentState) or not CheckBox.Visible then
+    Exit;
+  if (csLoading in ComponentState) then
     Exit;
   if CheckBox.Action in [cbaToggleChildrenEnableState, cbaToggleMinimizeState] then
   begin
@@ -517,7 +521,8 @@ begin
   end;
   if CheckBox.Action = cbaToggleMinimizeState then
     Minimized := not CheckBox.Checked;
-  DoCheckBoxStateChanged;
+  if AFireEvent then
+    DoCheckBoxStateChanged;
 end;
 
 function TACLGroupBox.CanAutoSize(var NewWidth, NewHeight: Integer): Boolean;
@@ -549,14 +554,26 @@ begin
   CallNotifyEvent(Self, OnCheckBoxStateChanged);
 end;
 
+procedure TACLGroupBox.DoLoaded;
+begin
+  inherited;
+  ApplyCheckBoxState(False); // !!
+end;
+
 function TACLGroupBox.GetMinimizeStateHeight: Integer;
 begin
   Result := FCaptionRect.Bottom + acBorderOffsets.Bottom;
 end;
 
+procedure TACLGroupBox.GetTabOrderList(List: TTabOrderList);
+begin
+  if not Minimized then
+    inherited;
+end;
+
 procedure TACLGroupBox.DisableChildren;
 var
-  AControl: TControl;
+  LControl: TControl;
   I: Integer;
 begin
   if FDisabledChildren = nil then
@@ -564,11 +581,11 @@ begin
     FDisabledChildren := TList.Create;
     for I := 0 to ControlCount - 1 do
     begin
-      AControl := Controls[I];
-      if AControl.Enabled then
+      LControl := Controls[I];
+      if LControl.Enabled then
       begin
-        FDisabledChildren.Add(AControl);
-        AControl.Enabled := False;
+        FDisabledChildren.Add(LControl);
+        LControl.Enabled := False;
       end;
     end;
   end;
@@ -576,16 +593,16 @@ end;
 
 procedure TACLGroupBox.EnableChildren;
 var
-  AControl: TControl;
+  LControl: TControl;
   I: Integer;
 begin
   if FDisabledChildren <> nil then
   try
     for I := 0 to ControlCount - 1 do
     begin
-      AControl := Controls[I];
-      if FDisabledChildren.Remove(AControl) >= 0 then
-        AControl.Enabled := True;
+      LControl := Controls[I];
+      if FDisabledChildren.Remove(LControl) >= 0 then
+        LControl.Enabled := True;
     end;
   finally
     FreeAndNil(FDisabledChildren);

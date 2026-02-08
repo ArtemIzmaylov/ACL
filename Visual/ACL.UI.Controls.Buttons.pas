@@ -6,7 +6,7 @@
 //  Purpose:   Buttons
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -1631,13 +1631,15 @@ begin
 end;
 
 procedure TACLButton.SetKind(AValue: TACLButtonKind);
+const
+  DropDownKinds = [sbkDropDown, sbkDropDownButton];
 begin
   if FKind <> AValue then
   begin
     if [csDesigning, csReading, csLoading] * ComponentState = [csDesigning] then
     begin
-      if (Kind = sbkDropDownButton) <> (AValue = sbkDropDownButton) then
-        Width := Width + Signs[AValue = sbkDropDownButton] * DropDownSubClass.TextureSize.cx;
+      if (Kind in DropDownKinds) <> (AValue in DropDownKinds) then
+        Width := Width + Signs[AValue in DropDownKinds] * DropDownSubClass.TextureSize.cx;
     end;
     FKind := AValue;
     UpdateTransparency;
@@ -1903,7 +1905,7 @@ begin
     //#AI:
     // Always use acSysDrawText to make layout consistent between
     // singleline and multiline checkboxes
-    acSysDrawText(ACanvas, FTextRect, Caption, DT_END_ELLIPSIS or DT_NOPREFIX or
+    acSysDrawText(ACanvas, FTextRect, Caption, DT_END_ELLIPSIS or
       DT_VCENTER or acTextAlignHorz[Alignment] or IfThen(WordWrap, DT_WORDBREAK));
   end;
   if ShowLine then

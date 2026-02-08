@@ -565,10 +565,13 @@ procedure TACLDropTargetHook.HockedWndProc(var AMessage: TMessage);
 begin
   FControlWndProc(AMessage);
   case AMessage.Msg of
-    WM_CREATE:
-      Registered := True;
     WM_DESTROY:
       Registered := False;
+    WM_CREATE:
+    begin
+      Registered := False;
+      Registered := True;
+    end;
   end;
 end;
 

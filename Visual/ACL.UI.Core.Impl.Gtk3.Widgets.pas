@@ -395,7 +395,13 @@ end;
 
 procedure TACLGtk3AdvancedWindow.Repaint(const ARect: PRect);
 begin
-  if FParams.ExStyle and WS_EX_LAYERED = 0 then
+  if FParams.ExStyle and WS_EX_LAYERED <> 0 then
+  begin
+    Widget^.queue_draw;
+    if Gtk3IsGdkWindow(Widget^.window) then
+      Widget^.window^.process_updates(True);
+  end
+  else
     inherited;
 end;
 

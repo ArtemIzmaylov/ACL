@@ -534,8 +534,10 @@ begin
 end;
 
 procedure TACLUIInsightHighlightWindow.BoundsChanged;
+{$IFNDEF LCLGtk3}
 var
   LRegion: TRegionHandle;
+{$ENDIF}
 begin
   inherited;
   if HandleAllocated then
