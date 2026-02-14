@@ -6,7 +6,7 @@
 //  Purpose:   ObjectInspector
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -986,7 +986,7 @@ begin
       inherited
     else
     begin
-      EditingController.StartEditing(HitTest.Node, Columns[1]);
+      StartEditing(HitTest.Node, Columns[1]);
       if EditingController.Edit is TWinControl then
       begin
         LInplace := TWinControl(EditingController.Edit);

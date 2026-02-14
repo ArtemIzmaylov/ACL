@@ -6,7 +6,7 @@
 //  Purpose:   TreeList Core
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -597,8 +597,12 @@ type
   { TACLTreeListEditingController }
 
   TACLTreeListEditingController = class(TACLCompoundControlPersistent)
+  strict private type
+    TDelayedStartData = TPair<TACLTreeListNode, TACLTreeListColumn>;
   strict private
     FApplyOnClose: Boolean;
+    FDelayedStart: TACLTimer;
+    FDelayedStartData: TDelayedStartData;
     FEdit: TComponent;
     FEditIntf: IACLInplaceControl;
     FLockCount: Integer;
@@ -614,6 +618,7 @@ type
     procedure HandlerApply(Sender: TObject); overload;
     procedure HandlerApply(Sender: TObject; AChanges: TIntegerSet); overload; virtual;
     procedure HandlerCancel(Sender: TObject); virtual;
+    procedure HandlerDelayedStart(Sender: TObject);
     procedure HandlerKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState); virtual;
     procedure ProcessChanges(AChanges: TIntegerSet = []);
     //# Properties
@@ -630,7 +635,8 @@ type
     //# Actions
     procedure Apply;
     procedure Cancel;
-    procedure StartEditing(ANode: TACLTreeListNode; AColumn: TACLTreeListColumn = nil);
+    procedure Start(ANode: TACLTreeListNode;
+      AColumn: TACLTreeListColumn = nil; ADelayed: Boolean = False);
     //# Properties
     property ApplyOnClose: Boolean read FApplyOnClose write FApplyOnClose;
     property ColumnIndex: Integer read FParams.ColumnIndex;
@@ -895,11 +901,11 @@ type
   TACLTreeListSelectionRectDragObject = class(TACLTreeListCustomDragSortingObject)
   strict private
     FCapturePoint: TPoint;
-    FRange1: TACLTreeListNode;
-    FRange2: TACLTreeListNode;
+    FRange1: TObject;
+    FRange2: TObject;
     FSelectionMode: Boolean;
 
-    procedure CalculateRange(const ARect: TRect; out AStart, AFinish: TACLTreeListNode);
+    procedure CalculateRange(const ARect: TRect; out AStart, AFinish: TObject);
     function GetContent: TACLTreeListContentViewInfo; inline;
   protected
     function CanStartSelectionMode: Boolean; virtual;
@@ -1153,6 +1159,7 @@ type
     procedure ProcessGesture(const AEventInfo: TGestureEventInfo; var AHandled: Boolean); override;
 
     // Keyboard
+    function GetNearestVisible(AObject: TObject): TObject;
     function GetNextColumn(out AColumn: TACLTreeListColumn): Boolean;
     function GetNextObject(AObject: TObject; AKey: Word): TObject; virtual;
     function GetPrevColumn(out AColumn: TACLTreeListColumn): Boolean;
@@ -2429,9 +2436,10 @@ begin
   end;
 end;
 
-procedure TACLTreeListNodeViewInfo.DoDrawCellImage(ACanvas: TCanvas; const ABounds: TRect);
+procedure TACLTreeListNodeViewInfo.DoDrawCellImage(ACanvas: TCanvas;
+  const AData: TACLTreeListNodeCustomDrawData; const ABounds: TRect);
 begin
-  acDrawImage(ACanvas, ABounds, OptionsNodes.Images, Node.ImageIndex);
+  acDrawImage(ACanvas, ABounds, AData.Images, AData.ImageIndex);
 end;
 
 procedure TACLTreeListNodeViewInfo.DoDrawCellValue(
@@ -3282,7 +3290,8 @@ begin
   Result := Edit <> nil;
 end;
 
-function TACLTreeListEditingController.IsEditing(AItemIndex, AColumnIndex: Integer): Boolean;
+function TACLTreeListEditingController.IsEditing(
+  AItemIndex, AColumnIndex: Integer): Boolean;
 begin
   Result := IsEditing and
     (FParams.ColumnIndex = AColumnIndex) and
@@ -3311,43 +3320,19 @@ procedure TACLTreeListEditingController.Apply;
 begin
   if IsEditing then
     HandlerApply(Edit);
+  FreeAndNil(FDelayedStart);
 end;
 
 procedure TACLTreeListEditingController.Cancel;
 begin
+  FreeAndNil(FDelayedStart);
   if IsEditing then Close;
-end;
-
-procedure TACLTreeListEditingController.StartEditing(
-  ANode: TACLTreeListNode; AColumn: TACLTreeListColumn = nil);
-begin
-  Cancel;
-  if SubClass.OptionsBehavior.Editing then
-  begin
-    Inc(FLockCount);
-    try
-      Application.CancelHint;
-      SubClass.FocusedColumn := AColumn;
-      InitializeParams(ANode, AColumn);
-      if SubClass.CreateInplaceEdit(FParams, FEdit) then
-      begin
-        if Supports(FEdit, IACLInplaceControl, FEditIntf) then
-        begin
-          EditIntf.InplaceSetValue(Value);
-          EditIntf.InplaceSetFocus;
-        end
-        else
-          Cancel;
-      end;
-    finally
-      Dec(FLockCount);
-    end;
-  end;
 end;
 
 procedure TACLTreeListEditingController.Close(
   AChanges: TIntegerSet = []; AAccepted: Boolean = False);
 begin
+  FreeAndNil(FDelayedStart);
   if IsEditing and not IsLocked then
   begin
     FEditIntf := nil;
@@ -3366,69 +3351,6 @@ begin
     if SubClass.Focused then // оно проверяет не только себя, но и Inner-ы
       SubClass.SetFocus;
   end;
-end;
-
-procedure TACLTreeListEditingController.InitializeParams(
-  ANode: TACLTreeListNode; AColumn: TACLTreeListColumn = nil);
-
-  procedure CalculateCellRect(var AParams: TACLInplaceInfo);
-  var
-    AColumnViewInfo: TACLTreeListColumnViewInfo;
-    AColumnVisibleIndex: Integer;
-    AContentCell: TACLCompoundControlBaseContentCell;
-  begin
-    if not ContentViewInfo.ViewItems.Find(ANode, AContentCell) then
-      raise EACLTreeListException.Create(sErrorCannotEditHiddenCell);
-
-    AColumnViewInfo := nil;
-    AColumnVisibleIndex := 0;
-    if AColumn <> nil then
-    begin
-      if ContentViewInfo.ColumnBarViewInfo.GetColumnViewInfo(AColumn, AColumnViewInfo) then
-        AColumnVisibleIndex := AColumnViewInfo.VisibleIndex
-      else
-        raise EACLTreeListException.Create(sErrorCannotEditHiddenCell);
-    end;
-
-    ContentViewInfo.NodeViewInfo.Initialize(ANode);
-    AParams.Bounds := ContentViewInfo.NodeViewInfo.CellRect[AColumnVisibleIndex];
-    AParams.Bounds.Offset(AContentCell.Bounds.TopLeft);
-    if ContentViewInfo.NodeViewInfo.HasVertSeparators then
-      Dec(AParams.Bounds.Right);
-    AParams.TextBounds := AParams.Bounds;
-    AParams.TextBounds.Content(ContentViewInfo.NodeViewInfo.CellTextExtends[AColumnViewInfo]);
-  end;
-
-begin
-  FParams.Reset;
-  if AColumn <> nil then
-    FParams.ColumnIndex := AColumn.Index;
-  FParams.RowIndex := ANode.AbsoluteVisibleIndex;
-  FParams.OnApply := HandlerApply;
-  FParams.OnKeyDown := HandlerKeyDown;
-  FParams.OnCancel := HandlerCancel;
-  FParams.Parent := SubClass.Container.GetControl;
-  CalculateCellRect(FParams);
-end;
-
-function TACLTreeListEditingController.GetContentViewInfo: TACLTreeListContentViewInfo;
-begin
-  Result := SubClass.ViewInfo.Content;
-end;
-
-function TACLTreeListEditingController.GetSubClass: TACLTreeListSubClass;
-begin
-  Result := TACLTreeListSubClass(inherited SubClass);
-end;
-
-function TACLTreeListEditingController.GetValue: string;
-begin
-  Result := SubClass.AbsoluteVisibleNodes[FParams.RowIndex].Values[FParams.ColumnIndex];
-end;
-
-procedure TACLTreeListEditingController.SetValue(const AValue: string);
-begin
-  SubClass.AbsoluteVisibleNodes[FParams.RowIndex].Values[FParams.ColumnIndex] := AValue;
 end;
 
 procedure TACLTreeListEditingController.HandlerApply(Sender: TObject);
@@ -3463,11 +3385,11 @@ begin
   begin
     SubClass.DoEditKeyDown(Key, Shift);
     case Key of
-      VK_ESCAPE:
+      vkEscape:
         HandlerCancel(Sender);
-      VK_RETURN:
+      vkReturn:
         HandlerApply(Sender);
-      VK_UP, VK_DOWN:
+      vkUp, vkDown:
         if not ((Edit is TControl) and (TControl(Edit).Perform(WM_GETDLGCODE, 0, 0) and DLGC_WANTARROWS <> 0)) then
         begin
           HandlerApply(Sender);
@@ -3483,8 +3405,107 @@ begin
   if Sender = Edit then Close;
 end;
 
+procedure TACLTreeListEditingController.HandlerDelayedStart(Sender: TObject);
+begin
+  Start(FDelayedStartData.Key, FDelayedStartData.Value, False);
+end;
+
+procedure TACLTreeListEditingController.InitializeParams(
+  ANode: TACLTreeListNode; AColumn: TACLTreeListColumn = nil);
+var
+  LColumnViewInfo: TACLTreeListColumnViewInfo;
+  LColumnVisibleIndex: Integer;
+  LContentCell: TACLCompoundControlBaseContentCell;
+begin
+  FParams.Reset;
+  if AColumn <> nil then
+    FParams.ColumnIndex := AColumn.Index;
+  FParams.RowIndex := ANode.AbsoluteVisibleIndex;
+  FParams.OnApply := HandlerApply;
+  FParams.OnKeyDown := HandlerKeyDown;
+  FParams.OnCancel := HandlerCancel;
+  FParams.Parent := SubClass.Container.GetControl;
+
+  if not ContentViewInfo.ViewItems.Find(ANode, LContentCell) then
+    raise EACLTreeListException.Create(sErrorCannotEditHiddenCell);
+
+  LColumnViewInfo := nil;
+  LColumnVisibleIndex := 0;
+  if AColumn <> nil then
+  begin
+    if ContentViewInfo.ColumnBarViewInfo.GetColumnViewInfo(AColumn, LColumnViewInfo) then
+      LColumnVisibleIndex := LColumnViewInfo.VisibleIndex
+    else
+      raise EACLTreeListException.Create(sErrorCannotEditHiddenCell);
+  end;
+
+  ContentViewInfo.NodeViewInfo.Initialize(ANode);
+  FParams.Bounds := ContentViewInfo.NodeViewInfo.CellRect[LColumnVisibleIndex];
+  FParams.Bounds.Offset(LContentCell.Bounds.TopLeft);
+  if ContentViewInfo.NodeViewInfo.HasVertSeparators then
+    Dec(FParams.Bounds.Right);
+  FParams.TextBounds := FParams.Bounds;
+  FParams.TextBounds.Content(ContentViewInfo.NodeViewInfo.CellTextExtends[LColumnViewInfo]);
+end;
+
+function TACLTreeListEditingController.GetContentViewInfo: TACLTreeListContentViewInfo;
+begin
+  Result := SubClass.ViewInfo.Content;
+end;
+
+function TACLTreeListEditingController.GetSubClass: TACLTreeListSubClass;
+begin
+  Result := TACLTreeListSubClass(inherited SubClass);
+end;
+
+function TACLTreeListEditingController.GetValue: string;
+begin
+  Result := SubClass.AbsoluteVisibleNodes[FParams.RowIndex].Values[FParams.ColumnIndex];
+end;
+
+procedure TACLTreeListEditingController.SetValue(const AValue: string);
+begin
+  SubClass.AbsoluteVisibleNodes[FParams.RowIndex].Values[FParams.ColumnIndex] := AValue;
+end;
+
+procedure TACLTreeListEditingController.Start(
+  ANode: TACLTreeListNode; AColumn: TACLTreeListColumn; ADelayed: Boolean);
+begin
+  Cancel;
+
+  if ANode = nil then
+    Exit;
+  if ADelayed then
+  begin
+    FDelayedStartData := TDelayedStartData.Create(ANode, AColumn);
+    FDelayedStart := TACLTimer.CreateEx(HandlerDelayedStart, GetDoubleClickTime);
+    FDelayedStart.Enabled := True;
+    Exit;
+  end;
+
+  Inc(FLockCount);
+  try
+    Application.CancelHint;
+    SubClass.FocusedColumn := AColumn;
+    InitializeParams(ANode, AColumn);
+    if SubClass.CreateInplaceEdit(FParams, FEdit) then
+    begin
+      if Supports(FEdit, IACLInplaceControl, FEditIntf) then
+      begin
+        EditIntf.InplaceSetValue(Value);
+        EditIntf.InplaceSetFocus;
+      end
+      else
+        Cancel;
+    end;
+  finally
+    Dec(FLockCount);
+  end;
+end;
+
 procedure TACLTreeListEditingController.ProcessChanges(AChanges: TIntegerSet);
 begin
+  FreeAndNil(FDelayedStart);
   if IsEditing then
   begin
     if ApplyOnClose then
@@ -4566,10 +4587,10 @@ begin
   Result := SubClass.OptionsSelection.MultiSelect;
 end;
 
-procedure TACLTreeListSelectionRectDragObject.CalculateRange(
-  const ARect: TRect; out AStart, AFinish: TACLTreeListNode);
+procedure TACLTreeListSelectionRectDragObject.CalculateRange(const ARect: TRect; out AStart, AFinish: TObject);
 var
   LItem: TACLCompoundControlBaseContentCell;
+  LNode: TACLTreeListNode;
 begin
   AStart := nil;
   AFinish := nil;
@@ -4579,12 +4600,21 @@ begin
       Continue;
     if LItem.Top > ARect.Bottom then
       Break;
-    if ARect.IntersectsWith(LItem.AbsBounds) and (LItem.Data is TACLTreeListNode) then
+    if not ARect.IntersectsWith(LItem.AbsBounds) then
+      Continue;
+    if Safe.Cast(LItem.Data, TACLTreeListNode, LNode) then
     begin
       if AStart = nil then
-        AStart := TACLTreeListNode(LItem.Data);
-      AFinish := TACLTreeListNode(LItem.Data);
-    end;
+        AStart := LNode;
+      AFinish := LNode;
+    end
+//    else
+//      if Safe.Cast(LItem.Data, TACLTreeListGroup, LGroup) and not LGroup.Expanded then
+//      begin
+//        if AStart = nil then
+//          AStart := LGroup;
+//        AFinish := LGroup;
+//      end;
   end;
 end;
 
@@ -4597,8 +4627,8 @@ end;
 procedure TACLTreeListSelectionRectDragObject.DragMove(
   const P: TPoint; var ADeltaX, ADeltaY: Integer);
 var
-  LNode1: TACLTreeListNode;
-  LNode2: TACLTreeListNode;
+  LItem1: TObject;
+  LItem2: TObject;
   LPoint: TPoint;
 begin
   if FSelectionMode then
@@ -4612,11 +4642,11 @@ begin
       Max(FCapturePoint.X, LPoint.X),
       Max(FCapturePoint.Y, LPoint.Y));
 
-    CalculateRange(Content.SelectionRect, LNode1, LNode2);
-    if (LNode1 <> FRange1) or (LNode2 <> FRange2) then
+    CalculateRange(Content.SelectionRect, LItem1, LItem2);
+    if (LItem1 <> FRange1) or (LItem2 <> FRange2) then
     begin
-      FRange1 := LNode1;
-      FRange2 := LNode2;
+      FRange1 := LItem1;
+      FRange2 := LItem2;
       if (FRange1 <> nil) and (FRange2 <> nil) then
         SubClass.SelectRange(FRange1, FRange2, False, True, smSelect)
       else
@@ -4798,9 +4828,11 @@ begin
   Columns.ConfigSave(AConfig, ASection, AItem + '.ColumnsData');
 end;
 
-procedure TACLTreeListSubClass.StartEditing(ANode: TACLTreeListNode; AColumn: TACLTreeListColumn = nil);
+procedure TACLTreeListSubClass.StartEditing(
+  ANode: TACLTreeListNode; AColumn: TACLTreeListColumn = nil);
 begin
-  EditingController.StartEditing(ANode, AColumn);
+  if OptionsBehavior.Editing then
+    EditingController.Start(ANode, AColumn);
 end;
 
 procedure TACLTreeListSubClass.StopEditing;
@@ -5145,11 +5177,10 @@ begin
       begin
         if ssShift in AShift then
           SelectRange(FStartObject, HitTest.HitObject, AShift)
+        else if ssCtrl in AShift then
+          SetFocusCore(not FWasSelected, False, False)
         else
-          if ssCtrl in AShift then
-            SetFocusCore(not FWasSelected, False, False)
-          else
-            SetFocusCore(True, False, False);
+          SetFocusCore(True, False, False);
       end
       else
         SetFocusCore(True);
@@ -5173,23 +5204,23 @@ procedure TACLTreeListSubClass.SelectRange(
   AFirstObject, ALastObject, AObjectToFocus: TObject;
   AMakeVisible, ADropSelection: Boolean; AMode: TACLSelectionMode);
 var
-  AFirstCell: TACLCompoundControlBaseContentCell;
-  AIndex1, AIndex2: Integer;
-  ALastCell: TACLCompoundControlBaseContentCell;
+  LCell1: TACLCompoundControlBaseContentCell;
+  LCell2: TACLCompoundControlBaseContentCell;
+  LIndex1, LIndex2: Integer;
   I: Integer;
 begin
-  if ContentViewInfo.ViewItems.Find(AFirstObject, AFirstCell) and
-     ContentViewInfo.ViewItems.Find(ALastObject, ALastCell) then
+  if ContentViewInfo.ViewItems.Find(AFirstObject, LCell1) and
+     ContentViewInfo.ViewItems.Find(ALastObject, LCell2) then
   begin
-    AIndex1 := ContentViewInfo.ViewItems.IndexOf(AFirstCell);
-    AIndex2 := ContentViewInfo.ViewItems.IndexOf(ALastCell);
+    LIndex1 := ContentViewInfo.ViewItems.IndexOf(LCell1);
+    LIndex2 := ContentViewInfo.ViewItems.IndexOf(LCell2);
 
     BeginUpdate;
     try
       if ADropSelection then
         SelectNone;
-      for I := Min(AIndex1, AIndex2) to Max(AIndex1, AIndex2) do
-        SelectObject(ContentViewInfo.ViewItems[I].Data, AMode, (I <> AIndex1) and (I <> AIndex2));
+      for I := Min(LIndex1, LIndex2) to Max(LIndex1, LIndex2) do
+        SelectObject(ContentViewInfo.ViewItems[I].Data, AMode, (I <> LIndex1) and (I <> LIndex2));
       SetFocusedObject(AObjectToFocus, False, AMakeVisible);
     finally
       EndUpdate;
@@ -5595,8 +5626,8 @@ end;
 procedure TACLTreeListSubClass.SetFocusedObject(
   AObject: TObject; ADropSelection: Boolean; AMakeVisible: Boolean = True);
 var
-  APrevFocusedColumn: TObject;
-  APrevFocusedObject: TObject;
+  LPrevFocusedColumn: TObject;
+  LPrevFocusedObject: TObject;
 begin
   if AObject = RootNode then
     Exit;
@@ -5607,8 +5638,8 @@ begin
     FFocusing := True;
     BeginUpdate;
     try
-      APrevFocusedObject := FFocusedObject;
-      APrevFocusedColumn := FFocusedColumn;
+      LPrevFocusedObject := FFocusedObject;
+      LPrevFocusedColumn := FFocusedColumn;
 
       if IncSearch.Mode <> ismFilter then
         IncSearch.Cancel;
@@ -5623,9 +5654,9 @@ begin
       FFocusedObject := AObject; // после SelectObject
 
       Changed([cccnContent]);
-      if APrevFocusedObject <> FFocusedObject then
+      if LPrevFocusedObject <> FFocusedObject then
         Changed([tlcnFocusedNode]);
-      if APrevFocusedColumn <> FFocusedColumn then
+      if LPrevFocusedColumn <> FFocusedColumn then
         Changed([tlcnFocusedColumn]);
       if AMakeVisible and (FFocusedObject <> nil) then
         Changed([tlcnMakeVisible]);
@@ -5638,25 +5669,22 @@ end;
 
 procedure TACLTreeListSubClass.ValidateFocusedObject;
 var
-  ACell: TACLCompoundControlBaseContentCell;
-  ANewFocusedObject: TObject;
+  LFocusedObject: TObject;
 begin
-  ANewFocusedObject := FocusedObject;
-  while (ANewFocusedObject <> nil) and not ContentViewInfo.ViewItems.Find(ANewFocusedObject, ACell) do
-    ANewFocusedObject := GetObjectParent(ANewFocusedObject);
-  if ANewFocusedObject <> FocusedObject then
-    SetFocusedObject(ANewFocusedObject, False, False);
+  LFocusedObject := GetNearestVisible(FocusedObject);
+  if LFocusedObject <> FocusedObject then
+    SetFocusedObject(LFocusedObject, False, False);
   if not (Columns.IsValid(FocusedColumn) and FocusedColumn.Visible) then
     FocusedColumn := nil;
 end;
 
 procedure TACLTreeListSubClass.ColumnSetVisibilityHandler(Sender: TObject);
 var
-  AIndex: Integer;
+  LIndex: Integer;
 begin
-  AIndex := (Sender as TComponent).Tag;
-  if Columns.IsValid(AIndex) then
-    Columns[AIndex].Visible := (Sender as TMenuItem).Checked;
+  LIndex := (Sender as TComponent).Tag;
+  if Columns.IsValid(LIndex) then
+    Columns[LIndex].Visible := (Sender as TMenuItem).Checked;
 end;
 
 procedure TACLTreeListSubClass.ColumnCustomizationMenuShow(const P: TPoint);
@@ -5689,10 +5717,7 @@ end;
 procedure TACLTreeListSubClass.ProcessChanges(AChanges: TIntegerSet);
 begin
   if AChanges - [cccnContent] <> [] then
-  begin
-    if EditingController.IsEditing then
-      EditingController.ProcessChanges(AChanges);
-  end;
+    EditingController.ProcessChanges(AChanges);
 
   if (cccnContent in AChanges) and not EnabledContent then
   begin
@@ -5848,22 +5873,31 @@ end;
 
 function TACLTreeListSubClass.GetObjectChild(AObject: TObject): TObject;
 var
-  ATreeNodeLink: IACLTreeNodeLink;
+  LLink: IACLTreeNodeLink;
 begin
-  if Supports(AObject, IACLTreeNodeLink, ATreeNodeLink) then
-    Result := ATreeNodeLink.GetChild
+  if Supports(AObject, IACLTreeNodeLink, LLink) then
+    Result := LLink.GetChild
   else
     Result := nil;
 end;
 
 function TACLTreeListSubClass.GetObjectParent(AObject: TObject): TObject;
 var
-  ATreeNodeLink: IACLTreeNodeLink;
+  LLink: IACLTreeNodeLink;
 begin
-  if Supports(AObject, IACLTreeNodeLink, ATreeNodeLink) then
-    Result := ATreeNodeLink.GetParent
+  if Supports(AObject, IACLTreeNodeLink, LLink) then
+    Result := LLink.GetParent
   else
     Result := nil;
+end;
+
+function TACLTreeListSubClass.GetNearestVisible(AObject: TObject): TObject;
+var
+  LCell: TACLCompoundControlBaseContentCell;
+begin
+  Result := AObject;
+  while (Result <> nil) and not ContentViewInfo.ViewItems.Find(Result, LCell) do
+    Result := GetObjectParent(Result);
 end;
 
 function TACLTreeListSubClass.GetNextColumn(out AColumn: TACLTreeListColumn): Boolean;
@@ -5917,16 +5951,16 @@ function TACLTreeListSubClass.GetNextObject(AObject: TObject; AKey: Word): TObje
   end;
 
 var
-  ACell: TACLCompoundControlBaseContentCell;
-  ACellIndex: Integer;
+  LCell: TACLCompoundControlBaseContentCell;
+  LCellIndex: Integer;
 begin
   Result := nil;
-  if ContentViewInfo.ViewItems.Find(AObject, ACell) then
+  if ContentViewInfo.ViewItems.Find(AObject, LCell) then
   begin
-    ACellIndex := ContentViewInfo.ViewItems.IndexOf(ACell);
-    GetNextCellIndex(ACellIndex, AKey);
+    LCellIndex := ContentViewInfo.ViewItems.IndexOf(LCell);
+    GetNextCellIndex(LCellIndex, AKey);
 
-    while not CanFocus(ContentViewInfo.ViewItems[ACellIndex].Data) do
+    while not CanFocus(ContentViewInfo.ViewItems[LCellIndex].Data) do
     begin
       case AKey of
         vkHome, vkDown, vkNext:
@@ -5934,15 +5968,15 @@ begin
         vkEnd, vkUp, vkPrior:
           AKey := vkUp;
       end;
-      if not GetNextCellIndex(ACellIndex, AKey) then
+      if not GetNextCellIndex(LCellIndex, AKey) then
       begin
-        ACellIndex := -1;
+        LCellIndex := -1;
         Break;
       end;
     end;
 
-    if InRange(ACellIndex, 0, ContentViewInfo.ViewItems.Count - 1) then
-      Result := ContentViewInfo.ViewItems[ACellIndex].Data
+    if InRange(LCellIndex, 0, ContentViewInfo.ViewItems.Count - 1) then
+      Result := ContentViewInfo.ViewItems[LCellIndex].Data
     else
       Result := AObject;
 
@@ -6036,7 +6070,7 @@ var
   LExpandable: IACLExpandableObject;
 begin
   case AKey of
-    65: // A
+    vkA: // A
       if [ssAlt, ssShift, ssCtrl] * AShift = [ssCtrl] then
         SelectAll;
 
@@ -6050,27 +6084,28 @@ begin
           Columns.ApplyBestFit;
       end;
 
-    VK_SHIFT:
-      if FStartObject = nil then
-        FStartObject := FocusedObject;
+    vkShift:
+      begin
+        if (FStartObject = nil) then
+          FStartObject := FocusedObject;
+        if (FStartObject = nil) and (Selection.Count > 0) then
+          FStartObject := GetNearestVisible(Selection.First);
+      end;
 
-    VK_SPACE:
+    vkSpace:
       if not IncSearch.ProcessKey(AKey, AShift) then
         ToggleCheckboxes;
 
-    VK_DELETE:
+    vkDelete:
       if OptionsBehavior.Deleting then
         DeleteSelected;
 
-    VK_RETURN:
-      if OptionsBehavior.Editing then
-      begin
-        if FocusedObject is TACLTreeListNode then
-          StartEditing(TACLTreeListNode(FocusedObject), FocusedColumn);
-      end;
+    vkF2, vkReturn:
+      if FocusedObject is TACLTreeListNode then
+        StartEditing(TACLTreeListNode(FocusedObject), FocusedColumn);
 
-    VK_UP, VK_DOWN, VK_NEXT, VK_PRIOR, VK_HOME, VK_END:
-      if CheckFocusedObject or (AKey in [VK_END, VK_NEXT]) and CheckFocusedObject then
+    vkUp, vkDown, vkNext, vkPrior, vkHome, vkEnd:
+      if CheckFocusedObject or (AKey in [vkEnd, vkNext]) and CheckFocusedObject then
       begin
         BeginUpdate;
         try
@@ -6084,7 +6119,7 @@ begin
         AKey := 0;
       end;
 
-    VK_LEFT:
+    vkLeft:
       if CheckFocusedObject then
       begin
         if OptionsSelection.FocusCell and GetPrevColumn(LColumn) then
@@ -6099,7 +6134,7 @@ begin
         AKey := 0;
       end;
 
-    VK_RIGHT:
+    vkRight:
       if CheckFocusedObject then
       begin
         if OptionsSelection.FocusCell and GetNextColumn(LColumn) then
@@ -6113,6 +6148,7 @@ begin
             NavigateTo(GetObjectChild(FocusedObject), AShift);
         AKey := 0;
       end;
+
   else
     IncSearch.ProcessKey(AKey, AShift);
   end;
@@ -6129,7 +6165,7 @@ end;
 procedure TACLTreeListSubClass.ProcessKeyUp(var AKey: Word; AShift: TShiftState);
 begin
   case AKey of
-    VK_SHIFT:
+    vkSHIFT:
       FStartObject := nil;
   end;
   inherited ProcessKeyUp(AKey, AShift);
@@ -6212,7 +6248,7 @@ begin
       if LastClickCount > 1 then
       begin
         if OptionsBehavior.EditingStartingMode = esmOnDoubleClick then
-          EditingController.StartEditing(ANode, HitTest.Column);
+          StartEditing(ANode, HitTest.Column);
         if not EditingController.IsEditing then
         begin
           if not DoNodeDblClicked(ANode) then
@@ -6252,11 +6288,13 @@ begin
           SetFocusedObject(HitTest.HitObject, True, not HitTest.HasAction);
       end;
     end;
-    if OptionsBehavior.EditingStartingMode = esmOnSingleClick then
-    begin
-      if HitTest.HitAtNode and not HitTest.HasAction then
-        StartEditing(HitTest.Node, HitTest.Column);
-    end;
+    if OptionsBehavior.Editing and HitTest.HitAtNode and HitTest.IsText then
+      case OptionsBehavior.EditingStartingMode of
+        esmOnSingleClick:
+          EditingController.Start(HitTest.Node, HitTest.Column);
+        esmOnSingleDelayedClick:
+          EditingController.Start(HitTest.Node, HitTest.Column, True);
+      end;
   end;
   FWasSelected := False;
   inherited ProcessMouseUp(AButton, AShift);
@@ -6452,9 +6490,9 @@ end;
 
 function TACLTreeListSubClass.QueryChildInterface(AChild: TObject; const IID: TGUID; var Obj): HRESULT;
 var
-  ACell: TACLCompoundControlBaseContentCell;
+  LCell: TACLCompoundControlBaseContentCell;
 begin
-  if ContentViewInfo.ViewItems.Find(AChild, ACell) and Supports(ACell, IID, Obj) then
+  if ContentViewInfo.ViewItems.Find(AChild, LCell) and Supports(LCell, IID, Obj) then
     Result := S_OK
   else
     Result := E_NOINTERFACE;

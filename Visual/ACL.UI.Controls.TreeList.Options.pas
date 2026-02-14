@@ -6,7 +6,7 @@
 //  Purpose:   TreeList Options
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -97,7 +97,8 @@ type
 
   { TACLTreeListOptionsBehavior }
 
-  TACLTreeListEditingStartingMode = (esmOnDoubleClick, esmOnSingleClick);
+  TACLTreeListStartEditingMode = (esmOnDoubleClick,
+    esmOnSingleClick, esmOnSingleDelayedClick, esmManually);
 
   TACLTreeListOptionsBehavior = class(TACLTreeListCustomOptions)
   strict private
@@ -113,7 +114,7 @@ type
     FDropTarget: Boolean;
     FDropTargetAllowCreateLevel: Boolean;
     FEditing: Boolean;
-    FEditingStartingMode: TACLTreeListEditingStartingMode;
+    FEditingStartingMode: TACLTreeListStartEditingMode;
     FGroups: Boolean;
     FGroupsAllowCollapse: Boolean;
     FGroupsFocus: Boolean;
@@ -155,7 +156,7 @@ type
     property DropTarget: Boolean read FDropTarget write SetDropTarget default False;
     property DropTargetAllowCreateLevel: Boolean read FDropTargetAllowCreateLevel write FDropTargetAllowCreateLevel default False;
     property Editing: Boolean read FEditing write FEditing default False;
-    property EditingStartingMode: TACLTreeListEditingStartingMode read FEditingStartingMode write FEditingStartingMode default esmOnDoubleClick;
+    property EditingStartingMode: TACLTreeListStartEditingMode read FEditingStartingMode write FEditingStartingMode default esmOnDoubleClick; // todo: rename
     property Groups: Boolean read FGroups write SetGroups default False;
     property GroupsAllowCollapse: Boolean read FGroupsAllowCollapse write SetGroupsAllowCollapse default False;
     property GroupsFocus: Boolean read FGroupsFocus write SetGroupsFocus default True;
