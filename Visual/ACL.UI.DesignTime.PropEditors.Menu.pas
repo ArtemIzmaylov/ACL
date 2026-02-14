@@ -6,7 +6,7 @@
 //  Purpose:   Design Time Routines
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2024
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -98,18 +98,20 @@ type
     pnlRight: TACLPanel;
 
     procedure acCreateItemExecute(Sender: TObject);
+    procedure acDeleteExecute(Sender: TObject);
+    procedure acDeleteUpdate(Sender: TObject);
+    procedure acMoveExecute(Sender: TObject);
+    procedure acMoveUpdate(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
+    procedure lvItemsCustomDrawNodeCell(Sender: TObject; ACanvas: TCanvas;
+      var AData: TACLTreeListNodeCustomDrawData; var AHandled: Boolean);
     procedure lvItemsDragSortingNodeDrop(Sender: TObject; ANode: TACLTreeListNode;
       AMode: TACLTreeListDropTargetInsertMode; var AHandled: Boolean);
     procedure lvItemsFocusedNodeChanged(Sender: TObject);
     procedure lvItemsGetNodeCellDisplayText(Sender: TObject;
       ANode: TACLTreeListNode; AValueIndex: Integer; var AText: string);
-    procedure acDeleteExecute(Sender: TObject);
-    procedure acDeleteUpdate(Sender: TObject);
-    procedure acMoveExecute(Sender: TObject);
-    procedure acMoveUpdate(Sender: TObject);
   strict private
     class var FInstance: TACLMenuEditorDialog;
   strict private type
@@ -351,6 +353,14 @@ begin
     lvItems.FocusedNodeData := LItem;
     acDesignerSetModified(FMenu);
   end;
+end;
+
+procedure TACLMenuEditorDialog.lvItemsCustomDrawNodeCell(
+  Sender: TObject; ACanvas: TCanvas;
+  var AData: TACLTreeListNodeCustomDrawData;
+  var AHandled: Boolean);
+begin
+  AData.Images := TMenuItem(AData.Node.Data).GetImageList;
 end;
 
 procedure TACLMenuEditorDialog.lvItemsDragSortingNodeDrop(Sender: TObject;

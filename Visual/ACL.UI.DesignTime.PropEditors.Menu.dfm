@@ -36,6 +36,7 @@ object ACLMenuEditorDialog: TACLMenuEditorDialog
     OptionsView.Columns.AutoWidth = True
     OptionsView.Columns.Visible = False
     OptionsView.Nodes.GridLines = []
+    OnCustomDrawNodeCell = lvItemsCustomDrawNodeCell
     OnDragSortingNodeDrop = lvItemsDragSortingNodeDrop
     OnFocusedNodeChanged = lvItemsFocusedNodeChanged
     OnGetNodeCellDisplayText = lvItemsGetNodeCellDisplayText
