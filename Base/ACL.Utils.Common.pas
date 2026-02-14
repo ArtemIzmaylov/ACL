@@ -224,7 +224,6 @@ function acGetProcessFileName(AWnd: TWndHandle; out AFileName: string): Boolean;
 {$ENDIF}
 
 // System
-procedure InitializeFormatSettings;
 procedure MinimizeMemoryUsage;
 procedure ZeroMemory(Data: Pointer; Size: Integer);
 
@@ -246,6 +245,7 @@ function IfThen(AValue: Boolean; ATrue, AFalse: TACLBoolean): TACLBoolean; overl
 // Version
 function acOSCheckVersion(AMajor, AMinor: Integer; ABuild: Integer = -1): Boolean;
 function acOSGetDescription: string;
+function acOSGuiMode: string;
 function IsWine: Boolean;
 
 // HRESULT
@@ -258,12 +258,9 @@ function IsBadWritePtr(Ptr: Pointer; Size: Integer): Boolean; deprecated 'not im
 {$ENDIF}
 implementation
 
-uses
-{$IFDEF LINUX}
-  ACL.Parsers,
-{$ENDIF}
-  ACL.Utils.FileSystem,
-  ACL.Utils.Strings;
+// FPC:
+//   Do not specify uses here
+//   It may lead to 20231102 internal error because of generics
 
 {$IFDEF MSWINDOWS}
 type
@@ -281,9 +278,18 @@ var
 var
   fOSDescription: string = '';
 
+function acOSCheckVersion(AMajor, AMinor: Integer; ABuild: Integer = -1): Boolean;
+begin
+  Result :=
+    (TOSVersion.Major > AMajor) or
+    (TOSVersion.Major = AMajor) and (TOSVersion.Minor > AMinor) or
+    (TOSVersion.Major = AMajor) and (TOSVersion.Minor = AMinor) and
+      ((ABuild < 0{dont care}) or (TOSVersion.Build >= ABuild));
+end;
+
 function acOSGetDescription: string;
 var
-  LBuilder: TACLStringBuilder;
+  LBuilder: TStringBuilder;
 {$IFDEF LINUX}
   LData: TStrings;
   LDescription: string;
@@ -293,7 +299,7 @@ var
 begin
   if fOSDescription = '' then
   begin
-    LBuilder := TACLStringBuilder.Get(32);
+    LBuilder := TStringBuilder.Create;
     try
       LBuilder.Append(TOSVersion.Name);
       LBuilder.Append(' / ');
@@ -334,26 +340,27 @@ begin
       if Assigned(FWineGetVersion) and Assigned(FWineGetBuildId) then
       begin
         LBuilder.Append(' / Wine: ');
-        LBuilder.Append(acString(FWineGetVersion));
+        LBuilder.Append(string(FWineGetVersion));
         LBuilder.AppendFormat(' (%s)', [FWineGetBuildId]);
       end;
     {$ENDIF}
 
       fOSDescription := LBuilder.ToString;
     finally
-      LBuilder.Release;
+      LBuilder.Free;
     end;
   end;
   Result := fOSDescription;
 end;
 
-function acOSCheckVersion(AMajor, AMinor: Integer; ABuild: Integer = -1): Boolean;
+function acOSGuiMode: string;
 begin
   Result :=
-    (TOSVersion.Major > AMajor) or
-    (TOSVersion.Major = AMajor) and (TOSVersion.Minor > AMinor) or
-    (TOSVersion.Major = AMajor) and (TOSVersion.Minor = AMinor) and
-      ((ABuild < 0{dont care}) or (TOSVersion.Build >= ABuild));
+//  {$IF DEFINED(MSWINDOWS)}
+  {$IF DEFINED(LINUX)}
+    GetEnvironmentVariable('XDG_SESSION_DESKTOP') + ' on ' +
+    GetEnvironmentVariable('XDG_SESSION_TYPE')
+  {$ELSE}''{$ENDIF};
 end;
 
 function IsWine: Boolean;
@@ -487,10 +494,10 @@ begin
     Result := AFileName // relative (./lib.so) or absolute (/lib64/lib.so)
   else
   begin
-    Result := acGetCurrentDir + AFileName;
-    if not FileExists(Result) then
-      Result := acSelfPath + AFileName;
-    if not FileExists(Result) then
+    Result := GetCurrentDir + AFileName;
+    if (Result = '') or not FileExists(Result) then
+      Result := ExtractFilePath(ParamStr(0)) + AFileName;
+    if (Result = '') or not FileExists(Result) then
       Result := ResolveLibraryPath(AFileName);
   end;
 end;
@@ -504,15 +511,15 @@ var
 begin
   AErrorMode := acSetThreadErrorMode(SEM_FAILCRITICALERRORS);
   try
-    APrevCurPath := acGetCurrentDir;
+    APrevCurPath := GetCurrentDir;
     try
-      acSetCurrentDir(acExtractFilePath(AFileName));
+      SetCurrentDir(ExtractFilePath(AFileName));
       if AFlags <> 0 then
         Result := LoadLibraryEx(PChar(AFileName), 0, AFlags)
       else
         Result := LoadLibrary(PChar(AFileName));
     finally
-      acSetCurrentDir(APrevCurPath);
+      SetCurrentDir(APrevCurPath);
     end;
   finally
     acSetThreadErrorMode(AErrorMode);
@@ -668,84 +675,6 @@ end;
 // System
 //==============================================================================
 
-procedure InitializeFormatSettings;
-{$IFDEF LINUX}
-var
-  LData: TStringList;
-
-  function TryGet(const AKey: string; out AValue: string): Boolean;
-  begin
-    AValue := LData.Values[AKey];
-    acUnquot(AValue);
-    Result := AValue <> '';
-  end;
-
-var
-  I: Integer;
-  LValue: string;
-  LValues: TStringDynArray;
-begin
-  LData := TStringList.Create;
-  try
-    LData.Text := TACLProcess.ExecuteToString('locale -k LC_TIME LC_NUMERIC');
-
-    if TryGet('decimal_point', LValue) then
-    begin
-      if LValue[1] = ',' then
-      begin
-        FormatSettings.DecimalSeparator := ',';
-        FormatSettings.ThousandSeparator := ' ';
-        FormatSettings.ListSeparator := ';';
-        FormatSettings.DateSeparator := '.';
-      end
-      else
-      begin
-        FormatSettings.DecimalSeparator := LValue[1];
-        FormatSettings.ThousandSeparator := ',';
-        FormatSettings.ListSeparator := ',';
-        FormatSettings.DateSeparator := '-';
-      end;
-    end;
-
-    if TryGet('alt_mon', LValue) or TryGet('mon', LValue) then
-    begin
-      if acSplitString(LValue, ';', LValues) = 12 then
-      begin
-        for I := 0 to 11 do
-          FormatSettings.LongMonthNames[I + 1] := LValues[I];
-      end;
-    end;
-
-    if TryGet('ab_alt_mon', LValue) or TryGet('ab_mon', LValue) then
-    begin
-      if acSplitString(LValue, ';', LValues) = 12 then
-      begin
-        for I := 0 to 11 do
-          FormatSettings.ShortMonthNames[I + 1] := LValues[I];
-      end;
-    end;
-
-    if TryGet('abday', LValue) and (acSplitString(LValue, ';', LValues) = 7) then
-    begin
-      for I := 0 to 6 do
-        FormatSettings.ShortDayNames[I + 1] := LValues[I];
-    end;
-
-    if TryGet('day', LValue) and (acSplitString(LValue, ';', LValues) = 7) then
-    begin
-      for I := 0 to 6 do
-        FormatSettings.LongDayNames[I + 1] := LValues[I];
-    end;
-
-    FormatSettings.ShortDateFormat := 'dd/mm/yyyy';
-  finally
-    LData.Free;
-  end;
-{$ELSE}
-begin
-{$ENDIF}
-end;
-
 procedure MinimizeMemoryUsage;
 begin
 {$IFDEF MSWINDOWS}
@@ -850,7 +779,7 @@ end;
 type
   TLiveLogStream = class(TStream)
   strict private
-    FBuffer: TACLStringBuilder;
+    FBuffer: TStringBuilder;
     FLog: TACLStringEnumMethod;
     procedure Flush;
   public
@@ -872,7 +801,8 @@ end;
 constructor TLiveLogStream.Create(ALog: TACLStringEnumMethod);
 begin
   FLog := ALog;
-  FBuffer := TACLStringBuilder.Create(128);
+  FBuffer := TStringBuilder.Create;
+  FBuffer.Capacity := 256;
 end;
 
 destructor TLiveLogStream.Destroy;

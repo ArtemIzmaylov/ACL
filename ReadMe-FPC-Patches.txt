@@ -22,3 +22,9 @@ https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42033
 https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42034
 https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42036
 https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42038
+https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42039
+https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42043
+https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42045
+https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42046
+https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42047
+https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42049

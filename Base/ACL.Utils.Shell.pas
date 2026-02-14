@@ -35,15 +35,18 @@ uses
   {System.}Classes,
   {System.}Math,
   {System.}SysUtils,
+  {System.}Types,
   // ACL
   ACL.Classes.StringList,
+  ACL.Math,
+  ACL.Parsers,
   ACL.Threading,
   ACL.Utils.Common,
   ACL.Utils.FileSystem,
 {$IFDEF FPC}
   ACL.Utils.FileSystem.GIO, // must be defined in interface section
 {$ENDIF}
-  ACL.Math;
+  ACL.Utils.Strings;
 
 const
   acMailToPrefix = 'mailto:';
@@ -192,6 +195,8 @@ type
   TShellPowerState = set of (psKeepPowerOn, psKeepScreenOn);
   TShellShutdownMode = (sdPowerOff, sdLogOff, sdHibernate, sdSleep, sdReboot);
 
+procedure InitializeFormatSettings;
+
 function ShellDesktopEnv: TShellDesktopEnvironment;
 
 // Shell - Executing
@@ -237,8 +242,7 @@ uses
   ACL.Utils.Registry,
   ACL.Utils.Stream,
 {$ENDIF}
-  ACL.Utils.Logger,
-  ACL.Utils.Strings;
+  ACL.Utils.Logger;
 
 {$IFNDEF MSWINDOWS}
 const
@@ -265,6 +269,85 @@ function g_get_user_special_dir(directory: DWORD): PChar; cdecl; external libGLi
 //------------------------------------------------------------------------------
 
 {$REGION ' General '}
+
+procedure InitializeFormatSettings;
+{$IFDEF LINUX}
+var
+  LData: TStringList;
+
+  function TryGet(const AKey: string; out AValue: string): Boolean;
+  begin
+    AValue := LData.Values[AKey];
+    acUnquot(AValue);
+    Result := AValue <> '';
+  end;
+
+var
+  I: Integer;
+  LValue: string;
+  LValues: TStringDynArray;
+begin
+  LData := TStringList.Create;
+  try
+    LData.Text := TACLProcess.ExecuteToString('locale -k LC_TIME LC_NUMERIC');
+
+    if TryGet('decimal_point', LValue) then
+    begin
+      if LValue[1] = ',' then
+      begin
+        FormatSettings.DecimalSeparator := ',';
+        FormatSettings.ThousandSeparator := ' ';
+        FormatSettings.ListSeparator := ';';
+        FormatSettings.DateSeparator := '.';
+      end
+      else
+      begin
+        FormatSettings.DecimalSeparator := LValue[1];
+        FormatSettings.ThousandSeparator := ',';
+        FormatSettings.ListSeparator := ',';
+        FormatSettings.DateSeparator := '-';
+      end;
+    end;
+
+    if TryGet('alt_mon', LValue) or TryGet('mon', LValue) then
+    begin
+      if acSplitString(LValue, ';', LValues) = 12 then
+      begin
+        for I := 0 to 11 do
+          FormatSettings.LongMonthNames[I + 1] := LValues[I];
+      end;
+    end;
+
+    if TryGet('ab_alt_mon', LValue) or TryGet('ab_mon', LValue) then
+    begin
+      if acSplitString(LValue, ';', LValues) = 12 then
+      begin
+        for I := 0 to 11 do
+          FormatSettings.ShortMonthNames[I + 1] := LValues[I];
+      end;
+    end;
+
+    if TryGet('abday', LValue) and (acSplitString(LValue, ';', LValues) = 7) then
+    begin
+      for I := 0 to 6 do
+        FormatSettings.ShortDayNames[I + 1] := LValues[I];
+    end;
+
+    if TryGet('day', LValue) and (acSplitString(LValue, ';', LValues) = 7) then
+    begin
+      for I := 0 to 6 do
+        FormatSettings.LongDayNames[I + 1] := LValues[I];
+    end;
+
+    FormatSettings.ShortDateFormat := 'dd/mm/yyyy';
+  finally
+    LData.Free;
+  end;
+{$ELSE}
+begin
+  FormatSettings := TFormatSettings.Create(GetThreadLocale);
+{$ENDIF}
+end;
 
 function ShellDesktopEnv: TShellDesktopEnvironment;
 {$IFDEF MSWINDOWS}

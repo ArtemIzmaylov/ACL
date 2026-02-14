@@ -844,7 +844,7 @@ implementation
 
 // FPC:
 //   Do not specify uses here
-//   It may lead to 20231102 internal error
+//   It may lead to 20231102 internal error because of generics
 
 {$IFDEF FPC}
 function GrowCollection(OldCapacity, NewCount: Integer): Integer;
