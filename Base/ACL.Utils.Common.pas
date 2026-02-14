@@ -421,14 +421,19 @@ end;
 function FindBinPath(const AFileName: string): string;
 const
   KnownPaths: array[0..5] of string = (
-    '/usr/local/sbin','/usr/local/bin','/usr/sbin','/usr/bin','/sbin','/bin'
+    '/usr/local/sbin/',
+    '/usr/local/bin/',
+    '/usr/sbin/',
+    '/usr/bin/',
+    '/sbin/',
+    '/bin/'
   );
 var
   I: integer;
 begin
   for I := Low(KnownPaths) to High(KnownPaths) do
   begin
-    Result := KnownPaths[I] + PathDelim + AFileName;
+    Result := KnownPaths[I] + AFileName;
     if FileExists(Result) then Exit;
   end;
   Result := AFilename;
@@ -442,6 +447,7 @@ var
   LCandidate: string;
   LCandidateFlags: string;
   LCandidateVersion: string;
+  LLibName: string;
   LLibList: TStrings;
   LLibVersion: Integer;
   LPosArrow: Integer;
@@ -449,12 +455,15 @@ var
   LPosOpenBracket: Integer;
   LTemp: string;
 begin
-  if not RunCommand(FindBinPath('ldconfig'), ['-p'], LTemp, []) then
-    Exit('');
+  LTemp := TACLProcess.ExecuteToString(FindBinPath('ldconfig') + ' -p');
+
   if TryStrToInt(Copy(ExtractFileExt(ALibraryName), 2), LLibVersion) then
-    ALibraryName := ChangeFileExt(ALibraryName, '')
+    LLibName := ChangeFileExt(ALibraryName, '')
   else
+  begin
+    LLibName := ALibraryName;
     LLibVersion := 0;
+  end;
 
   LLibList := TStringList.Create;
   try
@@ -466,9 +475,9 @@ begin
       if (LPosOpenBracket > 0) and (LPosArrow > 0) then
       begin
         LCandidate := LTemp.TrimLeft;
-        if LCandidate.StartsWith(ALibraryName + '.') then
+        if LCandidate.StartsWith(LLibName + '.') then
         begin
-          LCandidateVersion := Copy(LCandidate, Length(ALibraryName) + 2, LPosOpenBracket - Length(ALibraryName) - 3);
+          LCandidateVersion := Copy(LCandidate, Length(LLibName) + 2, LPosOpenBracket - Length(LLibName) - 3);
           LPosDot := Pos('.', LCandidateVersion);
           if LPosDot > 0 then
             LCandidateVersion := Copy(LCandidateVersion, LPosDot - 1);
@@ -499,6 +508,14 @@ begin
       Result := ExtractFilePath(ParamStr(0)) + AFileName;
     if (Result = '') or not FileExists(Result) then
       Result := ResolveLibraryPath(AFileName);
+  {$IFDEF CPU64}
+    if (Result = '') or not FileExists(Result) then
+      Result := '/usr/lib64/' + AFileName;
+    if (Result = '') or not FileExists(Result) then
+      Result := '/usr/lib/x86_64-linux-gnu/' + AFileName;
+  {$ENDIF}
+    if (Result = '') or not FileExists(Result) then
+      Result := '';
   end;
 end;
 {$ENDIF}
