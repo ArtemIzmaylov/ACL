@@ -6,7 +6,7 @@
 //  Purpose:   Animation Engine
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2024
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -75,12 +75,11 @@ type
 
     procedure SetFinished(AValue: Boolean);
   protected
-    procedure Animate;
+    procedure Animate; virtual;
+    procedure CalculateProgress;
     procedure Initialize; virtual;
     function IsCompatible(AAnimation: TACLAnimation): Boolean; virtual;
     function IsReady: Boolean; virtual;
-    // Events
-    procedure DoAnimate; virtual;
     //# Properties
     property CurrentTime: Int64 read FCurrentTime write FCurrentTime;
     property FinishTime: Int64 read FFinishTime write FFinishTime;
@@ -373,54 +372,28 @@ begin
   inherited Destroy;
 end;
 
-procedure TACLAnimation.Draw(ACanvas: TCanvas; const R: TRect);
-begin
-  // do nothing
-end;
-
-procedure TACLAnimation.Run;
-begin
-  if IsReady then
-  begin
-    Initialize;
-    AnimationManager.Add(Self);
-  end
-  else
-    Terminate;
-end;
-
-procedure TACLAnimation.RunImmediate;
-begin
-  if IsReady then
-  begin
-    Initialize;
-    while not Finished do
-      Animate;
-  end;
-  Terminate;
-end;
-
-procedure TACLAnimation.Terminate;
-begin
-  if not FTerminating then
-  begin
-    FTerminating := True;
-    Finished := True;
-    if FreeOnTerminate then
-      Free;
-  end;
-end;
-
 procedure TACLAnimation.Animate;
+begin
+  CalculateProgress;
+  Control.Animate;
+end;
+
+procedure TACLAnimation.CalculateProgress;
 begin
   CurrentTime := Min(FinishTime, TACLTimerManager.ExactTickCount);
   FFinished := Finished or (CurrentTime >= FinishTime);
   if Finished then
     FProgress := 1.0
   else
+  begin
     FProgress := Transition((CurrentTime - StartTime) / (FinishTime - StartTime));
+    FProgress := EnsureRange(FProgress, 0.0, 1.0);
+  end;
+end;
 
-  DoAnimate;
+procedure TACLAnimation.Draw(ACanvas: TCanvas; const R: TRect);
+begin
+  // do nothing
 end;
 
 procedure TACLAnimation.Initialize;
@@ -449,9 +422,26 @@ begin
   Result := True;
 end;
 
-procedure TACLAnimation.DoAnimate;
+procedure TACLAnimation.Run;
 begin
-  Control.Animate;
+  if IsReady then
+  begin
+    Initialize;
+    AnimationManager.Add(Self);
+  end
+  else
+    Terminate;
+end;
+
+procedure TACLAnimation.RunImmediate;
+begin
+  if IsReady then
+  begin
+    Initialize;
+    while not Finished do
+      Animate;
+  end;
+  Terminate;
 end;
 
 procedure TACLAnimation.SetFinished(AValue: Boolean);
@@ -466,6 +456,17 @@ begin
       Initialize;
     end;
     Animate;
+  end;
+end;
+
+procedure TACLAnimation.Terminate;
+begin
+  if not FTerminating then
+  begin
+    FTerminating := True;
+    Finished := True;
+    if FreeOnTerminate then
+      Free;
   end;
 end;
 
@@ -526,13 +527,17 @@ end;
 function TACLAnimationManager.Find(const AControl: IACLAnimateControl;
   out AAnimation: TACLAnimation; ATag: NativeInt = 0): Boolean;
 var
+  LAnimation: TACLAnimation;
   I: Integer;
 begin
   for I := FList.Count - 1 downto 0 do
   begin
-    AAnimation := TACLAnimation(FList.List[I]);
-    if (AAnimation.Control = AControl) and (AAnimation.Tag = ATag) then
+    LAnimation := FList.List[I];
+    if (LAnimation.Control = AControl) and (LAnimation.Tag = ATag) then
+    begin
+      AAnimation := LAnimation;
       Exit(True);
+    end;
   end;
   Result := False;
 end;
@@ -544,18 +549,21 @@ var
 begin
   Result := Find(AControl, LAnimation, ATag);
   if Result then
-    LAnimation.Draw(ACanvas, ARect)
+  begin
+    LAnimation.CalculateProgress;
+    LAnimation.Draw(ACanvas, ARect);
+  end;
 end;
 
 procedure TACLAnimationManager.RemoveOwner(AOwnerObject: TObject);
 var
-  AAnimation: TACLAnimation;
-  AControl: IACLAnimateControl;
+  LAnimation: TACLAnimation;
+  LControl: IACLAnimateControl;
 begin
-  if Supports(AOwnerObject, IACLAnimateControl, AControl) then
+  if Supports(AOwnerObject, IACLAnimateControl, LControl) then
   begin
-    while Find(AControl, AAnimation) do
-      AAnimation.Terminate;
+    while Find(LControl, LAnimation) do
+      LAnimation.Terminate;
   end;
 end;
 

@@ -6,7 +6,7 @@
 //  Purpose:   Generics and Collections
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -533,6 +533,23 @@ type
   public
     property OnKeyNotify: TCollectionNotifyEvent<TKey> read FOnKeyNotify write FOnKeyNotify;
     property OnValueNotify: TCollectionNotifyEvent<TValue> read FOnValueNotify write FOnValueNotify;
+  end;
+
+  { TACLLockFreeQueueOf }
+
+  TACLLockFreeQueueOf<T> = class
+  strict private type
+    PItem = ^TItem;
+    TItem = record
+      Next: PItem;
+      Value: T;
+    end;
+  strict private
+    FHead: PItem;
+  public
+    destructor Destroy; override;
+    function Pop(out Value: T): Boolean;
+    procedure Push(const Value: T);
   end;
 
   { TACLThreadList }
@@ -2291,6 +2308,54 @@ end;
 function TACLDictionary<TKey, TValue>.TValueEnumerator.GetEnumerator: IACLEnumerator<TValue>;
 begin
   Result := Self;
+end;
+
+{ TACLLockFreeQueueOf<T> }
+
+destructor TACLLockFreeQueueOf<T>.Destroy;
+var
+  LUnused: T;
+begin
+  while Pop(LUnused) do
+    {do nothing};
+  inherited;
+end;
+
+function TACLLockFreeQueueOf<T>.Pop(out Value: T): Boolean;
+var
+  LHead: PItem;
+  LNext: PItem;
+  LSuccedeeded: Boolean;
+begin
+  Result := False;
+  repeat
+    LHead := FHead;
+    if LHead = nil then
+      Exit;
+    LNext := LHead^.Next;
+    AtomicCmpExchange(FHead, LNext, LHead, LSuccedeeded);
+    if LSuccedeeded then
+    begin
+      Value := LHead^.Value;
+      Dispose(LHead);
+      Exit(True);
+    end;
+  until False;
+end;
+
+procedure TACLLockFreeQueueOf<T>.Push(const Value: T);
+var
+  LOldHead: PItem;
+  LNewHead: PItem;
+  LSuccedeeded: Boolean;
+begin
+  New(LNewHead);
+  LNewHead^.Value := Value;
+  repeat
+    LOldHead := FHead;
+    LNewHead^.Next := LOldHead;
+    AtomicCmpExchange(FHead, LNewHead, LOldHead, LSuccedeeded);
+  until LSuccedeeded;
 end;
 
 { TACLThreadListOf<T> }

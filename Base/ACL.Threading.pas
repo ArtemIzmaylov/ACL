@@ -6,7 +6,7 @@
 //  Purpose:   Threading Utilities and Types
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -140,7 +140,8 @@ type
   public
     constructor Create(ASuspended: Boolean);
     destructor Destroy; override;
-    procedure SetPaused(AValue: Boolean);
+    procedure SetPaused(AValue: Boolean); virtual;
+    procedure Terminate; override;
   end;
 
   { TACLMultithreadedOperation }
@@ -166,7 +167,7 @@ type
 
   TACLMainThread = class
   strict private type
-  {$REGION 'Internal types'}
+  {$REGION ' Internal types '}
     PSynchronizeRecord = ^TSynchronizeRecord;
     TSynchronizeRecord = record
       Method: TThreadMethod;
@@ -604,8 +605,7 @@ end;
 
 destructor TACLPauseableThread.Destroy;
 begin
-  SetPaused(False);
-  inherited Destroy;
+  inherited;
   FreeAndNil(FPauseEvent);
 end;
 
@@ -627,6 +627,12 @@ begin
     FPauseEvent.Reset
   else
     FPauseEvent.Signal;
+end;
+
+procedure TACLPauseableThread.Terminate;
+begin
+  SetPaused(False);
+  inherited;
 end;
 
 { TACLMultithreadedOperation }

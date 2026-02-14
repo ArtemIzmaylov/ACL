@@ -6,7 +6,7 @@
 //  Purpose:   Timers
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -58,9 +58,11 @@ type
   public const
     DefaultInterval = 1000;
   private
+  {$REGION ' Filled by the Manager '}
     FCounter: Int64;
     FId: NativeUInt;
     FTicked: Boolean;
+  {$ENDREGION}
   strict private
     FEnabled: Boolean;
     FHighResolution: Boolean;
@@ -72,7 +74,6 @@ type
     procedure SetInterval(Value: Cardinal);
     procedure SetHighResolution(Value: Boolean);
     procedure SetOnTimer(Value: TNotifyEvent);
-    procedure UpdateTimer;
   protected
     function CanSetTimer: Boolean; virtual;
     procedure Timer; virtual;
@@ -112,24 +113,24 @@ type
   { TACLTimerManager }
 
   TACLTimerManager = class
-  strict private
+  private
+    class var FHandle: TWndHandle;
     class var FHighResolutionThread: TACLPauseableThread;
+    class var FHighResolutionTimers: TList;
     class var FLock: TACLCriticalSection;
     class var FPerformanceCounterFrequency: Int64;
     class var FTimers: TList;
+    class var FTimersModification: Integer;
     class var FTimerWnd: TWndHandle;
 
+    class procedure ExecuteTickedTimers(AClass: TACLTimerClass = nil);
+    class function SafeTick(AList: TList; ATime: Int64;
+      var ATicked: Boolean; AClass: TACLTimerClass = nil): Int64; static;
     class procedure TimerProc(Handle: TWndHandle;
       Message: UINT; ID: UINT_PTR; Ticks: Cardinal); stdcall; static;
     class procedure WndProc(var Message: TMessage);
-  private
-    class var FHandle: TWndHandle;
-    class var FHighResolutionTimers: TThreadList;
-    class procedure ExecuteTickedTimers(AClass: TACLTimerClass = nil);
-    class function Tick(AList: TList; ATime: Int64;
-      var ATicked: Boolean; AClass: TACLTimerClass = nil): Int64; static;
-    class procedure Register(ATimer: TACLTimer);
-    class procedure Unregister(ATimer: TACLTimer);
+  protected
+    class procedure UpdateState(ATimer: TACLTimer);
   public
     class constructor Create;
     class destructor Destroy;
@@ -145,8 +146,19 @@ type
   { TACLTimerManagerHighResolutionThread }
 
   TACLTimerManagerHighResolutionThread = class(TACLPauseableThread)
+  strict private const
+    IdleInterval = 100;
+  strict private
+    FAdaptiveTimeout: Integer;
+    FIdleTimer: TACLTimer;
+    FIdleTimestamp: Int64;
+    procedure Idle(Sender: TObject);
   protected
     procedure Execute; override;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure SetPaused(AValue: Boolean); override;
   end;
 
 { TACLTimer }
@@ -200,7 +212,7 @@ begin
   if Value <> FEnabled then
   begin
     FEnabled := Value;
-    UpdateTimer;
+    TACLTimerManager.UpdateState(Self);
   end;
 end;
 
@@ -210,7 +222,7 @@ begin
   if Value <> FInterval then
   begin
     FInterval := Value;
-    UpdateTimer;
+    TACLTimerManager.UpdateState(Self);
   end;
 end;
 
@@ -219,14 +231,14 @@ begin
   if HighResolution <> Value then
   begin
     FHighResolution := Value;
-    UpdateTimer;
+    TACLTimerManager.UpdateState(Self);
   end;
 end;
 
 procedure TACLTimer.SetOnTimer(Value: TNotifyEvent);
 begin
   FOnTimer := Value;
-  UpdateTimer;
+  TACLTimerManager.UpdateState(Self);
 end;
 
 function TACLTimer.Start: TACLTimer;
@@ -238,13 +250,6 @@ end;
 procedure TACLTimer.Stop;
 begin
   Enabled := False;
-end;
-
-procedure TACLTimer.UpdateTimer;
-begin
-  TACLTimerManager.Unregister(Self);
-  if CanSetTimer then
-    TACLTimerManager.Register(Self);
 end;
 
 { TACLTimerList }
@@ -314,7 +319,7 @@ class constructor TACLTimerManager.Create;
 begin
   FTimers := TList.Create;
   FLock := TACLCriticalSection.Create;
-  FHighResolutionTimers := TThreadList.Create;
+  FHighResolutionTimers := TList.Create;
   FHandle := acWndAlloc(WndProc, ClassName, True);
   FPerformanceCounterFrequency := 0;
   // #AI: 11.12.2025
@@ -361,41 +366,71 @@ class procedure TACLTimerManager.ForceUpdate(ATimerClass: TACLTimerClass);
 var
   LTicked: Boolean;
 begin
+  LTicked := False;
   FLock.Enter;
   try
-    LTicked := False;
-    Tick(FTimers, ExactTickCount, LTicked, ATimerClass);
-    if LTicked then
-      ExecuteTickedTimers(ATimerClass);
+    SafeTick(FTimers, ExactTickCount, LTicked, ATimerClass);
   finally
     FLock.Leave;
   end;
+  // Вне Lock! См. описание ExecuteTickedTimers
+  if LTicked then
+    ExecuteTickedTimers(ATimerClass);
 end;
 
 class procedure TACLTimerManager.ExecuteTickedTimers(AClass: TACLTimerClass);
 var
-  I: Integer;
+  LCheck: TACLTimer;
+  LIndex: Integer;
   LTimer: TACLTimer;
 begin
-  if FTimers = nil then Exit;
-  FLock.Enter;
-  try
-    for I := 0 to FTimers.Count - 1 do
-    begin
-      LTimer := FTimers.List[I];
-      if LTimer.FTicked and ((AClass = nil) or LTimer.InheritsFrom(AClass)) then
+  if FTimers = nil then
+    Exit;
+
+  // Нюансы при работе с таймерами:
+  // 1) таймеры могут убиваться / останавливаться при срабатывании
+  // 2) таймеры могут быть заведены / остановлены из второстепенного потока
+  // 3) обработчик таймера может вызвать остановку другого потока, который имеет свой таймер
+
+  LIndex := 0;
+  repeat
+    FLock.Enter;
+    try
+      LTimer := nil;
+      // Если пока мы выполняли действие таймера изменился список -
+      // прерываем текущую итерацию и начинаем процессинг заново.
+      if AtomicExchange(FTimersModification, 0) <> 0 then
+        LIndex := 0;
+      while LIndex < FTimers.Count do
       begin
-        LTimer.FTicked := False;
-        LTimer.Timer;
+        LCheck := FTimers.List[LIndex];
+        Inc(LIndex);
+        if LCheck.FTicked and ((AClass = nil) or LCheck.InheritsFrom(AClass)) then
+        begin
+          LCheck.FTicked := False;
+          LTimer := LCheck;
+          Break;
+        end;
       end;
+    finally
+      FLock.Leave;
     end;
-  finally
-    FLock.Leave;
-  end;
+
+    if LTimer <> nil then
+    try
+      // Предполагаем, что текущий таймер может быть убит только из:
+      // 1) своего обрабочтика
+      // 2) главного потока
+      LTimer.Timer;
+    except
+      // предполагай, но проверяй
+    end;
+
+  until LTimer = nil;
 end;
 
-class function TACLTimerManager.Tick(AList: TList;
-  ATime: Int64; var ATicked: Boolean; AClass: TACLTimerClass = nil): Int64;
+class function TACLTimerManager.SafeTick(AList: TList; ATime: Int64;
+  var ATicked: Boolean; AClass: TACLTimerClass = nil): Int64;
 var
   I: Integer;
   LTimer: TACLTimer;
@@ -420,90 +455,96 @@ end;
 class procedure TACLTimerManager.TimerProc(
   Handle: TWndHandle; Message: UINT; ID: UINT_PTR; Ticks: Cardinal); stdcall;
 var
-  LTimer: TACLTimer;
   I: Integer;
+  LCheck: TACLTimer;
+  LTimer: TACLTimer;
 begin
   if FTimers = nil then Exit;
+
+  LTimer := nil;
+  // Нюансы при работе с таймерами:
+  // 1) таймеры могут убиваться / останавливаться при срабатывании
+  // 2) таймеры могут быть заведены / остановлены из второстепенного потока
+  // 3) обработчик таймера может вызвать остановку другого потока, который имеет свой таймер
   FLock.Enter;
   try
-    for I := FTimers.Count - 1 downto 0 do
+    for I := 0 to FTimers.Count - 1 do
     begin
-      LTimer := FTimers.List[I];
-      if LTimer.fId = ID then
+      LCheck := FTimers.List[I];
+      if LCheck.fId = ID then
       begin
+        LTimer := LCheck;
         LTimer.FCounter := Ticks + LTimer.Interval;
         LTimer.FTicked := False;
-        LTimer.Timer;
-        Exit;
+        Break;
       end;
     end;
   finally
     FLock.Leave;
   end;
+
+  if LTimer <> nil then
+  try
+    // Предполагаем, что текущий таймер может быть убит только из:
+    // 1) своего обрабочтика
+    // 2) главного потока
+    LTimer.Timer;
+  except
+    // предполагай, но проверяй
+  end;
 end;
 
-class procedure TACLTimerManager.Register(ATimer: TACLTimer);
+class procedure TACLTimerManager.UpdateState(ATimer: TACLTimer);
 var
   LElapse: Integer;
-  LList: TList;
 begin
-  FLock.Enter;
-  try;
-    FTimers.Add(ATimer);
-    if ATimer.HighResolution and (ATimer.Interval < 1000) then
-    begin
-      LList := FHighResolutionTimers.LockList;
-      try
-        LList.Add(ATimer);
-        if FHighResolutionThread = nil then
-          FHighResolutionThread := TACLTimerManagerHighResolutionThread.Create(False);
-        FHighResolutionThread.SetPaused(False);
-      finally
-        FHighResolutionTimers.UnlockList;
-      end;
-    end
-    else
-    begin
-      // The resolution of the GetTickCount function is limited to the resolution of the system timer,
-      // which is typically in the range of 10 milliseconds to 16 milliseconds
-      //#AI: Animation works too slow (in comparing with AIMP4)
-      //  LElapse := Max(1, Round(AInterval / SystemTimerResolution)) * SystemTimerResolution;
-      LElapse := Max(1, Round(ATimer.Interval / 10)) * 10;
-      if FTimerWnd <> 0 then
-      begin
-        ATimer.fId := NativeUInt(ATimer);
-        SetTimer(FTimerWnd, ATimer.FId, LElapse, nil);
-      end
-      else
-        ATimer.fId := SetTimer(0, 0, LElapse, @TimerProc);
-    end;
-  finally
-    FLock.Leave;
-  end;
-end;
+  AtomicIncrement(FTimersModification);
 
-class procedure TACLTimerManager.Unregister(ATimer: TACLTimer);
-var
-  LList: TList;
-begin
   FLock.Enter;
   try
+  {$REGION ' Unregister '}
     if FTimers.Remove(ATimer) >= 0 then
       KillTimer(FTimerWnd, ATimer.FId);
 
-    LList := FHighResolutionTimers.LockList;
-    try
-      if (LList.Remove(ATimer) >= 0) and (LList.Count = 0) then
-      begin
-        if FHighResolutionThread <> nil then
-          FHighResolutionThread.SetPaused(True);
-      end;
-    finally
-      FHighResolutionTimers.UnlockList;
+    FHighResolutionTimers.Remove(ATimer);
+    if FHighResolutionTimers.Count = 0 then
+    begin
+      if FHighResolutionThread <> nil then
+        FHighResolutionThread.SetPaused(True);
     end;
 
     ATimer.FCounter := 0;
     ATimer.FId := 0;
+  {$ENDREGION}
+
+  {$REGION ' Register  '}
+    if ATimer.CanSetTimer then
+    begin
+      FTimers.Add(ATimer);
+      if ATimer.HighResolution and (ATimer.Interval < 1000) then
+      begin
+        FHighResolutionTimers.Add(ATimer);
+        if FHighResolutionThread = nil then
+          FHighResolutionThread := TACLTimerManagerHighResolutionThread.Create;
+        FHighResolutionThread.SetPaused(False);
+      end
+      else
+      begin
+        // The resolution of the GetTickCount function is limited to the resolution of the system timer,
+        // which is typically in the range of 10 milliseconds to 16 milliseconds
+        //#AI: Animation works too slow (in comparing with AIMP4)
+        //  LElapse := Max(1, Round(AInterval / SystemTimerResolution)) * SystemTimerResolution;
+        LElapse := Max(1, Round(ATimer.Interval / 10)) * 10;
+        if FTimerWnd <> 0 then
+        begin
+          ATimer.fId := NativeUInt(ATimer);
+          SetTimer(FTimerWnd, ATimer.FId, LElapse, nil);
+        end
+        else
+          ATimer.fId := SetTimer(0, 0, LElapse, @TimerProc);
+      end;
+    end;
+  {$ENDREGION}
   finally
     FLock.Leave;
   end;
@@ -525,12 +566,24 @@ end;
 
 { TACLTimerManagerHighResolutionThread }
 
+constructor TACLTimerManagerHighResolutionThread.Create;
+begin
+  inherited Create(False);
+  FAdaptiveTimeout := IdleInterval div 3;
+  FIdleTimer := TACLTimer.CreateEx(Idle, IdleInterval);
+end;
+
+destructor TACLTimerManagerHighResolutionThread.Destroy;
+begin
+  FreeAndNil(FIdleTimer);
+  inherited;
+end;
+
 procedure TACLTimerManagerHighResolutionThread.Execute;
 var
   LCurrTick: Int64;
   LNextTick: Int64;
   LTicked: Boolean;
-  LTimers: TList;
 begin
 {$IFDEF ACL_THREADING_DEBUG}
   NameThreadForDebugging('HighResolutionTimers');
@@ -540,45 +593,52 @@ begin
   begin
     LTicked := False;
 
-    LTimers := TACLTimerManager.FHighResolutionTimers.LockList;
+    TACLTimerManager.FLock.Enter;
     try
       LCurrTick := TACLTimerManager.ExactTickCount;
-      LNextTick := TACLTimerManager.Tick(LTimers, LCurrTick, LTicked);
+      LNextTick := TACLTimerManager.SafeTick(TACLTimerManager.FHighResolutionTimers, LCurrTick, LTicked);
     finally
-      TACLTimerManager.FHighResolutionTimers.UnlockList;
+      TACLTimerManager.FLock.Leave;
     end;
 
     if LTicked then
     begin
-      //#AI: 08.12.2025
-      // В Linux все таймеры обрабатываем исключительно на OnIdle (как в Windows),
-      // Иначе на тяжелых анимациях скин-движка случается так, что вся очередь событий
-      // забивается таймерами и перерисовкой UI. Простой пример:
-      // Timer (interval 20) -> PaintBox.Invalidate -> PaintBox.OnPaint { sleep(50) }
-      // После такого отваливаются экшены, popup и modal loop-ы, а всё потому, что
-      // до idle дело просто не доходит.
-    {$IFDEF LINUX}
-      if not IsLibrary then
-        PostMessage(TACLTimerManager.FHandle, WM_NULL, 0, 0)
-      else
-    {$ENDIF}
-      begin
-      {$IFDEF MSWINDOWS}
-        SendMessage(TACLTimerManager.FHandle, WM_NULL, 0, 0);
-      {$ELSE}
-        Synchronize(procedure begin TACLTimerManager.ExecuteTickedTimers; end);
-      {$ENDIF}
-        // Переключение потоков можен занять существенное время,
-        // посему после актуализируем временную метку
-        LCurrTick := TACLTimerManager.ExactTickCount;
-      end;
+      acSendMessage(TACLTimerManager.FHandle, WM_NULL, 0, 0);
+      // Переключение потоков можен занять существенное время,
+      // посему после вызова актуализируем временную метку
+      LCurrTick := TACLTimerManager.ExactTickCount;
     end;
 
-    //#AI: always call sleep to take main thread some time to process message queue
-    Sleep(EnsureRange(LNextTick - LCurrTick, 1, 1000));
+    //#AI: 08.12.2025
+    // Поскольку события таймера генерируются в потоке, а не на Idle, как в
+    // случае обычными таймерами, может случиться так, что вся очередь событий
+    // забивается high-resolution таймерами и перерисовкой UI. Простой пример:
+    //   Timer (interval 20) -> PaintBox.Invalidate -> PaintBox.OnPaint { sleep(50) }
+    // Это приводит к тому, что Idle не вызывается и в приложении перестают
+    // работать экшены и обычные таймеры (анимации).
+    // Логика такая: если мы видим, что idle-таймер перестаёт работать -
+    // замедляем работу high-resolution таймеров
+    if FIdleTimestamp + IdleInterval < LCurrTick then
+      Inc(FAdaptiveTimeout, 4)
+    else if FAdaptiveTimeout > 0 then
+      FAdaptiveTimeout := FAdaptiveTimeout shr 1;
+
+    Sleep(Min(Max(LNextTick - LCurrTick, 1) + FAdaptiveTimeout, 1000));
 
     WaitForUnpause;
   end;
+end;
+
+procedure TACLTimerManagerHighResolutionThread.Idle(Sender: TObject);
+begin
+  FIdleTimestamp := TACLTimerManager.ExactTickCount;
+end;
+
+procedure TACLTimerManagerHighResolutionThread.SetPaused(AValue: Boolean);
+begin
+  if FIdleTimer <> nil then
+    FIdleTimer.Enabled := not AValue;
+  inherited SetPaused(AValue);
 end;
 
 end.
