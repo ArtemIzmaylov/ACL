@@ -268,6 +268,8 @@ type
     ColumnViewInfo: TACLTreeListColumnViewInfo;
     Node: TACLTreeListNode;
     NodeViewInfo: TACLTreeListNodeViewInfo;
+    ImageIndex: Integer;
+    Images: TCustomImageList;
     Value: string;
     ValueAlignment: TAlignment;
     ValueIndex: Integer;
@@ -377,7 +379,9 @@ type
       AColumnViewInfo: TACLTreeListColumnViewInfo);
     procedure DoDrawCellContent(ACanvas: TCanvas; const R: TRect;
       AColumnViewInfo: TACLTreeListColumnViewInfo); virtual;
-    procedure DoDrawCellImage(ACanvas: TCanvas; const ABounds: TRect); virtual;
+    procedure DoDrawCellImage(ACanvas: TCanvas;
+      const AData: TACLTreeListNodeCustomDrawData;
+      const ABounds: TRect); virtual;
     procedure DoDrawCellValue(ACanvas: TCanvas;
       var AData: TACLTreeListNodeCustomDrawData); virtual;
 
@@ -2413,7 +2417,10 @@ begin
   LData.NodeViewInfo := Self;
   LData.Column := GetColumnForViewInfo(AColumnViewInfo);
   LData.ColumnViewInfo := AColumnViewInfo;
+  LData.Images := OptionsNodes.Images;
   LData.ValueIndex := 0;
+  if Node <> nil then
+    LData.ImageIndex := Node.ImageIndex;
   if AColumnViewInfo <> nil then
     LData.ValueIndex := AColumnViewInfo.AbsoluteIndex;
   if (Node = nil) or not SubClass.DoCustomDrawNodeCell(ACanvas, LData) then
@@ -2425,7 +2432,7 @@ begin
       if not CheckBoxRect.IsEmpty then
         SubClass.Style.DrawCheckMark(ACanvas, CheckBoxRect, CheckBoxState, Node.CheckState);
       if not ImageRect.IsEmpty then
-        DoDrawCellImage(ACanvas, ImageRect);
+        DoDrawCellImage(ACanvas, LData, ImageRect);
     end;
     LData.Bounds := R.Split(CellTextExtends[AColumnViewInfo]);
     LData.Value := Node.Values[LData.ValueIndex];
