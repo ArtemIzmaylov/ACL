@@ -1127,18 +1127,30 @@ var
   LSelLength: Integer;
 begin
   inherited;
-  if (AButton = mbLeft) and Editable and (LayoutHitTest.PositionInText >= 0) then
+  if Editable and (LayoutHitTest.PositionInText >= 0) then
   begin
-    if LastClickCount > 1 then
-      Exit;
-    if (ssShift in AShift) and (FSelectionPin >= 0) then
-      LSelLength := FSelectionPin - FLayoutHitTest.PositionInText
-    else
-      LSelLength := 0;
+    if AButton = mbLeft then
+    begin
+      if LastClickCount > 1 then
+        Exit;
+      if (ssShift in AShift) and (FSelectionPin >= 0) then
+        LSelLength := FSelectionPin - FLayoutHitTest.PositionInText
+      else
+        LSelLength := 0;
 
-    MoveSelection(
-      LayoutHitTest.PositionInText, LSelLength,
-      LayoutHitTest.PositionInLineEnd);
+      MoveSelection(
+        LayoutHitTest.PositionInText, LSelLength,
+        LayoutHitTest.PositionInLineEnd);
+    end;
+    if AButton = mbRight then
+    begin
+      if (LayoutHitTest.PositionInText < SelStart) or
+         (LayoutHitTest.PositionInText > SelStart + SelLength)
+      then
+        MoveSelection(
+          LayoutHitTest.PositionInText, 0,
+          LayoutHitTest.PositionInLineEnd);
+    end;
   end;
 end;
 
@@ -1389,6 +1401,7 @@ begin
         FCaretRect.Offset((Layout.Bounds.Right - LWidth) div 2, 0);
       taRightJustify:
         FCaretRect.Offset(Layout.Bounds.Right - LWidth, 0);
+    else;
     end;
   end;
   FCaretGoal.X := FCaretRect.Left;

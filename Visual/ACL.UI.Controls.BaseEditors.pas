@@ -1053,10 +1053,17 @@ end;
 procedure TACLEditSubClass.MouseDown(
   Button: TMouseButton; Shift: TShiftState; const P: TPoint);
 var
+  LCaret: Integer;
   LRange: TACLRange;
 begin
   if not (esIteract in State) then
     Exit;
+  if (Button = mbRight) and Bounds.Contains(P) then
+  begin
+    LCaret := TextHitTest(P.X, P.Y, True);
+    if (LCaret < SelStart) or (LCaret > SelStart + SelLength) then
+      CaretPos := LCaret;
+  end;
   if (Button = mbLeft) and Bounds.Contains(P) then
   begin
     CaretPos := TextHitTest(P.X, P.Y, True);
