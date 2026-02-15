@@ -1216,9 +1216,9 @@ function acUtf8ToUnicode(Dest: PWideChar; MaxDestChars: Integer; Source: PAnsiCh
 const
   Masks: array[1..3] of Byte = ($3F, $1F, $F);
 var
-  AByte: Byte;
-  AByteRemaining: Integer;
-  ACharAccumulator: Cardinal;
+  LByte: Byte;
+  LByteRemaining: Integer;
+  LCharAccumulator: Cardinal;
 begin
   if Source = nil then
     Exit(0);
@@ -1229,49 +1229,49 @@ begin
 
   while (SourceBytes > 0) and (Result < MaxDestChars) do
   begin
-    AByte := Cardinal(Source^);
+    LByte := Cardinal(Source^);
     Dec(SourceBytes);
     Inc(Source);
 
     // Aggregate the char
-    ACharAccumulator := AByte;
-    if AByte and $80 <> 0 then // non-single byte
+    LCharAccumulator := LByte;
+    if LByte and $80 <> 0 then // non-single byte
     begin
-      if AByte and $F0 = $F0 then
-        AByteRemaining := 3 // 4 byte-wide
-      else if AByte and $E0 = $E0 then
-        AByteRemaining := 2 // 3 byte-wide
-      else if AByte and $C0 = $C0 then
-        AByteRemaining := 1 // 2 byte-wide
+      if LByte and $F0 = $F0 then
+        LByteRemaining := 3 // 4 byte-wide
+      else if LByte and $E0 = $E0 then
+        LByteRemaining := 2 // 3 byte-wide
+      else if LByte and $C0 = $C0 then
+        LByteRemaining := 1 // 2 byte-wide
       else
         Exit(-1); // malformed bit-stream
 
-      if AByteRemaining > SourceBytes then
+      if LByteRemaining > SourceBytes then
         Exit(-1); // incomplete multibyte char
 
-      ACharAccumulator := AByte and Masks[AByteRemaining];
-      while AByteRemaining > 0 do
+      LCharAccumulator := LByte and Masks[LByteRemaining];
+      while LByteRemaining > 0 do
       begin
-        AByte := Byte(Source^);
-        if AByte and $C0 <> $80 then
+        LByte := Byte(Source^);
+        if LByte and $C0 <> $80 then
           Exit(-1); // malformed trail byte or out of range char
-        ACharAccumulator := (ACharAccumulator shl 6) or (AByte and $3F);
-        Dec(AByteRemaining);
+        LCharAccumulator := (LCharAccumulator shl 6) or (LByte and $3F);
+        Dec(LByteRemaining);
         Dec(SourceBytes);
         Inc(Source);
       end;
     end;
 
     // Post the char
-    if ACharAccumulator > MaxWord then // Surrogate
+    if LCharAccumulator > MaxWord then // Surrogate
     begin
       if Result + 2 > MaxDestChars then
         Break;
       if Dest <> nil then
       begin
-        Dest^ := WideChar((((ACharAccumulator - $10000) shr 10) and $3FF) or $D800);
+        Dest^ := WideChar((((LCharAccumulator - $10000) shr 10) and $3FF) or $D800);
         Inc(Dest);
-        Dest^ := WideChar((((ACharAccumulator - $10000) and $3FF) or $DC00));
+        Dest^ := WideChar((((LCharAccumulator - $10000) and $3FF) or $DC00));
         Inc(Dest);
       end;
       Inc(Result, 2);
@@ -1280,7 +1280,7 @@ begin
     begin
       if Dest <> nil then
       begin
-        Dest^ := WideChar(ACharAccumulator);
+        Dest^ := WideChar(LCharAccumulator);
         Inc(Dest);
       end;
       Inc(Result);
@@ -1918,11 +1918,11 @@ end;
 
 function acDetectEncoding(ABuffer: PByte; ABufferSize: Integer; ADefaultEncoding: TEncoding = nil): TEncoding;
 var
-  ABytes: TBytes;
+  LBytes: TBytes;
 begin
-  SetLength(ABytes{%H-}, Min(ABufferSize, MaxPreambleLength));
-  FastMove(ABuffer^, ABytes, Length(ABytes));
-  acDetectEncoding(ABytes, Result, ADefaultEncoding);
+  SetLength(LBytes{%H-}, Min(ABufferSize, MaxPreambleLength));
+  FastMove(ABuffer^, LBytes, Length(LBytes));
+  acDetectEncoding(LBytes, Result, ADefaultEncoding);
 end;
 
 function acDetectEncoding(ABuffer: TBytes; out AEncoding: TEncoding; ADefaultEncoding: TEncoding = nil): Integer;

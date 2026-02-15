@@ -79,16 +79,20 @@ type
   strict private
     function GetFiles: TACLStringList;
     function GetStream(AFormat: TClipboardFormat): TCustomMemoryStream;
+    function GetString: string;
     procedure SetFiles(AFiles: TACLStringList);
     procedure SetStream(AFormat: TClipboardFormat; AValue: TCustomMemoryStream);
+    procedure SetString(const AValue: string);
   public
   {$IFDEF LINUX}
+    procedure AddFormat(const AMimeType, AData: AnsiString); overload;
     function EncodeFiles(AFiles: TACLStringList): string;
   {$ENDIF}
-    function HasText: Boolean;
-    function SafeGetText: string;
+    function HasString: Boolean;
     property AsFiles: TACLStringList read GetFiles write SetFiles;
     property AsStream[AFormat: TClipboardFormat]: TCustomMemoryStream read GetStream write SetStream;
+    // unlike AsText: no exceptions, utf-8 aware
+    property AsString: string read GetString write SetString;
   end;
 
 {$ENDIF}
@@ -435,6 +439,11 @@ end;
 { TACLClipboardHelper }
 
 {$IFDEF LINUX}
+procedure TACLClipboardHelper.AddFormat(const AMimeType, AData: AnsiString);
+begin
+  AddFormat(RegisterClipboardFormat(AMimeType), PAnsiChar(AData)^, Length(AData));
+end;
+
 function TACLClipboardHelper.EncodeFiles(AFiles: TACLStringList): string;
 var
   I: Integer;
@@ -449,6 +458,11 @@ begin
   end;
 end;
 {$ENDIF}
+
+function TACLClipboardHelper.HasString: Boolean;
+begin
+  Result := HasFormat(CF_TEXT){$IFDEF MSWINDOWS} or HasFormat(CF_UNICODETEXT){$ENDIF};
+end;
 
 function TACLClipboardHelper.GetStream(AFormat: TClipboardFormat): TCustomMemoryStream;
 begin
@@ -465,7 +479,7 @@ begin
 {$ENDIF}
 end;
 
-function TACLClipboardHelper.SafeGetText: string;
+function TACLClipboardHelper.GetString: string;
 begin
   try
     Result := AsText;
@@ -499,17 +513,27 @@ begin
 {$ENDIF}
 end;
 
+procedure TACLClipboardHelper.SetString(const AValue: string);
+begin
+{$IFDEF MSWINDOWS}
+  AsText := AValue;
+{$ELSE}
+  Open;
+  try
+    Clear;
+    AddFormat('text/plain', AValue);
+    AddFormat('text/plain;charset=utf-8', AValue);
+  finally
+    Close;
+  end;
+{$ENDIF}
+end;
+
 procedure TACLClipboardHelper.SetFiles(AFiles: TACLStringList);
 {$IFDEF MSWINDOWS}
 begin
   SetAsHandle(CF_HDROP, TACLGlobalMemory.Alloc(AFiles));
 {$ELSE}
-
-  procedure Append(const AMimeType, AData: AnsiString);
-  begin
-    AddFormat(RegisterClipboardFormat(AMimeType), PAnsiChar(AData)^, Length(AData));
-  end;
-
 var
   LFiles: AnsiString;
 begin
@@ -517,10 +541,10 @@ begin
   try
     Clear;
     LFiles := EncodeFiles(AFiles);
-    Append(acMimeLinuxFileList, LFiles);
+    AddFormat(acMimeLinuxFileList, LFiles);
     LFiles := 'copy'#10 + LFiles;
-    Append('x-special/mate-copied-files', LFiles);
-    Append('x-special/gnome-copied-files', LFiles);
+    AddFormat('x-special/mate-copied-files', LFiles);
+    AddFormat('x-special/gnome-copied-files', LFiles);
   finally
     Close;
   end;
@@ -534,11 +558,6 @@ begin
 {$ELSE}
   Clipboard.SetAsHandle(AFormat, TACLGlobalMemory.Alloc(AValue.Memory, AValue.Size));
 {$ENDIF}
-end;
-
-function TACLClipboardHelper.HasText: Boolean;
-begin
-  Result := HasFormat(CF_TEXT){$IFDEF MSWINDOWS} or HasFormat(CF_UNICODETEXT){$ENDIF};
 end;
 {$ENDIF}
 

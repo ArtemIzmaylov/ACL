@@ -52,6 +52,7 @@ uses
   ACL.UI.Controls.CompoundControl.SubClass,
   ACL.UI.Resources,
   ACL.Utils.Common,
+  ACL.Utils.Clipboard,
   ACL.Utils.DPIAware,
   ACL.Utils.Strings;
 
@@ -689,7 +690,7 @@ procedure TACLHexViewSubClass.CopyToClipboard(AEncodeProc: TEncodeProc);
   end;
 
 begin
-  Clipboard.AsText := acString(BytesToString(GetSelectedBytes));
+  Clipboard.AsString := acString(BytesToString(GetSelectedBytes));
 end;
 
 function TACLHexViewSubClass.GetSelectedBytes: TBytes;

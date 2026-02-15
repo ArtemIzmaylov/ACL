@@ -716,7 +716,7 @@ begin
     eaCopy:
       Result := (SelLength > 0);
     eaPaste:
-      Result := not ReadOnly and Clipboard.HasText;
+      Result := not ReadOnly and Clipboard.HasString;
     eaUndo:
       Result := FUndo.IsAssigned;
     eaSelectAll:
@@ -806,7 +806,7 @@ begin
   case AAction of
     eaCopy:
       if SelLength > 0 then
-        Clipboard.AsText := SelText;
+        Clipboard.AsString := SelText;
 
     eaDelete:
       if not ReadOnly then
@@ -821,7 +821,7 @@ begin
 
     eaPaste:
       if not ReadOnly then
-        SelText := Clipboard.AsText;
+        SelText := Clipboard.AsString;
 
     eaUndo:
       UndoRedo;
