@@ -1011,7 +1011,6 @@ function acIsSemitransparentFill(
   AContentColor1, AContentColor2: TACLResourceColor): Boolean;
 function acOpacityToAlphaBlendValue(AOpacity: Integer): Byte;
 
-procedure acDesignerSetModified(AInvoker: TPersistent);
 function acElementRectIncludeOffset(const R: TRect; ATargetDpi: Integer): TRect;
 function acIsChildOrSelf(AControl, AChildToTest: TControl): Boolean;
 
@@ -1052,7 +1051,6 @@ uses
   ACL.Utils.RTTI;
 
 type
-  TPersistentAccess = class(TPersistent);
   TControlAccess = class(TControl);
   TWinControlAccess = class(TWinControl);
 
@@ -1170,39 +1168,6 @@ procedure acInvalidateRect(AControl: TWinControl; const ARect: TRect; AErase: Bo
 begin
   if AControl.HandleAllocated and not (csDestroying in AControl.ComponentState) then
     InvalidateRect(AControl.Handle, {$IFDEF FPC}@{$ENDIF}ARect, AErase);
-end;
-
-procedure acDesignerSetModified(AInvoker: TPersistent);
-
-  function IsValidComponentState(AComponent: TComponent): Boolean;
-  begin
-    Result := AComponent.ComponentState * [csLoading, csWriting, csDestroying] = [];
-  end;
-
-  function CanSetModified(AObject: TPersistent): Boolean;
-  begin
-    if AObject is TComponent then
-      Result := IsValidComponentState(TComponent(AObject))
-    else
-      Result := True;
-
-    if AObject <> nil then
-      Result := Result and CanSetModified(TPersistentAccess(AObject).GetOwner);
-  end;
-
-var
-{$IFDEF FPC}
-  LDesigner: TIDesigner;
-{$ELSE}
-  LDesigner: IDesignerNotify;
-{$ENDIF}
-begin
-  if CanSetModified(AInvoker) then
-  begin
-    LDesigner := FindRootDesigner(AInvoker);
-    if LDesigner <> nil then
-      LDesigner.Modified;
-  end;
 end;
 
 function acElementRectIncludeOffset(const R: TRect; ATargetDpi: Integer): TRect;

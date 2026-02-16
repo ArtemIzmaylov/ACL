@@ -47,12 +47,40 @@ type
   end;
 
 function IsAlphaComposingSupports: Boolean;
+procedure LoadSystemThemedCursors;
 procedure SetWindowStayOnTop(AWnd: HWND; AValue: Boolean);
 implementation
 
 function IsAlphaComposingSupports: Boolean;
 begin
   Result := True;
+end;
+
+procedure LoadSystemThemedCursors;
+
+  procedure InitCursor(ID: Integer; AInstance: HINST; AName: PChar);
+  var
+    LCursor: HCURSOR;
+  begin
+    LCursor := LoadCursor(AInstance, AName);
+    if LCursor <> 0 then
+      Screen.Cursors[ID] := LCursor;
+  end;
+
+begin
+  InitCursor(crNo, 0, IDC_NO);
+  InitCursor(crAppStart, 0, IDC_APPSTARTING);
+  InitCursor(crDrag, LoadLibrary('ole32.dll'), MakeIntResource(3));
+  InitCursor(crHandPoint, 0, IDC_HAND);
+  InitCursor(crHourGlass, 0, IDC_WAIT);
+  InitCursor(crSizeAll, 0, IDC_SIZEALL);
+  InitCursor(crSizeNESW, 0, IDC_SIZENESW);
+  InitCursor(crSizeNS, 0, IDC_SIZENS);
+  InitCursor(crSizeNWSE, 0, IDC_SIZENWSE);
+  InitCursor(crSizeWE, 0, IDC_SIZEWE);
+  InitCursor(crNoDrop, 0, IDC_NO);
+  InitCursor(crHSplit, 0, IDC_SIZEWE);
+  InitCursor(crVSplit, 0, IDC_SIZENS);
 end;
 
 class function TACLStartDragHelper.Check(AControl: TWinControl; X, Y, AThreshold: Integer): Boolean;

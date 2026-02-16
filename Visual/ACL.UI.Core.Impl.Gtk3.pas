@@ -190,6 +190,7 @@ type
 
 function IsAlphaComposingSupports: Boolean;
 function LoadDialogIcon(AOwnerWnd: TWndHandle; AType: TMsgDlgType; ASize: Integer): TACLDib;
+procedure LoadSystemThemedCursors;
 procedure SetDragImageListOpacity(Opacity: Byte);
 procedure SetWindowStayOnTop(AWnd: TWndHandle; AValue: Boolean);
 
@@ -201,9 +202,10 @@ function GtkLoadStockIcon(AWidget: PGtkWidget; AName: PChar; ASize: Integer): TA
 implementation
 
 uses
-  ACL.UI.Controls.Base,
   ACL.UI.Core.Impl.Gtk3.Widgets,
-  ACL.UI.Forms.Base;
+  ACL.UI.Controls.Base,
+  ACL.UI.Forms.Base,
+  ACL.UI.Resources;
 
 type
   TFormAccess = class(TForm);
@@ -371,6 +373,13 @@ const
   );
 begin
   Result := GtkLoadStockIcon(nil, Map[AType], ASize);
+end;
+
+procedure LoadSystemThemedCursors;
+begin
+  Screen.Cursors[crDrag]       := HCURSOR(TGtk3Cursor.Create(GDK_Arrow));
+  Screen.Cursors[crNoDrop]     := HCURSOR(TGtk3Cursor.Create(GDK_X_CURSOR));
+  Screen.Cursors[crDragRemove] := HCURSOR(TGtk3Cursor.Create(GDK_X_CURSOR));
 end;
 
 procedure ReleaseInputGrab;

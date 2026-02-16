@@ -785,8 +785,6 @@ type
   strict private
     class var FFinalized: Boolean;
     class var FInstance: TACLCustomResourceCollection;
-
-    class procedure InitializeCursors;
   public
     class destructor Destroy;
     class function GetInstance: TACLCustomResourceCollection;
@@ -801,6 +799,7 @@ type
   end;
 
 procedure acApplyColorSchemaForPublishedProperties(AObject: TObject; const AColorSchema: TACLColorSchema);
+procedure acDesignerSetModified(AInvoker: TPersistent);
 function acResourceCollectionFieldSet(var AField: TACLCustomResourceCollection; AOwner: TComponent;
   const AListener: IACLResourceChangeListener; ANewValue: TACLCustomResourceCollection): Boolean;
 implementation
@@ -812,10 +811,11 @@ uses
   // VCL
   {Vcl.}Forms,
   // ACL
-  ACL.UI.Controls.Base,
+{$I ACL.UI.Core.Impl.inc},
   ACL.Utils.Strings;
 
 type
+  TPersistentAccess = class(TPersistent);
 
   { TACLRootResourceCollectionImpl }
 
@@ -881,6 +881,39 @@ begin
         AField.ListenerAdd(AListener);
       AField.FreeNotification(AOwner);
     end;
+  end;
+end;
+
+procedure acDesignerSetModified(AInvoker: TPersistent);
+
+  function IsValidComponentState(AComponent: TComponent): Boolean;
+  begin
+    Result := AComponent.ComponentState * [csLoading, csWriting, csDestroying] = [];
+  end;
+
+  function CanSetModified(AObject: TPersistent): Boolean;
+  begin
+    if AObject is TComponent then
+      Result := IsValidComponentState(TComponent(AObject))
+    else
+      Result := True;
+
+    if AObject <> nil then
+      Result := Result and CanSetModified(TPersistentAccess(AObject).GetOwner);
+  end;
+
+var
+{$IFDEF FPC}
+  LDesigner: TIDesigner;
+{$ELSE}
+  LDesigner: IDesignerNotify;
+{$ENDIF}
+begin
+  if CanSetModified(AInvoker) then
+  begin
+    LDesigner := FindRootDesigner(AInvoker);
+    if LDesigner <> nil then
+      LDesigner.Modified;
   end;
 end;
 
@@ -3313,7 +3346,9 @@ begin
   if (FInstance = nil) and not FFinalized then
   begin
     FInstance := TACLRootResourceCollectionImpl.Create;
-    InitializeCursors;
+    Screen.Cursors[crDragRemove] := LoadCursor(HInstance, 'CR_DRAGREMOVE');
+    Screen.Cursors[crDragLink] := LoadCursor(HInstance, 'CR_DRAGLINK');
+    LoadSystemThemedCursors;
   end;
   Result := FInstance;
 end;
@@ -3348,37 +3383,6 @@ class procedure TACLRootResourceCollection.ListenerRemove(AListener: IACLResourc
 begin
   if FInstance <> nil then
     FInstance.ListenerRemove(AListener);
-end;
-
-class procedure TACLRootResourceCollection.InitializeCursors;
-
-  procedure InitCursor(ID: Integer; AInstance: HINST; AName: PChar);
-  var
-    LCursor: HCURSOR;
-  begin
-    LCursor := LoadCursor(AInstance, AName);
-    if LCursor <> 0 then
-      Screen.Cursors[ID] := LCursor;
-  end;
-
-begin
-{$IFDEF MSWINDOWS}
-  InitCursor(crNo, 0, IDC_NO);
-  InitCursor(crAppStart, 0, IDC_APPSTARTING);
-  InitCursor(crDrag, LoadLibrary('ole32.dll'), MakeIntResource(3));
-  InitCursor(crHandPoint, 0, IDC_HAND);
-  InitCursor(crHourGlass, 0, IDC_WAIT);
-  InitCursor(crSizeAll, 0, IDC_SIZEALL);
-  InitCursor(crSizeNESW, 0, IDC_SIZENESW);
-  InitCursor(crSizeNS, 0, IDC_SIZENS);
-  InitCursor(crSizeNWSE, 0, IDC_SIZENWSE);
-  InitCursor(crSizeWE, 0, IDC_SIZEWE);
-  InitCursor(crNoDrop, 0, IDC_NO);
-  InitCursor(crHSplit, 0, IDC_SIZEWE);
-  InitCursor(crVSplit, 0, IDC_SIZENS);
-{$ENDIF}
-  InitCursor(crDragLink, HInstance, 'CR_DRAGLINK');
-  InitCursor(crDragRemove, HInstance, 'CR_DRAGREMOVE');
 end;
 
 { TACLRootResourceCollectionImpl }

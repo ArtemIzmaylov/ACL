@@ -199,6 +199,7 @@ type
 
 function IsAlphaComposingSupports: Boolean;
 function LoadDialogIcon(AOwnerWnd: TWndHandle; AType: TMsgDlgType; ASize: Integer): TACLDib;
+procedure LoadSystemThemedCursors;
 procedure SetDragImageListOpacity(Opacity: Byte);
 procedure SetWindowStayOnTop(AWnd: TWndHandle; AValue: Boolean);
 
@@ -225,6 +226,11 @@ function gdk_screen_is_composited(screen: PGdkScreen): gboolean; cdecl; external
 function IsAlphaComposingSupports: Boolean;
 begin
   Result := gdk_screen_is_composited(gdk_screen_get_default);
+end;
+
+procedure LoadSystemThemedCursors;
+begin
+  // do nothing
 end;
 
 procedure SetDragImageListOpacity(Opacity: Byte);

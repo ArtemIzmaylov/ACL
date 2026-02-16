@@ -55,6 +55,7 @@ uses
   ACL.UI.Dialogs,
   ACL.UI.Forms,
   ACL.UI.ImageList,
+  ACL.UI.Resources,
   ACL.Utils.FileSystem;
 
 type
