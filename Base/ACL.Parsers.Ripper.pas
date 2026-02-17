@@ -6,7 +6,7 @@
 //  Purpose:   High-level parsing routines
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2024
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -23,10 +23,11 @@ uses
   {System.}Types,
   // ACL
   ACL.Classes.Collections,
-  ACL.Math,
   ACL.Expressions,
   ACL.Expressions.FormatString,
-  ACL.FileFormats.XML.Types;
+  ACL.FileFormats.XML.Types,
+  ACL.Math,
+  ACL.Utils.Logger;
 
 type
 
@@ -36,12 +37,15 @@ type
   strict private
     FSource: TACLRipperRule;
   protected
+    FLogFileName: string;
+    FLogTag: string;
     procedure ProcessCore(const ATarget: TACLListOfString; const ASource: string); virtual;
   public
     constructor Create(ASource: TACLRipperRule = nil);
     destructor Destroy; override;
     function Extract(const AData: string): string; overload;
     function ExtractEx(const AData: string): TACLListOfString; overload;
+    function InitLogging(const ALogFileName, ALogTag: string): TACLRipperRule; virtual;
     procedure Process(var AData: TACLListOfString);
   end;
 
@@ -51,10 +55,13 @@ type
   TACLRipperRuleAimingByTagsOptions = set of TACLRipperRuleAimingByTagsOption;
   TACLRipperRuleAimingByTags = class(TACLRipperRule)
   strict private type
+  {$REGION ' Types '}
     TTag = record
       Data: string;
       Number: Integer;
+      function ToString: string;
     end;
+  {$ENDREGION}
   strict private
     FFinishTags: TArray<TTag>;
     FOptions: TACLRipperRuleAimingByTagsOptions;
@@ -69,6 +76,7 @@ type
   public
     constructor Create(const AStartTags, AFinishTags: string;
       AOptions: TACLRipperRuleAimingByTagsOptions; ASource: TACLRipperRule = nil);
+    function InitLogging(const ALogFileName, ALogTag: string): TACLRipperRule; override;
   end;
 
   { TACLRipperRuleExpression }
@@ -158,16 +166,16 @@ end;
 
 function TACLRipperRule.Extract(const AData: string): string;
 var
-  AList: TACLListOfString;
+  LList: TACLListOfString;
 begin
-  AList := ExtractEx(AData);
+  LList := ExtractEx(AData);
   try
-    if AList.Count > 0 then
-      Result := AList.List[0]
+    if LList.Count > 0 then
+      Result := LList.List[0]
     else
       Result := EmptyStr;
   finally
-    AList.Free;
+    LList.Free;
   end;
 end;
 
@@ -179,10 +187,19 @@ begin
   Process(Result)
 end;
 
+function TACLRipperRule.InitLogging(const ALogFileName, ALogTag: string): TACLRipperRule;
+begin
+  FLogTag := ALogTag; // first
+  FLogFileName := ALogFileName;
+  Result := Self;
+end;
+
 procedure TACLRipperRule.Process(var AData: TACLListOfString);
 var
+  LLog: TACLStringBuilder;
+  LSource: string;
   LTarget: TACLListOfString;
-  I: Integer;
+  LTargetCount: Integer;
 begin
   if FSource <> nil then
     FSource.Process(AData);
@@ -190,8 +207,36 @@ begin
   LTarget := TACLListOfString.Create;
   try
     LTarget.Capacity := AData.Count;
-    for I := 0 to AData.Count - 1 do
-      ProcessCore(LTarget, AData.List[I]);
+
+    if FLogFileName <> '' then
+    begin
+      LLog := TACLStringBuilder.Create(256);
+      try
+        LogEntry(FLogFileName, FLogTag, 'Processing:');
+        for LSource in AData do
+        begin
+          LogEntryDump(FLogFileName, LSource, '>> Input:');
+
+          LTargetCount := LTarget.Count;
+          ProcessCore(LTarget, LSource);
+
+          LLog.Length := 0;
+          while LTargetCount < LTarget.Count do
+          begin
+            LLog.AppendLine('<< Output: ');
+            LLog.AppendLine(LTarget[LTargetCount]);
+            Inc(LTargetCount);
+          end;
+          LogEntryDump(FLogFileName, LLog.ToString);
+        end;
+      finally
+        LLog.Release;
+      end;
+    end
+    else
+      for LSource in AData do
+        ProcessCore(LTarget, LSource);
+
     TACLMath.ExchangePtr(AData, LTarget);
   finally
     LTarget.Free;
@@ -206,7 +251,7 @@ end;
 { TACLRipperRuleAimingByTags }
 
 constructor TACLRipperRuleAimingByTags.Create(const AStartTags, AFinishTags: string;
-  AOptions: TACLRipperRuleAimingByTagsOptions; ASource: TACLRipperRule);
+  AOptions: TACLRipperRuleAimingByTagsOptions; ASource: TACLRipperRule = nil);
 
   procedure ParseTag(var ATag: TTag; const S: string);
   var
@@ -229,12 +274,12 @@ constructor TACLRipperRuleAimingByTags.Create(const AStartTags, AFinishTags: str
     ATag.Data := S;
   end;
 
-  procedure SplitTags(var ATags: TArray<TTag>; const S: string);
+  procedure SplitTags(var ATags: TArray<TTag>; const AStr: string);
   var
-    LTags: TStringDynArray;
     I: Integer;
+    LTags: TStringDynArray;
   begin
-    acSplitString(S, '|', LTags);
+    acSplitString(AStr, '|', LTags);
     SetLength(ATags, Length(LTags));
     for I := Low(LTags) to High(LTags) do
     begin
@@ -275,47 +320,47 @@ end;
 function TACLRipperRuleAimingByTags.Find(const AStrToFind: string;
   const AStr: string; AStartPos, AEndPos: Integer; AFromEnd: Boolean): Integer;
 var
-  AIterationCount: Integer;
-  AStrScan: PChar;
-  AStrToFindLength: Integer;
-  AStrToFindScan: PChar;
+  LIterationCount: Integer;
+  LStrScan: PChar;
+  LStrToFindLength: Integer;
+  LStrToFindScan: PChar;
 begin
   if AStartPos <= 0 then
     Exit(0);
   if AStartPos > AEndPos then
     Exit(0);
 
-  AStrToFindLength := Length(AStrToFind);
+  LStrToFindLength := Length(AStrToFind);
   AEndPos := Min(AEndPos, Length(AStr));
-  AIterationCount := AEndPos - AStartPos - AStrToFindLength + 1;
-  if AIterationCount < 0 then
+  LIterationCount := AEndPos - AStartPos - LStrToFindLength + 1;
+  if LIterationCount < 0 then
     Exit(0);
 
   if AFromEnd then
   begin
-    AStrToFindScan := PChar(AStrToFind);
-    AStartPos := AEndPos - AStrToFindLength;
-    AStrScan := PChar(AStr) + AStartPos;
-    while AIterationCount >= 0 do
+    LStrToFindScan := PChar(AStrToFind);
+    AStartPos := AEndPos - LStrToFindLength;
+    LStrScan := PChar(AStr) + AStartPos;
+    while LIterationCount >= 0 do
     begin
-      if CompareMem(AStrToFindScan, AStrScan, AStrToFindLength * SizeOf(Char)) then
+      if CompareMem(LStrToFindScan, LStrScan, LStrToFindLength * SizeOf(Char)) then
         Exit(AStartPos);
-      Dec(AIterationCount);
+      Dec(LIterationCount);
       Dec(AStartPos);
-      Dec(AStrScan);
+      Dec(LStrScan);
     end;
   end
   else
   begin
-    AStrToFindScan := PChar(AStrToFind);
-    AStrScan := PChar(AStr) + (AStartPos - 1);
-    while AIterationCount >= 0 do
+    LStrToFindScan := PChar(AStrToFind);
+    LStrScan := PChar(AStr) + (AStartPos - 1);
+    while LIterationCount >= 0 do
     begin
-      if CompareMem(AStrToFindScan, AStrScan, AStrToFindLength * SizeOf(Char)) then
+      if CompareMem(LStrToFindScan, LStrScan, LStrToFindLength * SizeOf(Char)) then
         Exit(AStartPos);
-      Dec(AIterationCount);
+      Dec(LIterationCount);
       Inc(AStartPos);
-      Inc(AStrScan);
+      Inc(LStrScan);
     end;
   end;
   Result := 0;
@@ -349,7 +394,10 @@ begin
       begin
         P1 := Find(FStartTags[I0], US, P1, P2, False);
         if P1 = 0 then
+        begin
+          LogEntry(FLogFileName, FLogTag, 'StartTagNotFound(%s)', [FStartTags[I0].ToString]);
           Exit;
+        end;
         P1 := P1 + Length(FStartTags[I0].Data);
       end;
 
@@ -357,7 +405,10 @@ begin
       begin
         P2 := Find(FFinishTags[I0], US, P1, P2, ratConstrictionMode in FOptions);
         if P2 = 0 then
+        begin
+          LogEntry(FLogFileName, FLogTag, 'FinishTagNotFound(%s)', [FFinishTags[I0].ToString]);
           Exit;
+        end;
         if PE < 0 then
           PE := P2;
       end;
@@ -365,6 +416,39 @@ begin
     ATarget.Add(Copy(ASource, P1, P2 - P1));
     P1 := PE;
   until (P1 < 0) or not (ratMultipleTargets in FOptions);
+end;
+
+function TACLRipperRuleAimingByTags.InitLogging(const ALogFileName, ALogTag: string): TACLRipperRule;
+
+  procedure DumpRules(const ATags: TArray<TTag>; const AEntryName: string);
+  var
+    I: Integer;
+    LDump: TACLStringBuilder;
+  begin
+    LDump := TACLStringBuilder.Create(32);
+    try
+      for I := Low(ATags) to High(ATags) do
+        LDump.Append('{').Append(ATags[I].ToString).Append('}, ');
+      LogEntry(FLogFileName, FLogTag, AEntryName + LDump.ToString);
+    finally
+      LDump.Release;
+    end;
+  end;
+
+begin
+  Result := inherited;
+  DumpRules(FStartTags, 'StartTags: ');
+  DumpRules(FFinishTags, 'FinishTags: ');
+end;
+
+{ TACLRipperRuleAimingByTags.TTag }
+
+function TACLRipperRuleAimingByTags.TTag.ToString: string;
+begin
+  if Number > 1 then
+    Result := '+' + IntToStr(Number) + ':' + Data
+  else
+    Result := Data;
 end;
 
 { TACLRipperRuleExpression }
@@ -383,14 +467,14 @@ end;
 
 procedure TACLRipperRuleExpression.ProcessCore(const ATarget: TACLListOfString; const ASource: string);
 var
-  AContext: TACLRipperRuleExpressionContext;
+  LContext: TACLRipperRuleExpressionContext;
 begin
-  AContext := TACLRipperRuleExpressionContext.Create;
+  LContext := TACLRipperRuleExpressionContext.Create;
   try
-    AContext.Value := ASource;
-    ATarget.Add(FExpression.Evaluate(AContext));
+    LContext.Value := ASource;
+    ATarget.Add(FExpression.Evaluate(LContext));
   finally
-    AContext.Free;
+    LContext.Free;
   end;
 end;
 

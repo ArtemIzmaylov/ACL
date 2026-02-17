@@ -70,7 +70,7 @@ procedure LogEntry(const AFileName: string;
   const ATag: string; const AException: Exception;
   const APrefix: string = ''; const ALocation: string = ''); overload;
 
-procedure LogEntryDump(const AFileName: string; const ADump: string); overload;
+procedure LogEntryDump(const AFileName: string; const ADump: string; const AHeader: string = '');
 procedure LogInit(const AFileName: string; AMaxCapacity: Integer = 0);
 implementation
 
@@ -150,13 +150,18 @@ begin
   end;
 end;
 
-procedure LogEntryDump(const AFileName: string; const ADump: string); overload;
+procedure LogEntryDump(const AFileName: string; const ADump, AHeader: string);
 var
   LLog: TACLLogFile;
 begin
   if TACLLogFile.Open(AFileName, LLog, FLogSync) then
   try
     LLog.WriteSeparator;
+    if AHeader <> '' then
+    begin
+      LLog.Write(AHeader);
+      LLog.WriteLine;
+    end;
     LLog.Write(ADump);
     LLog.WriteLine;
     LLog.WriteSeparator;

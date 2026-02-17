@@ -6,7 +6,7 @@
 //  Purpose:   Macros-based expressions
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2024
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -614,7 +614,10 @@ begin
   if TryProcessAsNumber(AParams[1].Evaluate(AContext), LNumber1) and
      TryProcessAsNumber(AParams[2].Evaluate(AContext), LNumber2)
   then
-    Result := Copy(Result, LNumber1, LNumber2);
+    if LNumber2 < 0 then
+      Result := Copy(Result, LNumber1)
+    else
+      Result := Copy(Result, LNumber1, LNumber2);
 end;
 
 class function TACLFormatStringFactory.FunctionStrDetransliterate(
