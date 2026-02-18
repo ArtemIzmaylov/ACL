@@ -507,17 +507,20 @@ class function TACLFileDialogVistaImpl.TryCreate(
   AOwnerWnd: TWndHandle; ADialog: TACLFileDialog; ASaveDialog: Boolean): TACLFileDialogImpl;
 var
   LIntf: IFileDialog;
+  LResult: HRESULT;
 begin
   LIntf := nil;
   if acOSCheckVersion(6, 0) then
   begin
     if ASaveDialog then
-      CoCreateInstance(CLSID_FileSaveDialog, nil, CLSCTX_INPROC_SERVER, IFileSaveDialog, LIntf)
+      LResult := CoCreateInstance(CLSID_FileSaveDialog, nil, CLSCTX_INPROC_SERVER, IFileSaveDialog, LIntf)
     else
-      CoCreateInstance(CLSID_FileOpenDialog, nil, CLSCTX_INPROC_SERVER, IFileOpenDialog, LIntf);
-  end;
+      LResult := CoCreateInstance(CLSID_FileOpenDialog, nil, CLSCTX_INPROC_SERVER, IFileOpenDialog, LIntf);
+  end
+  else
+    LResult := E_NOINTERFACE;
 
-  if LIntf <> nil then
+  if (LResult = S_OK) and (LIntf <> nil) then
   begin
     TACLFileDialogVistaImpl(Result) := Create(AOwnerWnd, ADialog, ASaveDialog);
     TACLFileDialogVistaImpl(Result).FFileDialog := LIntf;

@@ -124,7 +124,10 @@ end;
 
 function MonitorGet(const AWnd: TWndHandle): TACLMonitor;
 begin
-  Result := MonitorGetInfo(Screen.MonitorFromWindow(AWnd));
+  if AWnd <> 0 then
+    Result := MonitorGetInfo(Screen.MonitorFromWindow(AWnd))
+  else
+    Result := MonitorGetDefault;
 end;
 
 function MonitorGet(const APoint: TPoint): TACLMonitor;

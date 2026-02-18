@@ -1466,7 +1466,7 @@ begin
   LOrigin := acMoveWindowOrg(ACanvas.Handle, GetOrigin);
   try
     Layout.Draw(ACanvas);
-    if not Selection.Empty then
+    if SubClass.EnabledContent and not Selection.Empty then
     begin
       LClipRgn := acSaveClipRegion(ACanvas.Handle);
       try

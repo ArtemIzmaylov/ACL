@@ -438,7 +438,6 @@ type
     procedure DrawClipped(ACanvas: TCanvas; const AClipRect, R: TRect;
       AFrameIndex: Integer; AAlpha: Byte = MaxByte);
     function HasFrame(AIndex: Integer): Boolean; inline;
-    function HitTest(const ABounds: TRect; X, Y: Integer): Boolean; virtual;
     procedure InitailizeDefaults(AInstance: HINST;
       const AName: string; const AMargins, AContentOffsets: TRect;
       AFrameCount: Integer = 1; ALayout: TACLSkinImageLayout = ilVertical;
@@ -2042,11 +2041,6 @@ end;
 function TACLResourceTexture.HasFrame(AIndex: Integer): Boolean;
 begin
   Result := Image.HasFrame(AIndex);
-end;
-
-function TACLResourceTexture.HitTest(const ABounds: TRect; X, Y: Integer): Boolean;
-begin
-  Result := Image.HitTest(ABounds, X, Y);
 end;
 
 procedure TACLResourceTexture.Draw(ACanvas: TCanvas;

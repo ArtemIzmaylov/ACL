@@ -84,6 +84,7 @@ type
   public
     function AddBitmap(ABitmap: TBitmap): Integer;
     function AddImage(const AImageFileName: string): Integer; overload;
+    function AddImage(const AImage: TACLBaseDib): Integer; overload;
     function AddImage(const AImage: TACLImage): Integer; overload;
     function AddImage(const AImage: TACLSkinImage): Integer; overload;
     function AddIconFromResource(AInstance: HINST; const AName: string): Integer;
@@ -532,6 +533,19 @@ begin
     end;
   finally
     LIcon.Free;
+  end;
+end;
+
+function TACLImageList.AddImage(const AImage: TACLBaseDib): Integer;
+var
+  LTmp: TBitmap;
+begin
+  LTmp := TBitmap.Create;
+  try
+    AImage.AssignTo(LTmp);
+    Result := AddBitmap(LTmp);
+  finally
+    LTmp.Free;
   end;
 end;
 

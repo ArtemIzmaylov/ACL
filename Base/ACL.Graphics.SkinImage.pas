@@ -67,6 +67,7 @@ type
 
   TACLSkinImageBitsState = (ibsUnpremultiplied, ibsPremultiplied);
   TACLSkinImageHitTestMode = (ihtmOpaque, ihtmMask, ihtmTransparent);
+  TACLSkinImageHitTestCode = TACLSkinImageHitTestMode;
   TACLSkinImageSizingMode = (ismDefault, ismMargins, ismTiledAreas);
 
   { Fixed | Tiled | Center | Tiled | Fixed }

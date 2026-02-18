@@ -6,7 +6,7 @@
 //  Purpose:   Shell Wrappers
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -14,6 +14,7 @@
 unit ACL.Utils.Shell;
 
 {$I ACL.Config.inc}
+{$WARN SYMBOL_PLATFORM OFF}
 
 interface
 

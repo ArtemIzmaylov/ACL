@@ -6,7 +6,7 @@
 //  Purpose:   Advanced Labels
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2026
+//             © 2006-2025
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -112,7 +112,7 @@ type
     procedure SetSubControl(AValue: TACLLabelSubControlOptions);
     procedure SetTransparent(AValue: Boolean);
     // IACLCursorProvider
-    function GetCursor(const P: TPoint): TCursor;
+    function GetCursor(const P: TPoint): TCursor; reintroduce;
     // Messages
     procedure CMHintShow(var Message: TCMHintShow); message CM_HINTSHOW;
     procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
