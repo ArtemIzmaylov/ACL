@@ -63,7 +63,7 @@ type
     constructor Create(AIcon: TACLTrayIcon);
     function ActualIcon: TIcon;
     procedure BalloonHint(const ATitle, AText: string; AIcon: TACLTrayBalloonIcon); virtual; abstract;
-    procedure ShowMenu(const APoint: TPoint); virtual;
+    procedure ShowMenu; virtual;
     procedure Update; virtual; abstract;
   end;
 
@@ -85,7 +85,6 @@ type
     FLastMousePos: TPoint;
     FMousePressed: set of TMouseButton;
     FPopupMenu: TPopupMenu;
-    FVisible: Boolean;
     FWantDoubleClicks: Boolean;
 
     FOnBallonHintClick: TNotifyEvent;
@@ -102,6 +101,7 @@ type
     procedure SetIcon(AValue: TIcon);
     procedure SetIconVisible(AValue: Boolean);
     procedure SetID(const AValue: string);
+    procedure SetPopupMenu(AValue: TPopupMenu);
     procedure SetVisible(AValue: Boolean);
     // IACLCurrentDpi
     function GetCurrentDpi: Integer;
@@ -120,13 +120,12 @@ type
     procedure MouseDown(Button: TMouseButton);
     procedure MouseMove;
     procedure MouseWheel(Down: Boolean);
-    procedure MouseUp(Button: TMouseButton; const P: TPoint);
+    procedure MouseUp(Button: TMouseButton);
     // Update
     procedure Update(Sender: TObject = nil);
     procedure UpdateVisibility;
     //# Properties
     property ClickTimer: TACLTimer read FClickTimer;
-    property Visible: Boolean read FVisible write SetVisible;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -143,7 +142,7 @@ type
     property IconVisible: Boolean read FIconVisible write SetIconVisible default False;
     property ID: string read FID write SetID;
     // Gtk3: required (!), PopupMenu.OnPopup not supported!
-    property PopupMenu: TPopupMenu read FPopupMenu write FPopupMenu;
+    property PopupMenu: TPopupMenu read FPopupMenu write SetPopupMenu;
     // Events
     property OnBallonHintClick: TNotifyEvent read FOnBallonHintClick write FOnBallonHintClick;
     // Events - check ticClick in Capabilities
@@ -187,13 +186,15 @@ begin
     Result := Application.Icon;
 end;
 
-procedure TACLTrayIconIntf.ShowMenu(const APoint: TPoint);
+procedure TACLTrayIconIntf.ShowMenu;
+var
+  LPoint: TPoint;
 begin
   if Owner.PopupMenu <> nil then
   begin
-    Owner.PopupMenu.AutoPopup := False;
+    LPoint := MouseCursorPos;
     Owner.PopupMenu.PopupComponent := Owner;
-    Owner.PopupMenu.Popup(APoint.X, APoint.Y);
+    Owner.PopupMenu.Popup(LPoint.X, LPoint.Y);
   end;
 end;
 
@@ -210,7 +211,7 @@ end;
 
 destructor TACLTrayIcon.Destroy;
 begin
-  Enabled := False;
+  UpdateVisibility;
   ClickTimer.Enabled := False;
   TACLMouseTracker.Release(Self);
   FreeAndNil(FClickTimer);
@@ -221,7 +222,7 @@ end;
 procedure TACLTrayIcon.BalloonHint(
   const ATitle, AText: string; AIconType: TACLTrayBalloonIcon);
 begin
-  if Visible and (FIconImpl <> nil) then
+  if FIconImpl <> nil then
     FIconImpl.BalloonHint(ATitle, AText, AIconType);
 end;
 
@@ -294,7 +295,7 @@ begin
   if Assigned(OnMouseWheel) then OnMouseWheel(Self, Down);
 end;
 
-procedure TACLTrayIcon.MouseUp(Button: TMouseButton; const P: TPoint);
+procedure TACLTrayIcon.MouseUp(Button: TMouseButton);
 begin
   // #AI: 20.05.2024, Special for ExplorerPatcher
   // Если в момент Down изменится лейаут области уведомлений, то Up запросто
@@ -322,7 +323,7 @@ begin
 
     mbRight:
       if FIconImpl <> nil then
-        FIconImpl.ShowMenu(P);
+        FIconImpl.ShowMenu;
 
     mbMiddle:
       DoMidClick;
@@ -386,28 +387,40 @@ begin
   end;
 end;
 
+procedure TACLTrayIcon.SetPopupMenu(AValue: TPopupMenu);
+var
+  LWasVisible: Boolean;
+begin
+  if AValue <> FPopupMenu then
+  begin
+    LWasVisible := FIconImpl <> nil;
+    SetVisible(False);
+    acComponentFieldSet(FPopupMenu, Self, AValue);
+    SetVisible(LWasVisible);
+  end;
+end;
+
 procedure TACLTrayIcon.SetVisible(AValue: Boolean);
 begin
-  AValue := AValue and not (csDesigning in ComponentState);
-  if Visible <> AValue then
+  AValue := AValue and ([csDesigning, csDestroying, csLoading, csReading] * ComponentState = []);
+  if (FIconImpl <> nil) <> AValue then
   begin
-    FVisible := AValue;
-    if Visible then
+    if AValue then
       FIconImpl := TACLTrayIconImpl.Create(Self)
     else
       FreeAndNil(FIconImpl);
   end;
 end;
 
-procedure TACLTrayIcon.Update;
+procedure TACLTrayIcon.Update(Sender: TObject);
 begin
-  if Visible and (FIconImpl <> nil) then
+  if FIconImpl <> nil then
     FIconImpl.Update;
 end;
 
 procedure TACLTrayIcon.UpdateVisibility;
 begin
-  Visible := IconVisible and Enabled and ([csLoading, csReading] * ComponentState = []);
+  SetVisible(IconVisible and Enabled);
 end;
 
 end.

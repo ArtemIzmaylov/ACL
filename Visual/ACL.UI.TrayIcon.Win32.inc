@@ -113,11 +113,8 @@ type
         Message.Result := 1;
       if Message.Msg = WM_TASKBARCREATED then
       begin
-        if Owner.Visible then
-        begin
-          FTimestamp := TACLThread.Timestamp;
-          Shell_NotifyIconW(NIM_ADD, Build);
-        end;
+        FTimestamp := TACLThread.Timestamp;
+        Shell_NotifyIconW(NIM_ADD, Build);
       end;
       if Message.Msg = WM_TRAYNOTIFY then
       begin
@@ -131,11 +128,11 @@ type
           WM_MBUTTONDOWN, WM_MBUTTONDBLCLK:
             Owner.MouseDown(mbMiddle);
           WM_LBUTTONUP:
-            Owner.MouseUp(mbLeft, MouseCursorPos);
+            Owner.MouseUp(mbLeft);
           WM_RBUTTONUP:
-            Owner.MouseUp(mbRight, MouseCursorPos);
+            Owner.MouseUp(mbRight);
           WM_MBUTTONUP:
-            Owner.MouseUp(mbMiddle, MouseCursorPos);
+            Owner.MouseUp(mbMiddle);
           WM_MOUSEMOVE:
             // При запуске приложения приходит сообщение, что пользователь навел
             // указатель мыши на иконку в трее, хотя это не так. Похоже на баг винды.
