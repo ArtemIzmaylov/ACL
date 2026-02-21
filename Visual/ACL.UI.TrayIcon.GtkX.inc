@@ -498,7 +498,7 @@ type
       LLibHandle := 0;
       // Cinnamon: failed to hide/recreate the indicator that lead to abnormal
       // popup menu's handle desctruction that lead app to crash.
-      if ShellDesktopEnv <> sdeCinnamon then
+      if not (ShellDesktopEnv in [sdeCinnamon, sdeMate]) then
       begin
         LLibHandle := acLoadLibrary(libAppIndicator);
         if LLibHandle = 0 then
@@ -590,7 +590,7 @@ type
       sdeKDE:
         Result := [ticClick, ticWheel];
     else
-        Result := [ticClick, ticWheel, ticMove];
+      Result := [ticClick, ticWheel, ticMove];
     end;
   end;
 

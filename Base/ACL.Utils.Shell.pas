@@ -192,7 +192,8 @@ type
 
 {$ENDREGION}
 
-  TShellDesktopEnvironment = (sdeUnknown, sdeWindows, sdeCinnamon, sdeKDE, sdeGnome, sdeXFCE);
+  TShellDesktopEnvironment = (sdeUnknown, sdeWindows,
+    sdeCinnamon, sdeKDE, sdeGnome, sdeXFCE, sdeMate);
   TShellPowerState = set of (psKeepPowerOn, psKeepScreenOn);
   TShellShutdownMode = (sdPowerOff, sdLogOff, sdHibernate, sdSleep, sdReboot);
 
@@ -368,6 +369,8 @@ begin
     Exit(sdeKDE);
   if acContains('lightdm', DesktopEnv) then
     Exit(sdeXFCE);
+  if acContains('mate', DesktopEnv) then
+    Exit(sdeMate);
   Result := sdeUnknown;
 {$ENDIF}
 end;
