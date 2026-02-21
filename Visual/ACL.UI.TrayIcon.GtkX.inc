@@ -496,9 +496,9 @@ type
     if app_indicator_state = 0 then
     begin
       LLibHandle := 0;
-      // Cinnamon: failed to hide/recreate the indicator that lead to abnormal
-      // popup menu's handle desctruction that lead app to crash.
-      if not (ShellDesktopEnv in [sdeCinnamon, sdeMate]) then
+      // Because it failed to hide/recreate the indicator that lead to
+      // abnormal popup menu's handle desctruction that lead app to crash.
+      if not (ShellDesktopEnv in [sdeCinnamon, sdeMate, sdeXFCE]) then
       begin
         LLibHandle := acLoadLibrary(libAppIndicator);
         if LLibHandle = 0 then
