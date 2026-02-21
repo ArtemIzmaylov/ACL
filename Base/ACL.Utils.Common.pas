@@ -205,7 +205,7 @@ var
 procedure acFreeLibrary(var ALibHandle: HMODULE);
 function acGetProcAddress(ALibHandle: HMODULE; AProcName: PChar): Pointer; overload;
 function acGetProcAddress(ALibHandle: HMODULE; AProcName: PChar; var AResult: Boolean): Pointer; overload;
-function acLoadLibrary(const AFileName: string; AFlags: Cardinal = 0): HMODULE;
+function acLoadLibrary(const AFileName: string; AErrorText: PString = nil): HMODULE;
 {$IFDEF LINUX}
 function acFindLibrary(const AFileName: string): string;
 {$ENDIF}
@@ -503,7 +503,7 @@ begin
     Result := AFileName // relative (./lib.so) or absolute (/lib64/lib.so)
   else
   begin
-    Result := GetCurrentDir + AFileName;
+    Result := IncludeTrailingPathDelimiter(GetCurrentDir) + AFileName;
     if (Result = '') or not FileExists(Result) then
       Result := ExtractFilePath(ParamStr(0)) + AFileName;
     if (Result = '') or not FileExists(Result) then
@@ -520,43 +520,58 @@ begin
 end;
 {$ENDIF}
 
-function acLoadLibrary(const AFileName: string; AFlags: Cardinal = 0): HMODULE;
+function acLoadLibrary(const AFileName: string; AErrorText: PString = nil): HMODULE;
 {$IFDEF MSWINDOWS}
+const
+  PlatformSuffix = {$IFDEF CPUX64}'Win64'{$ELSE}'Win32'{$ENDIF};
 var
-  AErrorMode: Cardinal;
-  APrevCurPath: string;
+  LErrorMode: Cardinal;
+  LPrevCurrentDir: string;
 begin
-  AErrorMode := acSetThreadErrorMode(SEM_FAILCRITICALERRORS);
+  LErrorMode := acSetThreadErrorMode(SEM_FAILCRITICALERRORS);
   try
-    APrevCurPath := GetCurrentDir;
+    LPrevCurrentDir := GetCurrentDir;
     try
       SetCurrentDir(ExtractFilePath(AFileName));
-      if AFlags <> 0 then
-        Result := LoadLibraryEx(PChar(AFileName), 0, AFlags)
-      else
-        Result := LoadLibrary(PChar(AFileName));
+      Result := LoadLibrary(PChar(AFileName));
+      if AErrorText <> nil then
+      begin
+        if Result > HINSTANCE_ERROR then
+          AErrorText^ := ''
+        else
+          AErrorText^ := acLastSystemErrorMessage
+            .Replace('Win32', PlatformSuffix)
+            .Replace('%1', ExtractFileName(AFileName));
+      end;
     finally
-      SetCurrentDir(APrevCurPath);
+      SetCurrentDir(LPrevCurrentDir);
     end;
   finally
-    acSetThreadErrorMode(AErrorMode);
+    acSetThreadErrorMode(LErrorMode);
   end;
 {$ELSE}
 var
   LActualLibPath: string;
+  LErrorText: string;
 begin
   LActualLibPath := acFindLibrary(AFileName);
   if LActualLibPath <> '' then
   begin
     Result := LoadLibrary(LActualLibPath);
     if Result = 0 then
-      WriteLn('Library "', AFileName, '" failed to load ', dlerror());
+      LErrorText := 'Library "' + AFileName + '" failed to load ' + dlerror()
+    else
+      LErrorText := '';
   end
   else
   begin
+    LErrorText := 'Library "' + AFileName + '" was not found';
     Result := 0;
-    WriteLn('Library "', AFileName, '" was not found');
   end;
+  if Result = 0 then
+    WriteLn(LErrorText);
+  if AErrorText <> nil then
+    AErrorText^ := LErrorText;
 {$ENDIF}
 end;
 
