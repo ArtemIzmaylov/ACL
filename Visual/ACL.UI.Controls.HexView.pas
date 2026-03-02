@@ -6,7 +6,7 @@
 //  Purpose:   HexView
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -44,7 +44,6 @@ uses
   ACL.Geometry.Utils,
   ACL.Graphics,
   ACL.Graphics.Ex,
-  ACL.Graphics.FontCache,
   ACL.Graphics.TextLayout,
   ACL.Math,
   ACL.UI.Controls.Base,

@@ -7,7 +7,7 @@
 //  Purpose:   Gdi+ Wrappers
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -43,7 +43,7 @@ uses
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Ex,
-  ACL.Graphics.FontCache,
+  ACL.Graphics.Fonts,
   ACL.Graphics.Images,
   ACL.Math,
   ACL.Threading,
@@ -100,7 +100,7 @@ type
 
   TACLGdiplusResourcesCache = class
   strict private type
-  {$REGION 'Internal Types'}
+  {$REGION ' Internal Types '}
     TPenKey = record
       Color: TAlphaColor;
       Style: TACL2DRenderStrokeStyle;
@@ -109,7 +109,7 @@ type
   {$ENDREGION}
   strict private
     class var FBrushes: TACLValueCacheManager<TAlphaColor, GpBrush>;
-    class var FFonts: TACLValueCacheManager<TACLFontData, GpFont>;
+    class var FFonts: TACLValueCacheManager<string, GpFont>;
     class var FPens: TACLValueCacheManager<TPenKey, GpPen>;
 
     class procedure HandlerOnRemoveBrush(Sender: TObject; const ABrush: GpBrush);
@@ -118,8 +118,7 @@ type
   public
     class procedure Flush;
     class function BrushGet(AColor: TAlphaColor): GpBrush;
-    class function FontGet(const AFont: TACLFontData): GpFont; overload;
-    class function FontGet(const AFont: TFont): GpFont; overload;
+    class function FontGet(AFont: TFont): GpFont;
     class function PenGet(Color: TAlphaColor; Width: Single; Style: TACL2DRenderStrokeStyle): GpPen;
   end;
 
@@ -609,53 +608,50 @@ end;
 
 {$REGION ' GDI+ Cache '}
 
-function acCreateFont(const AData: TACLFontData): GpFont;
+function acCreateFont(const AData: TFont): GpFont;
 const
   DefaultTrueTypeFont: PChar = 'Tahoma';
 var
-  AError: GpStatus;
-  ALogFont: TLogFontW;
+  LError: GpStatus;
+  LLogFont: TLogFontW;
 begin
-  ZeroMemory(@ALogFont, SizeOf(ALogFont));
-
-  ALogFont.lfHeight := AData.Height;
-  ALogFont.lfEscapement := AData.Orientation;
-  ALogFont.lfOrientation := AData.Orientation;
-  ALogFont.lfWeight := IfThen(fsBold in AData.Style, FW_BOLD, FW_NORMAL);
-  ALogFont.lfItalic := Ord(fsItalic in AData.Style);
-  ALogFont.lfUnderline := Byte(fsUnderline in AData.Style);
-  ALogFont.lfStrikeOut := Byte(fsStrikeOut in AData.Style);
-  ALogFont.lfQuality := Ord(AData.Quality);
-
-  if (AData.Charset = DEFAULT_CHARSET) and (DefFontData.Charset <> DEFAULT_CHARSET) then
-    ALogFont.lfCharSet := DefFontData.Charset
-  else
-    ALogFont.lfCharSet := Byte(AData.Charset);
-
-  ALogFont.lfClipPrecision := CLIP_DEFAULT_PRECIS;
-  if ALogFont.lfOrientation <> 0 then
-    ALogFont.lfOutPrecision := OUT_TT_ONLY_PRECIS
-  else
-    ALogFont.lfOutPrecision := OUT_DEFAULT_PRECIS;
-
-  case AData.Pitch of
-    fpVariable:
-      ALogFont.lfPitchAndFamily := VARIABLE_PITCH;
-    fpFixed:
-      ALogFont.lfPitchAndFamily := FIXED_PITCH;
-  else
-    ALogFont.lfPitchAndFamily := DEFAULT_PITCH;
-  end;
-
-  StrLCopy(@ALogFont.lfFaceName[0], PChar(AData.Name), Length(ALogFont.lfFaceName));
-
-  AError := GdipCreateFontFromLogfontW(MeasureCanvas.Handle, @ALogFont, Result);
-  if AError = NotTrueTypeFont then
+  ZeroMemory(@LLogFont, SizeOf(LLogFont));
+//
+//  LLogFont.lfHeight := AData.Height;
+//  LLogFont.lfEscapement := AData.Orientation;
+//  LLogFont.lfOrientation := AData.Orientation;
+//  LLogFont.lfWeight := IfThen(fsBold in AData.Style, FW_BOLD, FW_NORMAL);
+//  LLogFont.lfItalic := Ord(fsItalic in AData.Style);
+//  LLogFont.lfUnderline := Byte(fsUnderline in AData.Style);
+//  LLogFont.lfStrikeOut := Byte(fsStrikeOut in AData.Style);
+//  LLogFont.lfQuality := Ord(AData.Quality);
+//  LLogFont.lfCharSet := DefFontData.Charset;
+//
+//  LLogFont.lfClipPrecision := CLIP_DEFAULT_PRECIS;
+//  if LLogFont.lfOrientation <> 0 then
+//    LLogFont.lfOutPrecision := OUT_TT_ONLY_PRECIS
+//  else
+//    LLogFont.lfOutPrecision := OUT_DEFAULT_PRECIS;
+//
+//  case AData.Pitch of
+//    fpVariable:
+//      LLogFont.lfPitchAndFamily := VARIABLE_PITCH;
+//    fpFixed:
+//      LLogFont.lfPitchAndFamily := FIXED_PITCH;
+//  else
+//    LLogFont.lfPitchAndFamily := DEFAULT_PITCH;
+//  end;
+//
+//  StrLCopy(@LLogFont.lfFaceName[0], PChar(AData.Name), Length(LLogFont.lfFaceName));
+//
+  GetObject(AData.Handle, SizeOf(LLogFont), @LLogFont);
+  LError := GdipCreateFontFromLogfontW(MeasureCanvas.Handle, @LLogFont, Result);
+  if LError = NotTrueTypeFont then
   begin
-    StrLCopy(@ALogFont.lfFaceName[0], DefaultTrueTypeFont, Length(ALogFont.lfFaceName));
-    AError := GdipCreateFontFromLogfontW(MeasureCanvas.Handle, @ALogFont, Result);
+    StrLCopy(@LLogFont.lfFaceName[0], DefaultTrueTypeFont, Length(LLogFont.lfFaceName));
+    LError := GdipCreateFontFromLogfontW(MeasureCanvas.Handle, @LLogFont, Result);
   end;
-  GdipCheck(AError);
+  GdipCheck(LError);
 end;
 
 { TACLGdiplusResourcesCache }
@@ -681,22 +677,20 @@ begin
   end;
 end;
 
-class function TACLGdiplusResourcesCache.FontGet(const AFont: TFont): GpFont;
-begin
-  Result := FontGet(TACLFontData.Create(AFont));
-end;
-
-class function TACLGdiplusResourcesCache.FontGet(const AFont: TACLFontData): GpFont;
+class function TACLGdiplusResourcesCache.FontGet(AFont: TFont): GpFont;
+var
+  LKey: string;
 begin
   if FFonts = nil then
   begin
-    FFonts := TACLValueCacheManager<TACLFontData, GpFont>.Create(16);
+    FFonts := TACLValueCacheManager<string, GpFont>.Create(16);
     FFonts.OnRemove := HandlerOnRemoveFont;
   end;
-  if not FFonts.Get(AFont, Result) then
+  LKey := acGetFontFaceId(AFont);
+  if not FFonts.Get(LKey, Result) then
   begin
     Result := acCreateFont(AFont);
-    FFonts.Add(AFont, Result);
+    FFonts.Add(LKey, Result);
   end;
 end;
 

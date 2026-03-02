@@ -118,8 +118,8 @@
         <UnitName Value="ACL.Graphics.Ex.Stub"/>
       </Item>
       <Item>
-        <Filename Value="Base/ACL.Graphics.FontCache.pas"/>
-        <UnitName Value="ACL.Graphics.FontCache"/>
+        <Filename Value="Base/ACL.Graphics.Fonts.pas"/>
+        <UnitName Value="ACL.Graphics.Fonts"/>
       </Item>
       <Item>
         <Filename Value="Base/ACL.Graphics.Images.pas"/>

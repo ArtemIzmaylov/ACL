@@ -54,7 +54,6 @@ uses
   ACL.Classes.Collections,
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.FontCache,
   ACL.MUI,
   ACL.ObjectLinks,
   ACL.Threading,

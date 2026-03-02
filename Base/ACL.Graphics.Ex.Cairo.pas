@@ -16,7 +16,6 @@ unit ACL.Graphics.Ex.Cairo;
 
 {$I ACL.Config.inc}
 
-{$DEFINE ACL_CAIRO_FONTS_SUBSTITUTION}
 {$RANGECHECKS OFF}
 {$POINTERMATH ON}
 
@@ -57,6 +56,7 @@ uses
   ACL.Geometry.Utils,
   ACL.Graphics,
   ACL.Graphics.Ex,
+  ACL.Graphics.Ex.Cairo.Fonts,
   ACL.Graphics.Ex.Stub,
   ACL.Graphics.TextLayout,
   ACL.Threading,
@@ -65,8 +65,6 @@ uses
   ACL.Utils.Strings;
 
 type
-  PCairoGlyphArray = ^TCairoGlyphArray;
-  TCairoGlyphArray = array[0..0] of cairo_glyph_t;
 
   { ICairoPainter }
 
@@ -124,7 +122,7 @@ type
     FContext: PCairoContext;
     FFillColor: TCairoColor;
     FFillColorAssigned: Boolean;
-    FFont: Pcairo_scaled_font_t;
+    FFont: TCairoFontFace;
     FFontColor: TCairoColor;
     FFontHasLines: Boolean;
     FFontMetrics: TCairoFontMetrics;
@@ -347,14 +345,9 @@ procedure cairo_lock;
 procedure cairo_unlock;
 implementation
 
-uses
-  ACL.Graphics.FontCache;
-
 {$REGION ' DrawText '}
 const
   CairoTextStyleLines = [fsUnderline, fsStrikeOut];
-  GLYPH_MASK_FONTINDEX  = $FF000000;
-  GLYPH_MASK_GLYPHINDEX = $00FFFFFF;
 
 type
   TTextBlock = class(TACLTextLayoutBlockText);
@@ -370,23 +363,10 @@ type
     Capacity: Integer;
     Count: Integer;
     HasSubstitutions: Boolean;
-    Glyphs: TCairoGlyphArray; // last!
+    Glyphs: cairo_glyph_t; // last!
     class function Allocate(ACount: Integer): PCairoTextLayoutMetrics; static;
-    procedure Calculate(ACairo: Pcairo_t; AText: PChar; ATextLength: Integer);
+    procedure Calculate(ACairo: Pcairo_t; AText: PChar; ATextLength: Integer; AFont: TCairoFontFace);
     function MeasureWidth(ACairo: Pcairo_t): Double;
-  end;
-
-  { TCairoTextMapping }
-
-  TCairoTextMapping = record
-  public
-    TextOffsets: array of Integer;
-    TextReference: PAnsiChar;
-    procedure Free;
-    // кластеры будут прибиты автоматически
-    procedure Init(AText: PAnsiChar; AGlyphCount: Integer;
-      AClusters: Pcairo_text_cluster_t; AClusterCount: Integer);
-    function TextAt(AGlyphIndex: Integer): PAnsiChar;
   end;
 
   { TCairoTextGlyphs }
@@ -394,11 +374,11 @@ type
   TCairoTextGlyphs = record
   public
     GlyphCount: Integer;
-    Glyphs: PCairoGlyphArray;
+    Glyphs: Pcairo_glyph_t;
     HasSubstitutions: Boolean;
     Mapping: TCairoTextMapping;
     procedure Free;
-    function Init(ACairo: Pcairo_t; AText: PChar; ATextLength: Integer): Boolean;
+    function Init(ACairo: Pcairo_t; AText: PChar; ATextLength: Integer; AFont: TCairoFontFace): Boolean;
     function MeasureWidth(ACairo: Pcairo_t): Double;
   end;
 
@@ -407,7 +387,7 @@ type
   PCairoTextLine = ^TCairoTextLine;
   TCairoTextLine = record
   public
-    Glyphs: PCairoGlyphArray;
+    Glyphs: Pcairo_glyph_t;
     GlyphCount: Integer;
     Width: Double;
     NextLine: PCairoTextLine;
@@ -415,39 +395,9 @@ type
     procedure CalcMetrics(ACairo: Pcairo_t);
     function GetCount: Integer;
     function GetMaxWidth: Double;
-    procedure Init(AGlyphs: PCairoGlyphArray; AIndex, ACount: Integer);
-    function Push(AGlyphs: PCairoGlyphArray; AIndex, ACount: Integer): PCairoTextLine;
+    procedure Init(AGlyphs: Pcairo_glyph_t; AIndex, ACount: Integer);
+    function Push(AGlyphs: Pcairo_glyph_t; AIndex, ACount: Integer): PCairoTextLine;
     procedure Free;
-  end;
-
-  { TCairoHelper }
-
-  TCairoHelper = class
-  strict private
-    class var FMeasurer: Pcairo_t;
-    class var FMeasurerFont: TFont;
-    class var FMeasurerSurface: Pcairo_surface_t;
-    class var FDefaultFontName: TFontDataName;
-    class var FDefaultFontSize: Integer;
-    class var FUsedFonts: TStringList;
-    class var FUtf8Buffer: PAnsiChar;
-    class var FUtf8BufferSize: Integer;
-    class procedure InitDefaultFont;
-  protected
-    // Не должно вызываться вне cairo_lock/unlock
-    class procedure SelectFont(ACairo: Pcairo_t; const AFontName: string); overload;
-    class procedure SelectFont(ACairo: Pcairo_t; const AFontId: LongWord); overload;
-    class function UseFont(const AFontName: string): Integer;
-  public
-    class destructor Destroy;
-    class function DefaultFontName: TFontDataName;
-    class function DefaultFontSize: Integer;
-    class function Measurer(ACanvas: TCanvas): Pcairo_t;
-    class function ToUtf8(AText: PAnsiChar; ATextLen: Integer; out Utf8Len: Integer): PAnsiChar; overload;
-    class function ToUtf8(AText: PWideChar; ATextLen: Integer; out Utf8Len: Integer): PAnsiChar; overload;
-    class function ResolveUnknownGlyphs(ACairo: Pcairo_t;
-      AGlyphs: Pcairo_glyph_t; AGlyphCount: Integer;
-      const AMapping: TCairoTextMapping): Boolean;
   end;
 
 {$ENDREGION}
@@ -515,17 +465,15 @@ type
 {$ENDREGION}
 
 {$REGION ' Generic '}
-var
-  CairoLock: TACLCriticalSection;
 
 procedure cairo_lock;
 begin
-  CairoLock.Enter;
+  TCairoFonts.Lock.Enter;
 end;
 
 procedure cairo_unlock;
 begin
-  CairoLock.Leave;
+  TCairoFonts.Lock.Leave;
 end;
 
 function cairo_create_context(DC: HDC; out Origin: TPoint; out SavedContext: PCairoContext): pcairo_t;
@@ -662,19 +610,6 @@ begin
   end;
 end;
 
-function cairo_get_glyph_index(ACairo: Pcairo_t; AText: PAnsiChar; ATextLen: Integer): LongWord;
-var
-  LGlyph: cairo_glyph_t;
-  LGlyphNum: Integer;
-  LGlyphPtr: Pcairo_glyph_t;
-begin
-  LGlyphNum := 1;
-  LGlyphPtr := @LGlyph;
-  cairo_scaled_font_text_to_glyphs(cairo_get_scaled_font(ACairo),
-    0, 0, AText, ATextLen, @LGlyphPtr, @LGlyphNum, nil, nil, nil);
-  Result := LGlyph.index;
-end;
-
 procedure cairo_font_metrics(AFont: Pcairo_scaled_font_t; out AMetrics: TCairoFontMetrics);
 begin
   cairo_scaled_font_extents(AFont, @AMetrics);
@@ -771,34 +706,6 @@ begin
     Cairo.cairo_set_dash(ACairo, nil, 0, 0);
   end;
   cairo_set_line_width(ACairo, AWidth);
-end;
-
-procedure cairo_set_font(ACairo: pcairo_t; AFont: TFont);
-var
-  LName: AnsiString;
-  LSlant: cairo_font_slant_t;
-  LWeight: cairo_font_weight_t;
-begin
-  if fsItalic in AFont.Style then
-    LSlant := CAIRO_FONT_SLANT_ITALIC
-  else
-    LSlant := CAIRO_FONT_SLANT_NORMAL;
-
-  if fsBold in AFont.Style then
-    LWeight := CAIRO_FONT_WEIGHT_BOLD
-  else
-    LWeight := CAIRO_FONT_WEIGHT_NORMAL;
-
-  if AFont.Name = 'default' then
-    LName := TCairoHelper.DefaultFontName
-  else
-    LName := acAString(AFont.Name);
-
-  cairo_select_font_face(ACairo, PAnsiChar(LName), LSlant, LWeight);
-  if AFont.Height = 0 then
-    cairo_set_font_size(ACairo, TCairoHelper.DefaultFontSize)
-  else
-    cairo_set_font_size(ACairo, Abs(acResolveFontHeight(AFont, AFont.Height)));
 end;
 
 procedure cairo_set_source_color(ACairo: pcairo_t; const AColor: TAlphaColor);
@@ -922,52 +829,15 @@ end;
 
 {$REGION ' DrawText '}
 
-procedure OffsetGlyphs(AGlyphs: PCairoGlyphArray; ACount: Integer; ADeltaX, ADeltaY: Double);
-var
-  I: Integer;
-begin
-  for I := 0 to ACount - 1 do
-    with AGlyphs^[I] do
-    begin
-      X := X + ADeltaX;
-      Y := Y + ADeltaY;
-    end;
-end;
-
-function CairoCalculateGlyphWidth(ACairo: Pcairo_t; AGlyphIndex: LongWord): cairo_text_extents_t;
-var
-  LGlyph: cairo_glyph_t;
-  LSwitchFont: Boolean;
-begin
-  cairo_lock;
-  try
-    LSwitchFont := AGlyphIndex and GLYPH_MASK_FONTINDEX <> 0;
-    if LSwitchFont then
-    begin
-      cairo_save(ACairo);
-      TCairoHelper.SelectFont(ACairo, AGlyphIndex and GLYPH_MASK_FONTINDEX);
-      AGlyphIndex := AGlyphIndex and GLYPH_MASK_GLYPHINDEX;
-    end;
-    LGlyph.x := 0;
-    LGlyph.y := 0;
-    LGlyph.index := AGlyphIndex;
-    cairo_scaled_font_glyph_extents(cairo_get_scaled_font(ACairo), @LGlyph, 1, @Result);
-    if LSwitchFont then
-      cairo_restore(ACairo);
-  finally
-    cairo_unlock;
-  end;
-end;
-
 procedure CairoCalculateTextLayout(ACairo: Pcairo_t;
   const AMapping: TCairoTextMapping; ALines: PCairoTextLine;
-  const ARect: TRect; AFlags: Cardinal);
+  const ARect: TRect; AFlags: Cardinal; AFont: TCairoFontFace);
 const
   Epsilon = 0.1;
   WordBreaks = AnsiString(#13#10#9' ');
 var
   LGlyphCount: Integer;
-  LGlyphs: PCairoGlyphArray;
+  LGlyphs: Pcairo_glyph_t;
 
   function CalculateEndEllipse(out AGlyph: LongWord): Double;
   var
@@ -975,10 +845,10 @@ var
   begin
     Result := 0;
     AGlyph := 0;
-    if LGlyphs.Init(ACairo, '.', 1) then
+    if LGlyphs.Init(ACairo, '.', 1, AFont) then
     try
-      AGlyph := LGlyphs.Glyphs^[0].index;
-      Result := CairoCalculateGlyphWidth(ACairo, AGlyph).x_advance;
+      AGlyph := LGlyphs.Glyphs^.index;
+      Result := cairo_get_glyph_width(ACairo, AGlyph).x_advance;
     finally
       LGlyphs.Free;
     end;
@@ -1032,9 +902,9 @@ begin
       while I < LGlyphCount do
       begin
         if I + 1 < LGlyphCount then
-          LGlyphWidth := LGlyphs^[I + 1].X - LGlyphs^[I].X;
-        LGlyphs^[I].X := LOffsetX;
-        LGlyphs^[I].Y := LOffsetY;
+          LGlyphWidth := LGlyphs[I + 1].X - LGlyphs[I].X;
+        LGlyphs[I].X := LOffsetX;
+        LGlyphs[I].Y := LOffsetY;
         LOffsetX := LOffsetX + LGlyphWidth;
         if CharInSet(AMapping.TextAt(I)^, [#13, #10]) then
         begin
@@ -1050,9 +920,9 @@ begin
     begin
       SetLength(LGlyphWidths{%H-}, LGlyphCount);
       for I := 0 to LGlyphCount - 2 do
-        LGlyphWidths[I] := LGlyphs^[I + 1].X - LGlyphs^[I].X;
-      LGlyphWidths[LGlyphCount - 1] := CairoCalculateGlyphWidth(
-        ACairo, LGlyphs^[LGlyphCount - 1].index).x_advance;
+        LGlyphWidths[I] := LGlyphs[I + 1].X - LGlyphs[I].X;
+      LGlyphWidths[LGlyphCount - 1] :=
+        cairo_get_glyph_width(ACairo, LGlyphs[LGlyphCount - 1].index).x_advance;
 
       I := 0;
       LLineStart := 0;
@@ -1077,8 +947,8 @@ begin
               J := I - 1
             else
             begin
-              LGlyphs^[I].X := LOffsetX;
-              LGlyphs^[I].Y := LOffsetY;
+              LGlyphs[I].X := LOffsetX;
+              LGlyphs[I].Y := LOffsetY;
             end;
           end;
 
@@ -1099,8 +969,8 @@ begin
           end;
         end;
 
-        LGlyphs^[I].X := LOffsetX;
-        LGlyphs^[I].Y := LOffsetY;
+        LGlyphs[I].X := LOffsetX;
+        LGlyphs[I].Y := LOffsetY;
         LOffsetX := LOffsetX + LGlyphWidths[I];
         LOffsetX := LOffsetX + LGlyphWidth;
         if CharInSet(AMapping.TextAt(I)^, [#13, #10]) then
@@ -1152,16 +1022,16 @@ begin
 
       while I >= 0 do
       begin
-        if (LLineScan^.Glyphs^[I].X <= LWidth) or (I = 0) then
+        if (LLineScan^.Glyphs[I].X <= LWidth) or (I = 0) then
         begin
           // Подменяем имеющиеся глифы на глиф точки
-          LLineScan^.Glyphs^[I + 0].index := LEndEllipsis;
-          LLineScan^.Glyphs^[I + 1].index := LEndEllipsis;
-          LLineScan^.Glyphs^[I + 1].x := LLineScan^.Glyphs^[I].x + LOffsetX;
-          LLineScan^.Glyphs^[I + 1].y := LLineScan^.Glyphs^[I].y;
-          LLineScan^.Glyphs^[I + 2].index := LEndEllipsis;
-          LLineScan^.Glyphs^[I + 2].x := LLineScan^.Glyphs^[I].x + LOffsetX * 2;
-          LLineScan^.Glyphs^[I + 2].y := LLineScan^.Glyphs^[I].y;
+          LLineScan^.Glyphs[I + 0].index := LEndEllipsis;
+          LLineScan^.Glyphs[I + 1].index := LEndEllipsis;
+          LLineScan^.Glyphs[I + 1].x := LLineScan^.Glyphs[I].x + LOffsetX;
+          LLineScan^.Glyphs[I + 1].y := LLineScan^.Glyphs[I].y;
+          LLineScan^.Glyphs[I + 2].index := LEndEllipsis;
+          LLineScan^.Glyphs[I + 2].x := LLineScan^.Glyphs[I].x + LOffsetX * 2;
+          LLineScan^.Glyphs[I + 2].y := LLineScan^.Glyphs[I].y;
           LLineScan^.GlyphCount := I + 3;
           // Усекаем лейаут по текущей строке (последующие строки будут освобождены)
           LLineScan^.Free;
@@ -1216,7 +1086,7 @@ begin
 
     // Выравнивание по вертикали
     if AFlags and DT_VCENTER <> 0 then
-      LDeltaY := (ARect.Top + ARect.Bottom - LHeight) / 2
+      LDeltaY := Trunc((ARect.Top + ARect.Bottom - LHeight) * 0.5)
     else if AFlags and DT_BOTTOM <> 0 then
       LDeltaY := ARect.Bottom - LHeight
     else
@@ -1246,7 +1116,7 @@ procedure CairoDrawGlyphs(ACairo: Pcairo_t;
     end;
 
     cairo_save(ACairo);
-    TCairoHelper.SelectFont(ACairo, LFont);
+    TCairoFonts.Select(ACairo, LFont);
     // Вот такой код работает быстрее, чем выводить глифы посимвольно
     if AGlyphCount > 1 then
     begin
@@ -1322,9 +1192,9 @@ begin
     if ALines^.GlyphCount > 0 then
     begin
       CairoDrawGlyphs(ACairo,
-        @ALines^.Glyphs^[0], ALines^.GlyphCount, AHasSubstitutions);
+        ALines^.Glyphs, ALines^.GlyphCount, AHasSubstitutions);
       CairoDrawTextStyleLines(ACairo, AFontStyle,
-        ALines^.Glyphs^[0].X, ALines^.Glyphs^[0].Y - AFontMetrics.baseline,
+        ALines^.Glyphs^.X, ALines^.Glyphs^.Y - AFontMetrics.baseline,
         ALines^.Width, AFontMetrics);
     end;
     ALines := ALines^.NextLine;
@@ -1336,7 +1206,7 @@ procedure CairoDrawTextCore(ACanvas: TCanvas;
 var
   LCairo: Pcairo_t;
   LContext: PCairoContext;
-  LFont: Pcairo_scaled_font_t;
+  LFont: TCairoFontFace;
   LFontMetrics: TCairoFontMetrics;
   LGlyphs: TCairoTextGlyphs;
   LLines: TCairoTextLine;
@@ -1348,16 +1218,15 @@ begin
   try
     LCairo := cairo_create_context(ACanvas, LSurface, LOrigin, LContext);
     try
-      cairo_set_font(LCairo, ACanvas.Font);
-      LFont := cairo_get_scaled_font(LCairo);
-      if LGlyphs.Init(LCairo, PChar(S), Length(S)) then
+      LFont := TCairoFonts.Select(LCairo, ACanvas.Font);
+      if LGlyphs.Init(LCairo, PChar(S), Length(S), LFont) then
       try
-        cairo_font_metrics(LFont, LFontMetrics);
+        cairo_font_metrics(cairo_get_scaled_font(LCairo), LFontMetrics);
         if AFlags and DT_CALCRECT <> 0 then
         begin
           LLines.Init(LGlyphs.Glyphs, 0, LGlyphs.GlyphCount);
           try
-            CairoCalculateTextLayout(LCairo, LGlyphs.Mapping, @LLines, R, AFlags);
+            CairoCalculateTextLayout(LCairo, LGlyphs.Mapping, @LLines, R, AFlags, LFont);
             R.Height := Ceil(LLines.GetCount * LFontMetrics.height);
             R.Width := Ceil(LLines.GetMaxWidth);
           finally
@@ -1371,7 +1240,7 @@ begin
             LRect.Offset(-LOrigin.X, -LOrigin.Y);
             LLines.Init(LGlyphs.Glyphs, 0, LGlyphs.GlyphCount);
             try
-              CairoCalculateTextLayout(LCairo, LGlyphs.Mapping, @LLines, LRect, AFlags);
+              CairoCalculateTextLayout(LCairo, LGlyphs.Mapping, @LLines, LRect, AFlags, LFont);
               cairo_set_source_color(LCairo, TCairoColor.From(ACanvas.Font));
               if AFlags and DT_NOCLIP = 0 then
               begin
@@ -1429,20 +1298,22 @@ end;
 function CairoTextGetLastVisible(ACanvas: TCanvas; const S: string; AMaxWidth: Integer): Integer;
 var
   LCairo: pcairo_t;
+  LFont: TCairoFontFace;
   LGlyphs: TCairoTextGlyphs;
   LWidth: Double;
 begin
   cairo_lock;
   try
     Result := 0;
-    LCairo := TCairoHelper.Measurer(ACanvas);
-    if LGlyphs.Init(LCairo, PChar(S), Length(S)) then
+    LCairo := TCairoFonts.MeasurerContext;
+    LFont := TCairoFonts.Select(LCairo, ACanvas.Font);
+    if LGlyphs.Init(LCairo, PChar(S), Length(S), LFont) then
     try
       Result := LGlyphs.GlyphCount - 1;
       LWidth := LGlyphs.MeasureWidth(LCairo);
       while (Result > 0) and (LWidth > AMaxWidth) do
       begin
-        LWidth := LGlyphs.Glyphs^[Result].x;
+        LWidth := LGlyphs.Glyphs[Result].x;
         Dec(Result);
       end;
       Result := LGlyphs.Mapping.TextOffsets[Result];
@@ -1459,6 +1330,7 @@ procedure CairoTextOut(ACanvas: TCanvas; X, Y: Integer;
 var
   LCairo: pcairo_t;
   LContext: PCairoContext;
+  LFont: TCairoFontFace;
   LGlyphs: TCairoTextGlyphs;
   LMetrics: TCairoFontMetrics;
   LOrigin: TPoint;
@@ -1480,14 +1352,13 @@ begin
         Dec(X, LOrigin.X);
         Dec(Y, LOrigin.Y);
 
-        cairo_set_font(LCairo, ACanvas.Font);
-        cairo_set_source_color(LCairo, TCairoColor.From(ACanvas.Font));
-
-        if LGlyphs.Init(LCairo, AText, ALength) then
+        LFont := TCairoFonts.Select(LCairo, ACanvas.Font);
+        if LGlyphs.Init(LCairo, AText, ALength, LFont) then
         try
+          cairo_set_source_color(LCairo, TCairoColor.From(ACanvas.Font));
           cairo_font_metrics(cairo_get_scaled_font(LCairo), LMetrics);
           OffsetGlyphs(LGlyphs.Glyphs, LGlyphs.GlyphCount, X, Y + LMetrics.baseline);
-          CairoDrawGlyphs(LCairo, @LGlyphs.Glyphs^[0], LGlyphs.GlyphCount, LGlyphs.HasSubstitutions);
+          CairoDrawGlyphs(LCairo, LGlyphs.Glyphs, LGlyphs.GlyphCount, LGlyphs.HasSubstitutions);
           if CairoTextStyleLines * ACanvas.Font.Style <> [] then
             CairoDrawTextStyleLines(LCairo, ACanvas.Font.Style, X, Y, LGlyphs.MeasureWidth(LCairo), LMetrics);
         finally
@@ -1505,12 +1376,14 @@ end;
 procedure CairoTextSize(ACanvas: TCanvas; const S: string; AWidth, AHeight: PInteger);
 var
   LCairo: pcairo_t;
+  LFont: TCairoFontFace;
   LFontExtents: cairo_font_extents_t;
   LGlyphs: TCairoTextGlyphs;
 begin
   cairo_lock;
   try
-    LCairo := TCairoHelper.Measurer(ACanvas);
+    LCairo := TCairoFonts.MeasurerContext;
+    LFont := TCairoFonts.Select(LCairo, ACanvas.Font);
     if AHeight <> nil then
     begin
       cairo_font_extents(LCairo, @LFontExtents);
@@ -1519,7 +1392,7 @@ begin
     if AWidth <> nil then
     begin
       AWidth^ := 0;
-      if LGlyphs.Init(LCairo, PChar(S), Length(S)) then
+      if LGlyphs.Init(LCairo, PChar(S), Length(S), LFont) then
       try
         AWidth^ := Round(LGlyphs.MeasureWidth(LCairo));
       finally
@@ -1531,259 +1404,19 @@ begin
   end;
 end;
 
-{ TCairoHelper }
-
-class destructor TCairoHelper.Destroy;
-begin
-  if FMeasurer <> nil then
-    cairo_destroy(FMeasurer);
-  if FMeasurerSurface <> nil then
-    cairo_surface_destroy(FMeasurerSurface);
-  FreeAndNil(FMeasurerFont);
-  FreeAndNil(FUsedFonts);
-  FreeMem(FUtf8Buffer);
-end;
-
-class function TCairoHelper.DefaultFontName: TFontDataName;
-begin
-  if FDefaultFontName = '' then
-    InitDefaultFont;
-  Result := FDefaultFontName;
-end;
-
-class function TCairoHelper.DefaultFontSize: Integer;
-begin
-  if FDefaultFontSize = 0 then
-    InitDefaultFont;
-  Result := FDefaultFontSize;
-end;
-
-class procedure TCairoHelper.InitDefaultFont;
-var
-  LFont: TLogFont;
-begin
-  cairo_lock;
-  try
-    GetObject(GetStockObject(DEFAULT_GUI_FONT), SizeOf(TLogFont), @LFont);
-    FDefaultFontName := TFontDataName(string(LFont.lfFaceName));
-    FDefaultFontSize := LFont.lfHeight;
-    if FDefaultFontName = '' then
-    {$IF DEFINED(LCLGtk3)}
-      FDefaultFontName := GTK3WidgetSet.DefaultAppFontName;
-    {$ELSEIF DEFINED(LCLGtk2)}
-      FDefaultFontName := GetDefaultFontName;
-    {$ELSE}
-      FDefaultFontName := DefFontData.Name;
-    {$ENDIF}
-    if FDefaultFontSize = 0 then
-      FDefaultFontSize := DefFontData.Height;
-    if FDefaultFontSize = 0 then
-      FDefaultFontSize := -11;
-  finally
-    cairo_unlock;
-  end;
-end;
-
-class function TCairoHelper.Measurer(ACanvas: TCanvas): Pcairo_t;
-begin
-  CheckIsMainThread;
-  if FMeasurerFont = nil then
-  begin
-    FMeasurerFont := TFont.Create;
-    FMeasurerFont.Assign(ACanvas.Font);
-    FMeasurerFont.Height := ACanvas.Font.Height; // PPI
-    FMeasurerSurface := cairo_create_surface(1, 1);
-    FMeasurer := cairo_create(FMeasurerSurface);
-    cairo_set_font(FMeasurer, FMeasurerFont);
-  end
-  else
-    if FMeasurerFont.Handle <> ACanvas.Font.Handle then
-    //if not ACanvas.Font.IsEqual(FMeasurerFont) then
-    begin
-      FMeasurerFont.Assign(ACanvas.Font);
-      FMeasurerFont.Height := ACanvas.Font.Height; // PPI
-      cairo_set_font(FMeasurer, FMeasurerFont);
-    end;
-
-  Result := FMeasurer;
-end;
-
-class function TCairoHelper.ResolveUnknownGlyphs(
-  ACairo: Pcairo_t; AGlyphs: Pcairo_glyph_t; AGlyphCount: Integer;
-  const AMapping: TCairoTextMapping): Boolean;
-
-  function GetCharCode(AChar: PAnsiChar; ACharLen: Integer): LongWord;
-  begin
-    Result := 0;
-    if ACharLen > 4 then
-      Exit;
-    while ACharLen > 0 do
-    begin
-      Result := (Result shl 8) or Ord(AChar^);
-      Dec(ACharLen);
-      Inc(AChar);
-    end;
-  end;
-
-  function HasUnknownGlyphs: Boolean;
-  var
-    I: Integer;
-  begin
-    for I := 0 to AGlyphCount - 1 do
-    begin
-      if AGlyphs[I].index = 0 then
-        Exit(True);
-    end;
-    Result := False;
-  end;
-
-var
-  LChar: PAnsiChar;
-  LCharCode: LongWord;
-  LCharLen: Integer;
-  LDelta: Double;
-  LFontId: LongWord;
-  LFontName: string;
-  LFonts: TACLFontSubstitutions;
-  LGlyphIndex: LongWord;
-  LMoveCount: Integer;
-  I, J: Integer;
-begin
-  Result := False;
-  if HasUnknownGlyphs then
-  begin
-    cairo_lock;
-    cairo_save(ACairo);
-    try
-      LFontId := 0;
-      LFontName := acString(cairo_toy_font_face_get_family(cairo_get_font_face(ACairo)));
-      LFonts := TACLFontCache.GetSubstitutions(LFontName);
-      for I := 0 to AGlyphCount - 1 do
-      begin
-        if AGlyphs[I].index <> 0 then
-          Continue;
-
-        LChar := AMapping.TextAt(I);
-        LCharLen := acUtf8CharLength(LChar);
-        LCharCode := GetCharCode(LChar, LCharLen);
-        if LCharCode = 0 then
-          Continue;
-
-        if LFonts.Find(LCharCode, LGlyphIndex) then
-          AGlyphs[I].index := LGlyphIndex
-        else
-        begin
-          // шрифт мог быть переключен на предыдущем символе.
-          // посему проверяем, нет ли в нем и такого глифа
-          LGlyphIndex := cairo_get_glyph_index(ACairo, LChar, LCharLen);
-          if LGlyphIndex = 0 then
-            for J := 0 to LFonts.Count - 1 do
-            begin
-              SelectFont(ACairo, LFonts[J]);
-              LGlyphIndex := cairo_get_glyph_index(ACairo, LChar, LCharLen);
-              if LGlyphIndex <> 0 then
-              begin
-                LogEntry(acGeneralLogFileName, 'FontCache',
-                  'Substitute(%x: %s -> %s)', [LCharCode, LFontName, LFonts[J]]);
-                LFontId := UseFont(LFonts[J]);
-                Break;
-              end;
-            end;
-
-          if LGlyphIndex <> 0 then
-          begin
-            AGlyphs[I].index :=
-              (LFontId and GLYPH_MASK_FONTINDEX) or
-              (LGlyphIndex and GLYPH_MASK_GLYPHINDEX);
-            LFonts.Push(LCharCode, AGlyphs[I].index);
-          end
-          else
-            LFonts.Push(LCharCode, 0);
-        end;
-
-        if LGlyphIndex <> 0 then
-        begin
-          LMoveCount := AGlyphCount - I - 1;
-          if LMoveCount > 0 then
-          begin
-            LDelta := CairoCalculateGlyphWidth(ACairo, LGlyphIndex).width - (AGlyphs[I + 1].x- AGlyphs[I].x);
-            if LDelta <> 0 then
-              OffsetGlyphs(@AGlyphs[I + 1], LMoveCount, LDelta, 0);
-          end;
-          Result := True; // Eсть подстановка!
-        end;
-      end;
-    finally
-      cairo_restore(ACairo);
-      cairo_unlock;
-    end;
-  end;
-end;
-
-class procedure TCairoHelper.SelectFont(ACairo: Pcairo_t; const AFontName: string);
-var
-  LFace: Pcairo_font_face_t;
-  LFont: Pcairo_scaled_font_t;
-begin
-  LFont := cairo_get_scaled_font(ACairo);
-  LFace := cairo_scaled_font_get_font_face(LFont);
-  cairo_select_font_face(ACairo, PAnsiChar(acAString(AFontName)),
-    cairo_toy_font_face_get_slant(LFace),
-    cairo_toy_font_face_get_weight(LFace));
-end;
-
-class procedure TCairoHelper.SelectFont(ACairo: Pcairo_t; const AFontId: LongWord);
-var
-  LFont: LongWord;
-begin
-  LFont := AFontId shr 24;
-  if (FUsedFonts <> nil) and InRange(LFont, 0, FUsedFonts.Count - 1) then
-    SelectFont(ACairo, FUsedFonts.Strings[LFont]);
-end;
-
-class function TCairoHelper.ToUtf8(AText: PAnsiChar; ATextLen: Integer; out Utf8Len: Integer): PAnsiChar;
-begin
-  Result := AText;
-  Utf8Len := ATextLen;
-end;
-
-class function TCairoHelper.ToUtf8(AText: PWideChar; ATextLen: Integer; out Utf8Len: Integer): PAnsiChar;
-begin
-  if FUtf8BufferSize < 3 * ATextLen + 1 then
-  begin
-    FUtf8BufferSize := 3 * ATextLen + 1;
-    ReallocMem(FUtf8Buffer, FUtf8BufferSize);
-  end;
-  Result := FUtf8Buffer;
-  Utf8Len := acUnicodeToUtf8(Result, FUtf8BufferSize - 1, AText, ATextLen);
-  Result[Utf8Len] := #0;
-end;
-
-class function TCairoHelper.UseFont(const AFontName: string): Integer;
-begin
-  if FUsedFonts = nil then
-  begin
-    FUsedFonts := TStringList.Create;
-    FUsedFonts.Add(acString(DefaultFontName));
-  end;
-  Result := FUsedFonts.IndexOf(AFontName);
-  if Result < 0 then
-    Result := FUsedFonts.Add(AFontName);
-  Result := Result shl 24;
-end;
-
 { TCairoTextGlyphs }
 
 procedure TCairoTextGlyphs.Free;
 begin
   if Glyphs <> nil then
-    cairo_glyph_free(@Glyphs^[0]);
+    cairo_glyph_free(Glyphs);
   Mapping.Free;
   GlyphCount := 0;
   Glyphs := nil;
 end;
 
-function TCairoTextGlyphs.Init(ACairo: Pcairo_t; AText: PChar; ATextLength: Integer): Boolean;
+function TCairoTextGlyphs.Init(ACairo: Pcairo_t;
+  AText: PChar; ATextLength: Integer; AFont: TCairoFontFace): Boolean;
 var
   LClusterCount: Integer;
   LClusterFlags: cairo_text_cluster_flags_t;
@@ -1795,18 +1428,14 @@ begin
   GlyphCount := 0;
   LClusters := nil;
   LClusterCount := 0;
-  LUtf8 := TCairoHelper.ToUtf8(AText, ATextLength, LUtf8Len);
+  LUtf8 := TCairoFonts.ToUtf8(AText, ATextLength, LUtf8Len);
   cairo_scaled_font_text_to_glyphs(cairo_get_scaled_font(ACairo), 0, 0,
     LUtf8, LUtf8Len, @Glyphs, @GlyphCount, @LClusters, @LClusterCount, @LClusterFlags);
   Result := Glyphs <> nil;
   if Result then
   begin
     Mapping.Init(LUtf8, GlyphCount, LClusters, LClusterCount);
-  {$IFDEF ACL_CAIRO_FONTS_SUBSTITUTION}
-    HasSubstitutions := TCairoHelper.ResolveUnknownGlyphs(ACairo, @Glyphs^[0], GlyphCount, Mapping);
-  {$ELSE}
-    HasSubstitutions := False;
-  {$ENDIF}
+    HasSubstitutions := TCairoFonts.Substitute(ACairo, AFont, Glyphs, GlyphCount, Mapping);
   end;
 end;
 
@@ -1828,11 +1457,11 @@ begin
   if GlyphCount > 0 then
   begin
     if AAlignment = THorzRectAlign.Center then
-      LDeltaX := (ARightBound - (Glyphs^[0].x * 2 + Width)) / 2
+      LDeltaX := (ARightBound - (Glyphs^.x * 2 + Width)) / 2
     else if AAlignment = THorzRectAlign.Right then
-      LDeltaX := (ARightBound - (Glyphs^[0].x + Width))
+      LDeltaX := (ARightBound - (Glyphs^.x + Width))
     else
-      LDeltaX := -Glyphs^[0].x;
+      LDeltaX := -Glyphs^.x;
 
     if LDeltaX <> 0 then
       OffsetGlyphs(Glyphs, GlyphCount, LDeltaX, 0);
@@ -1845,9 +1474,9 @@ procedure TCairoTextLine.CalcMetrics(ACairo: Pcairo_t);
 begin
   if GlyphCount > 0 then
   begin
-    Width := CairoCalculateGlyphWidth(ACairo,
-      Glyphs^[GlyphCount - 1].index).x_advance +
-      Glyphs^[GlyphCount - 1].x - Glyphs^[0].x;
+    Width := cairo_get_glyph_width(ACairo,
+      Glyphs[GlyphCount - 1].index).x_advance +
+      Glyphs[GlyphCount - 1].x - Glyphs^.x;
   end
   else
     Width := 0;
@@ -1880,7 +1509,7 @@ begin
     Result := Max(Result, NextLine^.GetMaxWidth);
 end;
 
-procedure TCairoTextLine.Init(AGlyphs: PCairoGlyphArray; AIndex, ACount: Integer);
+procedure TCairoTextLine.Init(AGlyphs: Pcairo_glyph_t; AIndex, ACount: Integer);
 begin
   Glyphs := @AGlyphs[AIndex];
   GlyphCount := ACount - AIndex;
@@ -1888,7 +1517,7 @@ begin
   Width := -1;
 end;
 
-function TCairoTextLine.Push(AGlyphs: PCairoGlyphArray; AIndex, ACount: Integer): PCairoTextLine;
+function TCairoTextLine.Push(AGlyphs: Pcairo_glyph_t; AIndex, ACount: Integer): PCairoTextLine;
 var
   LCurr: PCairoTextLine;
 begin
@@ -1911,16 +1540,14 @@ begin
 end;
 
 procedure TCairoTextLayoutMetrics.Calculate(
-  ACairo: Pcairo_t; AText: PChar; ATextLength: Integer);
+  ACairo: Pcairo_t; AText: PChar; ATextLength: Integer; AFont: TCairoFontFace);
 var
   LGlyphs: Pcairo_glyph_t;
   LGlyphCount: Integer;
-{$IFDEF ACL_CAIRO_FONTS_SUBSTITUTION}
   LClusterCount: Integer;
   LClusterFlags: cairo_text_cluster_flags_t;
   LClusters: Pcairo_text_cluster_t;
   LMapping: TCairoTextMapping;
-{$ENDIF}
   LUtf8: PAnsiChar;
   LUtf8Len: Integer;
 begin
@@ -1928,31 +1555,21 @@ begin
     raise EInvalidArgument.CreateFmt('TCairoTextLayoutMetrics capacity exceeded (%d -> %d)', [ATextLength, Capacity]);
 
   // используем для глифов память, что мы сами выделили. Дабы избежать реалокации и move
-  LGlyphs := @Glyphs[0];
+  LGlyphs := @Glyphs;
   LGlyphCount := Capacity;
-{$IFDEF ACL_CAIRO_FONTS_SUBSTITUTION}
   LClusterCount := 0;
   LClusters := nil;
-{$ENDIF}
-  LUtf8 := TCairoHelper.ToUtf8(AText, ATextLength, LUtf8Len);
+  LUtf8 := TCairoFonts.ToUtf8(AText, ATextLength, LUtf8Len);
   cairo_scaled_font_text_to_glyphs(cairo_get_scaled_font(ACairo), 0, 0,
     LUtf8, LUtf8Len, @LGlyphs, @LGlyphCount,
-  {$IFDEF ACL_CAIRO_FONTS_SUBSTITUTION}
-    @LClusters, @LClusterCount, @LClusterFlags
-  {$ELSE}
-    nil, nil, nil
-  {$ENDIF});
+    @LClusters, @LClusterCount, @LClusterFlags);
 
-  if LGlyphs <> @Glyphs[0] then // хм, что-то пошло не так - cairo перетер наш буфер
+  if LGlyphs <> @Glyphs then // хм, что-то пошло не так - cairo перетер наш буфер
     raise EInvalidArgument.CreateFmt('TCairoTextLayoutMetrics glyphs reallocated (%d -> %d)', [LGlyphCount, Capacity]);
   Count := LGlyphCount;
 
-{$IFDEF ACL_CAIRO_FONTS_SUBSTITUTION}
   LMapping.Init(LUtf8, LGlyphCount, LClusters, LClusterCount);
-  HasSubstitutions := TCairoHelper.ResolveUnknownGlyphs(ACairo, LGlyphs, Count, LMapping);
-{$ELSE}
-  HasSubstitutions := False;
-{$ENDIF}
+  HasSubstitutions := TCairoFonts.Substitute(ACairo, AFont, LGlyphs, Count, LMapping);
 end;
 
 function TCairoTextLayoutMetrics.MeasureWidth(ACairo: Pcairo_t): Double;
@@ -1962,45 +1579,6 @@ begin
   LLine.Init(@Glyphs, 0, Count);
   LLine.CalcMetrics(ACairo);
   Result := LLine.Width;
-end;
-
-{ TCairoTextMapping }
-
-procedure TCairoTextMapping.Free;
-begin
-  TextReference := nil;
-  TextOffsets := nil;
-end;
-
-procedure TCairoTextMapping.Init(AText: PAnsiChar; AGlyphCount: Integer;
-  AClusters: Pcairo_text_cluster_t; AClusterCount: Integer);
-var
-  LGlyphIndex: Integer;
-  LTextOffset: Integer;
-  I, J: Integer;
-begin
-  try
-    LGlyphIndex := 0;
-    LTextOffset := 0;
-    TextReference := AText;
-    SetLength(TextOffsets, AGlyphCount);
-    for I := 0 to AClusterCount - 1 do
-    begin
-      for J := 1 to AClusters[I].num_glyphs do
-      begin
-        TextOffsets[LGlyphIndex] := LTextOffset;
-        Inc(LGlyphIndex);
-      end;
-      Inc(LTextOffset, AClusters[I].num_bytes);
-    end;
-  finally
-    cairo_text_cluster_free(AClusters);
-  end;
-end;
-
-function TCairoTextMapping.TextAt(AGlyphIndex: Integer): PAnsiChar;
-begin
-  Result := TextReference + TextOffsets[AGlyphIndex];
 end;
 
 { TACLTextLayoutCairoRender }
@@ -2076,9 +1654,9 @@ begin
       cairo_set_source_color(FHandle, FFontColor);
     end;
 
-    OffsetGlyphs(@LMetrics^.Glyphs[0], LMetrics^.Count,  X,  Y + FFontMetrics.baseline);
-    CairoDrawGlyphs(FHandle, @LMetrics^.Glyphs[0], LMetrics^.Count, LMetrics^.HasSubstitutions);
-    OffsetGlyphs(@LMetrics^.Glyphs[0], LMetrics^.Count, -X, -Y - FFontMetrics.baseline);
+    OffsetGlyphs(@LMetrics^.Glyphs, LMetrics^.Count,  X,  Y + FFontMetrics.baseline);
+    CairoDrawGlyphs(FHandle, @LMetrics^.Glyphs, LMetrics^.Count, LMetrics^.HasSubstitutions);
+    OffsetGlyphs(@LMetrics^.Glyphs, LMetrics^.Count, -X, -Y - FFontMetrics.baseline);
 
     if FFontHasLines then
       CairoDrawTextStyleLines(FHandle, Canvas.Font.Style, X, Y, ABlock.TextWidth, FFontMetrics);
@@ -2108,6 +1686,7 @@ class function TACLTextLayoutCairoRender.GetChar(
 var
   LBlock: TTextBlock absolute ABlock;
   LChars: Integer;
+  LGlyphs: Pcairo_glyph_t;
   LMetrics: PCairoTextLayoutMetrics;
   LNextPos: Single;
   I: Integer;
@@ -2116,9 +1695,10 @@ begin
   if LBlock.FMetrics <> nil then
   begin
     LMetrics := LBlock.FMetrics;
+    LGlyphs := @LMetrics^.Glyphs;
     LChars := LMetrics^.Count;
     for I := 0 to LMetrics^.Count - 1 do
-      if AOffset < LMetrics^.Glyphs[I].X then
+      if AOffset < LGlyphs[I].X then
       begin
         LChars := I;
         Break;
@@ -2129,8 +1709,8 @@ begin
     begin
       LNextPos := LBlock.FWidth;
       if LChars < LMetrics^.Count then
-        LNextPos := LMetrics^.Glyphs[LChars].X;
-      if Abs(LMetrics^.Glyphs[LChars - 1].X - AOffset) < Abs(LNextPos - AOffset) then
+        LNextPos := LGlyphs[LChars].X;
+      if Abs(LGlyphs[LChars - 1].X - AOffset) < Abs(LNextPos - AOffset) then
         Dec(LChars);
     end;
 
@@ -2141,7 +1721,7 @@ begin
       Inc(Result, UTF8CodepointToByteIndex(ABlock.Text, ABlock.TextLength, LChars));
     {$ENDIF}
     if LChars < LMetrics^.Count then
-      AOffset := Round(LMetrics^.Glyphs[LChars].X)
+      AOffset := Round(LGlyphs[LChars].X)
     else
       AOffset := LBlock.FWidth;
   end;
@@ -2155,6 +1735,7 @@ var
   LCharLen: Integer;
   LText: PChar;
 {$ENDIF}
+  LGlyphs: Pcairo_glyph_t;
   LMetrics: PCairoTextLayoutMetrics;
 begin
   Result := ABlock.Bounds;
@@ -2167,6 +1748,7 @@ begin
     {$IFNDEF UNICODE}
       LText := ABlock.PositionInText;
     {$ENDIF}
+      LGlyphs := @LMetrics^.Glyphs;
       while (AOffset > 0) and (LChar < LMetrics^.Count) do
       begin
       {$IFDEF UNICODE}
@@ -2179,9 +1761,9 @@ begin
         Inc(LChar);
       end;
       if LChar < LMetrics^.Count then
-        Result.Left  := ABlock.Position.X + Round(LMetrics^.Glyphs[LChar].x);
+        Result.Left  := ABlock.Position.X + Round(LGlyphs[LChar].x);
       if LChar < LMetrics^.Count - 1 then
-        Result.Right := ABlock.Position.X + Round(LMetrics^.Glyphs[LChar + 1].x);
+        Result.Right := ABlock.Position.X + Round(LGlyphs[LChar + 1].x);
     end;
   end;
 end;
@@ -2210,7 +1792,7 @@ begin
   if LBlock.FMetrics = nil then
     LBlock.FMetrics := TCairoTextLayoutMetrics.Allocate(LBlock.TextLength);
   LMetrics := PCairoTextLayoutMetrics(LBlock.FMetrics);
-  LMetrics.Calculate(FHandle, LBlock.Text, LBlock.TextLength);
+  LMetrics.Calculate(FHandle, LBlock.Text, LBlock.TextLength, FFont);
   LBlock.FLengthVisible := LBlock.TextLength;
   LBlock.FWidth := Round(LMetrics^.MeasureWidth(FHandle));
   LBlock.FHeight := FLineHeight;
@@ -2225,11 +1807,10 @@ end;
 procedure TACLTextLayoutCairoRender.SetFont(AFont: TFont);
 begin
   Canvas.Font := AFont; // иначе TFont.GetColor не сработает
-  cairo_set_font(FHandle, AFont);
+  FFont := TCairoFonts.Select(FHandle, Canvas.Font);
   FFontColor := TCairoColor.From(Canvas.Font);
   cairo_set_source_color(FHandle, FFontColor);
-  FFont := cairo_get_scaled_font(FHandle);
-  cairo_font_metrics(FFont, FFontMetrics);
+  cairo_font_metrics(cairo_get_scaled_font(FHandle), FFontMetrics);
   FFontHasLines := CairoTextStyleLines * AFont.Style <> [];
   FLineHeight := Round(FFontMetrics.height);
 end;
@@ -2243,7 +1824,8 @@ var
   LWidth: Double;
 begin
   LMetrics := PCairoTextLayoutMetrics(LBlock.FMetrics);
-  LGlyph := @LMetrics^.Glyphs[LMetrics^.Count - 1];
+  LGlyph := @LMetrics^.Glyphs;
+  Inc(LGlyph, LMetrics^.Count - 1);
   LWidth := LBlock.FWidth;
   while LMetrics^.Count > 0 do
   begin
@@ -2663,7 +2245,7 @@ end;
 procedure TACLCairoRender.MeasureText(
   const Text: string; Font: TFont; var Rect: TRect; WordWrap: Boolean);
 var
-  LFont: Pcairo_scaled_font_t;
+  LFont: TCairoFontFace;
   LFontMetrics: TCairoFontMetrics;
   LGlyphs: TCairoTextGlyphs;
   LLines: TCairoTextLine;
@@ -2671,9 +2253,8 @@ var
 begin
   cairo_lock;
   try
-    cairo_set_font(Handle, Font);
-    LFont := cairo_get_scaled_font(Handle);
-    if LGlyphs.Init(Handle, PChar(Text), Length(Text)) then
+    LFont := TCairoFonts.Select(Handle, Font);
+    if LGlyphs.Init(Handle, PChar(Text), Length(Text), LFont) then
     try
       LFlags := DT_CALCRECT;
       if WordWrap then
@@ -2681,8 +2262,8 @@ begin
 
       LLines.Init(LGlyphs.Glyphs, 0, LGlyphs.GlyphCount);
       try
-        CairoCalculateTextLayout(FHandle, LGlyphs.Mapping, @LLines, Rect, LFlags);
-        cairo_font_metrics(LFont, LFontMetrics);
+        CairoCalculateTextLayout(FHandle, LGlyphs.Mapping, @LLines, Rect, LFlags, LFont);
+        cairo_font_metrics(cairo_get_scaled_font(Handle), LFontMetrics);
         Rect.Height := Ceil(LLines.GetCount * LFontMetrics.height);
         Rect.Width := Ceil(LLines.GetMaxWidth);
       finally
@@ -2700,7 +2281,7 @@ procedure TACLCairoRender.DrawText(const Text: string; const R: TRect;
   Color: TAlphaColor; Font: TFont; HorzAlign: TAlignment;
   VertAlign: TVerticalAlignment; WordWrap: Boolean);
 var
-  LFont: Pcairo_scaled_font_t;
+  LFont: TCairoFontFace;
   LFontMetrics: TCairoFontMetrics;
   LGlyphs: TCairoTextGlyphs;
   LLines: TCairoTextLine;
@@ -2711,9 +2292,8 @@ begin
 
   cairo_lock;
   try
-    cairo_set_font(Handle, Font);
-    LFont := cairo_get_scaled_font(Handle);
-    if LGlyphs.Init(Handle, PChar(Text), Length(Text)) then
+    LFont := TCairoFonts.Select(Handle, Font);
+    if LGlyphs.Init(Handle, PChar(Text), Length(Text), LFont) then
     try
       LFlags := acTextAlignHorz[HorzAlign] or acTextAlignVert[VertAlign];
       if WordWrap then
@@ -2721,8 +2301,8 @@ begin
 
       LLines.Init(LGlyphs.Glyphs, 0, LGlyphs.GlyphCount);
       try
-        CairoCalculateTextLayout(Handle, LGlyphs.Mapping, @LLines, R - Origin, LFlags);
-        cairo_font_metrics(LFont, LFontMetrics);
+        CairoCalculateTextLayout(Handle, LGlyphs.Mapping, @LLines, R - Origin, LFlags, LFont);
+        cairo_font_metrics(cairo_get_scaled_font(Handle), LFontMetrics);
         cairo_set_source_color(Handle, Color);
         CairoDrawTextLines(Handle, @LLines, Font.Style, LFontMetrics, LGlyphs.HasSubstitutions);
       finally
@@ -3167,10 +2747,8 @@ end;
 {$ENDREGION}
 
 initialization
-  CairoLock := TACLCriticalSection.Create(nil, 'CairoLock');
   CairoPainter := TACLCairoRender.Create;
 
 finalization
   FreeAndNil(CairoPainter);
-  FreeAndNil(CairoLock);
 end.

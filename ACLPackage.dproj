@@ -86,6 +86,7 @@
         <DCC_Namespace>Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;System;Xml;Data;Datasnap;Web;Soap;DUnitX.Loggers.GUI;Winapi;$(DCC_Namespace)</DCC_Namespace>
         <VerInfo_Locale>1049</VerInfo_Locale>
         <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=;CFBundleName=</VerInfo_Keys>
+        <DCC_DcuOutput>.\DCUs\</DCC_DcuOutput>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
         <DCC_Namespace>System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
@@ -189,7 +190,7 @@
         <DCCReference Include="Base\ACL.Graphics.Ex.D2D.Types.pas"/>
         <DCCReference Include="Base\ACL.Graphics.Ex.Gdip.pas"/>
         <DCCReference Include="Base\ACL.Graphics.Ex.Stub.pas"/>
-        <DCCReference Include="Base\ACL.Graphics.FontCache.pas"/>
+        <DCCReference Include="Base\ACL.Graphics.Fonts.pas"/>
         <DCCReference Include="Base\ACL.Graphics.Images.pas"/>
         <DCCReference Include="Base\ACL.Graphics.Palette.pas"/>
         <DCCReference Include="Base\ACL.Graphics.SkinImage.pas"/>

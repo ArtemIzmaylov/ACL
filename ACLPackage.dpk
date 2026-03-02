@@ -62,7 +62,7 @@ contains
   ACL.Graphics.Ex.D2D.Types in 'Base\ACL.Graphics.Ex.D2D.Types.pas',
   ACL.Graphics.Ex.Gdip in 'Base\ACL.Graphics.Ex.Gdip.pas',
   ACL.Graphics.Ex.Stub in 'Base\ACL.Graphics.Ex.Stub.pas',
-  ACL.Graphics.FontCache in 'Base\ACL.Graphics.FontCache.pas',
+  ACL.Graphics.Fonts in 'Base\ACL.Graphics.Fonts.pas',
   ACL.Graphics.Images in 'Base\ACL.Graphics.Images.pas',
   ACL.Graphics.Palette in 'Base\ACL.Graphics.Palette.pas',
   ACL.Graphics.SkinImage in 'Base\ACL.Graphics.SkinImage.pas',

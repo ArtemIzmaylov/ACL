@@ -36,7 +36,7 @@ uses
   ACL.Classes.Collections,
   ACL.FileFormats.INI,
   ACL.Graphics,
-  ACL.Graphics.FontCache,
+  ACL.Graphics.Fonts,
   ACL.Timers,
   ACL.Utils.Common,
   ACL.Utils.DPIAware;
@@ -314,7 +314,6 @@ end;
 
 class procedure TACLApplication.SetDefaultFont(AName: TFontName; AHeight: Integer);
 begin
-  TACLFontCache.RemapFont(AName, AHeight);
   AHeight := MulDiv(AHeight, acGetSystemDpi, acDefaultDpi);
 
   DefFontData.Name := TFontDataName(AName);

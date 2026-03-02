@@ -36,7 +36,7 @@ uses
   // ACL
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.FontCache,
+  ACL.Graphics.Fonts,
   ACL.Math,
   ACL.UI.Controls.Base,
   ACL.UI.Controls.Buttons,
@@ -343,7 +343,7 @@ var
   LName: string;
   LNode: TACLTreeListNode;
 begin
-  for LName in TACLFontCache.Enumerate do
+  for LName in TACLFontRepository.Enumerate do
   begin
     if not acBeginsWith(LName, '@', False) then
     begin
@@ -392,9 +392,8 @@ procedure TACLFontPickerDialog.HandlerFontPreview(
   var AData: TACLTreeListNodeCustomDrawData;
   var AHandled: Boolean);
 begin
-  ACanvas.Font.Assign(
-    TACLFontCache.Get(AData.Node.Caption, [], ACanvas.Font.Height, acDefaultDPI, fqDefault),
-    FFontName.Style.RowColorsText[True]);
+  ACanvas.Font.Color := FFontName.Style.RowColorsText[True];
+  ACanvas.Font.Name := AData.Node.Caption;
 end;
 
 procedure TACLFontPickerDialog.HandlerFontSizeListChanged(Sender: TObject);

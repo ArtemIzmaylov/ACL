@@ -52,7 +52,6 @@ uses
   ACL.FileFormats.INI,
   ACL.Geometry,
   ACL.Graphics,
-  ACL.Graphics.FontCache,
   ACL.MUI,
   ACL.ObjectLinks,
   ACL.Threading,

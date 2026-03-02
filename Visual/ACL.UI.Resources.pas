@@ -41,7 +41,7 @@ uses
   ACL.Geometry,
   ACL.Graphics,
   ACL.Graphics.Ex,
-  ACL.Graphics.FontCache,
+  ACL.Graphics.Fonts,
   ACL.Graphics.SkinImage,
   ACL.Graphics.SkinImageSet,
   ACL.ObjectLinks,
@@ -1533,6 +1533,7 @@ end;
 
 destructor TACLResourceFont.Destroy;
 begin
+  FreeAndNil(FActualFont);
   FreeAndNil(FColor);
   inherited;
 end;
@@ -1594,7 +1595,7 @@ procedure TACLResourceFont.DoFlushCache;
 begin
   FColor.DoFlushCache;
   FActualFontColor := TAlphaColor.Default;
-  FActualFont := nil;
+  FreeAndNil(FActualFont);
 end;
 
 procedure TACLResourceFont.DoFullRefresh;
@@ -1663,7 +1664,22 @@ end;
 function TACLResourceFont.GetActualFont: TFont;
 begin
   if FActualFont = nil then
-    FActualFont := TACLFontCache.Get(Name, Style, Height, TargetDPI, Quality);
+  begin
+    FActualFont := TFont.Create;
+  {$IFDEF FPC}
+    FActualFont.BeginUpdate;
+  {$ENDIF}
+    try
+      FActualFont.Name := Name;
+      FActualFont.Quality := Quality;
+      FActualFont.Style := Style;
+      acSetFontHeight(FActualFont, Height, TargetDPI);
+    finally
+    {$IFDEF FPC}
+      FActualFont.EndUpdate;
+    {$ENDIF}
+    end;
+  end;
   Result := FActualFont;
 end;
 

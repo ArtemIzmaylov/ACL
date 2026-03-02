@@ -415,7 +415,7 @@ type
     procedure ApplyTint(const AColor: TACLPixel32); overload;
     procedure ApplyTint(const AColor: TColor); overload;
     procedure Blur(ARadius: Integer);
-    procedure Flip(AHorizontally, AVertically: Boolean);
+    procedure Flip(AHorizontally, AVertically: Boolean); inline;
     procedure MakeDisabled(AIgnoreMask: Boolean = False);
     procedure MakeMirror(ASize: Integer);
     procedure MakeOpaque; overload;

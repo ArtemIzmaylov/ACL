@@ -459,6 +459,9 @@ function acUtf8ToUnicode(Dest: PWideChar; MaxDestChars: Integer; Source: PAnsiCh
 // FPC: returns string as it is (we asume that AnsiString is already utf8-encoded);
 function acStringFromUtf8(const S: AnsiString): string;
 function acStringToUtf8(const S: string): AnsiString;
+{$IFNDEF FPC}
+function UTF8CodepointToUnicode(Source: PAnsiChar; out ALength: Integer): UCS4Char;
+{$ENDIF}
 
 // Characters
 function acCharCopy(const S: string; AIndex, ACount: Integer): string;
@@ -1199,9 +1202,9 @@ begin
     224..239: Result := 3;
     240..247: Result := 4;
     // UTF-8 supports length up to 7, but RFC 3629 limits it to 1-4 bytes.
-    //#248..#251   : Result := 5;
-    //#252, #253   : Result := 6;
-    //#254         : Result := 7;
+//    248..251: Result := 5;
+//    252..253: Result := 6;
+//    254     : Result := 7;
   else
     Result := 1;
   end;
@@ -1336,6 +1339,22 @@ begin
   Result := acDecodeUtf8(S);
 {$ENDIF}
 end;
+
+{$IFNDEF FPC}
+function UTF8CodepointToUnicode(Source: PAnsiChar; out ALength: Integer): UCS4Char;
+var
+  LBuffer: array[0..1] of WideChar;
+  LReturn: Integer;
+begin
+  ALength := acUtf8CharLength(Source);
+  LReturn := acUtf8ToUnicode(@LBuffer[0], 2, Source, ALength);
+  if LReturn = 2 then
+    Exit(Char.ConvertToUtf32(LBuffer[0], LBuffer[1]));
+  if LReturn = 1 then
+    Exit(UCS4Char(LBuffer[0]));
+  Result := 0; // some error
+end;
+{$ENDIF}
 
 // -----------------------------------------------------------------------------
 // Characters

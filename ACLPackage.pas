@@ -14,7 +14,7 @@ uses
   ACL.FileFormats.CSV, ACL.FileFormats.INI, ACL.FileFormats.XML, 
   ACL.FileFormats.XML.Reader, ACL.FileFormats.XML.Types, 
   ACL.FileFormats.XML.Writer, ACL.Geometry, ACL.Geometry.Utils, ACL.Graphics, 
-  ACL.Graphics.Ex, ACL.Graphics.Ex.Cairo, ACL.Graphics.FontCache, 
+  ACL.Graphics.Ex, ACL.Graphics.Ex.Cairo, ACL.Graphics.Fonts, 
   ACL.Graphics.Images, ACL.Graphics.Palette, ACL.Graphics.SkinImage, 
   ACL.Graphics.SkinImageSet, ACL.Graphics.TextLayout, ACL.Hashes, ACL.MUI, 
   ACL.Math, ACL.Math.Complex, ACL.ObjectLinks, ACL.Parsers, 
