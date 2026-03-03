@@ -37,15 +37,9 @@ type
 
   TACLDropSourceImpl = class(TACLDropSource, IDropSource, IDataObject)
   strict private
-    FThreadAttached: THandle;
-    FThreadCurrent: THandle;
-
     function GetAttachThreadId: THandle;
-    function GetAttachWindow: TWndHandle;
-    procedure AttachThread;
-    procedure DetachThread;
   protected
-    procedure ExecuteCore; override;
+    procedure ExecuteImpl; override;
     // IDataObject
     function DAdvise(const AFormat: TFormatEtc; advf: Longint;
       const advSink: IAdviseSink; out dwConnection: Longint): HRESULT; stdcall;
@@ -145,29 +139,17 @@ type
 
   { TACLDropSourceImpl }
 
-  procedure TACLDropSourceImpl.AttachThread;
-  begin
-    FThreadAttached := GetAttachThreadId;
-    FThreadCurrent := GetCurrentThreadId;
-    if FThreadAttached <> FThreadCurrent then
-      AttachThreadInput(FThreadAttached, FThreadCurrent, True);
-  end;
-
-  procedure TACLDropSourceImpl.DetachThread;
-  begin
-    if (FThreadAttached <> 0) and (FThreadAttached <> FThreadCurrent) then
-    begin
-      AttachThreadInput(FThreadAttached, FThreadCurrent, False);
-      FThreadAttached := 0;
-    end;
-  end;
-
-  procedure TACLDropSourceImpl.ExecuteCore;
+  procedure TACLDropSourceImpl.ExecuteImpl;
   var
     LActions: Integer;
     LResult: Integer;
+    LThread1: THandle;
+    LThread2: THandle;
   begin
-    AttachThread;
+    LThread1 := GetAttachThreadId;
+    LThread2 := GetCurrentThreadId;
+    if LThread1 <> LThread2 then
+      AttachThreadInput(LThread1, LThread2, True);
     try
       LActions := 0;
       if dsaCopy in AllowedActions then
@@ -192,7 +174,8 @@ type
         OleUninitialize;
       end;
     finally
-      DetachThread;
+      if LThread1 <> LThread2 then
+        AttachThreadInput(LThread1, LThread2, False);
     end;
   end;
 
@@ -237,7 +220,7 @@ type
   begin
     AEnumFormat := nil;
     if ADirection = DATADIR_GET then
-    begin
+    try
       AFormatEtcList := TACLDropFormatEtcList.Create;
       for I := 0 to DataProviders.Count - 1 do
       begin
@@ -247,6 +230,8 @@ type
       end;
       if AFormatEtcList.FormatCount > 0 then
         AEnumFormat := AFormatEtcList;
+    except
+      Application.HandleException(nil);
     end;
     Result := ResultMap[AEnumFormat <> nil];
   end;
@@ -265,42 +250,39 @@ type
   begin
     Result := DV_E_FORMATETC;
     if AFormat.dwAspect = DVASPECT_CONTENT then
-    begin
+    try
       for I := 0 to DataProviders.Count - 1 do
       begin
         LProvider := DataProviders[I];
         if LProvider.IsSupported(AFormat) and LProvider.HasData then
           Exit(S_OK);
       end;
+    except
+      Application.HandleException(nil);
     end;
   end;
 
   function TACLDropSourceImpl.GetAttachThreadId: THandle;
   var
-    AAttach: TWndHandle;
+    LWnd: TWndHandle;
   begin
-    AAttach := GetAttachWindow;
-    if AAttach <> 0 then
-      Result := GetWindowThreadProcessId(AAttach, nil)
-    else
-      Result := MainThreadID;
-  end;
-
-  function TACLDropSourceImpl.GetAttachWindow: TWndHandle;
-  begin
-    Result := GetForegroundWindow;
+    LWnd := GetForegroundWindow;
     // Fallback to the unsafe method in case GetForegroundWindow didn't work
     // out (from MSDN: The foreground window can be NULL in certain
     // circumstances, such as when a window is losing activation).
-    if Result = 0 then
+    if LWnd = 0 then
     begin
       // Get handle of window under mouse-cursor.
       // Warning: This introduces a race condition. The cursor might have moved
       // from the original drop source window to another window. This can happen
       // easily if the user moves the cursor rapidly or if sufficient time has
       // elapsed since DragDetect exited.
-      Result := MouseCurrentWindow;
+      LWnd := MouseCurrentWindow;
     end;
+    if LWnd <> 0 then
+      Result := GetWindowThreadProcessId(LWnd, nil)
+    else
+      Result := MainThreadID;
   end;
 
   function TACLDropSourceImpl.GetData(const AFormat: TFormatEtc; out AMedium: TStgMedium): HRESULT; stdcall;
@@ -309,14 +291,18 @@ type
     I: Integer;
   begin
     ZeroMemory(@AMedium, SizeOf(AMedium));
-    for I := 0 to DataProviders.Count - 1 do
-    begin
-      LProvider := DataProviders[I];
-      if LProvider.IsSupported(AFormat) and LProvider.HasData then
+    try
+      for I := 0 to DataProviders.Count - 1 do
       begin
-        if LProvider.Store(AMedium, AFormat) then
-          Exit(S_OK);
+        LProvider := DataProviders[I];
+        if LProvider.IsSupported(AFormat) and LProvider.HasData then
+        begin
+          if LProvider.Store(AMedium, AFormat) then
+            Exit(S_OK);
+        end;
       end;
+    except
+      Application.HandleException(nil);
     end;
     Result := DV_E_FORMATETC;
   end;

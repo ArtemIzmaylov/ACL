@@ -1387,7 +1387,7 @@ begin
     if (FDropSource.DataProviders.Count = 0) or not DropSourceConfig.IsEmpty then
       FDropSource.DataProviders.Add(TACLDragDropDataProviderConfig.Create(DropSourceConfig));
     SubClass.DoDropSourceGetData(FDropSource, FDropSourceObject);
-    FDropSource.ExecuteInThread;
+    FDropSource.Execute;
   end;
 end;
 

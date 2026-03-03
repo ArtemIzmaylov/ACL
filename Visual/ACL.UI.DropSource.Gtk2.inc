@@ -18,7 +18,7 @@ type
     FContext: PGdkDragContext;
     FEvent: TACLEvent;
   protected
-    procedure ExecuteCore; override;
+    procedure ExecuteImpl; override;
   public
     procedure Cancel; override;
   end;
@@ -27,17 +27,24 @@ type
 
   procedure doGtkDropEnd(w: PGtkWidget; ctx: PGdkDragContext; impl: TACLDropSourceImpl); cdecl;
   begin
-    impl.FDropResult := [];
-    case ctx^.action of
-      GDK_ACTION_COPY:
-        impl.FDropResult := [dsaCopy];
-      GDK_ACTION_MOVE:
-        impl.FDropResult := [dsaMove];
-      GDK_ACTION_LINK:
-        impl.FDropResult := [dsaLink];
+    try
+      try
+        impl.FDropResult := [];
+        case ctx^.action of
+          GDK_ACTION_COPY:
+            impl.FDropResult := [dsaCopy];
+          GDK_ACTION_MOVE:
+            impl.FDropResult := [dsaMove];
+          GDK_ACTION_LINK:
+            impl.FDropResult := [dsaLink];
+        end;
+      finally
+        if impl.fEvent <> nil then
+          impl.fEvent.Signal;
+      end;
+    except
+      Application.HandleException(nil);
     end;
-    if impl.fEvent <> nil then
-      impl.fEvent.Signal;
   end;
 
   procedure doGtkDropGetData(w: PGtkWidget; ctx: PGdkDragContext;
@@ -47,23 +54,27 @@ type
     LMedium: TStgMedium;
     I: Integer;
   begin
-    LFormat := MakeFormat(data^.target);
-    for I := 0 to src.DataProviders.Count - 1 do
-    begin
-      if src.DataProviders[I].IsSupported(LFormat) then
+    try
+      LFormat := MakeFormat(data^.target);
+      for I := 0 to src.DataProviders.Count - 1 do
       begin
-        if src.DataProviders[I].Store(LMedium, LFormat) then
-        try
-          gtk_selection_data_set(data, data^.target, 8, LMedium.Data, LMedium.Size);
-        finally
-          ReleaseStgMedium(LMedium)
+        if src.DataProviders[I].IsSupported(LFormat) then
+        begin
+          if src.DataProviders[I].Store(LMedium, LFormat) then
+          try
+            gtk_selection_data_set(data, data^.target, 8, LMedium.Data, LMedium.Size);
+          finally
+            ReleaseStgMedium(LMedium)
+          end;
+          Break;
         end;
-        Break;
       end;
+    except
+      Application.HandleException(nil);
     end;
   end;
 
-  procedure TACLDropSourceImpl.ExecuteCore;
+  procedure TACLDropSourceImpl.ExecuteImpl;
   var
     LActions: TGdkDragAction;
     LControl: TWinControl;
@@ -110,8 +121,11 @@ type
         gdk_keyboard_ungrab(GDK_CURRENT_TIME);
         gdk_pointer_ungrab(GDK_CURRENT_TIME);
       finally
-        gtk_signal_disconnect_by_func(PGtkObject(LWidget), @doGtkDropGetData, Self);
-        gtk_signal_disconnect_by_func(PGtkObject(LWidget), @doGtkDropEnd, Self);
+        if Control <> nil then
+        begin
+          gtk_signal_disconnect_by_func(PGtkObject(LWidget), @doGtkDropGetData, Self);
+          gtk_signal_disconnect_by_func(PGtkObject(LWidget), @doGtkDropEnd, Self);
+        end;
       end;
     finally
       FreeAndNil(FEvent);

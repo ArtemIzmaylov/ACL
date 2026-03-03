@@ -19,7 +19,7 @@ type
     FContext: PGdkDragContext;
     FEvent: TACLEvent;
   protected
-    procedure ExecuteCore; override;
+    procedure ExecuteImpl; override;
   public
     procedure Cancel; override;
   end;
@@ -36,16 +36,23 @@ type
   var
     LActions: TGdkDragAction;
   begin
-    LActions := ctx^.get_actions;
-    impl.FDropResult := [];
-    if GDK_ACTION_COPY in LActions then
-      Include(impl.FDropResult, dsaCopy);
-    if GDK_ACTION_MOVE in LActions then
-      Include(impl.FDropResult, dsaMove);
-    if GDK_ACTION_LINK in LActions then
-      Include(impl.FDropResult, dsaLink);
-    if impl.fEvent <> nil then
-      impl.fEvent.Signal;
+    try
+      try
+        LActions := ctx^.get_actions;
+        impl.FDropResult := [];
+        if GDK_ACTION_COPY in LActions then
+          Include(impl.FDropResult, dsaCopy);
+        if GDK_ACTION_MOVE in LActions then
+          Include(impl.FDropResult, dsaMove);
+        if GDK_ACTION_LINK in LActions then
+          Include(impl.FDropResult, dsaLink);
+      finally
+        if impl.fEvent <> nil then
+          impl.fEvent.Signal;
+      end;
+    except
+      Application.HandleException(nil);
+    end;
   end;
 
   procedure doGtkDropGetData(w: PGtkWidget; ctx: PGdkDragContext;
@@ -55,23 +62,27 @@ type
     LMedium: TStgMedium;
     I: Integer;
   begin
-    LFormat := MakeFormat(TClipboardFormat(data^.get_target));
-    for I := 0 to src.DataProviders.Count - 1 do
-    begin
-      if src.DataProviders[I].IsSupported(LFormat) then
+    try
+      LFormat := MakeFormat(TClipboardFormat(data^.get_target));
+      for I := 0 to src.DataProviders.Count - 1 do
       begin
-        if src.DataProviders[I].Store(LMedium, LFormat) then
-        try
-          gtk_selection_data_set(data, data^.get_target, 8, LMedium.Data, LMedium.Size);
-        finally
-          ReleaseStgMedium(LMedium)
+        if src.DataProviders[I].IsSupported(LFormat) then
+        begin
+          if src.DataProviders[I].Store(LMedium, LFormat) then
+          try
+            gtk_selection_data_set(data, data^.get_target, 8, LMedium.Data, LMedium.Size);
+          finally
+            ReleaseStgMedium(LMedium)
+          end;
+          Break;
         end;
-        Break;
       end;
+    except
+      Application.HandleException(nil);
     end;
   end;
 
-  procedure TACLDropSourceImpl.ExecuteCore;
+  procedure TACLDropSourceImpl.ExecuteImpl;
   var
     LActions: TGdkDragAction;
     LControl: TWinControl;
@@ -104,7 +115,7 @@ type
 
     FEvent := TACLEvent.Create(True, False);
     try
-      LWidget := TGtk3Widget(LControl.Handle).Widget;
+      LWidget := TGtk3Widget(LControl.Handle).GetContainerWidget;
       g_signal_connect_data(LWidget, 'drag_data_get', @doGtkDropGetData, Self, nil, G_CONNECT_DEFAULT);
       g_signal_connect_data(LWidget, 'drag_end', @doGtkDropEnd, Self, nil, G_CONNECT_DEFAULT);
       try
@@ -118,8 +129,11 @@ type
         //gdk_keyboard_ungrab(GDK_CURRENT_TIME);
         gdk_pointer_ungrab(GDK_CURRENT_TIME);
       finally
-        gtk_signal_disconnect_by_func(LWidget, @doGtkDropGetData, Self);
-        gtk_signal_disconnect_by_func(LWidget, @doGtkDropEnd, Self);
+        if Control <> nil then
+        begin
+          gtk_signal_disconnect_by_func(LWidget, @doGtkDropGetData, Self);
+          gtk_signal_disconnect_by_func(LWidget, @doGtkDropEnd, Self);
+        end;
       end;
     finally
       FreeAndNil(FEvent);
@@ -131,7 +145,7 @@ type
     inherited;
     if FContext <> nil then
     try
-      gtk_drag_finish(FContext, False, False, GDK_CURRENT_TIME);
+      gtk_drag_cancel(FContext);
     except
       // do nothing
     end;

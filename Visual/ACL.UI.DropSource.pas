@@ -6,7 +6,7 @@
 //  Purpose:   Shell Drop Source
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -144,6 +144,8 @@ type
 
   TACLDropSource = class(TACLComponent)
   strict private
+    class var FActiveInstances: Integer;
+  strict private
     FAllowedActions: TACLDropSourceActions;
     FDataProviders: TACLDragDropDataProviders;
     FControl: TWinControl;
@@ -153,23 +155,22 @@ type
     FDropResult: TACLDropSourceActions;
 
     constructor CreateCore(AHandler: IACLDropSourceOperation; AControl: TWinControl);
-    procedure ExecuteCore; virtual; abstract;
-    procedure ExecuteSafeFree;
+    procedure ExecuteCore;
+    procedure ExecuteImpl; virtual; abstract;
     // TComponent
     procedure Notification(AComponent: TComponent; AOperation: TOperation); override;
     // IUnknown
     function QueryInterface({$IFDEF FPC}constref{$ELSE}const{$ENDIF} IID: TGUID; out Obj): HRESULT; override;
     //# Events
-    procedure DoDropFinish;
-    procedure DoDropStart;
+    procedure DoFinish;
+    procedure DoStart;
   public
     class function Create(AHandler: IACLDropSourceOperation;
       AControl: TWinControl): TACLDropSource; reintroduce; static;
+    class function IsActive: Boolean;
     destructor Destroy; override;
     procedure Cancel; virtual;
-    function Execute: Boolean;
-    // In this case, The DropSource will be automatically freed after execution
-    procedure ExecuteInThread;
+    procedure Execute; // The DropSource will be automatically freed after execution
     //# Properties
     property AllowedActions: TACLDropSourceActions read FAllowedActions write FAllowedActions;
     property DataProviders: TACLDragDropDataProviders read FDataProviders;
@@ -274,7 +275,6 @@ type
 const
   DropSourceDefaultActions = [dsaCopy, dsaMove, dsaLink];
 
-function DropSourceIsActive: Boolean;
 implementation
 
 {$IF DEFINED(MSWINDOWS)}
@@ -284,14 +284,6 @@ implementation
 {$ELSEIF DEFINED(LCLGtk2)}
   {$I ACL.UI.DropSource.Gtk2.inc}
 {$ENDIF}
-
-var
-  FDropSourceActiveCount: Integer = 0;
-
-function DropSourceIsActive: Boolean;
-begin
-  Result := FDropSourceActiveCount > 0;
-end;
 
 {$REGION ' General '}
 
@@ -439,61 +431,21 @@ begin
   FHandler := nil;
 end;
 
-procedure TACLDropSource.DoDropFinish;
+procedure TACLDropSource.DoFinish;
 begin
   if Handler <> nil then
     Handler.DropSourceEnd(FDropResult, FShiftStateAtDrop);
 end;
 
-procedure TACLDropSource.DoDropStart;
+procedure TACLDropSource.DoStart;
 begin
   if Handler <> nil then
     Handler.DropSourceBegin;
 end;
 
-function TACLDropSource.Execute: Boolean;
+class function TACLDropSource.IsActive: Boolean;
 begin
-  InterlockedIncrement(FDropSourceActiveCount);
-  try
-    RunInMainThread(DoDropStart);
-    try
-      FDropResult := [];
-      ExecuteCore;
-      Result := FDropResult <> [];
-    finally
-      RunInMainThread(DoDropFinish);
-    end;
-  finally
-    InterlockedDecrement(FDropSourceActiveCount);
-  end;
-end;
-
-procedure TACLDropSource.ExecuteInThread;
-begin
-  if IsWine then
-    ExecuteSafeFree
-  else
-    TThread.CreateAnonymousThread(ExecuteSafeFree).Start;
-end;
-
-procedure TACLDropSource.ExecuteSafeFree;
-begin
-  try
-  {$IFDEF ACL_THREADING_DEBUG}
-    if not IsMainThread then
-      TThread.NameThreadForDebugging(ClassName + 'Thread');
-  {$ENDIF}
-    try
-      Execute;
-    except
-      // do nothing
-    end;
-  finally
-    if IsMainThread or not (csFreeNotification in ComponentState) then
-      Free
-    else
-      RunInMainThread(Free, False);
-  end;
+  Result := FActiveInstances > 0;
 end;
 
 procedure TACLDropSource.Notification(
@@ -509,6 +461,38 @@ begin
   Result := inherited;
   if Assigned(Handler) and (Result <> S_OK) then
     Result := Handler.QueryInterface(IID, Obj);
+end;
+
+procedure TACLDropSource.Execute;
+begin
+  if IsWine then
+    ExecuteCore
+  else
+    TThread.CreateAnonymousThread(ExecuteCore).Start;
+end;
+
+procedure TACLDropSource.ExecuteCore;
+begin
+  InterlockedIncrement(FActiveInstances);
+  try
+    FDropResult := [];
+  {$IFDEF ACL_THREADING_DEBUG}
+    if not IsMainThread then
+      TThread.NameThreadForDebugging('DropSourceThread');
+  {$ENDIF}
+    RunInMainThread(DoStart);
+    try
+      Safe.Call(ExecuteImpl);
+    finally
+      RunInMainThread(DoFinish);
+    end;
+  finally
+    InterlockedDecrement(FActiveInstances);
+    if IsMainThread or not (csFreeNotification in ComponentState) then
+      Free
+    else
+      RunInMainThread(Free, False);
+  end;
 end;
 {$ENDREGION}
 

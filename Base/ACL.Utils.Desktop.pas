@@ -294,7 +294,7 @@ begin
 end;
 {$ENDIF}
 
-function MouseCurrentWindow: HWND;
+function MouseCurrentWindow: TWndHandle;
 begin
   Result := WindowFromPoint(MouseCursorPos);
 end;
