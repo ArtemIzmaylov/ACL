@@ -710,7 +710,7 @@ begin
   except
     // Мы в потоке, падать никак нельзя
     on E: Exception do
-      LogEntry(acGeneralLogFileName, 'ThreadPool', E);
+      LogError(acGeneralLogFileName, 'ThreadPool', E);
   end;
 {$IFDEF ACL_THREADING_DEBUG}
   TThread.NameThreadForDebugging('ThreadPool - Idle');
@@ -771,7 +771,7 @@ begin
       end;
     except
       on E: Exception do
-        LogEntry(acGeneralLogFileName, 'ThreadPool', E);
+        LogError(acGeneralLogFileName, 'ThreadPool', E);
     end;
 
     FLock.Enter;

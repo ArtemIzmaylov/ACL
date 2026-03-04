@@ -582,7 +582,7 @@ begin
   except
     on E: Exception do
     begin
-      LogEntry(acGeneralLogFileName, 'Shell', e);
+      LogError(acGeneralLogFileName, 'Shell', e);
       Result := nil;
     end;
   end;

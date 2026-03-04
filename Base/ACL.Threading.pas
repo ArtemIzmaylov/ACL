@@ -777,7 +777,7 @@ begin
       Execute(LRec);
     except
       on E: Exception do
-        LogEntry(acGeneralLogFileName, 'App', E, ClassName);
+        LogError(acGeneralLogFileName, 'App', E, ClassName);
     end;
   until False;
 end;

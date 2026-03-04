@@ -6,7 +6,7 @@
 //  Purpose:   Debug Logger
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -53,8 +53,12 @@ type
       out AInstance: TACLLogFile; ALock: TACLCriticalSection = nil): Boolean;
   end;
 
+type
+  TGetStackTraceFunc = function (AException: Exception): string of object;
+
 var
   acGeneralLogFileName: string = '';
+  acGetStackTraceFunc: TGetStackTraceFunc = nil;
 
 procedure LogEntry(const AFileName: string;
   const ATag, AFormatLine: string; const AArguments: array of const;
@@ -65,8 +69,8 @@ procedure LogEntry(const AFileName: string;
 
 procedure LogError(const AFileName: string;
   const ATag, AExceptionClass, AExceptionMessage, AStackTrace: string;
-  const APrefix: string = ''; const ALocation: string = '');
-procedure LogEntry(const AFileName: string;
+  const APrefix: string = ''; const ALocation: string = ''); overload;
+procedure LogError(const AFileName: string;
   const ATag: string; const AException: Exception;
   const APrefix: string = ''; const ALocation: string = ''); overload;
 
@@ -108,14 +112,23 @@ begin
   end;
 end;
 
-procedure LogEntry(const AFileName: string; const ATag: string;
+procedure LogError(const AFileName: string; const ATag: string;
   const AException: Exception; const APrefix, ALocation: string);
+var
+  LStackTrace: string;
 begin
   if AFileName <> '' then
-    LogError(AFileName, ATag,
-      AException.ClassName, AException.ToString,
-      {$IFDEF FPC}''{$ELSE}AException.StackTrace{$ENDIF},
-      APrefix, ALocation);
+  begin
+    LStackTrace := '';
+    if Assigned(acGetStackTraceFunc) then
+      LStackTrace := acGetStackTraceFunc(AException);
+  {$IFNDEF FPC}
+    if LStackTrace = '' then
+      LStackTrace := AException.StackTrace;
+  {$ENDIF}
+    LogError(AFileName, ATag, AException.ClassName,
+      AException.ToString, LStackTrace, APrefix, ALocation);
+  end;
 end;
 
 procedure LogEntry(const AFileName: string;
