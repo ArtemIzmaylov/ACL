@@ -34,9 +34,13 @@
 
   function TACLDropTargetHookImpl.DragLeave: HRESULT;
   begin
-    HideHint;
-    ActiveTarget := nil;
-    FDataObject := nil;
+    try
+      HideHint;
+      ActiveTarget := nil;
+      FDataObject := nil;
+    except
+      Application.HandleException(nil);
+    end;
     Result := S_OK;
   end;
 
@@ -47,11 +51,15 @@
     LAction: TACLDropAction;
     LAllow: Boolean;
   begin
-    LAllow := AEffect <> DROPEFFECT_NONE;
-    LAction := GetActionFromEffect(AEffect);
-    DoDragOver(P, KeysToShiftState(AKeyState), LAllow, LAction);
-    AEffect := IfThen(LAllow, Map[LAction], DROPEFFECT_NONE);
     Result := S_OK;
+    try
+      LAllow := AEffect <> DROPEFFECT_NONE;
+      LAction := GetActionFromEffect(AEffect);
+      DoDragOver(P, KeysToShiftState(AKeyState), LAllow, LAction);
+      AEffect := IfThen(LAllow, Map[LAction], DROPEFFECT_NONE);
+    except
+      Application.HandleException(nil);
+    end;
   end;
 
   function TACLDropTargetHookImpl.Drop(const ADataObj: IDataObject;
@@ -59,14 +67,18 @@
   begin
     Result := S_OK;
     try
-      if (DataObject <> nil) and (AEffect <> DROPEFFECT_NONE) then
-      begin
-        HideHint;
-        if ActiveTarget <> nil then
-          ActiveTarget.DoDrop(KeysToShiftState(AKeyState), P, GetActionFromEffect(AEffect));
+      try
+        if (DataObject <> nil) and (AEffect <> DROPEFFECT_NONE) then
+        begin
+          HideHint;
+          if ActiveTarget <> nil then
+            ActiveTarget.DoDrop(KeysToShiftState(AKeyState), P, GetActionFromEffect(AEffect));
+        end;
+      finally
+        DragLeave;
       end;
-    finally
-      DragLeave;
+    except
+      Application.HandleException(nil);
     end;
   end;
 

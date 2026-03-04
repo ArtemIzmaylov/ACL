@@ -1,144 +1,291 @@
 ﻿{%MainUnit ACL.UI.DropTarget.pas}
 
+{$DEFINE DEBUG_DROP_TARGET}
+
 uses
-  Glib2,
   Gtk3Objects,
   Gtk3Widgets,
+  LazGLib2,
   LazGObject2,
   LazGdk3,
   LazGtk3;
 
 type
 
+  { TDropActionState }
+
+  TDropActionState = record
+    Action: TACLDropAction;
+    Allow: Boolean;
+    Cursor: TPoint;
+    Shift: TShiftState;
+    procedure Init(w: PGtkWidget; context: PGdkDragContext; x, y: guint);
+  end;
+
   { TACLDropTargetHookImpl }
 
-  // https://www.manpagez.com/html/gdk2/gdk2-2.24.29/gdk2-Drag-and-Drop.php
-  // https://www.manpagez.com/html/gtk2/gtk2-2.24.28/gtk2-Drag-and-Drop.php#gtk-drag-get-data
+  // https://docs.gtk.org/gtk3/signal.Widget.drag-data-received.html
+  // https://docs.gtk.org/gtk3/signal.Widget.drag-motion.html
   // https://gitlab.gnome.org/GNOME/gtk/-/issues/5518
   TACLDropTargetHookImpl = class(TACLDropTargetHook)
-  strict private
-    FContext: PGdkDragContext;
-    FData: PGtkSelectionData;
-    FWidget: PGtkWidget;
+  public type
+    TDataMap = TACLDictionary<TClipboardFormat, TMemoryStream>;
   protected
-    FRecursion: Integer;
-
+    FFinishRequested: Boolean;
+    FSupportedFormats: PGtkTargetList;
     function GetData(AFormat: TClipboardFormat; out AMedium: TStgMedium): Boolean; override;
     function HasData(AFormat: TClipboardFormat): Boolean; override;
-    procedure UpdateContext(AWidget: PGtkWidget; AContext: PGdkDragContext; AData: PGtkSelectionData);
+    procedure RequestData(ASource: PGtkWidget; ATime: gint);
     procedure UpdateMimeTypes; override;
     procedure UpdateRegistration(AHandle: TWndHandle; ARegister: Boolean); override;
+  protected public
+    class var Data: TDataMap;
+    class var DataContext: PGdkDragContext;
+    class var DataRequested: Integer;
+    class var DataSource: PGtkWidget;
+    class procedure SetContext(AContext: PGdkDragContext; ATime: gint);
+  public
+    class destructor Destroy;
   end;
 
-  function GetWidgetClientOrigin(w: PGtkWidget): TPoint;
-  var
-    x, y: gint;
-  begin
-    gdk_window_get_origin(gtk_widget_get_window(w), @x, @y);
-    Result := Point(X, Y);
-  end;
-
-  function doGtkGetAction(context: PGdkDragContext): TACLDropAction;
-  begin
-    Result := daCopy;
-    if GDK_ACTION_LINK in context^.get_actions then
-      Result := daLink;
-    if GDK_ACTION_MOVE in context^.get_actions then
-      Result := daMove;
-  end;
-
-  procedure doGtkDragOver(w: PGtkWidget; context: PGdkDragContext;
-    x, y, time: guint; impl: TACLDropTargetHookImpl); cdecl;
+  function doDropOver(w: PGtkWidget; context: PGdkDragContext;
+    x, y, time: guint; impl: TACLDropTargetHookImpl): gboolean; cdecl;
   const
     Map: array[TACLDropAction] of TGdkDragAction = (
       [GDK_ACTION_COPY], [GDK_ACTION_MOVE], [GDK_ACTION_LINK]
     );
   var
-    LAllow: Boolean;
-    LAction: TACLDropAction;
-    LCursor: TPoint;
+    LState: TDropActionState;
   begin
-    Inc(impl.FRecursion);
+    Result := True;
     try
-      LAllow := True;
-      LAction := doGtkGetAction(context);
-      LCursor := GetWidgetClientOrigin(w);
-      LCursor.Offset(x, y);
-      impl.UpdateContext(w, context, nil);
-      impl.DoDragOver(LCursor, KeyboardStateToShiftState, LAllow, LAction);
-      if LAllow then
-        gdk_drag_status(context, Map[LAction], time)
+    {$IFDEF DEBUG_DROP_TARGET}
+      WriteLn('Gtk3.OnDropOver');
+    {$ENDIF}
+      LState.Init(w, context, x, y);
+      impl.FFinishRequested := False;
+      impl.SetContext(context, time);
+      impl.DoDragOver(LState.Cursor, LState.Shift, LState.Allow, LState.Action);
+      if LState.Allow then
+        gdk_drag_status(context, Map[LState.Action], time)
       else
         gdk_drag_status(context, [], time);
-    finally
-      Dec(impl.FRecursion);
+    except
+      Application.HandleException(nil);
     end;
   end;
 
-  procedure doGtkDragLeave(w: PGtkWidget; context: PGdkDragContext;
+  procedure doDropLeave(w: PGtkWidget; context: PGdkDragContext;
     time: guint; impl: TACLDropTargetHookImpl); cdecl;
   begin
-    impl.ActiveTarget := nil;
-    impl.UpdateContext(nil, nil, nil);
-    impl.HideHint;
+    try
+      // The signal is also emitted before the ::drag-drop signal, for instance to
+      // allow cleaning up of a preview item created in the drag-motion signal handler
+      // https://docs.gtk.org/gtk3/signal.Widget.drag-leave.html
+    {$IFDEF DEBUG_DROP_TARGET}
+      WriteLn('Gtk3.OnDropLeave');
+    {$ENDIF}
+      impl.HideHint;
+      impl.ActiveTarget := nil;
+    except
+      Application.HandleException(nil);
+    end;
   end;
 
-  procedure doGtkDragDrop(w: PGtkWidget; context: PGdkDragContext; x, y:gint;
+  procedure doDropEnd(w: PGtkWidget; context: PGdkDragContext;
+    x, y, time: guint; impl: TACLDropTargetHookImpl); cdecl;
+  var
+    LState: TDropActionState;
+  begin
+    try
+      if impl.DataRequested < 0 then
+      begin
+      {$IFDEF DEBUG_DROP_TARGET}
+        WriteLn('Gtk3.OnDrop');
+      {$ENDIF}
+        impl.FFinishRequested := True;
+        impl.SetContext(context, time);
+        impl.RequestData(w, time);
+      end;
+      if impl.DataRequested = 0 then
+      begin
+      {$IFDEF DEBUG_DROP_TARGET}
+        WriteLn('Gtk3.OnDropEnd');
+      {$ENDIF}
+        LState.Init(w, context, x, y);
+        try
+          impl.DoDragOver(LState.Cursor, LState.Shift, LState.Allow, LState.Action);
+          impl.HideHint; // before drop, but after over
+          if (impl.ActiveTarget <> nil) and LState.Allow then
+            impl.ActiveTarget.DoDrop(LState.Shift, LState.Cursor, LState.Action);
+          impl.ActiveTarget := nil;
+          impl.SetContext(nil, time);
+        finally
+          gtk_drag_finish(context, LState.Allow, LState.Action = daMove, time);
+        end;
+      end;
+    except
+      Application.HandleException(nil);
+    end;
+  end;
+
+  procedure doDropData(w: PGtkWidget; context: PGdkDragContext; x, y:gint;
     data: PGtkSelectionData; info, time: guint; impl: TACLDropTargetHookImpl); cdecl;
   var
-    LAllow: Boolean;
-    LAction: TACLDropAction;
-    LCursor: TPoint;
-    LState: TShiftState;
+    LData: TMemoryStream;
+    LDataLen: gint;
+    LDataPtr: Pointer;
+    LType: PGdkAtom;
   begin
-    impl.UpdateContext(w, context, data);
-    // The "data-received" может придти во время обработки "drag-motion"
-    if impl.FRecursion = 0 then
-    try
-      LAllow := True;
-      LAction := doGtkGetAction(context);
-      LCursor := GetWidgetClientOrigin(w);
-      LCursor.Offset(x, y);
-      LState := KeyboardStateToShiftState;
-      impl.DoDragOver(LCursor, LState, LAllow, LAction);
-      impl.HideHint; // before drop, but after over
-      if (impl.ActiveTarget <> nil) and LAllow then
-        impl.ActiveTarget.DoDrop(LState, LCursor, LAction);
-    finally
-      doGtkDragLeave(w, context, time, impl);
-      gtk_drag_finish(context, LAllow, LAction = daMove, time);
+    if impl.Data = nil then
+    begin
+    {$IFDEF DEBUG_DROP_TARGET}
+      if impl.FFinishRequested then
+        WriteLn('Gtk3.OnDropData(Unexpected Failure)');
+    {$ENDIF}
+      Exit;
     end;
+
+    try
+      LType := data^.get_data_type;
+    {$IFDEF DEBUG_DROP_TARGET}
+      WriteLn('Gtk3.OnDropData(', impl.DataRequested, ', ', TClipboardFormat(LType), ', ', LType^.name, ')');
+    {$ENDIF}
+      if impl.Data.ContainsKey(TClipboardFormat(LType)) then
+      begin
+        LDataPtr := data^.get_data;
+        LDataLen := data^.get_length;
+        if (LDataPtr <> nil) and (LDataLen >= 0) then // < 0 if request failed
+        begin
+          LData := TMemoryStream.Create;
+          LData.WriteBuffer(LDataPtr^, LDataLen);
+          impl.Data.AddOrSetValue(TClipboardFormat(LType), LData);
+        end;
+        Dec(impl.DataRequested);
+      end;
+
+      if impl.FFinishRequested and (impl.DataRequested <= 0) then
+      begin
+        impl.FFinishRequested := False;
+        doDropEnd(w, context, x, y, time, impl);
+      end;
+    except
+      Application.HandleException(nil);
+    end;
+  end;
+
+  { TDropActionState }
+
+  procedure TDropActionState.Init(w: PGtkWidget; context: PGdkDragContext; x, y: guint);
+  var
+    keymap: PGdkKeymap;
+    state: TGdkModifierType;
+    tx, ty: gint;
+  begin
+    Allow := True;
+    w^.get_window^.get_origin(@tx, @ty);
+    Cursor := Point(tx + x, ty + y);
+
+    Action := daCopy;
+    if GDK_ACTION_LINK in context^.get_actions then
+      Action := daLink;
+    if GDK_ACTION_MOVE in context^.get_actions then
+      Action := daMove;
+
+    Shift := [];
+    keymap := gdk_keymap_get_for_display(TGdkDisplay.get_default);
+    if keymap <> nil then
+    begin
+      state := TGdkModifierType(keymap^.get_modifier_state);
+      if GDK_MOD1_MASK    in state then Include(Shift, ssAlt);
+      if GDK_SHIFT_MASK   in state then Include(Shift, ssShift);
+      if GDK_CONTROL_MASK in state then Include(Shift, ssCtrl);
+    end;
+  end;
+
+  { TACLDropTargetHookImpl }
+
+  class destructor TACLDropTargetHookImpl.Destroy;
+  begin
+    SetContext(nil, 0);
   end;
 
   function TACLDropTargetHookImpl.GetData(AFormat: TClipboardFormat; out AMedium: TStgMedium): Boolean;
+  var
+    LData: TMemoryStream;
   begin
-    Result := (FData <> nil) and
-      (TClipboardFormat(FData.get_target) = AFormat) and
-      (FData^.get_length >= 0);
+    Result := (Data <> nil) and Data.TryGetValue(AFormat, LData) and (LData <> nil);
     if Result then
     begin
-      AMedium.Data := FData^.get_data;
-      AMedium.Size := FData^.get_length;
+      AMedium.Data := LData.Memory;
+      AMedium.Size := LData.Size;
       AMedium.Owned := False;
     end;
   end;
 
   function TACLDropTargetHookImpl.HasData(AFormat: TClipboardFormat): Boolean;
   begin
-    // Запрос во время drag-motion не работает...
-    //if (FData = nil) and (FWidget <> nil) and (FContext <> nil) then
-    //  gtk_drag_get_data(FWidget, FContext, AFormat, GDK_CURRENT_TIME);
-    if FRecursion > 0{drag-motion?} then
-      Exit(True); // на дропе разберемся...
-    Result := (FData <> nil) and (TClipboardFormat(FData.get_target) = AFormat);
+    Result := (Data <> nil) and Data.ContainsKey(AFormat);
   end;
 
-  procedure TACLDropTargetHookImpl.UpdateContext(
-    AWidget: PGtkWidget; AContext: PGdkDragContext; AData: PGtkSelectionData);
+  procedure TACLDropTargetHookImpl.RequestData(ASource: PGtkWidget; ATime: gint);
+  var
+    LNode: PGList;
   begin
-    FData := AData;
-    FContext := AContext;
-    FWidget := AWidget;
+    if DataRequested < 0 then
+    begin
+      DataRequested := 0;
+      if (DataContext <> nil) and (FSupportedFormats <> nil) then
+      begin
+        // в случае перемещения внутри приложения, drag_get_data сразу
+        // же дёрнет doDropData, асинхронного вызова не будет. Соответственно,
+        // мы не должны завершать драг до тех пор, пока не получим все данные.
+        Inc(DataRequested);
+        try
+          LNode := DataContext^.list_targets;
+          while LNode <> nil do
+          begin
+            // Мы сможем получить данные только для тех mime-типов, которые
+            // были декларированы через drag_dest_set_XXX
+            if FSupportedFormats^.find(LNode^.data, nil) then
+            begin
+              Inc(DataRequested); // first
+              ASource.drag_get_data(DataContext, LNode^.data, ATime);
+            end;
+            LNode := LNode^.next;
+          end;
+        finally
+          Dec(DataRequested);
+        end;
+      end;
+    end;
+  end;
+
+  class procedure TACLDropTargetHookImpl.SetContext(AContext: PGdkDragContext; ATime: gint);
+  var
+    LAtom: PGdkAtom;
+    LNode: PGList;
+  begin
+    if AContext <> DataContext then
+    begin
+      FreeAndNil(Data);
+      DataContext := AContext;
+      DataRequested := -1;
+      if DataContext <> nil then
+      begin
+        Data := TDataMap.Create([doOwnsValues], 16, nil);
+        LNode := AContext^.list_targets;
+        while LNode <> nil do
+        begin
+          LAtom := LNode^.data;
+          Data.AddIfAbsent(TClipboardFormat(LAtom), nil);
+        {$IFDEF DEBUG_DROP_TARGET}
+          WriteLn('  (', TClipboardFormat(LAtom), ') ', LAtom^.name);
+        {$ENDIF}
+          LNode := LNode^.next;
+        end;
+      end;
+    end;
   end;
 
   procedure TACLDropTargetHookImpl.UpdateMimeTypes;
@@ -154,7 +301,7 @@ type
     LMimeTypes: TACLStringList;
     LWidget: PGtkWidget;
   begin
-    LWidget := PGtkWidget(TGtk3WIdget(AHandle).Widget);
+    LWidget := TGtk3Widget(AHandle).GetContainerWidget;
     if ARegister then
     begin
       LMimeTypes := TACLStringList.Create;
@@ -175,18 +322,22 @@ type
           LFormats[I].info := 0;
         end;
 
-        gtk_drag_dest_set(LWidget, GTK_DEST_DEFAULT_ALL,
-          @LFormats[0], Length(LFormats), [GDK_ACTION_COPY, GDK_ACTION_MOVE]);
-        gtk_drag_dest_add_text_targets(LWidget);
+        LWidget^.drag_dest_set([], @LFormats[0], Length(LFormats), [GDK_ACTION_COPY, GDK_ACTION_MOVE]);
+        LWidget^.drag_dest_add_text_targets();
+        FSupportedFormats := LWidget^.drag_dest_get_target_list;
 
-        g_signal_connect_data(LWidget, 'drag_data_received', @doGtkDragDrop, Self, nil, G_CONNECT_DEFAULT);
-        g_signal_connect_data(LWidget, 'drag_motion', @doGtkDragOver, Self, nil, G_CONNECT_DEFAULT);
-        g_signal_connect_data(LWidget, 'drag_leave', @doGtkDragLeave, Self, nil, G_CONNECT_DEFAULT);
+        g_signal_connect_data(LWidget, 'drag_drop', @doDropEnd, Self, nil, G_CONNECT_DEFAULT);
+        g_signal_connect_data(LWidget, 'drag_data_received', @doDropData, Self, nil, G_CONNECT_DEFAULT);
+        g_signal_connect_data(LWidget, 'drag_motion', @doDropOver, Self, nil, G_CONNECT_DEFAULT);
+        g_signal_connect_data(LWidget, 'drag_leave', @doDropLeave, Self, nil, G_CONNECT_DEFAULT);
       finally
         LMimeTypes.Free;
       end;
     end
     else
+    begin
+      FSupportedFormats := nil;
       gtk_drag_dest_unset(LWidget);
+    end;
   end;
 

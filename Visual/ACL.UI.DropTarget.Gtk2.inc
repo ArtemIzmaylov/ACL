@@ -42,8 +42,8 @@ type
     end;
   end;
 
-  procedure doGtkDragOver(w: PGtkWidget; context: PGdkDragContext;
-    x, y, time: guint; impl: TACLDropTargetHookImpl); cdecl;
+  function doGtkDragOver(w: PGtkWidget; context: PGdkDragContext;
+    x, y, time: guint; impl: TACLDropTargetHookImpl): gboolean; cdecl;
   const
     Map: array[TACLDropAction] of TGdkDragAction = (
       GDK_ACTION_COPY, GDK_ACTION_MOVE, GDK_ACTION_LINK
@@ -53,29 +53,38 @@ type
     LAction: TACLDropAction;
     LCursor: TPoint;
   begin
-    Inc(impl.FRecursion);
     try
-      LAllow := True;
-      LAction := doGtkGetAction(context);
-      LCursor := GetWidgetClientOrigin(w);
-      LCursor.Offset(x, y);
-      impl.UpdateContext(w, context, nil);
-      impl.DoDragOver(LCursor, KeyboardStateToShiftState, LAllow, LAction);
-      if LAllow then
-        gdk_drag_status(context, Map[LAction], time)
-      else
-        gdk_drag_status(context, 0, time);
-    finally
-      Dec(impl.FRecursion);
+      Inc(impl.FRecursion);
+      try
+        LAllow := True;
+        LAction := doGtkGetAction(context);
+        LCursor := GetWidgetClientOrigin(w);
+        LCursor.Offset(x, y);
+        impl.UpdateContext(w, context, nil);
+        impl.DoDragOver(LCursor, KeyboardStateToShiftState, LAllow, LAction);
+        if LAllow then
+          gdk_drag_status(context, Map[LAction], time)
+        else
+          gdk_drag_status(context, 0, time);
+      finally
+        Dec(impl.FRecursion);
+      end;
+    except
+      Application.HandleException(nil);
     end;
+    Result := gTrue;
   end;
 
   procedure doGtkDragLeave(w: PGtkWidget; context: PGdkDragContext;
     time: guint; impl: TACLDropTargetHookImpl); cdecl;
   begin
-    impl.ActiveTarget := nil;
-    impl.UpdateContext(nil, nil, nil);
-    impl.HideHint;
+    try
+      impl.ActiveTarget := nil;
+      impl.UpdateContext(nil, nil, nil);
+      impl.HideHint;
+    except
+      Application.HandleException(nil);
+    end;
   end;
 
   procedure doGtkDragDrop(w: PGtkWidget; context: PGdkDragContext; x, y:gint;
@@ -86,22 +95,26 @@ type
     LCursor: TPoint;
     LState: TShiftState;
   begin
-    impl.UpdateContext(w, context, data);
-    // The "data-received" может придти во время обработки "drag-motion"
-    if impl.FRecursion = 0 then
     try
-      LAllow := True;
-      LAction := doGtkGetAction(context);
-      LCursor := GetWidgetClientOrigin(w);
-      LCursor.Offset(x, y);
-      LState := KeyboardStateToShiftState;
-      impl.DoDragOver(LCursor, LState, LAllow, LAction);
-      impl.HideHint; // before drop, but after over
-      if (impl.ActiveTarget <> nil) and LAllow then
-        impl.ActiveTarget.DoDrop(LState, LCursor, LAction);
-    finally
-      doGtkDragLeave(w, context, time, impl);
-      gtk_drag_finish(context, LAllow, LAction = daMove, time);
+      impl.UpdateContext(w, context, data);
+      // The "data-received" может придти во время обработки "drag-motion"
+      if impl.FRecursion = 0 then
+      try
+        LAllow := True;
+        LAction := doGtkGetAction(context);
+        LCursor := GetWidgetClientOrigin(w);
+        LCursor.Offset(x, y);
+        LState := KeyboardStateToShiftState;
+        impl.DoDragOver(LCursor, LState, LAllow, LAction);
+        impl.HideHint; // before drop, but after over
+        if (impl.ActiveTarget <> nil) and LAllow then
+          impl.ActiveTarget.DoDrop(LState, LCursor, LAction);
+      finally
+        doGtkDragLeave(w, context, time, impl);
+        gtk_drag_finish(context, LAllow, LAction = daMove, time);
+      end;
+    except
+      Application.HandleException(nil);
     end;
   end;
 
