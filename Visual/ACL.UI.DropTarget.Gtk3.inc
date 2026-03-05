@@ -1,10 +1,11 @@
 ﻿{%MainUnit ACL.UI.DropTarget.pas}
 
-{$DEFINE DEBUG_DROP_TARGET}
+{.$DEFINE DEBUG_DROP_TARGET}
 
 uses
   Gtk3Objects,
   Gtk3Widgets,
+  LazLogger,
   LazGLib2,
   LazGObject2,
   LazGdk3,
@@ -60,7 +61,7 @@ type
     Result := True;
     try
     {$IFDEF DEBUG_DROP_TARGET}
-      WriteLn('Gtk3.OnDropOver');
+      DebugLn('Gtk3.OnDropOver');
     {$ENDIF}
       LState.Init(w, context, x, y);
       impl.FFinishRequested := False;
@@ -83,7 +84,7 @@ type
       // allow cleaning up of a preview item created in the drag-motion signal handler
       // https://docs.gtk.org/gtk3/signal.Widget.drag-leave.html
     {$IFDEF DEBUG_DROP_TARGET}
-      WriteLn('Gtk3.OnDropLeave');
+      DebugLn('Gtk3.OnDropLeave');
     {$ENDIF}
       impl.HideHint;
       impl.ActiveTarget := nil;
@@ -101,7 +102,7 @@ type
       if impl.DataRequested < 0 then
       begin
       {$IFDEF DEBUG_DROP_TARGET}
-        WriteLn('Gtk3.OnDrop');
+        DebugLn('Gtk3.OnDrop');
       {$ENDIF}
         impl.FFinishRequested := True;
         impl.SetContext(context, time);
@@ -110,7 +111,7 @@ type
       if impl.DataRequested = 0 then
       begin
       {$IFDEF DEBUG_DROP_TARGET}
-        WriteLn('Gtk3.OnDropEnd');
+        DebugLn('Gtk3.OnDropEnd');
       {$ENDIF}
         LState.Init(w, context, x, y);
         try
@@ -141,7 +142,7 @@ type
     begin
     {$IFDEF DEBUG_DROP_TARGET}
       if impl.FFinishRequested then
-        WriteLn('Gtk3.OnDropData(Unexpected Failure)');
+        DebugLn('Gtk3.OnDropData(Unexpected Failure)');
     {$ENDIF}
       Exit;
     end;
@@ -149,7 +150,7 @@ type
     try
       LType := data^.get_data_type;
     {$IFDEF DEBUG_DROP_TARGET}
-      WriteLn('Gtk3.OnDropData(', impl.DataRequested, ', ', TClipboardFormat(LType), ', ', LType^.name, ')');
+      DebugLn(['Gtk3.OnDropData(', impl.DataRequested, ', ', TClipboardFormat(LType), ', ', LType^.name, ')']);
     {$ENDIF}
       if impl.Data.ContainsKey(TClipboardFormat(LType)) then
       begin
@@ -280,7 +281,7 @@ type
           LAtom := LNode^.data;
           Data.AddIfAbsent(TClipboardFormat(LAtom), nil);
         {$IFDEF DEBUG_DROP_TARGET}
-          WriteLn('  (', TClipboardFormat(LAtom), ') ', LAtom^.name);
+          DebugLn(['  (', TClipboardFormat(LAtom), ') ', LAtom^.name]);
         {$ENDIF}
           LNode := LNode^.next;
         end;
