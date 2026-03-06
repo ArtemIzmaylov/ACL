@@ -110,6 +110,7 @@ type
   strict private
     FDropDownMode: Boolean;
     FOwnerFormWnd: TWndHandle;
+    FShowing: Boolean;
     FOnClosePopup: TNotifyEvent;
     FOnPopup: TNotifyEvent;
 
@@ -469,20 +470,25 @@ begin
   if FOwnerFormWnd <> 0 then
     SendMessage(FOwnerFormWnd, WM_ENTERMENULOOP, 0, 0);
 
-  Visible := True;
-{$IFDEF LCLGtkX}
+  FShowing := True;
   try
-    TGtkApp.BeginPopup(Self);
+    Visible := True;
+  {$IFDEF LCLGtkX}
+    try
+      TGtkApp.BeginPopup(Self);
+      if DropDownMode then
+        TGtkApp.SetInputRedirection(Safe.CastOrNil<TWinControl>(Owner));
+    except
+      ClosePopup;
+      raise;
+    end;
+  {$ELSE}
     if DropDownMode then
-      TGtkApp.SetInputRedirection(Safe.CastOrNil<TWinControl>(Owner));
-  except
-    ClosePopup;
-    raise;
+      MouseCapture := True;
+  {$ENDIF}
+  finally
+    FShowing := False;
   end;
-{$ELSE}
-  if DropDownMode then
-    MouseCapture := True;
-{$ENDIF}
 end;
 
 {$IFDEF FPC}
@@ -516,7 +522,7 @@ procedure TACLPopupWindow.WndProc(var Message: TMessage);
 begin
   case Message.Msg of
     CM_CANCELMODE:
-      if Visible and not (fsShowing in FormState) then
+      if Visible and not FShowing then
       begin
         if not ContainsControl(TCMCancelMode(Message).Sender) then
           ClosePopup;
@@ -543,15 +549,18 @@ begin
       if Visible then
       begin
         if TWMActivate(Message).Active = WA_INACTIVE then
-          TACLMainThread.RunPostponed(ClosePopup, Self)
+        begin
+          if not FShowing then
+            TACLMainThread.RunPostponed(ClosePopup, Self);
+        end
       {$IFDEF MSWINDOWS}
-        else // c нашей формой, по идее, это не нужно:
+        else // чтобы форма осталась активной. По идее, c нашей формой это уже и не нужно.
           SendMessage(TWMActivate(Message).ActiveWindow, WM_NCACTIVATE, WPARAM(True), 0);
       {$ENDIF}
       end;
 
     WM_ACTIVATEAPP:
-      if not (fsShowing in FFormState) then
+      if not FShowing then
         ClosePopup;
 
   {$IFNDEF FPC}

@@ -121,7 +121,6 @@ type
     procedure TakeParentFontIfNecessary;
     //# Messages
   {$IFDEF FPC}
-    procedure WMEraseBkgnd(var Message: TMessage); message WM_ERASEBKGND;
     procedure WMLButtonDown(var Message: TLMLButtonDown); message LM_LBUTTONDOWN;
     procedure WMNCHitTest(var Message: TMessage); message WM_NCHITTEST;
   {$ELSE}
@@ -132,6 +131,7 @@ type
     procedure WMDPIChanged(var Message: TWMDpi); message WM_DPICHANGED;
     procedure WMSysUp(var Message: TWMKeyUp); message WM_SYSKEYUP;
   {$ENDIF}
+    procedure WMEraseBkgnd(var Message: TMessage); message WM_ERASEBKGND;
   {$IFDEF FPC}
   protected type
     TScalingFlags = set of (sfLeft, sfTop, sfWidth, sfHeight, sfFont, sfDesignSize);
@@ -1082,9 +1082,11 @@ begin
     Perform(WM_SETCURSOR, Handle, HTCLIENT);
 end;
 
-{$IFDEF FPC}
 procedure TACLBasicForm.WMEraseBkgnd(var Message: TMessage);
 begin
+  if csDestroyingHandle in ControlState then
+    Exit;
+{$IFDEF FPC}
   if (Message.WParam = Message.LParam) and (Message.LParam <> 0) then
   begin
     Canvas.Handle := Message.LParam;
@@ -1095,9 +1097,11 @@ begin
     end;
   end
   else
+{$ENDIF}
     inherited;
 end;
 
+{$IFDEF FPC}
 procedure TACLBasicForm.WMLButtonDown(var Message: TLMLButtonDown);
 begin
   if not GtkNCProcessMessage(Self, Message) then

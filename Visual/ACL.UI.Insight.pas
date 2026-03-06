@@ -6,7 +6,7 @@
 //  Purpose:   Search thougth app controls
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -546,7 +546,7 @@ begin
     TACLWSCustomControl.SetOpacity(Self, 128);
   {$ELSE}
     LRegion := CreateRectRgnIndirect(ClientRect);
-    acRegionCombine(LRegion, ClientRect.InflateTo(-dpiApply(4, FCurrentPPI)), RGN_DIFF);
+    acRegionCombine(LRegion, ClientRect.InflateTo(-dpiApply(2, FCurrentPPI)), RGN_DIFF);
     acRegionSetToWindow(Handle, LRegion, True);
   {$ENDIF}
   end;

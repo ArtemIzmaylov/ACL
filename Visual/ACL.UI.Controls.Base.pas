@@ -1004,7 +1004,7 @@ function acCanStartDragging(const APoint1, APoint2: TPoint; ATargetDpi: Integer)
 procedure acDrawTransparentControlBackground(AControl: TWinControl;
   DC: HDC; R: TRect; APaintWithChildren: Boolean = True);
 procedure acInvalidateBorders(AControl: TWinControl;
-  const ARect, ABorderWidths: TRect; AErase: Boolean = True);
+  const ARect, ABorders: TRect; AErase: Boolean = True);
 procedure acInvalidateRect(AControl: TWinControl;
   const ARect: TRect; AErase: Boolean = True);
 function acIsSemitransparentFill(
@@ -1146,17 +1146,21 @@ begin
 end;
 
 procedure acInvalidateBorders(AControl: TWinControl;
-  const ARect, ABorderWidths: TRect; AErase: Boolean);
+  const ARect, ABorders: TRect; AErase: Boolean);
 var
   LRegion1: HRGN;
   LRegion2: HRGN;
 begin
-  if ABorderWidths = NullRect then
+  if ABorders = NullRect then
     Exit;
-  if AControl.HandleAllocated and not (csDestroying in AControl.ComponentState) then
+  if not AControl.HandleAllocated or (csDestroying in AControl.ComponentState) then
+    Exit;
+  if (ABorders.MarginsWidth >= ARect.Width) or (ABorders.MarginsHeight >= ARect.Height) then
+    acInvalidateRect(AControl, ARect, AErase)
+  else
   begin
     LRegion1 := CreateRectRgnIndirect(ARect);
-    LRegion2 := CreateRectRgnIndirect(ARect.Split(ABorderWidths));
+    LRegion2 := CreateRectRgnIndirect(ARect.Split(ABorders));
     CombineRgn(LRegion1, LRegion1, LRegion2, RGN_DIFF);
     InvalidateRgn(AControl.Handle, LRegion1, AErase);
     DeleteObject(LRegion2);

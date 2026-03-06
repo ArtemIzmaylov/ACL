@@ -375,11 +375,27 @@ begin
   Result := GtkLoadStockIcon(nil, Map[AType], ASize);
 end;
 
+function LoadSystemCursor(const AName: Pgchar): HCURSOR;
+var
+  LCursor: TGtk3Cursor;
+  LHandle: PGdkCursor;
+begin
+  LCursor := TGtk3Cursor.Create(GDK_Arrow);
+  LHandle := gdk_cursor_new_from_name(gdk_display_get_default, AName);
+  // TODO: make the patch to overload version of TGtk3Cursor.Create
+  if LHandle <> nil then
+  begin
+    LCursor.Handle^.unref;
+    PPointer(@LCursor.Handle)^ := LHandle;
+  end;
+  Result := HCURSOR(LCursor);
+end;
+
 procedure LoadSystemThemedCursors;
 begin
-  Screen.Cursors[crDrag]       := HCURSOR(TGtk3Cursor.Create(GDK_Arrow));
-  Screen.Cursors[crNoDrop]     := HCURSOR(TGtk3Cursor.Create(GDK_X_CURSOR));
-  Screen.Cursors[crDragRemove] := HCURSOR(TGtk3Cursor.Create(GDK_X_CURSOR));
+  Screen.Cursors[crDrag]       := LoadSystemCursor('default');
+  Screen.Cursors[crNoDrop]     := LoadSystemCursor('not-allowed');
+  Screen.Cursors[crDragRemove] := LoadSystemCursor('not-allowed');
 end;
 
 procedure ReleaseInputGrab;
@@ -1028,13 +1044,12 @@ begin
   end;
 
   LWindow := PGtkWindow(LWidget.Widget);
-  // LCL: use this if pure SetCapture(0) does not work under wayland (commented)
-  // AIMP: DblClick -> ShowModal -> Modal form does not react on mouse
-  if LWidget.FParams.ExStyle and WS_EX_NOACTIVATE = 0 then // hint, drag-image, etc
-    ReleaseInputGrab;
-
   if LForm.HandleObjectShouldBeVisible then
   begin
+    // LCL: use this if pure SetCapture(0) does not work under wayland (commented)
+    // AIMP: DblClick -> ShowModal -> Modal form does not react on mouse
+    if LWidget.FParams.ExStyle and WS_EX_NOACTIVATE = 0 then // hint, drag-image, etc
+      ReleaseInputGrab;
     if LForm = Application.MainForm then
       LogEntry(acGeneralLogFileName, 'Main', 'WindowShow');
 

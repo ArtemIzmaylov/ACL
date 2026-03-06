@@ -1204,7 +1204,13 @@ begin
     Exit;
   end;
 {$ENDIF}
+{$IFDEF MSWINDOWS}
+  SetWindowRgn(AWnd, ARegion, False);
+  if ARedraw then // так меньше фликает
+    RedrawWindow(AWnd, nil, 0, RDW_INVALIDATE or RDW_UPDATENOW);
+{$ELSE}
   SetWindowRgn(AWnd, ARegion, ARedraw);
+{$ENDIF}
 {$IFDEF FPC}
   DeleteObject(ARegion);
 {$ENDIF}

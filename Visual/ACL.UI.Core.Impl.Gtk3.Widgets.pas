@@ -56,6 +56,7 @@ uses
   ACL.Utils.Common,
   ACL.Utils.DPIAware,
   ACL.Utils.Logger,
+  ACL.Utils.Shell,
   // VCL
   Graphics,
   Controls,
@@ -87,6 +88,8 @@ type
     class function OnAlphaExpose(AWidget: PGtkWindow;
       AContext: Pcairo_t; AImpl: TGtk3Widget): gboolean; cdecl; static;
     class function OnMapped(AWindow: PGtkWindow; AEvent: PGdkEventAny;
+      AImpl: TACLGtk3AdvancedWindow): gboolean; cdecl; static;
+    class function OnState(AWidget: PGtkWidget; AEvent: PGdkEvent;
       AImpl: TACLGtk3AdvancedWindow): gboolean; cdecl; static;
   public
     function ClientToScreen(var P: TPoint): boolean; override;
@@ -247,7 +250,7 @@ procedure TACLGtk3CustomControl.InitializeWidget;
 begin
   inherited InitializeWidget;
   SetBorderStyle(TWinControlAccess(LCLObject).BorderStyle);
-  SetVisible(LCLObject.Showing);
+  SetVisible(LCLObject.Visible);
 end;
 
 procedure TACLGtk3CustomControl.SetBorderStyle(AValue: TBorderStyle);
@@ -328,6 +331,9 @@ function TACLGtk3AdvancedWindow.DeliverMessage(var Msg; const AIsInput: Boolean)
 var
   LMsg: TMessage absolute Msg;
 begin
+  // допускаем генерацию только из нашего OnState, штатная лазаревская имлементация кривая
+  if (LMsg.Msg = LM_ACTIVATE) and (TLMActivate(Msg).ActiveWindow <> 0) then
+    Exit(0);
   // Положение DropDown-окна сбрасывается в (0,0) при инициализации показа на Wayland.
   if (LMsg.Msg = LM_MOVE) and (wtWindow in WidgetType) and (BorderStyle = bsNone) then
   begin
@@ -362,6 +368,7 @@ procedure TACLGtk3AdvancedWindow.InitializeWidget;
 begin
   inherited;
   g_signal_connect_data(Widget, 'map-event', TGCallback(@OnMapped), Self, nil, G_CONNECT_DEFAULT);
+  g_signal_connect_data(Widget, 'window-state-event', TGCallback(@OnState), Self, nil, G_CONNECT_DEFAULT);
 end;
 
 class function TACLGtk3AdvancedWindow.OnAlphaExpose(
@@ -378,12 +385,43 @@ end;
 
 class function TACLGtk3AdvancedWindow.OnMapped(AWindow: PGtkWindow;
   AEvent: PGdkEventAny; AImpl: TACLGtk3AdvancedWindow): gboolean; cdecl;
+var
+  LRect: TRect;
 begin
   if AImpl.LCLObject = Application.MainForm then
     LogEntry(acGeneralLogFileName, 'Main', 'WindowMapped');
-  AImpl.SetBounds(
-    AImpl.LCLObject.Left, AImpl.LCLObject.Top,
-    AImpl.LCLObject.Width, AImpl.LCLObject.Height);
+  LRect := AImpl.LCLObject.BoundsRect;
+  // Manjaro 26, KDE
+  // У окон со сложным лейаутом не показывается кнопка закрытия до тех пор,
+  // пока не поресайзишь окно. По началу я грешил на кривые декорации, но
+  // оказалось, что кнопка есть, просто она рисуется за пределами экрана.
+  // Видимо, комплексный лейаут формы что-то где-то залочил и зона заголовка
+  // не пересчиталась.
+  if (AImpl.FParams.ExStyle and WS_EX_LAYERED = 0) and (ShellDesktopEnv = sdeKDE) then
+  begin
+    AImpl.SetBounds(LRect.Left, LRect.Top, LRect.Width + 1, LRect.Height);
+    while g_main_context_pending(nil) do
+      g_main_context_iteration(nil, false);
+  end;
+  AImpl.SetBounds(LRect.Left, LRect.Top, LRect.Width, LRect.Height);
+  Result := False;
+end;
+
+class function TACLGtk3AdvancedWindow.OnState(AWidget: PGtkWidget;
+  AEvent: PGdkEvent; AImpl: TACLGtk3AdvancedWindow): gboolean; cdecl;
+var
+  LMessage: TLMActivate;
+  LState: TGdkWindowState;
+begin
+  if GDK_WINDOW_STATE_FOCUSED in AEvent^.window_state.changed_mask then
+  begin
+    LState := AEvent^.window_state.new_window_state;
+    LMessage := Default(TLMActivate);
+    LMessage.Msg := LM_ACTIVATE;
+    LMessage.Active := IfThen(GDK_WINDOW_STATE_FOCUSED in LState, WA_ACTIVE, WA_INACTIVE);
+    LMessage.Minimized := GDK_WINDOW_STATE_ICONIFIED in LState;
+    AImpl.DeliverMessage(LMessage);
+  end;
   Result := False;
 end;
 
