@@ -21,6 +21,7 @@ uses
 {$IFNDEF MSWINDOWS}
   LCLIntf,
 {$ENDIF}
+  Messages,
   // System
   {System.}Classes,
   {System.}Math,
@@ -37,6 +38,7 @@ uses
   ACL.ObjectLinks,
   ACL.Threading,
   ACL.Timers,
+  ACL.UI.Application,
   ACL.UI.Controls.Base,
   ACL.UI.HintWindow,
   ACL.Utils.Common,
@@ -267,20 +269,36 @@ begin
 end;
 
 procedure TACLTrayIcon.MouseEnter;
+var
+  LMsg: TMessage;
 begin
   Inc(FTrayIconIsMouseAtIcon);
+  if FIconImpl <> nil then
+  begin
+    LMsg := Default(TMessage);
+    LMsg.Msg := CM_MOUSEENTER;
+    FIconImpl.Dispatch(LMsg);
+  end;
   CallNotifyEvent(Self, OnMouseEnter);
 end;
 
 procedure TACLTrayIcon.MouseMove;
 begin
+  FLastMousePos := MouseCursorPos; // first
   TACLMouseTracker.Start(Self);
-  FLastMousePos := MouseCursorPos;
 end;
 
 procedure TACLTrayIcon.MouseLeave;
+var
+  LMsg: TMessage;
 begin
   Dec(FTrayIconIsMouseAtIcon);
+  if FIconImpl <> nil then
+  begin
+    LMsg := Default(TMessage);
+    LMsg.Msg := CM_MOUSELEAVE;
+    FIconImpl.Dispatch(LMsg);
+  end;
   CallNotifyEvent(Self, OnMouseExit);
 end;
 

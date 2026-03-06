@@ -46,6 +46,8 @@ type
     acAccentColor, acColorSchema, acScalingMode, acDefaultFont);
   TACLApplicationChanges = set of TACLApplicationChange;
 
+  TACLMouseWheelHookProc = procedure (Enable: LongBool; Handler: TWndHandle); stdcall;
+
   { IACLApplicationListener }
 
   IACLApplicationListener = interface
@@ -64,13 +66,15 @@ type
     class var FActualDarkMode: Boolean;
     class var FActualDarkModeForSystem: Boolean;
     class var FCatchExceptions: Boolean;
+    class var FChangeAggregator: TACLTimer;
     class var FColorSchema: TACLColorSchema;
     class var FColorSchemaUseNative: Boolean;
-    class var FChangeAggregator: TACLTimer;
     class var FDarkMode: TACLBoolean;
     class var FDefaultFont: TFont;
     class var FGlobalSettings: TObject;
     class var FListeners: TACLListenerList;
+    class var FMouseWheelHook: TACLMouseWheelHookProc;
+    class var FMouseWheelHookLibrary: HMODULE;
     class var FTargetDPI: Integer;
     class var FVersion: string;
 
@@ -109,6 +113,9 @@ type
     class function GetTargetDPI(AControl: TWinControl): Integer;
     class function IsDarkMode: Boolean;
     class function IsDarkModeOfSystemBar: Boolean;
+
+    class procedure InitMouseWheeHook(const AHookLibName: string);
+    class property MouseWheelHook: TACLMouseWheelHookProc read FMouseWheelHook;
 
     class property AccentColor: TAlphaColor read FActualAccentColor;
     class property CatchExceptions: Boolean read FCatchExceptions write FCatchExceptions;
@@ -162,6 +169,9 @@ end;
 
 class destructor TACLApplication.Destroy;
 begin
+  if Assigned(MouseWheelHook) then
+    MouseWheelHook(False, 0);
+  acFreeLibrary(FMouseWheelHookLibrary);
   FreeAndNil(FGlobalSettings);
   FreeAndNil(FChangeAggregator);
   FreeAndNil(FDefaultFont);
@@ -244,6 +254,12 @@ begin
     Result := TargetDPI
   else
     Result := acGetTargetDPI(AControl);
+end;
+
+class procedure TACLApplication.InitMouseWheeHook(const AHookLibName: string);
+begin
+  FMouseWheelHookLibrary := acLoadLibrary(AHookLibName);
+  FMouseWheelHook := acGetProcAddress(FMouseWheelHookLibrary, 'MouseWheelHook');
 end;
 
 class function TACLApplication.IsDarkMode: Boolean;

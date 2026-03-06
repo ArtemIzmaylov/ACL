@@ -1,5 +1,4 @@
 ﻿uses
-  Winapi.Messages,
   Winapi.ShellApi,
   Winapi.Windows,
   // ACL
@@ -19,6 +18,8 @@ type
     FIconData: TNotifyIconData;
     FTimestamp: Cardinal;
     function Build: PNotifyIconDataW;
+    procedure CMMouseEnter(var Message: TMessage); message CM_MOUSEENTER;
+    procedure CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;
     procedure WndProc(var Message: TMessage);
   public
     class constructor Create;
@@ -46,6 +47,8 @@ type
   destructor TACLTrayIconImpl.Destroy;
   begin
     Shell_NotifyIconW(NIM_DELETE, Build);
+    if Assigned(TACLApplication.MouseWheelHook) then
+      TACLApplication.MouseWheelHook(False, 0);
     acWndFree(FHandle);
     inherited;
   end;
@@ -101,6 +104,18 @@ type
     Result := @FIconData;
   end;
 
+  procedure TACLTrayIconImpl.CMMouseEnter(var Message: TMessage);
+  begin
+    if Assigned(TACLApplication.MouseWheelHook) then
+      TACLApplication.MouseWheelHook(True, FHandle);
+  end;
+
+  procedure TACLTrayIconImpl.CMMouseLeave(var Message: TMessage);
+  begin
+    if Assigned(TACLApplication.MouseWheelHook) then
+      TACLApplication.MouseWheelHook(False, 0);
+  end;
+
   procedure TACLTrayIconImpl.Update;
   begin
     Shell_NotifyIconW(NIM_MODIFY, Build);
@@ -111,6 +126,11 @@ type
     try
       if Message.Msg = WM_QUERYENDSESSION then
         Message.Result := 1;
+      if Message.Msg = WM_MOUSEWHEEL then
+      begin
+        Owner.MouseWheel(TWMMouseWheel(Message).WheelDelta > 0);
+        Message.Result := 1;
+      end;
       if Message.Msg = WM_TASKBARCREATED then
       begin
         FTimestamp := TACLThread.Timestamp;
@@ -136,6 +156,7 @@ type
           WM_MOUSEMOVE:
             // При запуске приложения приходит сообщение, что пользователь навел
             // указатель мыши на иконку в трее, хотя это не так. Похоже на баг винды.
+            // TODO: migrate to the Shell_NotifyIconGetRect
             if TACLThread.IsTimeout(FTimestamp, 2000) then
               Owner.MouseMove
             else
