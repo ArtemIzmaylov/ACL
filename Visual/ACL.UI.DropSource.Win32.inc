@@ -54,6 +54,8 @@ type
     // IDropSource
     function GiveFeedback(AEffect: LongInt): HRESULT; stdcall;
     function QueryContinueDrag(AEscapePressed: LongBool; AKeyState: LongInt): HRESULT; stdcall;
+  public
+    procedure Execute; override;
   end;
 
   { TACLDropFormatEtcList }
@@ -138,6 +140,14 @@ type
   end;
 
   { TACLDropSourceImpl }
+
+  procedure TACLDropSourceImpl.Execute;
+  begin
+    if IsWine then
+      ExecuteCore
+    else
+      TThread.CreateAnonymousThread(ExecuteCore).Start;
+  end;
 
   procedure TACLDropSourceImpl.ExecuteImpl;
   var

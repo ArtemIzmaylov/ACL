@@ -7,7 +7,9 @@ uses
   LazGObject2,
   LazGdk3,
   LazGtk3,
-  LCLType;
+  LCLType,
+  // ACL
+  ACL.UI.Core.Impl.Gtk3;
 
 type
 
@@ -17,7 +19,7 @@ type
   TACLDropSourceImpl = class(TACLDropSource)
   private
     FContext: PGdkDragContext;
-    FEvent: TACLEvent;
+    FDone: Boolean;
   protected
     procedure ExecuteImpl; override;
   public
@@ -47,8 +49,7 @@ type
         if GDK_ACTION_LINK in LActions then
           Include(impl.FDropResult, dsaLink);
       finally
-        if impl.fEvent <> nil then
-          impl.fEvent.Signal;
+        impl.FDone := True;
       end;
     except
       Application.HandleException(nil);
@@ -113,14 +114,23 @@ type
         gtk_target_list_add(LList, PGdkAtom(DataProviders[I].GetFormat.cfFormat), 0, 0);
     end;
 
-    FEvent := TACLEvent.Create(True, False);
+    FDone := False;
+    LWidget := TGtk3Widget(LControl.Handle).GetContainerWidget;
+    g_signal_connect_data(LWidget, 'drag_data_get', @doGtkDropGetData, Self, nil, G_CONNECT_DEFAULT);
+    g_signal_connect_data(LWidget, 'drag_end', @doGtkDropEnd, Self, nil, G_CONNECT_DEFAULT);
     try
-      LWidget := TGtk3Widget(LControl.Handle).GetContainerWidget;
-      g_signal_connect_data(LWidget, 'drag_data_get', @doGtkDropGetData, Self, nil, G_CONNECT_DEFAULT);
-      g_signal_connect_data(LWidget, 'drag_end', @doGtkDropEnd, Self, nil, G_CONNECT_DEFAULT);
       try
-        FContext := LWidget.drag_begin_with_coordinates(LList, LActions, 1, nil, -1, -1);
-        FEvent.WaitFor;
+        FContext := LWidget^.drag_begin_with_coordinates(LList, LActions, 1, nil, -1, -1);
+        if FContext <> nil then
+        repeat
+          try
+            TGtkApp.ProcessMessages;
+          except
+            Application.HandleException(Self);
+          end;
+          Application.Idle(True);
+        until FDone;
+      finally
         FContext := nil;
         //* Bug in GTK.  If a drag is initiated using gtk_drag_begin and the
         //* mouse is released immediately, the mouse and keyboard remain
@@ -128,15 +138,13 @@ type
         //* whenever the drag is terminated.
         //gdk_keyboard_ungrab(GDK_CURRENT_TIME);
         gdk_pointer_ungrab(GDK_CURRENT_TIME);
-      finally
-        if Control <> nil then
-        begin
-          gtk_signal_disconnect_by_func(LWidget, @doGtkDropGetData, Self);
-          gtk_signal_disconnect_by_func(LWidget, @doGtkDropEnd, Self);
-        end;
       end;
     finally
-      FreeAndNil(FEvent);
+      if Control <> nil then
+      begin
+        gtk_signal_disconnect_by_func(LWidget, @doGtkDropGetData, Self);
+        gtk_signal_disconnect_by_func(LWidget, @doGtkDropEnd, Self);
+      end;
     end;
   end;
 
@@ -149,6 +157,5 @@ type
     except
       // do nothing
     end;
-    if FEvent <> nil then
-      FEvent.Signal;
+    FDone := True;
   end;

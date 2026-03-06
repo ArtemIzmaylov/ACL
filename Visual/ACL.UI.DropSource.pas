@@ -170,7 +170,10 @@ type
     class function IsActive: Boolean;
     destructor Destroy; override;
     procedure Cancel; virtual;
-    procedure Execute; // The DropSource will be automatically freed after execution
+    /// <summary>
+    /// The DropSource will be automatically freed after execution
+    /// </summary>
+    procedure Execute; virtual;
     //# Properties
     property AllowedActions: TACLDropSourceActions read FAllowedActions write FAllowedActions;
     property DataProviders: TACLDragDropDataProviders read FDataProviders;
@@ -465,10 +468,7 @@ end;
 
 procedure TACLDropSource.Execute;
 begin
-  if IsWine then
-    ExecuteCore
-  else
-    TThread.CreateAnonymousThread(ExecuteCore).Start;
+  ExecuteCore;
 end;
 
 procedure TACLDropSource.ExecuteCore;

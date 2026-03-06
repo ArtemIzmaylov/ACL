@@ -6,7 +6,9 @@ uses
   Gtk2,
   Gtk2Def,
   Gtk2Int,
-  Gtk2Proc;
+  Gtk2Proc,
+  // ACL
+  ACL.UI.Core.Impl.Gtk2;
 
 type
 
@@ -16,7 +18,7 @@ type
   TACLDropSourceImpl = class(TACLDropSource)
   private
     FContext: PGdkDragContext;
-    FEvent: TACLEvent;
+    FDone: Boolean;
   protected
     procedure ExecuteImpl; override;
   public
@@ -39,8 +41,7 @@ type
             impl.FDropResult := [dsaLink];
         end;
       finally
-        if impl.fEvent <> nil then
-          impl.fEvent.Signal;
+        Impl.FDone := True;
       end;
     except
       Application.HandleException(nil);
@@ -105,14 +106,23 @@ type
         gtk_target_list_add(LList, DataProviders[I].GetFormat.cfFormat, 0, 0);
     end;
 
-    FEvent := TACLEvent.Create(True, False);
+    FDone := False;
+    LWidget := PGtkWidget(LControl.Handle);
+    ConnectSignal(PGtkObject(LWidget), 'drag_data_get', @doGtkDropGetData, Self);
+    ConnectSignal(PGtkObject(LWidget), 'drag_end', @doGtkDropEnd, Self);
     try
-      LWidget := PGtkWidget(LControl.Handle);
-      ConnectSignal(PGtkObject(LWidget), 'drag_data_get', @doGtkDropGetData, Self);
-      ConnectSignal(PGtkObject(LWidget), 'drag_end', @doGtkDropEnd, Self);
+      FContext := gtk_drag_begin(LWidget, LList, LActions, 1, nil);
       try
-        FContext := gtk_drag_begin(LWidget, LList, LActions, 1, nil);
-        FEvent.WaitFor;
+        if FContext <> nil then
+        repeat
+          try
+            TGtkApp.ProcessMessages;
+          except
+            Application.HandleException(Self);
+          end;
+          Application.Idle(True);
+        until FDone;
+      finally
         FContext := nil;
         //* Bug in GTK.  If a drag is initiated using gtk_drag_begin and the
         //* mouse is released immediately, the mouse and keyboard remain
@@ -120,15 +130,13 @@ type
         //* whenever the drag is terminated.
         gdk_keyboard_ungrab(GDK_CURRENT_TIME);
         gdk_pointer_ungrab(GDK_CURRENT_TIME);
-      finally
-        if Control <> nil then
-        begin
-          gtk_signal_disconnect_by_func(PGtkObject(LWidget), @doGtkDropGetData, Self);
-          gtk_signal_disconnect_by_func(PGtkObject(LWidget), @doGtkDropEnd, Self);
-        end;
       end;
     finally
-      FreeAndNil(FEvent);
+      if Control <> nil then
+      begin
+        gtk_signal_disconnect_by_func(PGtkObject(LWidget), @doGtkDropGetData, Self);
+        gtk_signal_disconnect_by_func(PGtkObject(LWidget), @doGtkDropEnd, Self);
+      end;
     end;
   end;
 
@@ -141,6 +149,5 @@ type
     except
       // do nothing
     end;
-    if FEvent <> nil then
-      FEvent.Signal;
+    FDone := True;
   end;
