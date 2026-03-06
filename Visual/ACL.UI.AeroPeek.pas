@@ -527,11 +527,8 @@ begin
 end;
 
 procedure TACLAeroPeek.LivePreviewTimerHandler(Sender: TObject);
-var
-  AClassName: string;
 begin
-  AClassName := acGetClassName(WindowFromPoint(MouseCursorPos));
-  if acContains(AClassName, ['TaskListThumbnailWnd', 'MSTaskListWClass', 'ToolbarWindow32'], True) then
+  if acContains(acGetClassName(MouseCurrentWindow), ['TaskListThumbnailWnd', 'MSTaskListWClass', 'ToolbarWindow32'], True) then
     UpdateLivePreviews
   else
     StopLivePreviewTimer;

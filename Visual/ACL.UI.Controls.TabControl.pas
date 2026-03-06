@@ -6,7 +6,7 @@
 //  Purpose:   TabControl/PageControl
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -239,8 +239,8 @@ type
     // Drawing
     procedure DrawContentAreaBackground(ACanvas: TCanvas); virtual;
     procedure DrawItem(ACanvas: TCanvas; AViewItem: TACLTabViewItem); virtual;
-    procedure DrawItems(ACanvas: TCanvas); virtual;
     procedure DrawItemText(ACanvas: TCanvas; AViewItem: TACLTabViewItem); virtual;
+    procedure DrawItems(ACanvas: TCanvas); virtual;
     procedure Paint; override;
 
     // Keyboard
@@ -835,7 +835,7 @@ begin
     begin
       LDib := TACLDib.Create(AViewItem.Bounds);
       try
-        acBitBlt(LDib.Handle, ACanvas.Handle, LDib.ClientRect, AViewItem.Bounds.TopLeft);
+        LDib.CopyRect(LDib.ClientRect, ACanvas, AViewItem.Bounds);
         Style.DrawTab(LDib.Canvas, LDib.ClientRect, AViewItem.Active, OptionsView.Style);
         LDib.Flip(False, True);
         LDib.DrawCopy(ACanvas, AViewItem.Bounds.TopLeft);
@@ -978,7 +978,7 @@ end;
 
 function TACLCustomTabControl.IsMouseAtControl: Boolean;
 begin
-  Result := HandleAllocated and (WindowFromPoint(MouseCursorPos) = Handle);
+  Result := HandleAllocated and (MouseCurrentWindow = Handle);
 end;
 
 procedure TACLCustomTabControl.MouseDown(
@@ -1362,7 +1362,8 @@ constructor TACLPageControlPage.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   ControlStyle := ControlStyle + [csAcceptsControls];
-  FPageVisible := True;
+  PageVisible := True;
+  Visible := False;
 end;
 
 destructor TACLPageControlPage.Destroy;

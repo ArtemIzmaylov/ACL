@@ -3019,7 +3019,7 @@ var
 begin
   LFilterEvent := SubClass.OnFilter;
   LAllowCollapseGroups := SubClass.OptionsBehavior.GroupsAllowCollapse;
-  if (SubClass.OptionsBehavior.IncSearchMode = ismFilter) and SubClass.IncSearch.Active then
+  if (OptionsBehavior.IncSearchMode = ismFilter) and SubClass.IncSearch.Active then
     LFilterProc := SubClass.IncSearchContains
   else
     LFilterProc := nil;
@@ -4905,12 +4905,14 @@ begin
   Viewport := Viewport + Point(ADeltaX, ADeltaY);
 end;
 
-procedure TACLTreeListSubClass.ScrollByLines(ALines: Integer; ADirection: TACLMouseWheelDirection);
+procedure TACLTreeListSubClass.ScrollByLines(
+  ALines: Integer; ADirection: TACLMouseWheelDirection);
 begin
   ContentViewInfo.ScrollByLines(ALines, ADirection);
 end;
 
-procedure TACLTreeListSubClass.ScrollTo(AObject: TObject; AMode: TACLScrollToMode; AColumn: TACLTreeListColumn = nil);
+procedure TACLTreeListSubClass.ScrollTo(AObject: TObject;
+  AMode: TACLScrollToMode; AColumn: TACLTreeListColumn = nil);
 var
   ADelta: TPoint;
 begin
@@ -4929,7 +4931,8 @@ begin
   ContentViewInfo.ScrollVertically(AScrollCode);
 end;
 
-procedure TACLTreeListSubClass.GroupBy(AColumn: TACLTreeListColumn; AResetPrevSortingParams: Boolean = False);
+procedure TACLTreeListSubClass.GroupBy(
+  AColumn: TACLTreeListColumn; AResetPrevSortingParams: Boolean = False);
 begin
   if AColumn <> nil then
   begin

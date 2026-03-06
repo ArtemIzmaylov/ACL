@@ -330,8 +330,15 @@ begin
   if AStartPos > AEndPos then
     Exit(0);
 
-  LStrToFindLength := Length(AStrToFind);
   AEndPos := Min(AEndPos, Length(AStr));
+  LStrToFindLength := Length(AStrToFind);
+  if LStrToFindLength = 0 then
+  begin
+    if AFromEnd then
+      Exit(AEndPos);
+    Exit(AStartPos);
+  end;
+
   LIterationCount := AEndPos - AStartPos - LStrToFindLength + 1;
   if LIterationCount < 0 then
     Exit(0);
