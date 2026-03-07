@@ -3,10 +3,10 @@
 //  Project:   Artem's Controls Library aka ACL
 //             v7.0
 //
-//  Purpose:   General Dialogs (Implementation for Windows)
+//  Purpose:   General Dialogs implementation for Windows
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2024
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -40,6 +40,7 @@ uses
   Vcl.Graphics,
 
   // ACL
+  ACL.Classes,
   ACL.Classes.StringList,
   ACL.Graphics,
   ACL.UI.Dialogs,
@@ -48,6 +49,21 @@ uses
   ACL.Utils.Strings;
 
 type
+
+  { TACLFileDialogImpl }
+
+  TACLFileDialogImpl = class(TACLUnknownObject)
+  strict private
+    FDefaultExts: string;
+  protected
+    FDialog: TACLFileDialog;
+    FSaveDialog: Boolean;
+
+    function GetDefaultExts(out APtr: PWideChar): Boolean;
+  public
+    class function Create(ADialog: TACLFileDialog; ASaveDialog: Boolean): TACLFileDialogImpl; static;
+    function Execute(AOwnerWnd: TWndHandle): Boolean; virtual; abstract;
+  end;
 
   { TACLFileDialogOldImpl }
 
@@ -67,9 +83,9 @@ type
     procedure PrepareConst(var AStruct: TOpenFilenameW);
     procedure PrepareFlags(var AStruct: TOpenFilenameW);
   public
-    constructor Create(AOwnedWnd: HWND; ADialog: TACLFileDialog; ASaveDialog: Boolean);
+    constructor Create(ADialog: TACLFileDialog; ASaveDialog: Boolean);
     destructor Destroy; override;
-    function Execute: Boolean; override;
+    function Execute(AOwnerWnd: TWndHandle): Boolean; override;
   end;
 
   { TACLFileDialogVistaImpl }
@@ -96,17 +112,14 @@ type
       const psi: IShellItem; out pResponse: Cardinal): HRESULT; virtual; stdcall;
     function OnTypeChange(const pfd: IFileDialog): HRESULT; virtual; stdcall;
   public
+    constructor Create(ADialog: TACLFileDialog; ADialogIntf: IFileDialog; ASaveDialog: Boolean);
     destructor Destroy; override;
-    function Execute: Boolean; override;
-    class function TryCreate(AOwnerWnd: TWndHandle;
-      ADialog: TACLFileDialog; ASaveDialog: Boolean): TACLFileDialogImpl;
+    function Execute(AOwnerWnd: TWndHandle): Boolean; override;
+    class function TryCreate(ADialog: TACLFileDialog; ASaveDialog: Boolean): TACLFileDialogImpl;
   end;
 
 function LoadDialogIcon(AOwnerWnd: HWND; AType: TMsgDlgType; ASize: Integer): TACLDib;
 implementation
-
-type
-  TACLFileDialogAccess = class(TACLFileDialog);
 
 function LoadDialogIcon(AOwnerWnd: HWND; AType: TMsgDlgType; ASize: Integer): TACLDib;
 
@@ -143,28 +156,60 @@ begin
     Result := nil;
 end;
 
+{ TACLFileDialogImpl }
+
+class function TACLFileDialogImpl.Create(
+  ADialog: TACLFileDialog; ASaveDialog: Boolean): TACLFileDialogImpl;
+begin
+  Result := TACLFileDialogVistaImpl.TryCreate(ADialog, ASaveDialog);
+  if Result = nil then
+    Result := TACLFileDialogOldImpl.Create(ADialog, ASaveDialog);
+end;
+
+function TACLFileDialogImpl.GetDefaultExts(out APtr: PWideChar): Boolean;
+var
+  LParts: TStringDynArray;
+begin
+  FDefaultExts := '';
+  if FSaveDialog then
+  begin
+    acSplitString(FDialog.Filter, '|', LParts);
+    for var I := 0 to Length(LParts) div 2 - 1 do
+    begin
+      if (FDefaultExts.Length > 0) and (FDefaultExts[FDefaultExts.Length] <> ';') then
+        FDefaultExts := FDefaultExts + ';';
+      FDefaultExts := FDefaultExts + StringReplace(LParts[2 * I + 1], '*.', '', [rfReplaceAll]);
+    end;
+    if (FDefaultExts.Length > 0) and (FDefaultExts[FDefaultExts.Length] = ';') then
+      Delete(FDefaultExts, Length(FDefaultExts), 1);
+    APtr := PWideChar(FDefaultExts);
+  end;
+  Result := FDefaultExts <> '';
+end;
+
 { TACLFileDialogOldImpl }
 
-constructor TACLFileDialogOldImpl.Create(
-  AOwnedWnd: HWND; ADialog: TACLFileDialog; ASaveDialog: Boolean);
+constructor TACLFileDialogOldImpl.Create(ADialog: TACLFileDialog; ASaveDialog: Boolean);
+var
+  LDefaultExt: PWideChar;
 begin
-  inherited Create(AOwnedWnd, ADialog, ASaveDialog);
-  FTempInitialPath := TACLFileDialogAccess(ADialog).GetActualInitialDir;
+  FDialog := ADialog;
+  FSaveDialog := ASaveDialog;
+  FTempInitialPath := ADialog.GetActualInitialDir;
   FTempFilter := AllocFilterStr(ADialog.Filter);
   FTempBufferSize := MAXWORD;
   FTempBuffer := AllocMem(FTempBufferSize);
   ZeroMemory(@FStruct, SizeOf(FStruct));
   FStruct.FlagsEx := 0;
   FStruct.hInstance := HINSTANCE;
-  FStruct.hWndOwner := OwnerWnd;
   FStruct.lpfnHook := DialogHook;
   FStruct.lpstrFilter := PWideChar(FTempFilter);
   FStruct.lpstrInitialDir := PWideChar(FTempInitialPath);
   FStruct.lpstrTitle := PWideChar(ADialog.Title);
   FStruct.lStructSize := SizeOf(TOpenFilenameW);
   FStruct.nFilterIndex := ADialog.FilterIndex;
-  if FDefaultExts <> '' then
-    FStruct.lpstrDefExt := PWideChar(FDefaultExts);
+  if GetDefaultExts(LDefaultExt) then
+    FStruct.lpstrDefExt := LDefaultExt;
   PrepareFlags(FStruct);
   PrepareConst(FStruct);
 end;
@@ -173,20 +218,6 @@ destructor TACLFileDialogOldImpl.Destroy;
 begin
   FreeMemAndNil(FTempBuffer);
   inherited Destroy;
-end;
-
-function TACLFileDialogOldImpl.Execute: Boolean;
-begin
-  if SaveDialog then
-    Result := GetSaveFileNameW(FStruct)
-  else
-    Result := GetOpenFileNameW(FStruct);
-
-  if Result then
-  begin
-    GetFileNames(Dialog.Files);
-    Dialog.FilterIndex := FStruct.nFilterIndex;
-  end;
 end;
 
 function TACLFileDialogOldImpl.AllocFilterStr(const S: string): string;
@@ -207,6 +238,22 @@ begin
   end;
 end;
 
+function TACLFileDialogOldImpl.Execute(AOwnerWnd: TWndHandle): Boolean;
+begin
+  FStruct.hWndOwner := AOwnerWnd;
+
+  if FSaveDialog then
+    Result := GetSaveFileNameW(FStruct)
+  else
+    Result := GetOpenFileNameW(FStruct);
+
+  if Result then
+  begin
+    GetFileNames(FDialog.Files);
+    FDialog.FilterIndex := FStruct.nFilterIndex;
+  end;
+end;
+
 procedure TACLFileDialogOldImpl.PrepareConst(var AStruct: TOpenFilenameW);
 const
   MultiSelectBufferSize = High(Word) - 16;
@@ -216,7 +263,7 @@ begin
   AStruct.nMaxFile := FTempBufferSize - 2; // two zeros in end
   ZeroMemory(FTempBuffer, FTempBufferSize);
   AStruct.lpstrFile := FTempBuffer;
-  acStrLCopy(FTempBuffer, Dialog.FileName, Length(Dialog.Filename));
+  acStrLCopy(FTempBuffer, FDialog.FileName, Length(FDialog.Filename));
 end;
 
 procedure TACLFileDialogOldImpl.PrepareFlags(var AStruct: TOpenFilenameW);
@@ -232,7 +279,7 @@ begin
   AStruct.Flags := OFN_ENABLEHOOK;
   for Option := Low(TACLFileDialogOption) to High(TACLFileDialogOption) do
   begin
-    if Option in Dialog.Options then
+    if Option in FDialog.Options then
       AStruct.Flags := AStruct.Flags or OpenOptions[Option];
   end;
   AStruct.Flags := AStruct.Flags xor OFN_EXPLORER;
@@ -278,7 +325,7 @@ procedure TACLFileDialogOldImpl.GetFileNames(AFileList: TACLStringList);
   end;
 
 begin
-  if not (ofAllowMultiSelect in Dialog.Options) or SaveDialog then
+  if FSaveDialog or not (ofAllowMultiSelect in FDialog.Options) then
     AFileList.Add(FTempBuffer)
   else
     ExtractFileNames(FTempBuffer);
@@ -307,22 +354,30 @@ class function TACLFileDialogOldImpl.DialogHook(Wnd: HWND; Msg: UINT; WParam: WP
   end;
 
 var
-  AParent: HWND;
+  LParent: HWND;
 begin
   if Msg = WM_INITDIALOG then
     CenterWindow(Wnd)
   else
     if (Msg = WM_NOTIFY) and (POFNotify(LParam)^.hdr.code = CDN_INITDONE) then
     begin
-      AParent := GetWindowLong(Wnd, GWL_HWNDPARENT);
-      CenterWindow(AParent);
-      SetForegroundWindow(AParent);
+      LParent := GetWindowLong(Wnd, GWL_HWNDPARENT);
+      CenterWindow(LParent);
+      SetForegroundWindow(LParent);
     end;
 
   Result := DefWindowProc(Wnd, Msg, WParam, LParam);
 end;
 
 { TACLFileDialogVistaImpl }
+
+constructor TACLFileDialogVistaImpl.Create(
+  ADialog: TACLFileDialog; ADialogIntf: IFileDialog; ASaveDialog: Boolean);
+begin
+  FDialog := ADialog;
+  FFileDialog := ADialogIntf;
+  FSaveDialog := ASaveDialog;
+end;
 
 destructor TACLFileDialogVistaImpl.Destroy;
 begin
@@ -331,18 +386,18 @@ begin
   inherited;
 end;
 
-function TACLFileDialogVistaImpl.Execute: Boolean;
+function TACLFileDialogVistaImpl.Execute(AOwnerWnd: TWndHandle): Boolean;
 var
-  AFilterIndex: Cardinal;
+  LFilterIndex: Cardinal;
 begin
   Initialize;
   InitializeFilter;
-  Result := Succeeded(FFileDialog.Show(OwnerWnd));
+  Result := Succeeded(FFileDialog.Show(AOwnerWnd));
   if Result then
   begin
-    QuerySeletectedFiles(Dialog.Files);
-    if Succeeded(FFileDialog.GetFileTypeIndex(AFilterIndex)) then
-      Dialog.FilterIndex := AFilterIndex;
+    QuerySeletectedFiles(FDialog.Files);
+    if Succeeded(FFileDialog.GetFileTypeIndex(LFilterIndex)) then
+      FDialog.FilterIndex := LFilterIndex;
   end;
 end;
 
@@ -353,58 +408,57 @@ const
     FOS_FILEMUSTEXIST, 0, FOS_FORCESHOWHIDDEN, 0
   );
 var
-  ACookie: DWORD;
-  AFlags: DWORD;
-  AOption: TACLFileDialogOption;
-  ASelectedPath: UnicodeString;
-  AShellItem: IShellItem;
+  LCookie: DWORD;
+  LDefaultExts: PWideChar;
+  LFlags: DWORD;
+  LSelectedPath: UnicodeString;
+  LShellItem: IShellItem;
 begin
-  ASelectedPath := TACLFileDialogAccess(Dialog).GetActualInitialDir;
-  if Dialog.Title <> '' then
-    FFileDialog.SetTitle(PWideChar(Dialog.Title));
-  if FDefaultExts <> '' then
-    FFileDialog.SetDefaultExtension(PWideChar(FDefaultExts));
-  if Dialog.FileName <> '' then
+  LSelectedPath := FDialog.GetActualInitialDir;
+  if FDialog.Title <> '' then
+    FFileDialog.SetTitle(PWideChar(FDialog.Title));
+  if GetDefaultExts(LDefaultExts) then
+    FFileDialog.SetDefaultExtension(LDefaultExts);
+  if FDialog.FileName <> '' then
   begin
-    FFileDialog.SetFileName(PWideChar(acExtractFileName(Dialog.FileName)));
-    if ASelectedPath = '' then
-      ASelectedPath := acExtractFilePath(Dialog.FileName);
+    FFileDialog.SetFileName(PWideChar(acExtractFileName(FDialog.FileName)));
+    if LSelectedPath = '' then
+      LSelectedPath := acExtractFilePath(FDialog.FileName);
   end;
-  if ASelectedPath <> '' then
+  if LSelectedPath <> '' then
   begin
-    if Succeeded(SHCreateItemFromParsingName(PWideChar(ASelectedPath),
-      nil, StringToGUID(SID_IShellItem), AShellItem))
+    if Succeeded(SHCreateItemFromParsingName(PWideChar(LSelectedPath),
+      nil, StringToGUID(SID_IShellItem), LShellItem))
     then
-      FFileDialog.SetFolder(AShellItem);
+      FFileDialog.SetFolder(LShellItem);
   end;
 
-  AFlags := 0;
-  for AOption := Low(TACLFileDialogOption) to High(TACLFileDialogOption) do
+  LFlags := 0;
+  for var LOption := Low(TACLFileDialogOption) to High(TACLFileDialogOption) do
   begin
-    if AOption in Dialog.Options then
-      AFlags := AFlags or DialogOptions[AOption];
+    if LOption in FDialog.Options then
+      LFlags := LFlags or DialogOptions[LOption];
   end;
-  FFileDialog.SetOptions(AFlags);
+  FFileDialog.SetOptions(LFlags);
 
-  FFileDialog.Advise(Self, ACookie);
+  FFileDialog.Advise(Self, LCookie);
 end;
 
 procedure TACLFileDialogVistaImpl.InitializeFilter;
 var
-  AFilterStr: TComdlgFilterSpecArray;
-  I: Integer;
+  LParts: TComdlgFilterSpecArray;
 begin
-  acSplitString(Dialog.Filter, '|', FFilter);
-  SetLength(AFilterStr, Length(FFilter) div 2);
-  if Length(AFilterStr) > 0 then
+  acSplitString(FDialog.Filter, '|', FFilter);
+  SetLength(LParts, Length(FFilter) div 2);
+  if Length(LParts) > 0 then
   begin
-    for I := 0 to Length(AFilterStr) - 1 do
+    for var I := 0 to Length(LParts) - 1 do
     begin
-      AFilterStr[I].pszName := PWideChar(FFilter[2 * I]);
-      AFilterStr[I].pszSpec := PWideChar(FFilter[2 * I + 1]);
+      LParts[I].pszName := PWideChar(FFilter[2 * I]);
+      LParts[I].pszSpec := PWideChar(FFilter[2 * I + 1]);
     end;
-    FFileDialog.SetFileTypes(Length(AFilterStr), AFilterStr);
-    FFileDialog.SetFileTypeIndex(Dialog.FilterIndex);
+    FFileDialog.SetFileTypes(Length(LParts), LParts);
+    FFileDialog.SetFileTypeIndex(FDialog.FilterIndex);
   end;
 end;
 
@@ -412,21 +466,21 @@ procedure TACLFileDialogVistaImpl.QuerySeletectedFiles(AFileList: TACLStringList
 
   procedure OpenDialogPopulateSelectedFiles(AFileList: TACLStringList);
   var
-    ACount: Integer;
-    AEnumerator: IEnumShellItems;
-    AItems: IShellItemArray;
-    AResult: HRESULT;
-    AShellItem: IShellItem;
+    LCount: Integer;
+    LEnumerator: IEnumShellItems;
+    LItems: IShellItemArray;
+    LResult: HRESULT;
+    LShellItem: IShellItem;
   begin
-    if Succeeded((FFileDialog as IFileOpenDialog).GetResults(AItems)) then
+    if Succeeded((FFileDialog as IFileOpenDialog).GetResults(LItems)) then
     begin
-      if Succeeded(AItems.EnumItems(AEnumerator)) then
+      if Succeeded(LItems.EnumItems(LEnumerator)) then
       begin
-        AResult := AEnumerator.Next(1, AShellItem, @ACount);
-        while Succeeded(AResult) and (ACount <> 0) do
+        LResult := LEnumerator.Next(1, LShellItem, @LCount);
+        while Succeeded(LResult) and (LCount <> 0) do
         begin
-          AFileList.Add(GetItemName(AShellItem));
-          AResult := AEnumerator.Next(1, AShellItem, @ACount);
+          AFileList.Add(GetItemName(LShellItem));
+          LResult := LEnumerator.Next(1, LShellItem, @LCount);
         end;
       end;
     end;
@@ -434,15 +488,15 @@ procedure TACLFileDialogVistaImpl.QuerySeletectedFiles(AFileList: TACLStringList
 
   procedure SaveDialogPopulateSelectedFileName(AFileList: TACLStringList);
   var
-    AItem: IShellItem;
+    LItems: IShellItem;
   begin
-    if Succeeded((FFileDialog as IFileSaveDialog).GetResult(AItem)) then
-      AFileList.Add(GetItemName(AItem));
+    if Succeeded((FFileDialog as IFileSaveDialog).GetResult(LItems)) then
+      AFileList.Add(GetItemName(LItems));
   end;
 
 begin
   AFileList.Clear;
-  if SaveDialog then
+  if FSaveDialog then
     SaveDialogPopulateSelectedFileName(AFileList)
   else
     OpenDialogPopulateSelectedFiles(AFileList);
@@ -488,23 +542,23 @@ end;
 
 function TACLFileDialogVistaImpl.GetItemName(const AItem: IShellItem): UnicodeString;
 var
-  AError: HRESULT;
-  AName: PWideChar;
+  LError: HRESULT;
+  LName: PWideChar;
 begin
   Result := '';
-  AError := AItem.GetDisplayName(SIGDN_FILESYSPATH, AName);
-  if Failed(AError) then
-    AError := AItem.GetDisplayName(SIGDN_NORMALDISPLAY, AName);
-  if Succeeded(AError) then
+  LError := AItem.GetDisplayName(SIGDN_FILESYSPATH, LName);
+  if Failed(LError) then
+    LError := AItem.GetDisplayName(SIGDN_NORMALDISPLAY, LName);
+  if Succeeded(LError) then
   try
-    Result := acSimplifyLongFileName(AName);
+    Result := acSimplifyLongFileName(LName);
   finally
-    CoTaskMemFree(AName);
+    CoTaskMemFree(LName);
   end;
 end;
 
 class function TACLFileDialogVistaImpl.TryCreate(
-  AOwnerWnd: TWndHandle; ADialog: TACLFileDialog; ASaveDialog: Boolean): TACLFileDialogImpl;
+  ADialog: TACLFileDialog; ASaveDialog: Boolean): TACLFileDialogImpl;
 var
   LIntf: IFileDialog;
   LResult: HRESULT;
@@ -521,10 +575,7 @@ begin
     LResult := E_NOINTERFACE;
 
   if (LResult = S_OK) and (LIntf <> nil) then
-  begin
-    TACLFileDialogVistaImpl(Result) := Create(AOwnerWnd, ADialog, ASaveDialog);
-    TACLFileDialogVistaImpl(Result).FFileDialog := LIntf;
-  end
+    Result := Create(ADialog, LIntf, ASaveDialog)
   else
     Result := nil;
 end;

@@ -96,8 +96,6 @@ type
 
   { TACLFileDialog }
 
-  TACLFileDialogImpl = class;
-
   TACLFileDialogOption = (ofOverwritePrompt, ofHideReadOnly, ofAllowMultiSelect,
     ofPathMustExist, ofFileMustExist, ofEnableSizing, ofForceShowHidden, ofAutoExtension);
   TACLFileDialogOptions = set of TACLFileDialogOption;
@@ -116,8 +114,7 @@ type
     FTitle: string;
   protected
     function AutoExtension(const AFileName: string): string;
-    function CreateImpl(ASaveDialog: Boolean; AOwnerWnd: TWndHandle = 0): TACLFileDialogImpl; virtual;
-    function GetActualInitialDir: string;
+    function CreateImpl(ASaveDialog: Boolean): TObject; virtual;
   public
     class var MRUPaths: TACLStringList;
   public
@@ -126,6 +123,7 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     function Execute(ASaveDialog: Boolean; AOwnerWnd: TWndHandle = 0): Boolean; virtual;
+    function GetActualInitialDir: string;
     //# Properties
     property FileName: string read FFilename write FFileName;
     property Files: TACLStringList read FFiles;
@@ -138,24 +136,6 @@ type
     property Title: string read FTitle write FTitle;
   end;
 
-  { TACLFileDialogImpl }
-
-  TACLFileDialogImpl = class(TACLUnknownObject)
-  strict private
-    FDialog: TACLFileDialog;
-    FSaveDialog: Boolean;
-  protected
-    FDefaultExts: string;
-    FOwnerWnd: TWndHandle;
-    procedure PopulateDefaultExts;
-  public
-    constructor Create(AOwnerWnd: TWndHandle; ADialog: TACLFileDialog; ASaveDialog: Boolean);
-    function Execute: Boolean; virtual;
-    //# Properties
-    property Dialog: TACLFileDialog read FDialog;
-    property OwnerWnd: TWndHandle read FOwnerWnd;
-    property SaveDialog: Boolean read FSaveDialog;
-  end;
 {$ENDREGION}
 
 {$REGION ' InputDialogs '}
@@ -427,12 +407,15 @@ procedure acShowMessage(const AMessage: string);
 implementation
 
 uses
+{$IF DEFINED(LCLGtk3)}
+  ACL.UI.Core.Impl.Gtk3,
+{$ELSEIF DEFINED(LCLGtk2)}
+  ACL.UI.Core.Impl.Gtk2,
+{$ENDIF}
 {$IF DEFINED(MSWINDOWS)}
   ACL.UI.Dialogs.Impl.Win32;
-{$ELSEIF DEFINED(LCLGtk3)}
-  ACL.UI.Core.Impl.Gtk3;
-{$ELSEIF DEFINED(LCLGtk2)}
-  ACL.UI.Core.Impl.Gtk2;
+{$ELSE}
+  ACL.UI.Dialogs.Impl.Other;
 {$ENDIF}
 
 type
@@ -452,25 +435,6 @@ begin
   finally
     Free;
   end;
-
-//  Application.ModalStarted;
-//  try
-//  {$IFDEF MSWINDOWS}
-//    if acOSCheckVersion(6, 1) and UseLatestCommonDialogs then
-//    begin
-//      with TACLMessageTaskDialog.Create(AMessage, ACaption, AFlags) do
-//      try
-//        if Execute(AOwnerWnd) then
-//          Exit(ModalResult);
-//      finally
-//        Free;
-//      end;
-//    end;
-//  {$ENDIF}
-//    Result := MessageBox(AOwnerWnd, PChar(AMessage), PChar(ACaption), AFlags);
-//  finally
-//    Application.ModalFinished;
-//  end;
 end;
 
 procedure acShowMessage(const AMessage: string);
@@ -659,12 +623,17 @@ var
 begin
   LPrevPath := acGetCurrentDir;
   try
+    if (AOwnerWnd = 0) and (Screen.ActiveCustomForm <> nil) then
+      AOwnerWnd := Screen.ActiveCustomForm.Handle;
+    if (AOwnerWnd = 0) then
+      AOwnerWnd := TACLApplication.GetHandle;
+
     Application.ModalStarted;
     try
-      LImpl := CreateImpl(ASaveDialog, AOwnerWnd);
+      LImpl := CreateImpl(ASaveDialog) as TACLFileDialogImpl;
       try
         Files.Clear;
-        Result := LImpl.Execute;
+        Result := LImpl.Execute(AOwnerWnd);
         if Result then
         begin
           FFileName := '';
@@ -720,15 +689,9 @@ begin
     Result := AFileName + LSelectedExt;
 end;
 
-function TACLFileDialog.CreateImpl(ASaveDialog: Boolean; AOwnerWnd: TWndHandle): TACLFileDialogImpl;
+function TACLFileDialog.CreateImpl(ASaveDialog: Boolean): TObject;
 begin
-{$IFDEF MSWINDOWS}
-  Result := TACLFileDialogVistaImpl.TryCreate(AOwnerWnd, Self, ASaveDialog);
-  if Result = nil then
-    Result := TACLFileDialogOldImpl.Create(AOwnerWnd, Self, ASaveDialog);
-{$ELSE}
-  Result := TACLFileDialogImpl.Create(AOwnerWnd, Self, ASaveDialog);
-{$ENDIF}
+  Result := TACLFileDialogImpl.Create(Self, ASaveDialog);
 end;
 
 function TACLFileDialog.GetActualInitialDir: string;
@@ -741,77 +704,6 @@ begin
     Result := EmptyStr;
 end;
 
-{ TACLFileDialogImpl }
-
-constructor TACLFileDialogImpl.Create(
-  AOwnerWnd: TWndHandle; ADialog: TACLFileDialog; ASaveDialog: Boolean);
-begin
-  inherited Create;
-  FDialog := ADialog;
-  FSaveDialog := ASaveDialog;
-  FOwnerWnd := AOwnerWnd;
-  if OwnerWnd = 0 then
-    FOwnerWnd := TACLApplication.GetHandle;
-  if ASaveDialog then
-    PopulateDefaultExts;
-end;
-
-function TACLFileDialogImpl.Execute: Boolean;
-var
-  LDialog: TOpenDialog;
-  LOptions: TOpenOptions;
-begin
-  LOptions := [];
-  if ofOverwritePrompt in Dialog.Options then
-    Include(LOptions, TOpenOption.ofOverwritePrompt);
-  if ofHideReadOnly in Dialog.Options then
-    Include(LOptions, TOpenOption.ofHideReadOnly);
-  if ofAllowMultiSelect in Dialog.Options then
-    Include(LOptions, TOpenOption.ofAllowMultiSelect);
-  if ofPathMustExist in Dialog.Options then
-    Include(LOptions, TOpenOption.ofPathMustExist);
-  if ofFileMustExist in Dialog.Options then
-    Include(LOptions, TOpenOption.ofFileMustExist);
-  if ofEnableSizing in Dialog.Options then
-    Include(LOptions, TOpenOption.ofEnableSizing);
-  if ofForceShowHidden in Dialog.Options then
-    Include(LOptions, TOpenOption.ofForceShowHidden);
-
-  if SaveDialog then
-    LDialog := TSaveDialog.Create(nil)
-  else
-    LDialog := TOpenDialog.Create(nil);
-  try
-    LDialog.Filter := Dialog.Filter;
-    LDialog.InitialDir := Dialog.GetActualInitialDir;
-    LDialog.Options := LOptions;
-    Result := LDialog.Execute;
-    if Result then
-    begin
-      Dialog.Files.Assign(LDialog.Files);
-      Dialog.FilterIndex := LDialog.FilterIndex;
-    end;
-  finally
-    LDialog.Free;
-  end;
-end;
-
-procedure TACLFileDialogImpl.PopulateDefaultExts;
-var
-  F: TStringDynArray;
-  I: Integer;
-begin
-  FDefaultExts := '';
-  acSplitString(Dialog.Filter, '|', F);
-  for I := 0 to Length(F) div 2 - 1 do
-  begin
-    if (FDefaultExts.Length > 0) and (FDefaultExts[FDefaultExts.Length] <> ';') then
-      FDefaultExts := FDefaultExts + ';';
-    FDefaultExts := FDefaultExts + StringReplace(F[2 * I + 1], '*.', '', [rfReplaceAll]);
-  end;
-  if (FDefaultExts.Length > 0) and (FDefaultExts[FDefaultExts.Length] = ';') then
-    Delete(FDefaultExts, Length(FDefaultExts), 1);
-end;
 {$ENDREGION}
 
 {$REGION ' InputDialogs '}
