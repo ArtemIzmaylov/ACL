@@ -407,14 +407,12 @@ procedure acShowMessage(const AMessage: string);
 implementation
 
 uses
-{$IF DEFINED(LCLGtk3)}
-  ACL.UI.Core.Impl.Gtk3,
-{$ELSEIF DEFINED(LCLGtk2)}
-  ACL.UI.Core.Impl.Gtk2,
-{$ENDIF}
 {$IF DEFINED(MSWINDOWS)}
   ACL.UI.Dialogs.Impl.Win32;
-{$ELSE}
+{$ELSEIF DEFINED(LCLGtk3)}
+  ACL.UI.Dialogs.Impl.Gtk3;
+{$ELSEIF DEFINED(LCLGtk2)}
+  ACL.UI.Core.Impl.Gtk2,
   ACL.UI.Dialogs.Impl.Other;
 {$ENDIF}
 
