@@ -6,7 +6,7 @@
 //  Purpose:   Color Picker
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2024
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -134,7 +134,7 @@ type
   public
     constructor Create(AOwner: IACLCompoundControlSubClassContainer);
     destructor Destroy; override;
-    function CalculateAutoSize(var AWidth, AHeight: Integer): Boolean; override;
+    procedure CalculateAutoSize(var AWidth, AHeight: Integer; AMinSize: Boolean); override;
     procedure SetTargetDPI(AValue: Integer); override;
     // Properties
     property Color: TACLColorPickerColorInfo read FColor;
@@ -170,6 +170,7 @@ type
     FCreating: Boolean;
     function GetSubClass: TACLColorPickerSubClass;
   protected
+    FIndentBetweenElements: Integer;
     FEdits: array[TACLColorPickerColorComponent] of TACLColorPickerColorModifierCell;
     FGamut: TACLColorPickerColorModifierCell;
     FHexCode: TACLColorPickerColorModifierCell;
@@ -177,9 +178,7 @@ type
     FSlider1: TACLColorPickerColorModifierCell;
     FSlider2: TACLColorPickerColorModifierCell;
 
-    FIndentBetweenElements: Integer;
-
-    procedure CalculateAutoSize(var AWidth, AHeight: Integer); virtual;
+    procedure CalculateAutoSize(var AWidth, AHeight: Integer; AMinSize: Boolean); virtual;
     procedure CalculateSubCells(const AChanges: TIntegerSet); override;
     procedure CalculateSubCellsEditors(var R: TRect; const AChanges: TIntegerSet);
     procedure CalculateSubCellsSliders(var R: TRect; const AChanges: TIntegerSet);
@@ -258,7 +257,6 @@ type
     procedure SetStyleHatch(const Value: TACLStyleHatch);
   protected
     procedure AlignControls(AControl: TControl; var Rect: TRect); override;
-    function CanAutoSize(var NewWidth, NewHeight: Integer): Boolean; override;
     procedure CreateParams(var Params: TCreateParams); override;
     function CreatePadding: TACLPadding; override;
     function CreateSubClass: TACLCompoundControlSubClass; override;
@@ -278,6 +276,7 @@ type
     property OnColorChanged: TNotifyEvent read GetOnColorChanged write SetOnColorChanged;
   public
     constructor Create(AOwner: TComponent); override;
+    procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
     //# Properties
     property Color: TAlphaColor read GetColor write SetColor;
   end;
@@ -799,10 +798,9 @@ begin
   Result := inherited + [cpcnValue];
 end;
 
-function TACLColorPickerSubClass.CalculateAutoSize(var AWidth, AHeight: Integer): Boolean;
+procedure TACLColorPickerSubClass.CalculateAutoSize(var AWidth, AHeight: Integer; AMinSize: Boolean);
 begin
-  TACLColorPickerViewInfo(ViewInfo).CalculateAutoSize(AWidth, AHeight);
-  Result := True;
+  TACLColorPickerViewInfo(ViewInfo).CalculateAutoSize(AWidth, AHeight, AMinSize);
 end;
 
 procedure TACLColorPickerSubClass.SetTargetDPI(AValue: Integer);
@@ -867,7 +865,7 @@ begin
   FIndentBetweenElements := dpiApply(accpIndentBetweenElements, CurrentDpi);
 end;
 
-procedure TACLColorPickerViewInfo.CalculateAutoSize(var AWidth, AHeight: Integer);
+procedure TACLColorPickerViewInfo.CalculateAutoSize(var AWidth, AHeight: Integer; AMinSize: Boolean);
 
   procedure Include(const ASize: TSize);
   begin
@@ -879,6 +877,8 @@ procedure TACLColorPickerViewInfo.CalculateAutoSize(var AWidth, AHeight: Integer
     end;
   end;
 
+var
+  LSize: TSize;
 begin
   if FCreating then Exit;
 
@@ -892,19 +892,19 @@ begin
   Include(MeasureEditsAreaSize);
 
   if FGamut <> nil then
-    Include(TSize.Create(Max(AHeight, FGamut.MeasureSize.cy)));
-
-  // Content Offsets
-  Inc(AHeight, 2 * FIndentBetweenElements);
-  Inc(AWidth, 2 * FIndentBetweenElements);
+  begin
+    LSize := FGamut.MeasureSize;
+    if not AMinSize then
+      LSize := TSize.Create(Max(AHeight, LSize.cy));
+    Include(LSize);
+  end;
 end;
 
 procedure TACLColorPickerViewInfo.CalculateSubCells(const AChanges: TIntegerSet);
 var
   LRect: TRect;
 begin
-  inherited CalculateSubCells(AChanges);
-
+  inherited;
   LRect := Bounds;
   CalculateSubCellsEditors(LRect, AChanges);
   CalculateSubCellsSliders(LRect, AChanges);
@@ -977,17 +977,17 @@ function TACLColorPickerViewInfo.MeasureEditsAreaSize: TSize;
   end;
 
 var
-  ACell: TACLColorPickerColorModifierCell;
-  AComponent: TACLColorPickerColorComponent;
+  LCell: TACLColorPickerColorModifierCell;
+  LComponent: TACLColorPickerColorComponent;
 begin
   Result := NullSize;
-  for AComponent := Low(AComponent) to High(AComponent) do
+  for LComponent := Low(LComponent) to High(LComponent) do
   begin
-    ACell := FEdits[AComponent];
-    if ACell <> nil then
+    LCell := FEdits[LComponent];
+    if LCell <> nil then
     begin
-      Include(ACell.MeasureSize, Result);
-      if AComponent in [cpccA, cpccB, cpccL] then
+      Include(LCell.MeasureSize, Result);
+      if LComponent in [cpccA, cpccB, cpccL] then
         Inc(Result.cy, FIndentBetweenElements);
     end;
   end;
@@ -996,7 +996,7 @@ begin
   if FPreview <> nil then
     Include(TSize.Create(Result.cx), Result);
   if Result.cy > 0 then
-    Inc(Result.cy, FIndentBetweenElements);
+    Dec(Result.cy, FIndentBetweenElements);
 end;
 
 procedure TACLColorPickerViewInfo.RecreateSubCells;
@@ -1457,11 +1457,6 @@ begin
   // do nothing
 end;
 
-function TACLCustomColorPicker.CanAutoSize(var NewWidth, NewHeight: Integer): Boolean;
-begin
-  Result := SubClass.CalculateAutoSize(NewWidth, NewHeight);
-end;
-
 function TACLCustomColorPicker.CreateSubClass: TACLCompoundControlSubClass;
 begin
   Result := TACLColorPickerSubClass.Create(Self);
@@ -1529,6 +1524,21 @@ begin
     Realign;
     Invalidate;
   end;
+end;
+
+procedure TACLCustomColorPicker.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
+var
+  LWidth, LHeight: Integer;
+begin
+  if not AutoSize then
+  begin
+    LHeight := AHeight;
+    LWidth := AWidth;
+    CalculateAutoSize(LWidth, LHeight, True);
+    AHeight := Max(AHeight, LHeight);
+    AWidth := Max(AWidth, LWidth);
+  end;
+  inherited;
 end;
 
 procedure TACLCustomColorPicker.SetColor(const Value: TAlphaColor);

@@ -6,7 +6,7 @@
 //  Purpose:   CompoundControl Classes
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2024
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -75,18 +75,18 @@ type
     procedure WMHScroll(var Message: TWMHScroll); message WM_HSCROLL;
     procedure WMVScroll(var Message: TWMVScroll); message WM_VSCROLL;
   protected
-    procedure BoundsChanged; override;
-    procedure LayoutChanged;
-    procedure ResourceChanged; override;
     function CreateSubClass: TACLCompoundControlSubClass; virtual; abstract;
 
     // Ancestor
+    procedure BoundsChanged; override;
     function CanAutoSize(var NewWidth, NewHeight: Integer): Boolean; override;
     procedure DoContextPopup(MousePos: TPoint; var Handled: Boolean); override;
     procedure DoFullRefresh; override;
     procedure FocusChanged; override;
+    procedure LayoutChanged;
     procedure Loaded; override;
     procedure Paint; override;
+    procedure ResourceChanged; override;
     procedure SetTargetDPI(AValue: Integer); override;
 
     // Mouse
@@ -118,6 +118,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     procedure AfterConstruction; override;
+    procedure CalculateAutoSize(var AWidth, AHeight: Integer; AMinSize: Boolean = False);
     function Focused: Boolean; override;
     procedure Localize(const ASection, AName: string); override;
     // HourGlass notify
@@ -160,6 +161,27 @@ procedure TACLCompoundControl.AfterConstruction;
 begin
   inherited AfterConstruction;
   FullRefresh;
+end;
+
+procedure TACLCompoundControl.CalculateAutoSize(
+  var AWidth, AHeight: Integer; AMinSize: Boolean = False);
+var
+  LPadding: TRect;
+begin
+  LPadding := NullRect;
+  AdjustClientRect(LPadding);
+  Inc(AHeight, LPadding.Height);
+  Inc(AWidth, LPadding.Width);
+  SubClass.CalculateAutoSize(AWidth, AHeight, AMinSize);
+  Dec(AHeight, LPadding.Height);
+  Dec(AWidth, LPadding.Width);
+end;
+
+function TACLCompoundControl.CanAutoSize(var NewWidth, NewHeight: Integer): Boolean;
+begin
+  Result := AutoSize and not SubClass.IsUpdateLocked;
+  if Result then
+    CalculateAutoSize(NewWidth, NewHeight);
 end;
 
 function TACLCompoundControl.Focused: Boolean;
@@ -266,20 +288,6 @@ begin
     finally
       SubClass.EndUpdate;
     end;
-  end;
-end;
-
-function TACLCompoundControl.CanAutoSize(var NewWidth, NewHeight: Integer): Boolean;
-var
-  ARect: TRect;
-begin
-  Result := AutoSize and not SubClass.IsUpdateLocked;
-  if Result and SubClass.CalculateAutoSize(NewWidth, NewHeight) then
-  begin
-    ARect := NullRect;
-    AdjustClientRect(ARect);
-    Inc(NewHeight, -ARect.Height);
-    Inc(NewWidth, -ARect.Width);
   end;
 end;
 

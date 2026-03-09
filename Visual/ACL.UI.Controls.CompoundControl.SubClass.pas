@@ -824,14 +824,12 @@ type
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
     procedure Calculate(ABounds: TRect); override;
+    procedure CalculateAutoSize(var AWidth, AHeight: Integer; AMinSize: Boolean); virtual;
     procedure Changed(AChanges: TIntegerSet); virtual;
     procedure ContextPopup(const P: TPoint; var AHandled: Boolean);
     procedure FullRefresh;
     procedure SetFocus; inline;
     procedure SetTargetDPI(AValue: Integer); virtual;
-
-    // AutoSize
-    function CalculateAutoSize(var AWidth, AHeight: Integer): Boolean; virtual;
 
     // Localization
     procedure Localize(const ASection: string); virtual;
@@ -2651,9 +2649,9 @@ begin
   end;
 end;
 
-function TACLCompoundControlSubClass.CalculateAutoSize(var AWidth, AHeight: Integer): Boolean;
+procedure TACLCompoundControlSubClass.CalculateAutoSize(
+  var AWidth, AHeight: Integer; AMinSize: Boolean);
 begin
-  Result := False;
 end;
 
 procedure TACLCompoundControlSubClass.Localize(const ASection: string);

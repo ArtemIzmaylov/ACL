@@ -6,7 +6,7 @@
 //  Purpose:   Color Palette
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2024
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -98,7 +98,7 @@ type
     constructor Create(AViewInfo: TACLColorPaletteViewInfo;
       AColor: TAlphaColor; const ABounds: TRect; ABorders: TACLBorders = acAllBorders);
     procedure Draw(ACanvas: TCanvas);
-    //
+    // Properties
     property Borders: TACLBorders read FBorders write FBorders;
     property Bounds: TRect read FBounds;
     property Color: TAlphaColor read FColor;
@@ -123,8 +123,7 @@ type
     function GetItems: TACLColorPaletteItems;
     function GetOptions: TACLColorPaletteOptionsView;
   protected
-    function CalculateCellSpacing(ACellSize, AWidth: Integer): Integer;
-    procedure CalculateClassicLayout(ABounds: TRect);
+    procedure CalculateClassicLayout(const ABounds: TRect);
     procedure CalculateOfficeLikeLayout(ABounds: TRect);
   public
     constructor Create(AOwner: TACLColorPalette);
@@ -132,7 +131,7 @@ type
     procedure Calculate(const ABounds: TRect);
     procedure Draw(ACanvas: TCanvas);
     function HitTest(const P: TPoint): TACLColorPaletteItemViewInfo;
-    //
+    // Properties
     property CurrentDpi: Integer read GetCurrentDpi;
     property Height: Integer read FHeight;
     property Items: TACLColorPaletteItems read GetItems;
@@ -166,11 +165,13 @@ type
     FCellSpacing: Integer;
     FOwner: TACLColorPalette;
     FStyle: TACLColorPaletteStyle;
+    FStyleClassicRowCount: Integer;
     FStyleOfficeTintCount: Integer;
 
     procedure SetCellSize(AValue: Integer);
     procedure SetCellSpacing(AValue: Integer);
     procedure SetStyle(AValue: TACLColorPaletteStyle);
+    procedure SetStyleClassicRowCount(AValue: Integer);
     procedure SetStyleOfficeTintCount(AValue: Integer);
   protected
     procedure DoAssign(Source: TPersistent); override;
@@ -181,6 +182,7 @@ type
     property CellSize: Integer read FCellSize write SetCellSize default 16;
     property CellSpacing: Integer read FCellSpacing write SetCellSpacing default -1;
     property Style: TACLColorPaletteStyle read FStyle write SetStyle default cpsOffice;
+    property StyleClassicRowCount: Integer read FStyleClassicRowCount write SetStyleClassicRowCount default 3;
     property StyleOfficeTintCount: Integer read FStyleOfficeTintCount write SetStyleOfficeTintCount default 5;
   end;
 
@@ -203,7 +205,6 @@ type
     procedure SetOptionsView(AValue: TACLColorPaletteOptionsView);
     procedure SetStyle(AValue: TACLStyleColorPalette);
   protected
-    function CanAutoSize(var NewWidth, NewHeight: Integer): Boolean; override;
     procedure InitializeDefaultPalette;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X: Integer; Y: Integer); override;
@@ -216,6 +217,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    function CanAutoSize(var NewWidth, NewHeight: Integer): Boolean; override;
   {$IFDEF FPC}
     procedure SetBoundsKeepBase(aLeft, aTop, aWidth, aHeight: Integer); override;
   {$ELSE}
@@ -398,48 +400,44 @@ begin
     CalculateClassicLayout(ABounds);
 end;
 
-function TACLColorPaletteViewInfo.CalculateCellSpacing(ACellSize, AWidth: Integer): Integer;
-begin
-  if Options.CellSpacing >= 0 then
-    Result := dpiApply(Options.CellSpacing, CurrentDpi)
-  else
-    if Items.Count < 2 then
-      Result := 0
-    else
-      if Options.Style = cpsOffice then
-        Result := (AWidth - ACellSize * Items.Count) div (Items.Count - 1)
-      else
-        Result := (AWidth - (AWidth div ACellSize) * ACellSize) div (Items.Count - 1);
-
-  Result := Max(Result, 0);
-end;
-
-procedure TACLColorPaletteViewInfo.CalculateClassicLayout(ABounds: TRect);
+procedure TACLColorPaletteViewInfo.CalculateClassicLayout(const ABounds: TRect);
 var
-  AItemBounds: TRect;
-  ASize: Integer;
-  ASpace: Integer;
   I: Integer;
+  LCellPos: TPoint;
+  LCellSize: Integer;
+  LColumn: Integer;
+  LColumnCount: Integer;
+  LSpace: Integer;
 begin
-  ASize := dpiApply(Options.CellSize, CurrentDpi);
-  ASpace := CalculateCellSpacing(ASize, ABounds.Width);
+  LCellSize := dpiApply(Options.CellSize, CurrentDpi);
+  LColumnCount := Ceil(Items.Count / Options.StyleClassicRowCount);
+  if Options.CellSpacing >= 0 then
+    LSpace := dpiApply(Options.CellSpacing, CurrentDpi)
+  else if LColumnCount > 1 then
+    LSpace := Max(0, (ABounds.Width - LColumnCount * LCellSize) div (LColumnCount - 1))
+  else
+    LSpace := 0;
 
-  AItemBounds := TRect.Create(ABounds.TopLeft, ASize, ASize);
+  LColumn := 0;
+  LCellPos := ABounds.TopLeft;
   for I := 0 to Items.Count - 1 do
   begin
-    if AItemBounds.Right > ABounds.Right then
+    if LColumn >= LColumnCount then
     begin
-      ABounds.Top := AItemBounds.Bottom + ASpace;
-      AItemBounds := TRect.Create(ABounds.TopLeft, ASize, ASize);
+      LCellPos.X := ABounds.Left;
+      LCellPos.Y := LCellPos.Y + LCellSize + LSpace;
+      LColumn := 0;
     end;
-    FCells.Add(TACLColorPaletteItemViewInfo.Create(Self, Items[I].Color, AItemBounds));
-    AItemBounds.Offset(ASpace + ASize, 0);
+    FCells.Add(TACLColorPaletteItemViewInfo.Create(Self,
+      Items[I].Color, TRect.Create(LCellPos, LCellSize, LCellSize)));
+    Inc(LCellPos.X, LSpace + LCellSize);
+    Inc(LColumn);
   end;
 
-  if Items.Count > 0 then
+  if FCells.Count > 0 then
   begin
+    FWidth  := LColumnCount * LCellSize + (LColumnCount - 1) * LSpace;
     FHeight := FCells.Last.Bounds.Bottom - FCells.First.Bounds.Top;
-    FWidth := FCells.Last.Bounds.Right - FCells.First.Bounds.Left;
   end
   else
   begin
@@ -452,58 +450,58 @@ procedure TACLColorPaletteViewInfo.CalculateOfficeLikeLayout(ABounds: TRect);
 
   function GetBorders(Index: Integer): TACLBorders;
   begin
+    Result := [mLeft, mRight];
     if Index = 0 then
-      Result := [mLeft, mTop, mRight]
-    else if Index = Options.StyleOfficeTintCount - 1 then
-      Result := [mLeft, mBottom, mRight]
-    else
-      Result := [mLeft, mRight];
+      Include(Result, mTop);
+    if Index = Options.StyleOfficeTintCount - 1 then
+      Include(Result, mBottom);
   end;
 
 var
-  AColor: TAlphaColor;
-  AItemBounds: TRect;
-  ASize: Integer;
-  ASpace: Integer;
+  LColor: TAlphaColor;
+  LItemBounds: TRect;
+  LSize: Integer;
+  LSpace: Integer;
   I, J: Integer;
 begin
-  ASize := dpiApply(Options.CellSize, CurrentDpi);
-  ASpace := CalculateCellSpacing(ASize, ABounds.Width);
+  LSize := dpiApply(Options.CellSize, CurrentDpi);
+  if Options.CellSpacing >= 0 then
+    LSpace := dpiApply(Options.CellSpacing, CurrentDpi)
+  else if Items.Count > 1 then
+    LSpace := (ABounds.Width - LSize * Items.Count) div (Items.Count - 1)
+  else
+    LSpace := 0;
 
-  FWidth := ASize * Items.Count + ASpace * (Items.Count - 1);
-  FHeight := ASize + ASpace + Options.StyleOfficeTintCount * ASize - (Options.StyleOfficeTintCount - 1) * BorderSize;
+  FWidth := LSize * Items.Count + LSpace * (Items.Count - 1);
+  FHeight := LSize + LSpace + Options.StyleOfficeTintCount * LSize - (Options.StyleOfficeTintCount - 1) * BorderSize;
 
   for I := 0 to Items.Count - 1 do
   begin
-    AColor := Items[I].Color;
-    AItemBounds := TRect.Create(ABounds.TopLeft, ASize, ASize);
-    ABounds.Left := AItemBounds.Right + ASpace;
-    FCells.Add(TACLColorPaletteItemViewInfo.Create(Self, AColor, AItemBounds));
-    AItemBounds.Offset(0, ASize + ASpace);
-    if AColor <> TAlphaColor.None then
+    LColor := Items[I].Color;
+    LItemBounds := TRect.Create(ABounds.TopLeft, LSize, LSize);
+    ABounds.Left := LItemBounds.Right + LSpace;
+    FCells.Add(TACLColorPaletteItemViewInfo.Create(Self, LColor, LItemBounds));
+    LItemBounds.Offset(0, LSize + LSpace);
+    if LColor <> TAlphaColor.None then
       for J := 0 to Options.StyleOfficeTintCount - 1 do
       begin
         FCells.Add(TACLColorPaletteItemViewInfo.Create(Self,
-          AdjustColor(AColor, 1 - (J + 1) / (Options.StyleOfficeTintCount + 1)),
-          AItemBounds, GetBorders(J)));
-        AItemBounds.Offset(0, ASize - BorderSize);
+          AdjustColor(LColor, 1 - (J + 1) / (Options.StyleOfficeTintCount + 1)),
+          LItemBounds, GetBorders(J)));
+        LItemBounds.Offset(0, LSize - BorderSize);
       end;
   end;
 end;
 
 procedure TACLColorPaletteViewInfo.Draw(ACanvas: TCanvas);
 var
-  AItemViewInfo: TACLColorPaletteItemViewInfo;
   ASaveIndex: Integer;
   I: Integer;
 begin
   ASaveIndex := acSaveDC(ACanvas);
   try
     for I := 0 to FCells.Count - 1 do
-    begin
-      AItemViewInfo := FCells[I];
-      AItemViewInfo.Draw(ACanvas);
-    end;
+      FCells[I].Draw(ACanvas);
   finally
     acRestoreDC(ACanvas, ASaveIndex)
   end;
@@ -588,6 +586,7 @@ begin
   FOwner := AOwner;
   FCellSize := 16;
   FCellSpacing := -1;
+  FStyleClassicRowCount := 3;
   FStyleOfficeTintCount := 5;
 end;
 
@@ -598,6 +597,7 @@ begin
     Style := TACLColorPaletteOptionsView(Source).Style;
     CellSize := TACLColorPaletteOptionsView(Source).CellSize;
     CellSpacing := TACLColorPaletteOptionsView(Source).CellSpacing;
+    StyleClassicRowCount := TACLColorPaletteOptionsView(Source).StyleClassicRowCount;
     StyleOfficeTintCount := TACLColorPaletteOptionsView(Source).StyleOfficeTintCount;
   end;
 end;
@@ -626,9 +626,14 @@ begin
   end;
 end;
 
+procedure TACLColorPaletteOptionsView.SetStyleClassicRowCount(AValue: Integer);
+begin
+  SetIntegerFieldValue(FStyleClassicRowCount, Max(AValue, 1));
+end;
+
 procedure TACLColorPaletteOptionsView.SetStyleOfficeTintCount(AValue: Integer);
 begin
-  SetIntegerFieldValue(FStyleOfficeTintCount, MinMax(AValue, 1, 10));
+  SetIntegerFieldValue(FStyleOfficeTintCount, EnsureRange(AValue, 1, 10));
 end;
 
 { TACLColorPalette }

@@ -6,7 +6,7 @@
 //  Purpose:   Color Picker Dialog
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -86,7 +86,6 @@ type
   TACLColorPickerDialog = class(TACLCustomInputDialog)
   strict private
     FPalette: TACLColorPalette;
-    FPanel: TACLPanel;
     FPicker: TACLColorPicker;
 
     FColor: PAlphaColor;
@@ -260,25 +259,21 @@ end;
 
 procedure TACLColorPickerDialog.CreateControls;
 begin
-  CreateControl(FPanel, TACLPanel, Self,
-    NullRect, {$IFDEF FPC}alCustom{$ELSE}alNone{$ENDIF});
-  FPanel.Padding.All := 2;
-
-  CreateControl(FPicker, TACLColorPicker, FPanel, NullRect, alTop);
+  FPicker := TACLColorPicker.Create(Self);
+  FPicker.AutoSize := False;
   FPicker.Borders := [];
+  FPicker.Padding.All := 0;
   FPicker.OnColorChanged := ColorChangeHandler;
+  FPicker.Parent := Self;
 
-  CreateControl(FPalette, TACLColorPalette, FPanel, Rect(0, MaxWord, 0, 0), alTop);
-  FPalette.Margins.All := TACLMargins.Default;
-  FPalette.Margins.Left := 8;
-  FPalette.Margins.Scalable := False;
+  FPalette := TACLColorPalette.Create(Self);
+  FPalette.Parent := Self;
   FPalette.FocusOnClick := True;
   FPalette.OptionsView.CellSize := 24;
   FPalette.OptionsView.CellSpacing := 2;
   FPalette.OptionsView.StyleOfficeTintCount := 4;
   FPalette.OnColorChanged := ColorChangeHandler;
 
-  FPanel.AutoSize := True;
   inherited;
 end;
 
@@ -317,10 +312,21 @@ begin
 end;
 
 procedure TACLColorPickerDialog.PlaceControls(var R: TRect);
+var
+  D, W, H: Integer;
 begin
-  FPanel.Width := Max(FPicker.Width, FPalette.Width);
-  R.Top := FPanel.BoundsRect.Bottom + dpiApply(8, FCurrentPPI);
-  R.Right := FPanel.BoundsRect.Right;
+  D := dpiApply(8, FCurrentPPI);
+
+  H := R.Height; W := R.Width;
+  FPicker.CalculateAutoSize(W, H);
+  FPicker.SetBounds(R.Left, R.Top, W, H);
+  Inc(R.Top, D + H);
+  R.Width := W;
+
+  FPalette.CanAutoSize(W, H);
+  FPalette.SetBounds(R.Left, R.Top, W, H);
+  Inc(R.Top, D + H);
+
   inherited;
 end;
 
