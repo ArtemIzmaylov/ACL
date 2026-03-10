@@ -5813,7 +5813,16 @@ end;
 procedure TACLTreeListSubClass.IncSearchChanged(Sender: TObject);
 begin
   if OptionsBehavior.IncSearchMode = ismFilter then
+  begin
     Changed([cccnStruct]);
+    if not IsUpdateLocked and OptionsBehavior.IncSearchAutoSelect then
+    begin
+      if AbsoluteVisibleNodes.Count > 0 then
+        FocusedNode := AbsoluteVisibleNodes.First
+      else
+        FocusedNode := nil;
+    end;
+  end;
   if Assigned(OnIncSearch) then
     OnIncSearch(Self);
   Changed([cccnContent]);
