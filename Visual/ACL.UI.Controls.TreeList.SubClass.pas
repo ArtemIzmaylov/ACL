@@ -3031,10 +3031,8 @@ end;
 procedure TACLTreeListContentViewInfo.RecreateSubCells;
 begin
   inherited;
-  ViewItems.Clear;
-  ViewItems.Capacity := 10240;
-  AbsoluteVisibleNodes.Clear;
-  AbsoluteVisibleNodes.Capacity := 10240;
+  ViewItems.Count := 0;
+  AbsoluteVisibleNodes.Count := 0;
   PopulateViewItems(SubClass.RootNode);
   FHasSubLevels := CalculateHasSubLevels;
 end;
