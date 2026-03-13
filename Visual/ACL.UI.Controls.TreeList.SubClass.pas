@@ -4873,28 +4873,35 @@ end;
 
 procedure TACLTreeListSubClass.MoveSelected(ADelta: Integer);
 var
-  LCount: Integer;
   LIndex: Integer;
+  LIndexMax: Integer;
   LNode: TACLTreeListNode;
   LRoot: TACLTreeListNode;
 begin
   if FocusedNode <> nil then
-  begin
-    LRoot := FocusedNode.Parent;
-    LCount := LRoot.ChildrenCount - 1;
-    LIndex := IfThen(ADelta > 0, LCount);
-    while InRange(LIndex, 0, LCount) do
-    begin
-      LNode := LRoot.Children[LIndex];
-      if LNode.Selected then
+  try
+    BeginUpdate;
+    try
+      LRoot  := FocusedNode.Parent;
+      LIndexMax := LRoot.ChildrenCount - 1;
+      LIndex := IfThen(ADelta > 0, LIndexMax);
+      while InRange(LIndex, 0, LIndexMax) do
       begin
-        if InRange(LIndex + ADelta, 0, LCount) then
-          LNode.Index := LIndex + ADelta
-        else
-          Break;
+        LNode := LRoot.Children[LIndex];
+        if LNode.Selected then
+        begin
+          if InRange(LIndex + ADelta, 0, LIndexMax) then
+            LNode.Index := LIndex + ADelta
+          else
+            Break;
+        end;
+        Dec(LIndex, ADelta);
       end;
-      Dec(LIndex, ADelta);
+    finally
+      EndUpdate;
     end;
+  finally
+    DoDragSorting;
   end;
 end;
 
@@ -6084,22 +6091,50 @@ end;
 procedure TACLTreeListSubClass.ProcessKeyDown(var AKey: Word; AShift: TShiftState);
 var
   LColumn: TACLTreeListColumn;
-  LExpandable: IACLExpandableObject;
+
+  procedure ProcessCursorNavigation;
+  begin
+    if CheckFocusedObject or (AKey in [vkEnd, vkNext]) and CheckFocusedObject then
+    try
+      BeginUpdate;
+      try
+        LColumn := FocusedColumn;
+        NavigateTo(GetNextObject(FocusedObject, AKey), AShift);
+        FocusedColumn := LColumn;
+      finally
+        EndUpdate;
+      end;
+      UpdateHotTrack;
+    finally
+      AKey := 0;
+    end;
+  end;
+
+  function TryExpand(AObject: TObject; AExpand: Boolean): Boolean;
+  var
+    LExpandable: IACLExpandableObject;
+  begin
+    Result := Supports(AObject, IACLExpandableObject, LExpandable) and 
+      (LExpandable.CanToggle and (LExpandable.Expanded <> AExpand));
+    if Result then
+      LExpandable.Expanded := AExpand;
+  end;
+  
 begin
   case AKey of
     vkA: // A
       if [ssAlt, ssShift, ssCtrl] * AShift = [ssCtrl] then
         SelectAll;
 
-    106: // Num *
-      SelectInvert;
-
-    107: // Num +
+    vkAdd: // Num +
       if ssCtrl in AShift then
       begin
         if not OptionsView.Columns.AutoWidth then
           Columns.ApplyBestFit;
       end;
+
+    vkMultiply: // Num *
+      SelectInvert;
 
     vkShift:
       begin
@@ -6117,81 +6152,77 @@ begin
       if OptionsBehavior.Deleting then
         DeleteSelected;
 
-    vkF2, vkReturn:
+    vkReturn, vkF2:
       if FocusedObject is TACLTreeListNode then
         StartEditing(TACLTreeListNode(FocusedObject), FocusedColumn);
 
-    vkUp, vkDown, vkNext, vkPrior, vkHome, vkEnd:
-      if CheckFocusedObject or (AKey in [vkEnd, vkNext]) and CheckFocusedObject then
-      begin
-        BeginUpdate;
-        try
-          LColumn := FocusedColumn;
-          NavigateTo(GetNextObject(FocusedObject, AKey), AShift);
-          FocusedColumn := LColumn;
-        finally
-          EndUpdate;
+    vkNext, vkPrior, vkHome, vkEnd:
+      ProcessCursorNavigation;
+
+    vkUp, vkDown:
+      if acIsShiftPressed([ssShift, ssCtrl], AShift) then
+      try
+        if (FocusedNode <> nil) and OptionsBehavior.DragSorting then
+        begin
+          MoveSelected(Signs[AKey = vkDown]);
+          MakeVisible(FocusedNode);
         end;
-        UpdateHotTrack;
+      finally
         AKey := 0;
-      end;
+      end
+      else
+        ProcessCursorNavigation;
 
     vkLeft:
       if CheckFocusedObject then
-      begin
+      try
         if OptionsSelection.FocusCell and GetPrevColumn(LColumn) then
           FocusedColumn := LColumn
-        else
-          if Supports(FocusedObject, IACLExpandableObject, LExpandable) and
-            LExpandable.CanToggle and LExpandable.Expanded
-          then
-            LExpandable.Expanded := False
-          else
-            NavigateTo(GetObjectParent(FocusedObject), AShift);
+        else if not TryExpand(FocusedObject, False) then
+          NavigateTo(GetObjectParent(FocusedObject), AShift);
+      finally
         AKey := 0;
       end;
 
     vkRight:
       if CheckFocusedObject then
-      begin
+      try
         if OptionsSelection.FocusCell and GetNextColumn(LColumn) then
           FocusedColumn := LColumn
-        else
-          if Supports(FocusedObject, IACLExpandableObject, LExpandable) and
-            LExpandable.CanToggle and not LExpandable.Expanded
-          then
-            LExpandable.Expanded := True
-          else
-            NavigateTo(GetObjectChild(FocusedObject), AShift);
+        else if not TryExpand(FocusedObject, True) then
+          NavigateTo(GetObjectChild(FocusedObject), AShift);
+      finally
         AKey := 0;
       end;
 
   else
     IncSearch.ProcessKey(AKey, AShift);
   end;
-  inherited ProcessKeyDown(AKey, AShift);
+  inherited;
 end;
 
 procedure TACLTreeListSubClass.ProcessKeyPress(var AKey: WideChar);
 begin
   if OptionsBehavior.IncSearchColumnIndex >= 0 then
     IncSearch.ProcessKey(AKey);
-  inherited ProcessKeyPress(AKey);
+  inherited;
 end;
 
 procedure TACLTreeListSubClass.ProcessKeyUp(var AKey: Word; AShift: TShiftState);
 begin
   case AKey of
-    vkSHIFT:
+    vkShift:
       FStartObject := nil;
   end;
-  inherited ProcessKeyUp(AKey, AShift);
+  inherited;
 end;
 
 procedure TACLTreeListSubClass.ProcessContextPopup(var AHandled: Boolean);
 begin
-  inherited ProcessContextPopup(AHandled);
-  if not AHandled and (OptionsCustomizing.ColumnVisibility and (HitTest.HitAtColumn or HitTest.HitAtColumnBar)) then
+  inherited;
+  if AHandled then
+    Exit;
+  if OptionsCustomizing.ColumnVisibility and (HitTest.HitAtColumn or HitTest.HitAtColumnBar) then
   begin
     ColumnCustomizationMenuShow(HitTest.Point);
     AHandled := True;
@@ -6276,7 +6307,7 @@ end;
 
 procedure TACLTreeListSubClass.ProcessMouseDown(AButton: TMouseButton; AShift: TShiftState);
 begin
-  inherited ProcessMouseDown(AButton, AShift);
+  inherited;
   FWasSelected := False;
   if not HitTest.HasAction then
   begin
@@ -6314,7 +6345,7 @@ begin
       end;
   end;
   FWasSelected := False;
-  inherited ProcessMouseUp(AButton, AShift);
+  inherited;
 end;
 
 procedure TACLTreeListSubClass.ProcessMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState);
