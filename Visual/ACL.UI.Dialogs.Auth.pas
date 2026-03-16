@@ -109,7 +109,6 @@ end;
 
 destructor TACLAuthDialog.Destroy;
 begin
-  TACLMainThread.Unsubscribe(Self);
   FreeAndNil(FServer);
   inherited;
 end;

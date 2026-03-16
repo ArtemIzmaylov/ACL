@@ -312,7 +312,6 @@ end;
 
 destructor TACLPopupWindow.Destroy;
 begin
-  TACLMainThread.Unsubscribe(Self);
   TACLObjectLinks.Release(Self);
   inherited;
 end;

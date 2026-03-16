@@ -685,6 +685,7 @@ end;
 procedure TACLBasicForm.BeforeDestruction;
 begin
   inherited;
+  TACLMainThread.Unsubscribe(Self);
   TACLApplication.ListenerRemove(Self);
 end;
 

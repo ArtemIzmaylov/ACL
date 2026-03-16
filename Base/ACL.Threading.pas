@@ -63,6 +63,7 @@ type
     procedure Enter; inline;
     procedure Leave; inline;
     function TryEnter: Boolean; overload; inline;
+    function TryEnter(ACancelFunc: TFunc<Boolean>): Boolean; overload; inline;
     function TryEnter(ACancelToken: PBoolean): Boolean; overload; inline;
   end;
 
@@ -425,6 +426,17 @@ begin
   Result := True;
 end;
 {$ENDIF}
+
+function TACLCriticalSection.TryEnter(ACancelFunc: TFunc<Boolean>): Boolean;
+begin
+  while True do
+  begin
+    if TryEnter then
+      Exit(True);
+    if ACancelFunc then
+      Exit(False);
+  end;
+end;
 
 function TACLCriticalSection.TryEnter(ACancelToken: PBoolean): Boolean;
 begin
