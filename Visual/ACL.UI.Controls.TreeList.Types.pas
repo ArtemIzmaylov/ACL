@@ -6,7 +6,7 @@
 //  Purpose:   TreeList Types (DataModel)
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -450,6 +450,7 @@ type
     function EnumChildren(AProc: TPredicateC<TACLTreeListNode>; AExpanded: Boolean): Boolean;
     function EnumChildrenData<T: class>: IACLEnumerable<T>;
     function IsChild(ANode: TACLTreeListNode): Boolean;
+    function LastVisible: TACLTreeListNode;
     // Search
     function Find(const AData: Pointer;
       ARecursive: Boolean = True): TACLTreeListNode; overload;
@@ -1589,6 +1590,14 @@ begin
       end;
     end;
   end;
+end;
+
+function TACLTreeListNode.LastVisible: TACLTreeListNode;
+begin
+  if Expanded and (ChildrenCount > 0) then
+    Result := Children[ChildrenCount - 1].LastVisible
+  else
+    Result := Self;
 end;
 
 function TACLTreeListNode.Find(out ANode: TACLTreeListNode;

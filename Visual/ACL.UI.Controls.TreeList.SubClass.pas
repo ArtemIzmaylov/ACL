@@ -86,7 +86,7 @@ type
   TACLTreeListDragAndDropController = class;
   TACLTreeListNodeViewInfo = class;
 
-  TACLTreeListDropTargetInsertMode = (dtimBefore, dtimAfter, dtimInto, dtimOver);
+  TACLTreeListDropTargetInsertMode = (dtimBefore, dtimAfter, dtimInto);
 
   { TACLStyleTreeList }
 
@@ -422,14 +422,9 @@ type
   TACLTreeListDropTargetViewInfo = class
   strict private
     FOwner: TACLTreeListContentViewInfo;
-
     function GetDragAndDropController: TACLTreeListDragAndDropController;
-    function GetDropTargetObject: TObject;
   protected
     FBounds: TRect;
-    FInsertMode: TACLTreeListDropTargetInsertMode;
-
-    function CalculateActualTargetObject: TObject;
     procedure CalculateBounds(const ACellBounds: TRect); virtual;
     function MeasureHeight: Integer; virtual;
   public
@@ -440,7 +435,6 @@ type
     // Properties
     property Bounds: TRect read FBounds;
     property DragAndDropController: TACLTreeListDragAndDropController read GetDragAndDropController;
-    property DropTargetObject: TObject read GetDropTargetObject;
     property Owner: TACLTreeListContentViewInfo read FOwner;
   end;
 
@@ -668,7 +662,7 @@ type
     destructor Destroy; override;
     procedure ProcessChanges(AChanges: TIntegerSet); override;
     function UpdateDropInfo(AObject: TObject; AMode: TACLTreeListDropTargetInsertMode): Boolean;
-
+    //# Properties
     property DropTargetObject: TObject read FDropTargetObject;
     property DropTargetObjectInsertMode: TACLTreeListDropTargetInsertMode read FDropTargetObjectInsertMode;
     property DropTargetViewInfo: TACLTreeListDropTargetViewInfo read GetDropTargetViewInfo;
@@ -743,7 +737,6 @@ type
   protected
     function CalculateDropTarget(var AObject: TObject;
       var AMode: TACLTreeListDropTargetInsertMode): Boolean; virtual;
-    function CalculateInsertMode(ANode: TACLTreeListNode): TACLTreeListDropTargetInsertMode;
     function CanChangeNodeLevel: Boolean; virtual;
     function GetTargetClientRect: TRect; override;
     function ScreenToClient(const P: TPoint): TPoint; override;
@@ -2596,41 +2589,79 @@ end;
 
 procedure TACLTreeListDropTargetViewInfo.Calculate;
 var
-  ACell: TACLCompoundControlBaseContentCell;
-  AObject: TObject;
+  LCell: TACLCompoundControlBaseContentCell;
+  LExpandable: IACLExpandableObject;
+  LNode: TACLTreeListNode;
+  LTarget: TObject;
 begin
   FBounds := NullRect;
-
-  AObject := CalculateActualTargetObject;
-  if (AObject <> nil) and Owner.ViewItems.Find(AObject, ACell) then
+  LTarget := DragAndDropController.DropTargetObject;
+  if Owner.ViewItems.Find(LTarget, LCell) then
   begin
-    FBounds := ACell.Bounds;
-    if Owner.ViewItems.Find(DropTargetObject, ACell) then
+    FBounds := LCell.Bounds;
+    if LCell.ViewInfo = Owner.NodeViewInfo then
     begin
-      FBounds.Left := ACell.Bounds.Left;
-      FBounds.Right := ACell.Bounds.Right;
-      if ACell.ViewInfo = Owner.NodeViewInfo then
+      Owner.NodeViewInfo.Initialize(LCell.Data);
+      FBounds.Left := Owner.NodeViewInfo.CheckBoxRect.Left;
+    end;
+
+    if DragAndDropController.DropTargetObjectInsertMode = dtimAfter then
+    begin
+      while Supports(LTarget, IACLExpandableObject, LExpandable) and LExpandable.Expanded do
       begin
-        Owner.NodeViewInfo.Initialize(ACell.Data);
-        FBounds.Left := Owner.NodeViewInfo.CheckBoxRect.Left;
+        if LTarget is TACLTreeListGroup then
+          LTarget := TACLTreeListGroup(LTarget).Links.Last
+        else
+          if Safe.Cast(LTarget, TACLTreeListNode, LNode) then
+          begin
+            if LNode.ChildrenCount > 0 then
+              LTarget := LNode.Children[LNode.ChildrenCount - 1]
+            else
+              Break;
+          end;
+      end;
+      if Owner.ViewItems.Find(LTarget, LCell) then
+      begin
+        FBounds.Bottom := LCell.Bounds.Bottom;
+        FBounds.Top := LCell.Bounds.Top;
       end;
     end;
+
     CalculateBounds(FBounds);
   end;
 end;
 
+procedure TACLTreeListDropTargetViewInfo.CalculateBounds(const ACellBounds: TRect);
+begin
+  FBounds := ACellBounds;
+  case DragAndDropController.DropTargetObjectInsertMode of
+    dtimBefore:
+      FBounds.Bottom := FBounds.Top;
+    dtimAfter:
+      FBounds.Top := FBounds.Bottom;
+    dtimInto:
+      Exit;
+  end;
+  FBounds.CenterVert(MeasureHeight);
+end;
+
 procedure TACLTreeListDropTargetViewInfo.Draw(ACanvas: TCanvas);
 var
-  AColor: TAlphaColor;
+  LColor: TAlphaColor;
 begin
   if not Bounds.IsEmpty then
   begin
-    AColor := Owner.SubClass.Style.RowColorText.Value;
-    if FInsertMode = dtimOver then
-      acDrawFrame(ACanvas, Bounds, AColor, MeasureHeight)
+    LColor := Owner.SubClass.Style.RowColorText.Value;
+    if Bounds.Height > MeasureHeight then
+      acDrawFrame(ACanvas, Bounds, LColor, MeasureHeight)
     else
-      acFillRect(ACanvas, Bounds, AColor);
+      acFillRect(ACanvas, Bounds, LColor);
   end;
+end;
+
+function TACLTreeListDropTargetViewInfo.GetDragAndDropController: TACLTreeListDragAndDropController;
+begin
+  Result := FOwner.SubClass.DragAndDropController;
 end;
 
 procedure TACLTreeListDropTargetViewInfo.Invalidate;
@@ -2640,57 +2671,7 @@ end;
 
 function TACLTreeListDropTargetViewInfo.MeasureHeight: Integer;
 begin
-  Result := dpiApply(3, Owner.CurrentDpi);
-end;
-
-function TACLTreeListDropTargetViewInfo.CalculateActualTargetObject: TObject;
-var
-  AExpandable: IACLExpandableObject;
-begin
-  Result := DropTargetObject;
-  if DragAndDropController.DropTargetObjectInsertMode = dtimAfter then
-  begin
-    while Supports(Result, IACLExpandableObject, AExpandable) and AExpandable.Expanded do
-    begin
-      if Result is TACLTreeListGroup then
-        Result := TACLTreeListGroup(Result).Links.Last
-      else
-        if Result is TACLTreeListNode then
-        begin
-          if TACLTreeListNode(Result).ChildrenCount > 0 then
-            Result := TACLTreeListNode(Result).Children[TACLTreeListNode(Result).ChildrenCount - 1]
-          else
-            Break;
-        end;
-    end;
-  end;
-end;
-
-procedure TACLTreeListDropTargetViewInfo.CalculateBounds(const ACellBounds: TRect);
-begin
-  FBounds := ACellBounds;
-  FInsertMode := DragAndDropController.DropTargetObjectInsertMode;
-  case FInsertMode of
-    dtimBefore:
-      FBounds.Height := 0;
-    dtimAfter:
-      FBounds := FBounds.Split(srBottom, 0);
-    dtimInto:
-      FBounds := Rect(FBounds.Left + 4 * Owner.GetLevelIndent, FBounds.Bottom, FBounds.Right, FBounds.Bottom);
-    dtimOver:
-      Exit;
-  end;
-  FBounds.CenterVert(MeasureHeight);
-end;
-
-function TACLTreeListDropTargetViewInfo.GetDragAndDropController: TACLTreeListDragAndDropController;
-begin
-  Result := FOwner.SubClass.DragAndDropController;
-end;
-
-function TACLTreeListDropTargetViewInfo.GetDropTargetObject: TObject;
-begin
-  Result := DragAndDropController.DropTargetObject;
+  Result := dpiApply(2, Owner.CurrentDpi);
 end;
 
 { TACLTreeListContentViewInfo }
@@ -2853,7 +2834,7 @@ var
 begin
   for I := 0 to SubClass.RootNode.ChildrenCount - 1 do
   begin
-    if SubClass.RootNode.Children[I].ChildrenCount > 0 then
+    if SubClass.RootNode.Children[I].HasChildren then
       Exit(True);
   end;
   Result := False;
@@ -3904,21 +3885,21 @@ end;
 procedure TACLTreeListDropTarget.DoOver(Shift: TShiftState;
   const ScreenPoint: TPoint; var Hint: string; var Allow: Boolean; var Action: TACLDropAction);
 var
-  AMode: TACLTreeListDropTargetInsertMode;
-  AObject: TObject;
+  LMode: TACLTreeListDropTargetInsertMode;
+  LObject: TObject;
 begin
   Allow := False;
   if SubClass.OptionsBehavior.DragSorting or not DragAndDropController.IsActive then
   begin
     CheckContentScrolling(ScreenToClient(ScreenPoint));
-    AObject := nil;
-    AMode := dtimInto;
+    LObject := nil;
+    LMode := dtimInto;
     SubClass.UpdateHitTest;
-    Allow := CalculateDropTarget(AObject, AMode);
+    Allow := CalculateDropTarget(LObject, LMode);
 
     if Allow and not DragAndDropController.IsActive then
-      SubClass.DoDropOver(Self, Action, AObject, AMode, Allow);
-    if DragAndDropController.UpdateDropInfo(AObject, AMode) then
+      SubClass.DoDropOver(Self, Action, LObject, LMode, Allow);
+    if DragAndDropController.UpdateDropInfo(LObject, LMode) then
     begin
       if AutoExpandTimer <> nil then
         AutoExpandTimer.Restart;
@@ -3934,12 +3915,43 @@ end;
 
 function TACLTreeListDropTarget.CalculateDropTarget(
   var AObject: TObject; var AMode: TACLTreeListDropTargetInsertMode): Boolean;
+var
+  LCell: TACLCompoundControlBaseContentCell;
+  LNode: TACLTreeListNode absolute AObject;
 begin
-  Result := HitTest.HitAtNode;
-  if Result then
+  if HitTest.HitAtNode then
   begin
     AObject := HitTest.HitObject;
-    AMode := CalculateInsertMode(HitTest.Node);
+    AMode := dtimAfter;
+    if ContentViewInfo.ViewItems.Find(AObject, LCell) then
+    begin
+      if HitTest.Point.Y < LCell.Bounds.CenterPoint.Y then
+        AMode := dtimBefore;
+      NodeViewInfo.Initialize(AObject);
+      if HitTest.Point.X > LCell.Bounds.Left + NodeViewInfo.CellTextExtends[nil].Left + 2 * LCell.Bounds.Height then
+        AMode := dtimInto
+      else
+
+      if LNode.Expanded and LNode.HasChildren then
+      begin
+        // Если узел под мышкой раскрыт, то вставку "после него" заменяем на "вставку в него".
+        // Иначе при движении мышкой подсветка скачет туда-сюда, что хреново с т.ч. UX
+        if AMode = dtimAfter then
+          AMode := dtimInto;
+      end
+      else
+        // Даём возможность вытащить последний узел на уровень выше
+        while not LNode.IsTopLevel do
+        begin
+          if HitTest.Point.X > LCell.Bounds.Left + NodeViewInfo.CheckBoxRect.Left then
+            Break; // мышь в пределах узла, на уровень выше не поднимаемся
+          if HitTest.HitObject <> LNode.Parent.LastVisible then
+            Break; // узел перестал быть последним в списке, выше подниматься нельзя
+          AObject := LNode.Parent;
+          NodeViewInfo.Initialize(AObject);
+        end;
+    end;
+    Result := (AMode <> dtimInto) or CanChangeNodeLevel or TACLTreeListNode(AObject).HasChildren;
   end
   else
 
@@ -3948,31 +3960,9 @@ begin
     AMode := dtimAfter;
     AObject := nil;
     Result := True;
-  end;
-end;
-
-function TACLTreeListDropTarget.CalculateInsertMode(ANode: TACLTreeListNode): TACLTreeListDropTargetInsertMode;
-var
-  ACell: TACLCompoundControlBaseContentCell;
-begin
-  Result := dtimAfter;
-  if ContentViewInfo.ViewItems.Find(ANode, ACell) then
-  begin
-    if CanChangeNodeLevel then
-    begin
-      NodeViewInfo.Initialize(ANode);
-      if HitTest.Point.X >
-        ACell.Bounds.Left + 3 * ACell.Bounds.Height +
-        NodeViewInfo.CellTextExtends[nil].Left
-      then
-        Exit(dtimInto);
-    end;
-
-    if HitTest.Point.Y > ACell.Bounds.CenterPoint.Y then
-      Result := dtimAfter
-    else
-      Result := dtimBefore;
-  end;
+  end
+  else
+    Result := False;
 end;
 
 function TACLTreeListDropTarget.CanChangeNodeLevel: Boolean;
@@ -3992,11 +3982,11 @@ end;
 
 procedure TACLTreeListDropTarget.AutoExpandTimerHandler(Sender: TObject);
 var
-  AExpandable: IACLExpandableObject;
+  LExpandable: IACLExpandableObject;
 begin
   AutoExpandTimer.Enabled := False;
-  if Supports(DragAndDropController.DropTargetObject, IACLExpandableObject, AExpandable) then
-    AExpandable.Expanded := True;
+  if Supports(DragAndDropController.DropTargetObject, IACLExpandableObject, LExpandable) then
+    LExpandable.Expanded := True;
 end;
 
 function TACLTreeListDropTarget.GetContentViewInfo: TACLTreeListContentViewInfo;
@@ -4098,21 +4088,21 @@ end;
 
 procedure TACLTreeListGroupDragSortingDropTarget.DoDropObjects;
 var
-  AGroup: TACLTreeListGroup;
+  LGroup: TACLTreeListGroup;
 begin
   if Selection.Count = 0 then
     Exit;
 
   if DragAndDropController.DropTargetObject is TACLTreeListGroup then
-    AGroup := TACLTreeListGroup(DragAndDropController.DropTargetObject)
+    LGroup := TACLTreeListGroup(DragAndDropController.DropTargetObject)
   else if DragAndDropController.DropTargetObject is TACLTreeListNode then
-    AGroup := TACLTreeListNode(DragAndDropController.DropTargetObject).Group
+    LGroup := TACLTreeListNode(DragAndDropController.DropTargetObject).Group
   else
-    AGroup := nil;
+    LGroup := nil;
 
-  if AGroup <> nil then
+  if LGroup <> nil then
   begin
-    SubClass.Groups.Move(AGroup.Index +
+    SubClass.Groups.Move(LGroup.Index +
       Ord(DragAndDropController.DropTargetObjectInsertMode = dtimAfter), Selection);
   end;
 end;
@@ -4152,50 +4142,54 @@ end;
 function TACLTreeListNodeDragSortingDropTarget.CalculateDropTarget(
   var AObject: TObject; var AMode: TACLTreeListDropTargetInsertMode): Boolean;
 var
-  ANode: TACLTreeListNode;
+  LNode: TACLTreeListNode;
 begin
-  Result := False;
-
   // Node
   if HitTest.HitAtNode then
   begin
-    ANode := HitTest.Node;
-    Result := (ANode.TopLevel.Group = SelectedGroup) and
-      (Selection.IndexOf(ANode) < 0) and not Selection.IsChild(ANode);
-    if not CanChangeNodeLevel then
-      Result := Result and (ANode.Parent = SelectedLevel);
-    if Result then
-    begin
-      AObject := ANode;
-      AMode := CalculateInsertMode(ANode);
-    end;
+    if not inherited then
+      Exit(False);
   end
   else
 
   // Group
   if HitTest.HitAtGroup then
   begin
-    Result := HitTest.HitObject = SelectedGroup;
-    if Result then
-    begin
-      AObject := SelectedGroup.Links.First;
-      AMode := dtimBefore;
-    end;
-  end;
+    AObject := HitTest.Group.Links.First;
+    AMode := dtimBefore;
+  end
+  else
+    Exit(False);
 
-  if Result then
+  LNode := AObject as TACLTreeListNode;
+  if LNode.TopLevel.Group <> SelectedGroup then
+    Exit(False);
+  if Selection.Contains(LNode) or Selection.IsChild(LNode) then
+    Exit(False);
+  if CanChangeNodeLevel then
   begin
-    Result := Selection.IndexOf(AObject) < 0;
-    case AMode of
-      dtimBefore:
-        Result := Result and (Selection.IndexOf(TACLTreeListNode(AObject).PrevSibling) < 0);
-      dtimAfter:
-        Result := Result and (Selection.IndexOf(TACLTreeListNode(AObject).NextSibling) < 0);
-    else;
+    if (AMode = dtimInto) and (LNode.ChildrenCount > 0) then
+    begin
+      if Selection.Contains(LNode.Children[LNode.ChildrenCount - 1]) then
+        Exit(False);
     end;
+  end
+  else
+  begin
+    if LNode.Parent <> SelectedLevel then
+      Exit(False);
+    if AMode = dtimInto then
+      Exit(False);
   end;
-
-  Result := Result and SubClass.DoDragSortingOver(AObject as TACLTreeListNode, AMode);
+  case AMode of
+    dtimBefore:
+      Result := Selection.IndexOf(LNode.PrevSibling) < 0;
+    dtimAfter:
+      Result := Selection.IndexOf(LNode.NextSibling) < 0;
+  else
+    Result := True;
+  end;
+  Result := Result and SubClass.DoDragSortingOver(LNode, AMode);
 end;
 
 function TACLTreeListNodeDragSortingDropTarget.CanChangeNodeLevel: Boolean;
@@ -4847,14 +4841,14 @@ end;
 
 procedure TACLTreeListSubClass.ExpandTo(AObject: TObject);
 var
-  AExpandable: IACLExpandableObject;
+  LExpandable: IACLExpandableObject;
 begin
   BeginUpdate;
   try
     repeat
       AObject := GetObjectParent(AObject);
-      if Supports(AObject, IACLExpandableObject, AExpandable) then
-        AExpandable.Expanded := True;
+      if Supports(AObject, IACLExpandableObject, LExpandable) then
+        LExpandable.Expanded := True;
     until AObject = nil;
   finally
     EndUpdate;
