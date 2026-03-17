@@ -1029,7 +1029,7 @@ begin
     end;
 
   {$IFDEF MSWINDOWS}
-    if TACLControls.IsVisible(Self) then
+    if Visible and not TACLControls.IsVisible(Self) then
       Perform(CM_SHOWINGCHANGED, 0, 0)
     else
   {$ENDIF}

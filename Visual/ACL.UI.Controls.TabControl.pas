@@ -338,6 +338,7 @@ type
     property Padding;
     property PageIndex: Integer read GetPageIndex write SetPageIndex stored False;
     property PageVisible: Boolean read FPageVisible write SetPageVisible default True;
+    property Visible stored False;
   end;
 
   { TACLPageControl }

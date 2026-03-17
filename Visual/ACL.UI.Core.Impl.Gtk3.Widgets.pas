@@ -250,7 +250,7 @@ procedure TACLGtk3CustomControl.InitializeWidget;
 begin
   inherited InitializeWidget;
   SetBorderStyle(TWinControlAccess(LCLObject).BorderStyle);
-  SetVisible(LCLObject.Visible);
+  SetVisible(LCLObject.Showing); // ATE
 end;
 
 procedure TACLGtk3CustomControl.SetBorderStyle(AValue: TBorderStyle);
