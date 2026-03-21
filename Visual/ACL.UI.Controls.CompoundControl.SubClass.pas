@@ -270,7 +270,8 @@ type
     procedure InitializePreview(ASourceViewInfo: TACLCompoundControlCustomViewInfo);
     procedure StartDropSource(AActions: TACLDropSourceActions;
       ASource: IACLDropSourceOperation; ASourceObject: TObject); virtual;
-    procedure UpdateAutoScrollDirection(const P: TPoint; const AArea: TRect);
+    procedure UpdateAutoScrollDirection(const ACursorPos: TPoint;
+      const AVisibleArea: TRect; const AContentSize: TSize);
     procedure UpdateCursor(ACursor: TCursor);
     procedure UpdateDropTarget(ADropTarget: TACLDropTarget);
   public
@@ -1189,12 +1190,15 @@ begin
 end;
 
 procedure TACLCompoundControlDragObject.UpdateAutoScrollDirection(
-  const P: TPoint; const AArea: TRect);
+  const ACursorPos: TPoint; const AVisibleArea: TRect; const AContentSize: TSize);
 var
   LDirection: TAlign;
   LInterval: Integer;
 begin
-  LDirection := acCalculateAutoScroll(P, AArea, CurrentDpi, LInterval);
+  LDirection := acCalculateAutoScroll(
+    ACursorPos, AVisibleArea, CurrentDpi, LInterval,
+    AContentSize.Width > AVisibleArea.Width,
+    AContentSize.Height > AVisibleArea.Height);
   FController.UpdateAutoScrollDirection(LDirection, LInterval);
 end;
 
@@ -1592,6 +1596,11 @@ begin
   Result := Bounds.Height;
 end;
 
+function TACLCompoundControlBaseContentCellViewInfo.GetBounds: TRect;
+begin
+  Result := Rect(0, 0, FWidth, FHeight);
+end;
+
 function TACLCompoundControlBaseContentCellViewInfo.GetFocusRect: TRect;
 begin
   Result := Bounds;
@@ -1605,11 +1614,6 @@ end;
 function TACLCompoundControlBaseContentCellViewInfo.HasFocusRect: Boolean;
 begin
   Result := False;
-end;
-
-function TACLCompoundControlBaseContentCellViewInfo.GetBounds: TRect;
-begin
-  Result := Rect(0, 0, FWidth, FHeight);
 end;
 
 { TACLCompoundControlBaseCheckableContentCellViewInfo }

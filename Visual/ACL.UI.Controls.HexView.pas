@@ -37,6 +37,7 @@ uses
   {Vcl.}Controls,
   {Vcl.}Graphics,
   {Vcl.}Forms,
+  {Vcl.}StdCtrls,
   // ACL
   ACL.Classes,
   ACL.Classes.ByteBuffer,
@@ -157,6 +158,8 @@ type
     procedure CopyToClipboard(AEncodeProc: TEncodeProc); overload;
     function GetSelectedBytes: TBytes;
     procedure MakeVisible(const ACharPosition: Int64);
+    procedure ScrollHorizontally(const AScrollCode: TScrollCode); override;
+    procedure ScrollVertically(const AScrollCode: TScrollCode); override;
     procedure SelectAll;
     procedure SetSelection(AStart, ALength: Int64);
     procedure SetTargetDPI(AValue: Integer); override;
@@ -342,6 +345,7 @@ type
     //# Properties
     property FocusedPane: TPane read FFocusedPane write SetFocusedPane;
     property HexSelection: TACLHexViewSelectionViewInfo read FHexSelection;
+    property RowViewInfo: TACLHexViewRowViewInfo read FRowViewInfo;
     property SubClass: TACLHexViewSubClass read GetSubClass;
     property TextSelection: TACLHexViewSelectionViewInfo read FTextSelection;
   end;
@@ -847,35 +851,34 @@ begin
   inherited;
 
   case AKey of
-    VK_SHIFT:
+    vkShift:
       FSelectionStart := SelStart;
-
-    VK_LEFT:
+    vkLeft:
       MoveCursor(Cursor - 1);
-    VK_RIGHT:
+    vkRight:
       MoveCursor(Cursor + 1);
-    VK_UP:
+    vkUp:
       MoveCursor(Cursor - acHexViewBytesPerRow, acHexViewBytesPerRow);
-    VK_DOWN:
+    vkDown:
       MoveCursor(Cursor + acHexViewBytesPerRow, acHexViewBytesPerRow);
-    VK_PRIOR:
+    vkPrior:
       MoveCursor(Cursor - acHexViewBytesPerRow * ViewInfo.VisibleRowCount, acHexViewBytesPerRow);
-    VK_NEXT:
+    vkNext:
       MoveCursor(Cursor + acHexViewBytesPerRow * ViewInfo.VisibleRowCount, acHexViewBytesPerRow);
 
-    VK_END:
+    vkEnd:
       if ssCtrl in AShift then
         MoveCursor(DataSize)
       else
         MoveCursor(Cursor - Cursor mod acHexViewBytesPerRow + acHexViewBytesPerRow - 1);
 
-    VK_HOME:
+    vkHome:
       if ssCtrl in AShift then
         MoveCursor(0)
       else
         MoveCursor(Cursor - Cursor mod acHexViewBytesPerRow);
 
-    Ord('A'):
+    vkA:
       if ssCtrl in AShift then
         SelectAll;
   else
@@ -917,18 +920,28 @@ begin
   ViewInfo.ScrollByMouseWheel(ADirection, AShift);
 end;
 
+procedure TACLHexViewSubClass.ScrollHorizontally(const AScrollCode: TScrollCode);
+begin
+  ViewInfo.ScrollHorizontally(AScrollCode);
+end;
+
+procedure TACLHexViewSubClass.ScrollVertically(const AScrollCode: TScrollCode);
+begin
+  ViewInfo.ScrollVertically(AScrollCode);
+end;
+
 procedure TACLHexViewSubClass.Select(AStart, ATarget: Int64);
 var
-  ACursor: Int64;
+  LCursor: Int64;
 begin
-  ACursor := ATarget;
+  LCursor := ATarget;
   if ATarget < AStart then
     TACLMath.Exchange<Int64>(AStart, ATarget);
 
   BeginUpdate;
   try
     SetSelection(AStart, ATarget - AStart + 1);
-    Cursor := ACursor;
+    Cursor := LCursor;
   finally
     EndUpdate;
   end;
@@ -1255,15 +1268,17 @@ end;
 
 procedure TACLHexViewSelectionDragObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
 var
-  AHitPoint: TPoint;
+  LHitPoint: TPoint;
 begin
-  if not PtInRect(FContentArea, P) then
+  if not FContentArea.Contains(P) then
   begin
-    AHitPoint.X := EnsureRange(P.X, FContentArea.Left, FContentArea.Right - 1);
-    AHitPoint.Y := EnsureRange(P.Y, FContentArea.Top, FContentArea.Bottom - 1);
-    SubClass.UpdateHitTest(AHitPoint);
+    LHitPoint.X := EnsureRange(P.X, FContentArea.Left, FContentArea.Right - 1);
+    LHitPoint.Y := EnsureRange(P.Y, FContentArea.Top, FContentArea.Bottom - 1);
+    SubClass.UpdateHitTest(LHitPoint);
   end;
-  UpdateAutoScrollDirection(P, FContentArea);
+  UpdateAutoScrollDirection(P,
+    SubClass.ViewInfo.RowsAreaClipRect,
+    SubClass.ViewInfo.ContentSize);
   UpdateSelection;
 end;
 
@@ -1271,7 +1286,9 @@ function TACLHexViewSelectionDragObject.DragStart: Boolean;
 begin
   FSavedSelStart := SubClass.SelStart;
   FSavedSelLength := SubClass.SelLength;
-  FContentArea := SubClass.ViewInfo.RowsArea;
+  FContentArea := SubClass.ViewInfo.RowsAreaClipRect;
+  Inc(FContentArea.Left, SubClass.ViewInfo.RowViewInfo.FLabelAreaWidth);
+  Inc(FContentArea.Left, SubClass.ViewInfo.RowViewInfo.IndentBetweenViews);
   Result := True;
 end;
 
@@ -1283,7 +1300,15 @@ end;
 procedure TACLHexViewSelectionDragObject.UpdateSelection;
 begin
   if HitTest.HitObject is TACLHexViewChararterSetViewViewInfo then
-    SubClass.Select(FStartPosition, SubClass.GetPositionFromHitTest(HitTest));
+  begin
+    SubClass.BeginUpdate;
+    try
+      SubClass.Select(FStartPosition, SubClass.GetPositionFromHitTest(HitTest));
+      SubClass.FChanges := SubClass.FChanges - [hvcMakeVisible];
+    finally
+      SubClass.EndUpdate;
+    end;
+  end;
 end;
 
 { TACLHexViewViewInfo }
@@ -1367,7 +1392,7 @@ var
 begin
   inherited;
 
-  if (FRowHeight > 0) and PtInRect(RowsArea, AInfo.Point) then
+  if (FRowHeight > 0) and RowsArea.Contains(AInfo.Point) then
   begin
     LDataOffset := 0;
     LRowRect := RowsArea;

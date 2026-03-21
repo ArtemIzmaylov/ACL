@@ -4408,7 +4408,9 @@ end;
 
 procedure TACLTreeListColumnDragMoveObject.DragMove(const P: TPoint; var ADeltaX, ADeltaY: Integer);
 begin
-  UpdateAutoScrollDirection(P, TRect.Intersect(ColumnBarViewInfo.Bounds, SubClass.Bounds));
+  UpdateAutoScrollDirection(P,
+    TRect.Intersect(ColumnBarViewInfo.Bounds, SubClass.Bounds),
+    ColumnBarViewInfo.Bounds.Size);
   UpdateHighlight;
   if SubClass.HitTest.HitAtColumn then
     UpdateCursor(crDefault)
@@ -4634,7 +4636,7 @@ begin
   begin
     LPoint := P - Content.ViewItemsOrigin;
     UpdateAutoScrollDirection(
-      HitTest.Point, Content.ViewItemsArea);
+      HitTest.Point, Content.ViewItemsArea, Content.ContentSize);
     Content.SelectionRect := Rect(
       Min(FCapturePoint.X, LPoint.X),
       Min(FCapturePoint.Y, LPoint.Y),

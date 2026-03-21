@@ -490,8 +490,13 @@ var
 begin
   LCaretPos := FSubClass.LayoutHitTest.PositionInText;
   if LCaretPos >= 0 then
-    FSubClass.MoveSelection(LCaretPos, FCaretPos - LCaretPos, FSubClass.LayoutHitTest.PositionInLineEnd);
-  UpdateAutoScrollDirection(P, FSubClass.ViewInfo.ClientBounds);
+    FSubClass.MoveSelection(
+      LCaretPos, FCaretPos - LCaretPos,
+      FSubClass.LayoutHitTest.PositionInLineEnd);
+
+  UpdateAutoScrollDirection(P,
+    FSubClass.ViewInfo.ClientBounds,
+    FSubClass.ViewInfo.ContentSize);
 end;
 
 function TACLMemoDragObject.DragStart: Boolean;
@@ -1307,15 +1312,13 @@ end;
 procedure TACLMemoSubClass.UpdateHitTest(const P: TPoint; ACalcHint: Boolean);
 var
   LPoint: TPoint;
-  LRect: TRect;
 begin
   LPoint := P;
   LayoutHitTest.Reset;
   if DragAndDropController.IsActive then
   begin
-    LRect := ViewInfo.ClientBounds.InflateTo(-2);
-    LPoint.X := EnsureRange(LPoint.X, LRect.Left, LRect.Right);
-    LPoint.Y := EnsureRange(LPoint.Y, LRect.Top, LRect.Bottom);
+    LPoint.X := EnsureRange(LPoint.X, ViewInfo.ClientBounds.Left, ViewInfo.ClientBounds.Right);
+    LPoint.Y := EnsureRange(LPoint.Y, ViewInfo.ClientBounds.Top, ViewInfo.ClientBounds.Bottom);
   end;
   inherited;
   if (HitTest.HitObject = ViewInfo) or (HitTest.HitObject = nil) then

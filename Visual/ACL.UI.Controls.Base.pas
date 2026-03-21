@@ -990,7 +990,8 @@ procedure CreateControl(out Obj; AClass: TControlClass; AParent: TWinControl;
 
 // Scrolling
 function acCalculateAutoScroll(const ACursorPos: TPoint;
-  const AContentArea: TRect; ADpi: Integer; out AInterval: Integer): TAlign;
+  const AContentArea: TRect; ADpi: Integer; out AInterval: Integer;
+  AHasHorzScrollBar: Boolean = True; AHasVertScrollBar: Boolean = True): TAlign;
 function acCalculateNextPageIndex(AFocusedIndex: Integer;
   AFirstVisibleIndex, ALastVisibleIndex: Integer; AGoForward: Boolean): Integer;
 function acCalculateScrollToDelta(
@@ -1416,7 +1417,8 @@ end;
 {$REGION ' Drag/Scrolling '}
 
 function acCalculateAutoScroll(const ACursorPos: TPoint;
-  const AContentArea: TRect; ADpi: Integer; out AInterval: Integer): TAlign;
+  const AContentArea: TRect; ADpi: Integer; out AInterval: Integer;
+  AHasHorzScrollBar: Boolean = True; AHasVertScrollBar: Boolean = True): TAlign;
 const
   acAutoScrollArea = 32;
   acAutoScrollIntervalMax = 300;
@@ -1440,23 +1442,23 @@ var
   LRect: TRect;
   LVertPriority: Boolean;
 begin
-  LVertPriority :=
+  LVertPriority := AHasVertScrollBar and (
     Max(AContentArea.Top - ACursorPos.Y, ACursorPos.Y - AContentArea.Bottom) >
-    Max(AContentArea.Left - ACursorPos.X, ACursorPos.X - AContentArea.Right);
+    Max(AContentArea.Left - ACursorPos.X, ACursorPos.X - AContentArea.Right));
 
   LRect := AContentArea;
   LRect.Inflate(-dpiApply(acAutoScrollArea, ADpi));
-  if (ACursorPos.Y < LRect.Top) and LVertPriority then
+  if (ACursorPos.Y < LRect.Top        ) and LVertPriority and AHasVertScrollBar then
     Result := alTop
-  else if (ACursorPos.Y > LRect.Bottom) and LVertPriority then
+  else if (ACursorPos.Y > LRect.Bottom) and LVertPriority and AHasVertScrollBar then
     Result := alBottom
-  else if (ACursorPos.X < LRect.Left) then
+  else if (ACursorPos.X < LRect.Left  ) and AHasHorzScrollBar then
     Result := alLeft
-  else if (ACursorPos.X > LRect.Right) then
+  else if (ACursorPos.X > LRect.Right ) and AHasHorzScrollBar then
     Result := alRight
-  else if (ACursorPos.Y < LRect.Top) and not LVertPriority then
+  else if (ACursorPos.Y < LRect.Top   ) and not LVertPriority and AHasVertScrollBar then
     Result := alTop
-  else if (ACursorPos.Y > LRect.Bottom) and not LVertPriority then
+  else if (ACursorPos.Y > LRect.Bottom) and not LVertPriority and AHasVertScrollBar then
     Result := alBottom
   else
     Result := alNone;
