@@ -1470,7 +1470,8 @@ begin
   LOrigin := acMoveWindowOrg(ACanvas.Handle, GetOrigin);
   try
     Layout.Draw(ACanvas);
-    if SubClass.EnabledContent and not Selection.Empty then
+    // TODO: ColorContentSelectedInactive
+    if SubClass.EnabledContent and not Selection.Empty and SubClass.Focused then
     begin
       LClipRgn := acSaveClipRegion(ACanvas.Handle);
       try
@@ -1567,7 +1568,10 @@ end;
 procedure TACLCustomMemo.FocusChanged;
 begin
   inherited;
-  InvalidateBorders;
+  if SubClass.SelectionRange <> 0 then
+    Invalidate
+  else
+    InvalidateBorders;
 end;
 
 function TACLCustomMemo.GetAlignment: TAlignment;
