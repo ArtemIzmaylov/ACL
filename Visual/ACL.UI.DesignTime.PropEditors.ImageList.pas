@@ -56,6 +56,7 @@ uses
   ACL.UI.Forms,
   ACL.UI.ImageList,
   ACL.UI.Resources,
+  ACL.Utils.Strings,
   ACL.Utils.FileSystem;
 
 type
@@ -223,7 +224,7 @@ end;
 
 function TfrmImageListEditor.LoadImage(const AFileName: string): TACLBitmap;
 begin
-  if acIsOurFile('*.bmp;', AFileName) then
+  if acEndsWith(AFileName, '.bmp') then
   begin
     Result := TACLBitmap.Create;
     Result.LoadFromFile(AFileName);

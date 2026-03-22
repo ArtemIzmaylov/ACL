@@ -44,6 +44,7 @@
 
 {$IF NOT DEFINED(FPC)}
   {$WARN DUPLICATE_CTOR_DTOR OFF} // We does not support for C++Builder
+  {$WARN OVERLOADING_ARRAY_PROPERTY OFF}
 {$IFEND}
 
 // -----------------------------------------------------------------------------

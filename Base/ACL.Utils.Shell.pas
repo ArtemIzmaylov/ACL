@@ -193,7 +193,7 @@ type
 {$ENDREGION}
 
   TShellDesktopEnvironment = (sdeUnknown, sdeWindows,
-    sdeCinnamon, sdeKDE, sdeGnome, sdeXFCE, sdeMate);
+    sdeCinnamon, sdeGnome, sdeKDE, sdeMate, sdeXFCE);
   TShellPowerState = set of (psKeepPowerOn, psKeepScreenOn);
   TShellShutdownMode = (sdPowerOff, sdLogOff, sdHibernate, sdSleep, sdReboot);
 
@@ -360,14 +360,14 @@ const
   DesktopEnv: string = '';
 begin
   if DesktopEnv = '' then
-    DesktopEnv := IfThenW(LowerCase(GetEnvironmentVariable('XDG_SESSION_DESKTOP')), '?');
+    DesktopEnv := IfThenW(LowerCase(GetEnvironmentVariable('XDG_CURRENT_DESKTOP')), '?');
   if acContains('cinnamon', DesktopEnv) then
     Exit(sdeCinnamon);
   if acContains('gnome', DesktopEnv) then
     Exit(sdeGnome);
   if acContains('kde', DesktopEnv) then
     Exit(sdeKDE);
-  if acContains('lightdm', DesktopEnv) then
+  if acContains('xfce', DesktopEnv) then
     Exit(sdeXFCE);
   if acContains('mate', DesktopEnv) then
     Exit(sdeMate);

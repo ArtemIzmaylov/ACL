@@ -318,6 +318,7 @@ type
     procedure DoDraw(ACanvas: TCanvas); override;
     function GetContentOffsets: TRect; virtual;
     function GetFocusRect: TRect; override;
+    function GetFocusRectColor: TColor; override;
     function HasFocusRect: Boolean; override;
     function StartFromEven: Boolean; virtual;
 
@@ -2066,6 +2067,9 @@ begin
   end;
   FFocusRect := LRect.InflateTo(acTextIndent);
 
+  if not Group.Expanded and Group.Selected then
+    acDrawFrame(ACanvas, FFocusRect, GetFocusRectColor);
+
   // Separator
   if FModernView then
   begin
@@ -2094,6 +2098,11 @@ end;
 function TACLTreeListGroupViewInfo.GetFocusRect: TRect;
 begin
   Result := FFocusRect;
+end;
+
+function TACLTreeListGroupViewInfo.GetFocusRectColor: TColor;
+begin
+  Result := SubClass.Style.GroupHeaderFont.Color.ToColor;
 end;
 
 function TACLTreeListGroupViewInfo.GetGroup: TACLTreeListGroup;

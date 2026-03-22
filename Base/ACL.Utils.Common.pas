@@ -356,10 +356,9 @@ end;
 function acOSGuiMode: string;
 begin
   Result :=
-//  {$IF DEFINED(MSWINDOWS)}
   {$IF DEFINED(LINUX)}
-    GetEnvironmentVariable('XDG_SESSION_DESKTOP') + ' on ' +
-    GetEnvironmentVariable('XDG_SESSION_TYPE')
+    UpperCase(GetEnvironmentVariable('XDG_CURRENT_DESKTOP')) + ' on ' +
+    UpperCase(GetEnvironmentVariable('XDG_SESSION_TYPE'))
   {$ELSE}''{$ENDIF};
 end;
 
