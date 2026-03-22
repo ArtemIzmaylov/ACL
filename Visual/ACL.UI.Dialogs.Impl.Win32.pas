@@ -44,6 +44,7 @@ uses
   ACL.Classes.StringList,
   ACL.Graphics,
   ACL.UI.Dialogs,
+  ACL.UI.Forms,
   ACL.Utils.Common,
   ACL.Utils.FileSystem,
   ACL.Utils.Strings;
@@ -335,22 +336,25 @@ class function TACLFileDialogOldImpl.DialogHook(Wnd: HWND; Msg: UINT; WParam: WP
 
   procedure CenterWindow(Wnd: HWnd);
   var
-    Monitor: TMonitor;
-    Rect: TRect;
+    LForm: TForm;
+    LMonitor: TMonitor;
+    LWndRect: TRect;
   begin
-    GetWindowRect(Wnd, Rect);
-    if Application.MainForm = nil then
-      Monitor := Screen.Monitors[0]
+    LForm := acActiveFormOrMain;
+    if LForm <> nil then
+      LMonitor := LForm.Monitor
+    else if Screen.MonitorCount > 0 then
+      LMonitor := Screen.Monitors[0]
     else
-      if Assigned(Screen.ActiveForm) then
-        Monitor := Screen.ActiveForm.Monitor
-      else
-        Monitor := Application.MainForm.Monitor;
+      LMonitor := nil;
 
-    SetWindowPos(Wnd, HWND_TOP,
-      Monitor.Left + ((Monitor.Width - Rect.Right + Rect.Left) div 2),
-      Monitor.Top + ((Monitor.Height - Rect.Bottom + Rect.Top) div 3),
-      0, 0, SWP_NOSIZE);
+    if LMonitor <> nil then
+    begin
+      GetWindowRect(Wnd, LWndRect);
+      SetWindowPos(Wnd, HWND_TOP,
+        LMonitor.Left + ((LMonitor.Width - LWndRect.Width) div 2),
+        LMonitor.Top + ((LMonitor.Height - LWndRect.Height) div 3), 0, 0, SWP_NOSIZE);
+    end;
   end;
 
 var

@@ -182,6 +182,8 @@ type
 
 {$ENDREGION}
 
+function acActiveFormOrMain: TForm;
+function acActiveFormOrMainHandle: TWndHandle;
 function acGetWindowText(AHandle: HWND): string;
 procedure acSetWindowText(AHandle: HWND; const AText: string);
 implementation
@@ -191,6 +193,24 @@ uses
 
 type
   TWinControlAccess = class(TWinControl);
+
+function acActiveFormOrMain: TForm;
+begin
+  Result := Screen.ActiveForm;
+  if Result = nil then
+    Result := Application.MainForm;
+end;
+
+function acActiveFormOrMainHandle: TWndHandle;
+var
+  LForm: TForm;
+begin
+  LForm := acActiveFormOrMain;
+  if LForm <> nil then
+    Result := LForm.Handle
+  else
+    Result := 0;
+end;
 
 function acGetWindowText(AHandle: HWND): string;
 {$IFDEF MSWINDOWS}

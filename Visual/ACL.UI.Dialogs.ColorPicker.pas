@@ -241,7 +241,6 @@ end;
 procedure TACLColorPickerDialog.AfterFormCreate;
 begin
   inherited AfterFormCreate;
-  Position := poMainFormCenter;
   BorderIcons := [biSystemMenu];
   BorderStyle := bsDialog;
   DoubleBuffered := True;

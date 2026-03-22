@@ -422,7 +422,7 @@ type
 function acMessageBox(AOwnerWnd: TWndHandle; const AMessage, ACaption: string; AFlags: Integer): Integer;
 begin
   if AOwnerWnd = 0 then
-    AOwnerWnd := Application.MainFormHandle;
+    AOwnerWnd := acActiveFormOrMainHandle;
 
   with TACLMessageDialog.CreateDialog(AOwnerWnd, True) do
   try

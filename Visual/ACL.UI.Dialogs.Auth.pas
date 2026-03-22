@@ -94,7 +94,7 @@ constructor TACLAuthDialog.Create(AOwnerWnd: TWndHandle);
 begin
   CreateDialog(AOwnerWnd, True);
   BorderStyle := bsDialog;
-  Position := poMainFormCenter;
+  Position := poOwnerFormCenter;
   SetBounds(Left, Top, 512, 160);
 
   FUrl := TACLEdit.Create(Self);
