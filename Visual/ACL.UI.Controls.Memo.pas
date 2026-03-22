@@ -1276,6 +1276,7 @@ begin
   inherited;
   Style.TargetDpi := AValue;
   Layout.TargetDpi := AValue;
+  Layout.FlushCalculatedValues;
 end;
 
 procedure TACLMemoSubClass.SetText(const AValue: string);
