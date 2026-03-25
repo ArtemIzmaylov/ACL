@@ -6,7 +6,7 @@
 //  Purpose:   Advanced Labels
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -179,7 +179,6 @@ type
     property Alignment;
     property AlignmentVert;
     property Anchors;
-    property AutoSize;
     property Caption;
     property Constraints;
     property Cursor;
@@ -195,6 +194,7 @@ type
     property URL: string read FUrl write SetUrl;
     property Visible;
     property Width;
+    property AutoSize; // last
     //# Events
     property OnClick;
     property OnDblClick;

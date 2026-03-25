@@ -969,7 +969,7 @@ end;
 procedure TACLCustomButton.BoundsChanged;
 begin
   inherited;
-  if SubClass <> nil then
+  if not (csDestroying in ComponentState) then
     Calculate(ClientRect);
 end;
 

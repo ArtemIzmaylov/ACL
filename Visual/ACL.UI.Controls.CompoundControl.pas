@@ -244,7 +244,7 @@ end;
 procedure TACLCompoundControl.FocusChanged;
 begin
   inherited FocusChanged;
-  if SubClass <> nil then // can be invoked from WM_KillFocus on DestroyWnd
+  if not (csDestroying in ComponentState) then // can be invoked from WM_KillFocus on DestroyWnd
     TACLCompoundControlSubClassAccess(SubClass).FocusChanged;
 end;
 
@@ -263,7 +263,7 @@ procedure TACLCompoundControl.BoundsChanged;
 var
   R: TRect;
 begin
-  if SubClass <> nil then
+  if not (csDestroying in ComponentState) then
   begin
     R := ClientRect;
     AdjustClientRect(R);
@@ -273,7 +273,7 @@ end;
 
 procedure TACLCompoundControl.LayoutChanged;
 begin
-  if SubClass <> nil then
+  if not (csDestroying in ComponentState) then
     SubClass.Changed([cccnLayout]);
 end;
 

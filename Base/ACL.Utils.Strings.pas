@@ -1324,19 +1324,19 @@ end;
 
 function acStringToUtf8(const S: string): AnsiString;
 begin
-{$IFDEF FPC}
-  Result := S;
-{$ELSE}
+{$IF DEFINED(UNICODE)}
   Result := acEncodeUtf8(S);
+{$ELSE}
+  Result := S;
 {$ENDIF}
 end;
 
 function acStringFromUtf8(const S: AnsiString): string;
 begin
-{$IFDEF FPC}
-  Result := S;
-{$ELSE}
+{$IF DEFINED(UNICODE)}
   Result := acDecodeUtf8(S);
+{$ELSE}
+  Result := S;
 {$ENDIF}
 end;
 
