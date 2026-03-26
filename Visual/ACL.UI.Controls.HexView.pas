@@ -693,7 +693,7 @@ procedure TACLHexViewSubClass.CopyToClipboard(AEncodeProc: TEncodeProc);
   end;
 
 begin
-  Clipboard.AsString := acString(BytesToString(GetSelectedBytes));
+  Clipboard.AsPlainText := acString(BytesToString(GetSelectedBytes));
 end;
 
 function TACLHexViewSubClass.GetSelectedBytes: TBytes;

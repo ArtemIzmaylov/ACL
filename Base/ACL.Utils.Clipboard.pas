@@ -6,7 +6,7 @@
 //  Purpose:   Clipboard and OS-wide data sharing utilities
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2024
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -38,6 +38,7 @@ uses
   // ACL
   ACL.Classes,
   ACL.Classes.StringList,
+  ACL.Utils.Common,
   ACL.Utils.FileSystem,
   ACL.Utils.Strings;
 
@@ -48,7 +49,9 @@ const
   acMimeHtml = 'text/html';
 
 type
-{$IFDEF MSWINDOWS}
+{$IFNDEF MSWINDOWS}
+  TClipboardFormat = LCLType.TClipboardFormat;
+{$ELSE}
   TClipboardFormat = Word;
 
   TACLGlobalMemory = class
@@ -68,7 +71,6 @@ type
     constructor Create(AHandle: HGLOBAL);
     destructor Destroy; override;
   end;
-
 {$ENDIF}
 
 {$IFNDEF ACL_BASE_NOVCL}
@@ -84,15 +86,22 @@ type
     procedure SetStream(AFormat: TClipboardFormat; AValue: TCustomMemoryStream);
     procedure SetString(const AValue: string);
   public
+  {$IFDEF FPC}
+    procedure AddFormat(const AFormat, AData: AnsiString); overload;
+  {$ELSE}
+    procedure AddFormat(const AFormat: TClipboardFormat; var ABuffer; ASize: Integer);
+  {$ENDIF}
+    procedure AddPlainText(const AText: string);
+    // Most effective way to list current formats
+    procedure EnumFormats(ACallback: TProc<TClipboardFormat>);
   {$IFDEF LINUX}
-    procedure AddFormat(const AMimeType, AData: AnsiString); overload;
     function EncodeFiles(AFiles: TACLStringList): string;
   {$ENDIF}
-    function HasString: Boolean;
+    function HasPlainText: Boolean;
+    // Properties
     property AsFiles: TACLStringList read GetFiles write SetFiles;
+    property AsPlainText: string read GetString write SetString; // unlike AsText: no exceptions, utf8 aware
     property AsStream[AFormat: TClipboardFormat]: TCustomMemoryStream read GetStream write SetStream;
-    // unlike AsText: no exceptions, utf-8 aware
-    property AsString: string read GetString write SetString;
   end;
 
 {$ENDIF}
@@ -438,12 +447,62 @@ end;
 
 { TACLClipboardHelper }
 
-{$IFDEF LINUX}
-procedure TACLClipboardHelper.AddFormat(const AMimeType, AData: AnsiString);
+{$IFDEF FPC}
+procedure TACLClipboardHelper.AddFormat(const AFormat, AData: AnsiString);
 begin
-  AddFormat(RegisterClipboardFormat(AMimeType), PAnsiChar(AData)^, Length(AData));
+  AddFormat(RegisterClipboardFormat(AFormat), PChar(AData)^, Length(AData));
+end;
+{$ELSE}
+procedure TACLClipboardHelper.AddFormat(const AFormat: TClipboardFormat; var ABuffer; ASize: Integer);
+begin
+  SetBuffer(AFormat, ABuffer, ASize);
+end;
+{$ENDIF}
+
+procedure TACLClipboardHelper.AddPlainText(const AText: string);
+{$IFDEF FPC}
+var
+  LText: AnsiString;
+begin
+  LText := acStringToUtf8(AText);
+  if ClipboardFormatNeedsNullByte(pcfText) then
+    LText := LText + #0;
+  AddFormat('text/plain', LText);
+  AddFormat('text/plain;charset=utf-8', LText);
+{$ELSE}
+begin
+  AddFormat({$IFDEF UNICODE}CF_UNICODETEXT{$ELSE}CF_TEXT{$ENDIF},
+    PChar(AText)^, (Length(AText) + 1) * SizeOf(Char));
+{$ENDIF}
 end;
 
+procedure TACLClipboardHelper.EnumFormats(ACallback: TProc<TClipboardFormat>);
+{$IFDEF FPC}
+var
+  LCount: Integer;
+  LFormats: PClipboardFormat;
+begin
+  LCount := 0;
+  LFormats := nil;
+  if ClipboardGetFormats(ctClipboard, LCount, LFormats) and (LFormats <> nil) then
+  try
+    while LCount > 0 do
+    begin
+      ACallback(LFormats^);
+      Inc(LFormats);
+      Dec(LCount);
+    end;
+  finally
+    FreeMem(LFormats);
+  end;
+{$ELSE}
+begin
+  for var I := 0 to FormatCount - 1 do
+    ACallback(Formats[I]);
+{$ENDIF}
+end;
+
+{$IFDEF LINUX}
 function TACLClipboardHelper.EncodeFiles(AFiles: TACLStringList): string;
 var
   I: Integer;
@@ -459,9 +518,40 @@ begin
 end;
 {$ENDIF}
 
-function TACLClipboardHelper.HasString: Boolean;
+function TACLClipboardHelper.HasPlainText: Boolean;
+{$IFDEF FPC}
+var
+  LCount: Integer;
+  LFormats: PClipboardFormat;
+  LTextFormat1: TClipboardFormat;
+  LTextFormat2: TClipboardFormat;
+  LTextFormat3: TClipboardFormat;
 begin
-  Result := HasFormat(CF_TEXT){$IFDEF MSWINDOWS} or HasFormat(CF_UNICODETEXT){$ENDIF};
+  LCount := 0;
+  LFormats := nil;
+  LTextFormat1 := CF_Text;
+  LTextFormat2 := ClipboardRegisterFormat('text/plain;charset=utf-8'); // Firefox / org.gnome.TextEditor
+  LTextFormat3 := ClipboardRegisterFormat('UTF8_STRING'); // KWrite
+  if ClipboardGetFormats(ctClipboard, LCount, LFormats) and (LFormats <> nil) then
+  try
+    while LCount > 0 do
+    begin
+      if (LFormats^ = LTextFormat1) or
+         (LFormats^ = LTextFormat2) or
+         (LFormats^ = LTextFormat3)
+      then
+        Exit(True);
+      Inc(LFormats);
+      Dec(LCount);
+    end;
+  finally
+    FreeMem(LFormats);
+  end;
+  Result := False;
+{$ELSE}
+begin
+  Result := HasFormat(CF_TEXT) or HasFormat(CF_UNICODETEXT);
+{$ENDIF};
 end;
 
 function TACLClipboardHelper.GetStream(AFormat: TClipboardFormat): TCustomMemoryStream;
@@ -515,18 +605,13 @@ end;
 
 procedure TACLClipboardHelper.SetString(const AValue: string);
 begin
-{$IFDEF MSWINDOWS}
-  AsText := AValue;
-{$ELSE}
   Open;
   try
     Clear;
-    AddFormat('text/plain', AValue);
-    AddFormat('text/plain;charset=utf-8', AValue);
+    AddPlainText(AValue);
   finally
     Close;
   end;
-{$ENDIF}
 end;
 
 procedure TACLClipboardHelper.SetFiles(AFiles: TACLStringList);

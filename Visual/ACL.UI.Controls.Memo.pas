@@ -571,7 +571,7 @@ begin
     eaCopy:
       Result := (SelLength > 0);
     eaPaste:
-      Result := not ReadOnly and Clipboard.HasString;
+      Result := not ReadOnly and Clipboard.HasPlainText;
     eaUndo:
       Result := History.CanUndo;
     eaSelectAll:
@@ -603,7 +603,7 @@ procedure TACLMemoSubClass.Execute(AAction: TACLEditAction);
 begin
   case AAction of
     eaCopy:
-      Clipboard.AsString := SelText;
+      Clipboard.AsPlainText := SelText;
 
     eaCut:
       if not ReadOnly then
@@ -618,7 +618,7 @@ begin
 
     eaPaste:
       if not ReadOnly then
-        SelText := Clipboard.AsString;
+        SelText := Clipboard.AsPlainText;
 
     eaSelectAll:
       MoveSelection(Length(Text), -Length(Text), False, False);
