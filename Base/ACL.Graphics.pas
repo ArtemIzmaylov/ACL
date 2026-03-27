@@ -6,7 +6,7 @@
 //  Purpose:   Graphics Library
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -470,6 +470,9 @@ type
     procedure CopyColorsToCanvas; virtual;
     function GetColors: PACLPixel32; override;
   {$ENDIF}
+  {$IFDEF MSWINDOWS}
+    procedure AssignIcon(ASource: TIcon);
+  {$ENDIF}
   protected
     procedure CreateHandles; override;
     procedure FreeHandles; override;
@@ -562,12 +565,12 @@ type
     UnpremultiplyTable: TACLPixelMap;
   public
     class constructor Create;
-    class function CompareRGB(const Q1, Q2: TACLPixel32): Boolean; inline; static;
     class function IsDark(Color: TColor): Boolean;
     class function IsMask(const P: TACLPixel32): Boolean; inline; static;
 
     class procedure AlphaBlend(var D: TColor; S: TColor; AAlpha: Byte = 255); overload; inline; static;
     class procedure AlphaBlend(var D: TACLPixel32; const S: TACLPixel32; AAlpha: Byte = 255); overload; inline; static;
+    class procedure Analyze(P: PACLPixel32; Count: Integer; out HasNull, HasSemitransparent, HasOpaque: Boolean);
     class procedure Clone(var Colors: PACLPixel32; Width, Height: Integer); static;
     class procedure Flip(AColors: PACLPixel32; AWidth, AHeight: Integer; AHorizontally, AVertically: Boolean);
     class procedure Flush(var P: TACLPixel32); inline; static;
@@ -580,6 +583,7 @@ type
     class procedure MakeOpaque(P: PACLPixel32; Count: Integer); overload; static;
     class procedure MakeTransparent(P: PACLPixel32; Count: Integer; const ATransparentColor: TACLPixel32);
     class procedure Mix(var D: TACLPixel32; const S: TACLPixel32; AAlpha: Byte = 255); overload; inline; static;
+    class procedure RecoverAlpha(P: PACLPixel32; Count: Integer); static;
 
     // ApplyColorSchema
     class procedure ApplyColorSchema(P: PACLPixel32; ACount: Integer; const AValue: TACLColorSchema); overload;
@@ -1168,27 +1172,26 @@ function acRegionFromBitmap(AColors: PACLPixel32; AWidth, AHeight: Integer; ATra
   end;
 
 var
-  ACount: Integer;
-  ATransparent: TACLPixel32;
+  LCount: Integer;
+  LValue: Cardinal;
   X, Y: Integer;
 begin
   Result := 0;
-  ATransparent.B := GetBValue(ATransparentColor);
-  ATransparent.G := GetGValue(ATransparentColor);
-  ATransparent.R := GetRValue(ATransparentColor);
+  LValue := Cardinal(TACLPixel32.Create(ATransparentColor));
+  LValue := LValue and TACLPixel32.EssenceMask;
   for Y := 0 to AHeight - 1 do
   begin
-    ACount := 0;
+    LCount := 0;
     for X := 0 to AWidth - 1 do
     begin
-      if TACLColors.CompareRGB(AColors^, ATransparent) then
-        FlushRegion(X, Y, ACount, Result)
+      if (Cardinal(AColors^) and TACLPixel32.EssenceMask) = LValue then
+        FlushRegion(X, Y, LCount, Result)
       else
-        Inc(ACount);
+        Inc(LCount);
 
       Inc(AColors);
     end;
-    FlushRegion(AWidth, Y, ACount, Result);
+    FlushRegion(AWidth, Y, LCount, Result);
   end;
 end;
 
@@ -1752,9 +1755,9 @@ begin
 {$ENDIF}
 end;
 
-//----------------------------------------------------------------------------------------------------------------------
-// Alpha Blend Functions
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+// Windows Platform Specific functions
+//------------------------------------------------------------------------------
 
 {$IFDEF MSWINDOWS}
 procedure acAlphaBlend(DC, SrcDC: HDC; const R, SrcRect: TRect; AAlpha: Integer = 255);
@@ -1810,9 +1813,9 @@ begin
 end;
 {$ENDIF}
 
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // GDI
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
 procedure acBitBlt(DC, SourceDC: HDC; const R: TRect; const APoint: TPoint);
 begin
@@ -3159,6 +3162,37 @@ begin
   inherited Destroy;
 end;
 
+procedure TACLBaseDib.ApplyColorSchema(const ASchema: TACLColorSchema);
+begin
+  if (ColorCount > 0) and ASchema.IsAssigned then
+    TACLColors.ApplyColorSchema(Colors, ColorCount, ASchema);
+end;
+
+procedure TACLBaseDib.ApplyTint(const AColor: TColor);
+begin
+  ApplyTint(TAlphaColor.FromColor(AColor).ToPixel);
+end;
+
+procedure TACLBaseDib.ApplyTint(const AColor: TACLPixel32);
+var
+  P: PACLPixel32;
+  I: Integer;
+begin
+  P := Colors;
+  for I := 0 to ColorCount - 1 do
+  begin
+    if P^.A > 0 then
+    begin
+      TACLColors.Unpremultiply(P^);
+      P^.B := AColor.B;
+      P^.G := AColor.G;
+      P^.R := AColor.R;
+      TACLColors.Premultiply(P^);
+    end;
+    Inc(P);
+  end;
+end;
+
 procedure TACLBaseDib.Assign(AColors: PACLPixel32; AWidth, AHeight: Integer);
 begin
   Resize(AWidth, AHeight);
@@ -3313,37 +3347,6 @@ begin
   Result := TACLColors.ArePremultiplied(Colors, ColorCount);
 end;
 
-procedure TACLBaseDib.ApplyColorSchema(const ASchema: TACLColorSchema);
-begin
-  if (ColorCount > 0) and ASchema.IsAssigned then
-    TACLColors.ApplyColorSchema(Colors, ColorCount, ASchema);
-end;
-
-procedure TACLBaseDib.ApplyTint(const AColor: TColor);
-begin
-  ApplyTint(TAlphaColor.FromColor(AColor).ToPixel);
-end;
-
-procedure TACLBaseDib.ApplyTint(const AColor: TACLPixel32);
-var
-  P: PACLPixel32;
-  I: Integer;
-begin
-  P := Colors;
-  for I := 0 to ColorCount - 1 do
-  begin
-    if P^.A > 0 then
-    begin
-      TACLColors.Unpremultiply(P^);
-      P^.B := AColor.B;
-      P^.G := AColor.G;
-      P^.R := AColor.R;
-      TACLColors.Premultiply(P^);
-    end;
-    Inc(P);
-  end;
-end;
-
 procedure TACLBaseDib.Flip(AHorizontally, AVertically: Boolean);
 begin
   TACLColors.Flip(Colors, Width, Height, AHorizontally, AVertically);
@@ -3437,19 +3440,8 @@ begin
 end;
 
 procedure TACLBaseDib.MakeTransparent(const AColor: TACLPixel32);
-var
-  I: Integer;
-  P: PACLPixel32;
 begin
-  P := Colors;
-  for I := 0 to ColorCount - 1 do
-  begin
-    if TACLColors.CompareRGB(P^, AColor) then
-      TACLColors.Flush(P^)
-    else
-      P^.A := $FF;
-    Inc(P);
-  end;
+  TACLColors.MakeTransparent(Colors, ColorCount, AColor);
 end;
 
 procedure TACLBaseDib.MakeTransparent(const AColor: TColor);
@@ -3583,6 +3575,10 @@ begin
     Assign(TRasterImage(ASource).RawImage)
   else
 {$ELSE}
+  if ASource is TIcon then
+    AssignIcon(TIcon(ASource))
+  else
+
   if ASource.SupportsPartialTransparency then
     Canvas.Draw(0, 0, ASource)
   else
@@ -3601,6 +3597,83 @@ begin
     MakeOpaque;
   end;
 end;
+
+{$IFDEF MSWINDOWS}
+procedure TACLDib.AssignIcon(ASource: TIcon);
+
+  function HasMask(AMask: PACLPixel32; ACount: Integer): Boolean;
+  begin
+    Result := False;
+    while ACount > 0 do
+    begin
+      if Cardinal(AMask^) <> 0 then
+        Exit(True);
+      Dec(ACount);
+      Inc(AMask);
+    end;
+  end;
+
+  procedure ApplyMask(AMask: PACLPixel32; ACount: Integer);
+  var
+    LColor: PACLPixel32;
+  begin
+    LColor := Colors;
+    while ACount > 0 do
+    begin
+      if Cardinal(AMask^) = 0 then
+        LColor^.A := MaxByte;
+      Dec(ACount);
+      Inc(AMask);
+      Inc(LColor);
+    end;
+  end;
+
+var
+  LHasAlpha: Boolean;
+  LHasNull: Boolean;
+  LHasOpaque: Boolean;
+  LIcon: HICON;
+  LMask: TACLDib;
+begin
+  // Варианты отрисовки иконок
+  // 1. есть альфаканал, однако при этом бывают цветные пиксели,
+  //    у которых не выставлено A - их делаем полностью непрозрачными и всё.
+  // 2. У всех пикселей выставлен A = 255 - ничего делать не надо
+  // 3. У части пикселей выставлен A = 0 и тут три варианта:
+  //    1. иконка имеет маску - тогда выставляем прозрачность по маске
+  //    2. маски нет, но есть пиксели с A = 255, тогда маской выступают цветные пиксели и пиксели с A = 255
+  //    3. маски нет и нет пикселей с A = 255, тогда все делаем целиком непрозрачным без учета цвета
+  LIcon := CopyImage(ASource.Handle, IMAGE_ICON, Width, Height, LR_COPYFROMRESOURCE or LR_COPYRETURNORG);
+
+  if LIcon <> 0 then
+  try
+    DrawIconEx(Handle, 0, 0, LIcon, Width, Height, 0, 0, DI_NORMAL);
+    TACLColors.Analyze(Colors, ColorCount, LHasNull, LHasAlpha, LHasOpaque);
+
+    if LHasAlpha then // 1
+      TACLColors.RecoverAlpha(Colors, ColorCount)
+    else
+      if LHasNull then // 3
+      begin
+        LMask := TACLDib.Create(Width, Height);
+        try
+          DrawIconEx(LMask.Handle, 0, 0, LIcon, LMask.Width, LMask.Height, 0, 0, DI_MASK);
+          if HasMask(LMask.Colors, LMask.ColorCount) then // 3.1
+            ApplyMask(LMask.Colors, LMask.ColorCount)
+          else if LHasOpaque then // 3.2
+            TACLColors.RecoverAlpha(Colors, ColorCount)
+          else // 3.3
+            TACLColors.MakeOpaque(Colors, ColorCount);
+        finally
+          LMask.Free;
+        end;
+      end;
+  finally
+    if LIcon <> ASource.Handle then
+      DestroyIcon(LIcon);
+  end;
+end;
+{$ENDIF}
 
 {$IFNDEF FPC}
 procedure TACLDib.AssignTo(ATarget: TBitmap);
@@ -4045,24 +4118,21 @@ begin
 end;
 
 procedure TACLDibMask.Apply(ADib: TACLBaseDib; AClipArea: PRect);
-var
-  LRange1: TPoint;
-  LRange2: TPoint;
 
-  procedure CalculateRanges;
+  procedure CalculateRanges(out ARange1, ARange2: TPoint);
   var
     LIndex: Integer;
   begin
-    LRange1.X := 0;
-    LRange1.Y := ADib.ColorCount;
-    LRange2.X := 0;
-    LRange2.Y := 0;
+    ARange1.X := 0;
+    ARange1.Y := ADib.ColorCount;
+    ARange2.X := 0;
+    ARange2.Y := 0;
 
     if FOpaqueRange <> NullPoint then
     begin
-      LRange1.Y := Min(LRange1.Y, FOpaqueRange.X - 1);
-      LRange2.X := FOpaqueRange.Y;
-      LRange2.Y := ADib.ColorCount;
+      ARange1.Y := Min(ARange1.Y, FOpaqueRange.X - 1);
+      ARange2.X := FOpaqueRange.Y;
+      ARange2.Y := ADib.ColorCount;
     end;
 
     if AClipArea <> nil then
@@ -4070,25 +4140,27 @@ var
       LIndex := ADib.CoordToFlatIndex(AClipArea^.Left, AClipArea^.Top);
       if LIndex > 0 then
       begin
-        LRange1.X := Max(LRange1.X, LIndex);
-        LRange2.X := Max(LRange2.X, LIndex);
+        ARange1.X := Max(ARange1.X, LIndex);
+        ARange2.X := Max(ARange2.X, LIndex);
       end;
 
       LIndex := ADib.CoordToFlatIndex(AClipArea^.Right, AClipArea^.Bottom);
       if LIndex > 0 then
       begin
-        LRange1.Y := Min(LRange1.Y, LIndex);
-        LRange2.Y := Min(LRange2.Y, LIndex);
+        ARange1.Y := Min(ARange1.Y, LIndex);
+        ARange2.Y := Min(ARange2.Y, LIndex);
       end;
     end;
   end;
 
 var
   LAlpha: Byte;
+  LRange1: TPoint;
+  LRange2: TPoint;
 begin
   if FColor = TAlphaColor.Default then
   begin
-    CalculateRanges;
+    CalculateRanges(LRange1, LRange2);
     if LRange1.Y > LRange1.X then
       ApplyCore(FData + LRange1.X, FData + ADib.ColorCount, @ADib.Colors[LRange1.X], LRange1.Y - LRange1.X);
     if LRange2.Y > LRange2.X then
@@ -4102,7 +4174,7 @@ begin
     else
       if LAlpha < 255 then
       begin
-        CalculateRanges;
+        CalculateRanges(LRange1, LRange2);
         if LRange1.Y > LRange1.X then
           ApplyCore(@LAlpha, @LAlpha, @ADib.Colors[LRange1.X], LRange1.Y - LRange1.X);
         if LRange2.Y > LRange2.X then
@@ -4223,11 +4295,6 @@ begin
   end;
 end;
 
-class function TACLColors.CompareRGB(const Q1, Q2: TACLPixel32): Boolean;
-begin
-  Result := (Q1.B = Q2.B) and (Q1.G = Q2.G) and (Q1.R = Q2.R);
-end;
-
 class function TACLColors.IsDark(Color: TColor): Boolean;
 begin
   Result := Lightness(Color) < 0.45;
@@ -4235,8 +4302,8 @@ end;
 
 class function TACLColors.IsMask(const P: TACLPixel32): Boolean;
 begin
-  Result := (TAlphaColor(P) and TACLPixel32.EssenceMask) =
-    (TAlphaColor(MaskPixel) and TACLPixel32.EssenceMask);
+  Result := (Cardinal(P) and TACLPixel32.EssenceMask) =
+    (Cardinal(MaskPixel) and TACLPixel32.EssenceMask);
 //  Result := (P.G = MaskPixel.G) and (P.B = MaskPixel.B) and (P.R = MaskPixel.R);
 end;
 
@@ -4264,6 +4331,28 @@ begin
   end
   else
     TAlphaColor(D) := TAlphaColor(S);
+end;
+
+class procedure TACLColors.Analyze(P: PACLPixel32; Count: Integer;
+  out HasNull, HasSemitransparent, HasOpaque: Boolean);
+begin
+  HasNull := False;
+  HasOpaque := False;
+  HasSemitransparent := False;
+  while Count > 0 do
+  begin
+    if P^.A = 0 then
+      HasNull := True
+    else if P^.A = 255 then
+      HasOpaque := True
+    else
+    begin
+      HasSemitransparent := True;
+      Break;
+    end;
+    Dec(Count);
+    Inc(P);
+  end;
 end;
 
 class procedure TACLColors.ApplyColorSchema(var AColor: TColor; const AValue: TACLColorSchema);
@@ -4511,10 +4600,13 @@ end;
 
 class procedure TACLColors.MakeTransparent(
   P: PACLPixel32; Count: Integer; const ATransparentColor: TACLPixel32);
+var
+  LMask: Cardinal;
 begin
+  LMask := Cardinal(ATransparentColor) and TACLPixel32.EssenceMask;
   while Count > 0 do
   begin
-    if CompareRGB(P^, ATransparentColor) then
+    if (Cardinal(P^) and TACLPixel32.EssenceMask) = LMask then
       PDWORD(P)^ := 0
     else
       P^.A := MaxByte;
@@ -4732,6 +4824,17 @@ class procedure TACLColors.RGBtoHSL(AColor: TColor; out H, S, L: Single);
 begin
   AColor := ColorToRGB(AColor);
   RGBtoHSL(GetRValue(AColor), GetGValue(AColor), GetBValue(AColor), H, S, L);
+end;
+
+class procedure TACLColors.RecoverAlpha(P: PACLPixel32; Count: Integer);
+begin
+  while Count > 0 do
+  begin
+    if (Cardinal(P) and TACLPixel32.EssenceMask <> 0) and (P^.A = 0) then
+      P^.A := 255;
+    Dec(Count);
+    Inc(P);
+  end;
 end;
 
 class procedure TACLColors.RGBtoHSL(R, G, B: Byte; out H, S, L: Single);
