@@ -6,7 +6,7 @@
 //  Purpose:   Object Links (aka WeakReferences)
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -24,6 +24,7 @@ uses
   // System
   {System.}Classes,
   {System.}Generics.Collections,
+  {System.}Generics.Defaults,
   {System.}SysUtils,
   {System.}Types,
   // ACL
@@ -51,7 +52,7 @@ type
   TACLObjectLinks = class sealed
   strict private
     class var FFreeNotifier: TComponent;
-    class var FLinks: TObjectDictionary<TObject, TObject>;
+    class var FLinks: TObject;
     class function SafeCreateLink(AObject: TObject): TObject;
   protected
     class var Lock: TACLCriticalSection;
@@ -117,7 +118,7 @@ type
 class constructor TACLObjectLinks.Create;
 begin
   Lock := TACLCriticalSection.Create(nil, ClassName);
-  FLinks := TObjectDictionary<TObject, TObject>.Create([doOwnsValues]);
+  FLinks := TACLObjectDictionary.Create([doOwnsValues], TACLObjectOrdinalComparer.Create);
   FFreeNotifier := TFreeNotifier.Create(nil);
 end;
 
@@ -140,7 +141,8 @@ var
 begin
   Lock.Enter;
   try
-    Result := (AObject <> nil) and FLinks.TryGetValue(AObject, TObject(LLink)) and LLink.GetExtension(IID, Obj);
+    Result := (AObject <> nil) and TACLObjectDictionary(FLinks).TryGetValue(
+      AObject, TObject(LLink)) and LLink.GetExtension(IID, Obj);
   finally
     Lock.Leave;
   end;
@@ -148,23 +150,24 @@ end;
 
 class procedure TACLObjectLinks.Release(AObject: TObject);
 var
-  LPair: TPair<TObject, TObject>;
+  LValue: TObject;
 begin
   if FLinks = nil then Exit;
 
   Lock.Enter;
   try
-    LPair := FLinks.ExtractPair(AObject);
+    if not TACLObjectDictionary(FLinks).TryExtract(AObject, LValue) then
+      LValue := nil;
   finally
     Lock.Leave;
   end;
 
-  if LPair.Value <> nil then
-    // Тут надо быть аккуратным:
-    // С одной стороны Link имеет ссылки на другие линки, и их надо чистить синхронно
-    // С другой - уведомление Removing может спровоцировать ожидание потока,
-    // который в свою очередь ждет разблокировки TACLObjectLinks
-    LPair.Value.Free;
+  // Тут надо быть аккуратным:
+  // С одной стороны Link имеет ссылки на другие линки, и их надо чистить синхронно
+  // С другой - уведомление Removing может спровоцировать ожидание потока,
+  // который в свою очередь ждет разблокировки TACLObjectLinks
+  if LValue <> nil then
+    LValue.Free;
 end;
 
 class procedure TACLObjectLinks.RegisterBridge(AObject1, AObject2: TObject);
@@ -219,7 +222,7 @@ end;
 
 class function TACLObjectLinks.SafeCreateLink(AObject: TObject): TObject;
 begin
-  if not FLinks.TryGetValue(AObject, Result) then
+  if not TACLObjectDictionary(FLinks).TryGetValue(AObject, Result) then
   begin
     if not Supports(AObject, IACLObjectLinksSupport) then
     begin
@@ -229,7 +232,7 @@ begin
         raise Exception.Create('Object must implement the IACLObjectLinksSupport interface');
     end;
     Result := TACLObjectLink.Create(AObject);
-    FLinks.Add(AObject, Result);
+    TACLObjectDictionary(FLinks).Add(AObject, Result);
   end;
 end;
 
@@ -241,8 +244,8 @@ begin
 
   Lock.Enter;
   try
-    if FLinks.TryGetValue(AObject1, TObject(LLink1)) and
-       FLinks.TryGetValue(AObject2, TObject(LLink2)) then
+    if TACLObjectDictionary(FLinks).TryGetValue(AObject1, TObject(LLink1)) and
+       TACLObjectDictionary(FLinks).TryGetValue(AObject2, TObject(LLink2)) then
     begin
       LLink1.RemoveBridge(LLink2);
       LLink2.RemoveBridge(LLink1);
@@ -259,7 +262,7 @@ begin
   if AObject = nil then Exit;
   Lock.Enter;
   try
-    if FLinks.TryGetValue(AObject, AValue) then
+    if TACLObjectDictionary(FLinks).TryGetValue(AObject, AValue) then
       TACLObjectLink(AValue).RemoveExtension(AExtension);
   finally
     Lock.Leave;
@@ -275,11 +278,11 @@ begin
   try
     if AObject = nil then
     begin
-      for ALink in FLinks.Values do
+      for ALink in TACLObjectDictionary(FLinks).GetValues do
         TACLObjectLink(ALink).RemoveRemoveListener(ARemoveListener);
     end
     else
-      if FLinks.TryGetValue(AObject, ALink) then
+      if TACLObjectDictionary(FLinks).TryGetValue(AObject, ALink) then
         TACLObjectLink(ALink).RemoveRemoveListener(ARemoveListener);
   finally
     Lock.Leave;
@@ -294,7 +297,7 @@ begin
   try
     Lock.Enter;
     try
-      if FLinks.TryGetValue(AWeakReference^, AValue) then
+      if TACLObjectDictionary(FLinks).TryGetValue(AWeakReference^, AValue) then
         TACLObjectLink(AValue).RemoveWeakReference(AWeakReference);
     finally
       Lock.Leave;

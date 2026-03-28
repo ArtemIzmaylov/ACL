@@ -421,6 +421,28 @@ type
     property OwnsObjects: Boolean read FOwnsObjects write SetOwnObjects;
   end;
 
+  { TACLObjectComparer }
+
+  TACLObjectComparer = class(TInterfacedObject, IEqualityComparer<TObject>)
+  public type
+    HashCode = {$IFDEF FPC}UInt32{$ELSE}Integer{$ENDIF};
+  public
+    // IEqualityComparer
+    function Equals(const Left, Right: TObject): Boolean; reintroduce;
+    function GetHashCode(const Value: TObject): HashCode; reintroduce;
+  end;
+
+  { TACLObjectOrdinalComparer }
+
+  TACLObjectOrdinalComparer = class(TInterfacedObject, IEqualityComparer<TObject>)
+  public type
+    HashCode = {$IFDEF FPC}UInt32{$ELSE}Integer{$ENDIF};
+  public
+    // IEqualityComparer
+    function Equals(const Left, Right: TObject): Boolean; reintroduce;
+    function GetHashCode(const Value: TObject): HashCode; reintroduce;
+  end;
+
   { TACLDictionary }
 
   TACLPairEnum<TKey, TValue> = reference to procedure (const Key: TKey; const Value: TValue);
@@ -1766,7 +1788,39 @@ begin
 end;
 {$ENDIF}
 
-{ TDictionary<TKey,TValue> }
+{ TACLObjectComparer }
+
+function TACLObjectComparer.Equals(const Left, Right: TObject): Boolean;
+begin
+  Result := (Left = Right) or (Left <> nil) and Left.Equals(Right);
+end;
+
+function TACLObjectComparer.GetHashCode(const Value: TObject): HashCode;
+begin
+  if Value <> nil then
+    Result := Value.GetHashCode
+  else
+    Result := 0;
+end;
+
+{ TACLObjectOrdinalComparer }
+
+function TACLObjectOrdinalComparer.Equals(const Left, Right: TObject): Boolean;
+begin
+  Result := Pointer(Left) = Pointer(Right);
+end;
+
+function TACLObjectOrdinalComparer.GetHashCode(const Value: TObject): HashCode;
+begin
+{$IFDEF CPUX64}
+  Result := HashCode(IntPtr(Value) shr 4) xor HashCode(IntPtr(Value) shr 32);
+{$ELSE}
+  Result := HashCode(Value);
+  Result := Result xor (Result shr 4);
+{$ENDIF}
+end;
+
+{ TACLDictionary<TKey,TValue> }
 
 constructor TACLDictionary<TKey, TValue>.Create(ACapacity: Integer = 0);
 begin
