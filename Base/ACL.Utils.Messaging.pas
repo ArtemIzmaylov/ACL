@@ -52,6 +52,21 @@ type
   WPARAM = Windows.WPARAM;
 {$ENDIF}
 
+  { TACLEventener }
+
+  TACLEventener = class
+  strict private
+    FEvents: array[Byte] of Integer;
+    FTargetMsg: Cardinal;
+    FTargetWnd: TWndHandle;
+  public
+    constructor Create(ATargetWnd: TWndHandle; ATargetMsg: Cardinal);
+    procedure Post(const ACode: Byte);
+    function Reset(const ACode: Byte): Boolean; overload;
+    procedure Reset(const ALowCode, AHighCode: Byte); overload;
+    procedure Reset; overload;
+  end;
+
 function acWndAlloc(AMethod: TWndMethod; const AClassName: string;
   AIsMessageOnly: Boolean = False; const AName: string = ''): TWndHandle;
 procedure acWndDefaultProc(AWnd: TWndHandle; var Message: TMessage);
@@ -59,7 +74,6 @@ procedure acWndFree(AWnd: TWndHandle);
 
 function acSendMessage(AWnd: TWndHandle; AMsg: Cardinal; WParam: WPARAM; LParam: LPARAM): LRESULT;
 function acPostMessage(AWnd: TWndHandle; AMsg: Cardinal; WParam: WPARAM; LParam: LPARAM): Boolean;
-procedure acRemoveMessage(AMessage: Cardinal; ATargetWnd: TWndHandle = 0);
 {$IFDEF MSWINDOWS}
 procedure acProcessMessage(AMessage: Cardinal; ATargetWnd: TWndHandle = 0);
 {$ENDIF}
@@ -92,13 +106,6 @@ end;
 function acPostMessage(AWnd: TWndHandle; AMsg: Cardinal; WParam: WPARAM; LParam: LPARAM): Boolean;
 begin
   Result := PostMessage(AWnd, AMsg, WParam, LParam);
-end;
-
-procedure acRemoveMessage(AMessage: Cardinal; ATargetWnd: TWndHandle = 0);
-var
-  LMsg: TMsg;
-begin
-  while PeekMessage(LMsg{%H-}, ATargetWnd, AMessage, AMessage, PM_REMOVE) do ;
 end;
 
 {$IFDEF MSWINDOWS}
@@ -184,5 +191,37 @@ begin
   end;
 end;
 {$ENDIF}
+
+{ TACLEventener }
+
+constructor TACLEventener.Create(ATargetWnd: TWndHandle; ATargetMsg: Cardinal);
+begin
+  FTargetMsg := ATargetMsg;
+  FTargetWnd := ATargetWnd;
+end;
+
+procedure TACLEventener.Post(const ACode: Byte);
+begin
+  if InterlockedExchange(FEvents[ACode], 1) = 0 then
+    acPostMessage(FTargetWnd, FTargetMsg, 0, ACode);
+end;
+
+procedure TACLEventener.Reset;
+begin
+  Reset(0, 255);
+end;
+
+function TACLEventener.Reset(const ACode: Byte): Boolean;
+begin
+  Result := InterlockedExchange(FEvents[ACode], 0) <> 0;
+end;
+
+procedure TACLEventener.Reset(const ALowCode, AHighCode: Byte);
+var
+  LCode: Byte;
+begin
+  for LCode := ALowCode to AHighCode do
+    Reset(LCode);
+end;
 
 end.
