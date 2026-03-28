@@ -369,9 +369,10 @@ type
     try
     {$IFDEF ACL_TRAYICON_DEBUGLOG}
       // x, y are local coordinates
-      WriteLn('Tray:ButtonDown ', Event^.button, ' ',
-        Round(Event.x), ' ', Round(Event.y), ' ',
-        Round(Event.x_root), ' ', Round(Event.y_root));
+      LogEntry(acGeneralLogFileName, 'Tray', 'ButtonDown(%d, %d,%d, %d,%d)',
+        [Event^.button,
+         Round(Event.x), Round(Event.y),
+         Round(Event.x_root), Round(Event.y_root)]);
     {$ENDIF}
 
       case Event^.button of
@@ -403,9 +404,10 @@ type
     Result := gTRUE;
     try
     {$IFDEF ACL_TRAYICON_DEBUGLOG}
-      WriteLn('Tray:ButtonUp ', Event^.button, ' ',
-        Round(Event.x), ' ', Round(Event.y), ' ',
-        Round(Event.x_root), ' ', Round(Event.y_root));
+      LogEntry(acGeneralLogFileName, 'Tray', 'ButtonUp(%d, %d,%d, %d,%d)',
+        [Event^.button,
+         Round(Event.x), Round(Event.y),
+         Round(Event.x_root), Round(Event.y_root)]);
     {$ENDIF}
 
 //      LPoint.X := Round(Event.x_root + Event.x);
@@ -426,9 +428,10 @@ type
   begin
     try
     {$IFDEF ACL_TRAYICON_DEBUGLOG}
-      WriteLn('Tray:Scroll: ', Integer(Event^.direction));
+      LogEntry(acGeneralLogFileName, 'Tray', 'Scroll(%d)', [Integer(Event^.direction)]);
     {$ENDIF}
-      Self.Owner.MouseWheel(Event^.direction in [GDK_SCROLL_UP, GDK_SCROLL_LEFT]);
+      if Event^.direction in [GDK_SCROLL_UP, GDK_SCROLL_DOWN] then
+        Self.Owner.MouseWheel(Event^.direction = GDK_SCROLL_UP);
     except
       if Assigned(ApplicationHandleException) then
         ApplicationHandleException(Self);
@@ -442,9 +445,9 @@ type
   begin
     Result := gFALSE;
     try
-    {$IFDEF ACL_TRAYICON_DEBUGLOG}
-      WriteLn('Tray:Query ', x, ' ', y);
-    {$ENDIF}
+    //{$IFDEF ACL_TRAYICON_DEBUGLOG}
+    //  WriteLn('Tray:Query ', x, ' ', y);
+    //{$ENDIF}
       // На Gnome query-tooltip приходит при клике на иконку, дабы не
       // генерировать ложных событий - форсированно отключаем это дело
       if ticMove in TACLTrayIcon.Capabilities then
