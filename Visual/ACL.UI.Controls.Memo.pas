@@ -254,7 +254,7 @@ type
     procedure Select(AStart, ALength: Integer; AGoForward: Boolean = True);
     procedure SetTargetDPI(AValue: Integer); override;
     procedure SetTextEx(const AText: string; const ATextSettings: TACLTextFormatSettings);
-    procedure UpdateHitTest(const P: TPoint; ACalcHint: Boolean); override;
+    procedure UpdateHitTest(const P: TPoint; AShift: TShiftState; ACalcHint: Boolean); override;
     function WantSpecialKey(Key: Word; Shift: TShiftState): Boolean; override;
 
     // Actions
@@ -1310,7 +1310,8 @@ begin
   end;
 end;
 
-procedure TACLMemoSubClass.UpdateHitTest(const P: TPoint; ACalcHint: Boolean);
+procedure TACLMemoSubClass.UpdateHitTest(
+  const P: TPoint; AShift: TShiftState; ACalcHint: Boolean);
 var
   LPoint: TPoint;
 begin

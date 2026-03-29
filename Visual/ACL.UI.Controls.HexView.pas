@@ -1274,7 +1274,7 @@ begin
   begin
     LHitPoint.X := EnsureRange(P.X, FContentArea.Left, FContentArea.Right - 1);
     LHitPoint.Y := EnsureRange(P.Y, FContentArea.Top, FContentArea.Bottom - 1);
-    SubClass.UpdateHitTest(LHitPoint);
+    SubClass.UpdateHitTest(LHitPoint, []);
   end;
   UpdateAutoScrollDirection(P,
     SubClass.ViewInfo.RowsAreaClipRect,

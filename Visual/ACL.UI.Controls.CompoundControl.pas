@@ -233,7 +233,7 @@ end;
 
 procedure TACLCompoundControl.UpdateHitTest(const P: TPoint);
 begin
-  SubClass.UpdateHitTest(P);
+  SubClass.UpdateHitTest(P, []);
 end;
 
 procedure TACLCompoundControl.UpdateHitTest;

@@ -2032,7 +2032,10 @@ end;
 function TACLTreeListGroupViewInfo.CreateDragObject(
   const AInfo: TACLHitTestInfo): TACLCompoundControlDragObject;
 begin
-  Result := TACLTreeListGroupDragObject.Create(TACLTreeListHitTest(AInfo).Group);
+  if acIsShiftPressed([ssShift], AInfo.Shift) then
+    Result := TACLTreeListSelectionRectDragObject.Create(nil)
+  else
+    Result := TACLTreeListGroupDragObject.Create(TACLTreeListHitTest(AInfo).Group);
 end;
 
 procedure TACLTreeListGroupViewInfo.DoDraw(ACanvas: TCanvas);
@@ -4693,7 +4696,7 @@ begin
   Result := False;
   if (SubClass.Columns.Count > 0) and inherited and HitTest.HitAtNode then
   begin
-    if acIsShiftPressed([ssShift], SubClass.DragAndDropController.ShiftState) then
+    if acIsShiftPressed([ssShift], HitTest.Shift) then
       Exit(True);
     LColumn := HitTest.ColumnViewInfo;
     Result := (LColumn = nil) or (HitTest.Point.X > LColumn.Bounds.Left + MulDiv(LColumn.Bounds.Width, 3, 4));

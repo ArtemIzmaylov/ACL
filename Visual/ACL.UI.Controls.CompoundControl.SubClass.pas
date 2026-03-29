@@ -98,6 +98,7 @@ type
     FFlags: TACLListOfInteger;
     FHitObject: TObject;
     FPoint: TPoint;
+    FShift: TShiftState;
 
     function GetData(const Index: string): Pointer;
     procedure SetData(const Index: string; const Value: Pointer);
@@ -118,6 +119,7 @@ type
     property Data[const Index: string]: Pointer read GetData write SetData;
     property HitObject: TObject read FHitObject write FHitObject;
     property Point: TPoint read FPoint write FPoint;
+    property Shift: TShiftState read FShift write FShift;
     // Flags
     property Flags[Index: Integer]: Boolean read GetFlag write SetFlag;
     property IsCheckable: Boolean index cchtCheckable read GetFlag write SetFlag;
@@ -310,7 +312,6 @@ type
     FIsStarted: Boolean;
     FLastPoint: TPoint;
     FMouseCapturePoint: TPoint;
-    FShiftState: TShiftState;
 
     procedure AutoScrollTimerHandler(Sender: TObject);
     function GetHitTest: TACLHitTestInfo; inline;
@@ -365,7 +366,6 @@ type
     property IsDropping: Boolean read FIsDropping write FIsDropping;
     property IsDropSourceOperation: Boolean read GetIsDropSourceOperation;
     property IsPressed: Boolean read FIsPressed;
-    property ShiftState: TShiftState read FShiftState;
   end;
 
 {$ENDREGION}
@@ -864,7 +864,7 @@ type
     // HitTest
     function CalculateState(AObject: TObject; ASubPart: NativeInt = 0): TACLButtonState;
     procedure UpdateHitTest; overload;
-    procedure UpdateHitTest(const P: TPoint; ACalcHint: Boolean = False); overload; virtual;
+    procedure UpdateHitTest(const P: TPoint; AShift: TShiftState; ACalcHint: Boolean = False); overload; virtual;
 
     // HourGlass notify
     procedure BeginLongOperation;
@@ -956,6 +956,7 @@ begin
   FFlags.Clear;
   HintData.Reset;
   HitObject := nil;
+  Shift := [];
 end;
 
 function TACLHitTestInfo.GetFlag(Index: Integer): Boolean;
@@ -1294,7 +1295,6 @@ begin
   FIsStarted := False;
   MouseCapturePoint := APoint;
   LastPoint := MouseCapturePoint;
-  FShiftState := AShift;
 end;
 
 procedure TACLCompoundControlDragAndDropController.MouseMove(
@@ -1311,14 +1311,13 @@ begin
     begin
       FIsStarted := True;
       DoBeforeDragStarted;
-      SubClass.UpdateHitTest(LastPoint);
-      FShiftState := AShift;
+      SubClass.UpdateHitTest(LastPoint, AShift);
       if (SubClass.PressedObject = HitTest.HitObject) and DragStart then
       begin
         FIsActive := True; // first
         SubClass.DoDragStarted;
         LastPoint := DragObject.TransformPoint(LastPoint);
-        SubClass.UpdateHitTest(APoint);
+        SubClass.UpdateHitTest(APoint, AShift);
         UpdateCursor(HitTest.Cursor);
       end
       else
@@ -1395,7 +1394,7 @@ end;
 
 procedure TACLCompoundControlDragAndDropController.DropSourceBegin;
 begin
-  SubClass.UpdateHitTest(LastPoint);
+  SubClass.UpdateHitTest(LastPoint, []);
   FDropSourceOperation.DropSourceBegin;
 end;
 
@@ -2591,7 +2590,7 @@ procedure TACLCompoundControlSubClass.ContextPopup(const P: TPoint; var AHandled
 begin
   if CanInteract then
   begin
-    UpdateHitTest(P);
+    UpdateHitTest(P, []);
     if HitTest.IsNonClient then
       AHandled := True
     else
@@ -2622,7 +2621,7 @@ begin
     else
       if CanInteract then
       begin
-        UpdateHitTest(P);
+        UpdateHitTest(P, []);
         DoGetCursor(HitTest);
         Result := HitTest.Cursor;
       end
@@ -2760,7 +2759,7 @@ begin
     try
       DragAndDropController.Cancel;
       Application.CancelHint;
-      UpdateHitTest(P);
+      UpdateHitTest(P, Shift);
 
       if Button <> mbLeft then
         FLastClickCount := 1
@@ -2800,7 +2799,7 @@ begin
   begin
     FActionType := ccatMouse;
     try
-      UpdateHitTest(P);
+      UpdateHitTest(P, Shift);
       DragAndDropController.MouseMove(Shift, P);
       if DragAndDropController.IsActive then
         FLastClickCount := 0
@@ -2823,7 +2822,7 @@ begin
         FLastClickCount := 0;
       DragAndDropController.MouseUp;
 
-      UpdateHitTest(P);
+      UpdateHitTest(P, Shift);
       if (Button = mbLeft) and (LastClickCount > 0) then
       begin
         if PressedObject = HitTest.HitObject then
@@ -2858,15 +2857,16 @@ end;
 
 procedure TACLCompoundControlSubClass.UpdateHitTest;
 begin
-  UpdateHitTest(ScreenToClient(MouseCursorPos));
+  UpdateHitTest(ScreenToClient(MouseCursorPos), []);
 end;
 
 procedure TACLCompoundControlSubClass.UpdateHitTest(
-  const P: TPoint; ACalcHint: Boolean = False);
+  const P: TPoint; AShift: TShiftState; ACalcHint: Boolean = False);
 begin
   HitTest.Reset;
   HitTest.Point := P;
   HitTest.CalcHintData := ACalcHint;
+  HitTest.Shift := AShift;
   ViewInfo.CalculateHitTest(HitTest);
 end;
 
@@ -2930,7 +2930,7 @@ end;
 
 procedure TACLCompoundControlSubClass.CMHintShow(var Message: TCMHintShow);
 begin
-  UpdateHitTest(Message.HintInfo.CursorPos, True);
+  UpdateHitTest(Message.HintInfo.CursorPos, [], True);
   if HitTest.HintData.TextRect <> NullRect then
     Message.HintInfo^.HintPos := ClientToScreen(HitTest.HintData.TextRect.TopLeft);
   Message.HintInfo^.CursorRect := HitTest.HintData.Area;
