@@ -432,15 +432,17 @@ begin
 end;
 
 procedure TACLGtk3AdvancedWindow.Repaint(const ARect: PRect);
+var
+  LWidget: PGtkWidget;
 begin
   if FParams.ExStyle and WS_EX_LAYERED <> 0 then
-  begin
-    Widget^.queue_draw;
-    if Gtk3IsGdkWindow(Widget^.window) then
-      Widget^.window^.process_updates(True);
-  end
+    LWidget := Widget
   else
-    inherited;
+    LWidget := GetContainerWidget;
+
+  LWidget^.queue_draw;
+  if Gtk3IsGdkWindow(LWidget^.window) then
+    LWidget^.window^.process_updates(True);
 end;
 
 procedure TACLGtk3AdvancedWindow.SetBounds(ALeft, ATop, AWidth, AHeight: integer);
