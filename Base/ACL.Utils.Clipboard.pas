@@ -522,6 +522,7 @@ function TACLClipboardHelper.HasPlainText: Boolean;
 {$IFDEF FPC}
 var
   LCount: Integer;
+  LFormat: PClipboardFormat;
   LFormats: PClipboardFormat;
   LTextFormat1: TClipboardFormat;
   LTextFormat2: TClipboardFormat;
@@ -534,14 +535,15 @@ begin
   LTextFormat3 := ClipboardRegisterFormat('UTF8_STRING'); // KWrite
   if ClipboardGetFormats(ctClipboard, LCount, LFormats) and (LFormats <> nil) then
   try
+    LFormat := LFormats;
     while LCount > 0 do
     begin
-      if (LFormats^ = LTextFormat1) or
-         (LFormats^ = LTextFormat2) or
-         (LFormats^ = LTextFormat3)
+      if (LFormat^ = LTextFormat1) or
+         (LFormat^ = LTextFormat2) or
+         (LFormat^ = LTextFormat3)
       then
         Exit(True);
-      Inc(LFormats);
+      Inc(LFormat);
       Dec(LCount);
     end;
   finally
