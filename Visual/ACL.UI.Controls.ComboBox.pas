@@ -1188,16 +1188,10 @@ procedure TACLComboBox.SetTextCore(const AValue: string);
 begin
   if not HasSelection or (Items[ItemIndex] <> AValue) then
     FItemIndex := Items.IndexOf(AValue);
-
-  Inc(FTextChangeLockCount);
-  try
-    if (Mode = cbmList) and (ItemIndex < 0) then
-      inherited SetTextCore(acEmptyStr)
-    else
-      inherited SetTextCore(AValue);
-  finally
-    Dec(FTextChangeLockCount);
-  end;
+  if (Mode = cbmList) and (ItemIndex < 0) then
+    inherited SetTextCore(acEmptyStr)
+  else
+    inherited SetTextCore(AValue);
 end;
 
 procedure TACLComboBox.SynchronizeText;
