@@ -4886,7 +4886,7 @@ var
   LNode: TACLTreeListNode;
   LRoot: TACLTreeListNode;
 begin
-  if FocusedNode <> nil then
+  if (FocusedNode <> nil) and (ADelta <> 0) then
   try
     BeginUpdate;
     try
@@ -6097,26 +6097,6 @@ begin
 end;
 
 procedure TACLTreeListSubClass.ProcessKeyDown(var AKey: Word; AShift: TShiftState);
-var
-  LColumn: TACLTreeListColumn;
-
-  procedure ProcessCursorNavigation;
-  begin
-    if CheckFocusedObject or (AKey in [vkEnd, vkNext]) and CheckFocusedObject then
-    try
-      BeginUpdate;
-      try
-        LColumn := FocusedColumn;
-        NavigateTo(GetNextObject(FocusedObject, AKey), AShift);
-        FocusedColumn := LColumn;
-      finally
-        EndUpdate;
-      end;
-      UpdateHotTrack(AShift);
-    finally
-      AKey := 0;
-    end;
-  end;
 
   function TryExpand(AObject: TObject; AExpand: Boolean): Boolean;
   var
@@ -6128,6 +6108,9 @@ var
       LExpandable.Expanded := AExpand;
   end;
   
+var
+  LColumn: TACLTreeListColumn;
+  LDelta: Integer;
 begin
   case AKey of
     vkA: // A
@@ -6164,23 +6147,6 @@ begin
       if FocusedObject is TACLTreeListNode then
         StartEditing(TACLTreeListNode(FocusedObject), FocusedColumn);
 
-    vkNext, vkPrior, vkHome, vkEnd:
-      ProcessCursorNavigation;
-
-    vkUp, vkDown:
-      if acIsShiftPressed([ssShift, ssCtrl], AShift) then
-      try
-        if (FocusedNode <> nil) and OptionsBehavior.DragSorting then
-        begin
-          MoveSelected(Signs[AKey = vkDown]);
-          MakeVisible(FocusedNode);
-        end;
-      finally
-        AKey := 0;
-      end
-      else
-        ProcessCursorNavigation;
-
     vkLeft:
       if CheckFocusedObject then
       try
@@ -6199,6 +6165,49 @@ begin
           FocusedColumn := LColumn
         else if not TryExpand(FocusedObject, True) then
           NavigateTo(GetObjectChild(FocusedObject), AShift);
+      finally
+        AKey := 0;
+      end;
+
+    vkNext, vkPrior, vkUp, vkDown, vkHome, vkEnd:
+      if acIsShiftPressed([ssShift, ssCtrl], AShift) then
+      try
+        if OptionsBehavior.DragSorting and (FocusedNode <> nil) then
+        begin
+          case AKey of
+            vkUp:
+              LDelta := IfThen(CanMoveSelected.Start > 0, -1);
+            vkDown:
+              LDelta := IfThen(CanMoveSelected.Finish > 0, 1);
+            vkHome:
+              LDelta := -CanMoveSelected.Start;
+            vkEnd:
+              LDelta := CanMoveSelected.Finish;
+          else
+            LDelta := 0;
+          end;
+          if LDelta <> 0 then
+          begin
+            MoveSelected(LDelta);
+            MakeVisible(FocusedNode);
+          end;
+        end;
+      finally
+        AKey := 0;
+      end
+      else
+
+      if CheckFocusedObject or (AKey in [vkEnd, vkNext]) and CheckFocusedObject then
+      try
+        BeginUpdate;
+        try
+          LColumn := FocusedColumn;
+          NavigateTo(GetNextObject(FocusedObject, AKey), AShift);
+          FocusedColumn := LColumn;
+        finally
+          EndUpdate;
+        end;
+        UpdateHotTrack(AShift);
       finally
         AKey := 0;
       end;
