@@ -793,7 +793,7 @@ type
     procedure ProcessMouseUp(AButton: TMouseButton; AShift: TShiftState); virtual;
     procedure ProcessMouseWheel(ADirection: TACLMouseWheelDirection; AShift: TShiftState); virtual;
     procedure SetHoveredObject(AObject: TObject; APart: NativeInt = 0);
-    procedure UpdateHotTrack;
+    procedure UpdateHotTrack(AShift: TShiftState);
 
     // Events
     procedure DoDragStarted; virtual;
@@ -863,7 +863,7 @@ type
 
     // HitTest
     function CalculateState(AObject: TObject; ASubPart: NativeInt = 0): TACLButtonState;
-    procedure UpdateHitTest; overload;
+    procedure UpdateHitTest(AShift: TShiftState = []); overload;
     procedure UpdateHitTest(const P: TPoint; AShift: TShiftState; ACalcHint: Boolean = False); overload; virtual;
 
     // HourGlass notify
@@ -1259,7 +1259,7 @@ begin
     finally
       SubClass.EndUpdate; // prevent from update;
     end;
-    SubClass.UpdateHotTrack;
+    SubClass.UpdateHotTrack(KeyboardStateToShiftState);
   end;
 end;
 
@@ -2614,19 +2614,15 @@ end;
 function TACLCompoundControlSubClass.GetCursor(const P: TPoint): TCursor;
 begin
   if FLongOperationCount > 0 then
-    Result := crHourGlass
-  else
-    if DragAndDropController.IsActive then
-      Result := DragAndDropController.Cursor
-    else
-      if CanInteract then
-      begin
-        UpdateHitTest(P, []);
-        DoGetCursor(HitTest);
-        Result := HitTest.Cursor;
-      end
-      else
-        Result := crDefault;
+    Exit(crHourGlass);
+  if DragAndDropController.IsActive then
+    Exit(DragAndDropController.Cursor);
+  if not CanInteract then
+    Exit(crDefault);
+  if P <> HitTest.Point then
+    UpdateHitTest(P, HitTest.Shift);
+  DoGetCursor(HitTest);
+  Result := HitTest.Cursor;
 end;
 
 procedure TACLCompoundControlSubClass.SetTargetDPI(AValue: Integer);
@@ -2848,16 +2844,16 @@ begin
       finally
         EndUpdate;
       end;
-      UpdateHotTrack;
+      UpdateHotTrack(AShift);
     finally
       FActionType := ccatNone;
     end;
   end;
 end;
 
-procedure TACLCompoundControlSubClass.UpdateHitTest;
+procedure TACLCompoundControlSubClass.UpdateHitTest(AShift: TShiftState = []);
 begin
-  UpdateHitTest(ScreenToClient(MouseCursorPos), []);
+  UpdateHitTest(ScreenToClient(MouseCursorPos), AShift);
 end;
 
 procedure TACLCompoundControlSubClass.UpdateHitTest(
@@ -3077,9 +3073,9 @@ begin
   // do nothing
 end;
 
-procedure TACLCompoundControlSubClass.UpdateHotTrack;
+procedure TACLCompoundControlSubClass.UpdateHotTrack(AShift: TShiftState);
 begin
-  MouseMove(KeyboardStateToShiftState, ScreenToClient(MouseCursorPos));
+  MouseMove(AShift, ScreenToClient(MouseCursorPos));
 end;
 
 procedure TACLCompoundControlSubClass.DoDragStarted;

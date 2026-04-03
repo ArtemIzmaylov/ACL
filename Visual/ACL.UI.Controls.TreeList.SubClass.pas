@@ -3906,7 +3906,7 @@ begin
     CheckContentScrolling(ScreenToClient(ScreenPoint));
     LObject := nil;
     LMode := dtimInto;
-    SubClass.UpdateHitTest;
+    SubClass.UpdateHitTest(Shift);
     Allow := CalculateDropTarget(LObject, LMode);
 
     if Allow and not DragAndDropController.IsActive then
@@ -6112,7 +6112,7 @@ var
       finally
         EndUpdate;
       end;
-      UpdateHotTrack;
+      UpdateHotTrack(AShift);
     finally
       AKey := 0;
     end;
