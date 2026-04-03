@@ -806,7 +806,7 @@ begin
   case AAction of
     eaCopy:
       if SelLength > 0 then
-        Clipboard.AsText := SelText;
+        Clipboard.AsPlainText := SelText;
 
     eaDelete:
       if not ReadOnly then

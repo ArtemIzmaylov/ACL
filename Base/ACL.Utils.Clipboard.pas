@@ -469,6 +469,7 @@ begin
     LText := LText + #0;
   AddFormat('text/plain', LText);
   AddFormat('text/plain;charset=utf-8', LText);
+  AddFormat('UTF8_STRING', LText);
 {$ELSE}
 begin
   AddFormat({$IFDEF UNICODE}CF_UNICODETEXT{$ELSE}CF_TEXT{$ENDIF},
