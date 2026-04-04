@@ -3933,48 +3933,50 @@ var
 begin
   if HitTest.HitAtNode then
   begin
-    AObject := HitTest.HitObject;
     AMode := dtimAfter;
+    AObject := HitTest.HitObject;
     if ContentViewInfo.ViewItems.Find(AObject, LCell) then
     begin
       if HitTest.Point.Y < LCell.Bounds.CenterPoint.Y then
         AMode := dtimBefore;
-      NodeViewInfo.Initialize(AObject);
-      if HitTest.Point.X > LCell.Bounds.Left + NodeViewInfo.CellTextExtends[nil].Left + 2 * LCell.Bounds.Height then
-        AMode := dtimInto
-      else
-
-      if LNode.Expanded and LNode.HasChildren then
+      if CanChangeNodeLevel then
       begin
-        // Если узел под мышкой раскрыт, то вставку "после него" заменяем на "вставку в него".
-        // Иначе при движении мышкой подсветка скачет туда-сюда, что хреново с т.ч. UX
-        if AMode = dtimAfter then
-          AMode := dtimInto;
-      end
-      else
-        // Даём возможность вытащить последний узел на уровень выше
-        while not LNode.IsTopLevel do
+        NodeViewInfo.Initialize(AObject);
+        if HitTest.Point.X > LCell.Bounds.Left + NodeViewInfo.CellTextExtends[nil].Left + 2 * LCell.Bounds.Height then
+          AMode := dtimInto
+        else
+
+        if LNode.Expanded and LNode.HasChildren then
         begin
-          if HitTest.Point.X > LCell.Bounds.Left + NodeViewInfo.CheckBoxRect.Left then
-            Break; // мышь в пределах узла, на уровень выше не поднимаемся
-          if HitTest.HitObject <> LNode.Parent.LastVisible then
-            Break; // узел перестал быть последним в списке, выше подниматься нельзя
-          AObject := LNode.Parent;
-          NodeViewInfo.Initialize(AObject);
-        end;
+          // Если узел под мышкой раскрыт, то вставку "после него" заменяем на "вставку в него".
+          // Иначе при движении мышкой подсветка скачет туда-сюда, что хреново с т.ч. UX
+          if AMode = dtimAfter then
+            AMode := dtimInto;
+        end
+        else
+          // Даём возможность вытащить последний узел на уровень выше
+          while not LNode.IsTopLevel do
+          begin
+            if HitTest.Point.X > LCell.Bounds.Left + NodeViewInfo.CheckBoxRect.Left then
+              Break; // мышь в пределах узла, на уровень выше не поднимаемся
+            if HitTest.HitObject <> LNode.Parent.LastVisible then
+              Break; // узел перестал быть последним в списке, выше подниматься нельзя
+            AObject := LNode.Parent;
+            NodeViewInfo.Initialize(AObject);
+          end;
+      end;
     end;
-    Result := (AMode <> dtimInto) or CanChangeNodeLevel or TACLTreeListNode(AObject).HasChildren;
-  end
-  else
+    Exit(True);
+  end;
 
   if HitTest.HitAtContentArea then
   begin
     AMode := dtimAfter;
     AObject := nil;
-    Result := True;
-  end
-  else
-    Result := False;
+    Exit(True);
+  end;
+
+  Result := False;
 end;
 
 function TACLTreeListDropTarget.CanChangeNodeLevel: Boolean;
