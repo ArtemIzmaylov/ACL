@@ -188,7 +188,6 @@ type
     FActiveIndex: Integer;
     FBorders: TACLBorders;
     FHoverTab: TACLTab;
-    FIsUserAction: Boolean;
     FLoadedActiveIndex: Integer;
     FMoreButton: TACLButtonSubClass;
     FMoreMenu: TACLPopupMenu;
@@ -201,6 +200,7 @@ type
     FOnTabChanging: TACLTabsActiveChangeEvent;
     FOnTabChanged: TACLTabsActiveChangeEvent;
 
+    function IsChildFocused: Boolean;
     procedure SetActiveIndex(AValue: Integer);
     procedure SetBorders(AValue: TACLBorders);
     procedure SetHoverTab(AValue: TACLTab);
@@ -220,10 +220,10 @@ type
     function CreatePadding: TACLPadding; override;
     procedure CreateWnd; override;
     function IsTabVisible(AIndex: Integer): Boolean;
+    procedure SetFocusToActiveTab;
     procedure SetTargetDPI(AValue: Integer); override;
     procedure UpdateTransparency; override;
     procedure ValidateActiveTab;
-    procedure ValidateFocus;
 
     // Calculating
     function CalculateTabPlaceIndents(AItem: TACLTabViewItem): TRect; virtual;
@@ -273,7 +273,6 @@ type
     procedure JumpToNextPage(AForward: Boolean);
     //# Properties
     property HoverTab: TACLTab read FHoverTab;
-    property IsUserAction: Boolean read FIsUserAction;
   published
     property ActiveIndex: Integer read FActiveIndex write SetActiveIndex default 0;
     property Align;
@@ -540,6 +539,7 @@ begin
   FMoreButton.OnClick := HandlerMoreClick;
   FMoreButton.HasArrow := True;
   ControlStyle := ControlStyle + [csAcceptsControls];
+  FocusOnClick := True;
   TabStop := True;
 end;
 
@@ -815,7 +815,6 @@ begin
   begin
     if Assigned(OnTabChanged) then
       OnTabChanged(Self, ActiveIndex);
-    ValidateFocus;
   end;
 end;
 
@@ -953,18 +952,10 @@ end;
 
 procedure TACLCustomTabControl.KeyDown(var Key: Word; Shift: TShiftState);
 begin
-  inherited KeyDown(Key, Shift);
-
+  inherited;
   case Key of
     VK_LEFT, VK_RIGHT:
-      begin
-        FIsUserAction := True;
-        try
-          ActiveIndex := ActiveIndex + Signs[Key = VK_RIGHT];
-        finally
-          FIsUserAction := False;
-        end;
-      end;
+      ActiveIndex := ActiveIndex + Signs[Key = VK_RIGHT];
   end;
 end;
 
@@ -975,6 +966,15 @@ begin
     FTabAreaRect.Contains({$IFNDEF FPC}ScreenToClient{$ENDIF}(MousePos));
   if Result then
     ActiveIndex := ActiveIndex - TACLMouseWheel.DirectionToInteger[Direction];
+end;
+
+function TACLCustomTabControl.IsChildFocused: Boolean;
+var
+  LForm: TCustomForm;
+begin
+  LForm := GetParentForm(Self);
+  Result := (LForm <> nil) and (LForm.ActiveControl <> Self) and
+    acIsChildOrSelf(Self, LForm.ActiveControl);
 end;
 
 function TACLCustomTabControl.IsMouseAtControl: Boolean;
@@ -989,15 +989,7 @@ var
 begin
   inherited;
   if HitTest(X, Y, LItem) then
-  begin
-    FIsUserAction := True;
-    try
-      ActiveIndex := LItem.Tab.Index;
-      SetFocus;
-    finally
-      FIsUserAction := False;
-    end;
-  end;
+    ActiveIndex := LItem.Tab.Index;
 end;
 
 procedure TACLCustomTabControl.MouseLeave;
@@ -1048,27 +1040,6 @@ begin
     JumpToNextPage(True);
 end;
 
-procedure TACLCustomTabControl.ValidateFocus;
-var
-  AControl: TWinControl;
-  AForm: TCustomForm;
-begin
-  if IsUserAction then
-    Exit;
-
-  AForm := GetParentForm(Self);
-  if (AForm <> nil) and acIsChildOrSelf(Self, AForm.ActiveControl) then
-  begin
-    AControl := FindNextControl(nil, True, True, False);
-    if AControl = nil then
-      AControl := FindNextControl(nil, True, False, False);
-    if AControl = nil then
-      AControl := Self;
-    if AControl.CanFocus then
-      AForm.ActiveControl := AControl;
-  end;
-end;
-
 procedure TACLCustomTabControl.UpdateTransparency;
 begin
   ControlStyle := ControlStyle - [csOpaque];
@@ -1112,7 +1083,14 @@ begin
 end;
 
 procedure TACLCustomTabControl.SetActiveIndex(AValue: Integer);
+var
+  LWasFocused: Boolean;
 begin
+  if csDestroying in ComponentState then
+  begin
+    FActiveIndex := AValue;
+    Exit;
+  end;
   if csLoading in ComponentState then
   begin
     FLoadedActiveIndex := AValue;
@@ -1122,10 +1100,13 @@ begin
   AValue := MinMax(AValue, 0, Tabs.Count - 1);
   if AValue <> FActiveIndex then
   try
+    LWasFocused := IsChildFocused;
     DoActiveIndexChanging(AValue);
     FActiveIndex := AValue;
     FullRefresh; // first
     DoActiveIndexChanged;
+    if LWasFocused and not IsChildFocused then
+      SetFocusToActiveTab;
   except
     // do nothing
   end;
@@ -1138,6 +1119,18 @@ begin
     FBorders := AValue;
     FullRefresh;
   end;
+end;
+
+procedure TACLCustomTabControl.SetFocusToActiveTab;
+var
+  AControl: TWinControl;
+begin
+  AControl := FindNextControl(nil, True, True, False);
+  if AControl = nil then
+    AControl := FindNextControl(nil, True, False, False);
+  if AControl = nil then
+    AControl := Self;
+  acSafeSetFocus(AControl);
 end;
 
 procedure TACLCustomTabControl.SetHoverTab(AValue: TACLTab);
@@ -1188,12 +1181,7 @@ begin
     VK_PRIOR, VK_NEXT:
       if acIsShiftPressed([ssCtrl]) then
       begin
-        FIsUserAction := True;
-        try
-          JumpToNextPage(Message.CharCode = VK_NEXT);
-        finally
-          FIsUserAction := False;
-        end;
+        JumpToNextPage(Message.CharCode = VK_NEXT);
         Message.Result := 1;
       end;
 
@@ -1202,12 +1190,7 @@ begin
         LShift := GetKeyShiftState;
         if [ssCtrl, ssAlt] * LShift = [ssCtrl] then
         begin
-          FIsUserAction := True;
-          try
-            JumpToNextPage(not (ssShift in LShift));
-          finally
-            FIsUserAction := False;
-          end;
+          JumpToNextPage(not (ssShift in LShift));
           Message.Result := 1;
         end;
       end;
