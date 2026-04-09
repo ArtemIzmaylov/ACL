@@ -438,6 +438,7 @@ end;
 procedure TACLCompoundControl.CMHintShow(var Message: TCMHintShow);
 begin
   SubClasses.Dispatch(Message);
+  inherited; // last, to make possible to customize the hint via event
 end;
 
 procedure TACLCompoundControl.CMWantSpecialKey(var Message: TCMWantSpecialKey);

@@ -2927,12 +2927,15 @@ end;
 procedure TACLCompoundControlSubClass.CMHintShow(var Message: TCMHintShow);
 begin
   UpdateHitTest(Message.HintInfo.CursorPos, [], True);
-  if HitTest.HintData.TextRect <> NullRect then
-    Message.HintInfo^.HintPos := ClientToScreen(HitTest.HintData.TextRect.TopLeft);
-  Message.HintInfo^.CursorRect := HitTest.HintData.Area;
-  Message.HintInfo^.HintWindowClass := TACLHintWindow;
-  Message.HintInfo^.HintData := @HitTest.HintData;
-  Message.HintInfo^.HintStr := HitTest.HintData.Text;
+  if HitTest.HintData.Text <> '' then
+  begin
+    if HitTest.HintData.TextRect <> NullRect then
+      Message.HintInfo^.HintPos := ClientToScreen(HitTest.HintData.TextRect.TopLeft);
+    Message.HintInfo^.CursorRect := HitTest.HintData.Area;
+    Message.HintInfo^.HintWindowClass := TACLHintWindow;
+    Message.HintInfo^.HintData := @HitTest.HintData;
+    Message.HintInfo^.HintStr := HitTest.HintData.Text;
+  end;
 end;
 
 function TACLCompoundControlSubClass.ClientToScreen(const P: TPoint): TPoint;
