@@ -6,7 +6,7 @@
 //  Purpose:   SearchBox
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -95,6 +95,7 @@ type
     destructor Destroy; override;
     procedure CancelSearch;
     procedure Localize(const ASection, AName: string); override;
+    procedure RestartDelay;
   published
     property AutoSize;
     property Borders;
@@ -254,6 +255,11 @@ begin
     FocusControl := nil;
 end;
 
+procedure TACLSearchEdit.RestartDelay;
+begin
+  FDelayTimer.Restart;
+end;
+
 function TACLSearchEdit.GetChangeDelay: Integer;
 begin
   Result := FDelayTimer.Interval;
@@ -289,7 +295,7 @@ procedure TACLSearchEdit.TextChanged;
 begin
   DropDownButtonVisible := Text <> '';
   if not (csLoading in ComponentState) then
-    FDelayTimer.Restart;
+    RestartDelay;
 end;
 
 { TACLSearchEditStyleButton }

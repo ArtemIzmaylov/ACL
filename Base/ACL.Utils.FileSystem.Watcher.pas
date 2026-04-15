@@ -140,10 +140,10 @@ type
     class procedure Changed(const ADrive: string;
       AMounted: Boolean; AInfo: PACLDriveInfo = nil);
     class function CheckDrivePath(const ADrive: string): string;
-    class procedure EnsureInit;
   public
     class constructor Create;
     class destructor Destroy;
+    class procedure EnsureInit;
     class procedure EnsureReady;
     class procedure Enum(AProc: TEnumProc);
     class function GetInfo(const ADrive: string): TACLDriveInfo;

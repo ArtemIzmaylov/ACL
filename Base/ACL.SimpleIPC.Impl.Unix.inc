@@ -107,12 +107,8 @@ end;
 destructor TIPCServer.Destroy;
 begin
   FreeAndNil(FIdle);
-  try
-    FCore.StopServer;
-  except
-    // do nothing
-  end;
-  FreeAndNil(FCore);
+  Safe.Call(FCore.StopServer);
+  Safe.Call(FCore.Free);
   inherited Destroy;
 end;
 

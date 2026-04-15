@@ -1459,6 +1459,9 @@ begin
   else
   begin
     ACanvas.Pen.Color := ColorBorder1.AsColor;
+    // for backward compatibility with VCL behavior (black_onix_two skin):
+    if (ACanvas.Pen.Color = clNone) or (ACanvas.Pen.Color = clDefault) then
+      ACanvas.Pen.Color := clBlack;
     if ColorBorder2.IsEmpty then
       ACanvas.Brush.Color := ColorBorder1.AsColor
     else
