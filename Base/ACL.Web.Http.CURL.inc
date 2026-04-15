@@ -26,7 +26,6 @@ type
     FOnReceive: THttpDataProc;
 
     procedure Progress(APosition, ATotal: Int64);
-    procedure ProcessHeaders;
     procedure SetUserError(AError: Exception);
   protected
     class function OnHeader(buffer: PAnsiChar; size: size_t;
@@ -35,6 +34,7 @@ type
       nitems: size_t; data: THttpRequestData): size_t; cdecl; static;
     class function OnWrite(buffer: PAnsiChar; size: size_t;
       nitems: size_t; data: THttpRequestData): size_t; cdecl; static;
+    procedure ProcessHeaders;
   public
     constructor Create(
       APostData: TStream = nil;
@@ -121,10 +121,7 @@ type
     Result := size * nitems;
     try
       if not data.FHeadersProcessed then
-      begin
-        data.FHeadersProcessed := True;
         data.ProcessHeaders;
-      end;
       Inc(data.FPosition, Result);
       if not data.FOnReceive(PByte(buffer), Result) then
         raise EHttpWriteError.Create;
@@ -148,6 +145,8 @@ type
   var
     LParts: TStringDynArray;
   begin
+    if FHeadersProcessed then Exit;
+    FHeadersProcessed := True;
     FResponce.Init;
     FResponce.RawHeaders := THttpHeaders.Build(FHeaders);
     FResponce.ContentLength := StrToInt64Def(FHeaders.ValueFromName[THttpHeaders.IdentContentLength], -1);
@@ -168,8 +167,11 @@ type
 
   procedure THttpRequestData.SetUserError(AError: Exception);
   begin
+    FLastError.Initialize(acWebErrorUnknown, AError.Message);
     if AError is EHttpError then
       FLastError := EHttpError(AError).Info;
+    if AError is EHttpWriteError then
+      FLastError.ErrorCode := acWebErrorCanceled;
   end;
 
   { THttpConnectionImpl }
@@ -288,10 +290,21 @@ type
           curl_slist_free_all(LHeaders);
       end;
 
+      if (LResult = CURLE_PARTIAL_FILE) and acSameText(AMethod, 'HEAD') then
+      begin
+        LRequest.ProcessHeaders;
+        LResult := CURLE_OK;
+      end;
+
       if LResult <> CURLE_OK then
       begin
         if not LRequest.LastError.Succeeded then
-          raise EHttpError.Create(LRequest.LastError);
+        begin
+          if LRequest.LastError.ErrorCode = acWebErrorCanceled then
+            raise EHttpWriteError.Create
+          else
+            raise EHttpError.Create(LRequest.LastError);
+        end;
         CheckCURL(LResult);
       end;
 
