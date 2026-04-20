@@ -155,6 +155,7 @@ type
     FOnReturn: TThreadMethod;
 
     function CalculateStep(AGoForward: Boolean; AShift: TShiftState): Integer;
+    function MaskText(const AText: string): string;
     procedure HandlerCaretBlink(Sender: TObject);
     function GetSelText: string;
     function GetState(AState: TState): Boolean;
@@ -643,12 +644,12 @@ begin
   {$ENDREGION}
 
   {$REGION ' Selection '}
-    if FSelLength > 0 then
+    if (SelLength > 0) and (esFocused in State){HideSelection} then
     begin
       FSelectionRect := FTextRect;
       Inc(FSelectionRect.Left, LShadow.Left);
-      Inc(FSelectionRect.Left, acTextSize(MeasureCanvas, GetPart1(LText)).cx);
-      FSelectionRect.Width := acTextSize(MeasureCanvas, SelText).Width;
+      Inc(FSelectionRect.Left, acTextSize(MeasureCanvas, MaskText(GetPart1(Text))).cx);
+      FSelectionRect.Width  := acTextSize(MeasureCanvas, MaskText(SelText)).Width;
     end
     else
       FSelectionRect := NullRect;
@@ -833,10 +834,8 @@ end;
 
 function TACLEditSubClass.GetDisplayText: string;
 begin
-  if Ord(PasswordChar) <> 0 then
-    Result := acDupeString(PasswordChar, Length(Text))
-  else if esFocused in State then
-    Result := Text
+  if (Ord(PasswordChar) <> 0) or (esFocused in State) then
+    Result := MaskText(Text)
   else if Assigned(OnDisplayFormat) then
     Result := OnDisplayFormat
   else
@@ -1016,6 +1015,14 @@ begin
     ACanHandle := AKey in [vkC, vkV, vkX, vkA, vkZ, vkLeft, vkRight]
   else
     ACanHandle := ([ssCtrl, ssAlt] * Shift = []) and not (AKey in ControlKeys);
+end;
+
+function TACLEditSubClass.MaskText(const AText: string): string;
+begin
+  if Ord(PasswordChar) <> 0 then
+    Result := acDupeString(PasswordChar, acCharCount(AText))
+  else
+    Result := AText;
 end;
 
 procedure TACLEditSubClass.Modify(const AText: string; ACaretPos: Integer);
