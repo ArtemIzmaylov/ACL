@@ -7,7 +7,7 @@
 //  Purpose:   General Classes
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -687,8 +687,8 @@ begin
           LTarget.A := MaxByte - LTarget.A;
 
           LSource.R := TACLColors.PremultiplyTable[LSource.R, LTarget.A] + LTarget.R;
-          LSource.B := TACLColors.PremultiplyTable[LSource.B, LTarget.A] + LTarget.G;
-          LSource.G := TACLColors.PremultiplyTable[LSource.G, LTarget.A] + LTarget.B;
+          LSource.G := TACLColors.PremultiplyTable[LSource.G, LTarget.A] + LTarget.G;
+          LSource.B := TACLColors.PremultiplyTable[LSource.B, LTarget.A] + LTarget.B;
         end;
 
       if LSource.A < MaxByte then
