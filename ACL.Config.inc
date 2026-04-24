@@ -17,33 +17,34 @@
   {$inline off}
 
   {$H+}
+  {$DEFINE DEBUG}
   {$WARN 5023 off : Unit "$1" not used in $2}
   {$WARN 5024 off} // Parameter "$1" not used
   {$WARN 5026 off}
   {$WARN 6058 off} // Call to subroutine "$1" marked as inline is not inlined
   {$WARN 3124 off} // Inlining disabled
 
-  {$IFNDEF LINUX}
-    {$MESSAGE FATAL 'ACL is not yet ready for other platforms via FPC/LCL'}
+  {$IF DEFINED(LCLGtk2) OR DEFINED(LCLGtk3)}
+    {$DEFINE LCLGtkX}
+  {$ELSE}
+    // Now, only Gtk2 and Gtk3 widget sets are supported.
+    {$MESSAGE FATAL 'ACL is not ready for this WidgetSet'}
   {$ENDIF}
-
-  {$DEFINE DEBUG}
 {$ENDIF}
 
-{$IF DEFINED(LCLGtk2) OR DEFINED(LCLGtk3)}
-  {$DEFINE LCLGtkX}
-{$ENDIF}
-
-{$IF DEFINED(CPUX64) OR DEFINED(CPU64)}
+// CPU64 is defined in FreePascal when target is 64-bit
+// Win64 is defined in Delphi when target is Windows 64-bit (x86-64 or ARM64EC)
+{$IF DEFINED(CPUX64) OR DEFINED(CPU64) OR DEFINED(WIN64)}
   {$DEFINE CPUX64}
 {$IFEND}
 
-{$IF DEFINED(CPUX64) OR DEFINED(FPC)}
-  {$DEFINE ACL_PUREPASCAL}
+{$IF DEFINED(FPC) OR DEFINED(CPUX64) OR DEFINED(CPUARM)}
+  {$DEFINE ACL_PUREPASCAL} // disable inline assembler
 {$IFEND}
 
 {$IF NOT DEFINED(FPC)}
-  {$WARN DUPLICATE_CTOR_DTOR OFF} // We does not support for C++Builder
+  // Disable some Delphi's warnings
+  {$WARN DUPLICATE_CTOR_DTOR OFF}
   {$WARN OVERLOADING_ARRAY_PROPERTY OFF}
 {$IFEND}
 
@@ -51,23 +52,23 @@
 // IDE Versions
 // -----------------------------------------------------------------------------
 
-{$IFDEF VER350} // 11.0 Alexandria
+{$IFDEF VER350} // Delphi 11 Alexandria
   {$DEFINE DELPHI110ALEXANDRIA}
 {$ENDIF}
 
-{$IFDEF VER360} // 12.0 Athens
+{$IFDEF VER360} // Delphi 12 Athens
   {$DEFINE DELPHI110ALEXANDRIA}
   {$DEFINE DELPHI120}
 {$ENDIF}
 
-{$IFDEF VER370} // 13.0 Florence
+{$IFDEF VER370} // Delphi 13 Florence
   {$DEFINE DELPHI110ALEXANDRIA}
   {$DEFINE DELPHI120}
   {$DEFINE DELPHI130}
 {$ENDIF}
 
 {$IF NOT DEFINED(FPC) AND NOT DEFINED(DELPHI110ALEXANDRIA)}
-  {$MESSAGE FATAL 'You need Delphi 11.0 Alexandria for this library, previous Delphi versions has too many bugs with dpi scaling'}
+  {$MESSAGE FATAL 'You need at least Delphi 11 Alexandria to use this library'}
 {$IFEND}
 
 // -----------------------------------------------------------------------------
@@ -93,7 +94,7 @@
 {$ENDIF}
 
 {$DEFINE ACL_ALPHACOMPOSED_POPUPMENUS}
-{$DEFINE ACL_TEXTLAYOUT_RTL}   // support for right-to-left text direction
+{$DEFINE ACL_TEXTLAYOUT_RTL}  // support for right-to-left text direction
 
 {$IFDEF LCLGtkX}
   {$DEFINE ACL_CAIRO}

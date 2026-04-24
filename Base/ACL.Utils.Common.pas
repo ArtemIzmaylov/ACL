@@ -160,9 +160,10 @@ type
       AErrorData: TStream = nil; AExitCode: PCardinal = nil): LongBool; overload;
     class function ExecuteToString(const ACmdLine: string): string;
   {$IFDEF MSWINDOWS}
+    class function IsArm64: LongBool; overload;
     class function IsWow64: LongBool; overload;
     class function IsWow64(AProcess: THandle): LongBool; overload;
-    class function IsWow64Window(AWindow: HWND): LongBool;
+    class function IsWow64Window(AWindow: TWndHandle): LongBool;
     class function Wow64SetFileSystemRedirection(AValue: Boolean): LongBool;
   {$ENDIF}
   end;
@@ -302,6 +303,10 @@ begin
     LBuilder := TStringBuilder.Create;
     try
       LBuilder.Append(TOSVersion.Name);
+    {$IFDEF MSWINDOWS}
+      if TACLProcess.IsArm64 then
+        LBuilder.Append(' on Arm ');
+    {$ENDIF}
       LBuilder.Append(' / ');
 
     {$IFDEF LINUX}
@@ -320,6 +325,7 @@ begin
         LDescription := Trim(LData.Values['Description']);
         if LDescription = '' then
           LDescription := Trim(LData.Values['Operating System']); // hostnamectl
+
         LBuilder.Append(LDescription);
 
         // Release
@@ -484,7 +490,7 @@ begin
           begin
             Inc(LPosOpenBracket, Length(OpenBracket));
             LCandidateFlags := Copy(LTemp, LPosOpenBracket, LPosArrow - LPosOpenBracket);
-            if LCandidateFlags.Contains('x86-64') = {$IFDEF CPU64}True{$ELSE}False{$ENDIF} then
+            if LCandidateFlags.Contains('x86-64') = {$IFDEF CPUX64}True{$ELSE}False{$ENDIF} then
               Exit(Copy(LTemp, LPosArrow + Length(Arrow)));
           end;
         end;
@@ -507,7 +513,7 @@ begin
       Result := ExtractFilePath(ParamStr(0)) + AFileName;
     if (Result = '') or not FileExists(Result) then
       Result := ResolveLibraryPath(AFileName);
-  {$IFDEF CPU64}
+  {$IFDEF CPUX64}
     if (Result = '') or not FileExists(Result) then
       Result := '/usr/lib64/' + AFileName;
     if (Result = '') or not FileExists(Result) then
@@ -1097,6 +1103,30 @@ begin
 end;
 {$ENDIF}
 
+class function TACLProcess.IsArm64: LongBool;
+{$IF DEFINED(CPUARM)}
+begin
+  Result := True
+{$ELSEIF NOT DEFINED(CPUX64)}
+begin
+  Result := False;
+{$ELSE}
+type
+  TIsWow64Process2 = function (Process: THandle; out ProcessMachine, NativeMachine: Word): LongBool; stdcall;
+var
+  LLibHandle: HMODULE;
+  LMachine1: Word;
+  LMachine2: Word;
+  LWow64Proc: TIsWow64Process2;
+begin
+  Result := False;
+  LLibHandle := GetModuleHandle(kernel32);
+  LWow64Proc := TIsWow64Process2(GetProcAddress(LLibHandle, 'IsWow64Process2'));
+  if Assigned(LWow64Proc) and LWow64Proc(GetCurrentProcess, LMachine1, LMachine2) then
+    Result := LMachine2 = IMAGE_FILE_MACHINE_ARM64;
+{$ENDIF}
+end;
+
 {$IFDEF MSWINDOWS}
 class function TACLProcess.IsWow64: LongBool;
 begin
@@ -1111,29 +1141,29 @@ class function TACLProcess.IsWow64(AProcess: THandle): LongBool;
 type
   TIsWow64ProcessProc = function (hProcess: THandle; out AValue: LongBool): LongBool; stdcall;
 var
-  ALibHandle: THandle;
-  AWow64Proc: TIsWow64ProcessProc;
+  LLibHandle: HMODULE;
+  LWow64Proc: TIsWow64ProcessProc;
 begin
-  ALibHandle := GetModuleHandle(kernel32);
-  AWow64Proc := TIsWow64ProcessProc(GetProcAddress(ALibHandle, 'IsWow64Process'));
-  if not (Assigned(AWow64Proc) and AWow64Proc(AProcess, Result)) then
+  LLibHandle := GetModuleHandle(kernel32);
+  LWow64Proc := TIsWow64ProcessProc(GetProcAddress(LLibHandle, 'IsWow64Process'));
+  if not (Assigned(LWow64Proc) and LWow64Proc(AProcess, Result)) then
     Result := False;
 end;
 
 class function TACLProcess.IsWow64Window(AWindow: TWndHandle): LongBool;
 var
-  AProcessID: Cardinal;
-  AProcessHandle: THandle;
+  LProcessID: Cardinal;
+  LProcessHandle: THandle;
 begin
   Result := False;
-  if GetWindowThreadProcessId(AWindow, AProcessID) <> 0 then
+  if GetWindowThreadProcessId(AWindow, LProcessID) <> 0 then
   begin
-    AProcessHandle := OpenProcess(PROCESS_QUERY_INFORMATION, True, AProcessID);
-    if AProcessHandle <> 0 then
+    LProcessHandle := OpenProcess(PROCESS_QUERY_INFORMATION, True, LProcessID);
+    if LProcessHandle <> 0 then
     try
-      Result := IsWow64(AProcessHandle);
+      Result := IsWow64(LProcessHandle);
     finally
-      CloseHandle(AProcessHandle);
+      CloseHandle(LProcessHandle);
     end;
   end;
 end;
@@ -1142,12 +1172,12 @@ class function TACLProcess.Wow64SetFileSystemRedirection(AValue: Boolean): LongB
 type
   TWow64SetProc = function (AValue: LongBool): LongBool; stdcall;
 var
-  ALibHandle: THandle;
-  AWow64SetProc: TWow64SetProc;
+  LLibHandle: HMODULE;
+  LWow64Proc: TWow64SetProc;
 begin
-  ALibHandle := GetModuleHandle(kernel32);
-  AWow64SetProc := TWow64SetProc(GetProcAddress(ALibHandle, 'Wow64EnableWow64FsRedirection'));
-  Result := Assigned(AWow64SetProc) and AWow64SetProc(AValue);
+  LLibHandle := GetModuleHandle(kernel32);
+  LWow64Proc := TWow64SetProc(GetProcAddress(LLibHandle, 'Wow64EnableWow64FsRedirection'));
+  Result := Assigned(LWow64Proc) and LWow64Proc(AValue);
 end;
 {$ENDIF}
 
