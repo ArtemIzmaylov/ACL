@@ -6,7 +6,7 @@
 //  Purpose:   High-level command line switch processor
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -28,6 +28,9 @@ uses
   ACL.Utils.Common,
   ACL.Utils.Logger,
   ACL.Utils.Strings;
+
+const
+  sSwitchSkipUAC = 'skipuac';
 
 type
 
@@ -86,6 +89,7 @@ type
     class procedure Execute(const AParams: string);
     class procedure ExecuteFromCommandLine;
 
+    class function HasCommands: Boolean;
     class function HasPendingCommand(const ACommand: string): Boolean; overload;
     class function HasPendingCommand(const AFlags: Cardinal): Boolean; overload;
     class procedure ParseParams(ATarget: TCommands; const AParams: string); // for internal use only
@@ -105,6 +109,7 @@ type
     class procedure Unregister(const ACommand: string);
   end;
 
+function BuildSwitch(const AName: string; AData: TACLStringList): string;
 function FindSwitch(const ACmdLine, ASwitch: string): Boolean; overload;
 function FindSwitch(const ACmdLine, ASwitch: string; out AValues: string): Boolean; overload;
 function GetCommandLine: string;
@@ -115,6 +120,27 @@ implementation
 uses
   Windows;
 {$ENDIF}
+
+function BuildSwitch(const AName: string; AData: TACLStringList): string;
+var
+  LDelim: string;
+  LPrefix: string;
+begin
+  if AName = '' then
+    Exit('');
+
+  if CharInSet(AName[1], ['-', '/']) then
+    LPrefix := ''
+  else
+    LPrefix := '/';
+
+  if acEndsWith(Result, '=', False) then
+    LDelim := ';'
+  else
+    LDelim := ' ';
+
+  Result := LPrefix + AName + '"' + AData.GetDelimitedText(LDelim, False) + '"';
+end;
 
 {$IFNDEF MSWINDOWS}
 function CombineParams(ASkipAppName: Boolean): string;
@@ -273,6 +299,11 @@ begin
     if acSameText(FPendingToExecute.List[I].Name, ACommand) then
       Exit(True);
   end;
+end;
+
+class function TACLCommandLineProcessor.HasCommands: Boolean;
+begin
+  Result := FCommands.Count > 0;
 end;
 
 class function TACLCommandLineProcessor.HasPendingCommand(const AFlags: Cardinal): Boolean;

@@ -205,11 +205,9 @@ function ShellDesktopEnv: TShellDesktopEnvironment;
 procedure ShellExecute(const AFileName: string); // Postponed call
 procedure ShellExecuteURL(const ALink: string);
 function ShellExecuteEx(const AFileName: string; const AParameters: string = ''): Boolean;
+function ShellExecuteWithElevatedRights(const AFileName: string;
+  const AParameters: string; AWaitForTerminate: Boolean): Boolean;
 function ShellJumpToFile(const AFileName: string): Boolean;
-{$IFDEF LINUX}
-function ShellGetMimeType(const AFileName: string): string;
-{$ENDIF}
-function ShellOpenStream(const AFileName: string): TStream;
 
 // Shell - System Paths
 function ShellPath(CLSID: Integer): string;
@@ -232,9 +230,16 @@ function ShellIsLibraryPath(const APath: string): Boolean;
 function ShellShortcutCreate(const ALinkFileName, AFileName: string): Boolean;
 function ShellShortcutResolve(const AShortcutFileName: string; out AFileName: string): Boolean;
 
+// Shell - Misc
+{$IFDEF LINUX}
+function ShellGetMimeType(const AFileName: string): string;
+{$ENDIF}
+function ShellOpenStream(const AFileName: string): TStream;
 function ShellGetFreeSpace(const AFileName: string): Int64;
-function ShellShutdown(AMode: TShellShutdownMode): Boolean;
 procedure ShellFlushCache;
+
+// Shell - PowerState
+function ShellShutdown(AMode: TShellShutdownMode): Boolean;
 procedure ShellRequirePowerState(AState: TShellPowerState);
 implementation
 
@@ -267,7 +272,7 @@ function g_get_user_special_dir(directory: DWORD): PChar; cdecl; external libGLi
 {$ENDIF}
 
 //------------------------------------------------------------------------------
-// Shell - General
+// Shell - Misc
 //------------------------------------------------------------------------------
 
 {$REGION ' General '}
@@ -427,81 +432,6 @@ begin
 end;
 {$ENDIF}
 
-function ShellShutdown(AMode: TShellShutdownMode): Boolean;
-{$IFDEF MSWINDOWS}
-
-  function GetPrivileges: Boolean;
-  var
-    ALength: Cardinal;
-    ALuID: TLargeInteger;
-    ANewPriv: TTokenPrivileges;
-    APrevPriv: TTokenPrivileges;
-    AToken: THandle;
-  begin
-    Result := False;
-    if OpenProcessToken(GetCurrentProcess, TOKEN_ADJUST_PRIVILEGES or TOKEN_QUERY, AToken) then
-    begin
-      if not GetTokenInformation(AToken, TokenPrivileges, nil, 0, ALength) then
-      begin
-        if (GetLastError = 122) and LookupPrivilegeValue(nil, 'SeShutdownPrivilege', ALuID) then
-        begin
-          ANewPriv.PrivilegeCount := 1;
-          ANewPriv.Privileges[0].Luid := ALuID;
-          ANewPriv.Privileges[0].Attributes := SE_PRIVILEGE_ENABLED;
-          Result := AdjustTokenPrivileges(AToken, False, ANewPriv, SizeOf(TTokenPrivileges), APrevPriv, ALength);
-        end;
-      end;
-    end;
-  end;
-
-var
-  Version: TOSVersionInfo;
-begin
-  Result := False;
-  Version.dwOSVersionInfoSize := SizeOf(TOSVersionInfo);
-  GetVersionEx(version);
-  if Version.dwPlatformId = VER_PLATFORM_WIN32_NT then
-  begin
-    if not GetPrivileges then
-      Exit;
-  end;
-  case AMode of
-    sdPowerOff:
-      Result := ExitWindowsEx(EWX_FORCEIFHUNG or EWX_POWEROFF, MaxInt);
-    sdLogOff:
-      Result := ExitWindowsEx(EWX_FORCEIFHUNG or EWX_LOGOFF, MaxInt);
-    sdReboot:
-      Result := ExitWindowsEx(EWX_FORCEIFHUNG or EWX_REBOOT, MaxInt);
-    sdHibernate, sdSleep:
-      Result := SetSystemPowerState(AMode = sdSleep, False);
-  end;
-{$ELSE}
-const
-  // https://www.computerhope.com/unix/ushutdow.htm
-  CmdMap: array[TShellShutdownMode] of string = (
-    '/sbin/shutdown -h now',
-    '/sbin/shutdown -h now',
-    'systemctl hibernate',
-    'systemctl suspend',
-    '/sbin/shutdown -r now'
-  );
-begin
-  with TProcessUTF8.Create(nil) do
-  try
-    InheritHandles := False;
-    {%H-}CommandLine{%H-} := CmdMap[AMode];
-    try
-      Execute;
-      Result := True;
-    except
-      Result := False;
-    end;
-  finally
-    Free;
-  end;
-{$ENDIF}
-end;
-
 procedure ShellFlushCache;
 begin
 {$IFDEF MSWINDOWS}
@@ -511,22 +441,6 @@ begin
 {$IFDEF LINUX}
   ShellExecuteEx('update-desktop-database', '/usr/share/applications');
   ShellExecuteEx('update-mime-database', '/usr/share/mime');
-{$ENDIF}
-end;
-
-procedure ShellRequirePowerState(AState: TShellPowerState);
-{$IFDEF MSWINDOWS}
-var
-  LFlags: EXECUTION_STATE;
-{$ENDIF}
-begin
-{$IFDEF MSWINDOWS}
-  LFlags := ES_CONTINUOUS;
-  if psKeepScreenOn in AState then
-    LFlags := LFlags or ES_DISPLAY_REQUIRED;
-  if psKeepPowerOn in AState then
-    LFlags := LFlags or ES_SYSTEM_REQUIRED;
-  SetThreadExecutionState(LFlags);
 {$ENDIF}
 end;
 
@@ -602,6 +516,49 @@ begin
     Result := ShellOpenUrl(AFileName)
   else
     Result := ShellOpen(AFileName, AParameters);
+end;
+
+function ShellExecuteWithElevatedRights(const AFileName: string;
+  const AParameters: string; AWaitForTerminate: Boolean): Boolean;
+{$IF DEFINED(MSWINDOWS)}
+var
+  LInfo: TShellExecuteInfo;
+begin
+  LInfo := Default(TShellExecuteInfo);
+  LInfo.cbSize := SizeOf(LInfo);
+  LInfo.lpVerb := 'runas';
+  LInfo.lpFile := PChar(AFileName);
+  LInfo.lpParameters := PChar(AParameters);
+  LInfo.lpDirectory := PChar(acExtractFilePath(AFileName));
+  LInfo.nShow := SW_SHOWNORMAL;
+  LInfo.fMask :=
+    SEE_MASK_FLAG_NO_UI or
+    SEE_MASK_FLAG_DDEWAIT or
+    SEE_MASK_NOCLOSEPROCESS or
+    SEE_MASK_NOZONECHECKS;
+
+  Result := Winapi.ShellApi.ShellExecuteEx(@LInfo);
+  if Result then
+  begin
+    if AWaitForTerminate then
+    begin
+      WaitForSyncObject(LInfo.hProcess, INFINITE);
+      CloseHandle(LInfo.hProcess);
+    end;
+  end
+  else
+    if GetLastError <> ERROR_CANCELLED then
+      RaiseLastOSError;
+{$ELSEIF DEFINED(LINUX)}
+const
+  Options: array[Boolean] of TExecuteOptions =
+    ([eoShowGUI], [eoShowGUI, eoWaitForTerminate]);
+begin
+  Result := TACLProcess.Execute('"pkexec" bash -c "' +
+    AFileName + ' ' + AParameters + '"', Options[AWaitForTerminate]);
+{$ELSE}
+  {$MESSAGE FATAL 'ShellExecuteWithElevatedRights is not implemented'}
+{$ENDIF}
 end;
 
 function ShellJumpToFile(const AFileName: string): Boolean;
@@ -830,7 +787,7 @@ end;
 // Shell - Shortcuts
 //------------------------------------------------------------------------------
 
-{$REGION ' Links '}
+{$REGION ' Shortcuts '}
 
 {$IFDEF MSWINDOWS}
 function CreateShortcutObjects(out ALink: IShellLinkW; out AFile: IPersistFile): Boolean;
@@ -945,6 +902,108 @@ begin
 end;
 
 {$ENDREGION}
+
+//------------------------------------------------------------------------------
+// Shell - PowerState
+//------------------------------------------------------------------------------
+
+{$REGION ' PowerState '}
+
+function ShellShutdown(AMode: TShellShutdownMode): Boolean;
+{$IFDEF MSWINDOWS}
+
+  function GetPrivileges: Boolean;
+  var
+    ALength: Cardinal;
+    ALuID: TLargeInteger;
+    ANewPriv: TTokenPrivileges;
+    APrevPriv: TTokenPrivileges;
+    AToken: THandle;
+  begin
+    Result := False;
+    if OpenProcessToken(GetCurrentProcess, TOKEN_ADJUST_PRIVILEGES or TOKEN_QUERY, AToken) then
+    begin
+      if not GetTokenInformation(AToken, TokenPrivileges, nil, 0, ALength) then
+      begin
+        if (GetLastError = 122) and LookupPrivilegeValue(nil, 'SeShutdownPrivilege', ALuID) then
+        begin
+          ANewPriv.PrivilegeCount := 1;
+          ANewPriv.Privileges[0].Luid := ALuID;
+          ANewPriv.Privileges[0].Attributes := SE_PRIVILEGE_ENABLED;
+          Result := AdjustTokenPrivileges(AToken, False, ANewPriv, SizeOf(TTokenPrivileges), APrevPriv, ALength);
+        end;
+      end;
+    end;
+  end;
+
+var
+  Version: TOSVersionInfo;
+begin
+  Result := False;
+  Version.dwOSVersionInfoSize := SizeOf(TOSVersionInfo);
+  GetVersionEx(version);
+  if Version.dwPlatformId = VER_PLATFORM_WIN32_NT then
+  begin
+    if not GetPrivileges then
+      Exit;
+  end;
+  case AMode of
+    sdPowerOff:
+      Result := ExitWindowsEx(EWX_FORCEIFHUNG or EWX_POWEROFF, MaxInt);
+    sdLogOff:
+      Result := ExitWindowsEx(EWX_FORCEIFHUNG or EWX_LOGOFF, MaxInt);
+    sdReboot:
+      Result := ExitWindowsEx(EWX_FORCEIFHUNG or EWX_REBOOT, MaxInt);
+    sdHibernate, sdSleep:
+      Result := SetSystemPowerState(AMode = sdSleep, False);
+  end;
+{$ELSE}
+const
+  // https://www.computerhope.com/unix/ushutdow.htm
+  CmdMap: array[TShellShutdownMode] of string = (
+    '/sbin/shutdown -h now',
+    '/sbin/shutdown -h now',
+    'systemctl hibernate',
+    'systemctl suspend',
+    '/sbin/shutdown -r now'
+  );
+begin
+  with TProcessUTF8.Create(nil) do
+  try
+    InheritHandles := False;
+    {%H-}CommandLine{%H-} := CmdMap[AMode];
+    try
+      Execute;
+      Result := True;
+    except
+      Result := False;
+    end;
+  finally
+    Free;
+  end;
+{$ENDIF}
+end;
+
+procedure ShellRequirePowerState(AState: TShellPowerState);
+{$IFDEF MSWINDOWS}
+var
+  LFlags: EXECUTION_STATE;
+{$ENDIF}
+begin
+{$IFDEF MSWINDOWS}
+  LFlags := ES_CONTINUOUS;
+  if psKeepScreenOn in AState then
+    LFlags := LFlags or ES_DISPLAY_REQUIRED;
+  if psKeepPowerOn in AState then
+    LFlags := LFlags or ES_SYSTEM_REQUIRED;
+  SetThreadExecutionState(LFlags);
+{$ENDIF}
+end;
+{$ENDREGION}
+
+//------------------------------------------------------------------------------
+// Shell - Classes
+//------------------------------------------------------------------------------
 
 {$REGION ' TACLShellFolder '}
 
