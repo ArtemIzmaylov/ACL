@@ -1103,6 +1103,7 @@ begin
 end;
 {$ENDIF}
 
+{$IFDEF MSWINDOWS}
 class function TACLProcess.IsArm64: LongBool;
 {$IF DEFINED(CPUARM)}
 begin
@@ -1127,7 +1128,6 @@ begin
 {$ENDIF}
 end;
 
-{$IFDEF MSWINDOWS}
 class function TACLProcess.IsWow64: LongBool;
 begin
 {$IFDEF CPUX64}

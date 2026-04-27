@@ -1424,7 +1424,7 @@ end;
 procedure TACLTreeListNode.BeforeDestruction;
 begin
   inherited;
-  Clear; // первым, иначе GetObjectParent на валидации захватит нас после NodeRemoving
+  DeleteChildren; // первым, иначе GetObjectParent на валидации захватит нас после NodeRemoving
   if TreeList <> nil then
     TreeList.NodeRemoving(Self);
   TACLObjectLinks.Release(Self);
@@ -2035,7 +2035,7 @@ end;
 destructor TACLTreeListStringNode.Destroy;
 begin
   FreeAndNil(FValues);
-  inherited Destroy;
+  inherited;
 end;
 
 procedure TACLTreeListStringNode.DeleteValues;
