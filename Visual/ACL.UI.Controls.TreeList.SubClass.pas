@@ -4905,7 +4905,7 @@ begin
           else
             Break;
         end;
-        Dec(LIndex, ADelta);
+        Dec(LIndex, Sign(ADelta));
       end;
     finally
       EndUpdate;
