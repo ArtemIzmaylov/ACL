@@ -205,8 +205,10 @@ function ShellDesktopEnv: TShellDesktopEnvironment;
 procedure ShellExecute(const AFileName: string); // Postponed call
 procedure ShellExecuteURL(const ALink: string);
 function ShellExecuteEx(const AFileName: string; const AParameters: string = ''): Boolean;
-function ShellExecuteWithElevatedRights(const AFileName: string;
-  const AParameters: string; AWaitForTerminate: Boolean): Boolean;
+// returns False if user cancels the action,
+// raises exception on any other fail.
+function ShellExecuteWithElevatedRights(AFileName: string;
+  AParameters: string; AWaitForTerminate: Boolean): Boolean;
 function ShellJumpToFile(const AFileName: string): Boolean;
 
 // Shell - System Paths
@@ -231,6 +233,7 @@ function ShellShortcutCreate(const ALinkFileName, AFileName: string): Boolean;
 function ShellShortcutResolve(const AShortcutFileName: string; out AFileName: string): Boolean;
 
 // Shell - Misc
+function HasUserElevatedRights: Boolean;
 {$IFDEF LINUX}
 function ShellGetMimeType(const AFileName: string): string;
 {$ENDIF}
@@ -244,6 +247,9 @@ procedure ShellRequirePowerState(AState: TShellPowerState);
 implementation
 
 uses
+{$IFDEF LINUX}
+  BaseUnix,
+{$ENDIF}
   ACL.FileFormats.INI,
 {$IFDEF MSWINDOWS}
   ACL.Utils.Registry,
@@ -353,6 +359,17 @@ begin
 {$ELSE}
 begin
   FormatSettings := TFormatSettings.Create(GetThreadLocale);
+{$ENDIF}
+end;
+
+function HasUserElevatedRights: Boolean;
+begin
+{$IFDEF MSWINDOWS}
+  Result := IsUserAnAdmin;
+{$ELSEIF DEFINED(LINUX)}
+  Result := fpGetUID = 0;
+{$ELSE}
+  {$MESSAGE FATAL 'NotImplemented'}
 {$ENDIF}
 end;
 
@@ -518,8 +535,8 @@ begin
     Result := ShellOpen(AFileName, AParameters);
 end;
 
-function ShellExecuteWithElevatedRights(const AFileName: string;
-  const AParameters: string; AWaitForTerminate: Boolean): Boolean;
+function ShellExecuteWithElevatedRights(AFileName: string;
+  AParameters: string; AWaitForTerminate: Boolean): Boolean;
 {$IF DEFINED(MSWINDOWS)}
 var
   LInfo: TShellExecuteInfo;
@@ -553,9 +570,24 @@ begin
 const
   Options: array[Boolean] of TExecuteOptions =
     ([eoShowGUI], [eoShowGUI, eoWaitForTerminate]);
+var
+  LError: TMemoryStream;
+  LErrorCode: Cardinal;
 begin
-  Result := TACLProcess.Execute('"pkexec" bash -c "' +
-    AFileName + ' ' + AParameters + '"', Options[AWaitForTerminate]);
+  LError := TMemoryStream.Create;
+  try
+    AParameters := AParameters.Replace('"', #39);
+    Result := TACLProcess.Execute('"pkexec" bash -c "' +
+      AFileName + ' ' + AParameters + '"', Options[AWaitForTerminate],
+      nil, LError, @LErrorCode);
+    if (LErrorCode > 0) and (LError.Size > 0) then
+    begin
+      LError.Position := 0;
+      raise Exception.Create(acLoadString(LError));
+    end;
+  finally
+    LError.Free;
+  end;
 {$ELSE}
   {$MESSAGE FATAL 'ShellExecuteWithElevatedRights is not implemented'}
 {$ENDIF}
