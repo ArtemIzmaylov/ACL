@@ -54,17 +54,23 @@ type
   var
     LKey: HKEY;
   begin
+    ADarkModeForSystem := TACLColors.IsDark(ColorToRGB(clWindow));
+    ADarkModeForApps := ADarkModeForSystem;
+
+    if acRegOpenRead(HKEY_CURRENT_USER, 'Control Panel\Accessibility\HighContrast', LKey) then
+    try
+      if StrToIntDef(acRegReadStr(LKey, 'Flags'), 0) and $1 = $1 then // 126 (off), 127 (on)
+        Exit;
+    finally
+      acRegClose(LKey);
+    end;
+
     if acRegOpenRead(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Themes\Personalize', LKey) then
     try
       ADarkModeForApps := acRegReadInt(LKey, 'AppsUseLightTheme', 1) = 0;
       ADarkModeForSystem := acRegReadInt(LKey, 'SystemUsesLightTheme', 1) = 0;
     finally
       acRegClose(LKey);
-    end
-    else
-    begin
-      ADarkModeForSystem := TACLColors.IsDark(ColorToRGB(clWindow));
-      ADarkModeForApps := ADarkModeForSystem;
     end;
   end;
 
