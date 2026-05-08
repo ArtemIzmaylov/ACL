@@ -126,6 +126,7 @@ type
     FControlCustomPath: TACLEdit;
     FControlRecursive: TACLCheckBox;
     FControlShellTree: TACLShellTreeView;
+    FPanelBottom: TACLCustomControl;
     FCustomPathSynchronizing: Boolean;
     FDefaultBounds: TRect;
     FOwnerHandle: HWND;
@@ -141,7 +142,7 @@ type
     procedure CMVisibleChanged(var Message: TMessage); message CM_VISIBLECHANGED;
   protected const
     ContentOffset = 7;
-    ButtonHeight = 23;
+    ButtonHeight = 25;
     ButtonWidth  = 90;
   protected
     procedure AdjustClientRect(var Rect: TRect); override;
@@ -149,6 +150,7 @@ type
       AAlign: TAlign; AParent: TWinControl = nil);
     procedure CreateCustomControls; virtual;
     procedure CreateParams(var Params: TCreateParams); override;
+    procedure DpiChanged; override;
     function GetConfigSection: string; override;
     procedure InitializeControls; virtual;
     procedure InitializePath(const APath: string);
@@ -430,6 +432,13 @@ begin
   UpdateState;
 end;
 
+procedure TACLFolderBrowserDialog.DpiChanged;
+begin
+  inherited;
+  FPanelBottom.Height := dpiApply(ButtonHeight, FCurrentPPI) +
+    2 * dpiApply(TACLMargins.Default, FCurrentPPI);
+end;
+
 function TACLFolderBrowserDialog.Execute: Boolean;
 begin
   Result := ShowModal = mrOk;
@@ -437,8 +446,6 @@ begin
 end;
 
 procedure TACLFolderBrowserDialog.InitializeControls;
-var
-  APanel: TACLCustomControl;
 begin
   if ssoRecursive in Options then
   begin
@@ -453,23 +460,24 @@ begin
   ControlShellTree.OnFocusedNodeChanged := DoSelectionChanged;
   ActiveControl := ControlShellTree;
 
-  CreateControl(APanel, TACLCustomControl, alBottom);
-  APanel.Margins.All := 0;
-  APanel.Height := dpiApply(ButtonHeight, FCurrentPPI) + 2 * dpiApply(3, FCurrentPPI);
+  CreateControl(FPanelBottom, TACLCustomControl, alBottom);
+  FPanelBottom.Margins.All := 0;
+  FPanelBottom.Height := dpiApply(ButtonHeight, FCurrentPPI) +
+    2 * dpiApply(TACLMargins.Default, FCurrentPPI);
 
-  CreateControl(FControlCreateNew, TACLButton, alLeft, APanel);
+  CreateControl(FControlCreateNew, TACLButton, alLeft, FPanelBottom);
   ControlCreateNew.Width := dpiApply(ButtonWidth, FCurrentPPI);
   ControlCreateNew.Caption := TACLDialogsStrs.FolderBrowserNewFolder;
   ControlCreateNew.OnClick := DoNewFolderClick;
   ControlCreateNew.Visible := [ssoMultiPath, ssoRecursive] * Options = [];
   ControlCreateNew.Enabled := False;
 
-  CreateControl(FControlCancel, TACLButton, alRight, APanel);
+  CreateControl(FControlCancel, TACLButton, alRight, FPanelBottom);
   ControlCancel.Width := dpiApply(ButtonWidth, FCurrentPPI);
   ControlCancel.Caption := TACLDialogsStrs.MsgDlgButtons[mbCancel];
   ControlCancel.ModalResult := mrCancel;
 
-  CreateControl(FControlApply, TACLButton, alRight, APanel);
+  CreateControl(FControlApply, TACLButton, alRight, FPanelBottom);
   ControlApply.Width := dpiApply(ButtonWidth, FCurrentPPI);
   ControlApply.Caption := TACLDialogsStrs.MsgDlgButtons[mbOk];
   ControlApply.ModalResult := mrOk;
