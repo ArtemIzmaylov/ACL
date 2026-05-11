@@ -613,8 +613,8 @@ begin
 
     LIndex := 0;
     LLength := LBuffer.Length - 1;
-    // Trim spaces
-    while (LIndex <= LLength) and CharInSet(LBuffer.Chars[LIndex], [' ']) do
+    // Trim spaces and dots (required for folders in Windows)
+    while (LIndex <= LLength) and CharInSet(LBuffer.Chars[LIndex], [' ', '.']) do
       Inc(LIndex);
     while (LLength >= 1) and CharInSet(LBuffer.Chars[LLength], [' ']) do
       Dec(LLength);
@@ -623,8 +623,6 @@ begin
       LLength := LIndex + MAX_PATH - 1;
 
     Result := LBuffer.ToString(LIndex, LLength - LIndex + 1);
-    if (Result = '.') or (Result = '..') then
-      Result := '';
   finally
     LBuffer.Release;
   end;
