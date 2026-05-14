@@ -41,10 +41,16 @@ uses
 
 type
   TACLThreadMethodCallMode = (tmcmAsync, tmcmSync, tmcmSyncPostponed);
-
 {$IFNDEF MSWINDOWS}
   TThreadStartRoutine = function(lpThreadParameter: Pointer): Integer stdcall;
 {$ENDIF}
+
+  { EACLDeadlockException }
+
+  EACLDeadlockException = class(Exception)
+  public
+    constructor Create(AThreadId1, AThreadId2: Cardinal);
+  end;
 
   { TACLCriticalSection }
 
@@ -106,6 +112,8 @@ type
 
   TACLThread = class(TThread, IUnknown)
   protected
+    procedure Synchronize(AProc: TProc); overload;
+    procedure Synchronize(AProc: TThreadMethod); overload;
     // IUnknown
     function _AddRef: Integer; {$IFDEF MSWINDOWS}stdcall{$ELSE}cdecl{$ENDIF};
     function _Release: Integer; {$IFDEF MSWINDOWS}stdcall{$ELSE}cdecl{$ENDIF};
@@ -115,7 +123,13 @@ type
     procedure BeforeDestruction; override;
     procedure Terminate; virtual;
     procedure TerminateForce;
-
+  {$IF DEFINED(ACL_THREADING_DEBUG_DEADLOCKS)}
+    function WaitFor: LongWord;
+  {$ENDIF}
+  {$IF DEFINED(ACL_THREADING_DEBUG) AND DEFINED(MSWINDOWS)}
+    class procedure NameThreadForDebugging(const AName: string);
+  {$ENDIF}
+    class function GetName(AThreadId: Cardinal): string;
     /// <summary>
     ///    Returns True if after AStartTime the specified ATimeout is passed.
     ///    If ATimeout = 0 or ATimeout = INFINITY - function always returns False.
@@ -177,23 +191,26 @@ type
     end;
   {$ENDREGION}
   strict private
-  {$IFDEF ACL_THREADING_USE_MESSAGES}
+  {$IFDEF MSWINDOWS}
     class var FWnd: TWndHandle;
     class var FWndMessage: Cardinal;
   {$ENDIF}
     class var FQueue: TThreadList<PSynchronizeRecord>;
-
+  {$IFDEF ACL_THREADING_DEBUG_DEADLOCKS}
+    class var FSynchronizingThreads: TThreadList<Cardinal>;
+  {$ENDIF}
     class function Allocate(AReceiver: Pointer; AProc: TThreadMethod): PSynchronizeRecord; overload;
     class function Allocate(AReceiver: Pointer; AProc: TProc): PSynchronizeRecord; overload;
     class procedure Execute; overload;
     class procedure Execute(ARecord: PSynchronizeRecord); overload;
     class procedure Run(ARecord: PSynchronizeRecord; AWaitFor: Boolean); overload;
-  {$IFDEF ACL_THREADING_USE_MESSAGES}
+  {$IFDEF MSWINDOWS}
     class procedure WndProc(var AMessage: TMessage);
   {$ENDIF}
   public
     class constructor Create;
     class destructor Destroy;
+    class procedure CheckForDeadlock(AWaitedThreadId: Cardinal);
     class procedure CheckSynchronize;
     class procedure Run(AProc: TProc; AWaitFor: Boolean; AReceiver: Pointer = nil); overload;
     class procedure Run(AProc: TThreadMethod; AWaitFor: Boolean; AReceiver: Pointer = nil); overload;
@@ -223,10 +240,23 @@ implementation
 
 uses
   ACL.Utils.Logger,
-{$IFDEF ACL_THREADING_USE_MESSAGES}
+{$IFDEF MSWINDOWS}
   ACL.Utils.Messaging,
 {$ENDIF}
   Math;
+
+{$IFDEF MSWINDOWS}
+const
+  THREAD_SET_LIMITED_INFORMATION   = $0400;
+  THREAD_QUERY_LIMITED_INFORMATION = $0800;
+type
+  TGetThreadDescription = function (AThread: THandle; out ADescription: LPWSTR): HRESULT; stdcall;
+  TSetThreadDescription = function (AThread: THandle; ADescription: LPWSTR): HRESULT; stdcall;
+var
+  FGetThreadDescription: TGetThreadDescription = nil; // Since Windows 10, 1607
+  FSetThreadDescription: TSetThreadDescription = nil; // Since Windows 10, 1607
+  function OpenThread(DesiredAccess: DWORD; InheritHandle: BOOL; ThreadId: DWORD): THandle; stdcall; external kernel32;
+{$ENDIF}
 
 procedure CheckIsMainThread;
 begin
@@ -330,6 +360,14 @@ begin
 {$ENDIF}
 end;
 
+{ EACLDeadlockException }
+
+constructor EACLDeadlockException.Create(AThreadId1, AThreadId2: Cardinal);
+begin
+  inherited CreateFmt('Deadlock between "%s" and "%s" was detected. Please send the report to the developers',
+    [TACLThread.GetName(AThreadId1), TACLThread.GetName(AThreadId2)]);
+end;
+
 { TACLCriticalSection }
 
 constructor TACLCriticalSection.Create(AOwner: TObject = nil; const AName: string = '');
@@ -345,7 +383,7 @@ begin
   DoneCriticalSection(FHandle);
 {$ELSE}
   if FOwningThreadId <> 0 then
-    raise EInvalidOperation.CreateFmt('Atempt to destroy locked section (%d)', [FOwningThreadId]);
+    raise EInvalidOperation.CreateFmt('Attempt to destroy locked section (%d)', [FOwningThreadId]);
 {$ENDIF}
   inherited Destroy;
 end;
@@ -542,6 +580,35 @@ begin
   Terminate;
 end;
 
+class function TACLThread.GetName(AThreadId: Cardinal): string;
+{$IFDEF MSWINDOWS}
+var
+  LHandle: THandle;
+  LName: LPWSTR;
+{$ENDIF}
+begin
+  if AThreadId = MainThreadID then
+    Exit('Main');
+{$IFDEF MSWINDOWS}
+  if Assigned(FGetThreadDescription) then
+  begin
+    LHandle := OpenThread(THREAD_QUERY_LIMITED_INFORMATION, False, AThreadId);
+    if LHandle <> 0 then
+    try
+      if Succeeded(FGetThreadDescription(LHandle, PChar(LName))) then
+      try
+        Exit(LName + ' (' + IntToStr(AThreadId) + ')');
+      finally
+        LocalFree(LName);
+      end;
+    finally
+      CloseHandle(LHandle);
+    end;
+  end;
+{$ENDIF}
+  Result := IntToStr(AThreadId);
+end;
+
 class function TACLThread.IsTimeout(AStartTime, ATimeOut: Cardinal): Boolean;
 begin
   Result := IsTimeoutEx(AStartTime, ATimeOut);
@@ -562,6 +629,35 @@ begin
 
   if Result then
     ATimestamp := LNow;
+end;
+
+{$IF DEFINED(ACL_THREADING_DEBUG) AND DEFINED(MSWINDOWS)}
+class procedure TACLThread.NameThreadForDebugging(const AName: string);
+var
+  LHandle: THandle;
+begin
+  if Assigned(FSetThreadDescription) then
+  begin
+    LHandle := OpenThread(THREAD_SET_LIMITED_INFORMATION, False, GetCurrentThreadId);
+    if LHandle <> 0 then
+    try
+      FSetThreadDescription(LHandle, PChar(AName));
+    finally
+      CloseHandle(LHandle);
+    end;
+  end;
+  TThread.NameThreadForDebugging(AName);
+end;
+{$ENDIF}
+
+procedure TACLThread.Synchronize(AProc: TThreadMethod);
+begin
+  RunInMainThread(AProc);
+end;
+
+procedure TACLThread.Synchronize(AProc: TProc);
+begin
+  RunInMainThread(AProc);
 end;
 
 class function TACLThread.Timestamp: Cardinal;
@@ -588,6 +684,14 @@ begin
   DoTerminate;
 {$ENDIF}
 end;
+
+{$IFDEF ACL_THREADING_DEBUG_DEADLOCKS}
+function TACLThread.WaitFor: LongWord;
+begin
+  TACLMainThread.CheckForDeadlock(Handle);
+  Result := inherited WaitFor;
+end;
+{$ENDIF}
 
 function TACLThread._AddRef: Integer;
 begin
@@ -715,20 +819,22 @@ end;
 
 class constructor TACLMainThread.Create;
 begin
-{$IFDEF ACL_THREADING_USE_MESSAGES}
+{$IFDEF MSWINDOWS}
   FWnd := acWndAlloc(WndProc, ClassName, True);
   FWndMessage := RegisterWindowMessage(PChar(ClassName));
 {$ENDIF}
   FQueue := TThreadList<PSynchronizeRecord>.Create;
+{$IFDEF ACL_THREADING_DEBUG_DEADLOCKS}
+  FSynchronizingThreads := TThreadList<Cardinal>.Create;
+{$ENDIF}
 end;
 
 class destructor TACLMainThread.Destroy;
 begin
-{$IFDEF ACL_THREADING_USE_MESSAGES}
+{$IFDEF MSWINDOWS}
   acWndFree(FWnd);
-{$ELSE}
-  TACLThread.RemoveQueuedEvents(Execute);
 {$ENDIF}
+  TACLThread.RemoveQueuedEvents(Execute);
   with FQueue.LockList do
   try
   {$IFDEF DEBUG}
@@ -743,6 +849,9 @@ begin
   finally
     FQueue.UnlockList;
   end;
+{$IFDEF ACL_THREADING_DEBUG_DEADLOCKS}
+  FreeAndNil(FSynchronizingThreads);
+{$ENDIF}
   FreeAndNil(FQueue);
 end;
 
@@ -760,6 +869,21 @@ begin
   Result^.Method := nil;
   Result^.Proc := AProc;
   Result^.Receiver := AReceiver;
+end;
+
+class procedure TACLMainThread.CheckForDeadlock(AWaitedThreadId: Cardinal);
+begin
+{$IFDEF ACL_THREADING_DEBUG_DEADLOCKS}
+  if not IsMainThread then
+    Exit; // not yet supported
+  with FSynchronizingThreads.LockList do
+  try
+    if Contains(MainThreadId) and Contains(AWaitedThreadId) then
+      raise EACLDeadlockException.Create(MainThreadID, AWaitedThreadId);
+  finally
+    FSynchronizingThreads.UnlockList;
+  end;
+{$ENDIF}
 end;
 
 class procedure TACLMainThread.CheckSynchronize;
@@ -784,26 +908,27 @@ begin
     finally
       FQueue.UnlockList;
     end;
-
-    try
-      Execute(LRec);
-    except
-      on E: Exception do
-        LogError(acGeneralLogFileName, 'App', E, ClassName);
-    end;
+    Execute(LRec);
   until False;
 end;
 
 class procedure TACLMainThread.Execute(ARecord: PSynchronizeRecord);
 begin
-  if ARecord <> nil then
   try
-    if Assigned(ARecord^.Method) then
-      ARecord^.Method();
-    if Assigned(ARecord^.Proc) then
-      ARecord^.Proc();
-  finally
-    Dispose(ARecord);
+    if ARecord <> nil then
+    try
+      if Assigned(ARecord^.Method) then
+        ARecord^.Method();
+      if Assigned(ARecord^.Proc) then
+        ARecord^.Proc();
+    finally
+      Dispose(ARecord);
+    end;
+  except
+    on E: EACLDeadlockException do
+      raise;
+    on E: Exception do
+      LogError(acGeneralLogFileName, 'App', E, ClassName);
   end;
 end;
 
@@ -815,6 +940,64 @@ end;
 class procedure TACLMainThread.Run(AProc: TThreadMethod; AWaitFor: Boolean; AReceiver: Pointer);
 begin
   Run(Allocate(AReceiver, AProc), AWaitFor);
+end;
+
+class procedure TACLMainThread.Run(ARecord: PSynchronizeRecord; AWaitFor: Boolean);
+var
+  LCurrentThreadId: Cardinal;
+begin
+  if ARecord = nil then
+    Exit;
+  if AWaitFor then
+  begin
+    LCurrentThreadId := GetCurrentThreadId;
+    if LCurrentThreadId = MainThreadID then
+      Execute(ARecord)
+    else
+    {$IFDEF MSWINDOWS}
+      if IsLibrary then
+        acSendMessage(FWnd, FWndMessage, 0, {%H-}LPARAM(ARecord))
+      else
+    {$ENDIF}
+      begin
+      {$IFDEF ACL_THREADING_DEBUG_DEADLOCKS}
+        FSynchronizingThreads.Add(LCurrentThreadId);
+        try
+      {$ENDIF}
+          TACLThread.Synchronize(nil,
+            procedure
+            begin
+              Execute(ARecord);
+            end);
+      {$IFDEF ACL_THREADING_DEBUG_DEADLOCKS}
+        finally
+          FSynchronizingThreads.Remove(LCurrentThreadId);
+        end;
+      {$ENDIF}
+      end;
+  end
+  else
+  begin
+    FQueue.Add(ARecord);
+  {$IFDEF MSWINDOWS}
+    if IsLibrary then
+      acPostMessage(FWnd, FWndMessage, 0, 0)
+    else
+  {$ENDIF}
+    {$IFDEF ACL_THREADING_DEBUG_DEADLOCKS}
+      TACLThread.ForceQueue(nil, procedure
+      begin
+        FSynchronizingThreads.Add(MainThreadID);
+        try
+          Execute;
+        finally
+          FSynchronizingThreads.Remove(MainThreadID);
+        end;
+      end);
+    {$ELSE}
+      TACLThread.ForceQueue(nil, Execute);
+    {$ENDIF}
+  end;
 end;
 
 class procedure TACLMainThread.RunImmediately(AProc: TThreadMethod);
@@ -832,32 +1015,6 @@ begin
   Run(AProc, False, AReceiver);
 end;
 
-class procedure TACLMainThread.Run(ARecord: PSynchronizeRecord; AWaitFor: Boolean);
-begin
-  if ARecord = nil then
-    Exit;
-  if AWaitFor then
-  begin
-    if IsMainThread then
-      Execute(ARecord)
-    else
-    {$IFDEF ACL_THREADING_USE_MESSAGES}
-      acSendMessage(FWnd, FWndMessage, 0, {%H-}LPARAM(ARecord));
-    {$ELSE}
-      TACLThread.Synchronize(nil, procedure begin Execute(ARecord); end);
-    {$ENDIF}
-  end
-  else
-  begin
-    FQueue.Add(ARecord);
-  {$IFDEF ACL_THREADING_USE_MESSAGES}
-    acPostMessage(FWnd, FWndMessage, 0, 0);
-  {$ELSE}
-    TACLThread.ForceQueue(nil, Execute);
-  {$ENDIF}
-  end;
-end;
-
 class procedure TACLMainThread.RunPostponed(AProc: TProc; AReceiver: Pointer);
 begin
   Run(AProc, False, AReceiver);
@@ -865,17 +1022,17 @@ end;
 
 class procedure TACLMainThread.Unsubscribe(AProc: TThreadMethod);
 var
-  ASync: PSynchronizeRecord;
+  LRec: PSynchronizeRecord;
   I: Integer;
 begin
   with FQueue.LockList do
   try
     for I := Count - 1 downto 0 do
     begin
-      ASync := {$IFDEF FPC}Items{$ELSE}List{$ENDIF}[I];
-      if @ASync.Method = @AProc then
+      LRec := {$IFDEF FPC}Items{$ELSE}List{$ENDIF}[I];
+      if @LRec.Method = @AProc then
       begin
-        Dispose(ASync);
+        Dispose(LRec);
         Delete(I);
       end;
     end;
@@ -886,17 +1043,17 @@ end;
 
 class procedure TACLMainThread.Unsubscribe(AReceiver: Pointer);
 var
-  LSync: PSynchronizeRecord;
+  LRec: PSynchronizeRecord;
   I: Integer;
 begin
   with FQueue.LockList do
   try
     for I := Count - 1 downto 0 do
     begin
-      LSync := {$IFDEF FPC}Items{$ELSE}List{$ENDIF}[I];
-      if LSync.Receiver = AReceiver then
+      LRec := {$IFDEF FPC}Items{$ELSE}List{$ENDIF}[I];
+      if LRec.Receiver = AReceiver then
       begin
-        Dispose(LSync);
+        Dispose(LRec);
         Delete(I);
       end;
     end;
@@ -916,7 +1073,7 @@ begin
     WakeMainThread(nil);
 end;
 
-{$IFDEF ACL_THREADING_USE_MESSAGES}
+{$IFDEF MSWINDOWS}
 class procedure TACLMainThread.WndProc(var AMessage: TMessage);
 begin
   if AMessage.Msg = FWndMessage then
@@ -963,7 +1120,9 @@ end;
 initialization
   IsMultiThread := True;
   // Linux: main thread name will be displayed in the Top utility output
-{$IF DEFINED(ACL_THREADING_DEBUG) AND DEFINED(MSWINDOWS)}
-  TThread.NameThreadForDebugging('Main');
+{$IF DEFINED(MSWINDOWS) AND DEFINED(ACL_THREADING_DEBUG)}
+  TACLThread.NameThreadForDebugging('Main');
+  FGetThreadDescription := GetProcAddress(GetModuleHandle(kernel32), 'GetThreadDescription');
+  FSetThreadDescription := GetProcAddress(GetModuleHandle(kernel32), 'SetThreadDescription');
 {$ENDIF}
 end.

@@ -49,7 +49,7 @@ type
   IACLTaskEvent = interface
   ['{3CAF68AD-4959-429F-A6BB-19DC671BD3BB}']
     function Signal: Boolean;
-    function WaitFor(ATimeOut: Cardinal): TWaitResult;
+    function WaitFor(ATimeOut: Cardinal; AThreadId: Cardinal): TWaitResult;
   end;
 
   { TACLTask }
@@ -62,7 +62,7 @@ type
     FEvent: IACLTaskEvent;
     FOwner: TACLTaskDispatcher;
     FOwnerTask: TACLTask;
-    FThreadID: Cardinal;
+    FThreadId: Cardinal;
 
     FOnComplete: TThreadMethod;
     FOnCompleteMode: TACLThreadMethodCallMode;
@@ -219,7 +219,7 @@ type
     constructor Create;
     destructor Destroy; override;
     function Signal: Boolean;
-    function WaitFor(ATimeOut: Cardinal): TWaitResult;
+    function WaitFor(ATimeOut: Cardinal; AThreadId: Cardinal): TWaitResult;
   end;
 
   { TACLSimpleTask }
@@ -484,8 +484,10 @@ begin
 {$ENDIF}
 end;
 
-function TACLTaskEvent.WaitFor(ATimeOut: Cardinal): TWaitResult;
+function TACLTaskEvent.WaitFor(ATimeOut: Cardinal; AThreadId: Cardinal): TWaitResult;
 begin
+  if (ATimeOut = INFINITE) and (AThreadId <> 0) then
+    TACLMainThread.CheckForDeadlock(AThreadId);
 {$IFDEF FPC}
   if FEvent.WaitFor(ATimeOut) then
     Result := wrSignaled
@@ -599,10 +601,12 @@ var
   LIndex: Integer;
   LTask: TACLTask;
   LWaitEvent: IACLTaskEvent;
+  LWaitThreadId: Cardinal;
 begin
   if ATaskHandle = 0 then
     Exit(wrSignaled);
 
+  LWaitThreadId := 0;
   LWaitEvent := nil;
   FLock.Enter;
   try
@@ -624,6 +628,7 @@ begin
       begin
         LTask.Cancel;
         LWaitEvent := LTask.FEvent;
+        LWaitThreadId := LTask.FThreadId;
         Break;
       end;
     end;
@@ -632,7 +637,7 @@ begin
   end;
 
   if LWaitEvent <> nil then
-    Result := LWaitEvent.WaitFor(AWaitTimeOut)
+    Result := LWaitEvent.WaitFor(AWaitTimeOut, LWaitThreadId)
   else
     Result := wrAbandoned;
 
@@ -668,10 +673,12 @@ end;
 function TACLTaskDispatcher.WaitFor(ATaskHandle: TObjHandle; AWaitTimeOut: Cardinal): TWaitResult;
 var
   AIndex: Integer;
-  AWaitEvent: IACLTaskEvent;
   ATask: TACLTask;
+  AWaitEvent: IACLTaskEvent;
+  AWaitThreadId: Cardinal;
 begin
   AWaitEvent := nil;
+  AWaitThreadId := 0;
 
   FLock.Enter;
   try
@@ -687,6 +694,7 @@ begin
       if ATaskHandle = ATask.Handle then
       begin
         AWaitEvent := ATask.FEvent;
+        AWaitThreadId := ATask.FThreadId;
         Break;
       end;
     end;
@@ -695,7 +703,7 @@ begin
   end;
 
   if AWaitEvent <> nil then
-    Result := AWaitEvent.WaitFor(AWaitTimeOut)
+    Result := AWaitEvent.WaitFor(AWaitTimeOut, AWaitThreadId)
   else
     Result := wrAbandoned;
 end;
@@ -703,7 +711,7 @@ end;
 class function TACLTaskDispatcher.ThreadProc(ATask: TACLTask): Integer;
 begin
 {$IFDEF ACL_THREADING_DEBUG}
-  TThread.NameThreadForDebugging('ThreadPool - ' + ATask.ClassName);
+  TACLThread.NameThreadForDebugging('ThreadPool - ' + ATask.ClassName);
 {$ENDIF}
   try
     ATask.FOwner.AsyncRun(ATask);
@@ -713,7 +721,7 @@ begin
       LogError(acGeneralLogFileName, 'ThreadPool', E);
   end;
 {$IFDEF ACL_THREADING_DEBUG}
-  TThread.NameThreadForDebugging('ThreadPool - Idle');
+  TACLThread.NameThreadForDebugging('ThreadPool - Idle');
 {$ENDIF}
   Result := 0;
 end;

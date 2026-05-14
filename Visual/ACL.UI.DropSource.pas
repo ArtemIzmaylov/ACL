@@ -478,7 +478,7 @@ begin
     FDropResult := [];
   {$IFDEF ACL_THREADING_DEBUG}
     if not IsMainThread then
-      TThread.NameThreadForDebugging('DropSourceThread');
+      TACLThread.NameThreadForDebugging('DropSourceThread');
   {$ENDIF}
     RunInMainThread(DoStart);
     try

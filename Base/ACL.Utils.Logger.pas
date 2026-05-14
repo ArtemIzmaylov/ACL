@@ -279,11 +279,7 @@ end;
 
 procedure TACLLogFile.WriteThreadId;
 begin
-  if GetCurrentThreadId = MainThreadID then
-    Write('Main')
-  else
-    Write('thread-' + Format('%4d', [GetCurrentThreadId]));
-
+  Write(TACLThread.GetName(GetCurrentThreadId));
   Write(#9);
 end;
 
