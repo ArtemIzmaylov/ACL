@@ -236,6 +236,7 @@ type
     procedure SetGeometrySmoothing(AValue: TACLBoolean); override;
     procedure SetImageSmoothing(AValue: TACLBoolean); override;
     procedure SetPixelOffsetMode(AMode: TACLImagePixelOffsetMode); override;
+    procedure SetTextAntialiasMode(AMode: TACL2DRenderTextAntialiasMode); override;
 
     property NativeHandle: GpGraphics read FGraphics;
   end;
@@ -1181,7 +1182,7 @@ begin
 //      IntersectClipRect(R);
 
       AFont := TACLGdiplusResourcesCache.FontGet(Font);
-      ARectF := MakeRect(Single(R.Left - Origin.X), R.Top - Origin.X, R.Width, R.Height);
+      ARectF := MakeRect(Single(R.Left - Origin.X), R.Top - Origin.Y, R.Width, R.Height);
 
 //      // GDI+ adds a small amount (1/6 em) to each end of every string displayed.
 //      // This 1/6 em allows >for glyphs with overhanging ends (such as italic 'f'),
@@ -1418,6 +1419,18 @@ end;
 procedure TACLGdiplusRender.SetPixelOffsetMode(AMode: TACLImagePixelOffsetMode);
 begin
   GdipSetPixelOffsetMode(NativeHandle, PixelOffsetModeMap[AMode]);
+end;
+
+procedure TACLGdiplusRender.SetTextAntialiasMode(AMode: TACL2DRenderTextAntialiasMode);
+const
+  Map: array [TACL2DRenderTextAntialiasMode] of TextRenderingHint = (
+    TextRenderingHintSystemDefault,
+    TextRenderingHintSingleBitPerPixel, // none (?)
+    TextRenderingHintAntiAliasGridFit,
+    TextRenderingHintClearTypeGridFit
+  );
+begin
+  GdipSetTextRenderingHint(NativeHandle, Map[AMode]);
 end;
 
 {$ENDREGION}

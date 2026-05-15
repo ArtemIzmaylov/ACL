@@ -175,6 +175,7 @@ type
 
     // Options
     procedure SetImageSmoothing(AValue: TACLBoolean); override;
+    procedure SetTextAntialiasMode(AMode: TACL2DRenderTextAntialiasMode); override;
   end;
 
   { TACLDirect2DGdiCompatibleRender }
@@ -1276,6 +1277,19 @@ end;
 procedure TACLDirect2DAbstractRender.SetImageSmoothing(AValue: TACLBoolean);
 begin
   FImageSmoothStretching := AValue;
+end;
+
+procedure TACLDirect2DAbstractRender.SetTextAntialiasMode(
+  AMode: TACL2DRenderTextAntialiasMode);
+const
+  Map: array[TACL2DRenderTextAntialiasMode] of D2D1_TEXT_ANTIALIAS_MODE = (
+    D2D1_TEXT_ANTIALIAS_MODE_DEFAULT,
+    D2D1_TEXT_ANTIALIAS_MODE_ALIASED,
+    D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE,
+    D2D1_TEXT_ANTIALIAS_MODE_CLEARTYPE
+  );
+begin
+  FDeviceContext.SetTextAntialiasMode(Map[AMode]);
 end;
 
 procedure TACLDirect2DAbstractRender.SetWorldTransform(const XForm: TXForm);

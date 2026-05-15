@@ -92,6 +92,7 @@ type
 
   TACL2DRender = class;
   TACL2DRenderStrokeStyle = (ssSolid, ssDash, ssDot, ssDashDot, ssDashDotDot);
+  TACL2DRenderTextAntialiasMode = (tamDefault, tamNone, tamGrayscale, tamClearType);
 
   TACL2DRenderSourceUsage = (
     suCopy,      // Copy required data from the source
@@ -301,6 +302,7 @@ type
     procedure SetGeometrySmoothing(AValue: TACLBoolean); virtual;
     procedure SetImageSmoothing(AValue: TACLBoolean); virtual;
     procedure SetPixelOffsetMode(AMode: TACLImagePixelOffsetMode); virtual;
+    procedure SetTextAntialiasMode(AMode: TACL2DRenderTextAntialiasMode); virtual;
   protected
     property Origin: TPoint read FOrigin write SetOrigin;
     property Serial: Integer read FSerial;
@@ -1672,6 +1674,11 @@ begin
 end;
 
 procedure TACL2DRender.SetPixelOffsetMode(AMode: TACLImagePixelOffsetMode);
+begin
+  // unsupported
+end;
+
+procedure TACL2DRender.SetTextAntialiasMode(AMode: TACL2DRenderTextAntialiasMode);
 begin
   // unsupported
 end;

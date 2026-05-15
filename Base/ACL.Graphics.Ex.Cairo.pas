@@ -253,6 +253,7 @@ type
     //# Options
     procedure SetGeometrySmoothing(AValue: TACLBoolean); override;
     procedure SetImageSmoothing(AValue: TACLBoolean); override;
+    procedure SetTextAntialiasMode(AMode: TACL2DRenderTextAntialiasMode); override;
 
     //# Properties
     property Handle: Pcairo_t read FHandle;
@@ -1857,6 +1858,7 @@ begin
     FHandleOwnership := soReference;
     FImageSmoothStretching := TACLBoolean.Default;
     FOrigin := NullPoint;
+    SetTextAntialiasMode(tamDefault);
   except
     FLock.Leave;
     raise;
@@ -1872,6 +1874,7 @@ begin
     FHandle := cairo_create_context(ACanvas, FTargetSurface, FOrigin, FContext);
     FImageSmoothStretching := TACLBoolean.Default;
     cairo_set_clipping(Handle, ACanvas, FContext);
+    SetTextAntialiasMode(tamDefault);
   except
     FLock.Leave;
     raise;
@@ -1888,6 +1891,7 @@ begin
     FHandleOwnership := soOwned;
     FHandle := cairo_create(FTargetSurface);
     FImageSmoothStretching := TACLBoolean.Default;
+    SetTextAntialiasMode(tamDefault);
   except
     FLock.Leave;
     raise;
@@ -1909,6 +1913,7 @@ begin
     FHandle := cairo_create(ASurface);
     FImageSmoothStretching := TACLBoolean.Default;
     FOrigin := NullPoint;
+    SetTextAntialiasMode(tamDefault);
   except
     FLock.Leave;
     raise;
@@ -1929,6 +1934,7 @@ begin
       UpdateRect.Top - FOrigin.Y,
       UpdateRect.Width, UpdateRect.Height);
     cairo_clip(FHandle);
+    SetTextAntialiasMode(tamDefault);
   except
     FLock.Leave;
     raise;
@@ -2401,6 +2407,24 @@ end;
 procedure TACLCairoRender.SetImageSmoothing(AValue: TACLBoolean);
 begin
   FImageSmoothStretching := AValue;
+end;
+
+procedure TACLCairoRender.SetTextAntialiasMode(AMode: TACL2DRenderTextAntialiasMode);
+const
+  Map: array[TACL2DRenderTextAntialiasMode] of cairo_antialias_t = (
+    CAIRO_ANTIALIAS_DEFAULT,
+    CAIRO_ANTIALIAS_NONE,
+    CAIRO_ANTIALIAS_GRAY,
+    CAIRO_ANTIALIAS_BEST
+  );
+var
+  LOptions: Pcairo_font_options_t;
+begin
+  LOptions := cairo_font_options_create;
+  cairo_font_options_set_antialias(LOptions, Map[AMode]);
+  //cairo_font_options_set_subpixel_order(LOptions, CAIRO_SUBPIXEL_ORDER_RGB); // SUBPIXEL mode only
+  cairo_set_font_options(Handle, LOptions);
+  cairo_font_options_destroy(LOptions);
 end;
 
 procedure TACLCairoRender.SetWorldTransform(const XForm: TXForm);

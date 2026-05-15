@@ -95,6 +95,8 @@ type
     procedure DoDestroy; override;
     procedure Paint(ARender: TACL2DRender); override;
   published
+    property Align;
+    property Anchors;
     property OnCreate: TACLRenderEvent read FOnCreate write FOnCreate;
     property OnDestroy: TACLRenderEvent read FOnDestroy write FOnDestroy;
     property OnPaint: TACLRenderEvent read FOnPaint write FOnPaint;
