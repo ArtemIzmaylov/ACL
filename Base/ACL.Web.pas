@@ -388,8 +388,8 @@ begin
   end;
 
   // Port
-  LPos := acPos(acPortDelimiter, S);
-  if (LPos > 0) and (LPos < acPos('/', S)) then
+  LPos := acPos(acPortDelimiter, Result.Host);
+  if LPos > 0 then
   begin
     Result.Port := StrToIntDef(Copy(Result.Host, LPos + 1), 0);
     Delete(Result.Host, LPos, MaxInt);
