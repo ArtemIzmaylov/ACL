@@ -49,7 +49,7 @@ type
   IACLTaskEvent = interface
   ['{3CAF68AD-4959-429F-A6BB-19DC671BD3BB}']
     function Signal: Boolean;
-    function WaitFor(ATimeOut: Cardinal; AThreadId: Cardinal): TWaitResult;
+    function WaitFor(ATimeOut: Cardinal; AThreadId: TThreadId): TWaitResult;
   end;
 
   { TACLTask }
@@ -62,7 +62,7 @@ type
     FEvent: IACLTaskEvent;
     FOwner: TACLTaskDispatcher;
     FOwnerTask: TACLTask;
-    FThreadId: Cardinal;
+    FThreadId: TThreadId;
 
     FOnComplete: TThreadMethod;
     FOnCompleteMode: TACLThreadMethodCallMode;
@@ -219,7 +219,7 @@ type
     constructor Create;
     destructor Destroy; override;
     function Signal: Boolean;
-    function WaitFor(ATimeOut: Cardinal; AThreadId: Cardinal): TWaitResult;
+    function WaitFor(ATimeOut: Cardinal; AThreadId: TThreadId): TWaitResult;
   end;
 
   { TACLSimpleTask }
@@ -484,7 +484,7 @@ begin
 {$ENDIF}
 end;
 
-function TACLTaskEvent.WaitFor(ATimeOut: Cardinal; AThreadId: Cardinal): TWaitResult;
+function TACLTaskEvent.WaitFor(ATimeOut: Cardinal; AThreadId: TThreadId): TWaitResult;
 begin
   if (ATimeOut = INFINITE) and (AThreadId <> 0) then
     TACLMainThread.CheckForDeadlock(AThreadId);
@@ -535,30 +535,24 @@ end;
 
 function TACLTaskDispatcher.Run(ATask: TACLTask): TObjHandle;
 begin
-  Result := Run(ATask, TThreadMethod(nil), tmcmAsync);
-end;
-
-function TACLTaskDispatcher.Run(ATask: TACLTask;
-  ACompleteEvent: TThreadMethod; ACompleteEventCallMode: TACLThreadMethodCallMode): TObjHandle;
-var
-  AComparer: IComparer<TACLTask>;
-begin
   FLock.Enter;
   try
-    ATask.FOnComplete := ACompleteEvent;
-    ATask.FOnCompleteMode := ACompleteEventCallMode;
     Result := ATask.Handle;
     FTasks.Add(ATask);
-    AComparer := TACLTaskComparer.Create;
-    try
-      FTasks.Sort(AComparer);
-    finally
-      AComparer := nil;
-    end;
+    FTasks.Sort(TACLTaskComparer.Default);
   finally
     FLock.Leave;
   end;
   CheckActiveTasks;
+end;
+
+function TACLTaskDispatcher.Run(ATask: TACLTask;
+  ACompleteEvent: TThreadMethod;
+  ACompleteEventCallMode: TACLThreadMethodCallMode): TObjHandle;
+begin
+  ATask.OnComplete := ACompleteEvent;
+  ATask.OnCompleteMode := ACompleteEventCallMode;
+  Result := Run(ATask);
 end;
 
 function TACLTaskDispatcher.Run(AProc, ACompleteEvent: TThreadMethod;
@@ -601,7 +595,7 @@ var
   LIndex: Integer;
   LTask: TACLTask;
   LWaitEvent: IACLTaskEvent;
-  LWaitThreadId: Cardinal;
+  LWaitThreadId: TThreadId;
 begin
   if ATaskHandle = 0 then
     Exit(wrSignaled);
@@ -647,7 +641,7 @@ end;
 
 function TACLTaskDispatcher.CurrentTask: TACLTask;
 var
-  LThreadId: Cardinal;
+  LThreadId: TThreadId;
   LIndex: Integer;
 begin
   FLock.Enter;
@@ -675,7 +669,7 @@ var
   AIndex: Integer;
   ATask: TACLTask;
   AWaitEvent: IACLTaskEvent;
-  AWaitThreadId: Cardinal;
+  AWaitThreadId: TThreadId;
 begin
   AWaitEvent := nil;
   AWaitThreadId := 0;

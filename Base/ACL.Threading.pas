@@ -49,7 +49,7 @@ type
 
   EACLDeadlockException = class(Exception)
   public
-    constructor Create(AThreadId1, AThreadId2: Cardinal);
+    constructor Create(AThreadId1, AThreadId2: TThreadId);
   end;
 
   { TACLCriticalSection }
@@ -60,7 +60,7 @@ type
     FHandle: TRTLCriticalSection;
   {$ELSE}
     FLocked: Integer;
-    FOwningThreadID: Cardinal;
+    FOwningThreadID: TThreadId;
     FRecursionCount: Integer;
   {$IFEND}
   public
@@ -129,7 +129,7 @@ type
   {$IF DEFINED(ACL_THREADING_DEBUG) AND DEFINED(MSWINDOWS)}
     class procedure NameThreadForDebugging(const AName: string);
   {$ENDIF}
-    class function GetName(AThreadId: Cardinal): string;
+    class function GetName(AThreadId: TThreadId): string;
     /// <summary>
     ///    Returns True if after AStartTime the specified ATimeout is passed.
     ///    If ATimeout = 0 or ATimeout = INFINITY - function always returns False.
@@ -210,7 +210,7 @@ type
   public
     class constructor Create;
     class destructor Destroy;
-    class procedure CheckForDeadlock(AWaitedThreadId: Cardinal);
+    class procedure CheckForDeadlock(AWaitedThreadId: TThreadId);
     class procedure CheckSynchronize;
     class procedure Run(AProc: TProc; AWaitFor: Boolean; AReceiver: Pointer = nil); overload;
     class procedure Run(AProc: TThreadMethod; AWaitFor: Boolean; AReceiver: Pointer = nil); overload;
@@ -255,7 +255,7 @@ type
 var
   FGetThreadDescription: TGetThreadDescription = nil; // Since Windows 10, 1607
   FSetThreadDescription: TSetThreadDescription = nil; // Since Windows 10, 1607
-  function OpenThread(DesiredAccess: DWORD; InheritHandle: BOOL; ThreadId: DWORD): THandle; stdcall; external kernel32;
+  function OpenThread(DesiredAccess: DWORD; InheritHandle: BOOL; ThreadId: TThreadId): THandle; stdcall; external kernel32;
 {$ENDIF}
 
 procedure CheckIsMainThread;
@@ -362,7 +362,7 @@ end;
 
 { EACLDeadlockException }
 
-constructor EACLDeadlockException.Create(AThreadId1, AThreadId2: Cardinal);
+constructor EACLDeadlockException.Create(AThreadId1, AThreadId2: TThreadId);
 begin
   inherited CreateFmt('Deadlock between "%s" and "%s" was detected. Please send the report to the developers',
     [TACLThread.GetName(AThreadId1), TACLThread.GetName(AThreadId2)]);
@@ -395,7 +395,7 @@ begin
 end;
 {$ELSE}
 var
-  LThreadId: Cardinal;
+  LThreadId: TThreadId;
 begin
   LThreadId := GetCurrentThreadId;
   if FOwningThreadId <> LThreadId then
@@ -442,7 +442,7 @@ begin
 end;
 {$ELSE}
 var
-  LThreadId: Cardinal;
+  LThreadId: TThreadId;
   LTryCount: Integer;
 begin
   LThreadId := GetCurrentThreadId;
@@ -580,7 +580,7 @@ begin
   Terminate;
 end;
 
-class function TACLThread.GetName(AThreadId: Cardinal): string;
+class function TACLThread.GetName(AThreadId: TThreadId): string;
 {$IFDEF MSWINDOWS}
 var
   LHandle: THandle;
@@ -871,7 +871,7 @@ begin
   Result^.Receiver := AReceiver;
 end;
 
-class procedure TACLMainThread.CheckForDeadlock(AWaitedThreadId: Cardinal);
+class procedure TACLMainThread.CheckForDeadlock(AWaitedThreadId: TThreadId);
 begin
 {$IFDEF ACL_THREADING_DEBUG_DEADLOCKS}
   if not IsMainThread then
@@ -944,7 +944,7 @@ end;
 
 class procedure TACLMainThread.Run(ARecord: PSynchronizeRecord; AWaitFor: Boolean);
 var
-  LCurrentThreadId: Cardinal;
+  LCurrentThreadId: TThreadId;
 begin
   if ARecord = nil then
     Exit;
