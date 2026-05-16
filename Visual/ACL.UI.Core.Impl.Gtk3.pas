@@ -898,6 +898,17 @@ end;
 
 function ModalFilter(xevent: PGdkXEvent; event: PGdkEvent; data: gpointer): TGdkFilterReturn; cdecl;
 begin
+  // Только для X11-бэка!! В Wayland этот callback не вызывается.
+  case PInteger(xevent)^ of
+    // Несмотря на modal-lock, KDE позволяет свернуть приложение через кнопку на таскбаре.
+    // Однако полноценно развернуть его обратно уже "не получится" - окно появляется,
+    // но не перерисовывается до тех пор, пока модальная форма не будет закрыта.
+    7, 15, 19: // xexpose, xmap, xresize
+      Exit(GDK_FILTER_CONTINUE);
+    // Что интересно, в Gtk2 parent-форма вообще не лочилась - её свободно можно
+    // было таскать по экрану. Единственное, что ей было запрещено - получать фокус.
+    // Возможно, в рамках Gtk3 нам стоит сделать так же, ведь никто не жаловался...
+  end;
   Result := GDK_FILTER_REMOVE;
 end;
 
@@ -1014,6 +1025,16 @@ begin
 end;
 
 class procedure TACLWSForm.ShowHide(const AWinControl: TWinControl);
+
+  procedure SetMandatoryTransientWindow(AForm: TCustomForm; AFormWidget: PGtkWindow);
+  begin
+    SetRealPopupParent(AForm, Screen.ActiveCustomForm);
+    if (AFormWidget^.transient_for = nil) then
+      AFormWidget^.set_transient_for(GetActiveGtkWindow);
+    if (AFormWidget^.transient_for = nil) and (AForm <> Application.MainForm) then
+      SetRealPopupParent(AForm, Application.MainForm);
+  end;
+
 var
   LForm: TCustomForm absolute AWinControl;
   LWidget: TGtk3WidgetAccess;
@@ -1036,14 +1057,14 @@ begin
     Exit;
   end;
 
+  LWindow := PGtkWindow(LWidget.Widget);
   if wtHintWindow in LWidget.WidgetType then
   begin
-    SetRealPopupParent(LForm, Screen.ActiveCustomForm);
+    SetRealPopupParent(LForm, Screen.ActiveCustomForm); //!!
     LWidget.Visible := AWinControl.HandleObjectShouldBeVisible;
     Exit;
   end;
 
-  LWindow := PGtkWindow(LWidget.Widget);
   if LForm.HandleObjectShouldBeVisible then
   begin
     // LCL: use this if pure SetCapture(0) does not work under wayland (commented)
@@ -1059,7 +1080,7 @@ begin
     begin
       LWindow^.set_modal(True);
       LWindow^.window^.set_modal_hint(true);
-      SetRealPopupParent(LForm, Screen.ActiveCustomForm);
+      SetMandatoryTransientWindow(LForm, LWindow);
     end;
     LWindow^.realize;
 
@@ -1070,7 +1091,7 @@ begin
         if LForm.PopupParent <> nil then
           SetRealPopupParent(LForm, LForm.PopupParent)
         else
-          SetRealPopupParent(LForm, Screen.ActiveCustomForm);
+          SetMandatoryTransientWindow(LForm, LWindow);
       end;
       if LWidget.Shape <> nil then
       begin
