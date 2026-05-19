@@ -197,6 +197,7 @@ type
     class function Check(AControl: TWinControl; X, Y, AThreshold: Integer): Boolean;
   end;
 
+function FindVCLWindow(const P: TPoint): TWinControl;
 function IsAlphaComposingSupports: Boolean;
 function LoadDialogIcon(AOwnerWnd: TWndHandle; AType: TMsgDlgType; ASize: Integer): TACLDib;
 procedure LoadSystemThemedCursors;
@@ -222,6 +223,11 @@ type
   TWinControlAccess = class(TWinControl);
 
 function gdk_screen_is_composited(screen: PGdkScreen): gboolean; cdecl; external gdklib; // since v2.10
+
+function FindVCLWindow(const P: TPoint): TWinControl;
+begin
+  Result := FindLCLWindow(P);
+end;
 
 function IsAlphaComposingSupports: Boolean;
 begin

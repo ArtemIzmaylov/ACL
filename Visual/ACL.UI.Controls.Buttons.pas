@@ -753,12 +753,12 @@ end;
 procedure TACLSimpleButtonSubClass.MouseDown(
   Button: TMouseButton; Shift: TShiftState; const P: TPoint);
 begin
-  IsPressed := IsEnabled and PtInRect(Bounds, P) and (Button = mbLeft);
+  IsPressed := IsEnabled and Bounds.Contains(P) and (Button = mbLeft);
 end;
 
 procedure TACLSimpleButtonSubClass.MouseMove(Shift: TShiftState; const P: TPoint);
 begin
-  IsHovered := IsEnabled and PtInRect(Bounds, P) and not (ssLeft in Shift);
+  IsHovered := IsEnabled and Bounds.Contains(P);
 end;
 
 procedure TACLSimpleButtonSubClass.MouseUp(
@@ -766,7 +766,7 @@ procedure TACLSimpleButtonSubClass.MouseUp(
 begin
   if IsPressed then
   try
-    if (Button = mbLeft) and  PtInRect(Bounds, P) then
+    if (Button = mbLeft) and Bounds.Contains(P) then
       PerformClick;
   finally
     IsPressed := False;

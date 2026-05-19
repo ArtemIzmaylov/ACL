@@ -337,18 +337,25 @@ begin
 end;
 
 procedure TACLPopupWindow.ClosePopup;
+var
+  LCtrl: TWinControl;
 begin
-  MouseCapture := False;
+  ReleaseCapture;
   if Visible then
-  try
-  {$IFDEF LCLGtkX}
-    TGtkApp.EndPopup(Self);
-  {$ENDIF}
-    Hide;
-    if FOwnerFormWnd <> 0 then
-      SendMessage(FOwnerFormWnd, WM_EXITMENULOOP, 0, 0);
-  finally
-    DoPopupClosed;
+  begin
+    try
+    {$IFDEF LCLGtkX}
+      TGtkApp.EndPopup(Self);
+    {$ENDIF}
+      Hide;
+      if FOwnerFormWnd <> 0 then
+        SendMessage(FOwnerFormWnd, WM_EXITMENULOOP, 0, 0);
+    finally
+      DoPopupClosed;
+    end;
+    LCtrl := FindVCLWindow(Mouse.CursorPos);
+    if LCtrl <> nil then
+      PostMessage(LCtrl.Handle, WM_MOUSEMOVE, 0, PointToLParam(LCtrl.CalcCursorPos));
   end;
 end;
 

@@ -188,6 +188,7 @@ type
     class function Check(AControl: TWinControl; X, Y, AThreshold: Integer): Boolean;
   end;
 
+function FindVCLWindow(const P: TPoint): TWinControl;
 function IsAlphaComposingSupports: Boolean;
 function LoadDialogIcon(AOwnerWnd: TWndHandle; AType: TMsgDlgType; ASize: Integer): TACLDib;
 procedure LoadSystemThemedCursors;
@@ -244,6 +245,11 @@ begin
   gtk_css_provider_load_from_data(LCssProvider, PgChar(LCss), Length(LCss), nil);
   gtk_style_context_add_provider_for_screen(gdk_screen_get_default(),
     PGtkStyleProvider(LCssProvider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+end;
+
+function FindVCLWindow(const P: TPoint): TWinControl;
+begin
+  Result := FindLCLWindow(P);
 end;
 
 function IsChild(AChild, AParent: PGtkWidget): Boolean;

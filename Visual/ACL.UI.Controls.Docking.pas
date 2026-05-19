@@ -3718,11 +3718,7 @@ begin
   if HitTest(FSite.ScreenToClient(ACursorPos)) <> nil then
     Exit;
 
-{$IFDEF FPC}
-  ADockControl := GetNearestDockControl(FindLCLWindow(ACursorPos), TACLDockControl);
-{$ELSE}
   ADockControl := GetNearestDockControl(FindVCLWindow(ACursorPos), TACLDockControl);
-{$ENDIF}
   if (ADockControl <> nil) and acIsChildOrSelf(ActiveTab.Control, ADockControl) then
     Exit;
 
