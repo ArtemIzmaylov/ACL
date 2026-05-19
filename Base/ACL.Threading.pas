@@ -42,6 +42,7 @@ uses
   {System.}SysUtils,
   // ACL
   ACL.Utils.Common,
+  ACL.Utils.Logger,
   ACL.Utils.Messaging;
 
 type
@@ -242,10 +243,6 @@ implementation
 // FPC:
 //   Do not specify uses here
 //   It may lead to 20231102 internal error because of generics
-{$IFNDEF FPC}
-uses
-  ACL.Utils.Logger;
-{$ENDIF}
 
 {$IFDEF MSWINDOWS}
 const
@@ -961,9 +958,7 @@ begin
     on E: EACLDeadlockException do
       raise;
     on E: Exception do
-    {$IFNDEF FPC}
       LogError(acGeneralLogFileName, 'App', E, ClassName);
-    {$ENDIF}
   end;
 end;
 
