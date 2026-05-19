@@ -18,6 +18,9 @@ unit ACL.Threading;
 interface
 
 uses
+{$IFDEF LINUX}
+  dl,
+{$ENDIF}
 {$IF DEFINED(LCLGtk3)}
   LazGlib2,
 {$ELSEIF DEFINED(LCLGtk2)}
@@ -250,6 +253,12 @@ var
   FGetThreadDescription: TGetThreadDescription = nil; // Since Windows 10, 1607
   FSetThreadDescription: TSetThreadDescription = nil; // Since Windows 10, 1607
   function OpenThread(DesiredAccess: DWORD; InheritHandle: BOOL; ThreadId: TThreadId): THandle; stdcall; external kernel32;
+{$ENDIF}
+
+{$IFDEF LINUX}
+var
+  pthread: Pointer = nil;
+  pthread_getname_np: function (thread: pointer; buf: PAnsiChar; len: size_t): Integer;cdecl;
 {$ENDIF}
 
 procedure CheckIsMainThread;
@@ -575,15 +584,19 @@ begin
 end;
 
 class function TACLThread.GetName(AThreadId: TThreadId): string;
-{$IFDEF MSWINDOWS}
+{$IF DEFINED(MSWINDOWS)}
 var
   LHandle: THandle;
   LName: LPWSTR;
+{$ELSEIF DEFINED(FPC) AND DEFINED(LINUX)}
+var
+  LBuffer: array[0..31] of AnsiChar;
 {$ENDIF}
 begin
   if AThreadId = MainThreadID then
     Exit('Main');
-{$IFDEF MSWINDOWS}
+
+{$IF DEFINED(MSWINDOWS)}
   if Assigned(FGetThreadDescription) then
   begin
     LHandle := OpenThread(THREAD_QUERY_LIMITED_INFORMATION, False, AThreadId);
@@ -600,6 +613,21 @@ begin
     end;
   end;
 {$ENDIF}
+
+{$IF DEFINED(FPC) AND DEFINED(LINUX)}
+  if pthread = nil then
+  begin
+    pthread := dlopen('libc.so', RTLD_LAZY);
+    pthread_getname_np := dlsym(pthread, 'pthread_getname_np');
+    pthread := Pointer(-1);
+  end;
+  if Assigned(pthread_getname_np) then
+  begin
+    if pthread_getname_np(Pointer(AThreadId), @LBuffer[0], SizeOf(LBuffer)) = 0 then
+      Exit(StrPas(LBuffer));
+  end;
+{$ENDIF}
+
   Result := IntToStr(AThreadId);
 end;
 
