@@ -37,10 +37,12 @@ uses
   {System.}Classes,
   {System.}Generics.Defaults,
   {System.}Generics.Collections,
+  {System.}Math,
   {System.}SyncObjs,
   {System.}SysUtils,
   // ACL
-  ACL.Utils.Common;
+  ACL.Utils.Common,
+  ACL.Utils.Messaging;
 
 type
   TACLThreadMethodCallMode = (tmcmAsync, tmcmSync, tmcmSyncPostponed);
@@ -237,10 +239,13 @@ procedure RunInMainThread(AProc: TThreadMethod; AWaitFor: Boolean = True); overl
 procedure RunInThread(Func: TThreadStartRoutine; Context: Pointer);
 implementation
 
+// FPC:
+//   Do not specify uses here
+//   It may lead to 20231102 internal error because of generics
+{$IFNDEF FPC}
 uses
-  ACL.Utils.Logger,
-  ACL.Utils.Messaging,
-  Math;
+  ACL.Utils.Logger;
+{$ENDIF}
 
 {$IFDEF MSWINDOWS}
 const
@@ -847,7 +852,11 @@ begin
 {$ENDIF}
   begin
     FWnd := acWndAlloc(WndProc, ClassName, True);
+  {$IFDEF MSWINDOWS}
     FWndMessage := RegisterWindowMessage(PChar(ClassName));
+  {$ELSE}
+    FWndMessage := WM_USER;
+  {$ENDIF}
   end;
   FQueue := TThreadList<PSynchronizeRecord>.Create;
 {$IFDEF ACL_THREADING_DEBUG_DEADLOCKS}
@@ -952,7 +961,9 @@ begin
     on E: EACLDeadlockException do
       raise;
     on E: Exception do
+    {$IFNDEF FPC}
       LogError(acGeneralLogFileName, 'App', E, ClassName);
+    {$ENDIF}
   end;
 end;
 
