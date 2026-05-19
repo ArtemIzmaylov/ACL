@@ -191,10 +191,8 @@ type
     end;
   {$ENDREGION}
   strict private
-  {$IFDEF MSWINDOWS}
     class var FWnd: TWndHandle;
     class var FWndMessage: Cardinal;
-  {$ENDIF}
     class var FQueue: TThreadList<PSynchronizeRecord>;
   {$IFDEF ACL_THREADING_DEBUG_DEADLOCKS}
     class var FSynchronizingThreads: TThreadList<Cardinal>;
@@ -204,9 +202,7 @@ type
     class procedure Execute; overload;
     class procedure Execute(ARecord: PSynchronizeRecord); overload;
     class procedure Run(ARecord: PSynchronizeRecord; AWaitFor: Boolean); overload;
-  {$IFDEF MSWINDOWS}
     class procedure WndProc(var AMessage: TMessage);
-  {$ENDIF}
   public
     class constructor Create;
     class destructor Destroy;
@@ -240,9 +236,7 @@ implementation
 
 uses
   ACL.Utils.Logger,
-{$IFDEF MSWINDOWS}
   ACL.Utils.Messaging,
-{$ENDIF}
   Math;
 
 {$IFDEF MSWINDOWS}
@@ -819,10 +813,14 @@ end;
 
 class constructor TACLMainThread.Create;
 begin
-{$IFDEF MSWINDOWS}
-  FWnd := acWndAlloc(WndProc, ClassName, True);
-  FWndMessage := RegisterWindowMessage(PChar(ClassName));
+{$IFDEF LINUX}
+  // Messaging works only in main app, not plugins.
+  if not IsLibrary then
 {$ENDIF}
+  begin
+    FWnd := acWndAlloc(WndProc, ClassName, True);
+    FWndMessage := RegisterWindowMessage(PChar(ClassName));
+  end;
   FQueue := TThreadList<PSynchronizeRecord>.Create;
 {$IFDEF ACL_THREADING_DEBUG_DEADLOCKS}
   FSynchronizingThreads := TThreadList<Cardinal>.Create;
@@ -831,9 +829,7 @@ end;
 
 class destructor TACLMainThread.Destroy;
 begin
-{$IFDEF MSWINDOWS}
   acWndFree(FWnd);
-{$ENDIF}
   TACLThread.RemoveQueuedEvents(Execute);
   with FQueue.LockList do
   try
@@ -954,8 +950,8 @@ begin
     if LCurrentThreadId = MainThreadID then
       Execute(ARecord)
     else
-    {$IFDEF MSWINDOWS}
-      if IsLibrary then
+    {$IFDEF MSWINDOWS} // Only Windows switches the context to the main thread when sending a message.
+      if FWnd <> 0 then
         acSendMessage(FWnd, FWndMessage, 0, {%H-}LPARAM(ARecord))
       else
     {$ENDIF}
@@ -979,11 +975,11 @@ begin
   else
   begin
     FQueue.Add(ARecord);
-  {$IFDEF MSWINDOWS}
-    if IsLibrary then
+    // Unlike the WaitFor condition, here we prefer for system's postpone mechanism. 
+    // This way, we can avoid deadlocks between postponed methods and UI synchronization from other threads
+    if FWnd <> 0 then    
       acPostMessage(FWnd, FWndMessage, 0, 0)
     else
-  {$ENDIF}
     {$IFDEF ACL_THREADING_DEBUG_DEADLOCKS}
       TACLThread.ForceQueue(nil, procedure
       begin
@@ -1073,7 +1069,6 @@ begin
     WakeMainThread(nil);
 end;
 
-{$IFDEF MSWINDOWS}
 class procedure TACLMainThread.WndProc(var AMessage: TMessage);
 begin
   if AMessage.Msg = FWndMessage then
@@ -1089,7 +1084,6 @@ begin
   else
     acWndDefaultProc(FWnd, AMessage);
 end;
-{$ENDIF}
 
 { TACLThreadObject<T> }
 

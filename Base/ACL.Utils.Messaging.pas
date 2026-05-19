@@ -139,7 +139,8 @@ end;
 
 procedure acWndFree(AWnd: TWndHandle);
 begin
-  DeallocateHWnd(AWnd);
+  if AWnd <> 0 then
+    DeallocateHWnd(AWnd);
 end;
 
 {$ELSE}
