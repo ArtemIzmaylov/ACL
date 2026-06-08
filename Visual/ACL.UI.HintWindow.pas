@@ -140,7 +140,7 @@ type
       const AHint: string; AData: TCustomData): TRect; reintroduce; overload;
     function CalcHintRect(MaxWidth: Integer;
       const AHint: string; AData: TCustomData): TRect; overload; override;
-    procedure InitFont(const AFontData: string);
+    procedure InitFont(const AFontData: string); virtual;
 
     //# Float Hints
     procedure Hide;

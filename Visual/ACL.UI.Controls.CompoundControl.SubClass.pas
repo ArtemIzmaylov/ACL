@@ -714,8 +714,6 @@ type
 
   { TACLCompoundControlSubClass }
 
-  TACLCompoundControlGetCursorEvent = procedure (
-    Sender: TObject; AHitTestInfo: TACLHitTestInfo) of object;
   TACLCompoundControlDropSourceDataEvent = procedure (
     Sender: TObject; ASource: TACLDropSource) of object;
   TACLCompoundControlDropSourceFinishEvent = procedure (
@@ -749,10 +747,10 @@ type
     FOnDropSourceData: TACLCompoundControlDropSourceDataEvent;
     FOnDropSourceFinish: TACLCompoundControlDropSourceFinishEvent;
     FOnDropSourceStart: TACLCompoundControlDropSourceStartEvent;
-    FOnGetCursor: TACLCompoundControlGetCursorEvent;
     FOnUpdateState: TNotifyEvent;
 
     function GetCurrentDpi: Integer;
+    function GetCursor: TCursor;
     function GetFocused: Boolean;
     function GetFont: TFont;
     function GetIsDestroying: Boolean; inline;
@@ -800,7 +798,6 @@ type
     function DoDropSourceBegin(var AAllowAction: TACLDropSourceActions; AConfig: TACLIniFile): Boolean; virtual;
     procedure DoDropSourceFinish(Canceled: Boolean; const ShiftState: TShiftState); virtual;
     procedure DoDropSourceGetData(ASource: TACLDropSource; ADropSourceObject: TObject); virtual;
-    procedure DoGetCursor(AHitTest: TACLHitTestInfo); virtual;
     procedure DoHoveredObjectChanged; virtual;
 
     // IACLResourceCollection
@@ -850,10 +847,6 @@ type
     procedure KeyUp(var Key: Word; Shift: TShiftState); override; final;
     function WantSpecialKey(Key: Word; Shift: TShiftState): Boolean; virtual;
 
-    // Cursor
-    function GetCursor(const P: TPoint): TCursor;
-    procedure UpdateCursor;
-
     // Mouse
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; const P: TPoint); override; final;
     procedure MouseLeave; override; final;
@@ -888,6 +881,7 @@ type
     property ActionType: TACLControlActionType read FActionType;
     property Container: IACLCompoundControlSubClassContainer read FContainer;
     property CurrentDpi: Integer read GetCurrentDpi;
+    property Cursor: TCursor read GetCursor;
     property DragAndDropController: TACLCompoundControlDragAndDropController read FDragAndDropController;
     property EnabledContent: Boolean read FEnabledContent write SetEnabledContent;
     property Focused: Boolean read GetFocused;
@@ -904,7 +898,6 @@ type
     property OnDropSourceData: TACLCompoundControlDropSourceDataEvent read FOnDropSourceData write FOnDropSourceData;
     property OnDropSourceFinish: TACLCompoundControlDropSourceFinishEvent read FOnDropSourceFinish write FOnDropSourceFinish;
     property OnDropSourceStart: TACLCompoundControlDropSourceStartEvent read FOnDropSourceStart write FOnDropSourceStart;
-    property OnGetCursor: TACLCompoundControlGetCursorEvent read FOnGetCursor write FOnGetCursor;
     property OnUpdateState: TNotifyEvent read FOnUpdateState write FOnUpdateState;
     //# Flags
     property IsDestroying: Boolean read GetIsDestroying;
@@ -1293,6 +1286,7 @@ procedure TACLCompoundControlDragAndDropController.MouseDown(
 begin
   FIsPressed := True;
   FIsStarted := False;
+  FCursor := HitTest.Cursor;
   MouseCapturePoint := APoint;
   LastPoint := MouseCapturePoint;
 end;
@@ -1315,10 +1309,10 @@ begin
       if (SubClass.PressedObject = HitTest.HitObject) and DragStart then
       begin
         FIsActive := True; // first
+        UpdateCursor(HitTest.Cursor); // before update-hittest
         SubClass.DoDragStarted;
         LastPoint := DragObject.TransformPoint(LastPoint);
         SubClass.UpdateHitTest(APoint, AShift);
-        UpdateCursor(HitTest.Cursor);
       end
       else
         Cancel;
@@ -1484,7 +1478,7 @@ begin
     if DragWindow <> nil then
       DragWindow.DragCursor := FCursor
     else
-      SubClass.UpdateCursor;
+      SubClass.Container.UpdateCursor;
   end;
 end;
 
@@ -2611,17 +2605,16 @@ begin
   Result := StyleScrollBox.TargetDPI;
 end;
 
-function TACLCompoundControlSubClass.GetCursor(const P: TPoint): TCursor;
+function TACLCompoundControlSubClass.GetCursor: TCursor;
 begin
   if FLongOperationCount > 0 then
     Exit(crHourGlass);
-  if DragAndDropController.IsActive then
-    Exit(DragAndDropController.Cursor);
+  if FDragAndDropController.IsActive then
+    Exit(FDragAndDropController.Cursor);
+  if FDragAndDropController.IsPressed then
+    Exit(FDragAndDropController.Cursor);
   if not CanInteract then
     Exit(crDefault);
-  if P <> HitTest.Point then
-    UpdateHitTest(P, HitTest.Shift);
-  DoGetCursor(HitTest);
   Result := HitTest.Cursor;
 end;
 
@@ -2870,14 +2863,14 @@ procedure TACLCompoundControlSubClass.BeginLongOperation;
 begin
   Inc(FLongOperationCount);
   if FLongOperationCount = 1 then
-    UpdateCursor;
+    Container.UpdateCursor;
 end;
 
 procedure TACLCompoundControlSubClass.EndLongOperation;
 begin
   Dec(FLongOperationCount);
   if FLongOperationCount = 0 then
-    UpdateCursor;
+    Container.UpdateCursor;
 end;
 
 procedure TACLCompoundControlSubClass.ScrollHorizontally(const AScrollCode: TScrollCode);
@@ -3108,12 +3101,6 @@ begin
     OnDropSourceData(Self, ASource);
 end;
 
-procedure TACLCompoundControlSubClass.DoGetCursor(AHitTest: TACLHitTestInfo);
-begin
-  if Assigned(OnGetCursor) then
-    OnGetCursor(Self, AHitTest);
-end;
-
 procedure TACLCompoundControlSubClass.DoHoveredObjectChanged;
 begin
   // do nothing
@@ -3199,11 +3186,6 @@ begin
   finally
     EndUpdate;
   end;
-end;
-
-procedure TACLCompoundControlSubClass.UpdateCursor;
-begin
-  Container.UpdateCursor;
 end;
 
 function TACLCompoundControlSubClass.GetFont: TFont;

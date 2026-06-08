@@ -194,10 +194,10 @@ type
     procedure CMHintShow(var Message: TCMHintShow); message CM_HINTSHOW;
   protected
     procedure CalculateButtons(var ARect: TRect; AIndent: Integer); override;
-    function GetCursor(const P: TPoint): TCursor; override;
     procedure DefineProperties(Filer: TFiler); override;
     procedure HandlerImageChange(Sender: TObject); virtual;
     procedure Loaded; override;
+    procedure MouseUpdateCursor(const P: TPoint); override;
     procedure Notification(AComponent: TComponent; AOperation: TOperation); override;
 
     // Input
@@ -571,16 +571,6 @@ begin
   FEditBox.Execute(AAction)
 end;
 
-function TACLCustomTextEdit.GetCursor(const P: TPoint): TCursor;
-var
-  LButton: TACLButtonSubClass;
-begin
-  if Safe.Cast(SubClasses.HitTest(P), TACLButtonSubClass, LButton) and LButton.IsEnabled then
-    Result := crHandPoint
-  else
-    Result := inherited;
-end;
-
 function TACLCustomTextEdit.GetMaxLength: Integer;
 begin
   Result := FEditBox.MaxLength;
@@ -683,6 +673,16 @@ begin
       end;
     end;
   end;
+end;
+
+procedure TACLCustomTextEdit.MouseUpdateCursor(const P: TPoint);
+var
+  LButton: TACLButtonSubClass;
+begin
+  if Safe.Cast(SubClasses.HitTest(P), TACLButtonSubClass, LButton) and LButton.IsEnabled then
+    Cursor := crHandPoint
+  else
+    inherited;
 end;
 
 procedure TACLCustomTextEdit.Notification(AComponent: TComponent; AOperation: TOperation);

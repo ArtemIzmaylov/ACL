@@ -107,17 +107,17 @@ type
     function CreateDropDownWindow: TACLPopupWindow; override;
     procedure DoEnter; override;
     procedure DoExit; override;
+    procedure DoGetHint(const P: TPoint; var AHint: string); override;
     procedure DoPrepareDropDownList(AList: TACLBasicDropDownList); override;
     procedure DoSearch; override;
     procedure InvalidateBorders; override;
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
+    procedure MouseUpdateCursor(const P: TPoint); override;
     procedure Paint; override;
     procedure PostValue(ANode: TACLTreeListNode); override;
     procedure SetTargetDPI(AValue: Integer); override;
     procedure ShowDropDownWindow; override;
     procedure TextChanged; override;
-    //# IACLCursorProvider
-    function GetCursor(const P: TPoint): TCursor; override;
     //# Properties
     property Candidates: TACLUIInsightCandidates read FCandidates;
   public
@@ -245,6 +245,13 @@ begin
   inherited;
 end;
 
+procedure TACLUIInsightSearchBox.DoGetHint(const P: TPoint; var AHint: string);
+begin
+  if (Mode = isemIcon) and (State <> isemIcon) then
+    AHint := '';
+  inherited;
+end;
+
 procedure TACLUIInsightSearchBox.DoPrepareDropDownList(AList: TACLBasicDropDownList);
 var
   LBuilder: TACLUIInsightSearchQueueBuilder;
@@ -279,12 +286,12 @@ begin
     LDropDownList.IncSearch.Text := Text;
 end;
 
-function TACLUIInsightSearchBox.GetCursor(const P: TPoint): TCursor;
+procedure TACLUIInsightSearchBox.MouseUpdateCursor(const P: TPoint);
 begin
   if State = isemIcon then
-    Result := crHandPoint
+    Cursor := crHandPoint
   else
-    Result := inherited;
+    inherited;
 end;
 
 procedure TACLUIInsightSearchBox.HideHighlightion;
@@ -363,8 +370,8 @@ begin
     FState := AState;
     DroppedDown := False;
     HideHighlightion;
+    MouseUpdateCursor(CalcCursorPos);
     AdjustSize;
-    UpdateCursor;
     Invalidate;
   end;
 end;

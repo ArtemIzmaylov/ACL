@@ -193,13 +193,6 @@ type
     procedure SetFocusOnSearchResult;
   end;
 
-  { IACLCursorProvider }
-
-  IACLCursorProvider = interface
-  ['{2FCA84BF-1DFE-40AC-88C8-893791B1AB8F}']
-    function GetCursor(const P: TPoint): TCursor;
-  end;
-
   { IACLPopup }
 
   IACLPopup = interface
@@ -541,6 +534,7 @@ type
     IACLResourceCollection)
   strict private
     FAlignOrder: Integer;
+    FDefaultCursor: TCursor;
     FMargins: TACLMargins;
     FMouseInControl: Boolean;
     FResourceCollection: TACLCustomResourceCollection;
@@ -554,6 +548,7 @@ type
     procedure MarginsChangeHandler(Sender: TObject);
     procedure SetAlignOrder(AValue: Integer);
     procedure SetAlignWithMargins(AValue: Boolean);
+    procedure SetCursor(AValue: TCursor);
     procedure SetMargins(const Value: TACLMargins);
     procedure SetResourceCollection(AValue: TACLCustomResourceCollection);
   protected
@@ -600,6 +595,7 @@ type
     property OnMouseEnter: TNotifyEvent read FOnMouseEnter write FOnMouseEnter;
     property OnMouseLeave: TNotifyEvent read FOnMouseLeave write FOnMouseLeave;
     //# Resources
+    property DefaultCursor: TCursor read FDefaultCursor write FDefaultCursor stored False;
     property ResourceCollection: TACLCustomResourceCollection
       read FResourceCollection write SetResourceCollection;
   public
@@ -628,6 +624,7 @@ type
     property AlignWithMargins write SetAlignWithMargins stored False;
   {$ENDIF}
     property Anchors;
+    property Cursor write SetCursor;
     property Enabled;
     property Hint;
     property Margins: TACLMargins read FMargins write SetMargins stored IsMarginsStored;
@@ -676,6 +673,7 @@ type
     IACLResourceCollection)
   strict private
     FAlignOrder: Integer;
+    FDefaultCursor: TCursor;
     FFocusOnClick: Boolean;
     FMargins: TACLMargins;
     FMouseInClient: Boolean;
@@ -694,6 +692,7 @@ type
     function IsPaddingStored: Boolean;
     procedure SetAlignOrder(AValue: Integer);
     procedure SetAlignWithMargins(AValue: Boolean);
+    procedure SetCursor(AValue: TCursor);
     procedure SetMargins(AValue: TACLMargins);
     procedure SetPadding(AValue: TACLPadding);
     procedure SetResourceCollection(AValue: TACLCustomResourceCollection);
@@ -753,7 +752,6 @@ type
     procedure RegisterSubClass(out Obj; Inst: TACLControlSubClass);
     procedure SetFocusOnClick; virtual;
     procedure SetTargetDPI(AValue: Integer); virtual;
-    procedure UpdateCursor;
     procedure UpdateTransparency; virtual;
     procedure WndProc(var Message: TMessage); override;
 
@@ -788,6 +786,7 @@ type
     procedure ResourceCollectionChanged; virtual;
 
     // Properties
+    property DefaultCursor: TCursor read FDefaultCursor write FDefaultCursor stored False;
     property FocusOnClick: Boolean read FFocusOnClick write FFocusOnClick default False;
     property MouseInClient: Boolean read FMouseInClient;
     property Padding: TACLPadding read FPadding write SetPadding stored IsPaddingStored;
@@ -822,6 +821,7 @@ type
   {$ENDIF}
     property Anchors;
     property Constraints;
+    property Cursor write SetCursor;
     property DoubleBuffered default False;
     property DragCursor;
     property DragKind;
@@ -937,11 +937,10 @@ type
   { TACLControls }
 
   TACLControls = class
-  strict private
-    class procedure UpdateCursor(ACaller: TWinControl; var Message: TWMSetCursor);
   public
     class procedure AlignControl(AControl: TControl; const ABounds: TRect);
     class procedure BufferedPaint(ACaller: TWinControl);
+    class procedure RefreshMousePos(AControl: TWinControl);
     // Scaling
     class procedure ScaleChanging(AControl: TWinControl; var AState: TObject);
     class procedure ScaleChanged(AControl: TWinControl; var AState: TObject);
@@ -2623,6 +2622,7 @@ begin
   inherited;
   if (Width = 0) or (Height = 0) then
     SetBounds(Left, Top, FDefaultSize.cx, FDefaultSize.cy);
+  Cursor := DefaultCursor;
   MarginsChangeHandler(nil);
   UpdateTransparency;
 end;
@@ -2664,6 +2664,13 @@ procedure TACLGraphicControl.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
 begin
   inherited SetBounds(ALeft, ATop, AWidth, AHeight);
   BoundsChanged;
+end;
+
+procedure TACLGraphicControl.SetCursor(AValue: TCursor);
+begin
+  if csReading in ComponentState then
+    FDefaultCursor := AValue;
+  inherited Cursor := AValue;
 end;
 
 procedure TACLGraphicControl.SetParent(NewParent: TWinControl);
@@ -3013,6 +3020,7 @@ end;
 constructor TACLCustomControl.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  FDefaultCursor := crDefault;
   FMargins := TACLMargins.Create(0);
   FMargins.OnChanged := MarginsChangeHandler;
   FPadding := CreatePadding;
@@ -3030,9 +3038,10 @@ end;
 
 procedure TACLCustomControl.AfterConstruction;
 begin
-  inherited AfterConstruction;
+  inherited;
   if (Width = 0) or (Height = 0) then
     SetBounds(Left, Top, FDefaultSize.cx, FDefaultSize.cy);
+  Cursor := DefaultCursor;
   MarginsChangeHandler(nil);
   UpdateTransparency;
 end;
@@ -3144,7 +3153,6 @@ end;
 procedure TACLCustomControl.MouseEnter;
 begin
   FMouseInClient := True;
-  UpdateCursor;
 end;
 
 procedure TACLCustomControl.MouseLeave;
@@ -3158,9 +3166,9 @@ end;
 
 procedure TACLCustomControl.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
-  inherited;
   if MouseInClient then
     SubClasses.MouseMove(Shift, Point(X, Y));
+  inherited; // after hit-test calculation
 end;
 
 procedure TACLCustomControl.MouseUp(
@@ -3168,15 +3176,15 @@ procedure TACLCustomControl.MouseUp(
 begin
   if MouseInClient then
     SubClasses.MouseUp(Button, Shift, Point(X, Y));
-  inherited;
+  inherited; // after hit-test calculation
 end;
 
 procedure TACLCustomControl.MouseDown(
   Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
-  inherited MouseDown(Button, Shift, X, Y);
   if MouseInClient then
     SubClasses.MouseDown(Button, Shift, Point(X, Y));
+  inherited; // after hit-test calculation
 end;
 
 function TACLCustomControl.MouseWheel(Direction: TACLMouseWheelDirection;
@@ -3248,6 +3256,13 @@ begin
   Margins.All := IfThen(AValue, TACLMargins.Default, 0);
 end;
 
+procedure TACLCustomControl.SetCursor(AValue: TCursor);
+begin
+  if csReading in ComponentState then
+    FDefaultCursor := AValue;
+  inherited Cursor := AValue;
+end;
+
 procedure TACLCustomControl.SetFocusOnClick;
 begin
   if not Focused then
@@ -3291,12 +3306,6 @@ begin
   TACLStyle.Refresh(Self);
 end;
 
-procedure TACLCustomControl.UpdateCursor;
-begin
-  if MouseInClient and HandleAllocated and not (csDestroying in ComponentState) then
-    Perform(WM_SETCURSOR, Handle, HTCLIENT);
-end;
-
 procedure TACLCustomControl.UpdateTransparency;
 begin
   if Transparent then
@@ -3330,7 +3339,6 @@ begin
   inherited;
   SubClasses.Dispatch(Message);
   Invalidate;
-  UpdateCursor;
 end;
 
 procedure TACLCustomControl.CMFontChanged(var Message: TMessage);
@@ -3755,7 +3763,6 @@ procedure TACLContainer.SetAutoSize(Value: Boolean);
 begin
   if Value <> AutoSize then
   begin
-    inherited SetAutoSize(Value);
   {$IFDEF FPC}
     // Сохраняем поведение как в Delphi: дельфя корректирует положение
     // анчорид-контролов только при включении автосайза, а не всегда.
@@ -3764,6 +3771,7 @@ begin
     else
       ControlStyle := ControlStyle - [csAutoSizeKeepChildLeft, csAutoSizeKeepChildTop];
   {$ENDIF}
+    inherited SetAutoSize(Value);
   end;
 end;
 
@@ -4001,6 +4009,20 @@ begin
   Result := AControl.Perform(WM_NCHITTEST, 0, PointToLParam(LPoint));
 end;
 
+class procedure TACLControls.RefreshMousePos(AControl: TWinControl);
+var
+  P: TPoint;
+begin
+  if csDestroying in AControl.ComponentState then
+    Exit;
+  if AControl.HandleAllocated then
+  begin
+    P := AControl.CalcCursorPos;
+    if AControl.ClientRect.Contains(P) then
+      AControl.Perform(WM_MOUSEMOVE, 0, PointToLParam(P));
+  end;
+end;
+
 class function TACLControls.WndProc(ACaller: TWinControl; var Message: TMessage): Boolean;
 {$IFDEF FPC}
 var
@@ -4011,15 +4033,6 @@ var
 begin
   Result := False;
 {$IFDEF FPC}
-  if (Message.Msg >= LM_MOUSEFIRST) and (Message.Msg <= LM_MOUSELAST) then
-  begin
-    if not Mouse.IsDragging then
-    begin
-      LCode := NCHitTest(ACaller, TWMMouse(Message));
-      if ACaller.Perform(WM_SETCURSOR, ACaller.Handle, MakeLong(LCode, Message.Msg)) = 0 then
-        SetCursor(crDefault);
-    end;
-  end;
   if Message.Msg = LM_MOUSEWHEEL then
   begin
     LForm := GetParentForm(ACaller);
@@ -4031,11 +4044,6 @@ begin
     Result := Message.Result <> 0;
   end;
 {$ENDIF}
-  if Message.Msg = WM_SETCURSOR then
-  begin
-    UpdateCursor(ACaller, TWMSetCursor(Message));
-    Result := Message.Result = 1;
-  end;
 end;
 
 class function TACLControls.GetMargins(AControl: TControl; out AMargins: TACLMargins): Boolean;
@@ -4069,50 +4077,6 @@ begin
 {$IFNDEF FPC}
   AControl.AlignWithMargins := AMargins <> NullRect;
 {$ENDIF}
-end;
-
-class procedure TACLControls.UpdateCursor(ACaller: TWinControl; var Message: TWMSetCursor);
-
-  function GetCursor(AControl: TControl): TCursor;
-  var
-    LIntf: IACLCursorProvider;
-  begin
-    if Supports(AControl, IACLCursorProvider, LIntf) then
-      Result := LIntf.GetCursor(AControl.CalcCursorPos)
-    else
-      Result := AControl.Cursor;
-  end;
-
-var
-  AControl: TControl;
-  ACursor: TCursor;
-begin
-  if csDesigning in ACaller.ComponentState then
-    Exit;
-  if Message.HitTest <> HTCLIENT then
-  begin
-  {$IFDEF FPC}
-    SetCursor(Screen.Cursors[GtkNCGetCursor(Message.HitTest)]);
-    Message.Result := 1;
-  {$ENDIF}
-    Exit;
-  end;
-  if ACaller.HandleAllocated and (Message.CursorWnd = ACaller.Handle) then
-  begin
-    ACursor := Screen.Cursor;
-    if ACursor = crDefault then
-    begin
-      AControl := GetCaptureControl;
-      if AControl = nil then
-        AControl := ACaller.ControlAtPos(ACaller.CalcCursorPos, False);
-      if AControl <> nil then
-        ACursor := GetCursor(AControl);
-      if ACursor = crDefault then
-        ACursor := GetCursor(ACaller);
-    end;
-    SetCursor(Screen.Cursors[ACursor]);
-    Message.Result := 1;
-  end;
 end;
 
 { TACLControlHelper }

@@ -212,8 +212,8 @@ function acFindLibrary(const AFileName: string): string;
 {$ENDIF}
 {$IFDEF MSWINDOWS}
 function acModuleFileName(AModule: HMODULE): string; inline;
-function acModuleHandle(const AFileName: string): HMODULE;
 {$ENDIF}
+function acModuleHandle(const AFileName: string): HMODULE;
 
 // Window Handles
 function acFindWindow(const AClassName: string): TWndHandle;
@@ -601,12 +601,18 @@ begin
   AResult := AResult and (Result <> nil);
 end;
 
-{$IFDEF MSWINDOWS}
 function acModuleHandle(const AFileName: string): HMODULE;
 begin
+{$IF DEFINED(MSWINDOWS)}
   Result := GetModuleHandle(PChar(AFileName));
+{$ELSEIF DEFINED(LINUX)}
+  Result := HMODULE(dlopen(PChar(AFileName), RTLD_LAZY or RTLD_NOLOAD));
+{$ELSE}
+  {$MESSAGE FATAL 'Not Implemented'}
+{$ENDIF}
 end;
 
+{$IFDEF MSWINDOWS}
 function acModuleFileName(AModule: HMODULE): string;
 begin
   Result := GetModuleName(AModule);

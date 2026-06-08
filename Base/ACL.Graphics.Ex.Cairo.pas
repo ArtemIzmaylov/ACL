@@ -168,6 +168,7 @@ type
     FHandleOwnership: TStreamOwnership;
     FImageSmoothStretching: TACLBoolean;
     FTargetSurface: Pcairo_surface_t;
+    FTextAntialiasMode: TACL2DRenderTextAntialiasMode;
 
     procedure CheckRecursivePaint;
     procedure PathEllipseArc(X1, Y1, X2, Y2: Double);
@@ -334,6 +335,7 @@ function cairo_create_region_ex(ARects: PRectArray; ACount: Integer): Pcairo_reg
 procedure cairo_set_source_color(ACairo: pcairo_t; const AColor: TAlphaColor); overload;
 procedure cairo_set_source_color(ACairo: pcairo_t; const AColor: TACLPixel32); overload;
 procedure cairo_set_source_color(ACairo: pcairo_t; const AColor: TCairoColor); overload;
+procedure cairo_set_text_aliasing(ACairo: pcairo_t; AMode: TACL2DRenderTextAntialiasMode);
 
 procedure cairo_fill_surface(ACairo: pcairo_t; ASurface: Pcairo_surface_t;
   const ATargetRect, ASourceRect: TRect; const AOrigin: TPoint;
@@ -504,7 +506,7 @@ begin
   Result := Pcairo_t(LContext.pcr);
   cairo_save(Result);
   cairo_set_operator(Result, CAIRO_OPERATOR_OVER);
-  Origin := NullPoint;
+  Origin := LContext.WindowOrg;
 {$ELSEIF DEFINED(LCLGtk2)}
 var
   LContext: TGtkDeviceContext absolute DC;
@@ -722,6 +724,24 @@ end;
 procedure cairo_set_source_color(ACairo: pcairo_t; const AColor: TCairoColor);
 begin
   cairo_set_source_rgba(ACairo, AColor.R, AColor.G, AColor.B, AColor.A);
+end;
+
+procedure cairo_set_text_aliasing(ACairo: pcairo_t; AMode: TACL2DRenderTextAntialiasMode);
+const
+  Map: array[TACL2DRenderTextAntialiasMode] of cairo_antialias_t = (
+    CAIRO_ANTIALIAS_DEFAULT,
+    CAIRO_ANTIALIAS_NONE,
+    CAIRO_ANTIALIAS_GRAY,
+    CAIRO_ANTIALIAS_SUBPIXEL
+  );
+var
+  LOptions: Pcairo_font_options_t;
+begin
+  LOptions := cairo_font_options_create;
+  cairo_font_options_set_antialias(LOptions, Map[AMode]);
+  cairo_font_options_set_subpixel_order(LOptions, CAIRO_SUBPIXEL_ORDER_RGB); // SUBPIXEL mode only
+  cairo_set_font_options(ACairo, LOptions);
+  cairo_font_options_destroy(LOptions);
 end;
 
 procedure cairo_fill_surface(ACairo: pcairo_t; ASurface: Pcairo_surface_t;
@@ -973,7 +993,6 @@ begin
         LGlyphs[I].X := LOffsetX;
         LGlyphs[I].Y := LOffsetY;
         LOffsetX := LOffsetX + LGlyphWidths[I];
-        LOffsetX := LOffsetX + LGlyphWidth;
         if CharInSet(AMapping.TextAt(I)^, [#13, #10]) then
         begin
           ProcessLineBreak(I);
@@ -1099,6 +1118,20 @@ end;
 
 procedure CairoDrawGlyphs(ACairo: Pcairo_t;
   AGlyphs: Pcairo_glyph_t; AGlyphCount: Integer; AHasSubstitutions: Boolean);
+var
+  LOptions: Pcairo_font_options_t;
+
+  procedure DrawGlyphs(AGlyphs: Pcairo_glyph_t; AGlyphCount: Integer);
+  begin
+    // Выводить глифы надо без включенного хинтинга метрик, иначе посчитанные
+    // нами позиции глифов дополнительно будут корректироваться cairo перед
+    // выводом, что может к обрезке cleartype-сглаживания у начальной и конечной
+    // букв на краях (вылозло в тестах по treeView и Gallery)
+    cairo_get_font_options(ACairo, LOptions);
+    cairo_font_options_set_hint_metrics(LOptions, CAIRO_HINT_METRICS_OFF);
+    cairo_set_font_options(ACairo, LOptions);
+    cairo_show_glyphs(ACairo, AGlyphs, AGlyphCount);
+  end;
 
   // Тут предполагается, что у всего массива выставлен один и тот же шрифт
   procedure ShowGlyphs(AGlyphs: Pcairo_glyph_t; AGlyphCount: Integer);
@@ -1112,7 +1145,7 @@ procedure CairoDrawGlyphs(ACairo: Pcairo_t;
     LFont := AGlyphs^.index and GLYPH_MASK_FONTINDEX;
     if LFont = 0 then
     begin
-      cairo_show_glyphs(ACairo, AGlyphs, AGlyphCount);
+      DrawGlyphs(AGlyphs, AGlyphCount);
       Exit;
     end;
 
@@ -1125,7 +1158,7 @@ procedure CairoDrawGlyphs(ACairo: Pcairo_t;
       for I := 0 to AGlyphCount - 1 do
         AGlyphs[I].index := AGlyphs[I].index and GLYPH_MASK_GLYPHINDEX;
       // Выводим
-      cairo_show_glyphs(ACairo, AGlyphs, AGlyphCount);
+      DrawGlyphs(AGlyphs, AGlyphCount);
       // Восстанавливаем фейковые glyph-индексы
       for I := 0 to AGlyphCount - 1 do
         AGlyphs[I].index := AGlyphs[I].index or LFont;
@@ -1134,7 +1167,7 @@ procedure CairoDrawGlyphs(ACairo: Pcairo_t;
     begin
       LGlyph := AGlyphs^;
       LGlyph.index := LGlyph.index and GLYPH_MASK_GLYPHINDEX;
-      cairo_show_glyphs(ACairo, @LGlyph, 1);
+      DrawGlyphs(@LGlyph, 1);
     end;
     cairo_restore(ACairo);
   end;
@@ -1144,31 +1177,36 @@ var
   LPrevGlyph: Pcairo_glyph_t;
   LFontIndex: LongWord;
 begin
-  if AHasSubstitutions then
-  begin
-    cairo_lock;
-    try
-      LFontIndex := 0;
-      LCurrGlyph := AGlyphs;
-      LPrevGlyph := AGlyphs;
-      while AGlyphCount > 0 do
-      begin
-        if (LCurrGlyph^.index and GLYPH_MASK_FONTINDEX) <> LFontIndex then
+  LOptions := cairo_font_options_create;
+  try
+    if AHasSubstitutions then
+    begin
+      cairo_lock;
+      try
+        LFontIndex := 0;
+        LCurrGlyph := AGlyphs;
+        LPrevGlyph := AGlyphs;
+        while AGlyphCount > 0 do
         begin
-          ShowGlyphs(LPrevGlyph, LCurrGlyph - LPrevGlyph);
-          LFontIndex := LCurrGlyph^.index and GLYPH_MASK_FONTINDEX;
-          LPrevGlyph := LCurrGlyph;
+          if (LCurrGlyph^.index and GLYPH_MASK_FONTINDEX) <> LFontIndex then
+          begin
+            ShowGlyphs(LPrevGlyph, LCurrGlyph - LPrevGlyph);
+            LFontIndex := LCurrGlyph^.index and GLYPH_MASK_FONTINDEX;
+            LPrevGlyph := LCurrGlyph;
+          end;
+          Dec(AGlyphCount);
+          Inc(LCurrGlyph);
         end;
-        Dec(AGlyphCount);
-        Inc(LCurrGlyph);
+        ShowGlyphs(LPrevGlyph, LCurrGlyph - LPrevGlyph);
+      finally
+        cairo_unlock;
       end;
-      ShowGlyphs(LPrevGlyph, LCurrGlyph - LPrevGlyph);
-    finally
-      cairo_unlock;
-    end;
-  end
-  else
-    cairo_show_glyphs(ACairo, AGlyphs, AGlyphCount);
+    end
+    else
+      DrawGlyphs(AGlyphs, AGlyphCount);
+  finally
+    cairo_font_options_destroy(LOptions);
+  end;
 end;
 
 procedure CairoDrawTextStyleLines(ACairo: Pcairo_t; AFontStyle: TFontStyles;
@@ -2299,6 +2337,8 @@ begin
   cairo_lock;
   try
     LFont := TCairoFonts.Select(Handle, Font);
+    if FTextAntialiasMode <> tamDefault then
+      cairo_set_text_aliasing(Handle, FTextAntialiasMode);
     if LGlyphs.Init(Handle, PChar(Text), Length(Text), LFont) then
     try
       LFlags := acTextAlignHorz[HorzAlign] or acTextAlignVert[VertAlign];
@@ -2398,7 +2438,9 @@ end;
 procedure TACLCairoRender.SetGeometrySmoothing(AValue: TACLBoolean);
 const
   Map: array[TACLBoolean] of cairo_antialias_t = (
-    CAIRO_ANTIALIAS_DEFAULT, CAIRO_ANTIALIAS_NONE, CAIRO_ANTIALIAS_SUBPIXEL
+    CAIRO_ANTIALIAS_DEFAULT,
+    CAIRO_ANTIALIAS_NONE,
+    CAIRO_ANTIALIAS_SUBPIXEL
   );
 begin
   cairo_set_antialias(Handle, Map[AValue]);
@@ -2410,21 +2452,9 @@ begin
 end;
 
 procedure TACLCairoRender.SetTextAntialiasMode(AMode: TACL2DRenderTextAntialiasMode);
-const
-  Map: array[TACL2DRenderTextAntialiasMode] of cairo_antialias_t = (
-    CAIRO_ANTIALIAS_DEFAULT,
-    CAIRO_ANTIALIAS_NONE,
-    CAIRO_ANTIALIAS_GRAY,
-    CAIRO_ANTIALIAS_BEST
-  );
-var
-  LOptions: Pcairo_font_options_t;
 begin
-  LOptions := cairo_font_options_create;
-  cairo_font_options_set_antialias(LOptions, Map[AMode]);
-  //cairo_font_options_set_subpixel_order(LOptions, CAIRO_SUBPIXEL_ORDER_RGB); // SUBPIXEL mode only
-  cairo_set_font_options(Handle, LOptions);
-  cairo_font_options_destroy(LOptions);
+  FTextAntialiasMode := AMode;
+  cairo_set_text_aliasing(Handle, FTextAntialiasMode);
 end;
 
 procedure TACLCairoRender.SetWorldTransform(const XForm: TXForm);

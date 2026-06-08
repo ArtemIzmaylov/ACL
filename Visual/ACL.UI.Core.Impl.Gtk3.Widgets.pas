@@ -77,6 +77,7 @@ type
     function ClientToScreen(var P: TPoint): boolean; override;
     function DeliverMessage(var Msg; const AIsInputEvent: Boolean=False): LRESULT; override;
     procedure InitializeWidget; override;
+    procedure PreferredSize(var PreferredWidth, PreferredHeight: integer; WithThemeSpace: Boolean); override;
     procedure SetBorderStyle(AValue: TBorderStyle);
   end;
 
@@ -95,7 +96,6 @@ type
     function ClientToScreen(var P: TPoint): boolean; override;
     function CreateWidget(const Params: TCreateParams): PGtkWidget; override;
     function DeliverMessage(var Msg; const AIsInput: Boolean = False): LRESULT; override;
-    function GtkEventKey(Sender: PGtkWidget; AEvent: PGdkEvent; AKeyPress: Boolean): Boolean; override;
     procedure InitializeWidget; override;
     procedure OffsetMousePos(const aGlobalX, aGlobalY: double; APoint: PPoint); override;
     procedure Repaint(const ARect: PRect=nil); override;
@@ -253,6 +253,12 @@ begin
   SetVisible(LCLObject.Showing); // ATE
 end;
 
+procedure TACLGtk3CustomControl.PreferredSize(
+  var PreferredWidth, PreferredHeight: integer; WithThemeSpace: Boolean);
+begin
+  // do nothing
+end;
+
 procedure TACLGtk3CustomControl.SetBorderStyle(AValue: TBorderStyle);
 begin
   PGtkLayout(Widget)^.set_border_width(IfThen(AValue <> bsNone, 2));
@@ -341,27 +347,6 @@ begin
       Exit(0);
   end;
   Result := inherited DeliverMessage(Msg, AIsInput);
-end;
-
-function TACLGtk3AdvancedWindow.GtkEventKey(
-  Sender: PGtkWidget; AEvent: PGdkEvent; AKeyPress: Boolean): Boolean;
-begin
-  // Оригинал зачем-то делает так:
-  //   if Widget^.has_focus or Widget^.is_toplevel then
-  // В итоге получается вот такая цепочка вызовов:
-  //   Form.OnKeyDown
-  //   Edit.OnKeyDown
-  //   Form.OnKeyUp
-  //   Edit.OnKeyUp
-  // Из-за такого рассинхрона не срабатывает штатный механизм TApplication.ControlKeyUp
-  // В итоге, нажатие vkReturn в поле ввода не доходит до Button.Default = True и модалка не закрывается
-  //
-  // В общем, новая логика такова: инпут форме отдаётся только,
-  // если она в фокусе или ни один из её чайлдов не сфокусирован
-  if Sender^.has_focus or (PGtkWindow(Sender)^.get_focus = nil) then
-    Result := inherited GtkEventKey(Sender, AEvent, AKeyPress)
-  else
-    Result := False;
 end;
 
 procedure TACLGtk3AdvancedWindow.InitializeWidget;

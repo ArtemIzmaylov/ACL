@@ -1,30 +1,4 @@
-Required for Gtk3:
------------------
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/41900
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/41901
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/41902
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/41903
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/41904
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/41905
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/41907
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/41910
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/41932
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/41933
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/41951
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/41961
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/41962
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/41964
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/41965
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42025
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42031
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42032
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42033
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42034
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42036
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42038
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42039
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42043
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42045
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42046
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42047
-https://gitlab.com/freepascal.org/lazarus/lazarus/-/issues/42049
+Gtk3 support limitation:
+------------------------
+* Requires atleast the ad5315104e revision of Lazarus's trunk
+* X11-backend only (It may works on Wayland backend too, but not tested).

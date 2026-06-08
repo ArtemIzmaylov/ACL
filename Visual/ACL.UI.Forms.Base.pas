@@ -122,6 +122,7 @@ type
     //# Messages
   {$IFDEF FPC}
     procedure WMLButtonDown(var Message: TLMLButtonDown); message LM_LBUTTONDOWN;
+    procedure WMMouseMove(var Message: TMessage); message LM_MOUSEMOVE;
     procedure WMNCHitTest(var Message: TMessage); message WM_NCHITTEST;
   {$ELSE}
     procedure CMDialogKey(var Message: TCMDialogKey); message CM_DIALOGKEY;
@@ -1106,6 +1107,17 @@ end;
 procedure TACLBasicForm.WMLButtonDown(var Message: TLMLButtonDown);
 begin
   if not GtkNCProcessMessage(Self, Message) then
+    inherited;
+end;
+
+procedure TACLBasicForm.WMMouseMove(var Message: TMessage);
+var
+  LCode: Integer;
+begin
+  LCode := TACLControls.NCHitTest(Self, TWMMouse(Message));
+  if LCode <> HTCLIENT then
+    SetTempCursor(GtkNCGetCursor(LCode))
+  else
     inherited;
 end;
 

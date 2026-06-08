@@ -974,14 +974,10 @@ begin
   try
     if LClipRegion = 0 then
       LClipRegion := CreateRectRgn(-MaxShort, -MaxShort, MaxShort, MaxShort);
-  {$IFNDEF LCLGtk3}
     GetWindowOrgEx(DC, LOrigin{%H-});
     OffsetRgn(ARegion, -LOrigin.X, -LOrigin.Y);
-  {$ENDIF}
     Result := CombineRgn(LClipRegion, LClipRegion, ARegion, AOperation) <> NULLREGION;
-  {$IFNDEF LCLGtk3}
     OffsetRgn(ARegion, LOrigin.X, LOrigin.Y);
-  {$ENDIF}
     SelectClipRgn(DC, LClipRegion);
   finally
     acRegionFree(LClipRegion);
@@ -989,21 +985,9 @@ begin
 end;
 
 procedure acExcludeFromClipRegion(DC: HDC; const R: TRect);
-{$IFDEF LCLGtk3}
-var
-  LRegion: TRegionHandle;
-{$ENDIF}
 begin
   if not R.IsEmpty then
-  begin
-  {$IFDEF LCLGtk3}
-    LRegion := CreateRectRgnIndirect(R);
-    acCombineWithClipRegion(DC, LRegion, RGN_DIFF);
-    acRegionFree(LRegion);
-  {$ELSE}
     ExcludeClipRect(DC, R.Left, R.Top, R.Right, R.Bottom);
-  {$ENDIF}
-  end;
 end;
 
 procedure acExcludeFromClipRegion(DC: HDC; ARegion: TRegionHandle);
@@ -1022,23 +1006,8 @@ begin
 end;
 
 function acRectVisible(DC: HDC; const ARect: TRect): Boolean;
-{$IFDEF LCLGtk3}
-var
-  LRegion: TRegionHandle;
-begin
-  Result := False;
-  if ARect.IsEmpty then
-    Exit;
-  if acGetClipRegion(DC, LRegion) then
-  try
-    Result := (LRegion = 0) or RectInRegion(LRegion, ARect);
-  finally
-    acRegionFree(LRegion);
-  end;
-{$ELSE}
 begin
   Result := RectVisible(DC, ARect);
-{$ENDIF}
 end;
 
 function acRectVisible(ACanvas: TCanvas; const ARect: TRect): Boolean;
@@ -1214,7 +1183,7 @@ begin
 {$ELSE}
   SetWindowRgn(AWnd, ARegion, ARedraw);
 {$ENDIF}
-{$IFDEF FPC}
+{$IFDEF LCLGtk2}
   DeleteObject(ARegion);
 {$ENDIF}
 end;

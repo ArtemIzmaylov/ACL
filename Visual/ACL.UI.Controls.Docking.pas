@@ -6,7 +6,7 @@
 //  Purpose:   Docking Layout Manager
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -252,7 +252,7 @@ type
   { TACLDockControl }
 
   TACLDockControlClass = class of TACLDockControl;
-  TACLDockControl = class(TACLCustomControl, IACLCursorProvider)
+  TACLDockControl = class(TACLCustomControl)
   protected const
     CursorMap: array[TACLBorder] of TCursor = (crHSplit, crVSplit, crHSplit, crVSplit);
   protected type
@@ -291,8 +291,6 @@ type
     procedure SetParent(AParent: TWinControl); override;
     //# IACLResourceCollection
     function GetCollection: TACLCustomResourceCollection; override;
-    //# IACLCursorProvider
-    function GetCursor(const P: TPoint): TCursor; reintroduce; virtual;
     //# Dragging
     procedure GetDockZones(ASource: TACLDockControl; AList: TACLDockZones); virtual;
     procedure StartDrag(const P: TPoint);
@@ -306,6 +304,7 @@ type
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
     procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+    procedure MouseUpdateCursor(const P: TPoint); virtual;
     //# Scaling
     procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
     procedure SetTargetDPI(AValue: Integer); override;
@@ -387,8 +386,6 @@ type
     function ResizeChild(AChild: TACLDockControl; ASide: TACLBorder; ADelta: Integer): Integer;
     procedure ResourceCollectionChanged; override;
     procedure ValidateInsert(AComponent: TComponent); override;
-    // IACLCursorProvider
-    function GetCursor(const P: TPoint): TCursor; override;
     //# Drawing
     procedure Paint; override;
     //# Storing
@@ -398,6 +395,7 @@ type
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
     procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+    procedure MouseUpdateCursor(const P: TPoint); override;
     //# Messages
     procedure CMCancelMode(var Message: TCMCancelMode); message CM_CANCELMODE;
     procedure CMControlListChange(var Message: TMessage); message CM_CONTROLLISTCHANGE;
@@ -457,8 +455,6 @@ type
   {$ENDIF}
     procedure SetParent(AParent: TWinControl); override;
     procedure ValidateInsert(AComponent: TComponent); override;
-    // IACLCursorProvider
-    function GetCursor(const P: TPoint): TCursor; override;
     //# storing
     procedure LayoutLoad(ANode: TACLXMLNode); override;
     procedure LayoutSave(ANode: TACLXMLNode); override;
@@ -466,6 +462,7 @@ type
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
     procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+    procedure MouseUpdateCursor(const P: TPoint); override;
     procedure MouseLeave; override;
     //# Drawing
     procedure Paint; override;
@@ -1559,20 +1556,6 @@ begin
     Result := TACLDockControl(Parent).GetCollection;
 end;
 
-function TACLDockControl.GetCursor(const P: TPoint): TCursor;
-var
-  ACtrl: TACLDockControl;
-  ASide: TACLBorder;
-begin
-  if FDragState = TDragState.Resize then
-    Exit(CursorMap[FSizingBorder]);
-  if FDragState = TDragState.Drag then
-    Exit(crSizeAll);
-  if HitOnSizeBox(P, ACtrl, ASide) then
-    Exit(CursorMap[ASide]);
-  Result := crDefault;
-end;
-
 procedure TACLDockControl.GetDockZones(ASource: TACLDockControl; AList: TACLDockZones);
 var
   AClient: TACLDockZoneClient;
@@ -1724,9 +1707,9 @@ begin
           else
             Inc(FDragCapture.Y, LGroup.ResizeChild(Self, FSizingBorder, Mouse.CursorPos.Y - FDragCapture.Y));
         end;
-  else;
+  else
+    MouseUpdateCursor(Point(X, Y));
   end;
-
   inherited;
 end;
 
@@ -1738,9 +1721,21 @@ begin
     if FDockEngine <> nil then
       FDockEngine.CreateLayout;
     FreeAndNil(FDockEngine);
+    Screen.Cursor := crDefault;
     MouseCapture := False;
   end;
   inherited;
+end;
+
+procedure TACLDockControl.MouseUpdateCursor(const P: TPoint);
+var
+  ACtrl: TACLDockControl;
+  ASide: TACLBorder;
+begin
+  if HitOnSizeBox(P, ACtrl, ASide) then
+    Cursor := CursorMap[ASide]
+  else
+    Cursor := crDefault;
 end;
 
 procedure TACLDockControl.Paint;
@@ -1753,7 +1748,7 @@ begin
   MouseCapture := True;
   FDragCapture := P;
   FDragState := TDragState.Drag;
-  UpdateCursor;
+  Screen.Cursor := crSizeAll;
 end;
 
 procedure TACLDockControl.StartResize(const P: TPoint; ABorder: TACLBorder);
@@ -1762,6 +1757,7 @@ begin
   FDragCapture := ClientToScreen(P);
   FDragState := TDragState.Resize;
   FSizingBorder := ABorder;
+  Screen.Cursor := CursorMap[FSizingBorder];
 end;
 
 procedure TACLDockControl.StoreCustomSize;
@@ -1872,8 +1868,8 @@ procedure TACLDockControl.CMCancelMode(var Message: TCMCancelMode);
 begin
   FDragState := TDragState.None;
   FreeAndNil(FDockEngine);
+  Screen.Cursor := crDefault;
   inherited;
-  UpdateCursor;
 end;
 
 procedure TACLDockControl.CMControlListChange(var Message: TMessage);
@@ -2456,20 +2452,6 @@ begin
   Result := inherited Controls[Index] as TACLDockControl;
 end;
 
-function TACLDockGroup.GetCursor(const P: TPoint): TCursor;
-var
-  ATab: TTab;
-begin
-  if (Layout = TACLDockGroupLayout.Tabbed) and (DragState = TDragState.None) then
-  begin
-    if FTabCapture.Control <> nil then
-      Exit(crDefault); //crDrag
-    if GetTabAtPos(P, ATab) and (ActiveControl <> ATab.Control) then
-      Exit(crHandPoint);
-  end;
-  Result := inherited;
-end;
-
 function TACLDockGroup.GetTabAtPos(const P: TPoint; out ATab: TTab): Boolean;
 var
   I: Integer;
@@ -2573,16 +2555,16 @@ end;
 
 procedure TACLDockGroup.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 var
-  ATab: TTab;
+  LTab: TTab;
 begin
   inherited;
   if Layout = TACLDockGroupLayout.Tabbed then
   begin
-    if GetTabAtPos(Point(X, Y), ATab) then
+    if GetTabAtPos(Point(X, Y), LTab) then
     begin
-      ActiveControlIndex := IndexOfControl(ATab.Control);
-      FTabCapture := ATab;
-      UpdateCursor;
+      ActiveControlIndex := IndexOfControl(LTab.Control);
+      FTabCapture := LTab;
+      MouseMove(Shift, X, Y);
     end;
   end
 end;
@@ -2615,8 +2597,25 @@ end;
 
 procedure TACLDockGroup.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
-  ZeroMemory(@FTabCapture, SizeOf(FTabCapture));
+  FTabCapture := Default(TTab);
   inherited;
+end;
+
+procedure TACLDockGroup.MouseUpdateCursor(const P: TPoint);
+var
+  LTab: TTab;
+begin
+  if Layout = TACLDockGroupLayout.Tabbed then
+  begin
+    if FTabCapture.Control <> nil then
+      Cursor := crDefault //crDrag
+    else if GetTabAtPos(P, LTab) and (ActiveControl <> LTab.Control) then
+      Cursor := crHandPoint
+    else
+      inherited;
+  end
+  else
+    inherited;
 end;
 
 procedure TACLDockGroup.Paint;
@@ -2931,16 +2930,6 @@ begin
     Result := NullRect;
 end;
 
-function TACLDockPanel.GetCursor(const P: TPoint): TCursor;
-begin
-  if DragState = TDragState.None then
-  begin
-    if HitOnCaptionButton(P) >= 0 then
-      Exit(crHandPoint);
-  end;
-  Result := inherited;
-end;
-
 function TACLDockPanel.GetOuterPadding: TRect;
 var
   LGroup: TACLDockGroup;
@@ -3062,6 +3051,14 @@ begin
     FResizeHandler := nil;
   end;
   inherited;
+end;
+
+procedure TACLDockPanel.MouseUpdateCursor(const P: TPoint);
+begin
+  if HitOnCaptionButton(P) >= 0 then
+    Cursor := crHandPoint
+  else
+    inherited;
 end;
 
 procedure TACLDockPanel.Paint;

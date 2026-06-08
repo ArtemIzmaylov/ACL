@@ -90,7 +90,7 @@ type
 
   { TACLCustomLabel }
 
-  TACLCustomLabel = class(TACLGraphicControl, IACLCursorProvider)
+  TACLCustomLabel = class(TACLGraphicControl)
   strict private
     class var FHintData: TACLHintData;
   strict private
@@ -111,8 +111,6 @@ type
     procedure SetStyle(AValue: TACLStyleLabel);
     procedure SetSubControl(AValue: TACLLabelSubControlOptions);
     procedure SetTransparent(AValue: Boolean);
-    // IACLCursorProvider
-    function GetCursor(const P: TPoint): TCursor; reintroduce;
     // Messages
     procedure CMHintShow(var Message: TCMHintShow); message CM_HINTSHOW;
     procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
@@ -130,6 +128,7 @@ type
     function GetDefaultTextColor: TColor; virtual;
     function GetHyperlinkAt(const P: TPoint; out AUrl: string): Boolean; virtual; abstract;
     procedure Loaded; override;
+    procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
     procedure Notification(AComponent: TComponent; AOperation: TOperation); override;
     procedure Paint; override;
     procedure PaintText; virtual; abstract;
@@ -503,16 +502,6 @@ begin
   Result := TACLLabelSubControlOptions.Create(Self);
 end;
 
-function TACLCustomLabel.GetCursor(const P: TPoint): TCursor;
-var
-  LUrl: string;
-begin
-  if GetHyperlinkAt(P, LUrl) then
-    Result := crHandPoint
-  else
-    Result := Cursor;
-end;
-
 function TACLCustomLabel.GetDefaultTextColor: TColor;
 begin
   Result := Font.Color;
@@ -524,6 +513,17 @@ procedure TACLCustomLabel.Loaded;
 begin
   inherited;
   Perform(CM_TEXTCHANGED, 0, 0);
+end;
+
+procedure TACLCustomLabel.MouseMove(Shift: TShiftState; X, Y: Integer);
+var
+  LUrl: string;
+begin
+  inherited;
+  if GetHyperlinkAt(Point(X, Y), LUrl) then
+    Cursor := crHandPoint
+  else
+    Cursor := DefaultCursor;
 end;
 
 procedure TACLCustomLabel.Notification(AComponent: TComponent; AOperation: TOperation);

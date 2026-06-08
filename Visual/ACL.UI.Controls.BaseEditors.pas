@@ -239,9 +239,7 @@ type
 
   { TACLCustomEdit }
 
-  TACLCustomEdit = class(TACLCustomControl,
-    IACLCursorProvider,
-    IACLEditActions)
+  TACLCustomEdit = class(TACLCustomControl, IACLEditActions)
   protected const
     InnerBorderSize = 1;
     OuterBorderSize = 1;
@@ -294,8 +292,8 @@ type
     //# Mouse
     procedure MouseEnter; override;
     procedure MouseLeave; override;
-    //# IACLCursorProvider
-    function GetCursor(const P: TPoint): TCursor; reintroduce; virtual;
+    procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
+    procedure MouseUpdateCursor(const P: TPoint); virtual;
     //# Properties
     property Borders: Boolean read FBorders write SetBorders default True;
     property EditBox: TACLEditSubClass read FEditBox implements IACLEditActions;
@@ -1488,14 +1486,6 @@ begin
   InvalidateBorders;
 end;
 
-function TACLCustomEdit.GetCursor(const P: TPoint): TCursor;
-begin
-  if FEditBox.Iteract and FEditBox.Bounds.Contains(P) then
-    Result := crIBeam
-  else
-    Result := Cursor;
-end;
-
 procedure TACLCustomEdit.InvalidateBorders;
 begin
   if Borders and HandleAllocated and not (csDestroying in ComponentState) then
@@ -1512,6 +1502,20 @@ procedure TACLCustomEdit.MouseLeave;
 begin
   inherited;
   InvalidateBorders;
+end;
+
+procedure TACLCustomEdit.MouseMove(Shift: TShiftState; X, Y: Integer);
+begin
+  inherited;
+  MouseUpdateCursor(Point(X, Y));
+end;
+
+procedure TACLCustomEdit.MouseUpdateCursor(const P: TPoint);
+begin
+  if FEditBox.Iteract and FEditBox.Bounds.Contains(P) then
+    Cursor := crIBeam
+  else
+    Cursor := DefaultCursor;
 end;
 
 function TACLCustomEdit.CreateStyle: TACLStyleEdit;

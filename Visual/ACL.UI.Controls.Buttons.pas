@@ -542,6 +542,7 @@ type
   {$IFDEF FPC}
     procedure ShouldAutoAdjust(var AWidth, AHeight: Boolean); override;
   {$ENDIF}
+    function TextOffset: Integer;
   published
     property Alignment default taLeftJustify;
     property AutoSize default True;
@@ -935,10 +936,10 @@ end;
 constructor TACLCustomButton.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  Cursor := crHandPoint;
   FocusOnClick := True;
   DoubleBuffered := True;
   TabStop := True;
+  DefaultCursor := crHandPoint;
   ControlStyle := ControlStyle - [csDoubleClicks, csClickEvents];
   FDefaultSize := TSize.Create(DefaultButtonWidth, DefaultButtonHeight);
   FStyle := CreateStyle;
@@ -2002,6 +2003,11 @@ end;
 procedure TACLCustomCheckBox.SetSubControl(AValue: TACLCheckBoxSubControlOptions);
 begin
   SubControl.Assign(AValue);
+end;
+
+function TACLCustomCheckBox.TextOffset: Integer;
+begin
+  Result := SubClass.TextRect.Left;
 end;
 
 procedure TACLCustomCheckBox.ToggleState;

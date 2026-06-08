@@ -72,18 +72,19 @@ var
   LClient: IACLIPCClient;
   LInfo: TACLFindFileInfo;
   LName: string;
-  LTemp: string;
 begin
   LName := Prefix + AAppId;
-  LTemp := acIncludeTrailingPathDelimiter(GetTempDir(True));
 
   FCore := TSimpleIPCServer.Create(nil);
   FCore.Global := True;
   FCore.OnMessage := HandlerMessage;
-  FCore.ServerID := LTemp + LName;
+  FCore.ServerID := LName;
+  FCore.SystemGlobal := False;
   FCore.StartServer;
 
-  if acFindFileFirst(LTemp, [ffoFile], LInfo) then
+  // GetTempDir: refer to unix\simpleipc.inc (TPipeClientComm)
+  // Requires for patch for issue #39690
+  if acFindFileFirst(GetTempDir(FCore.SystemGlobal), [ffoFile], LInfo) then
   try
     repeat
       if LInfo.FileName.StartsWith(Prefix) and (LInfo.FileName <> LName) then

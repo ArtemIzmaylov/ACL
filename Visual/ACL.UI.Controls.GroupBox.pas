@@ -52,7 +52,7 @@ type
 
   { TACLCustomGroupBox }
 
-  TACLCustomGroupBox = class(TACLContainer, IACLCursorProvider)
+  TACLCustomGroupBox = class(TACLContainer)
   strict private
     FCaptionSubClass: TACLCheckBoxSubClass;
     FDescription: string;
@@ -82,13 +82,11 @@ type
 
     // Events
     procedure DoCheckBoxClick; virtual;
-
     // Drawing
     procedure DrawBackground(ACanvas: TCanvas; const R: TRect);
     procedure Paint; override;
-
-    // IACLCursorProvider
-    function GetCursor(const P: TPoint): TCursor; reintroduce;
+    // Mouse
+    procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -323,12 +321,13 @@ begin
   end;
 end;
 
-function TACLCustomGroupBox.GetCursor(const P: TPoint): TCursor;
+procedure TACLCustomGroupBox.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
-  if CaptionSubClass.ShowCheckMark and PtInRect(CaptionSubClass.Bounds, P) then
-    Result := crHandPoint
+  inherited;
+  if CaptionSubClass.ShowCheckMark and CaptionSubClass.Bounds.Contains(Point(X, Y)) then
+    Cursor := crHandPoint
   else
-    Result := Cursor;
+    Cursor := DefaultCursor;
 end;
 
 procedure TACLCustomGroupBox.ResourceChanged;

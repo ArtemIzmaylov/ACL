@@ -217,7 +217,6 @@ type
     property OnCalculated;
     property OnDrop;
     property OnFocusedNodeChanged;
-    property OnGetCursor;
     property OnGetNodeBackground;
     property OnGetNodeCellStyle;
     property OnNodeChecked;

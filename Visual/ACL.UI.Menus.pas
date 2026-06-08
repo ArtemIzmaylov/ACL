@@ -2708,6 +2708,7 @@ var
   LBitmap: TACLDib;
   LRegion: TRegionHandle;
 begin
+  if csDestroying in ComponentState then Exit;
   LRegion := 0;
   if (Style.CornerRadius.Value > 0) and (Width > 0) and (Height > 0) then
   begin
@@ -3635,6 +3636,8 @@ begin
       case Msg.message of
         CM_RELEASE, WM_CLOSE, WM_QUIT:
           CloseMenu;
+        WM_MOUSEHWHEEL, WM_MOUSEWHEEL:
+          Msg.hwnd := Popups.Peek.Handle;
         WM_KEYFIRST..WM_KEYLAST:
           begin
             Popups.Peek.Dispatch(Msg.Message);

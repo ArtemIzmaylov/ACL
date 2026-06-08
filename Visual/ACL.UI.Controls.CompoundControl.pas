@@ -47,9 +47,7 @@ type
 
   { TACLCompoundControl }
 
-  TACLCompoundControl = class(TACLCustomControl,
-    IACLCompoundControlSubClassContainer,
-    IACLCursorProvider)
+  TACLCompoundControl = class(TACLCustomControl, IACLCompoundControlSubClassContainer)
   strict private
     FSubClass: TACLCompoundControlSubClass;
 
@@ -57,14 +55,12 @@ type
     function GetOnDropSourceData: TACLCompoundControlDropSourceDataEvent;
     function GetOnDropSourceFinish: TACLCompoundControlDropSourceFinishEvent;
     function GetOnDropSourceStart: TACLCompoundControlDropSourceStartEvent;
-    function GetOnGetCursor: TACLCompoundControlGetCursorEvent;
     function GetOnUpdateState: TNotifyEvent;
     function GetStyleScrollBox: TACLStyleScrollBox;
     procedure SetOnCalculated(const AValue: TNotifyEvent);
     procedure SetOnDropSourceData(const AValue: TACLCompoundControlDropSourceDataEvent);
     procedure SetOnDropSourceFinish(const AValue: TACLCompoundControlDropSourceFinishEvent);
     procedure SetOnDropSourceStart(const AValue: TACLCompoundControlDropSourceStartEvent);
-    procedure SetOnGetCursor(const AValue: TACLCompoundControlGetCursorEvent);
     procedure SetOnUpdateState(const Value: TNotifyEvent);
     procedure SetStyleScrollBox(const AValue: TACLStyleScrollBox);
     //# Messages
@@ -90,6 +86,7 @@ type
     procedure SetTargetDPI(AValue: Integer); override;
 
     // Mouse
+    procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
     function MouseWheel(Direction: TACLMouseWheelDirection;
       Shift: TShiftState; const MousePos: TPoint): Boolean; override;
 
@@ -103,9 +100,7 @@ type
     function ClientToScreen(const P: TPoint): TPoint; reintroduce;
     function GetControl: TWinControl;
     function ScreenToClient(const P: TPoint): TPoint; reintroduce;
-
-    // IACLCursorProvider
-    function GetCursor(const P: TPoint): TCursor; reintroduce; virtual;
+    procedure UpdateCursor;
 
     property StyleScrollBox: TACLStyleScrollBox read GetStyleScrollBox write SetStyleScrollBox;
     // Events
@@ -113,7 +108,6 @@ type
     property OnDropSourceData: TACLCompoundControlDropSourceDataEvent read GetOnDropSourceData write SetOnDropSourceData;
     property OnDropSourceFinish: TACLCompoundControlDropSourceFinishEvent read GetOnDropSourceFinish write SetOnDropSourceFinish;
     property OnDropSourceStart: TACLCompoundControlDropSourceStartEvent read GetOnDropSourceStart write SetOnDropSourceStart;
-    property OnGetCursor: TACLCompoundControlGetCursorEvent read GetOnGetCursor write SetOnGetCursor;
     property OnUpdateState: TNotifyEvent read GetOnUpdateState write SetOnUpdateState;
   public
     constructor Create(AOwner: TComponent); override;
@@ -236,6 +230,12 @@ begin
   SubClass.UpdateHitTest(P, []);
 end;
 
+procedure TACLCompoundControl.UpdateCursor;
+begin
+  if SubClass <> nil then
+    Cursor := SubClass.Cursor;
+end;
+
 procedure TACLCompoundControl.UpdateHitTest;
 begin
   SubClass.UpdateHitTest;
@@ -250,7 +250,7 @@ end;
 
 procedure TACLCompoundControl.Loaded;
 begin
-  inherited Loaded;
+  inherited;
   FullRefresh;
 end;
 
@@ -310,9 +310,10 @@ begin
     inherited DoContextPopup(MousePos, Handled);
 end;
 
-function TACLCompoundControl.GetCursor(const P: TPoint): TCursor;
+procedure TACLCompoundControl.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
-  Result := SubClass.GetCursor(P);
+  inherited;
+  UpdateCursor;
 end;
 
 function TACLCompoundControl.MouseWheel(Direction: TACLMouseWheelDirection;
@@ -373,11 +374,6 @@ begin
   Result := SubClass.OnDropSourceStart;
 end;
 
-function TACLCompoundControl.GetOnGetCursor: TACLCompoundControlGetCursorEvent;
-begin
-  Result := SubClass.OnGetCursor;
-end;
-
 function TACLCompoundControl.GetOnUpdateState: TNotifyEvent;
 begin
   Result := SubClass.OnUpdateState;
@@ -391,11 +387,6 @@ end;
 procedure TACLCompoundControl.SetOnCalculated(const AValue: TNotifyEvent);
 begin
   SubClass.OnCalculated := AValue;
-end;
-
-procedure TACLCompoundControl.SetOnGetCursor(const AValue: TACLCompoundControlGetCursorEvent);
-begin
-  SubClass.OnGetCursor := AValue;
 end;
 
 procedure TACLCompoundControl.SetOnUpdateState(const Value: TNotifyEvent);

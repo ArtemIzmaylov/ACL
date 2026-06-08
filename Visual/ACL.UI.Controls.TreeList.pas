@@ -313,7 +313,6 @@ type
     property OnEditKeyDown;
     property OnFocusedColumnChanged;
     property OnFocusedNodeChanged;
-    property OnGetCursor;
     property OnGetNodeBackground;
     property OnGetNodeCellDisplayText;
     property OnGetNodeCellStyle;

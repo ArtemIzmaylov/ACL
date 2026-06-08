@@ -204,8 +204,7 @@ type
 
   TACLBasicComboBoxDropDown = class(TACLPopupWindow,
     IACLControl,
-    IACLCompoundControlSubClassContainer,
-    IACLCursorProvider)
+    IACLCompoundControlSubClassContainer)
   strict private
     FCapturedObject: TObject;
     FList: TACLBasicDropDownList;
@@ -218,8 +217,6 @@ type
     // IACLCompoundControlSubClassContainer
     function GetControl: TWinControl;
     function GetFocused: Boolean;
-    // IACLCursorProvider
-    function GetCursor(const P: TPoint): TCursor; reintroduce;
     // Messages
     procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
   protected
@@ -947,14 +944,6 @@ end;
 function TACLBasicComboBoxDropDown.GetControl: TWinControl;
 begin
   Result := Self;
-end;
-
-function TACLBasicComboBoxDropDown.GetCursor(const P: TPoint): TCursor;
-begin
-  if List <> nil then
-    Result := List.GetCursor(P)
-  else
-    Result := crDefault;
 end;
 
 function TACLBasicComboBoxDropDown.GetFocused: Boolean;

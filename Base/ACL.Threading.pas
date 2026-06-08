@@ -260,7 +260,7 @@ var
 {$IFDEF LINUX}
 var
   pthread: Pointer = nil;
-  pthread_getname_np: function (thread: pointer; buf: PAnsiChar; len: size_t): Integer;cdecl;
+  pthread_getname_np: function (thread: pointer; buf: PAnsiChar; len: PtrInt): Integer;cdecl;
 {$ENDIF}
 
 procedure CheckIsMainThread;
