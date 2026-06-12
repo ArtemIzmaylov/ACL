@@ -47,7 +47,7 @@ type
 
   { TACLStyleBevel }
 
-  TACLBevelBorderStyle = (bbsNone, bbsSimple, bbs3D, bbsRounded);
+  TACLBevelBorderStyle = (bbsNone, bbsSimple, bbs3D, bbsRounded, bbsDashed);
 
   TACLStyleBevel = class(TACLStyle)
   strict private
@@ -60,7 +60,7 @@ type
     procedure DoAssign(ASource: TPersistent); override;
     procedure InitializeResources; override;
   public
-    procedure Draw(ACanvas: TCanvas; R: TRect);
+    procedure Draw(ACanvas: TCanvas; ARect: TRect);
   published
     property Borders: TACLBorders read FBorders write SetBorders default acAllBorders;
     property BorderStyle: TACLBevelBorderStyle read FBorderStyle write SetBorderStyle default bbs3D;
@@ -105,28 +105,57 @@ begin
   end;
 end;
 
-procedure TACLStyleBevel.Draw(ACanvas: TCanvas; R: TRect);
+procedure TACLStyleBevel.Draw(ACanvas: TCanvas; ARect: TRect);
+const
+  Radius = 5;
 var
-  AClipRgn: TRegionHandle;
+  LClipRegion: TRegionHandle;
 begin
+  if Borders = [] then
+    Exit;
+
   case BorderStyle of
     bbsSimple:
-      acDrawFrameEx(ACanvas, R, ColorBorder1.Value, Borders);
+      acDrawFrameEx(ACanvas, ARect, ColorBorder1.Value, Borders);
+
     bbs3D:
-      acDrawComplexFrame(ACanvas, R, ColorBorder1.Value, ColorBorder2.Value, Borders);
+      acDrawComplexFrame(ACanvas, ARect, ColorBorder1.Value, ColorBorder2.Value, Borders);
+
+    bbsDashed:
+      begin
+        ACanvas.Pen.Color := ColorBorder1.AsColor;
+        ACanvas.Pen.Style := psDot;
+        ACanvas.Brush.Style := bsClear;
+        if acAllBorders = Borders then
+          ACanvas.Rectangle(ARect)
+        else
+          if acStartClippedDraw(ACanvas, ARect, LClipRegion) then
+          try
+            ARect.Inflate(TRect.CreateMargins(1), acAllBorders - Borders);
+            ACanvas.Rectangle(ARect);
+          finally
+            acEndClippedDraw(ACanvas, LClipRegion);
+          end;
+      end;
+
     bbsRounded:
       begin
-        if acStartClippedDraw(ACanvas, R, AClipRgn) then
-        try
-          R.Inflate(Rect(5, 5, 5, 5), acAllBorders - Borders);
-          ACanvas.Pen.Color := ColorBorder1.AsColor;
-          ACanvas.Brush.Style := bsClear;
-          ACanvas.RoundRect(R.Left, R.Top, R.Right, R.Bottom, 5, 5);
-        finally
-          acEndClippedDraw(ACanvas, AClipRgn);
-        end;
-      end;
-  else;
+        ACanvas.Pen.Color := ColorBorder1.AsColor;
+        ACanvas.Pen.Style := psSolid;
+        ACanvas.Brush.Style := bsClear;
+        if acAllBorders = Borders then
+          ACanvas.RoundRect(ARect, Radius, Radius)
+        else
+          if acStartClippedDraw(ACanvas, ARect, LClipRegion) then
+          try
+            ARect.Inflate(TRect.CreateMargins(Radius), acAllBorders - Borders);
+            ACanvas.RoundRect(ARect, Radius, Radius);
+          finally
+            acEndClippedDraw(ACanvas, LClipRegion);
+          end;
+      end
+
+  else; // bbsNone
   end;
 end;
 
