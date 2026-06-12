@@ -195,6 +195,7 @@ type
     function ReadInt32BE: Integer; inline;
     function ReadInt64: Int64; inline;
     function ReadInt64BE: Int64; inline;
+    function ReadPackedInt: UInt64;
     function ReadRect: TRect; inline;
     function ReadSingle: Single; inline;
     function ReadSize: TSize; inline;
@@ -218,6 +219,7 @@ type
     procedure WriteInt64(const AValue: Int64); inline;
     procedure WriteInt64BE(const AValue: Int64); inline;
     function WritePadding(ASize: Integer): Integer;
+    procedure WritePackedInt(AValue: UInt64);
     procedure WriteRect(const AValue: TRect); inline;
     procedure WriteSingle(const AValue: Single); inline;
     procedure WriteSize(const AValue: TSize); inline;
@@ -875,6 +877,20 @@ begin
   Result := Swap64(ReadInt64);
 end;
 
+function TACLStreamHelper.ReadPackedInt: UInt64;
+var
+  LPart: Byte;
+  LShift: UInt64;
+begin
+  Result := 0;
+  LShift := 0;
+  repeat
+    LPart := ReadByte;
+    Result := Result or (UInt64(LPart and $7F) shl LShift);
+    Inc(LShift, 7);
+  until LPart and $80 = 0;
+end;
+
 function TACLStreamHelper.ReadRect: TRect;
 begin
   ReadBuffer(Result{%H-}, SizeOf(Result));
@@ -1272,6 +1288,19 @@ end;
 procedure TACLStreamHelper.WriteInt64BE(const AValue: Int64);
 begin
   WriteInt64(Swap64(AValue));
+end;
+
+procedure TACLStreamHelper.WritePackedInt(AValue: UInt64);
+var
+  LPart: Byte;
+begin
+  repeat
+    LPart  := AValue and $7F;
+    AValue := AValue shr 7;
+    if AValue > 0 then
+      LPart := LPart or $80;
+    WriteByte(LPart);
+  until LPart and $80 = 0;
 end;
 
 function TACLStreamHelper.WritePadding(ASize: Integer): Integer;
