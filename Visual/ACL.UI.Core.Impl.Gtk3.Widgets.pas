@@ -78,6 +78,7 @@ type
     function DeliverMessage(var Msg; const AIsInputEvent: Boolean=False): LRESULT; override;
     procedure InitializeWidget; override;
     procedure PreferredSize(var PreferredWidth, PreferredHeight: integer; WithThemeSpace: Boolean); override;
+    procedure Repaint(const ARect: PRect); override;
     procedure SetBorderStyle(AValue: TBorderStyle);
   end;
 
@@ -166,6 +167,31 @@ begin
     AWidget^.window^.get_origin(@Result.X, @Result.Y);
 end;
 
+procedure GtkRepaintWidget(AWidget: PGtkWidget; ARect: PRect = nil);
+var
+  LWindow: PGdkWindow;
+begin
+  //#AI: Используем нативный механизм перерисовки.
+  // НЕАКТУАЛЬНО:
+  //    Если рисовать прямо на канве, как делается в предке - мы можем получить
+  //    "assertion failed", если хоть один из дочерних вин-контролов не пересчитался.
+  // СЕЙЧАС:
+  //    Предыщущая проблема была пофикшена в транке, но теперь там появился
+  // нативный ProcessMessages, что проталкивает наши отложенные сообщения в контролах.
+
+  if ARect <> nil then
+  begin
+    if ARect^.IsEmpty then Exit;
+    AWidget^.queue_draw_area(ARect^.Left, ARect^.Top, ARect^.Width, ARect^.Height);
+  end
+  else
+    AWidget^.queue_draw;
+
+  LWindow := AWidget^.window;
+  if Gtk3IsGdkWindow(LWindow) then
+    LWindow^.process_updates(True);
+end;
+
 { TACLGtk3CustomControl }
 
 function TACLGtk3CustomControl.CreateWidget(const Params: TCreateParams): PGtkWidget;
@@ -248,7 +274,8 @@ end;
 
 procedure TACLGtk3CustomControl.InitializeWidget;
 begin
-  inherited InitializeWidget;
+  inherited;
+  Widget^.set_can_focus(True);
   SetBorderStyle(TWinControlAccess(LCLObject).BorderStyle);
   SetVisible(LCLObject.Showing); // ATE
 end;
@@ -257,6 +284,11 @@ procedure TACLGtk3CustomControl.PreferredSize(
   var PreferredWidth, PreferredHeight: integer; WithThemeSpace: Boolean);
 begin
   // do nothing
+end;
+
+procedure TACLGtk3CustomControl.Repaint(const ARect: PRect);
+begin
+  GtkRepaintWidget(PaintWidget, ARect);
 end;
 
 procedure TACLGtk3CustomControl.SetBorderStyle(AValue: TBorderStyle);
@@ -417,17 +449,11 @@ begin
 end;
 
 procedure TACLGtk3AdvancedWindow.Repaint(const ARect: PRect);
-var
-  LWidget: PGtkWidget;
 begin
   if FParams.ExStyle and WS_EX_LAYERED <> 0 then
-    LWidget := Widget
+    GtkRepaintWidget(Widget, ARect)
   else
-    LWidget := GetContainerWidget;
-
-  LWidget^.queue_draw;
-  if Gtk3IsGdkWindow(LWidget^.window) then
-    LWidget^.window^.process_updates(True);
+    GtkRepaintWidget(PaintWidget, ARect);
 end;
 
 procedure TACLGtk3AdvancedWindow.SetBounds(ALeft, ATop, AWidth, AHeight: integer);
