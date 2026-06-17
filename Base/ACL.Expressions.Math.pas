@@ -6,7 +6,7 @@
 //  Purpose:   Math expressions
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -175,8 +175,27 @@ begin
 end;
 
 class function TACLMathExpressionFactory.FunctionIf(AContext: TObject; AParams: TACLExpressionElements): Variant;
+var
+  LCompareResult: Boolean;
+  LValue: Integer;
+  LValueAsString: string;
 begin
-  if AParams[0].Evaluate(AContext) then
+  Result := AParams[0].Evaluate(AContext);
+  if VarIsStr(Result) then
+  begin
+    LValueAsString := VarToStr(Result);
+    if TryStrToInt(LValueAsString, LValue) then
+      LCompareResult := LValue <> 0
+    else
+      LCompareResult := LValueAsString <> '';
+  end
+  else
+    if VarIsEmpty(Result) or VarIsNull(Result) then
+      LCompareResult := False
+    else
+      LCompareResult := Result;
+
+  if LCompareResult then
     Result := AParams[1].Evaluate(AContext)
   else
     Result := AParams[2].Evaluate(AContext);
