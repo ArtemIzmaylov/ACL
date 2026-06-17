@@ -6,7 +6,7 @@
 //  Purpose:   SQLite3 Wrappers
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -219,6 +219,7 @@ type
     function BelowOrEqual: TACLSQLQueryBuilder; inline;
     function Dot: TACLSQLQueryBuilder; inline;
     function Equal: TACLSQLQueryBuilder; reintroduce; inline;
+    function Like: TACLSQLQueryBuilder; inline;
     function Minus: TACLSQLQueryBuilder; inline;
     function NotEquals: TACLSQLQueryBuilder; inline;
     function Plus: TACLSQLQueryBuilder; inline;
@@ -1367,6 +1368,11 @@ end;
 function TACLSQLQueryBuilder.Into: TACLSQLQueryBuilder;
 begin
   Result := Raw('INTO ');
+end;
+
+function TACLSQLQueryBuilder.Like: TACLSQLQueryBuilder;
+begin
+  Result := Raw(' LIKE ');
 end;
 
 function TACLSQLQueryBuilder.Limit(ALimit: Integer): TACLSQLQueryBuilder;
