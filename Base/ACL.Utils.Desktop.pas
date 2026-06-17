@@ -49,6 +49,9 @@ type
     function PixelsPerInch: Integer;
     class function Null: TACLMonitor; static;
     class operator Equal(const V1, V2: TACLMonitor): Boolean;
+    // Одна из наших форм может быть тулбаром рабочего стола - усекать WorkArea,
+    // и нам нужно знать доступное для нее пространство за вычетом таскабра.
+    function DesktopClientArea: TRect;
   end;
 
   { TACLTaskbarInfo }
@@ -66,10 +69,6 @@ function MonitorGet(const APoint: TPoint): TACLMonitor; overload;
 function MonitorGet(const AWnd: TWndHandle): TACLMonitor; overload;
 function MonitorGetByIndex(Index: Integer): TACLMonitor;
 function MonitorGetDefault: TACLMonitor;
-
-// Одна из наших форм может быть тулбаром рабочего стола - усекать WorkArea,
-// и нам нужно знать доступное для нее пространство за вычетом таскабра.
-function MonitorGetDesktopClientArea(const P: TPoint): TRect;
 
 function MonitorGetTaskBarInfo: TACLTaskbarInfo;
 function MonitorIsFullScreenApplicationRunning(const AMonitor: TACLMonitor): Boolean;
@@ -193,62 +192,6 @@ begin
 {$ENDIF}
 end;
 
-function MonitorGetDesktopClientArea(const P: TPoint): TRect;
-{$IFDEF MSWINDOWS}
-var
-  LRect: TRect;
-  LRects: array[0..3] of TRect;
-  LTaskBar: TACLTaskbarInfo;
-begin
-  Result := MonitorGet(P).BoundsRect;
-  // Одна из наших форм может быть тулбаром рабочего стола - усекать WorkArea,
-  // и нам нужно знать доступное для нее пространство за вычетом таскабра.
-  // Посему все считаем вручную
-  LTaskBar := MonitorGetTaskBarInfo;
-  if LTaskBar.AutoHide or LTaskBar.Bounds.IsEmpty then
-    Exit;
-  if Result.IntersectsWith(LTaskBar.Bounds) then // окно на другом мониторе
-  begin
-    // У чела стоит Start11 и таскбар закреплен вверху экрана, однако API говорит,
-    // что Position = Bottom, но Bounds-ы возвращаются корректные (для Top-а)
-    // В итоге у нас получается рект с нулевой площадью, что приводит к поломке попапов
-    //    case ATaskBar.Position of
-    //      tbpLeft:
-    //        Result.Left := ATaskBar.Bounds.Right;
-    //      tbpTop:
-    //        Result.Top := ATaskBar.Bounds.Bottom;
-    //      tbpRight:
-    //        Result.Right := ATaskBar.Bounds.Left;
-    //      tbpBottom:
-    //        Result.Bottom := ATaskBar.Bounds.Top;
-    //    end;
-    // Поэтому делаем так: вычитаем рект taskbar-а, а в качестве результата
-    // возвращаем рект наибольшей площади
-    // +-----------+
-    // +     0     +
-    // +-----------+
-    // + 1 - T - 2 +
-    // +-----------+
-    // +     3     +
-    // -------------
-    LRects[0] := Rect(Result.Left, Result.Top, Result.Right, LTaskBar.Bounds.Top);
-    LRects[1] := Rect(Result.Left, LTaskBar.Bounds.Top, LTaskBar.Bounds.Left, LTaskBar.Bounds.Bottom);
-    LRects[2] := Rect(LTaskBar.Bounds.Right, LTaskBar.Bounds.Top, Result.Right, LTaskBar.Bounds.Bottom);
-    LRects[3] := Rect(Result.Left, LTaskBar.Bounds.Bottom, Result.Right, Result.Bottom);
-    Result := LRects[0];
-    for LRect in LRects do
-    begin
-      if LRect.Width * LRect.Height > Result.Width * Result.Height then
-        Result := LRect;
-    end;
-  end;
-{$ELSE}
-begin
-  // В Linux наши формы не поддерживают режим тулбара рабочего стола
-  Result := MonitorGet(P).WorkareaRect;
-{$ENDIF}
-end;
-
 function MonitorGetTaskBarInfo: TACLTaskbarInfo;
 {$IFDEF MSWINDOWS}
 var
@@ -312,6 +255,62 @@ begin
 end;
 
 { TACLMonitor }
+
+function TACLMonitor.DesktopClientArea: TRect;
+{$IFDEF MSWINDOWS}
+var
+  LRect: TRect;
+  LRects: array[0..3] of TRect;
+  LTaskBar: TACLTaskbarInfo;
+begin
+  Result := BoundsRect;
+  // Одна из наших форм может быть тулбаром рабочего стола - усекать WorkArea,
+  // и нам нужно знать доступное для нее пространство за вычетом таскабра.
+  // Посему все считаем вручную
+  LTaskBar := MonitorGetTaskBarInfo;
+  if LTaskBar.AutoHide or LTaskBar.Bounds.IsEmpty then
+    Exit;
+  if Result.IntersectsWith(LTaskBar.Bounds) then // окно на другом мониторе
+  begin
+    // У чела стоит Start11 и таскбар закреплен вверху экрана, однако API говорит,
+    // что Position = Bottom, но Bounds-ы возвращаются корректные (для Top-а)
+    // В итоге у нас получается рект с нулевой площадью, что приводит к поломке попапов
+    //    case ATaskBar.Position of
+    //      tbpLeft:
+    //        Result.Left := ATaskBar.Bounds.Right;
+    //      tbpTop:
+    //        Result.Top := ATaskBar.Bounds.Bottom;
+    //      tbpRight:
+    //        Result.Right := ATaskBar.Bounds.Left;
+    //      tbpBottom:
+    //        Result.Bottom := ATaskBar.Bounds.Top;
+    //    end;
+    // Поэтому делаем так: вычитаем рект taskbar-а, а в качестве результата
+    // возвращаем рект наибольшей площади
+    // +-----------+
+    // +     0     +
+    // +-----------+
+    // + 1 - T - 2 +
+    // +-----------+
+    // +     3     +
+    // -------------
+    LRects[0] := Rect(Result.Left, Result.Top, Result.Right, LTaskBar.Bounds.Top);
+    LRects[1] := Rect(Result.Left, LTaskBar.Bounds.Top, LTaskBar.Bounds.Left, LTaskBar.Bounds.Bottom);
+    LRects[2] := Rect(LTaskBar.Bounds.Right, LTaskBar.Bounds.Top, Result.Right, LTaskBar.Bounds.Bottom);
+    LRects[3] := Rect(Result.Left, LTaskBar.Bounds.Bottom, Result.Right, Result.Bottom);
+    Result := LRects[0];
+    for LRect in LRects do
+    begin
+      if LRect.Width * LRect.Height > Result.Width * Result.Height then
+        Result := LRect;
+    end;
+  end;
+{$ELSE}
+begin
+  // В Linux наши формы не поддерживают режим тулбара рабочего стола
+  Result := WorkareaRect;
+{$ENDIF}
+end;
 
 class operator TACLMonitor.Equal(const V1, V2: TACLMonitor): Boolean;
 begin
