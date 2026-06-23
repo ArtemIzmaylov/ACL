@@ -62,7 +62,6 @@ uses
   ACL.UI.Resources,
   ACL.Utils.Common,
   ACL.Utils.DPIAware,
-  ACL.Utils.FileSystem,
   ACL.Utils.Shell,
   ACL.Utils.Strings;
 
@@ -548,7 +547,7 @@ type
     procedure MarginsChangeHandler(Sender: TObject);
     procedure SetAlignOrder(AValue: Integer);
     procedure SetAlignWithMargins(AValue: Boolean);
-    procedure SetCursor(AValue: TCursor);
+    procedure SetCursor(AValue: TCursor); reintroduce;
     procedure SetMargins(const Value: TACLMargins);
     procedure SetResourceCollection(AValue: TACLCustomResourceCollection);
   protected
@@ -692,7 +691,7 @@ type
     function IsPaddingStored: Boolean;
     procedure SetAlignOrder(AValue: Integer);
     procedure SetAlignWithMargins(AValue: Boolean);
-    procedure SetCursor(AValue: TCursor);
+    procedure SetCursor(AValue: TCursor); reintroduce;
     procedure SetMargins(AValue: TACLMargins);
     procedure SetPadding(AValue: TACLPadding);
     procedure SetResourceCollection(AValue: TACLCustomResourceCollection);
@@ -4027,7 +4026,6 @@ class function TACLControls.WndProc(ACaller: TWinControl; var Message: TMessage)
 {$IFDEF FPC}
 var
   LCapture: TControl;
-  LCode: SmallInt;
   LForm: TCustomForm;
 {$ENDIF}
 begin

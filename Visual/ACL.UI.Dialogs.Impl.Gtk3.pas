@@ -221,7 +221,6 @@ var
   LDialog: TACLFileDialog;
   LFilter: PGtkFileFilter;
   LFilterList: PGSList;
-  LFilterIndex: Integer;
 begin
   if Spec^.name = 'filter' then
   begin // filter changed

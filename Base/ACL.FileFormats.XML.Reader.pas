@@ -697,6 +697,9 @@ type
 
 function {%H-}NotImplemented: Pointer;
 begin
+{$IFDEF FPC}
+  Result := nil;
+{$ENDIF}
   raise ENotImplemented.Create('Not implemented');
 end;
 
