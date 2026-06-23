@@ -41,6 +41,7 @@ constructor TIPCClient.Create(const AServerName: string);
 begin
   FCore := TSimpleIPCClient.Create(nil);
   FCore.ServerID := AServerName;
+  FCore.SystemGlobal := False;
   FCore.Connect;
 end;
 
@@ -76,8 +77,8 @@ begin
   LName := Prefix + AAppId;
 
   FCore := TSimpleIPCServer.Create(nil);
-  FCore.Global := True;
   FCore.OnMessage := HandlerMessage;
+  FCore.Global := False;
   FCore.ServerID := LName;
   FCore.SystemGlobal := False;
   FCore.StartServer;
@@ -157,7 +158,7 @@ constructor TACLAppAtom.Create(const AppId: string);
 var
   LFileDesc: cint;
 begin
-  FSysPath := GetTempDir(True) + acLowerCase(acValidateFileName(AppId, '-')) + '.atom';
+  FSysPath := GetTempDir(False) + acLowerCase(acValidateFileName(AppId, '-')) + '.atom';
   // it's possible to have a stale file that is not open for reading which will
   // cause fpOpen to hang/block later when .Active is set to true while it
   // wait's for the pipe to be opened on the other end
