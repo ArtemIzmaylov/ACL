@@ -903,19 +903,20 @@ end;
 { TACLWSForm }
 
 function ModalFilter(xevent: PGdkXEvent; event: PGdkEvent; data: gpointer): TGdkFilterReturn; cdecl;
+const
+  X11_ButtonPress = 4;
+  X11_ButtonRelease = 5;
 begin
   // Только для X11-бэка!! В Wayland этот callback не вызывается.
   case PInteger(xevent)^ of
     // Несмотря на modal-lock, KDE позволяет свернуть приложение через кнопку на таскбаре.
     // Однако полноценно развернуть его обратно уже "не получится" - окно появляется,
     // но не перерисовывается до тех пор, пока модальная форма не будет закрыта.
-    7, 15, 19: // xexpose, xmap, xresize
-      Exit(GDK_FILTER_CONTINUE);
-    // Что интересно, в Gtk2 parent-форма вообще не лочилась - её свободно можно
-    // было таскать по экрану. Единственное, что ей было запрещено - получать фокус.
-    // Возможно, в рамках Gtk3 нам стоит сделать так же, ведь никто не жаловался...
+    X11_ButtonPress, X11_ButtonRelease:
+      Result := GDK_FILTER_REMOVE;
+  else
+    Result := GDK_FILTER_CONTINUE;
   end;
-  Result := GDK_FILTER_REMOVE;
 end;
 
 class procedure TACLWSForm.BlockTransientWindow(AWindow: PGtkWindow; AState: Boolean);
