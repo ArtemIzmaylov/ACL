@@ -170,9 +170,10 @@ type
   public
     class function ApplyColorSchema(AColor: TAlphaColor; const ASchema: TACLColorSchema): TAlphaColor; static;
     class function FromARGB(const A, R, G, B: Byte): TAlphaColor; static;
-    class function FromColor(const AColor: TColor; AAlpha: Byte = MaxByte): TAlphaColor; overload; static;
     class function FromColor(const AColor: TACLPixel32): TAlphaColor; overload; static;
+    class function FromColor(const AColor: TColor; AAlpha: Byte = MaxByte): TAlphaColor; overload; static;
     class function FromString(AColor: string): TAlphaColor; static;
+    class function FromVariant(const AValue: Variant): TAlphaColor; static; inline;
     function IsDefault: Boolean; inline;
     function IsValid: Boolean; inline;
     function ToColor: TColor;
@@ -579,11 +580,13 @@ type
     class function Hue(Color: TColor): Single; static;
     class function Invert(Color: TColor): TColor; static;
     class function Lightness(Color: TColor): Single; static;
+    class function Luminance(const Color: TACLPixel32): Double; static;
     class procedure MakeDisabled(P: PACLPixel32; Count: Integer; IgnoreMask: Boolean = False); static;
     class procedure MakeOpaque(P: PACLPixel32; Count: Integer); overload; static;
     class procedure MakeTransparent(P: PACLPixel32; Count: Integer; const ATransparentColor: TACLPixel32);
     class procedure Mix(var D: TACLPixel32; const S: TACLPixel32; AAlpha: Byte = 255); overload; inline; static;
     class procedure RecoverAlpha(P: PACLPixel32; Count: Integer); static;
+    class function XYZ(const S: Double): Double; static;
 
     // ApplyColorSchema
     class procedure ApplyColorSchema(P: PACLPixel32; ACount: Integer; const AValue: TACLColorSchema); overload;
@@ -2327,6 +2330,11 @@ begin
   P.G := StrToIntDef('$' + Copy(AColor, 5, 2), 0);
   P.B := StrToIntDef('$' + Copy(AColor, 7, 2), 0);
   Result := TAlphaColor.FromColor(P);
+end;
+
+class function TAlphaColorHelper.FromVariant(const AValue: Variant): TAlphaColor;
+begin
+  Result := TAlphaColor(Int64(AValue));
 end;
 
 function TAlphaColorHelper.IsDefault: Boolean;
@@ -4536,6 +4544,14 @@ begin
   TACLColors.RGBtoHSL(Color, H, S, Result);
 end;
 
+class function TACLColors.Luminance(const Color: TACLPixel32): Double;
+begin
+  Result :=
+    XYZ(Color.R / 255) * 0.2126 +
+    XYZ(Color.G / 255) * 0.7152 +
+    XYZ(Color.B / 255) * 0.0722;
+end;
+
 class procedure TACLColors.MakeDisabled(P: PACLPixel32; Count: Integer; IgnoreMask: Boolean = False);
 var
   LPx: Byte;
@@ -4671,6 +4687,14 @@ begin
     P.B := UnpremultiplyTable[P.B, P.A];
     P.R := UnpremultiplyTable[P.R, P.A];
   end;
+end;
+
+class function TACLColors.XYZ(const S: Double): Double;
+begin
+  if S < 0.04045 then
+    Result := S / 12.92
+  else
+    Result := Power((S + 0.055) / 1.055, 2.4);
 end;
 
 class procedure TACLColors.Unpremultiply(P: PACLPixel32; ACount: Integer);
