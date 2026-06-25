@@ -123,11 +123,7 @@ type
         FContext := LWidget^.drag_begin_with_coordinates(LList, LActions, 1, nil, -1, -1);
         if FContext <> nil then
         repeat
-          try
-            TGtkApp.ProcessMessages;
-          except
-            Application.HandleException(Self);
-          end;
+          TGtkApp.ProcessMessages;
           Application.Idle(True);
         until FDone;
       finally

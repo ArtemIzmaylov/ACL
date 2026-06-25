@@ -115,11 +115,7 @@ type
       try
         if FContext <> nil then
         repeat
-          try
-            TGtkApp.ProcessMessages;
-          except
-            Application.HandleException(Self);
-          end;
+          TGtkApp.ProcessMessages;
           Application.Idle(True);
         until FDone;
       finally
