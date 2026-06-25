@@ -1908,10 +1908,9 @@ begin
 end;
 
 procedure TACLSkinImage.SwapLayout;
-const
-  SwapLayout: array[TACLSkinImageLayout] of TACLSkinImageLayout = (ilVertical, ilHorizontal);
 var
   LFrame: Integer;
+  LFrameOffset: Integer;
   LTemp: PACLPixel32Array;
   LTempFrames: Integer;
   LTempSize: Integer;
@@ -1930,23 +1929,27 @@ begin
     try
       if Layout = ilVertical then
       begin
-        LTempStride := Width{=FrameWidth} * FrameCount;
+        LFrameOffset := FrameWidth;
+        LTempStride := FrameWidth * FrameCount;
         for LFrame := 0 to FrameCount - 1 do
-          UnpackFrame(@LTemp^[LFrame * Width{=FrameWidth}], LFrame, LTempStride);
+          UnpackFrame(@LTemp^[LFrame * LFrameOffset], LFrame, LTempStride);
         DoCreateBits(LTempStride, FrameHeight);
         Layout := ilHorizontal;
       end
       else
       begin
-        LTempStride := FrameHeight * FrameWidth;
+        LFrameOffset := FrameWidth * FrameHeight;
+        LTempStride := FrameWidth;
         for LFrame := 0 to FrameCount - 1 do
-          UnpackFrame(@LTemp^[LFrame * LTempStride], LFrame, FrameWidth);
-        DoCreateBits(FrameWidth, FrameHeight * FrameCount);
+          UnpackFrame(@LTemp^[LFrame * LFrameOffset], LFrame, LTempStride);
+        DoCreateBits(LTempStride, FrameHeight * FrameCount);
         Layout := ilVertical;
       end;
       FBitsState := LTempState;
       FrameCount := LTempFrames;
-      FastMove(LTemp^, Bits^, LTempSize);
+      // Если вдруг исходная текстура не делится на указанное число кадров нацело,
+      // то LTempSize будет больше, нежели вмещает Bits.
+      FastMove(LTemp^, Bits^, {LTempSize}BitCount * SizeOf(TACLPixel32));
     finally
       FreeMem(LTemp, LTempSize);
     end;
