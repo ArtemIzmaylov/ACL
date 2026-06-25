@@ -569,7 +569,8 @@ end;
 
 procedure TACLAnimationManager.TimerObject(const AObject: TACLAnimation);
 begin
-  AObject.Animate;
+  if not AObject.Finished then
+    AObject.Animate;
   if AObject.Finished then
   begin
     Remove(AObject);
