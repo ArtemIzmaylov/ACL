@@ -129,9 +129,9 @@ type
     procedure MakeUnique;
     procedure Optimize;
 
-    // Find optimal resolution for target rect and use it to raster the frame
-    // Return nil if image set is empty
-    function OptimalFill(const ASize: TSize; AFrameIndex: Integer): IACLImage;
+    // Find optimal resolution for target rect,
+    // Return nil if image set is empty.
+    function OptimalFill(const ASize: TSize): TACLSkinImageSetItem;
 
     // I/O
     procedure ImportFromImage(const AImage: TBitmap; DPI: Integer = acDefaultDPI);
@@ -525,46 +525,29 @@ begin
   end;
 end;
 
-function TACLSkinImageSet.OptimalFill(const ASize: TSize; AFrameIndex: Integer): IACLImage;
+function TACLSkinImageSet.OptimalFill(const ASize: TSize): TACLSkinImageSetItem;
 var
   I: Integer;
-  LBitmap: TACLDib;
-  LOptimal: TACLSkinImageSetItem;
-  LOptimalScore: TSize;
+  LScore: TSize;
   LSize: TSize;
 begin
   if IsEmpty or ASize.IsEmpty then
     Exit(nil);
 
-  LOptimal := nil;
-  LOptimalScore := TSize.Create(MaxWord);
+  Result := nil;
+  LScore := TSize.Create(MaxWord);
   for I := 0 to Count - 1 do
   begin
     LSize := FItems.List[I].FrameSize;
-    if (Abs(LSize.cx - ASize.cx) < LOptimalScore.cx) and
-       (Abs(LSize.cy - ASize.cy) < LOptimalScore.cy)
+    if (Abs(LSize.cx - ASize.cx) < LScore.cx) and
+       (Abs(LSize.cy - ASize.cy) < LScore.cy)
     then
       begin
-        LOptimalScore.cx := Abs(LSize.cx - ASize.cx);
-        LOptimalScore.cy := Abs(LSize.cy - ASize.cy);
-        LOptimal := FItems.List[I];
+        LScore.cx := Abs(LSize.cx - ASize.cx);
+        LScore.cy := Abs(LSize.cy - ASize.cy);
+        Result := FItems.List[I];
       end;
   end;
-
-  if LOptimal <> nil then
-  begin
-    LBitmap := TACLDib.Create(LOptimal.FrameSize);
-    try
-      LOptimal.Draw(LBitmap.Canvas, LBitmap.ClientRect, AFrameIndex);
-      Result := TACLImageKeeper.CreateFrom(LBitmap);
-      if not InRange(LOptimal.FrameWidth / ASize.Width, 0.95, 1.05) then
-        Result.Inst.Scale(ASize.Width, LOptimal.FrameWidth);
-    finally
-      LBitmap.Free;
-    end;
-  end
-  else
-    Result := nil;
 end;
 
 procedure TACLSkinImageSet.Optimize;

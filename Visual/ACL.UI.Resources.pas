@@ -6,7 +6,7 @@
 //  Purpose:   Styling Engine
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -42,6 +42,7 @@ uses
   ACL.Graphics,
   ACL.Graphics.Ex,
   ACL.Graphics.Fonts,
+  ACL.Graphics.Images,
   ACL.Graphics.SkinImage,
   ACL.Graphics.SkinImageSet,
   ACL.ObjectLinks,
@@ -448,6 +449,10 @@ type
       const AResName: string; AResType: PChar; DPI: Integer = acDefaultDPI);
     procedure ImportFromImageStream(const AStream: TStream; DPI: Integer = acDefaultDPI);
     procedure MakeUnique;
+    // Find optimal resolution for target rect and use it to raster the frame
+    // Return nil if image set is empty
+    function OptimalFill(const ASize: TSize; AFrameIndex: Integer = 0): IACLImage;
+
     // IACLColorSchema
     procedure ApplyColorSchema(const AValue: TACLColorSchema);
     //# Properties
@@ -2099,6 +2104,7 @@ procedure TACLResourceTexture.InitailizeDefaults(AInstance: HINST;
 begin
   BeginUpdate;
   try
+    Reset;
     IDDefault := '';
     Overriden := True;
     FImageSet.BeginUpdate;
@@ -2174,6 +2180,35 @@ begin
     ImageSet.MakeUnique;
   finally
     EndUpdate;
+  end;
+end;
+
+// Find optimal resolution for target rect and use it to raster the frame
+// Return nil if image set is empty
+function TACLResourceTexture.OptimalFill(const ASize: TSize; AFrameIndex: Integer): IACLImage;
+var
+  LItem: TACLSkinImageSetItem;
+  LTemp: TACLDib;
+begin
+  LItem := FImageSet.OptimalFill(ASize);
+  if LItem <> nil then
+    LItem := GetActualImage(LItem.DPI, AllowColoration);
+  if LItem = nil then
+    Exit(nil);
+
+  LItem.ReferenceAdd;
+  try
+    LTemp := TACLDib.Create(LItem.FrameSize);
+    try
+      LItem.Draw(LTemp.Canvas, LTemp.ClientRect, AFrameIndex);
+      Result := TACLImageKeeper.CreateFrom(LTemp);
+      if not InRange(LItem.FrameWidth / ASize.Width, 0.95, 1.05) then
+        Result.Inst.Scale(ASize.Width, LItem.FrameWidth);
+    finally
+      LTemp.Free;
+    end;
+  finally
+    LItem.ReferenceRemove;
   end;
 end;
 
