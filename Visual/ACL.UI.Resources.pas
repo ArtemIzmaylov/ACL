@@ -2190,7 +2190,7 @@ var
   LItem: TACLSkinImageSetItem;
   LTemp: TACLDib;
 begin
-  LItem := FImageSet.OptimalFill(ASize);
+  LItem := ImageSet.OptimalFill(ASize);
   if LItem <> nil then
     LItem := GetActualImage(LItem.DPI, AllowColoration);
   if LItem = nil then
