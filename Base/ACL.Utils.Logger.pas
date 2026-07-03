@@ -49,6 +49,7 @@ procedure LogError(const AFileName: string;
 procedure LogError(const AFileName: string;
   const ATag: string; const AException: Exception;
   const APrefix: string = ''; const ALocation: string = ''); overload;
+function LogErrorGetStackTrace(AError: Exception): string;
 
 procedure LogInit(const AFileName: string; AMaxCapacity: Integer = 0);
 implementation
@@ -161,21 +162,23 @@ end;
 
 procedure LogError(const AFileName: string; const ATag: string;
   const AException: Exception; const APrefix, ALocation: string);
-var
-  LStackTrace: string;
 begin
   if AFileName <> '' then
   begin
-    LStackTrace := '';
-    if Assigned(acGetStackTraceFunc) then
-      LStackTrace := acGetStackTraceFunc(AException);
-  {$IFNDEF FPC}
-    if LStackTrace = '' then
-      LStackTrace := AException.StackTrace;
-  {$ENDIF}
-    LogError(AFileName, ATag, AException.ClassName,
-      AException.ToString, LStackTrace, APrefix, ALocation);
+    LogError(AFileName, ATag, AException.ClassName, AException.ToString,
+      LogErrorGetStackTrace(AException), APrefix, ALocation);
   end;
+end;
+
+function LogErrorGetStackTrace(AError: Exception): string;
+begin
+  Result := '';
+  if Assigned(acGetStackTraceFunc) then
+    Result := acGetStackTraceFunc(AError);
+{$IFNDEF FPC}
+  if Result = '' then
+    Result := AException.StackTrace;
+{$ENDIF}
 end;
 
 procedure LogEntry(const AFileName: string;
