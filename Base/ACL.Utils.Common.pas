@@ -143,7 +143,7 @@ type
 
   { TACLProcess }
 
-  TExecuteOption = (eoWaitForTerminate, eoShowGUI);
+  TExecuteOption = (eoWaitForTerminate, eoShowGUI, eoAbortIfHangs);
   TExecuteOptions = set of TExecuteOption;
 
   TACLProcess = class
@@ -446,6 +446,8 @@ end;
 
 function ResolveLibraryPath(ALibraryName: string): string;
 const
+  CachedPaths: string = '';
+const
   Arrow = ') => ';
   OpenBracket = ' (';
 var
@@ -460,7 +462,8 @@ var
   LPosOpenBracket: Integer;
   LTemp: string;
 begin
-  LTemp := TACLProcess.ExecuteToString(FindBinPath('ldconfig') + ' -p');
+  if CachedPaths = '' then
+    CachedPaths := TACLProcess.ExecuteToString(FindBinPath('ldconfig') + ' -p');
 
   if TryStrToInt(Copy(ExtractFileExt(ALibraryName), 2), LLibVersion) then
     LLibName := ChangeFileExt(ALibraryName, '')
@@ -472,7 +475,7 @@ begin
 
   LLibList := TStringList.Create;
   try
-    LLibList.Text := LTemp;
+    LLibList.Text := CachedPaths;
     for LTemp in LLibList do
     begin
       LPosArrow := Pos(Arrow, LTemp);
@@ -564,13 +567,13 @@ begin
   begin
     Result := LoadLibrary(LActualLibPath);
     if Result = 0 then
-      LErrorText := 'Library "' + AFileName + '" failed to load ' + dlerror()
+      LErrorText := 'WARNING: Library "' + AFileName + '" failed to load ' + dlerror()
     else
       LErrorText := '';
   end
   else
   begin
-    LErrorText := 'Library "' + AFileName + '" was not found';
+    LErrorText := 'WARNING: Library "' + AFileName + '" was not found';
     Result := 0;
   end;
   if Result = 0 then
@@ -994,13 +997,21 @@ begin
   CloseHandle(AStdErrorWrite);
 end;
 {$ELSE}
+const
+  HangTimeout = 5000;
 var
   I: Integer;
   LChildSignal: SigActionRec;
   LError: string;
+  LErrorCapacity: Integer;
+  LErrorLength: Integer;
   LExitCode: Integer;
   LOutput: string;
+  LOutputCapacity: Integer;
+  LOutputLength: Integer;
+  LPrevLength: Int64;
   LProcess: TProcess;
+  LTimestamp: Int64;
 begin
   LProcess := DefaultTProcess.Create(nil);
   try
@@ -1015,13 +1026,64 @@ begin
 
     if eoWaitForTerminate in AOptions then
     begin
-      Result := LProcess.RunCommandLoop(LOutput, LError, LExitCode) = 0;
+      LOutput := '';
+      LOutputLength := 0;
+      LOutputCapacity := 0;
+      LError := '';
+      LErrorCapacity := 0;
+      LErrorLength := 0;
+      LPrevLength := 0;
+      try
+        LTimestamp := GetTickCount64;
+        LProcess.Options := [poUsePipes];
+        LProcess.Execute;
+        while LProcess.Running do
+        begin
+          // Only call ReadFromStream if Data from corresponding stream
+          // is already available, otherwise, on  linux, the read call
+          // is blocking, and thus it is not possible to be sure to handle
+          // big data amounts bboth on output and stderr pipes. PM.
+          LProcess.ReadInputStream(LProcess.Output, LOutputLength, LOutputCapacity, LOutput, 1);
+          // The check for assigned(P.stderr) is mainly here so that
+          // if we use poStderrToOutput in p.Options, we do not access invalid memory.
+          if LProcess.StdErr <> nil then
+            LProcess.ReadInputStream(LProcess.StdErr, LErrorLength, LErrorCapacity, LError, 1);
+          // Hangs up detection
+          if LPrevLength = LOutputLength + LErrorLength then
+          begin
+            if (eoAbortIfHangs in AOptions) and (GetTickCount64 - LTimestamp > HangTimeout) then
+            begin
+              Writeln('WARNING: "', ACmdLine, '" is running for too long! Abort!');
+              Abort;
+            end;
+          end
+          else
+          begin
+            LPrevLength := LOutputLength + LErrorLength;
+            LTimestamp := GetTickCount64;
+          end
+        end;
+        // Get left output after end of execution
+        LProcess.ReadInputStream(LProcess.Output, LOutputLength, LOutputCapacity, LOutput, MAXBYTE);
+        if LProcess.StdErr <> nil then
+          LProcess.ReadInputStream(LProcess.StdErr, LErrorLength, LErrorCapacity, LError, MAXBYTE);
+        // Trim the buffers
+        SetLength(LError, LErrorLength);
+        SetLength(LOutput, LOutputLength);
+        Result := True;
+      except
+        on E: Exception do
+        begin
+          LError := E.Message;
+          Result := False;
+        end;
+      end;
       if AExitCode <> nil then
-        AExitCode^ := LExitCode;
+        AExitCode^ := LProcess.ExitCode;
       if AErrorData <> nil then
-        AErrorData.Write(PChar(LError)^, Length(LError));
+        AErrorData.Write(PChar(LError)^, LErrorLength);
       if AOutputData <> nil then
-        AOutputData.Write(PChar(LOutput)^, Length(LOutput));
+        AOutputData.Write(PChar(LOutput)^, LOutputLength);
     end
     else
     begin
@@ -1035,6 +1097,7 @@ begin
       LProcess.InheritHandles := False;
       LProcess.Options := [poDetached, poNewProcessGroup];
       LProcess.Execute;
+      Result := True;
     end;
   finally
     LProcess.Free;
@@ -1076,7 +1139,7 @@ var
 begin
   LData := TStringStream.Create;
   try
-    Execute(ACmdLine, [eoWaitForTerminate], LData);
+    Execute(ACmdLine, [eoWaitForTerminate, eoAbortIfHangs], LData);
     Result := LData.DataString;
     // Trim trailing linebreaks
     LPos := Length(Result);
