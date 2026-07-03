@@ -1043,6 +1043,10 @@ procedure TACLColorPickerGamutCell.DragMove(X, Y: Integer);
 begin
   X := Min(ContentBounds.Width, Max(0, X - ContentBounds.Left));
   Y := Min(ContentBounds.Height, Max(0, Y - ContentBounds.Top));
+  if ColorInfo.Alpha = 0 then
+    ColorInfo.Alpha := 255;
+  if SameValue(ColorInfo.L, 0) or SameValue(ColorInfo.L, 1) then
+    ColorInfo.L := 0.5;
   ColorInfo.H := X / ContentBounds.Width;
   ColorInfo.S := 1 - Y / ContentBounds.Height;
   CursorPosition := Point(X, Y);
