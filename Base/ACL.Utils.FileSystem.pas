@@ -622,7 +622,11 @@ begin
     if LLength - LIndex + 1 >= MAX_PATH then
       LLength := LIndex + MAX_PATH - 1;
 
-    Result := LBuffer.ToString(LIndex, LLength - LIndex + 1);
+    LLength := LLength - LIndex + 1;
+    if LLength > 0 then
+      Result := LBuffer.ToString(LIndex, LLength)
+    else
+      Result := '';
   finally
     LBuffer.Release;
   end;
