@@ -177,7 +177,7 @@ begin
     Result := acGetStackTraceFunc(AError);
 {$IFNDEF FPC}
   if Result = '' then
-    Result := AException.StackTrace;
+    Result := AError.StackTrace;
 {$ENDIF}
 end;
 
