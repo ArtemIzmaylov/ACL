@@ -37,6 +37,7 @@ uses
   {Vcl.}Graphics,
   // ACL
   ACL.Classes,
+  ACL.Classes.ByteBuffer,
   ACL.Classes.Collections,
   ACL.Geometry,
   ACL.Graphics,
@@ -64,7 +65,7 @@ type
 
   TACLBlurFilter = class
   public const
-    MaxRadius = 32;
+    MaxRadius = 35;
   strict private
     FCore: IACLBlurFilterCore;
     FRadius: Integer;
@@ -77,8 +78,8 @@ type
   public
     class constructor Create;
     class destructor Destroy;
+    class procedure FlushCache;
   public
-    constructor Create;
     procedure Apply(AColors: PACLPixel32; AWidth, AHeight: Integer); overload;
     procedure Apply(ALayer: TACLBaseDib); overload;
     //# Properties
@@ -400,7 +401,7 @@ type
 
   TACLSoftwareImplGaussianBlur = class(TInterfacedObject, IACLBlurFilterCore)
   strict private type
-  {$REGION 'Internal Types'}
+  {$REGION ' Internal Types '}
 
     TChunk = class
     strict private
@@ -445,23 +446,34 @@ type
 
   // Stack Blur Algorithm by Mario Klingemann <mario@quasimondo.com>
   TACLSoftwareImplStackBlur = class(TInterfacedObject, IACLBlurFilterCore)
+  strict private type
+    PByteArrayOfInt32 = ^TByteArrayOfInt32;
+    TByteArrayOfInt32 = array[Byte] of Integer;
   strict private
-    FDivSum: Integer;
+    class var FBufferA: TACLByteBuffer;
+    class var FBufferB: TACLByteBuffer;
+    class var FBufferG: TACLByteBuffer;
+    class var FBufferM: TACLByteBuffer;
+    class var FBufferR: TACLByteBuffer;
+    class function GetBuffer(var ABuffer: TACLByteBuffer; ASize: Integer): TACLByteBuffer; inline;
+  strict private
     FDivValues: PIntegerArray;
+    FLock: TACLCriticalSection;
     FRadius: Integer;
-    FRadiusBias: array[-TACLBlurFilter.MaxRadius..TACLBlurFilter.MaxRadius] of Integer;
+    FRadiusBias: array[-TACLBlurFilter.MaxRadius..TACLBlurFilter.MaxRadius] of TByteArrayOfInt32;
     FStack: PAlphaColorArray;
     FStackOffset: Integer;
     FStackOffsets: PIntegerArray;
-    FValueDiv: Integer;
   public
     constructor Create(ARadius: Integer);
     destructor Destroy; override;
-    class function CreateBlurFilterCore(ARadius: Integer): IACLBlurFilterCore; static;
-    class procedure Register;
     // IACLBlurFilterCore
     procedure Apply(AColors: PACLPixel32; AWidth, AHeight: Integer);
     function GetSize: Integer;
+  public
+    class function CreateBlurFilterCore(ARadius: Integer): IACLBlurFilterCore; static;
+    class destructor Destroy;
+    class procedure Register;
   end;
 
 { TACLSoftwareImplBlendMode }
@@ -998,31 +1010,53 @@ end;
 
 constructor TACLSoftwareImplStackBlur.Create(ARadius: Integer);
 var
-  I: Integer;
+  I, J, K: Integer;
+  LDivSum: Integer;
+  LDivValue: Integer;
 begin
   FRadius := ARadius;
-  FValueDiv := 2 * FRadius + 1;
-  FStackOffset := FValueDiv - FRadius;
-  FDivSum := Sqr((FValueDiv + 1) shr 1);
+  LDivValue := 2 * FRadius + 1;
+  FStackOffset := LDivValue - FRadius;
+  LDivSum := Sqr((LDivValue + 1) shr 1);
 
-  FDivValues := AllocMem(256 * FDivSum * SizeOf(Integer));
-  for I := 0 to 256 * FDivSum - 1 do
-    FDivValues^[I] := I div FDivSum;
+  FDivValues := AllocMem(256 * LDivSum * SizeOf(Integer));
+  for I := 0 to 256 * LDivSum - 1 do
+    FDivValues^[I] := I div LDivSum;
 
-  FStack := AllocMem(FValueDiv * SizeOf(TAlphaColor));
-  FStackOffsets := AllocMem(2 * FValueDiv * SizeOf(Integer));
-  for I := 0 to 2 * FValueDiv - 1 do
-    FStackOffsets[I] := I mod FValueDiv;
+  FStack := AllocMem(LDivValue * SizeOf(TAlphaColor));
+  FStackOffsets := AllocMem(2 * LDivValue * SizeOf(Integer));
+  for I := 0 to 2 * LDivValue - 1 do
+    FStackOffsets[I] := I mod LDivValue;
   for I := -FRadius to FRadius do
-    FRadiusBias[I] := FRadius + 1 - FastAbs(I);
+  begin
+    K := FRadius + 1 - FastAbs(I);
+    for J := 0 to 255 do
+      FRadiusBias[I][J] := K * J;
+  end;
+  FLock := TACLCriticalSection.Create;
 end;
 
 destructor TACLSoftwareImplStackBlur.Destroy;
 begin
+  FreeAndNil(FLock);
   FreeMem(FDivValues);
   FreeMem(FStackOffsets);
   FreeMem(FStack);
   inherited;
+end;
+
+class function TACLSoftwareImplStackBlur.CreateBlurFilterCore(ARadius: Integer): IACLBlurFilterCore;
+begin
+  Result := TACLSoftwareImplStackBlur.Create(ARadius);
+end;
+
+class destructor TACLSoftwareImplStackBlur.Destroy;
+begin
+  FreeAndNil(FBufferA);
+  FreeAndNil(FBufferB);
+  FreeAndNil(FBufferG);
+  FreeAndNil(FBufferR);
+  FreeAndNil(FBufferM);
 end;
 
 class procedure TACLSoftwareImplStackBlur.Register;
@@ -1030,9 +1064,15 @@ begin
   TACLBlurFilter.FCreateCoreProc := CreateBlurFilterCore;
 end;
 
-class function TACLSoftwareImplStackBlur.CreateBlurFilterCore(ARadius: Integer): IACLBlurFilterCore;
+class function TACLSoftwareImplStackBlur.GetBuffer(
+  var ABuffer: TACLByteBuffer; ASize: Integer): TACLByteBuffer;
 begin
-  Result := TACLSoftwareImplStackBlur.Create(ARadius);
+  Result := AtomicExchange(Pointer(ABuffer), nil);
+  if (Result = nil) or (Result.Size < ASize) then
+  begin
+    Result.Free;
+    Result := TACLByteBuffer.Create(ASize);
+  end;
 end;
 
 function TACLSoftwareImplStackBlur.GetSize: Integer;
@@ -1041,257 +1081,318 @@ begin
 end;
 
 procedure TACLSoftwareImplStackBlur.Apply(AColors: PACLPixel32; AWidth, AHeight: Integer);
+{$PUSHOPT}
+{$OPTIMIZATION ON}
+{$Q-}{$R-}
 var
-  AColor: PACLPixel32;
-  AInputSumA: Integer;
-  AInputSumB: Integer;
-  AInputSumG: Integer;
-  AInputSumR: Integer;
-  AMinValues: PIntegerArray;
-  AOutputSumA: Integer;
-  AOutputSumB: Integer;
-  AOutputSumG: Integer;
-  AOutputSumR: Integer;
-  ARadiusBias: Integer;
-  AStackCursor: Integer;
-  AStackScan: PACLPixel32;
-  ASumA: Integer;
-  ASumB: Integer;
-  ASumG: Integer;
-  ASumR: Integer;
-  R, G, B, A: PIntegerArray;
-  X, Y, I, Yp, Yi, Yw, Wm, Hm, WH, K: Integer;
+  LBufferA: TACLByteBuffer;
+  LBufferB: TACLByteBuffer;
+  LBufferG: TACLByteBuffer;
+  LBufferM: TACLByteBuffer;
+  LBufferR: TACLByteBuffer;
+  LColor: PACLPixel32;
+  LColors: PAlphaColorArray absolute AColors;
+  LInputSumA: Integer;
+  LInputSumB: Integer;
+  LInputSumG: Integer;
+  LInputSumR: Integer;
+  LOutputSumA: Integer;
+  LOutputSumB: Integer;
+  LOutputSumG: Integer;
+  LOutputSumR: Integer;
+  LRadiusBias: PByteArrayOfInt32;
+  LSize: Integer;
+  LStack: PACLPixel32;
+  LStackCursor: Integer;
+  LSumA: Integer;
+  LSumB: Integer;
+  LSumG: Integer;
+  LSumR: Integer;
+  LValue: TAlphaColor;
+  M: PInteger;
+  R, G, B, A: PByteArray;
+  X, Y, I, K: Integer;
+  Yp, Yi, Yw: Integer;
+  Wi, Hi: Integer;
 begin
   if FRadius < 1 then
     Exit;
 
-  Wm := AWidth - 1;
-  Hm := AHeight - 1;
-  WH := AWidth * AHeight;
-
-  GetMem(R, WH * SizeOf(Integer));
-  GetMem(G, WH * SizeOf(Integer));
-  GetMem(B, WH * SizeOf(Integer));
-  GetMem(A, WH * SizeOf(Integer));
-  GetMem(AMinValues, max(AWidth, AHeight) * SizeOf(Integer));
+  FLock.Enter;
   try
+    Wi := AWidth - 1;
+    Hi := AHeight - 1;
+
+    LSize := AWidth * AHeight;
+    LBufferA := GetBuffer(FBufferA, LSize);
+    LBufferR := GetBuffer(FBufferR, LSize);
+    LBufferG := GetBuffer(FBufferG, LSize);
+    LBufferB := GetBuffer(FBufferB, LSize);
+    LSize := Max(AWidth, AHeight) * SizeOf(Integer);
+    LBufferM := GetBuffer(FBufferM, LSize);
+
+    A := PByteArray(LBufferA.Data);
+    R := PByteArray(LBufferR.Data);
+    G := PByteArray(LBufferG.Data);
+    B := PByteArray(LBufferB.Data);
+
     Yw := 0;
     Yi := 0;
 
+  {$REGION ' Horizontal '}
+    M := PInteger(LBufferM.Data);
+    for X := 0 to AWidth - 1 do
+    begin
+      M^ := Min(X + FRadius + 1, Wi);
+      Inc(M);
+    end;
     for Y := 0 to AHeight - 1 do
     begin
-      AInputSumR := 0;
-      AInputSumG := 0;
-      AInputSumB := 0;
-      AInputSumA := 0;
+      LInputSumR := 0;
+      LInputSumG := 0;
+      LInputSumB := 0;
+      LInputSumA := 0;
 
-      AOutputSumR := 0;
-      AOutputSumG := 0;
-      AOutputSumB := 0;
-      AOutputSumA := 0;
+      LOutputSumR := 0;
+      LOutputSumG := 0;
+      LOutputSumB := 0;
+      LOutputSumA := 0;
 
-      ASumR := 0;
-      ASumG := 0;
-      ASumB := 0;
-      ASumA := 0;
+      LSumR := 0;
+      LSumG := 0;
+      LSumB := 0;
+      LSumA := 0;
 
-      AStackScan := @FStack[0];
-      for I := -FRadius to FRadius do
+      LRadiusBias := @FRadiusBias[-FRadius];
+      LStack := @FStack[0];
+      LValue := LColors[Yi];
+      for I := -FRadius to 0 do
       begin
-        PAlphaColor(AStackScan)^ := PAlphaColorArray(AColors)[Yi + MinMax(I, 0, Wm)];
-        ARadiusBias := FRadiusBias[I];
-        Inc(ASumR, AStackScan.R * ARadiusBias);
-        Inc(ASumG, AStackScan.G * ARadiusBias);
-        Inc(ASumB, AStackScan.B * ARadiusBias);
-        Inc(ASumA, AStackScan.A * ARadiusBias);
-        if I > 0 then
-        begin
-          Inc(AInputSumR, AStackScan.R);
-          Inc(AInputSumG, AStackScan.G);
-          Inc(AInputSumB, AStackScan.B);
-          Inc(AInputSumA, AStackScan.A);
-        end
-        else
-        begin
-          Inc(AOutputSumR, AStackScan.R);
-          Inc(AOutputSumG, AStackScan.G);
-          Inc(AOutputSumB, AStackScan.B);
-          Inc(AOutputSumA, AStackScan.A);
-        end;
-        Inc(AStackScan);
+        PAlphaColor(LStack)^ := LValue;
+        Inc(LSumR, LRadiusBias[LStack^.R]);
+        Inc(LSumG, LRadiusBias[LStack^.G]);
+        Inc(LSumB, LRadiusBias[LStack^.B]);
+        Inc(LSumA, LRadiusBias[LStack^.A]);
+        Inc(LOutputSumR, LStack^.R);
+        Inc(LOutputSumG, LStack^.G);
+        Inc(LOutputSumB, LStack^.B);
+        Inc(LOutputSumA, LStack^.A);
+        Inc(LRadiusBias);
+        Inc(LStack);
       end;
-      AStackCursor := FRadius;
+      for I := 1 to FRadius do
+      begin
+        PAlphaColor(LStack)^ := LColors[Yi + Min(I, Wi)];
+        Inc(LSumR, LRadiusBias[LStack^.R]);
+        Inc(LSumG, LRadiusBias[LStack^.G]);
+        Inc(LSumB, LRadiusBias[LStack^.B]);
+        Inc(LSumA, LRadiusBias[LStack^.A]);
+        Inc(LInputSumR, LStack^.R);
+        Inc(LInputSumG, LStack^.G);
+        Inc(LInputSumB, LStack^.B);
+        Inc(LInputSumA, LStack^.A);
+        Inc(LRadiusBias);
+        Inc(LStack);
+      end;
+      LStackCursor := FRadius;
 
+      M := PInteger(LBufferM.Data);
       for X := 0 to AWidth - 1 do
       begin
-        R[Yi] := FDivValues[ASumR];
-        G[Yi] := FDivValues[ASumG];
-        B[Yi] := FDivValues[ASumB];
-        A[Yi] := FDivValues[ASumA];
+        R[Yi] := FDivValues[LSumR];
+        G[Yi] := FDivValues[LSumG];
+        B[Yi] := FDivValues[LSumB];
+        A[Yi] := FDivValues[LSumA];
 
-        Dec(ASumR, AOutputSumR);
-        Dec(ASumG, AOutputSumG);
-        Dec(ASumB, AOutputSumB);
-        Dec(ASumA, AOutputSumA);
+        Dec(LSumR, LOutputSumR);
+        Dec(LSumG, LOutputSumG);
+        Dec(LSumB, LOutputSumB);
+        Dec(LSumA, LOutputSumA);
 
-        AStackScan := @FStack[FStackOffsets[AStackCursor + FStackOffset]];
+        LStack := @FStack[FStackOffsets[LStackCursor + FStackOffset]];
 
-        Dec(AOutputSumR, AStackScan.R);
-        Dec(AOutputSumG, AStackScan.G);
-        Dec(AOutputSumB, AStackScan.B);
-        Dec(AOutputSumA, AStackScan.A);
+        Dec(LOutputSumR, LStack^.R);
+        Dec(LOutputSumG, LStack^.G);
+        Dec(LOutputSumB, LStack^.B);
+        Dec(LOutputSumA, LStack^.A);
 
-        if Y = 0 then
-          AMinValues[X] := Min(X + FRadius + 1, Wm);
+        PAlphaColor(LStack)^ := LColors[Yw + M^];
 
-        PAlphaColor(AStackScan)^ := PAlphaColorArray(AColors)[Yw + AMinValues[X]];
+        Inc(LInputSumR, LStack^.R);
+        Inc(LInputSumG, LStack^.G);
+        Inc(LInputSumB, LStack^.B);
+        Inc(LInputSumA, LStack^.A);
 
-        Inc(AInputSumR, AStackScan.R);
-        Inc(AInputSumG, AStackScan.G);
-        Inc(AInputSumB, AStackScan.B);
-        Inc(AInputSumA, AStackScan.A);
+        Inc(LSumR, LInputSumR);
+        Inc(LSumG, LInputSumG);
+        Inc(LSumB, LInputSumB);
+        Inc(LSumA, LInputSumA);
 
-        Inc(ASumR, AInputSumR);
-        Inc(ASumG, AInputSumG);
-        Inc(ASumB, AInputSumB);
-        Inc(ASumA, AInputSumA);
+        LStackCursor := FStackOffsets[LStackCursor + 1];
+        LStack := @FStack[LStackCursor];
 
-        AStackCursor := FStackOffsets[AStackCursor + 1];
-        AStackScan := @FStack[AStackCursor];
+        Inc(LOutputSumR, LStack^.R);
+        Inc(LOutputSumG, LStack^.G);
+        Inc(LOutputSumB, LStack^.B);
+        Inc(LOutputSumA, LStack^.A);
 
-        Inc(AOutputSumR, AStackScan.R);
-        Inc(AOutputSumG, AStackScan.G);
-        Inc(AOutputSumB, AStackScan.B);
-        Inc(AOutputSumA, AStackScan.A);
+        Dec(LInputSumR, LStack^.R);
+        Dec(LInputSumG, LStack^.G);
+        Dec(LInputSumB, LStack^.B);
+        Dec(LInputSumA, LStack^.A);
 
-        Dec(AInputSumR, AStackScan.R);
-        Dec(AInputSumG, AStackScan.G);
-        Dec(AInputSumB, AStackScan.B);
-        Dec(AInputSumA, AStackScan.A);
-
+        Inc(M);
         Inc(Yi);
       end;
       Inc(Yw, AWidth);
     end;
+  {$ENDREGION}
 
+  {$REGION ' Vertical '}
+    M := PInteger(LBufferM.Data);
+    for Y := 0 to AHeight - 1 do
+    begin
+      M^ := Min(Y + FRadius + 1, Hi) * AWidth;
+      Inc(M);
+    end;
     for X := 0 to AWidth - 1 do
     begin
-      AInputSumR := 0;
-      AInputSumG := 0;
-      AInputSumB := 0;
-      AInputSumA := 0;
+      LInputSumR := 0;
+      LInputSumG := 0;
+      LInputSumB := 0;
+      LInputSumA := 0;
 
-      AOutputSumR := 0;
-      AOutputSumG := 0;
-      AOutputSumB := 0;
-      AOutputSumA := 0;
+      LOutputSumR := 0;
+      LOutputSumG := 0;
+      LOutputSumB := 0;
+      LOutputSumA := 0;
 
-      ASumR := 0;
-      ASumG := 0;
-      ASumB := 0;
-      ASumA := 0;
+      LSumR := 0;
+      LSumG := 0;
+      LSumB := 0;
+      LSumA := 0;
 
+      LStack := @FStack[0];
+      LRadiusBias := @FRadiusBias[-FRadius];
       Yp := -FRadius * AWidth;
-      AStackScan := @FStack[0];
-      for I := -FRadius to FRadius do
+
+      for I := -FRadius to 0 do
       begin
-        Yi := Max(0, Yp) + X;
+        Yi := X;
+        if Yp > 0 then
+          Inc(Yi, Yp);
+        //if I < Hi then
+        //  Inc(Yp, AWidth);
+        Inc(Yp, AWidth);
 
-        AStackScan.R := R[Yi];
-        AStackScan.G := G[Yi];
-        AStackScan.B := B[Yi];
-        AStackScan.A := A[Yi];
+        LStack^.R := R[Yi];
+        LStack^.G := G[Yi];
+        LStack^.B := B[Yi];
+        LStack^.A := A[Yi];
 
-        ARadiusBias := FRadiusBias[I];
+        Inc(LSumR, LRadiusBias[LStack^.R]);
+        Inc(LSumG, LRadiusBias[LStack^.G]);
+        Inc(LSumB, LRadiusBias[LStack^.B]);
+        Inc(LSumA, LRadiusBias[LStack^.A]);
+        Inc(LRadiusBias);
 
-        Inc(ASumR, R[Yi] * ARadiusBias);
-        Inc(ASumG, G[Yi] * ARadiusBias);
-        Inc(ASumB, B[Yi] * ARadiusBias);
-        Inc(ASumA, A[Yi] * ARadiusBias);
-
-        if I > 0 then
-        begin
-          Inc(AInputSumR, AStackScan.R);
-          Inc(AInputSumG, AStackScan.G);
-          Inc(AInputSumB, AStackScan.B);
-          Inc(AInputSumA, AStackScan.A);
-        end
-        else
-        begin
-          Inc(AOutputSumR, AStackScan.R);
-          Inc(AOutputSumG, AStackScan.G);
-          Inc(AOutputSumB, AStackScan.B);
-          Inc(AOutputSumA, AStackScan.A);
-        end;
-
-        if I < Hm then
+        Inc(LOutputSumR, LStack^.R);
+        Inc(LOutputSumG, LStack^.G);
+        Inc(LOutputSumB, LStack^.B);
+        Inc(LOutputSumA, LStack^.A);
+        Inc(LStack);
+      end;
+      for I := 1 to FRadius do
+      begin
+        Yi := X;
+        if Yp > 0 then
+          Inc(Yi, Yp);
+        if I < Hi then
           Inc(Yp, AWidth);
-        Inc(AStackScan);
+
+        LStack^.R := R[Yi];
+        LStack^.G := G[Yi];
+        LStack^.B := B[Yi];
+        LStack^.A := A[Yi];
+
+        Inc(LSumR, LRadiusBias[LStack^.R]);
+        Inc(LSumG, LRadiusBias[LStack^.G]);
+        Inc(LSumB, LRadiusBias[LStack^.B]);
+        Inc(LSumA, LRadiusBias[LStack^.A]);
+        Inc(LRadiusBias);
+
+        Inc(LInputSumR, LStack^.R);
+        Inc(LInputSumG, LStack^.G);
+        Inc(LInputSumB, LStack^.B);
+        Inc(LInputSumA, LStack^.A);
+        Inc(LStack);
       end;
 
-      AColor := @PAlphaColorArray(AColors)^[X];
-      AStackCursor := FRadius;
+      LColor := @LColors^[X];
+      LStackCursor := FRadius;
+      M := PInteger(LBufferM.Data);
       for Y := 0 to AHeight - 1 do
       begin
-        AColor^.B := FDivValues[ASumB];
-        AColor^.G := FDivValues[ASumG];
-        AColor^.R := FDivValues[ASumR];
-        AColor^.A := FDivValues[ASumA];
+        LColor^.B := FDivValues[LSumB];
+        LColor^.G := FDivValues[LSumG];
+        LColor^.R := FDivValues[LSumR];
+        LColor^.A := FDivValues[LSumA];
+        Inc(LColor, AWidth);
 
-        Dec(ASumR, AOutputSumR);
-        Dec(ASumG, AOutputSumG);
-        Dec(ASumB, AOutputSumB);
-        Dec(ASumA, AOutputSumA);
+        Dec(LSumR, LOutputSumR);
+        Dec(LSumG, LOutputSumG);
+        Dec(LSumB, LOutputSumB);
+        Dec(LSumA, LOutputSumA);
 
-        AStackScan := @FStack[FStackOffsets[AStackCursor + FStackOffset]];
+        LStack := @FStack[FStackOffsets[LStackCursor + FStackOffset]];
 
-        Dec(AOutputSumR, AStackScan.R);
-        Dec(AOutputSumG, AStackScan.G);
-        Dec(AOutputSumB, AStackScan.B);
-        Dec(AOutputSumA, AStackScan.A);
+        Dec(LOutputSumR, LStack^.R);
+        Dec(LOutputSumG, LStack^.G);
+        Dec(LOutputSumB, LStack^.B);
+        Dec(LOutputSumA, LStack^.A);
 
-        if X = 0 then
-          AMinValues[Y] := Min(Y + FRadius + 1, Hm) * AWidth;
+        K := X + M^;
+        Inc(M);
+        LStack^.R := R[K];
+        LStack^.G := G[K];
+        LStack^.B := B[K];
+        LStack^.A := A[K];
 
-        K := X + AMinValues[Y];
-        AStackScan.R := R[K];
-        AStackScan.G := G[K];
-        AStackScan.B := B[K];
-        AStackScan.A := A[K];
+        Inc(LInputSumR, LStack^.R);
+        Inc(LInputSumG, LStack^.G);
+        Inc(LInputSumB, LStack^.B);
+        Inc(LInputSumA, LStack^.A);
 
-        Inc(AInputSumR, AStackScan.R);
-        Inc(AInputSumG, AStackScan.G);
-        Inc(AInputSumB, AStackScan.B);
-        Inc(AInputSumA, AStackScan.A);
+        Inc(LSumR, LInputSumR);
+        Inc(LSumG, LInputSumG);
+        Inc(LSumB, LInputSumB);
+        Inc(LSumA, LInputSumA);
 
-        Inc(ASumR, AInputSumR);
-        Inc(ASumG, AInputSumG);
-        Inc(ASumB, AInputSumB);
-        Inc(ASumA, AInputSumA);
+        LStackCursor := FStackOffsets[LStackCursor + 1];
+        LStack := @FStack[LStackCursor];
 
-        AStackCursor := FStackOffsets[AStackCursor + 1];
-        AStackScan := @FStack[AStackCursor];
+        Inc(LOutputSumR, LStack^.R);
+        Inc(LOutputSumG, LStack^.G);
+        Inc(LOutputSumB, LStack^.B);
+        Inc(LOutputSumA, LStack^.A);
 
-        Inc(AOutputSumR, AStackScan.R);
-        Inc(AOutputSumG, AStackScan.G);
-        Inc(AOutputSumB, AStackScan.B);
-        Inc(AOutputSumA, AStackScan.A);
-
-        Dec(AInputSumR, AStackScan.R);
-        Dec(AInputSumG, AStackScan.G);
-        Dec(AInputSumB, AStackScan.B);
-        Dec(AInputSumA, AStackScan.A);
-
-        Inc(AColor, AWidth);
+        Dec(LInputSumR, LStack^.R);
+        Dec(LInputSumG, LStack^.G);
+        Dec(LInputSumB, LStack^.B);
+        Dec(LInputSumA, LStack^.A);
       end;
     end;
+  {$ENDREGION}
+
+    TObject(AtomicExchange(Pointer(FBufferA), Pointer(LBufferA))).Free;
+    TObject(AtomicExchange(Pointer(FBufferR), Pointer(LBufferR))).Free;
+    TObject(AtomicExchange(Pointer(FBufferG), Pointer(LBufferG))).Free;
+    TObject(AtomicExchange(Pointer(FBufferB), Pointer(LBufferB))).Free;
+    TObject(AtomicExchange(Pointer(FBufferM), Pointer(LBufferM))).Free;
   finally
-    FreeMem(AMinValues);
-    FreeMem(A);
-    FreeMem(R);
-    FreeMem(G);
-    FreeMem(B);
+    FLock.Leave;
   end;
+{$POPOPT}
 end;
 
 {$ENDREGION}
@@ -1310,35 +1411,40 @@ begin
   FreeAndNil(FShare);
 end;
 
-constructor TACLBlurFilter.Create;
+class procedure TACLBlurFilter.FlushCache;
 begin
-  Radius := 20;
+  FShare.Clear;
 end;
 
 procedure TACLBlurFilter.Apply(ALayer: TACLBaseDib);
 begin
-  if FSize > 0 then
+  if Size > 0 then
     FCore.Apply(ALayer.Colors, ALayer.Width, ALayer.Height);
 end;
 
 procedure TACLBlurFilter.Apply(AColors: PACLPixel32; AWidth, AHeight: Integer);
 begin
-  if FSize > 0 then
+  if Size > 0 then
     FCore.Apply(AColors, AWidth, AHeight);
 end;
 
 procedure TACLBlurFilter.SetRadius(AValue: Integer);
 begin
-  AValue := MinMax(AValue, 0, MaxRadius);
+  AValue := EnsureRange(AValue, 0, MaxRadius);
   if FRadius <> AValue then
   begin
+    FSize := 0;
+    FCore := nil;
     FRadius := AValue;
-    if not FShare.Get(FRadius, FCore) then
+    if FRadius > 0 then
     begin
-      FCore := FCreateCoreProc(AValue);
-      FShare.Add(AValue, FCore);
+      if not FShare.Get(FRadius, FCore) then
+      begin
+        FCore := FCreateCoreProc(AValue);
+        FShare.Add(AValue, FCore);
+      end;
+      FSize := FCore.GetSize;
     end;
-    FSize := FCore.GetSize;
   end;
 end;
 
