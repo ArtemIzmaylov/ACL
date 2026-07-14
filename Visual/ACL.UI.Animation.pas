@@ -549,10 +549,7 @@ var
 begin
   Result := Find(AControl, LAnimation, ATag);
   if Result then
-  begin
-    LAnimation.CalculateProgress;
     LAnimation.Draw(ACanvas, ARect);
-  end;
 end;
 
 procedure TACLAnimationManager.RemoveOwner(AOwnerObject: TObject);
