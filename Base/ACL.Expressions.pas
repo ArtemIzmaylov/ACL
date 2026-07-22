@@ -9,7 +9,7 @@
 //               http://msdn.microsoft.com/ru-ru/library/ms139741.aspx
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2024
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -143,9 +143,10 @@ type
 
   TACLExpressionElement = class abstract
   public
-    procedure Optimize; virtual;
+    function Compare(AContext1, AContext2: TObject): Integer; virtual;
     function Evaluate(AContext: TObject): Variant; virtual; abstract;
     function IsConstant: Boolean; virtual;
+    procedure Optimize; virtual;
     procedure ToString(ABuffer: TACLStringBuilder;
       AFactory: TACLCustomExpressionFactory); reintroduce; virtual; abstract;
   end;
@@ -158,16 +159,14 @@ type
     function GetItem(Index: Integer): TACLExpressionElement; inline;
   protected
     FList: TList;
-
-    procedure Add(AElement: TACLExpressionElement);
-    procedure AddFromStack(AStack: TACLExpressionFastStack<TACLExpressionElement>; ACount: Integer);
-    procedure Optimize;
   public
     constructor Create; virtual;
     destructor Destroy; override;
+    procedure Add(AElement: TACLExpressionElement);
+    procedure AddFromStack(AStack: TACLExpressionFastStack<TACLExpressionElement>; ACount: Integer);
     function IsConstant: Boolean;
-    procedure ToString(ABuffer: TACLStringBuilder;
-      AFactory: TACLCustomExpressionFactory; const ASeparator: string = ','); reintroduce;
+    procedure Optimize;
+    procedure ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory); reintroduce;
     //# Properties
     property Count: Integer read GetCount;
     property Items[Index: Integer]: TACLExpressionElement read GetItem; default;
@@ -514,6 +513,11 @@ end;
 
 { TACLExpressionElement }
 
+function TACLExpressionElement.Compare(AContext1, AContext2: TObject): Integer;
+begin
+  Result := acLogicalCompare(Evaluate(AContext1), Evaluate(AContext2));
+end;
+
 function TACLExpressionElement.IsConstant: Boolean;
 begin
   Result := False;
@@ -562,15 +566,15 @@ begin
   end;
 end;
 
-procedure TACLExpressionElements.ToString(ABuffer: TACLStringBuilder;
-  AFactory: TACLCustomExpressionFactory; const ASeparator: string = ',');
+procedure TACLExpressionElements.ToString(
+  ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory);
 var
   I: Integer;
 begin
   for I := 0 to Count - 1 do
   begin
     if I > 0 then
-      ABuffer.Append(ASeparator);
+      ABuffer.Append(',');
     Items[I].ToString(ABuffer, AFactory);
   end;
 end;
@@ -619,9 +623,10 @@ begin
   Result := True;
 end;
 
-procedure TACLExpressionElementConstant.ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory);
+procedure TACLExpressionElementConstant.ToString(
+  ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory);
 begin
-  ABuffer.Append(string(FValue));
+  ABuffer.Append(VarToStr(FValue));
 end;
 
 { TACLExpressionElementFunction }

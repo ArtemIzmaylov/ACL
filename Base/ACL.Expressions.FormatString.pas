@@ -134,11 +134,13 @@ type
     constructor Create; overload;
     constructor Create(AStack: TACLExpressionFastStack<TACLExpressionElement>); overload;
     destructor Destroy; override;
-    procedure Optimize; override;
+    function Compare(AContext1, AContext2: TObject): Integer; override;
     function Evaluate(AContext: TObject): Variant; override;
+    function InvertComparingOrder: Boolean;
     function IsConstant: Boolean; override;
+    procedure Optimize; override;
     procedure ToString(ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory); override;
-    //# Properties
+    // Properties
     property Params: TACLExpressionElements read FParams;
   end;
 
@@ -187,41 +189,11 @@ begin
 end;
 
 function TACLFormatString.Compare(AContext1, AContext2: TObject): Integer;
-
-  function CompareCore(AElement: TACLExpressionElement): Integer;
-  begin
-    Result := acLogicalCompare(AElement.Evaluate(AContext1), AElement.Evaluate(AContext2));
-  end;
-
-var
-  AElement: TACLExpressionElement;
-  AReversed: Boolean;
-  I: Integer;
 begin
-  Result := 0;
-  if FRoot = nil then
-    Exit;
-  if FRoot is TACLFormatStringConcatenateFunction then
-  begin
-    AReversed := False;
-    for I := 0 to TACLFormatStringConcatenateFunction(FRoot).Params.Count - 1 do
-    begin
-      AElement := TACLFormatStringConcatenateFunction(FRoot).Params[I];
-      if AElement is TACLFormatStringReverseMacro then
-        AReversed := True;
-      if AElement is TACLFormatStringFunction then
-      begin
-        Result := CompareCore(AElement);
-        if AReversed then
-          Result := -Result;
-        if Result <> 0 then
-          Exit;
-        AReversed := False;
-      end;
-    end;
-  end
+  if FRoot <> nil then
+    Result := FRoot.Compare(AContext1, AContext2)
   else
-    Result := CompareCore(FRoot);
+    Result := 0;
 end;
 
 function TACLFormatString.Evaluate(AContext: TObject): Variant;
@@ -234,53 +206,21 @@ end;
 
 function TACLFormatString.InvertComparingOrder: Boolean;
 var
-  AElement: TACLExpressionElement;
-  AFunction: TACLFormatStringConcatenateFunction;
-  AIndex: Integer;
-  AParams: TACLExpressionElementsAccess;
-  AReversed: Boolean;
+  LFunction: TACLFormatStringConcatenateFunction;
 begin
   Result := False;
+  if FRoot = nil then
+    Exit;
   if FRoot is TACLFormatStringConcatenateFunction then
-  begin
-    AIndex := 0;
-    AReversed := False;
-    AParams := TACLExpressionElementsAccess(TACLFormatStringConcatenateFunction(FRoot).Params);
-    while AIndex < AParams.Count do
-    begin
-      AElement := AParams[AIndex];
-      if AElement is TACLFormatStringReverseMacro then
-      begin
-        AElement.Free;
-        AParams.FList.Delete(AIndex);
-        AReversed := True;
-      end
-      else
-      begin
-        if AElement is TACLFormatStringFunction then
-        begin
-          if AReversed then
-            AReversed := False
-          else
-          begin
-            AParams.FList.Insert(AIndex, TACLFormatStringReverseMacro.Create);
-            Inc(AIndex);
-          end;
-          Result := True;
-        end;
-        Inc(AIndex);
-      end;
-    end;
-  end
+    Result := TACLFormatStringConcatenateFunction(FRoot).InvertComparingOrder
   else
-    if FRoot <> nil then
-    begin
-      AFunction := TACLFormatStringConcatenateFunction.Create;
-      TACLExpressionElementsAccess(AFunction.Params).FList.Add(TACLFormatStringReverseMacro.Create);
-      TACLExpressionElementsAccess(AFunction.Params).FList.Add(FRoot);
-      FRoot := AFunction;
-      Result := True;
-    end;
+  begin
+    LFunction := TACLFormatStringConcatenateFunction.Create;
+    LFunction.Params.Add(TACLFormatStringReverseMacro.Create);
+    LFunction.Params.Add(FRoot);
+    FRoot := LFunction;
+    Result := True;
+  end;
 end;
 
 function TACLFormatString.ToString: string;
@@ -801,10 +741,7 @@ begin
     while GetToken(Token) do
     begin
       if not ProcessToken then
-      begin
-        OutputBuffer.Push(TACLExpressionElementConstant.Create(Token.ToString));
-        PrevSolidToken := ecsttOperand;
-      end;
+        PushConstant(Token.ToString);
     end;
     while OperatorStack.Count > 0 do
       OutputOperator(OperatorStack.Pop);
@@ -817,11 +754,10 @@ end;
 function TACLFormatStringCompiler.ProcessToken: Boolean;
 begin
   if Token.TokenType = acTokenDelimiter then
-    Result := PushConstant(Token.ToString)
-  else if Token.TokenType = acExprTokenReverse then
-    Result := PushOperand(TACLFormatStringReverseMacro.Create)
-  else
-    Result := inherited;
+    Exit(PushConstant(Token.ToString));
+  if Token.TokenType = acExprTokenReverse then
+    Exit(PushOperand(TACLFormatStringReverseMacro.Create));
+  Result := inherited;
 end;
 
 function TACLFormatStringCompiler.GetFactory: TACLFormatStringFactory;
@@ -840,7 +776,7 @@ end;
 constructor TACLFormatStringConcatenateFunction.Create(AStack: TACLExpressionFastStack<TACLExpressionElement>);
 begin
   Create;
-  TACLExpressionElementsAccess(Params).AddFromStack(AStack, AStack.Count);
+  Params.AddFromStack(AStack, AStack.Count);
 end;
 
 destructor TACLFormatStringConcatenateFunction.Destroy;
@@ -849,43 +785,29 @@ begin
   inherited Destroy;
 end;
 
-procedure TACLFormatStringConcatenateFunction.Optimize;
+function TACLFormatStringConcatenateFunction.Compare(AContext1, AContext2: TObject): Integer;
 var
-  ABuffer: TACLStringBuilder;
-  AParams: TACLExpressionElementsAccess;
-  I, J: Integer;
+  I: Integer;
+  LElement: TACLExpressionElement;
+  LReverse: Boolean;
 begin
-  AParams := TACLExpressionElementsAccess(Params);
-  AParams.Optimize;
-
-  I := 0;
-  while (I < Params.Count) do
+  LReverse := False;
+  for I := 0 to FParams.Count - 1 do
   begin
-    if AParams[I].IsConstant then
+    LElement := FParams[I];
+    if LElement is TACLFormatStringReverseMacro then
+      LReverse := True;
+    if LElement is TACLFormatStringFunction then
     begin
-      J := I + 1;
-      while (J < AParams.Count) and AParams[J].IsConstant do
-        Inc(J);
-      Dec(J);
-      if I < J then
-      begin
-        ABuffer := TACLStringBuilder.Get(256);
-        try
-          while I <= J do
-          begin
-            ABuffer.Append(VarToStr(AParams[I].Evaluate(nil)));
-            TObject(AParams.FList[I]).Free;
-            AParams.FList.Delete(I);
-            Dec(J);
-          end;
-          AParams.FList.Insert(I, TACLExpressionElementConstant.Create(ABuffer.ToString));
-        finally
-          ABuffer.Release;
-        end;
-      end;
+      Result := LElement.Compare(AContext1, AContext2);
+      if LReverse then
+        Result := -Result;
+      if Result <> 0 then
+        Exit;
+      LReverse := False;
     end;
-    Inc(I);
   end;
+  Result := 0;
 end;
 
 function TACLFormatStringConcatenateFunction.Evaluate(AContext: TObject): Variant;
@@ -901,10 +823,62 @@ begin
   LBuffer := TACLStringBuilder.Get(256);
   try
     for I := 0 to FParams.Count - 1 do
-      LBuffer.Append(VarToStr(FParams[I].Evaluate(AContext)));
+      LBuffer.Append(VarToStr(Params[I].Evaluate(AContext)));
     Result := LBuffer.ToString;
   finally
     LBuffer.Release;
+  end;
+end;
+
+function TACLFormatStringConcatenateFunction.InvertComparingOrder: Boolean;
+var
+  LElement: TACLExpressionElement;
+  LIndex: Integer;
+  LParams: TACLExpressionElementsAccess;
+  LReversed: Boolean;
+  LValue: Variant;
+begin
+  Result := False;
+  LIndex := 0;
+  LReversed := False;
+  LParams := TACLExpressionElementsAccess(Params);
+  while LIndex < LParams.Count do
+  begin
+    LElement := LParams[LIndex];
+    if LElement is TACLFormatStringReverseMacro then
+    begin
+      LElement.Free;
+      LParams.FList.Delete(LIndex);
+      LReversed := True;
+    end
+    else
+
+    if LReversed and (LElement is TACLExpressionElementConstant) then
+    begin
+      LValue := LElement.Evaluate(nil);
+      if VarIsStr(LValue) and (acTrim(LValue) = '') then
+      begin
+        LElement.Free;
+        LParams.FList.Delete(LIndex);
+      end
+      else
+        Inc(LIndex);
+    end
+    else
+    begin
+      if LElement is TACLFormatStringFunction then
+      begin
+        if LReversed then
+          LReversed := False
+        else
+        begin
+          LParams.FList.Insert(LIndex, TACLFormatStringReverseMacro.Create);
+          Inc(LIndex);
+        end;
+        Result := True;
+      end;
+      Inc(LIndex);
+    end;
   end;
 end;
 
@@ -913,10 +887,53 @@ begin
   Result := Params.IsConstant;
 end;
 
+procedure TACLFormatStringConcatenateFunction.Optimize;
+var
+  I, J: Integer;
+  LBuffer: TACLStringBuilder;
+  LElement: TACLExpressionElement;
+  LParams: TACLExpressionElementsAccess;
+begin
+  I := 0;
+  LParams := TACLExpressionElementsAccess(Params);
+  LParams.Optimize;
+  while I < LParams.Count do
+  begin
+    if LParams[I].IsConstant then
+    begin
+      J := I + 1;
+      while (J < LParams.Count) and LParams[J].IsConstant do
+        Inc(J);
+      Dec(J);
+      if I < J then
+      begin
+        LBuffer := TACLStringBuilder.Get(256);
+        try
+          while I <= J do
+          begin
+            LElement := LParams.FList.List[I];
+            LBuffer.Append(VarToStr(LElement.Evaluate(nil)));
+            LParams.FList.Delete(I);
+            LElement.Free;
+            Dec(J);
+          end;
+          LParams.FList.Insert(I, TACLExpressionElementConstant.Create(LBuffer.ToString));
+        finally
+          LBuffer.Release;
+        end;
+      end;
+    end;
+    Inc(I);
+  end;
+end;
+
 procedure TACLFormatStringConcatenateFunction.ToString(
   ABuffer: TACLStringBuilder; AFactory: TACLCustomExpressionFactory);
+var
+  I: Integer;
 begin
-  FParams.ToString(ABuffer, AFactory, '');
+  for I := 0 to Params.Count - 1 do
+    Params[I].ToString(ABuffer, AFactory);
 end;
 
 { TACLFormatStringFunction }
