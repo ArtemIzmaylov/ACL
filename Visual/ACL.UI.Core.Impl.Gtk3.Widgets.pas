@@ -372,10 +372,14 @@ begin
   // допускаем генерацию только из нашего OnState, штатная лазаревская имлементация кривая
   if (LMsg.Msg = LM_ACTIVATE) and (TLMActivate(Msg).ActiveWindow <> 0) then
     Exit(0);
-  // Положение DropDown-окна сбрасывается в (0,0) при инициализации показа на Wayland.
   if (LMsg.Msg = LM_MOVE) and (wtWindow in WidgetType) and (BorderStyle = bsNone) then
   begin
+    // Положение DropDown-окна сбрасывается в (0,0) при инициализации показа на Wayland.
     if InUpdate and GTK3WidgetSet.IsWayland then
+      Exit(0);
+    // KDE: сворачиваем максимизированное окно в трей, ОС присылает Configure со смещением координат окна на 10пкс...
+    // Короче говоря, если окно в фиксированном режиме и не отображается на экране - игнорируем configure
+    if (TCustomForm(LCLObject).WindowState <> wsNormal) and not PGtkWindow(Widget)^.get_mapped then
       Exit(0);
   end;
   Result := inherited DeliverMessage(Msg, AIsInput);
@@ -421,6 +425,7 @@ begin
       g_main_context_iteration(nil, false);
   end;
   AImpl.SetBounds(LRect.Left, LRect.Top, LRect.Width, LRect.Height);
+  AImpl.UpdateWindowState;
   Result := False;
 end;
 
