@@ -307,8 +307,11 @@ function acTempPath: string;
 function acValidateFileName(const Name: string; ReplacementForInvalidChars: Char = #0): string;
 function acValidateFilePath(const Name: string): string;
 function acValidateSubPath(const Path: string): string;
-function acUnixPathToWindows(const Path: string): string;
-function acWindowsPathToUnix(const Path: string): string;
+
+// Path delimiters conversions
+function acNativePathToUnix(const Path: string): string;
+function acUnixPathToNative(const Path: string): string;
+function acWindowsPathToNative(const Path: string): string;
 
 // FindFile
 function acFindFile(const AFileName: string; AFullFileName: PString; ASize: PInt64): Boolean;
@@ -485,12 +488,7 @@ end;
 function acDecodeFileUri(const AUri: string): string;
 begin
   if AUri.StartsWith(acFileProtocol, True) then
-  begin
-    Result := acURLDecode(Copy(AUri, Length(acFileProtocol) + 1));
-  {$IFDEF MSWINDOWS}
-    Result := acUnixPathToWindows(Result);
-  {$ENDIF}
-  end
+    Result := acUnixPathToNative(acURLDecode(Copy(AUri, Length(acFileProtocol) + 1)))
   else
     Result := AUri;
 end;
@@ -500,10 +498,7 @@ begin
   if (AFileName = '') or acIsUrlFileName(AFileName) then
     Result := AFileName
   else
-  begin
-    Result := {$IFDEF MSWINDOWS}acWindowsPathToUnix{$ENDIF}(AFileName);
-    Result := acFileProtocol + acURLEncode(Result);
-  end;
+    Result := acFileProtocol + acURLEncode(acNativePathToUnix(Result));
 end;
 
 function acExpandEnvironmentStrings(const AFileName: string): string;
@@ -674,14 +669,19 @@ begin
   end;
 end;
 
-function acUnixPathToWindows(const Path: string): string;
+function acNativePathToUnix(const Path: string): string;
 begin
-  Result := acReplaceChar(Path, acUnixPathDelim, acWindowPathDelim);
+  Result := acReplaceChar(Path, PathDelim, acUnixPathDelim);
 end;
 
-function acWindowsPathToUnix(const Path: string): string;
+function acUnixPathToNative(const Path: string): string;
 begin
-  Result := acReplaceChar(Path, acWindowPathDelim, acUnixPathDelim);
+  Result := acReplaceChar(Path, acUnixPathDelim, PathDelim);
+end;
+
+function acWindowsPathToNative(const Path: string): string;
+begin
+  Result := acReplaceChar(Path, acWindowPathDelim, PathDelim);
 end;
 
 function acGetFileExtBounds(const FileName: string;
