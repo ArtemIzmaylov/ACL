@@ -1112,6 +1112,8 @@ end;
 
 procedure TACLMemoSubClass.ProcessMouseClick(AShift: TShiftState);
 begin
+  if not Editable then
+    Exit;
   if LastClickCount > 2 then
     SelectNearestRow(LayoutHitTest.PositionInText - Ord(LayoutHitTest.PositionInLineEnd))
   else if LastClickCount = 2 then
