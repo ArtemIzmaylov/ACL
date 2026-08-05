@@ -6,7 +6,7 @@
 //  Purpose:   TimeEdit
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -203,7 +203,7 @@ begin
   LValue := LValue div 60;
   M := LValue mod 60;
   LValue := LValue div 60;
-  H := Min(LValue, 24);
+  H := Min(LValue, 23);
 end;
 
 end.
