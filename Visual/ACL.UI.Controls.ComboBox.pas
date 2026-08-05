@@ -419,7 +419,6 @@ procedure TACLAbstractComboBox.CalculateButtons(var ARect: TRect; AIndent: Integ
 var
   LRect: TRect;
 begin
-  inherited;
   if DropDownButtonVisible then
   begin
     LRect := ARect;
@@ -429,6 +428,8 @@ begin
   end
   else
     DropDownButton.Calculate(NullRect);
+
+  inherited;
 end;
 
 function TACLAbstractComboBox.CreateDropDownButton: TACLButtonSubClass;
