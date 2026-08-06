@@ -295,6 +295,7 @@ type
     procedure GetDockZones(ASource: TACLDockControl; AList: TACLDockZones); virtual;
     procedure StartDrag(const P: TPoint);
     procedure StartResize(const P: TPoint; ABorder: TACLBorder);
+    procedure StopDrag(ACanceled: Boolean);
     //# Drawing
     procedure Paint; override;
     //# Mouse
@@ -431,7 +432,6 @@ type
     FCaptionButtons: array[TCaptionButton] of TRect;
     FCaptionRect: TRect;
     FCaptionTextRect: TRect;
-    FResizeHandler: TACLDockControl;
     FShowCaption: Boolean;
     FShowFrame: Boolean;
 
@@ -1716,14 +1716,7 @@ end;
 procedure TACLDockControl.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   if Button = mbLeft then
-  begin
-    FDragState := TDragState.None;
-    if FDockEngine <> nil then
-      FDockEngine.CreateLayout;
-    FreeAndNil(FDockEngine);
-    Screen.Cursor := crDefault;
-    MouseCapture := False;
-  end;
+    StopDrag(False);
   inherited;
 end;
 
@@ -1745,7 +1738,12 @@ end;
 
 procedure TACLDockControl.StartDrag(const P: TPoint);
 begin
+{$IFDEF FPC}
+  TGtkApp.GrabInput(Self, nil);
+  TGtkApp.SetInputRedirection(Self);
+{$ELSE}
   MouseCapture := True;
+{$ENDIF}
   FDragCapture := P;
   FDragState := TDragState.Drag;
   Screen.Cursor := crSizeAll;
@@ -1753,11 +1751,33 @@ end;
 
 procedure TACLDockControl.StartResize(const P: TPoint; ABorder: TACLBorder);
 begin
+{$IFDEF FPC}
+  TGtkApp.GrabInput(Self, nil);
+  TGtkApp.SetInputRedirection(Self);
+{$ELSE}
   MouseCapture := True;
+{$ENDIF}
   FDragCapture := ClientToScreen(P);
   FDragState := TDragState.Resize;
   FSizingBorder := ABorder;
   Screen.Cursor := CursorMap[FSizingBorder];
+end;
+
+procedure TACLDockControl.StopDrag(ACanceled: Boolean);
+begin
+  if FDragState <> TDragState.None then
+  begin
+    FDragState := TDragState.None;
+    Screen.Cursor := crDefault;
+  {$IFDEF FPC}
+    TGtkApp.UngrabInput(Self);
+  {$ELSE}
+    MouseCapture := False;
+  {$ENDIF}
+    if (FDockEngine <> nil) and not ACanceled then
+      FDockEngine.CreateLayout;
+    FreeAndNil(FDockEngine);
+  end;
 end;
 
 procedure TACLDockControl.StoreCustomSize;
@@ -1866,9 +1886,7 @@ end;
 
 procedure TACLDockControl.CMCancelMode(var Message: TCMCancelMode);
 begin
-  FDragState := TDragState.None;
-  FreeAndNil(FDockEngine);
-  Screen.Cursor := crDefault;
+  StopDrag(True);
   inherited;
 end;
 
@@ -2998,20 +3016,21 @@ end;
 
 procedure TACLDockPanel.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 var
-  APoint: TPoint;
-  ASide: TACLBorder;
+  LHandler: TACLDockControl;
+  LPoint: TPoint;
+  LSide: TACLBorder;
 begin
-  APoint := Point(X, Y);
-  SetCaptionButtonActiveIndex(HitOnCaptionButton(APoint));
+  LPoint := Point(X, Y);
+  SetCaptionButtonActiveIndex(HitOnCaptionButton(LPoint));
 
   if Button = mbLeft then
   begin
     if FCaptionButtonActiveIndex >= 0 then
       SetCaptionButtonPressedIndex(FCaptionButtonActiveIndex)
-    else if PtInRect(FCaptionRect, APoint) and CanStartDrag then
-      StartDrag(APoint)
-    else if HitOnSizeBox(APoint, FResizeHandler, ASide) then
-      FResizeHandler.StartResize(acMapPoint(Self, FResizeHandler, APoint), ASide);
+    else if PtInRect(FCaptionRect, LPoint) and CanStartDrag then
+      StartDrag(LPoint)
+    else if HitOnSizeBox(LPoint, LHandler, LSide) then
+      LHandler.StartResize(acMapPoint(Self, LHandler, LPoint), LSide);
   end;
 
   inherited;
@@ -3019,13 +3038,6 @@ end;
 
 procedure TACLDockPanel.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
-{$IFDEF FPC}
-  if (ssLeft in Shift) and (FResizeHandler <> nil) and (FResizeHandler <> Self) then
-  begin
-    FResizeHandler.MouseMove(Shift, -1, -1);
-    Exit;
-  end;
-{$ENDIF}
   if DragState = TDragState.None then
     SetCaptionButtonActiveIndex(HitOnCaptionButton(Point(X, Y)));
   inherited;
@@ -3039,16 +3051,15 @@ end;
 
 procedure TACLDockPanel.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 var
-  AHitButtonIndex: Integer;
+  LButtonIndex: Integer;
 begin
   if Button = mbLeft then
   begin
-    AHitButtonIndex := HitOnCaptionButton(Point(X, Y));
-    if (FCaptionButtonPressedIndex = AHitButtonIndex) and (FCaptionButtonPressedIndex >= 0) then
+    LButtonIndex := HitOnCaptionButton(Point(X, Y));
+    if (FCaptionButtonPressedIndex = LButtonIndex) and (FCaptionButtonPressedIndex >= 0) then
       CaptionButtonClick(TCaptionButton(FCaptionButtonPressedIndex));
-    SetCaptionButtonActiveIndex(AHitButtonIndex);
+    SetCaptionButtonActiveIndex(LButtonIndex);
     SetCaptionButtonPressedIndex(-1);
-    FResizeHandler := nil;
   end;
   inherited;
 end;
