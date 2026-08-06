@@ -17,7 +17,7 @@ unit ACL.UI.Core.Impl.Gtk3;
 
 {$SCOPEDENUMS ON}
 
-{.$DEFINE DEBUG_MESSAGELOOP}
+{.$DEFINE DEBUG_GRAB_INPUT}
 {$MESSAGE WARN 'Gtk3: проблемы с кэпчей - неправильные координаты'}
 interface
 
@@ -76,31 +76,34 @@ type
     class var FInputTarget: PGtkWidget;
     class var FInputTargetWnd: TWinControl;
     class var FOldExceptionHandler: TExceptionEvent;
-    class var FPopupCapturedDevice: PGdkDevice;
-    class var FPopupControl: TWinControl;
-    class var FPopupError: string;
+    class var FGrabbedDevice: PGdkDevice;
+    class var FGrabbedInputControl: TWinControl;
+    class var FGrabbedInputError: string;
 
     class procedure Handler(event: PGdkEvent; data: gpointer); cdecl; static;
     class procedure HandlerException(Sender: TObject; Error: Exception);
     class procedure HandlerInit;
     class procedure HandlerOnDestroy(data: gpointer); cdecl; static;
     class procedure HandlerRemoving(Sender: TComponent);
-    class procedure PopupEventHandler(AType: TGdkEventType; AEvent: PGdkEvent; var AHandled: Boolean);
     class procedure TranslateCoords(ATarget: PGtkWidget; AEvent: PGdkEvent);
   public
     class constructor Create;
     class destructor Destroy;
+    class procedure ProcessMessages;
+
+    // Global Hooks
+    class procedure CallbackForPopupWindow(
+      AType: TGdkEventType; AEvent: PGdkEvent; var AHandled: Boolean);
+    class procedure GrabInput(AControl: TWinControl; ACallback: TGtkEventCallback);
+    class function IsGrabbedInputAborted: Boolean;
+    class function IsInputEvent(AEvent: PGdkEvent): Boolean;
+    class function IsLooseFocusEvent(AEvent: PGdkEvent): Boolean;
+    class procedure UngrabInput(AControl: TWinControl);
+
+    // Local Hooks
     class procedure Hook(ACallback: TGtkEventCallback);
     class procedure Unhook; overload;
     class procedure Unhook(ACallback: TGtkEventCallback); overload;
-
-    class procedure BeginPopup(APopupControl: TWinControl); overload;
-    class procedure BeginPopup(APopupControl: TWinControl; ACallback: TGtkEventCallback); overload;
-    class procedure EndPopup(AControl: TWinControl);
-    class function IsLooseFocusEvent(AEvent: PGdkEvent): Boolean;
-    class function IsPopupAborted: Boolean;
-
-    class procedure ProcessMessages;
     class procedure SetInputRedirection(AControl: TWinControl);
   end;
 
@@ -513,19 +516,50 @@ begin
   FreeAndNil(FHooks);
 end;
 
-class procedure TGtkApp.BeginPopup(APopupControl: TWinControl);
+class procedure TGtkApp.CallbackForPopupWindow(
+  AType: TGdkEventType; AEvent: PGdkEvent; var AHandled: Boolean);
+var
+  LWidget: PGtkWidget;
+  LWidgetOfGrabbedInputWnd: PGtkWidget;
 begin
-  BeginPopup(APopupControl, PopupEventHandler);
+  case AType of
+    GDK_KEY_PRESS, GDK_KEY_RELEASE:
+      if FInputTarget <> nil then
+      begin
+        gtk_widget_event(FInputTarget, AEvent);
+        AHandled := True;
+        Exit;
+      end;
+  end;
+
+  if IsInputEvent(AEvent) then
+  begin
+    AHandled := True;
+    LWidget := gtk_get_event_widget(AEvent);
+    LWidgetOfGrabbedInputWnd := TGtk3Widget(FGrabbedInputControl.Handle).Widget;
+    if not IsChild(LWidget, LWidgetOfGrabbedInputWnd) then
+    begin
+      LWidget := TGtk3Widget(FGrabbedInputControl.Handle).GetContainerWidget;
+      TranslateCoords(LWidget, AEvent);
+    end;
+    gtk_widget_event(LWidget, AEvent);
+  end;
+
+  if IsLooseFocusEvent(AEvent) then
+  begin
+    if Screen.ActiveCustomForm <> FGrabbedInputControl then
+      FGrabbedInputControl.Perform(CM_CANCELMODE, 0, 0);
+  end;
 end;
 
-class procedure TGtkApp.BeginPopup(
-  APopupControl: TWinControl; ACallback: TGtkEventCallback);
+class procedure TGtkApp.GrabInput(
+  AControl: TWinControl; ACallback: TGtkEventCallback);
 const
   GdkHookFlags = [GDK_POINTER_MOTION_MASK,
     GDK_BUTTON_PRESS_MASK, GDK_BUTTON_RELEASE_MASK,
     GDK_ENTER_NOTIFY_MASK, GDK_LEAVE_NOTIFY_MASK];
 var
-{$IFNDEF DEBUG_MESSAGELOOP}
+{$IFNDEF DEBUG_GRAB_INPUT}
   //LAttrs: TGdkWindowAttr;
   LGrabResult: TGdkGrabStatus;
 {$ENDIF}
@@ -533,10 +567,10 @@ var
   LWidget: PGtkWidget;
   LWindow: PGdkWindow;
 begin
-  if FPopupCapturedDevice <> nil then
-    raise EInvalidOperation.Create('Gtk3: recursive popups are not supported');
+  if FGrabbedDevice <> nil then
+    raise EInvalidOperation.Create('Gtk3: input is already grabbed');
 
-{$IFDEF DEBUG_MESSAGELOOP}
+{$IFDEF DEBUG_GRAB_INPUT}
   LDevice := nil;
   LWidget := nil;
   LWindow := nil;
@@ -551,7 +585,7 @@ begin
   //LAttrs.window_type := GDK_WINDOW_TEMP;
   //LAttrs.wclass := GDK_INPUT_ONLY;
 
-  LWidget := TGtk3Widget(APopupControl.Handle).Widget;
+  LWidget := TGtk3Widget(AControl.Handle).Widget;
   // в таком ключе контекстные меню в скин-движке не реагируют на мышь
   //LWindow := gdk_screen_get_root_window(gtk_widget_get_screen(LWidget));
   //LWindow := gdk_window_new(LWindow, @LAttrs, [GDK_WA_X, GDK_WA_Y, GDK_WA_NOREDIR]);
@@ -584,48 +618,69 @@ begin
 {$ENDIF}
 
   // если мы тут - все прошло ОК, инициализируем приёмник сообщений и перехватчик
-  FPopupError := '';
-  FPopupControl := APopupControl;
-  FPopupCapturedDevice := LDevice;
-  //FPopupWidget := LWidget;
-  //FPopupWindow := LWindow;
+  FGrabbedDevice := LDevice;
+  FGrabbedInputControl := AControl;
+  FGrabbedInputError := '';
+  //FGrabbedInputWidget := LWidget;
+  //FGrabbedInputWindow := LWindow;
   try
     FOldExceptionHandler := Application.OnException;
     Application.OnException := HandlerException;
     Hook(ACallback);
   except
-    EndPopup(FPopupControl);
+    UngrabInput(FGrabbedInputControl);
     raise;
   end;
 end;
 
-class procedure TGtkApp.EndPopup(AControl: TWinControl);
+class procedure TGtkApp.UngrabInput(AControl: TWinControl);
 var
   LDisplay: PGdkDisplay;
 begin
-  if FPopupControl <> AControl then Exit;
+  if FGrabbedInputControl <> AControl then Exit;
 
   Unhook;
-  FPopupControl := nil;
+  FGrabbedInputControl := nil;
   SetInputRedirection(nil);
   Application.OnException := FOldExceptionHandler;
 
   try
-    if FPopupCapturedDevice <> nil then
-      gdk_seat_ungrab(gdk_device_get_seat(FPopupCapturedDevice));
-    //if FPopupWindow <> nil then
+    if FGrabbedDevice <> nil then
+      gdk_seat_ungrab(gdk_device_get_seat(FGrabbedDevice));
+    //if FGrabbedInputWindow <> nil then
     //begin
-    //  gtk_widget_unregister_window(FPopupWidget, FPopupWindow);
-    //  gdk_window_destroy(FPopupWindow);
+    //  gtk_widget_unregister_window(FGrabbedInputWidget, FGrabbedInputWindow);
+    //  gdk_window_destroy(FGrabbedInputWindow);
     //end;
   finally
-    FPopupCapturedDevice := nil;
-    //FPopupWidget := nil;
-    //FPopupWindow := nil;
+    FGrabbedDevice := nil;
+    //FGrabbedInputWidget := nil;
+    //FGrabbedInputWindow := nil;
   end;
 
-  if FPopupError <> '' then
-    raise Exception.Create(FPopupError);
+  if FGrabbedInputError <> '' then
+    raise Exception.Create(FGrabbedInputError);
+end;
+
+class function TGtkApp.IsGrabbedInputAborted: Boolean;
+begin
+  Result := FGrabbedInputError <> '';
+end;
+
+class function TGtkApp.IsInputEvent(AEvent: PGdkEvent): Boolean;
+begin
+  case AEvent.type_ of
+    GDK_MOTION_NOTIFY,
+    GDK_BUTTON_RELEASE,
+    GDK_BUTTON_PRESS,
+    GDK_2BUTTON_PRESS,
+    GDK_3BUTTON_PRESS,
+    GDK_KEY_PRESS,
+    GDK_KEY_RELEASE,
+    GDK_SCROLL:
+      Exit(True);
+  end;
+  Result := False;
 end;
 
 class function TGtkApp.IsLooseFocusEvent(AEvent: PGdkEvent): Boolean;
@@ -651,26 +706,16 @@ begin
   begin
     LHandled := False;
     LCallback := FHooks.Last;
-    LCallback(event^.type_, event, LHandled);
+    if Assigned(LCallback) then
+      LCallback(event^.type_, event, LHandled);
     if LHandled then Exit;
   end;
 
-  // Input-Redirection
-  case event.type_ of
-    GDK_MOTION_NOTIFY,
-    GDK_BUTTON_RELEASE,
-    GDK_BUTTON_PRESS,
-    GDK_2BUTTON_PRESS,
-    GDK_3BUTTON_PRESS,
-    GDK_KEY_PRESS,
-    GDK_KEY_RELEASE,
-    GDK_SCROLL:
-      if FInputTarget <> nil then
-      begin
-        TranslateCoords(FInputTarget, event);
-        gtk_widget_event(FInputTarget, event);
-        Exit;
-      end;
+  if (FInputTarget <> nil) and IsInputEvent(event) then
+  begin
+    TranslateCoords(FInputTarget, event);
+    gtk_widget_event(FInputTarget, event);
+    Exit;
   end;
 
   gtk_main_do_event(event);
@@ -678,7 +723,7 @@ end;
 
 class procedure TGtkApp.HandlerException(Sender: TObject; Error: Exception);
 begin
-  FPopupError := Error.ToString;
+  FGrabbedInputError := Error.ToString;
 end;
 
 class procedure TGtkApp.HandlerInit;
@@ -717,59 +762,9 @@ begin
   FHooks.Remove(ACallback);
 end;
 
-class function TGtkApp.IsPopupAborted: Boolean;
-begin
-  Result := FPopupError <> '';
-end;
-
 class procedure TGtkApp.ProcessMessages;
 begin
   WidgetSet.AppProcessMessages;
-end;
-
-class procedure TGtkApp.PopupEventHandler(
-  AType: TGdkEventType; AEvent: PGdkEvent; var AHandled: Boolean);
-var
-  LWidget: PGtkWidget;
-  LWidgetOfPopupWnd: PGtkWidget;
-begin
-  case AType of
-    GDK_KEY_PRESS, GDK_KEY_RELEASE:
-      if FInputTarget <> nil then
-      begin
-        gtk_widget_event(FInputTarget, AEvent);
-        AHandled := True;
-        Exit;
-      end;
-  end;
-
-  case AType of
-    GDK_BUTTON_RELEASE,
-    GDK_BUTTON_PRESS,
-    GDK_2BUTTON_PRESS,
-    GDK_3BUTTON_PRESS,
-    GDK_MOTION_NOTIFY,
-    GDK_KEY_PRESS,
-    GDK_KEY_RELEASE,
-    GDK_SCROLL:
-      begin
-        AHandled := True;
-        LWidget := gtk_get_event_widget(AEvent);
-        LWidgetOfPopupWnd := TGtk3Widget(FPopupControl.Handle).Widget;
-        if not IsChild(LWidget, LWidgetOfPopupWnd) then
-        begin
-          LWidget := TGtk3Widget(FPopupControl.Handle).GetContainerWidget;
-          TranslateCoords(LWidget, AEvent);
-        end;
-        gtk_widget_event(LWidget, AEvent);
-      end;
-    GDK_WINDOW_STATE:
-      if IsLooseFocusEvent(AEvent) then
-      begin
-        if Screen.ActiveCustomForm <> FPopupControl then
-          FPopupControl.Perform(CM_CANCELMODE, 0, 0);
-      end;
-  end;
 end;
 
 class procedure TGtkApp.SetInputRedirection(AControl: TWinControl);

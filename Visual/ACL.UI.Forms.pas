@@ -345,7 +345,7 @@ begin
   begin
     try
     {$IFDEF LCLGtkX}
-      TGtkApp.EndPopup(Self);
+      TGtkApp.UngrabInput(Self);
     {$ENDIF}
       Hide;
       if FOwnerFormWnd <> 0 then
@@ -501,7 +501,7 @@ begin
     Visible := True;
   {$IFDEF LCLGtkX}
     try
-      TGtkApp.BeginPopup(Self);
+      TGtkApp.GrabInput(Self, TGtkApp.CallbackForPopupWindow);
       if DropDownMode then
         TGtkApp.SetInputRedirection(Safe.CastOrNil<TWinControl>(Owner));
     except

@@ -3683,7 +3683,7 @@ end;
 
 procedure TACLMenuPopupLooperImpl.Run;
 begin
-  TGtkApp.BeginPopup(Wnd, DoEvent);
+  TGtkApp.GrabInput(Wnd, DoEvent);
   try
     repeat
       try
@@ -3691,12 +3691,12 @@ begin
       except
         Application.HandleException(Self);
       end;
-      if TGtkApp.IsPopupAborted then
+      if TGtkApp.IsGrabbedInputAborted then
         Break;
       DoIdle;
     until not IsInLoop;
   finally
-    TGtkApp.EndPopup(Wnd);
+    TGtkApp.UngrabInput(Wnd);
   end;
 end;
 
