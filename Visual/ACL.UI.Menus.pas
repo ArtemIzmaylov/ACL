@@ -2690,6 +2690,10 @@ begin
   EnsureItemVisible(DefaultIndex);
   Visible := True;
 
+  // Gtk3: FPopupWnd.Visible := True вызывается в Popup до создания Looper-а
+  // и может форсировать обработку сообщений, что приведёт к раннему закрытию попапа.
+  if not Visible then Exit;
+
   if Looper = nil then
   try
     FLooper := TACLMenuPopupLooperImpl.Create(Self);
@@ -3228,7 +3232,12 @@ begin
     if FPopupWnd.SourceItem = LSelected then
       Exit;
     FPopupOnSelect := True;
-    FPopupWnd.Looper.CloseMenu;
+    // Gtk3: FPopupWnd.Visible := True вызывается в Popup до создания Looper-а
+    // и может форсировать обработку сообщений, что приведёт к раннему закрытию попапа.
+    if FPopupWnd.Looper <> nil then
+      FPopupWnd.Looper.CloseMenu
+    else
+      FPopupWnd.Hide;
     Exit;
   end;
 
