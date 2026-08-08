@@ -1845,7 +1845,7 @@ end;
 
 procedure TACLTextLayoutCairoRender.SetFont(AFont: TFont);
 begin
-  Canvas.Font := AFont; // иначе TFont.GetColor не сработает
+  Canvas.SetScaledFont(AFont); // иначе TFont.GetColor не сработает
   FFontColor := TCairoColor.From(Canvas.Font);
   FFont := TCairoFonts.Select(FHandle, AFont);
   cairo_set_source_color(FHandle, FFontColor);
