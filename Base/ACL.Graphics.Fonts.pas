@@ -113,11 +113,9 @@ type
     class function Enumerate: IACLEnumerable<string>;
     class procedure FlushCache;
     class procedure StartLoader;
-    //# LocalFonts (TTF-only!!!)
-    // <FontId> is name without path and extension of font file, for example: "FluentSystemIcons-Regular" (Linux only)
-    // !! DO NOT FORGET to call the Flush after registering all fonts
-    class function RegisterFont(AData: TMemoryStream; AFontId: string = ''): TObjHandle;
-    class procedure UnregisterFont(AHandle: TObjHandle);
+    //# Temporary fonts (TTF-only!!!)
+    // !! DO NOT FORGET to call the Flush after registering all custom fonts
+    class function RegisterCustomFont(AData: TMemoryStream; out AName: string): TObject;
   end;
 
   // pango-library/pango/pango-script.h
@@ -144,12 +142,6 @@ function acGetTrueTypeFontName(AStream: TStream): string;
 function acResolveFontHeight(AFont: TFont; AHeight: Integer): Integer;
 procedure acSetFontHeight(AFont: TFont; AHeight, ATargetDpi: Integer);
 implementation
-
-{$IFDEF MSWINDOWS}
-function AddFontMemResourceEx(AMem: Pointer; AMemSize: DWORD;
-  AVector: PDesignVector; ANumInstalled: LPDWORD): THandle; stdcall; external gdi32;
-function RemoveFontMemResourceEx(AFontHandle: THandle): BOOL; stdcall; external gdi32;
-{$ENDIF}
 
 {$REGION ' Metrics Cache '}
 type
@@ -1159,6 +1151,25 @@ begin
   Result := False;
 end;
 
+{$IFDEF MSWINDOWS}
+type
+  TMemoryFontHandle = class
+  public
+    FHandle: THandle;
+    destructor Destroy; override;
+  end;
+
+function AddFontMemResourceEx(AMem: Pointer; AMemSize: DWORD;
+  AVector: PDesignVector; ANumInstalled: LPDWORD): THandle; stdcall; external gdi32;
+function RemoveFontMemResourceEx(AFontHandle: THandle): BOOL; stdcall; external gdi32;
+
+destructor TMemoryFontHandle.Destroy;
+begin
+  RemoveFontMemResourceEx(FHandle);
+  inherited;
+end;
+{$ENDIF}
+
 { TACLFontRepository }
 
 class constructor TACLFontRepository.Create;
@@ -1228,39 +1239,48 @@ begin
 {$ENDIF}
 end;
 
-class function TACLFontRepository.RegisterFont(
-  AData: TMemoryStream; AFontId: string): TObjHandle;
-{$IFDEF MSWINDOWS}
+class function TACLFontRepository.RegisterCustomFont(
+  AData: TMemoryStream; out AName: string): TObject;
 var
-  LCount: DWORD;
-begin
-  LCount := 0;
-  Result := AddFontMemResourceEx(AData.Memory, AData.Size, nil, @LCount);
-  if (Result = 0) or (LCount = 0) then
-    LogEntry(acGeneralLogFileName, 'Fonts', 'RegisterFont(%s) failed', [AFontId]);
-{$ELSE}
-var
+{$IFDEF LINUX}
   LAppId: string;
   LPath: string;
+{$ENDIF}
+  LList: TACLObjectList;
 begin
-  Result := 0;
+  Result := nil;
+  AName := acGetTrueTypeFontName(AData);
+  if AName = '' then Exit;
+{$IFDEF MSWINDOWS}
+  var LCount: LongWord := 0;
+  var LHandle := AddFontMemResourceEx(AData.Memory, AData.Size, nil, @LCount);
+  if (LHandle = 0) or (LCount = 0) then
+    LogEntry(acGeneralLogFileName, 'Fonts', 'RegisterFont(%s) failed', [AName]);
+  if LHandle <> 0 then
+  begin
+    TMemoryFontHandle(Result) := TMemoryFontHandle.Create;
+    TMemoryFontHandle(Result).FHandle := LHandle;
+  end;
+{$ELSEIF DEFINED(LINUX)}
+  // TODO: FT_New_Memory_Face
   LAppId := acChangeFileExt(acExtractFileName(Paramstr(0)), '');
   LPath := acIncludeTrailingPathDelimiter(GetUserDir) + '.local/share/fonts/ttf/' + LAppId + '/';
-  if AFontId = '' then
-    AFontId := TACLHashMD5.Calculate(AData);
   if ForceDirectories(LPath) then
   begin
-    LPath := LPath + AFontId + '.ttf';
+    LPath := LPath + TACLHashMD5.Calculate(AData) + '.ttf';
     try
       AData.SaveToFile(LPath);
-      Result := TObjHandle(acAllocStr(LPath));
+      if FFontsToDelete = nil then
+        FFontsToDelete := TACLStringList.Create;
+      FFontsToDelete.Add(LPath);
     except
-      DeleteFile(LPath);
+      on E: Exception do
+      begin
+        DeleteFile(LPath);
+        LogEntry(acGeneralLogFileName, 'Fonts', 'RegisterFont(%s: %s) failed', [AName, E.Message]);
+      end;
     end;
   end;
-  if Result = 0 then
-    LogEntry(acGeneralLogFileName, 'Fonts', 'RegisterFont(%s) failed', [AFontId]);
-  // TODO: FT_New_Memory_Face
 {$ENDIF}
 end;
 
@@ -1280,21 +1300,6 @@ begin
     AsyncFontLoader(nil); // LCL API is not thread-safe
   {$ENDIF}
   end;
-end;
-
-class procedure TACLFontRepository.UnregisterFont(AHandle: TObjHandle);
-begin
-  if AHandle = 0 then Exit;
-{$IFDEF MSWINDOWS}
-  RemoveFontMemResourceEx(AHandle);
-{$ELSE}
-  //#AI: lead to AV in libfontconfig
-  //DeleteFile(PAnsiChar(AHandle));
-  if FFontsToDelete = nil then
-    FFontsToDelete := TACLStringList.Create;
-  FFontsToDelete.Add(PAnsiChar(AHandle));
-  FreeMem(Pointer(AHandle));
-{$ENDIF}
 end;
 
 class procedure TACLFontRepository.WaitForLoader(ACancel: Boolean);
