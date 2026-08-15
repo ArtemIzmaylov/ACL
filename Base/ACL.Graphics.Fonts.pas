@@ -48,12 +48,14 @@ uses
   ACL.Classes.StringList,
   ACL.Graphics,
   ACL.Hashes,
+  ACL.Math,
   ACL.Threading,
   ACL.Threading.Pool,
   ACL.Utils.Common,
   ACL.Utils.DPIAware,
   ACL.Utils.FileSystem,
   ACL.Utils.Logger,
+  ACL.Utils.Stream,
   ACL.Utils.Strings;
 
 type
@@ -137,6 +139,7 @@ function acGetCharsetGroup(Char: UCS4Char): TACLCharsetGroup;
 function acGetFontFaceId(AFont: TFont): string;
 function acGetReadingDirection(C: Word): TACLTextReadingDirection; overload;
 function acGetReadingDirection(P: PChar; L: Integer): TACLTextReadingDirection; overload; inline;
+function acGetTrueTypeFontName(AStream: TStream): string;
 
 function acResolveFontHeight(AFont: TFont; AHeight: Integer): Integer;
 procedure acSetFontHeight(AFont: TFont; AHeight, ATargetDpi: Integer);
@@ -891,6 +894,108 @@ begin
     IntToStr(AFont.Orientation) + ',' +
     IntToStr(Ord(AFont.Pitch)) + ',' +
     IntToStr(acFontStyleDecode(AFont.Style));
+end;
+
+function acGetTrueTypeFontName(AStream: TStream): string;
+type
+  TNameRecord = record
+    PlatformID: Word;
+    PlatformSpecifiedEncoding: Word;
+    LanguageID: Word;
+    NameID: Word;
+    StringLengthInBytes: Word;
+    StringOffset: Word;
+  end;
+
+  TNameRecords = array of TNameRecord;
+
+  function FindNameSection(out AOffset: LongInt): Boolean;
+  var
+    LCount: Integer;
+    LSection: LongWord;
+  begin
+    AStream.Seek(4, soFromCurrent); // Version
+    LCount := AStream.ReadWordBE;
+    AStream.Seek(6, soFromCurrent); // SearchRange + EntrySelector + RangeShift
+    while LCount > 0 do
+    begin
+      LSection := LongWord(AStream.ReadInt32);
+      AStream.ReadInt32BE; // Checksum
+      AOffset := AStream.ReadInt32BE;
+      AStream.ReadInt32BE; // Length
+      if LSection = $656D616E then
+        Exit(True);
+      Dec(LCount);
+    end;
+    Result := False;
+  end;
+
+  function FindActualRecord(const ARecords: TNameRecords; out ARecord: TNameRecord): Boolean;
+  var
+    I: Integer;
+  begin
+    Result := False;
+    for I := 0 to Length(ARecords) - 1 do
+      if (ARecords[I].NameID = 1) and (ARecords[I].PlatformID = 3) then
+      begin
+        Result := True;
+        ARecord := ARecords[I];
+        if ARecord.LanguageID = 1033 then Break;
+      end;
+  end;
+
+var
+  LCount: LongInt;
+  LName: UnicodeString;
+  LOffset: LongInt;
+  LPrevPosition: Int64;
+  LRecord: TNameRecord;
+  LRecords: TNameRecords;
+  LStringBase: LongInt;
+  I: Integer;
+begin
+  LPrevPosition := AStream.Position;
+  try
+    Result := '';
+    try
+      if FindNameSection(LOffset) then
+      begin
+        AStream.Position := LOffset;
+        AStream.Seek(2, soFromCurrent); // Format Selector ( = 0)
+        LCount := AStream.ReadWordBE;
+        LStringBase := AStream.ReadWordBE;
+        SetLength(LRecords{%H-}, LCount);
+        for I := 0 to LCount - 1 do
+        begin
+          LRecords[I].PlatformID := AStream.ReadWordBE;
+          LRecords[I].PlatformSpecifiedEncoding := AStream.ReadWordBE;
+          LRecords[I].LanguageID := AStream.ReadWordBE;
+          LRecords[I].NameID := AStream.ReadWordBE;
+          LRecords[I].StringLengthInBytes := AStream.ReadWordBE;
+          LRecords[I].StringOffset := LStringBase + AStream.ReadWordBE;
+        end;
+
+        if FindActualRecord(LRecords, LRecord) then
+        begin
+          AStream.Position := LOffset + LRecord.StringOffset;
+          case LRecord.PlatformSpecifiedEncoding of
+            0, 1:
+              begin
+                LCount := LRecord.StringLengthInBytes div SizeOf(WideChar);
+                SetLength(LName{%H-}, LCount);
+                for I := 1 to LCount do
+                  LName[I] := WideChar(AStream.ReadWordBE);
+                Result := acString(LName);
+              end;
+          end;
+        end;
+      end;
+    except
+      // incorrect font format, do nothing
+    end;
+  finally
+    AStream.Position := LPrevPosition;
+  end;
 end;
 
 function acResolveFontHeight(AFont: TFont; AHeight: Integer): Integer;
