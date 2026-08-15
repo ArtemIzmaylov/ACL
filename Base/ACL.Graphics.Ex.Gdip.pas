@@ -260,6 +260,19 @@ type
     procedure EndPaint; override;
   end;
 
+  { TACLGdiplusFonts }
+
+  TACLGdiplusFonts = class
+  strict private
+    class var FHandle: GpFontCollection;
+    class var FOldProc: TACLFontRepository.TRegisterCustomFontProc;
+    class procedure Register(AHandles: TACLObjectList; AData: TMemoryStream);
+  public
+    class function Create(AFont: TFont): GpFont;
+    class constructor Init;
+    class procedure Finalize;
+  end;
+
   { TACLGdiplusStream }
 
   TACLGdiplusStream = class(TStreamAdapter)
@@ -279,7 +292,6 @@ type
     class procedure Finalize;
     class function Get(Alpha: Byte): GpImageAttributes;
   end;
-
 
 var
   GpDefaultColorMatrix: TColorMatrix = (
@@ -307,6 +319,9 @@ implementation
 
 uses
   System.Math;
+
+  function GdipDeletePrivateFontCollection(
+    var fontCollection: GPFONTCOLLECTION): GPSTATUS; stdcall; external WINGDIPDLL;
 
 type
 
@@ -351,6 +366,7 @@ var
 procedure GdipFree;
 begin
   FreeAndNil(ExPainter);
+  TACLGdiplusFonts.Finalize;
   TACLGdiplusAlphaBlendAttributes.Finalize;
   TACLGdiplusResourcesCache.Flush;
   if gdiplusTokenOwned then
@@ -609,52 +625,6 @@ end;
 
 {$REGION ' GDI+ Cache '}
 
-function acCreateFont(const AData: TFont): GpFont;
-const
-  DefaultTrueTypeFont: PChar = 'Tahoma';
-var
-  LError: GpStatus;
-  LLogFont: TLogFontW;
-begin
-  ZeroMemory(@LLogFont, SizeOf(LLogFont));
-//
-//  LLogFont.lfHeight := AData.Height;
-//  LLogFont.lfEscapement := AData.Orientation;
-//  LLogFont.lfOrientation := AData.Orientation;
-//  LLogFont.lfWeight := IfThen(fsBold in AData.Style, FW_BOLD, FW_NORMAL);
-//  LLogFont.lfItalic := Ord(fsItalic in AData.Style);
-//  LLogFont.lfUnderline := Byte(fsUnderline in AData.Style);
-//  LLogFont.lfStrikeOut := Byte(fsStrikeOut in AData.Style);
-//  LLogFont.lfQuality := Ord(AData.Quality);
-//  LLogFont.lfCharSet := DefFontData.Charset;
-//
-//  LLogFont.lfClipPrecision := CLIP_DEFAULT_PRECIS;
-//  if LLogFont.lfOrientation <> 0 then
-//    LLogFont.lfOutPrecision := OUT_TT_ONLY_PRECIS
-//  else
-//    LLogFont.lfOutPrecision := OUT_DEFAULT_PRECIS;
-//
-//  case AData.Pitch of
-//    fpVariable:
-//      LLogFont.lfPitchAndFamily := VARIABLE_PITCH;
-//    fpFixed:
-//      LLogFont.lfPitchAndFamily := FIXED_PITCH;
-//  else
-//    LLogFont.lfPitchAndFamily := DEFAULT_PITCH;
-//  end;
-//
-//  StrLCopy(@LLogFont.lfFaceName[0], PChar(AData.Name), Length(LLogFont.lfFaceName));
-//
-  GetObject(AData.Handle, SizeOf(LLogFont), @LLogFont);
-  LError := GdipCreateFontFromLogfontW(MeasureCanvas.Handle, @LLogFont, Result);
-  if LError = NotTrueTypeFont then
-  begin
-    StrLCopy(@LLogFont.lfFaceName[0], DefaultTrueTypeFont, Length(LLogFont.lfFaceName));
-    LError := GdipCreateFontFromLogfontW(MeasureCanvas.Handle, @LLogFont, Result);
-  end;
-  GdipCheck(LError);
-end;
-
 { TACLGdiplusResourcesCache }
 
 class procedure TACLGdiplusResourcesCache.Flush;
@@ -690,7 +660,7 @@ begin
   LKey := acGetFontFaceId(AFont);
   if not FFonts.Get(LKey, Result) then
   begin
-    Result := acCreateFont(AFont);
+    Result := TACLGdiplusFonts.Create(AFont);
     FFonts.Add(LKey, Result);
   end;
 end;
@@ -1438,6 +1408,66 @@ end;
 //------------------------------------------------------------------------------
 // Other
 //------------------------------------------------------------------------------
+
+{ TACLGdiplusFonts }
+
+class function TACLGdiplusFonts.Create(AFont: TFont): GpFont;
+var
+  LError: GpStatus;
+  LFamily: GpFontFamily;
+  LHeight: Integer;
+  LLogFont: TLogFontW;
+begin
+  if FHandle <> nil then
+  begin
+    if GdipCreateFontFamilyFromName(PChar(AFont.Name), FHandle, LFamily) = Ok then
+    begin
+      LHeight := -acResolveFontHeight(AFont, AFont.Height);
+      if GdipCreateFont(LFamily, LHeight, 0, Ord(UnitPixel), Result) = Ok then
+        Exit;
+    end;
+  end;
+
+  LLogFont := Default(TLogFontW);
+  GetObject(AFont.Handle, SizeOf(LLogFont), @LLogFont);
+  LError := GdipCreateFontFromLogfontW(MeasureCanvas.Handle, @LLogFont, Result);
+  if LError = NotTrueTypeFont then
+  begin
+    StrLCopy(@LLogFont.lfFaceName[0], 'Tahoma', Length(LLogFont.lfFaceName));
+    LError := GdipCreateFontFromLogfontW(MeasureCanvas.Handle, @LLogFont, Result);
+  end;
+  GdipCheck(LError);
+end;
+
+class procedure TACLGdiplusFonts.Finalize;
+begin
+  TACLFontRepository.RegisterCustomFontProc := FOldProc;
+  if FHandle <> nil then
+  try
+    GdipDeletePrivateFontCollection(FHandle);
+  finally
+    FHandle := nil;
+  end;
+end;
+
+class constructor TACLGdiplusFonts.Init;
+begin
+  FOldProc := TACLFontRepository.RegisterCustomFontProc;
+  TACLFontRepository.RegisterCustomFontProc := TACLGdiplusFonts.Register;
+end;
+
+class procedure TACLGdiplusFonts.Register(AHandles: TACLObjectList; AData: TMemoryStream);
+begin
+  if Assigned(FOldProc) then
+    FOldProc(AHandles, AData);
+  if FHandle = nil then
+  begin
+    if GdipNewPrivateFontCollection(FHandle) <> Ok then
+      FHandle := nil;
+  end;
+  if FHandle <> nil then
+    GdipPrivateAddMemoryFont(FHandle, AData.Memory, AData.Size);
+end;
 
 { TACLGdiplusStream }
 

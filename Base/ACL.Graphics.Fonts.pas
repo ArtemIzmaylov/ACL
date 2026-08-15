@@ -87,6 +87,8 @@ type
   { TACLFontRepository }
 
   TACLFontRepository = class
+  public type
+    TRegisterCustomFontProc = procedure (AHandles: TACLObjectList; AData: TMemoryStream) of object;
   strict private type
   {$REGION ' Internal Types '}
     PCallbackData = ^TCallbackData;
@@ -99,6 +101,7 @@ type
     class var FFontsToDelete: TACLStringList;
     class var FLoaderHandle: TObjHandle;
     class var FLock: TACLCriticalSection;
+    class var FRegisterCustomFontProc: TRegisterCustomFontProc;
 
     class procedure AsyncFontLoader(
       ACheckCanceled: TACLTaskCancelCallback);
@@ -116,6 +119,8 @@ type
     //# Temporary fonts (TTF-only!!!)
     // !! DO NOT FORGET to call the Flush after registering all custom fonts
     class function RegisterCustomFont(AData: TMemoryStream; out AName: string): TObject;
+    class property RegisterCustomFontProc: TRegisterCustomFontProc
+      read FRegisterCustomFontProc write FRegisterCustomFontProc;
   end;
 
   // pango-library/pango/pango-script.h
@@ -1282,6 +1287,13 @@ begin
     end;
   end;
 {$ENDIF}
+  if Assigned(RegisterCustomFontProc) then
+  begin
+    LList := TACLObjectList.Create;
+    LList.Add(Result);
+    RegisterCustomFontProc(LList, AData);
+    Result := LList;
+  end;
 end;
 
 class procedure TACLFontRepository.StartLoader;
