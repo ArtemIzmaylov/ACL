@@ -88,7 +88,8 @@ type
 
   TACLFontRepository = class
   public type
-    TRegisterCustomFontProc = procedure (AHandles: TACLObjectList; AData: TMemoryStream) of object;
+    TRegisterCustomFontProc = procedure (AHandles: TACLObjectList;
+      const AName: string; AData: TMemoryStream) of object;
   strict private type
   {$REGION ' Internal Types '}
     PCallbackData = ^TCallbackData;
@@ -1291,7 +1292,7 @@ begin
   begin
     LList := TACLObjectList.Create;
     LList.Add(Result);
-    RegisterCustomFontProc(LList, AData);
+    RegisterCustomFontProc(LList, AName, AData);
     Result := LList;
   end;
 end;

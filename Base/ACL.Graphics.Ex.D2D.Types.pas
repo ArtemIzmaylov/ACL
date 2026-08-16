@@ -7,7 +7,7 @@
 //  Purpose:   Direct2D Api and Types
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2024
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -1996,6 +1996,129 @@ type
     function CreateSurfaceFromHandle(handle: THANDLE; out surface: IUnknown): HResult; stdcall;
     function CreateSurfaceFromHwnd(hwnd: HWND; out surface: IUnknown): HResult; stdcall;
   end;
+
+// ---------------------------------------------------------------------------------------------------------------------
+// DWrite Factories
+// ---------------------------------------------------------------------------------------------------------------------
+// MfPack/src/WinApi.DirectX.DWrite_3.pas
+
+  DWRITE_CONTAINER_TYPE = type LongWord;
+  DWRITE_GRID_FIT_MODE = type LongWord;
+  DWRITE_RENDERING_MODE1 = type LongWord;
+  DWRITE_TEXT_ANTIALIAS_MODE = type LongWord;
+
+  IDWriteColorGlyphRunEnumerator = IUnknown;
+  IDWriteColorGlyphRunEnumerator1 = IUnknown;
+  IDWriteFontCollection1 = IDWriteFontCollection;
+  IDWriteFontDownloadQueue = IUnknown;
+  IDWriteFontFaceReference = IUnknown;
+  IDWriteFontFallback = IUnknown;
+  IDWriteFontFallbackBuilder = IUnknown;
+  IDWriteFontSet = IUnknown;
+  IDWriteFontSetBuilder = IUnknown;
+  IDWriteFontSetBuilder1 = IUnknown;
+  IDWriteRemoteFontFileLoader = IUnknown;
+  IDWriteRenderingParams1 = IUnknown;
+  IDWriteRenderingParams2 = IUnknown;
+  IDWriteRenderingParams3 = IUnknown;
+
+  PDWRITE_MATRIX = ^DWRITE_MATRIX;
+  PDWRITE_GLYPH_RUN_DESCRIPTION = ^DWRITE_GLYPH_RUN_DESCRIPTION;
+
+  {$EXTERNALSYM IDWriteFactory1}
+  IDWriteFactory1 = interface(IDWriteFactory) // since Windows 8
+  ['{30572f99-dac6-41db-a16e-0486307e606a}']
+    function GetEudcFontCollection(
+      fontCollection: IDWriteFontCollection; checkForUpdates: BOOL): HResult; stdcall;
+    function CreateCustomRenderingParams(
+      gamma, enhancedContrast, enhancedContrastGrayscale, clearTypeLevel: Single;
+      pixelGeometry: DWRITE_PIXEL_GEOMETRY; renderingMode: DWRITE_RENDERING_MODE;
+      out renderingParams: IDWriteRenderingParams1): HResult; stdcall;
+  end;
+
+  {$EXTERNALSYM IDWriteFactory2}
+  IDWriteFactory2 = interface(IDWriteFactory1) // Windows 8.1
+  ['{0439fc60-ca44-4994-8dee-3a9af7b732ec}']
+    function GetSystemFontFallback(fontFallback: IDWriteFontFallback): HResult; stdcall;
+    function CreateFontFallbackBuilder(fontFallbackBuilder: IDWriteFontFallbackBuilder): HResult; stdcall;
+    function TranslateColorGlyphRun(baselineOriginX, baselineOriginY: Single;
+      glyphRun: DWRITE_GLYPH_RUN;
+      glyphRunDescription: PDWRITE_GLYPH_RUN_DESCRIPTION;
+      measuringMode: DWRITE_MEASURING_MODE;
+      worldToDeviceTransform: PDWRITE_MATRIX;
+      colorPaletteIndex: UINT32;
+      out colorLayers: IDWriteColorGlyphRunEnumerator): HResult; stdcall;
+    function CreateCustomRenderingParams(
+      gamma, enhancedContrast, grayscaleEnhancedContrast, clearTypeLevel: Single;
+      pixelGeometry: DWRITE_PIXEL_GEOMETRY; renderingMode: DWRITE_RENDERING_MODE;
+      gridFitMode: DWRITE_GRID_FIT_MODE; out renderingParams: IDWriteRenderingParams2): HResult; stdcall;
+    function CreateGlyphRunAnalysis(glyphRun: DWRITE_GLYPH_RUN;
+      transform: PDWRITE_MATRIX; renderingMode: DWRITE_RENDERING_MODE;
+      measuringMode: DWRITE_MEASURING_MODE; gridFitMode: DWRITE_GRID_FIT_MODE;
+      antialiasMode: DWRITE_TEXT_ANTIALIAS_MODE; baselineOriginX, baselineOriginY: Single;
+      out glyphRunAnalysis: IDWriteGlyphRunAnalysis): HResult; stdcall;
+  end;
+
+  {$EXTERNALSYM IDWriteFactory3}
+  IDWriteFactory3 = interface(IDWriteFactory2) // Windows 10
+  ['{9A1B41C3-D3BB-466A-87FC-FE67556A3B65}']
+    function CreateGlyphRunAnalysis(
+      glyphRun: DWRITE_GLYPH_RUN; transform: DWRITE_MATRIX;
+      renderingMode: DWRITE_RENDERING_MODE1; measuringMode: DWRITE_MEASURING_MODE;
+      gridFitMode: DWRITE_GRID_FIT_MODE; antialiasMode: DWRITE_TEXT_ANTIALIAS_MODE;
+      baselineOriginX, baselineOriginY: Single; out glyphRunAnalysis: IDWriteGlyphRunAnalysis): HResult; stdcall;
+    function CreateCustomRenderingParams(gamma, enhancedContrast: Single;
+      grayscaleEnhancedContrast, clearTypeLevel: Single;
+      pixelGeometry: DWRITE_PIXEL_GEOMETRY; renderingMode: DWRITE_RENDERING_MODE1;
+      gridFitMode: DWRITE_GRID_FIT_MODE; out renderingParams: IDWriteRenderingParams3): HResult; stdcall;
+    function CreateFontFaceReference(filePath: PWideChar; lastWriteTime: FILETIME;
+      faceIndex: UINT32; fontSimulations: DWRITE_FONT_SIMULATIONS;
+      out fontFaceReference: IDWriteFontFaceReference): HResult; overload; stdcall;
+    function CreateFontFaceReference(fontFile: IDWriteFontFile; faceIndex: UINT32;
+      fontSimulations: DWRITE_FONT_SIMULATIONS; out fontFaceReference: IDWriteFontFaceReference): HResult; overload; stdcall;
+    function GetSystemFontSet(out fontSet: IDWriteFontSet): HResult; stdcall;
+    function CreateFontSetBuilder(out fontSetBuilder: IDWriteFontSetBuilder): HResult; stdcall;
+    function CreateFontCollectionFromFontSet(fontSet: IDWriteFontSet;
+      out fontCollection: IDWriteFontCollection1): HResult; stdcall;
+    function GetSystemFontCollection(includeDownloadableFonts: BOOL;
+      out fontCollection: IDWriteFontCollection1; checkForUpdates: BOOL = FALSE): HResult; stdcall;
+    function GetFontDownloadQueue(out fontDownloadQueue: IDWriteFontDownloadQueue): HResult; stdcall;
+  end;
+
+  {$EXTERNALSYM IDWriteFactory4}
+  IDWriteFactory4 = interface(IDWriteFactory3) // Windows 10 14393
+  ['{4B0B5BD3-0797-4549-8AC5-FE915CC53856}']
+    function TranslateColorGlyphRun(baselineOriginX, baselineOriginY: Single;
+      glyphRun: PDWriteGlyphRun; glyphRunDescription: PDWriteGlyphRunDescription;
+      colorPaletteIndex: UINT32; measuringMode: TDWriteMeasuringMode;
+      worldTransform: PDWriteMatrix; pixelsPerDip: Single;
+      out colorGlyphRunEnumerator: IDWriteColorGlyphRunEnumerator1): HResult; stdcall;
+    function ComputeGlyphOrigins(glyphRun: PDWriteGlyphRun;
+      measuringMode: TDWriteMeasuringMode; baselineOrigin: Pointer;
+      worldTransform: PDWriteMatrix; pixelsPerDip: Single; out glyphOrigins: Single): HResult; stdcall;
+    function GetFontDownloadQueue(out fontDownloadQueue: IDWriteFontDownloadQueue): HResult; stdcall;
+  end;
+
+  {$EXTERNALSYM IDWriteInMemoryFontFileLoader}
+  IDWriteInMemoryFontFileLoader = interface(IDWriteFontFileLoader)
+  ['{DC102F47-A12D-4B1C-822D-9E117E33043F}']
+    function CreateInMemoryFontFileReference(factory: IDWriteFactory;
+      fontData: Pointer; fontDataSize: UINT32; ownerObject: IUnknown;
+      out fontFile: IDWriteFontFile): HResult; stdcall;
+    function GetFileCount: UINT32; stdcall;
+  end;
+
+  {$EXTERNALSYM IDWriteFactory5}
+  IDWriteFactory5 = interface(IDWriteFactory4) // Windows 10 15063
+  ['{958DB99A-BE2A-4F09-AF7D-65189803D1D3}']
+    function CreateFontSetBuilder(out fontSetBuilder: IDWriteFontSetBuilder1): HResult; stdcall;
+    function CreateInMemoryFontFileLoader(out newLoader: IDWriteInMemoryFontFileLoader): HResult; stdcall;
+    function CreateHttpFontFileLoader(referrerUrl, extraHeaders: PWideChar;
+      out newLoader: IDWriteRemoteFontFileLoader): HResult; stdcall;
+    function AnalyzeContainerType(fileData: Pointer; fileDataSize: UINT32): DWRITE_CONTAINER_TYPE; stdcall;
+    function UnpackFontFile(containerType: DWRITE_CONTAINER_TYPE;
+      fileData: Pointer; fileDataSize: UINT32; out unpackedFontStream: IDWriteFontFileStream): HResult; stdcall;
+ end;
 
 implementation
 

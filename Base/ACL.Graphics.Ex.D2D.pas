@@ -7,7 +7,7 @@
 //  Purpose:   Direct2D Wrappers
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2024
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -46,7 +46,9 @@ uses
   ACL.Graphics,
   ACL.Graphics.Ex,
   ACL.Graphics.Ex.D2D.Types,
+  ACL.Graphics.Fonts,
   ACL.Math,
+  ACL.Parsers,
   ACL.Utils.Common;
 
 type
@@ -235,11 +237,56 @@ type
     procedure SetWndHandle(AHandle: HWND);
   end;
 
+  { TACLDirect2DCustomFonts }
+
+  TACLDirect2DCustomFonts = class(TList)
+  strict private
+    FFactory: IDWriteFactory;
+    FOldProc: TACLFontRepository.TRegisterCustomFontProc;
+    procedure RegisterCustomFont(AHandles: TACLObjectList;
+      const AName: string; AData: TMemoryStream);
+  public
+    constructor Create(const AFactory: IDWriteFactory);
+    destructor Destroy; override;
+    function Get(const AName: string): IDWriteFontCollection;
+    //# Properties
+    property Factory: IDWriteFactory read FFactory;
+  end;
+
+  { TACLDirect2DCustomFont }
+
+  TACLDirect2DCustomFont = class(TACLUnknownObject,
+    IDWriteFontCollectionLoader,
+    IDWriteFontFileEnumerator)
+  strict private
+    FFile: IDWriteFontFile;
+    FHandle: IDWriteFontCollection;
+    FIndex: Integer;
+    FLoader: IDWriteInMemoryFontFileLoader;
+    FName: string;
+    FOwner: TACLDirect2DCustomFonts;
+    // IDWriteFontCollectionLoader
+    function CreateEnumeratorFromKey(const AFactory: IDWriteFactory;
+      ACollectionKey: Pointer; ACollectionKeySize: Cardinal;
+      out AFontFileEnumerator: IDWriteFontFileEnumerator): HResult; stdcall;
+    // IDWriteFontFileEnumerator
+    function GetCurrentFontFile(out fontFile: IDWriteFontFile): HResult; stdcall;
+    function MoveNext(var hasCurrentFile: BOOL): HResult; stdcall;
+  public
+    constructor Create(AOwner: TACLDirect2DCustomFonts;
+      const AName: string; AData: TMemoryStream);
+    destructor Destroy; override;
+    procedure Release;
+    //# Properties
+    property Name: string read FName;
+    property Handle: IDWriteFontCollection read FHandle;
+  end;
+
   { TACLDirect2D }
 
   TACLDirect2D = class
   strict private type
-  {$REGION 'Internal Types'}
+  {$REGION ' Internal Types '}
     TD2D1CreateFactoryFunc = function (factoryType: D2D1_FACTORY_TYPE; const riid: TGUID;
       pFactoryOptions: PD2D1FactoryOptions; out ppIFactory): HRESULT; stdcall;
     TD3D11CreateDeviceFunc = function (pAdapter: IDXGIAdapter; DriverType: TD3DDriveType; Software: HMODULE;
@@ -249,6 +296,7 @@ type
   {$ENDREGION}
   strict private
     class var FAvailable: TACLBoolean;
+    class var FCustomFonts: TACLDirect2DCustomFonts;
     class var FD2D1CreateFactory: TD2D1CreateFactoryFunc;
     class var FD2D1Library: HMODULE;
     class var FD3D11CreateDevice: TD3D11CreateDeviceFunc;
@@ -260,14 +308,16 @@ type
     class var FSwapChainSize: Integer;
     class var FVSync: Boolean;
 
-    class function CreateDevice3DContext(out ADevice: ID3D11Device; out ADeviceContext: ID3D11DeviceContext): Boolean;
+    class function CreateDevice3DContext(out ADevice: ID3D11Device;
+      out ADeviceContext: ID3D11DeviceContext): Boolean;
     class procedure SetSwapChainSize(AValue: Integer); static;
   protected
     class procedure CheckInitialized;
     class function NeedRecreateContext(AErrorCode: HRESULT): Boolean;
     class function NeedSwitchToGdiRenderMode(const AErrorCode: HRESULT = S_OK): Boolean; overload;
     class function NeedSwitchToGdiRenderMode(const AException: Exception): Boolean; overload;
-
+    //# Properties
+    class property CustomFonts: TACLDirect2DCustomFonts read FCustomFonts;
     class property Factory: ID2D1Factory1 read FFactory;
     class property DWriteFactory: IDWriteFactory read FDWriteFactory;
   public
@@ -276,7 +326,7 @@ type
     class function Initialize: Boolean;
     class function TryCreateRender(AOnRecreateNeeded: TNotifyEvent;
       AWndHandle: TWndHandle; out ARender: TACL2DRender): Boolean;
-
+    //# Properties
     class property SwapChainSize: Integer read FSwapChainSize write SetSwapChainSize;
     class property VSync: Boolean read FVSync write FVSync;
   end;
@@ -331,7 +381,7 @@ end;
 // Utilities
 //----------------------------------------------------------------------------------------------------------------------
 
-{$REGION 'Utilities'}
+{$REGION ' Utilities '}
 
 function D2D1Bitmap(ATarget: ID2D1RenderTarget; ABits: PACLPixel32;
   AWidth, AHeight: Integer; AAlphaFormat: TAlphaFormat): ID2D1Bitmap; overload;
@@ -528,6 +578,123 @@ end;
 // Classes
 //----------------------------------------------------------------------------------------------------------------------
 
+{ TACLDirect2DCustomFonts }
+
+constructor TACLDirect2DCustomFonts.Create(const AFactory: IDWriteFactory);
+begin
+  inherited Create;
+  FFactory := AFactory;
+  FOldProc := TACLFontRepository.RegisterCustomFontProc;
+  TACLFontRepository.RegisterCustomFontProc := RegisterCustomFont;
+end;
+
+destructor TACLDirect2DCustomFonts.Destroy;
+begin
+  TACLFontRepository.RegisterCustomFontProc := FOldProc;
+  for var I := Count - 1 downto 0 do
+    TACLDirect2DCustomFont(List[I]).Release;
+  inherited;
+end;
+
+function TACLDirect2DCustomFonts.Get(const AName: string): IDWriteFontCollection;
+var
+  LFont: TACLDirect2DCustomFont;
+begin
+  for var I := Count - 1 downto 0 do
+  begin
+    LFont := List[I];
+    if acCompareTokens(LFont.Name, AName) then
+      Exit(LFont.Handle);
+  end;
+  Result := nil;
+end;
+
+procedure TACLDirect2DCustomFonts.RegisterCustomFont(
+  AHandles: TACLObjectList; const AName: string; AData: TMemoryStream);
+begin
+  if Assigned(FOldProc) then
+    FOldProc(AHandles, AName, AData);
+  AHandles.Add(TACLDirect2DCustomFont.Create(Self, AName, AData));
+end;
+
+{ TACLDirect2DCustomFont }
+
+constructor TACLDirect2DCustomFont.Create(
+  AOwner: TACLDirect2DCustomFonts; const AName: string; AData: TMemoryStream);
+var
+  LFactory: IDWriteFactory5;
+begin
+  FName := AName;
+  if Supports(AOwner.Factory, IDWriteFactory5, LFactory) then // Windows 10 15063
+  begin
+    if Succeeded(LFactory.CreateInMemoryFontFileLoader(FLoader)) then
+    begin
+      LFactory.RegisterFontFileLoader(FLoader);
+      if Succeeded(FLoader.CreateInMemoryFontFileReference(AOwner.Factory, AData.Memory, AData.Size, nil, FFile)) then
+      begin
+        LFactory.RegisterFontCollectionLoader(Self);
+        if Failed(LFactory.CreateCustomFontCollection(Self, nil, 0, FHandle)) then
+        begin
+          LFactory.UnregisterFontCollectionLoader(Self);
+          LFactory.UnregisterFontFileLoader(FLoader);
+          FLoader := nil;
+          FHandle := nil;
+        end;
+      end
+      else
+      begin
+        LFactory.UnregisterFontFileLoader(FLoader);
+        FLoader := nil;
+      end;
+    end;
+  end;
+  FOwner := AOwner;
+  FOwner.Add(Self);
+end;
+
+destructor TACLDirect2DCustomFont.Destroy;
+begin
+  if FOwner <> nil then
+    FOwner.Extract(Self);
+  Release;
+  inherited;
+end;
+
+function TACLDirect2DCustomFont.CreateEnumeratorFromKey(
+  const AFactory: IDWriteFactory;
+  ACollectionKey: Pointer; ACollectionKeySize: Cardinal;
+  out AFontFileEnumerator: IDWriteFontFileEnumerator): HResult;
+begin
+  AFontFileEnumerator := Self;
+  Result := S_OK;
+end;
+
+function TACLDirect2DCustomFont.GetCurrentFontFile(out fontFile: IDWriteFontFile): HResult;
+begin
+  fontFile := FFile;
+  Result := acBoolToHRESULT(fontFile <> nil);
+end;
+
+function TACLDirect2DCustomFont.MoveNext(var hasCurrentFile: BOOL): HResult;
+begin
+  hasCurrentFile := FIndex = 0;
+  Inc(FIndex);
+  Result := S_OK;
+end;
+
+procedure TACLDirect2DCustomFont.Release;
+begin
+  if FHandle <> nil then
+  begin
+    FOwner.Factory.UnregisterFontCollectionLoader(Self);
+    FOwner.Factory.UnregisterFontFileLoader(FLoader);
+  end;
+  FOwner := nil;
+  FHandle := nil;
+  FLoader := nil;
+  FFile := nil;
+end;
+
 { TACLDirect2D }
 
 class procedure TACLDirect2D.CheckInitialized;
@@ -550,6 +717,7 @@ end;
 
 class destructor TACLDirect2D.Destroy;
 begin
+  FreeAndNil(FCustomFonts);
   FAvailable := TACLBoolean.False;
   FFactory := nil;
   FDWriteFactory := nil;
@@ -575,7 +743,10 @@ begin
     if Assigned(FD2D1CreateFactory) then
       D2D1Check(FD2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, ID2D1Factory1, nil, FFactory));
     if (FFactory <> nil) and (FDWriteFactory <> nil) then
+    begin
       FAvailable := TACLBoolean.True;
+      FCustomFonts := TACLDirect2DCustomFonts.Create(DWriteFactory);
+    end;
   except
     FAvailable := TACLBoolean.False;
   end;
@@ -924,10 +1095,11 @@ end;
 
 function TACLDirect2DAbstractRender.CreateTextFormat(AFont: TFont): IDWriteTextFormat;
 begin
-  if Failed(TACLDirect2D.DWriteFactory.CreateTextFormat(PChar(AFont.Name), nil,
+  if Failed(TACLDirect2D.DWriteFactory.CreateTextFormat(PChar(AFont.Name),
+    TACLDirect2D.CustomFonts.Get(AFont.Name),
     TACLMath.IfThen(fsBold in AFont.Style, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_WEIGHT_NORMAL),
     TACLMath.IfThen(fsItalic in AFont.Style, DWRITE_FONT_STYLE_ITALIC, DWRITE_FONT_STYLE_NORMAL),
-    DWRITE_FONT_STRETCH_NORMAL, -AFont.Height, 'en-us', Result))
+    DWRITE_FONT_STRETCH_NORMAL, -acResolveFontHeight(AFont, AFont.Height), 'en-us', Result))
   then
     Result := nil;
 end;

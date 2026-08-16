@@ -266,7 +266,7 @@ type
   strict private
     class var FHandle: GpFontCollection;
     class var FOldProc: TACLFontRepository.TRegisterCustomFontProc;
-    class procedure Register(AHandles: TACLObjectList; AData: TMemoryStream);
+    class procedure Register(AHandles: TACLObjectList; const AName: string; AData: TMemoryStream);
   public
     class function Create(AFont: TFont): GpFont;
     class constructor Init;
@@ -1456,10 +1456,11 @@ begin
   TACLFontRepository.RegisterCustomFontProc := TACLGdiplusFonts.Register;
 end;
 
-class procedure TACLGdiplusFonts.Register(AHandles: TACLObjectList; AData: TMemoryStream);
+class procedure TACLGdiplusFonts.Register(
+  AHandles: TACLObjectList; const AName: string; AData: TMemoryStream);
 begin
   if Assigned(FOldProc) then
-    FOldProc(AHandles, AData);
+    FOldProc(AHandles, AName, AData);
   if FHandle = nil then
   begin
     if GdipNewPrivateFontCollection(FHandle) <> Ok then
