@@ -6,7 +6,7 @@
 //  Purpose:   Hashing Algorithms
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2024
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -20,11 +20,12 @@ interface
 uses
   {System.}Classes,
   {System.}Generics.Defaults,
+  {System.}Math,
   {System.}SysUtils,
   {System.}Variants,
   {System.}VarUtils,
   System.AnsiStrings,
-{$IFDEF MSWINDOWS}
+{$IFNDEF FPC}
   System.Hash,
 {$ENDIF}
   // ACL
@@ -147,91 +148,12 @@ type
     class procedure UpdateCore(var AAccumulator: LongWord; AData: PByte; ASize: Cardinal; ATable: PCRC32Table);
   end;
 
-{$IFDEF MSWINDOWS}
-
-  { TACLHashCryptoApiBased }
-
-  TACLHashCryptoApiBased = class abstract(TACLHash)
-  protected type
-    PState = ^TState;
-    TState = record
-      Handle: NativeUInt;
-      ProviderHandle: NativeUInt;
-      Reserved: NativeUInt;
-    end;
-  protected
-    class procedure CryptCheck(AResult: LongBool);
-    class procedure FinalizeState(AState: Pointer); virtual;
-    class function GetAlgorithmId: Cardinal; virtual; abstract;
-    class function GetProviderName: PWideChar; virtual;
-    class function GetProviderType: Cardinal; virtual;
-  public
-    class function Finalize(var AState: Pointer): Variant; overload; override;
-    class procedure Finalize(var AState: Pointer; out AHash: TBytes); reintroduce; overload;
-    class procedure Initialize(out AState: Pointer); override;
-    class procedure Reset(var AState: Pointer); override;
-    class procedure Update(var AState: Pointer; AData: PByte; ASize: Cardinal); override;
-  end;
-
-  { TACLHashCustomHMAC }
-
-  TACLHashCustomHMAC = class(TACLHashCryptoApiBased)
-  strict private
-    class procedure CreateHashHandle(var AState: Pointer);
-  protected
-    class procedure FinalizeState(AState: Pointer); override;
-  public
-    class procedure Initialize(out AState: Pointer; AKey: TBytes); reintroduce;
-    class procedure Reset(var AState: Pointer); override;
-  end;
-
-  { TACLHashHMACSHA1 }
-
-  TACLHashHMACSHA1 = class(TACLHashCustomHMAC)
-  protected
-    class function GetAlgorithmId: Cardinal; override;
-  end;
-
-  { TACLHashMD5 }
-
-  TACLHashMD5 = class(TACLHashCryptoApiBased)
-  protected
-    class function GetAlgorithmId: Cardinal; override;
-  public
-    class procedure Finalize(var AState: Pointer; var AHash: TMD5Byte16); reintroduce; overload;
-  end;
-
-  { TACLHashSHA1 }
-
-  TACLHashSHA1 = class(TACLHashCryptoApiBased)
-  protected
-    class function GetAlgorithmId: Cardinal; override;
-  end;
-
-  { TACLHashSHA256 }
-
-  TACLHashSHA256 = class(TACLHashCryptoApiBased)
-  protected
-    class function GetAlgorithmId: Cardinal; override;
-    class function GetProviderName: PWideChar; override;
-    class function GetProviderType: Cardinal; override;
-  end;
-
-  { TACLHashSHA512 }
-
-  TACLHashSHA512 = class(TACLHashSHA256)
-  protected
-    class function GetAlgorithmId: Cardinal; override;
-  end;
-
-{$ELSE}
-
   { TACLHashMD5 }
 
   TACLHashMD5 = class(TACLHash)
   public
-    class function Finalize(var AState: Pointer): Variant; override; overload;
     class procedure Finalize(var AState: Pointer; var AHash: TMD5Byte16); reintroduce; overload;
+    class function Finalize(var AState: Pointer): Variant; overload; override;
     class procedure Initialize(out AState: Pointer); override;
     class procedure Reset(var AState: Pointer); override;
     class procedure Update(var AState: Pointer; AData: PByte; ASize: Cardinal); override;
@@ -247,7 +169,15 @@ type
     class procedure Update(var AState: Pointer; AData: PByte; ASize: Cardinal); override;
   end;
 
-{$ENDIF}
+  { TACLHashSHA256 }
+
+  TACLHashSHA256 = class(TACLHash)
+  public
+    class function Finalize(var AState: Pointer): Variant; override;
+    class procedure Initialize(out AState: Pointer); override;
+    class procedure Reset(var AState: Pointer); override;
+    class procedure Update(var AState: Pointer; AData: PByte; ASize: Cardinal); override;
+  end;
 
 // Elf
 function ElfHash(S: PChar; ACount: Integer; AIgnoryCase: Boolean): Integer; overload;
@@ -268,9 +198,12 @@ implementation
 uses
 {$IFDEF MSWINDOWS}
   Winapi.Windows,
-{$ELSE}
+{$ENDIF}
+{$IFDEF FPC}
   md5,
   sha1,
+  fpsha256,
+  fphashutils,
 {$ENDIF}
   // ACL
 {$IFDEF MSWINDOWS}
@@ -279,70 +212,13 @@ uses
   ACL.Utils.Common,
   ACL.Utils.FileSystem;
 
-{$IFDEF MSWINDOWS}
-{$REGION 'CryptoAPI Implemenation'}
 type
-  HCRYPTHASH = ULONG_PTR;
-  HCRYPTKEY  = ULONG_PTR;
-  HCRYPTPROV = ULONG_PTR;
-
-  PHMACInfo = ^THMACInfo;
-  THMACInfo = record
-    HashAlgid: Cardinal;
-    pbInnerString: PBYTE;
-    cbInnerString: DWORD;
-    pbOuterString: PBYTE;
-    cbOuterString: DWORD;
-  end;
-
-const
-  PROV_RSA_FULL      = 1;
-  PROV_RSA_SIG       = 2;
-  PROV_RSA_AES       = 24;
-
-const
-  HP_ALGID         = $0001; // Hash algorithm
-  HP_HASHVAL       = $0002; // Hash value
-  HP_HASHSIZE      = $0004; // Hash value size
-  HP_HMAC_INFO     = $0005; // information for creating an HMAC
-  HP_TLS1PRF_LABEL = $0006; // label for TLS1 PRF
-  HP_TLS1PRF_SEED  = $0007; // seed for TLS1 PRF
-
-  CALG_MD2	   = $00008001; //# Microsoft Base Cryptographic Provider.
-  CALG_MD4         = $00008002;
-  CALG_MD5	   = $00008003; //# Microsoft Base Cryptographic Provider.
-  CALG_HMAC        = $00008009; //# Microsoft Base Cryptographic Provider.
-  CALG_NO_SIGN	   = $00002000;
-  CALG_RC2	   = $00006602; //# Microsoft Base Cryptographic Provider.
-  CALG_RC4	   = $00006801; //# Microsoft Base Cryptographic Provider.
-  CALG_RC5	   = $0000660d;
-  CALG_RSA_KEYX	   = $0000a400; //# Microsoft Base Cryptographic Provider.
-  CALG_RSA_SIGN	   = $00002400; //# Microsoft Base Cryptographic Provider.
-  CALG_SHA	   = $00008004; //# Microsoft Base Cryptographic Provider.
-  CALG_SHA1        = $00008004; //# Microsoft Base Cryptographic Provider.
-  CALG_SHA_256	   = $0000800c; //# Microsoft Enhanced RSA and AES Cryptographic Provider, Windows XP with SP3 and newer
-  CALG_SHA_384	   = $0000800d; //# Microsoft Enhanced RSA and AES Cryptographic Provider, Windows XP with SP3 and newer
-  CALG_SHA_512	   = $0000800e; //# Microsoft Enhanced RSA and AES Cryptographic Provider, Windows XP with SP3 and newer
-
-function CryptCreateHash(hProv: HCRYPTPROV; Algid: Cardinal; hKey: HCRYPTKEY; dwFlags: DWORD; var phHash: HCRYPTHASH): BOOL; stdcall; external advapi32;
-{$EXTERNALSYM CryptCreateHash}
-function CryptHashData(hHash: HCRYPTHASH; pbData: LPBYTE; dwDataLen, dwFlags: DWORD): BOOL; stdcall; external advapi32;
-{$EXTERNALSYM CryptHashData}
-function CryptDestroyHash(hHash: HCRYPTHASH): BOOL; stdcall; external advapi32;
-{$EXTERNALSYM CryptDestroyHash}
-function CryptGetHashParam(hHash: HCRYPTHASH; dwParam: DWORD; pbData: LPBYTE; var pdwDataLen: DWORD; dwFlags: DWORD): BOOL; stdcall; external advapi32;
-{$EXTERNALSYM CryptGetHashParam}
-function CryptSetHashParam(hHash: HCRYPTHASH; dwParam: DWORD; pbData: LPBYTE; dwFlags: DWORD): BOOL; stdcall; external advapi32;
-{$EXTERNALSYM CryptSetHashParam}
-function CryptAcquireContextW(var phProv: HCRYPTPROV; pszContainer: LPWSTR; pszProvider: LPWSTR; dwProvType: DWORD; dwFlags: DWORD): BOOL; stdcall; external advapi32;
-{$EXTERNALSYM CryptAcquireContextW}
-function CryptReleaseContext(hProv: HCRYPTPROV; dwFlags: ULONG_PTR): BOOL; stdcall; external advapi32;
-{$EXTERNALSYM CryptReleaseContext}
-function CryptDeriveKey(hProv: HCRYPTPROV; Algid: Cardinal; hBaseData: HCRYPTHASH; dwFlags: DWORD; var phKey: HCRYPTKEY): BOOL; stdcall; external advapi32;
-{$EXTERNALSYM CryptDeriveKey}
-function CryptDestroyKey(hKey: HCRYPTKEY): BOOL; stdcall; external advapi32;
-{$EXTERNALSYM CryptDestroyKey}
-{$ENDREGION}
+{$IFDEF FPC}
+  PSHA1Context = ^TSHA1Context;
+{$ELSE}
+  PMD5Context  = ^THashMD5;
+  PSHA1Context = ^THashSHA1;
+  PSHA256      = ^THashSHA2;
 {$ENDIF}
 
 function acFileNameHash(const S: string): Cardinal;
@@ -899,246 +775,146 @@ begin
   end;
 end;
 
-{$IFDEF MSWINDOWS}
-
-{ TACLHashCryptoApiBased }
-
-class procedure TACLHashCryptoApiBased.Finalize(var AState: Pointer; out AHash: TBytes);
-var
-  AValue, ALength: Cardinal;
-begin
-  try
-    try
-      ALength := SizeOf(AValue);
-      CryptCheck(CryptGetHashParam(PState(AState).Handle, HP_HASHSIZE, @AValue, ALength, 0));
-
-      ALength := AValue;
-      SetLength(AHash, ALength);
-      CryptCheck(CryptGetHashParam(PState(AState).Handle, HP_HASHVAL, @AHash[0], ALength, 0));
-    finally
-      FinalizeState(AState);
-    end;
-  finally
-    FreeMemAndNil(AState);
-  end;
-end;
-
-class function TACLHashCryptoApiBased.Finalize(var AState: Pointer): Variant;
-var
-  AHash: TBytes;
-begin
-  Finalize(AState, AHash);
-  Result := acLowerCase(TACLHexcode.Encode(@AHash[0], Length(AHash)));
-end;
-
-class procedure TACLHashCryptoApiBased.Initialize(out AState: Pointer);
-var
-  AInternalState: PState;
-begin
-  New(AInternalState);
-  try
-    AState := AInternalState;
-    CryptCheck(CryptAcquireContextW(AInternalState^.ProviderHandle, nil, GetProviderName, GetProviderType, $F0000000));
-    CryptCheck(CryptCreateHash(AInternalState^.ProviderHandle, GetAlgorithmId, 0, 0, AInternalState^.Handle));
-  except
-    FreeMemAndNil(AState);
-    raise;
-  end;
-end;
-
-class procedure TACLHashCryptoApiBased.Reset(var AState: Pointer);
-var
-  AHashAlgorithm, ALength: Cardinal;
-begin
-  ALength := SizeOf(AHashAlgorithm);
-  CryptCheck(CryptGetHashParam(PState(AState).Handle, HP_ALGID, @AHashAlgorithm, ALength, 0));
-  CryptCheck(CryptDestroyHash(PState(AState).Handle));
-  CryptCheck(CryptCreateHash(PState(AState).ProviderHandle, AHashAlgorithm, 0, 0, PState(AState).Handle));
-end;
-
-class procedure TACLHashCryptoApiBased.Update(var AState: Pointer; AData: PByte; ASize: Cardinal);
-begin
-  CryptCheck(CryptHashData(PState(AState).Handle, AData, ASize, 0));
-end;
-
-class function TACLHashCryptoApiBased.GetProviderName: PWideChar;
-begin
-  Result := nil;
-end;
-
-class function TACLHashCryptoApiBased.GetProviderType: Cardinal;
-begin
-  Result := PROV_RSA_FULL;
-end;
-
-class procedure TACLHashCryptoApiBased.CryptCheck(AResult: LongBool);
-begin
-  if not AResult then
-    RaiseLastOSError;
-end;
-
-class procedure TACLHashCryptoApiBased.FinalizeState(AState: Pointer);
-begin
-  CryptCheck(CryptDestroyHash(PState(AState).Handle));
-  CryptCheck(CryptReleaseContext(PState(AState).ProviderHandle, 0));
-end;
-
-{ TACLHashCustomHMAC }
-
-class procedure TACLHashCustomHMAC.Initialize(out AState: Pointer; AKey: TBytes);
-begin
-  inherited Initialize(AState);
-  Update(AState, AKey);
-  CryptCheck(CryptDeriveKey(PState(AState).ProviderHandle, CALG_RC4, PState(AState).Handle, 0, PState(AState).Reserved));
-  CryptCheck(CryptDestroyHash(PState(AState).Handle));
-  CreateHashHandle(AState);
-end;
-
-class procedure TACLHashCustomHMAC.Reset(var AState: Pointer);
-begin
-  CryptCheck(CryptDestroyHash(PState(AState).Handle));
-  CreateHashHandle(AState);
-end;
-
-class procedure TACLHashCustomHMAC.CreateHashHandle(var AState: Pointer);
-var
-  AInfo: THMACInfo;
-begin
-  ZeroMemory(@AInfo, SizeOf(AInfo));
-  AInfo.HashAlgid := GetAlgorithmId;
-  CryptCheck(CryptCreateHash(PState(AState).ProviderHandle, CALG_HMAC, PState(AState).Reserved, 0, PState(AState).Handle));
-  CryptCheck(CryptSetHashParam(PState(AState).Handle, HP_HMAC_INFO, @AInfo, 0));
-end;
-
-class procedure TACLHashCustomHMAC.FinalizeState(AState: Pointer);
-begin
-  CryptCheck(CryptDestroyKey(PState(AState).Reserved));
-  inherited;
-end;
-
-{ TACLHashHMACSHA1 }
-
-class function TACLHashHMACSHA1.GetAlgorithmId: Cardinal;
-begin
-  Result := CALG_SHA1;
-end;
-
-{ TACLHashMD5 }
-
-class procedure TACLHashMD5.Finalize(var AState: Pointer; var AHash: TMD5Byte16);
-var
-  AHashValue: TBytes;
-begin
-  Finalize(AState, AHashValue);
-  Assert(SizeOf(AHash) = Length(AHashValue));
-  FastMove(AHashValue[0], AHash[0], Length(AHashValue));
-end;
-
-class function TACLHashMD5.GetAlgorithmId: Cardinal;
-begin
-  Result := CALG_MD5;
-end;
-
-{ TACLHashSHA1 }
-
-class function TACLHashSHA1.GetAlgorithmId: Cardinal;
-begin
-  Result := CALG_SHA1;
-end;
-
-{ TACLHashSHA256 }
-
-class function TACLHashSHA256.GetAlgorithmId: Cardinal;
-begin
-  Result := CALG_SHA_256;
-end;
-
-class function TACLHashSHA256.GetProviderName: PWideChar;
-begin
-  Result := 'Microsoft Enhanced RSA and AES Cryptographic Provider';
-end;
-
-class function TACLHashSHA256.GetProviderType: Cardinal;
-begin
-  Result := PROV_RSA_AES;
-end;
-
-{ TACLHashSHA512 }
-
-class function TACLHashSHA512.GetAlgorithmId: Cardinal;
-begin
-  Result := CALG_SHA_512;
-end;
-
-{$ELSE}
-
 { TACLHashMD5 }
 
 class function TACLHashMD5.Finalize(var AState: Pointer): Variant;
+{$IFDEF FPC}
 var
   LHash: TMD5Digest;
 begin
   MD5Final(PMD5Context(AState)^, LHash);
-  FreeMemAndNil(AState);
   Result := MD5Print(LHash);
+{$ELSE}
+begin
+  Result := PMD5Context(AState).HashAsString;
+{$ENDIF}
+  FreeMemAndNil(AState);
 end;
 
 class procedure TACLHashMD5.Finalize(var AState: Pointer; var AHash: TMD5Byte16);
 begin
+{$IFDEF FPC}
   MD5Final(PMD5Context(AState)^, PMD5Digset(@AHash)^);
+{$ELSE}
+  var LBytes := PMD5Context(AState).HashAsBytes;
+  Move(LBytes, AHash[0], Min(Length(LBytes), SizeOf(AHash)));
+{$ENDIF}
   FreeMemAndNil(AState);
 end;
 
 class procedure TACLHashMD5.Initialize(out AState: Pointer);
 var
-  LContext: PMD5Context;
+  LContext: PMD5Context absolute AState;
 begin
   New(LContext);
+{$IFDEF FPC}
   MD5Init(LContext^);
-  AState := LContext;
+{$ELSE}
+  LContext^ := THashMD5.Create;
+{$ENDIF}
 end;
 
 class procedure TACLHashMD5.Reset(var AState: Pointer);
 begin
+{$IFDEF FPC}
   MD5Init(PMD5Context(AState)^);
+{$ELSE}
+  PMD5Context(AState)^.Reset;
+{$ENDIF}
 end;
 
 class procedure TACLHashMD5.Update(var AState: Pointer; AData: PByte; ASize: Cardinal);
 begin
+{$IFDEF FPC}
   MD5Update(PMD5Context(AState)^, AData^, ASize);
+{$ELSE}
+  PMD5Context(AState)^.Update(AData^, ASize);
+{$ENDIF}
 end;
 
 { TACLHashSHA1 }
-type
-  PSHA1Context = ^TSHA1Context;
 
 class function TACLHashSHA1.Finalize(var AState: Pointer): Variant;
+{$IFDEF FPC}
 var
   LHash: TSHA1Digest;
 begin
   SHA1Final(PSHA1Context(AState)^, LHash);
-  FreeMemAndNil(AState);
   Result := SHA1Print(LHash);
+{$ELSE}
+begin
+  Result := PSHA1Context(AState)^.HashAsString;
+{$ENDIF}
+  FreeMemAndNil(AState);
 end;
 
 class procedure TACLHashSHA1.Initialize(out AState: Pointer);
 var
-  LContext: PSHA1Context;
+  LContext: PSHA1Context absolute AState;
 begin
   New(LContext);
+{$IFDEF FPC}
   SHA1Init(LContext^);
-  AState := LContext;
+{$ELSE}
+  LContext^ := THashSHA1.Create;
+{$ENDIF}
 end;
 
 class procedure TACLHashSHA1.Reset(var AState: Pointer);
 begin
+{$IFDEF FPC}
   SHA1Init(PSHA1Context(AState)^);
+{$ELSE}
+  PSHA1Context(AState)^.Reset;
+{$ENDIF}
 end;
 
 class procedure TACLHashSHA1.Update(var AState: Pointer; AData: PByte; ASize: Cardinal);
 begin
+{$IFDEF FPC}
   SHA1Update(PSHA1Context(AState)^, AData^, ASize);
+{$ELSE}
+  PSHA1Context(AState)^.Update(AData^, ASize);
+{$ENDIF}
 end;
 
+{ TACLHashSHA256 }
+
+class function TACLHashSHA256.Finalize(var AState: Pointer): Variant;
+{$IFDEF FPC}
+var
+  LHash: AnsiString;
+begin
+  PSHA256(AState)^.Final;
+  BytesToHexStr(LHash, @PSHA256(AState)^.Digest[0], SHA256_DIGEST_SIZE);
+  Result := acLowerCase(LHash);
+{$ELSE}
+begin
+  Result := PSHA256(AState).HashAsString;
 {$ENDIF}
+  FreeMemAndNil(AState);
+end;
+
+class procedure TACLHashSHA256.Initialize(out AState: Pointer);
+var
+  LContext: PSHA256 absolute AState;
+begin
+  New(LContext);
+{$IFDEF FPC}
+  LContext^.Init;
+{$ELSE}
+  LContext^ := THashSHA2.Create(THashSHA2.TSHA2Version.SHA256);
+{$ENDIF}
+end;
+
+class procedure TACLHashSHA256.Reset(var AState: Pointer);
+begin
+  PSHA256(AState)^.{$IFDEF FPC}Init{$ELSE}Reset{$ENDIF};
+end;
+
+class procedure TACLHashSHA256.Update(var AState: Pointer; AData: PByte; ASize: Cardinal);
+begin
+  PSHA256(AState)^.Update(AData{$IFNDEF FPC}^{$ENDIF}, ASize);
+end;
+
 end.
