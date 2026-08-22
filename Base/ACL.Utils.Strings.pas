@@ -46,9 +46,8 @@ const
   acEmptyStrA = AnsiString('');
   acEmptyStrU = UnicodeString('');
   acLineBreakMacro = '\n';
-  acLineSeparator = WideChar($2028);
-  acZero = #0#0;
-  acZeroWidthSpace = WideChar($200B);
+  acLineSeparator  = {$IFDEF UNICODE}#$2028{$ELSE}#$E2#$80#$A8{$ENDIF};
+  acZeroWidthSpace = {$IFDEF UNICODE}#$200B{$ELSE}#$E2#$80#$8B{$ENDIF};
 
   CP_UTF16LE = 1200; // aka Unicode
   CP_UTF16BE = 1201; // aka Unicode-BigEndian
