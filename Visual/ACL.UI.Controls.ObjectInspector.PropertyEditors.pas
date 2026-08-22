@@ -6,7 +6,7 @@
 //  Purpose:   ObjectInspector - Built-in property editors
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -397,7 +397,11 @@ end;
 
 procedure TACLPropertyEditor.SetValue(const AValue: string);
 begin
-  if not IsReadOnly and Changing(AValue) then
+  if IsReadOnly then
+    Exit;
+  if Value = AValue then
+    Exit;
+  if Changing(AValue) then
   begin
     TRTTI.SetPropValue(Owner, Info, AValue);
     Changed;
