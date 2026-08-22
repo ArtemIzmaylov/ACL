@@ -498,7 +498,7 @@ begin
   if (AFileName = '') or acIsUrlFileName(AFileName) then
     Result := AFileName
   else
-    Result := acFileProtocol + acURLEncode(acNativePathToUnix(Result));
+    Result := acFileProtocol + acURLEncode(acNativePathToUnix(AFileName));
 end;
 
 function acExpandEnvironmentStrings(const AFileName: string): string;
