@@ -1181,14 +1181,6 @@ begin
     Result := R;
 end;
 
-function ImageListSize(AImages: TCustomImageList): TSize;
-begin
-  if AImages <> nil then
-    Result := TSize.Create(AImages.Width, AImages.Height)
-  else
-    Result := NullSize;
-end;
-
 function acIsChildOrSelf(AControl, AChildToTest: TControl): Boolean;
 begin
   Result := False;

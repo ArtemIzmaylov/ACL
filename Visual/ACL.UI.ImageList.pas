@@ -6,7 +6,7 @@
 //  Purpose:   Advanced Image List
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -285,8 +285,11 @@ begin
         AValue.RegisterChanges(AChangeLink);
       AValue.FreeNotification(ANotifyComponent);
     end;
-    if AChangeLink <> nil then
-      AChangeLink.Change;
+    if not (csDestroying in ANotifyComponent.ComponentState) then
+    begin
+      if AChangeLink <> nil then
+        AChangeLink.Change;
+    end;
   end;
 end;
 

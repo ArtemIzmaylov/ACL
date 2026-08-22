@@ -633,15 +633,7 @@ end;
 
 procedure TACLImagePictureImageList.SetImages(const Value: TCustomImageList);
 begin
-  if Images <> Value then
-  begin
-    BeginUpdate;
-    try
-      acSetImageList(Value, FImages, FChangeLink, FOwner);
-    finally
-      EndUpdate;
-    end;
-  end;
+  acSetImageList(Value, FImages, FChangeLink, FOwner);
 end;
 
 { TACLSelectionFrame }

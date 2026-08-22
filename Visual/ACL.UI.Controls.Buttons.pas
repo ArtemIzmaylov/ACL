@@ -1262,6 +1262,7 @@ end;
 
 destructor TACLSimpleButton.Destroy;
 begin
+  Images := nil;
   FreeAndNil(FImageChangeLink);
   FreeAndNil(FGlyph);
   inherited Destroy;
