@@ -858,9 +858,15 @@ begin
 end;
 
 procedure TACLBasicComboBoxDropDown.ClosePopup(AAccept: Boolean);
+var
+  LNode: TACLTreeListNode;
 begin
-  if AAccept and List.HasSelection then
-    Owner.PostValue(List.FocusedNode);
+  if AAccept then
+  begin
+    LNode := List.FocusedNode;
+    if (LNode <> nil) and (List.AbsoluteVisibleNodes.IndexOf(LNode) >= 0) then
+      Owner.PostValue(LNode);
+  end;
   inherited ClosePopup;
 end;
 
