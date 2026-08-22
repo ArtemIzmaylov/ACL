@@ -2317,6 +2317,8 @@ var
 begin
   if AColor = '' then
     Exit(Default);
+  if AColor.StartsWith('#') then
+    Delete(AColor, 1, 1);
   if Length(AColor) < 6 then
     AColor := AColor + DupeString('0', 6 - Length(AColor));
   if Length(AColor) = 6 then
