@@ -918,6 +918,9 @@ begin
   try
     if Scaled and not (csDesigning in ComponentState) and (Parent = nil) then
       ScaleForPPI(TACLApplication.GetTargetDPI(Self));
+  {$IFDEF DELPHI120}
+    inherited;
+  {$ENDIF}
     ScalingFlags := [];
     Perform(CM_PARENTBIDIMODECHANGED, 0, 0);
   finally
