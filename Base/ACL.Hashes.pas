@@ -796,8 +796,9 @@ begin
 {$IFDEF FPC}
   MD5Final(PMD5Context(AState)^, PMD5Digset(@AHash)^);
 {$ELSE}
-  var LBytes := PMD5Context(AState).HashAsBytes;
-  Move(LBytes, AHash[0], Min(Length(LBytes), SizeOf(AHash)));
+  var LBytes: TBytes := PMD5Context(AState).HashAsBytes;
+  Assert(Length(LBytes) = SizeOf(AHash), 'TACLHashMD5.Finalize');
+  Move(LBytes[0], AHash[0], Min(Length(LBytes), SizeOf(AHash)));
 {$ENDIF}
   FreeMemAndNil(AState);
 end;
