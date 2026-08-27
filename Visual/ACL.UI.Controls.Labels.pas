@@ -675,7 +675,7 @@ end;
 procedure TACLLabel.PaintText;
 begin
   if Url <> '' then
-    Canvas.Font.Style := [fsUnderline];
+    Canvas.Font.Style := Canvas.Font.Style + [fsUnderline];
   acTextDraw(Canvas, Caption, FTextRect, taLeftJustify, taAlignTop,
     EndEllipsis and FTextTruncated, False, Style.WordWrap);
 end;
