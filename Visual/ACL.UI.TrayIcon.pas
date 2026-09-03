@@ -132,6 +132,7 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure BalloonHint(const ATitle, AText: string; AIconType: TACLTrayBalloonIcon);
+    function ToString: string; override;
     //# Properties
     property WantDoubleClicks: Boolean read FWantDoubleClicks write FWantDoubleClicks;
   public
@@ -428,6 +429,14 @@ begin
     else
       FreeAndNil(FIconImpl);
   end;
+end;
+
+function TACLTrayIcon.ToString: string;
+begin
+  if FIconImpl <> nil then
+    Result := FIconImpl.ToString
+  else
+    Result := inherited;
 end;
 
 procedure TACLTrayIcon.Update(Sender: TObject);
