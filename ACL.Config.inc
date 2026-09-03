@@ -88,7 +88,7 @@
 // Options
 // -----------------------------------------------------------------------------
 
-{$IF DEFINED(DEBUG)}
+{$IF DEFINED(DEBUG) OR DEFINED(MADEXCEPT) OR DEFINED(EUREKALOG)}
   {.$DEFINE ACL_LOG_REGISTRY}
   {$DEFINE ACL_THREADING_DEBUG}
   {$DEFINE ACL_THREADING_DEBUG_DEADLOCKS}

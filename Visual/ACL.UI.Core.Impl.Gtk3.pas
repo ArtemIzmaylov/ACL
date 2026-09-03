@@ -1113,6 +1113,7 @@ begin
       SetAlphaBlend(LForm, LForm.AlphaBlend, LForm.AlphaBlendValue);
       CheckAndFixGeometry(LForm); //See issue #41412
       LWindow^.show_all;
+      LWindow^.set_keep_above(LForm.FormStyle in fsAllStayOnTop); // !!! Astra 1.8
       LWindow^.window^.set_events(GDK_ALL_EVENTS_MASK);
       LWindow^.present;
      // LWindow^.set_interactive_debugging(true);

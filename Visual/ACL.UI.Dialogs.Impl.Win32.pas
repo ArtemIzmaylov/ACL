@@ -568,16 +568,16 @@ var
   LResult: HRESULT;
 begin
   LIntf := nil;
+  LResult := E_NOINTERFACE;
   if acOSCheckVersion(6, 0) then
-  begin
+  try
     if ASaveDialog then
       LResult := CoCreateInstance(CLSID_FileSaveDialog, nil, CLSCTX_INPROC_SERVER, IFileSaveDialog, LIntf)
     else
       LResult := CoCreateInstance(CLSID_FileOpenDialog, nil, CLSCTX_INPROC_SERVER, IFileOpenDialog, LIntf);
-  end
-  else
-    LResult := E_NOINTERFACE;
-
+  except
+    LResult := E_UNEXPECTED;
+  end;
   if (LResult = S_OK) and (LIntf <> nil) then
     Result := Create(ADialog, LIntf, ASaveDialog)
   else

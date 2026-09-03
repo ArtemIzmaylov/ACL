@@ -892,10 +892,10 @@ var
   AStartIndex: Integer;
 begin
   AIndex := ActiveIndex;
-  if ActiveIndex < 0 then
+  if AIndex < 0 then
     AStartIndex := IfThen(AForward, Tabs.Count - 1, 0)
   else
-    AStartIndex := ActiveIndex;
+    AStartIndex := AIndex;
 
   if Tabs.Count > 0 then
   repeat
@@ -954,8 +954,10 @@ procedure TACLCustomTabControl.KeyDown(var Key: Word; Shift: TShiftState);
 begin
   inherited;
   case Key of
-    VK_LEFT, VK_RIGHT:
-      ActiveIndex := ActiveIndex + Signs[Key = VK_RIGHT];
+    VK_LEFT:
+      ActiveIndex := ActiveIndex - 1;
+    VK_RIGHT:
+      ActiveIndex := ActiveIndex + 1;
   end;
 end;
 
