@@ -506,7 +506,7 @@ type
     procedure SetDelayWnd(AWnd: TACLMenuPopupWindow);
     procedure UpdateSelection(AWnd: TACLMenuPopupWindow);
   strict protected
-    procedure DoCloseMenu(AWnd: TACLMenuPopupWindow = nil);
+    procedure CloseMenuImmediatelly(AWnd: TACLMenuPopupWindow = nil);
     procedure DoIdle; virtual;
     function IsInLoop: Boolean;
   protected
@@ -2892,20 +2892,14 @@ begin
       begin
         LMenu := FPostponedClosure;
         FPostponedClosure := nil;
-        DoCloseMenu(LMenu);
+        CloseMenuImmediatelly(LMenu);
       end, Self);
   end
   else
     FInLoop := False;
 end;
 
-procedure TACLMenuPopupLooper.CloseMenuOnSelect(AItem: TMenuItem);
-begin
-  FPostponedSelection := AItem;
-  CloseMenu;
-end;
-
-procedure TACLMenuPopupLooper.DoCloseMenu(AWnd: TACLMenuPopupWindow);
+procedure TACLMenuPopupLooper.CloseMenuImmediatelly(AWnd: TACLMenuPopupWindow);
 begin
   while (FPopups.Count > 1) and (FPopups.Peek <> AWnd) do
     FPopups.Pop;
@@ -2916,13 +2910,21 @@ begin
   DoGrabInput;
 end;
 
+procedure TACLMenuPopupLooper.CloseMenuOnSelect(AItem: TMenuItem);
+begin
+  FPostponedSelection := AItem;
+  CloseMenu;
+end;
+
 procedure TACLMenuPopupLooper.DoGrabInput;
 var
   LWnd: TACLMenuWindow;
 begin
   FInGrabbing := True;
   try
-    LWnd := FPopups.Peek;
+    LWnd := nil;
+    if FInLoop then
+      LWnd := FPopups.Peek;
     if LWnd <> nil then
       LWnd.MouseCapture := True;
   {$IFDEF FPC}
@@ -3074,7 +3076,10 @@ begin
 
     WM_CAPTURECHANGED:
       if not FInGrabbing then
-        CloseMenu(Wnd);
+      begin
+        CloseMenuImmediatelly(Wnd);
+        if not FInLoop then Wnd.Hide;
+      end;
   end;
 end;
 
