@@ -587,7 +587,8 @@ type
       if Assigned(FActualMenu.OnPopup) then
         Log('[!] WARNING: AppIndicator does not support for dynamic menus');
       FHandle := app_indicator_new(PChar(IconId), PChar(IconFileName), APP_INDICATOR_CATEGORY_APPLICATION_STATUS);
-      g_signal_connect(FHandle, 'activate', TGCallback(@HandlerClick), Self);
+      if Assigned(app_indicator_set_tooltip_full) then // activate signal was added in v0.6.0
+        g_signal_connect(FHandle, 'activate', TGCallback(@HandlerClick), Self);
       g_signal_connect(FHandle, 'scroll-event', TGCallback(@HandlerScroll), Self);
       app_indicator_set_menu(FHandle, GetWidget(FActualMenu.Handle));
       // Вот без этого второй раз иконка уже не показывается...
