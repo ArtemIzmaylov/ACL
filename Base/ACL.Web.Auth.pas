@@ -6,7 +6,7 @@
 //  Purpose:   Web Authorization Utilities
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2024
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -141,7 +141,7 @@ var
   LParts: TStringDynArray;
 begin
   Result.Reset;
-  LData := TEncoding.UTF8.GetString(TACLMimecode.DecodeBytes(AStr));
+  LData := TACLMimecode.DecodeString(AStr);
   acCryptStringXOR(LData, 'TAuthToken');
   acSplitString(acString(LData), #9, LParts);
   if Length(LParts) > 3 then
@@ -168,7 +168,7 @@ begin
   Result := AccessToken + #9 + RefreshToken + #9 + Secret + #9 + IntToStr(ExpiresIn);
   LEncrypted := acUString(Result);
   acCryptStringXOR(LEncrypted, 'TAuthToken');
-  Result := TACLMimecode.EncodeBytes(TEncoding.UTF8.GetBytes(LEncrypted));
+  Result := TACLMimecode.EncodeString(LEncrypted);
 end;
 
 { TOAuth2 }

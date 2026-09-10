@@ -240,11 +240,34 @@ type
     function ToString: string;
   end;
 
+  { TACLBinToTextEncoding }
+
+  TACLBinToTextEncodingClass = class of TACLBinToTextEncoding;
+  TACLBinToTextEncoding = class abstract
+  public
+    // Decoding
+    class function Decode(const ACode: AnsiString): TBytesStream; overload; inline;
+    class function Decode(const ACode: UnicodeString): TBytesStream; overload; inline;
+    class function Decode(ACode: PChar; ACount: Integer): TBytesStream; overload; virtual; abstract;
+    class function DecodeString(const ACode: string): UnicodeString;
+    // Encoding
+    class function Encode(ABytes: PByte; ACount: Integer): string; overload;
+    class function Encode(AStream: TStream): string; overload;
+    class function EncodeString(const AValue: AnsiString): string; overload; inline;
+    class function EncodeString(const AValue: UnicodeString): string; overload; inline;
+    // Encoder
+    class function EncodingBegin(ACapacity: NativeUInt = 64): Pointer; virtual;
+    class procedure Encoding(AHandle: Pointer; ABytes: PByte; ACount: Integer); virtual; abstract;
+    class function EncodingDone(AHandle: Pointer): string; virtual;
+  end;
+
   { TACLHexcode }
 
-  TACLHexcode = class
+  TACLHexcode = class(TACLBinToTextEncoding)
   strict private const
-    Map: array[0..15] of Char = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f');
+    Map: array[0..15] of Char = (
+      '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+      'a', 'b', 'c', 'd', 'e', 'f');
   strict private
     class var FByteToHexMap: array[Byte] of string;
   public
@@ -253,26 +276,34 @@ type
     class function Decode(const AChar1, AChar2: Char): Byte; overload;
     class function Decode(const AChar1, AChar2: Char; out AValue: Byte): Boolean; overload; inline;
     class function Decode(const AChar1: Char; out AValue: Byte): Boolean; overload; inline;
-    class function Decode(const ACode: string; AStream: TStream): Boolean; overload;
-    class function DecodeString(const ACode: string): UnicodeString; overload;
+    class function Decode(ACode: PChar; ACount: Integer): TBytesStream; overload; override;
 
-    class function Encode(ABuffer: PByte; ACount: Integer): string; overload;
     class function Encode(AByte: Byte): string; overload; static; inline;
     class function Encode(AChar: AnsiChar): string; overload; static; inline;
     class function Encode(AChar: WideChar): string; overload; static; inline;
     class function Encode(AChar: WideChar; ABuffer: PWideChar): PWideChar; overload; static;
-    class function Encode(AStream: TStream): string; overload;
-    class function EncodeFile(const AFileName: string): string; overload;
-    class function EncodeString(const AValue: AnsiString): string; overload;
-    class function EncodeString(const AValue: UnicodeString): string; overload;
+
+    // Encoder
+    class function EncodingBegin(ACapacity: NativeUInt = 64): Pointer; override;
+    class procedure Encoding(AHandle: Pointer; ABytes: PByte; ACount: Integer); override;
   end;
 
   { TACLMimecode }
 
-  TACLMimecode = class
+  TACLMimecode = class(TACLBinToTextEncoding)
+  strict private type
+  {$REGION ' Internal Types '}
+    TEncoder = class(TACLStringBuilder)
+    public
+      Buffer: array[0..2] of Byte;
+      BufferSize: Integer;
+      CharBuffer: array[0..3] of Char;
+      procedure Output(ABank, ASize: Integer);
+    end;
+  {$ENDREGION}
   strict private const
-  {$REGION 'Internal Constants'}
-    PadByte = $3D;
+  {$REGION ' Internal Constants '}
+    PadByte = #$3D;
     DecodeTable: array[Byte] of Byte =
     (
       255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
@@ -301,16 +332,11 @@ type
     );
   {$ENDREGION}
   public
-    class function Decode(ASrc: PByte; ASrcSize: Integer; AStream: TStream): Integer; overload;
-    class function Decode(const ACode: AnsiString; AStream: TStream): Boolean; overload;
-    class function DecodeBytes(const ACode: AnsiString): TBytes; overload;
-    class function DecodeBytes(const ACode: UnicodeString): TBytes; overload;
-    class function Encode(ASrc: PByte; ASrcSize: Integer; AStream: TStream): Integer; overload;
-    class function Encode(P: PByteArray; ASize: Integer): TMemoryStream; overload;
-    class function EncodeBytes(const ABytes: PAnsiChar; ACount: Integer): string; overload;
-    class function EncodeBytes(const ABytes: TBytes): string; overload;
-    class function EncodeString(const S: AnsiString; AStream: TStream): Integer; overload;
-    class function EncodeString(const S: UnicodeString; AStream: TStream): Integer; overload;
+    class function Decode(ACode: PChar; ACount: Integer): TBytesStream; overload; override;
+    // Encoder
+    class function EncodingBegin(ACapacity: NativeUInt = 64): Pointer; override;
+    class procedure Encoding(AHandle: Pointer; ABytes: PByte; ACount: Integer); override;
+    class function EncodingDone(AHandle: Pointer): string; override;
   end;
 
   { TACLPunycode }
@@ -3597,6 +3623,134 @@ begin
   end;
 end;
 
+{ TACLBinToTextEncoding }
+
+class function TACLBinToTextEncoding.Decode(const ACode: AnsiString): TBytesStream;
+begin
+{$IFDEF UNICODE}
+  Result := Decode(acUStringFromBytes(PByte(PAnsiChar(ACode)), Length(ACode)));
+{$ELSE}
+  Result := Decode(PChar(ACode), Length(ACode));
+{$ENDIF}
+end;
+
+class function TACLBinToTextEncoding.Decode(const ACode: UnicodeString): TBytesStream;
+begin
+{$IFDEF UNICODE}
+  Result := Decode(PChar(ACode), Length(ACode));
+{$ELSE}
+  Result := Decode(acUStringToBytes(PWideChar(ACode), Length(ACode)));
+{$ENDIF}
+end;
+
+//class function TACLBinToTextEncoding.DecodeBytes(const ACode: string): TBytes;
+//var
+//  LStream: TBytesStream;
+//begin
+//  Result := nil;
+//  LStream := Decode(ACode);
+//  if LStream <> nil then
+//  try
+//    SetLength(Result, LStream.Size);
+//    LStream.ReadBuffer(Result[0], LStream.Size);
+//  finally
+//    LStream.Free;
+//  end;
+//end;
+
+class function TACLBinToTextEncoding.DecodeString(const ACode: string): UnicodeString;
+var
+  LStream: TBytesStream;
+begin
+  Result := '';
+  if ACode <> '' then
+  begin
+    LStream := Decode(ACode);
+    if LStream <> nil then
+    try
+      Result := TEncoding.UTF8.GetString(LStream.Bytes, 0, LStream.Size);
+    finally
+      LStream.Free;
+    end;
+  end;
+end;
+
+class function TACLBinToTextEncoding.Encode(ABytes: PByte; ACount: Integer): string;
+var
+  LHandle: Pointer;
+begin
+  if ACount > 0 then
+  begin
+    LHandle := EncodingBegin(ACount);
+    Encoding(LHandle, ABytes, ACount);
+    Result := EncodingDone(LHandle);
+  end
+  else
+    Result := '';
+end;
+
+class function TACLBinToTextEncoding.Encode(AStream: TStream): string;
+const
+  DataSize = 8192;
+var
+  LData: PByte;
+  LDataRead: Integer;
+  LHandle: Pointer;
+begin
+  if AStream is TCustomMemoryStream then
+    Result := Encode(TCustomMemoryStream(AStream).Memory, AStream.Size)
+  else
+  begin
+    LHandle := EncodingBegin(AStream.Size);
+    try
+      LData := AllocMem(DataSize);
+      try
+        AStream.Position := 0;
+        repeat
+          LDataRead := AStream.Read(LData^, DataSize);
+          if LDataRead > 0 then
+            Encoding(LHandle, LData, LDataRead);
+        until LDataRead < 1;
+      finally
+        FreeMem(LData, DataSize);
+      end;
+    finally
+      Result := EncodingDone(LHandle);
+    end;
+  end;
+end;
+
+//class function TACLBinToTextEncoding.EncodeBytes(const ACode: TBytes): string;
+//begin
+//  if Length(ACode) > 0 then
+//    Result := Encode(@ACode[0], Length(ACode))
+//  else
+//    Result := '';
+//end;
+
+class function TACLBinToTextEncoding.EncodeString(const AValue: AnsiString): string;
+begin
+  Result := Encode(PByte(PAnsiChar(AValue)), Length(AValue));
+end;
+
+class function TACLBinToTextEncoding.EncodeString(const AValue: UnicodeString): string;
+begin
+  Result := EncodeString(acEncodeUtf8(AValue));
+end;
+
+class function TACLBinToTextEncoding.EncodingBegin(ACapacity: NativeUInt): Pointer;
+begin
+  Result := TACLStringBuilder.Create(ACapacity);
+end;
+
+class function TACLBinToTextEncoding.EncodingDone(AHandle: Pointer): string;
+var
+  LBuilder: TACLStringBuilder absolute AHandle;
+begin
+  Result := LBuilder.ToString;
+  LBuilder.Free;
+end;
+
 { TACLHexcode }
 
 class constructor TACLHexcode.Create;
@@ -3622,38 +3776,27 @@ begin
     AValue := X1 shl 4 or X2;
 end;
 
-class function TACLHexcode.Decode(const ACode: string; AStream: TStream): Boolean;
+class function TACLHexcode.Decode(ACode: PChar; ACount: Integer): TBytesStream;
 var
-  B: Byte;
-  L: Integer;
-  P: Int64;
-  W: PChar;
+  LByte: Byte;
+  LIndex: Integer;
 begin
-  Result := False;
-  if (AStream <> nil) and (ACode <> '') then
+  Result := nil;
+  if (ACount > 0) and (ACount mod 2 = 0) then
   begin
-    W := @ACode[1];
-    L := Length(ACode);
-    if L mod 2 = 0 then
+    ACount := ACount div 2;
+    Result := TBytesStream.Create;
+    Result.Size := ACount;
+    for LIndex := 0 to ACount - 1 do
     begin
-      L := L div 2;
-      P := AStream.Position;
-      AStream.Size := Max(AStream.Size, P + L);
-      AStream.Position := P;
-      while L > 0 do
+      if Decode(ACode^, (ACode + 1)^, LByte) then
+        Result.Bytes[LIndex] := LByte
+      else
       begin
-        if Decode(W^, (W + 1)^, B) then
-          AStream.WriteBuffer(B, SizeOf(B))
-        else
-        begin
-          AStream.Position := P;
-          AStream.Size := P;
-          Exit(False);
-        end;
-        Inc(W, 2);
-        Dec(L);
+        FreeAndNil(Result);
+        Exit;
       end;
-      Result := True;
+      Inc(ACode, 2);
     end;
   end;
 end;
@@ -3670,58 +3813,6 @@ begin
       AValue := Ord(AChar1) - Ord('a') + 10;
   else
     Result := False;
-  end;
-end;
-
-class function TACLHexcode.DecodeString(const ACode: string): UnicodeString;
-var
-  LStream: TBytesStream;
-begin
-  LStream := TBytesStream.Create;
-  try
-    LStream.Size := Length(ACode) div 2;
-    Decode(ACode, LStream);
-    Result := TEncoding.UTF8.GetString(LStream.Bytes, 0, LStream.Size);
-  finally
-    LStream.Free;
-  end;
-end;
-
-class function TACLHexcode.Encode(ABuffer: PByte; ACount: Integer): string;
-var
-  AScan: PChar;
-begin
-  System.SetString(Result, nil, 2 * ACount);
-  AScan := @Result[1];
-  while ACount > 0 do
-  begin
-    AScan^ := Map[ABuffer^ shr 4];
-    Inc(AScan);
-    AScan^ := Map[ABuffer^ and $F];
-    Inc(ABuffer);
-    Inc(AScan);
-    Dec(ACount);
-  end;
-end;
-
-class function TACLHexcode.Encode(AStream: TStream): string;
-var
-  B: PByte;
-  L: Integer;
-begin
-  if AStream is TMemoryStream then
-    Result := Encode(TMemoryStream(AStream).Memory, AStream.Size)
-  else
-  begin
-    L := AStream.Size;
-    B := AllocMem(L);
-    try
-      AStream.Position := 0;
-      AStream.ReadBuffer(B^, L);
-      Result := Encode(B, L);
-    finally
-      FreeMem(B, L);
-    end;
   end;
 end;
 
@@ -3751,228 +3842,143 @@ begin
   Result := FByteToHexMap[Ord(AChar)];
 end;
 
-class function TACLHexcode.EncodeFile(const AFileName: string): string;
-var
-  AStream: TStream;
+class function TACLHexcode.EncodingBegin(ACapacity: NativeUInt): Pointer;
 begin
-  AStream := TACLFileStream.Create(AFileName, fmOpenReadOnly);
-  try
-    Result := Encode(AStream);
-  finally
-    AStream.Free;
+  Result := inherited EncodingBegin(ACapacity * 2);
+end;
+
+class procedure TACLHexcode.Encoding(AHandle: Pointer; ABytes: PByte; ACount: Integer);
+var
+  LBuilder: TACLStringBuilder absolute AHandle;
+begin
+  while ACount > 0 do
+  begin
+    LBuilder.Append(Map[ABytes^ shr 4]);
+    LBuilder.Append(Map[ABytes^ and $F]);
+    Inc(ABytes);
+    Dec(ACount);
   end;
-end;
-
-class function TACLHexcode.EncodeString(const AValue: AnsiString): string;
-begin
-  Result := Encode(PByte(PAnsiChar(AValue)), Length(AValue));
-end;
-
-class function TACLHexcode.EncodeString(const AValue: UnicodeString): string;
-var
-  ABytes: TBytes;
-begin
-  ABytes := TEncoding.UTF8.GetBytes(AValue);
-  Result := Encode(@ABytes[0], Length(ABytes));
 end;
 
 { TACLMimecode }
 
-class function TACLMimecode.Decode(ASrc: PByte; ASrcSize: Integer; AStream: TStream): Integer;
+class function TACLMimecode.Decode(ACode: PChar; ACount: Integer): TBytesStream;
 
-  function CalcDiscardValue(ASrc: PByteArray; ASrcSize: Integer): Integer;
+  function CalcDiscardValue(AScan: PChar; ACount: Integer): Integer;
   begin
-    if (ASrcSize > 1) and (ASrc^[ASrcSize - 2] = PadByte) then
-      Result := 2 * Ord(ASrc^[ASrcSize - 1] = PadByte)
-    else
-      if ASrcSize > 0 then
-        Result := Ord(ASrc^[ASrcSize - 1] = PadByte)
-      else
-        Result := 0;
+    if (ACount > 1) and (AScan[ACount - 2] = PadByte) then
+      Exit(2 * Ord(AScan[ACount - 1] = PadByte));
+    if ACount > 0 then
+      Exit(Ord(AScan[ACount - 1] = PadByte));
+    Result := 0;
   end;
 
-  function CheckCodeAlphabetic(ASrc: PByte; ASrcSize: Integer): Boolean;
+  function CheckCodeAlphabet(AScan: PChar; ACount: Integer): Boolean;
   begin
     Result := True;
-    while (ASrcSize > 0) and Result do
+    while ACount > 0 do
     begin
-      Result := Result and (DecodeTable[ASrc^] <> $FF);
-      Dec(ASrcSize);
-      Inc(ASrc);
+    {$IFDEF UNICODE}
+      if Word(AScan^) > $FF then
+        Exit(False);
+    {$ENDIF}
+      if DecodeTable[Byte(AScan^)] = $FF then
+        Exit(False);
+      Dec(ACount);
+      Inc(AScan);
     end;
   end;
 
 var
-  AData, X: Integer;
-  ADataBytes: array[0..3] of Byte absolute AData;
-  ADiscard: Integer;
+  LData: Integer;
+  LDataBytes: array[0..3] of Byte absolute LData;
+  LTemp: Integer;
 begin
-  Result := -1;
-  if CheckCodeAlphabetic(ASrc, ASrcSize) then
+  Result := nil;
+  if (ACount > 0) and CheckCodeAlphabet(ACode, ACount) then
   begin
-    Result := 0;
-    ADiscard := CalcDiscardValue(PByteArray(ASrc), ASrcSize);
-    Dec(ASrcSize, ADiscard);
-    while ASrcSize > 0 do
+    Dec(ACount, CalcDiscardValue(ACode, ACount));
+    if ACount < 1 then Exit;
+    Result := TBytesStream.Create;
+    Result.Size := MulDiv(ACount, 10, 12); // ~137% max
+    while ACount > 0 do
     begin
-      AData := DecodeTable[ASrc^] shl 18;
-      Inc(ASrc);
-      AData := AData or DecodeTable[ASrc^] shl 12;
-      Inc(ASrc);
-      AData := AData or DecodeTable[ASrc^] shl 6;
-      Inc(ASrc);
-      AData := AData or DecodeTable[ASrc^];
-      Inc(ASrc);
+      LData := DecodeTable[Byte(ACode^)] shl 18;
+      Inc(ACode);
+      LData := LData or DecodeTable[Byte(ACode^)] shl 12;
+      Inc(ACode);
+      LData := LData or DecodeTable[Byte(ACode^)] shl 6;
+      Inc(ACode);
+      LData := LData or DecodeTable[Byte(ACode^)];
+      Inc(ACode);
 
-      X := ADataBytes[2];
-      ADataBytes[2] := ADataBytes[0];
-      ADataBytes[0] := X;
+      LTemp := LDataBytes[2];
+      LDataBytes[2] := LDataBytes[0];
+      LDataBytes[0] := LTemp;
 
-      X := Min(ASrcSize - 1, 3);
-      AStream.Write(ADataBytes[0], X);
-      Dec(ASrcSize, 4);
-      Inc(Result, X);
+      LTemp := Min(ACount - 1, 3);
+      Result.Write(LDataBytes[0], LTemp);
+      Dec(ACount, 4);
+    end;
+    Result.Size := Result.Position;
+    Result.Position := 0;
+  end;
+end;
+
+class function TACLMimecode.EncodingBegin(ACapacity: NativeUInt = 64): Pointer;
+begin
+  Result := TEncoder.Create((ACapacity * 14) div 10); // 137% max;
+end;
+
+class procedure TACLMimecode.Encoding(AHandle: Pointer; ABytes: PByte; ACount: Integer);
+var
+  LEncoder: TEncoder absolute AHandle;
+begin
+  while ACount > 0 do
+  begin
+    LEncoder.Buffer[LEncoder.BufferSize] := ABytes^;
+    Inc(LEncoder.BufferSize);
+    Inc(ABytes);
+    Dec(ACount);
+    if LEncoder.BufferSize = 3 then
+    begin
+      LEncoder.Output(
+        (LEncoder.Buffer[0] shl 16) or
+        (LEncoder.Buffer[1] shl 8) or
+        (LEncoder.Buffer[2]), 4);
+      LEncoder.BufferSize := 0;
     end;
   end;
 end;
 
-class function TACLMimecode.Decode(const ACode: AnsiString; AStream: TStream): Boolean;
+class function TACLMimecode.EncodingDone(AHandle: Pointer): string;
 var
-  ANewSize: Integer;
+  LEncoder: TEncoder absolute AHandle;
 begin
-  AStream.Size := Length(ACode);
-  ANewSize := Decode(@ACode[1], Length(ACode), AStream);
-  Result := ANewSize >= 0;
-  if Result then
+  case LEncoder.BufferSize of
+    1: LEncoder.Output(LEncoder.Buffer[0] shl 4, 2);
+    2: LEncoder.Output(LEncoder.Buffer[0] shl 10 + LEncoder.Buffer[1] shl 2, 3);
+  end;
+  Result := LEncoder.ToString;
+  LEncoder.Free;
+end;
+
+{ TACLMimecode.TEncoder }
+
+procedure TACLMimecode.TEncoder.Output(ABank, ASize: Integer);
+var
+  I: Integer;
+begin
+  for I := ASize to 3 do
+    CharBuffer[I] := PadByte;
+  for I := ASize - 1 downto 1 do
   begin
-    AStream.Size := ANewSize;
-    AStream.Position := 0;
+    CharBuffer[I] := Char(EncodeTable[ABank and $3F]);
+    ABank := ABank shr 6;
   end;
-end;
-
-class function TACLMimecode.DecodeBytes(const ACode: UnicodeString): TBytes;
-begin
-  Result := DecodeBytes(acUStringToBytes(PWideChar(ACode), Length(ACode)));
-end;
-
-class function TACLMimecode.DecodeBytes(const ACode: AnsiString): TBytes;
-var
-  AStream: TMemoryStream;
-begin
-  AStream := TMemoryStream.Create;
-  try
-    Decode(ACode, AStream);
-    SetLength(Result{%H-}, AStream.Size);
-    AStream.Position := 0;
-    AStream.ReadBuffer(Result[0], Length(Result));
-  finally
-    AStream.Free;
-  end;
-end;
-
-class function TACLMimecode.Encode(ASrc: PByte; ASrcSize: Integer; AStream: TStream): Integer;
-
-  procedure OutputBytes(AStream: TStream; var ABank: Integer; ASize: Integer);
-  var
-    {%H-}ABuffer: array[0..3] of Byte;
-    I: Integer;
-  begin
-    for I := ASize to 3 do
-      ABuffer[I] := PadByte;
-    for I := ASize - 1 downto 1 do
-    begin
-      ABuffer[I] := EncodeTable[ABank and $3F];
-      ABank := ABank shr 6;
-    end;
-    ABuffer[0] := EncodeTable[ABank];
-
-    AStream.WriteBuffer(ABuffer[0], SizeOf(ABuffer));
-  end;
-
-var
-  ABank: Integer;
-  AOverHead: Integer;
-  ASrcLimit: Integer;
-begin
-  if ASrcSize <= 0 then
-    Exit(0);
-
-  Result := AStream.Position;
-  ASrcLimit := Trunc(ASrcSize / 3) * 3;
-  AOverHead := ASrcSize - ASrcLimit;
-
-  while ASrcLimit > 0 do
-  begin
-    ABank := ASrc^;
-    ABank := ABank shl 8;
-    ABank := ABank or PByte(ASrc + 1)^;
-    ABank := ABank shl 8;
-    ABank := ABank or PByte(ASrc + 2)^;
-    OutputBytes(AStream, ABank, 4);
-    Dec(ASrcLimit, 3);
-    Inc(ASrc, 3);
-  end;
-
-  case AOverHead of
-    1:
-      begin
-        ABank := ASrc^;
-        ABank := ABank shl 4;
-        OutputBytes(AStream, ABank, 2);
-      end;
-
-    2:
-      begin
-        ABank := ASrc^;
-        ABank := ABank shl 8;
-        ABank := ABank or PByte(ASrc + 1)^;
-        ABank := ABank shl 2;
-        OutputBytes(AStream, ABank, 3);
-      end;
-  end;
-  Result := AStream.Position - Result;
-end;
-
-class function TACLMimecode.Encode(P: PByteArray; ASize: Integer): TMemoryStream;
-begin
-  Result := TMemoryStream.Create;
-  Result.Size := (ASize * 14) div 10; // 137% max
-  Result.Size := Encode(@P^[0], ASize, Result);
-  Result.Position := 0;
-end;
-
-class function TACLMimecode.EncodeBytes(const ABytes: PAnsiChar; ACount: Integer): string;
-var
-  AStream: TMemoryStream;
-begin
-  AStream := Encode(PByteArray(ABytes), ACount);
-  try
-    Result := acLoadString(AStream);
-  finally
-    AStream.Free;
-  end;
-end;
-
-class function TACLMimecode.EncodeBytes(const ABytes: TBytes): string;
-var
-  AStream: TMemoryStream;
-begin
-  AStream := Encode(@ABytes[0], Length(ABytes));
-  try
-    Result := acLoadString(AStream);
-  finally
-    AStream.Free;
-  end;
-end;
-
-class function TACLMimecode.EncodeString(const S: AnsiString; AStream: TStream): Integer;
-begin
-  Result := Encode(PByte(PAnsiChar(S)), Length(S), AStream);
-end;
-
-class function TACLMimecode.EncodeString(const S: UnicodeString; AStream: TStream): Integer;
-begin
-  Result := Encode(PByte(PWideChar(S)), Length(S) * SizeOf(WideChar), AStream);
+  CharBuffer[0] := Char(EncodeTable[ABank]);
+  for I := Low(CharBuffer) to High(CharBuffer) do
+    Append(CharBuffer[I]);
 end;
 
 { TACLPunycode }

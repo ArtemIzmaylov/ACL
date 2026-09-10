@@ -6,7 +6,7 @@
 //  Purpose:   Cryptographic Routines
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2024
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -73,13 +73,28 @@ uses
   ACL.Utils.Strings;
 
 function acDecryptString(const S: string; const Key: string): UnicodeString;
+var
+  LStream: TBytesStream;
 begin
-  Result := TRC4.CryptString(TEncoding.Unicode.GetString(TACLMimecode.DecodeBytes(S)), Key);
+  Result := '';
+  LStream := TACLMimecode.Decode(S);
+  if LStream <> nil then
+  try
+    Result := TRC4.CryptString(TEncoding.Unicode.GetString(LStream.Bytes, 0, LStream.Size), Key);
+  finally
+    LStream.Free;
+  end;
 end;
 
 function acEncryptString(const S: UnicodeString; const Key: string): string;
+var
+  LBytes: TBytes;
 begin
-  Result := TACLMimecode.EncodeBytes(TEncoding.Unicode.GetBytes(TRC4.CryptString(S, Key)));
+  LBytes := TEncoding.Unicode.GetBytes(TRC4.CryptString(S, Key));
+  if Length(LBytes) > 0 then
+    Result := TACLMimecode.Encode(@LBytes[0], Length(LBytes))
+  else
+    Result := '';
 end;
 
 procedure acCryptStringXOR(var S: UnicodeString; const AKey: UnicodeString);

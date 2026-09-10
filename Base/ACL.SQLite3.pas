@@ -900,16 +900,8 @@ begin
 end;
 
 class procedure TSQLLiteHelper.Base64(Context: HSQLCONTEXT; Count: Integer; Vars: PPointerArray);
-var
-  AStream: TStringStream;
 begin
-  AStream := TStringStream.Create;
-  try
-    TACLMimecode.EncodeString({$IFDEF UNICODE}acEncodeUTF8{$ENDIF}(SQLiteVarToText(Vars^[0])), AStream);
-    SQLiteResultSet(Context, AStream.DataString);
-  finally
-    AStream.Free;
-  end;
+  SQLiteResultSet(Context, TACLMimecode.EncodeString(SQLiteVarToText(Vars^[0])));
 end;
 
 class procedure TSQLLiteHelper.KeyContains(Context: HSQLCONTEXT; Count: Integer; Vars: PPointerArray); cdecl;
