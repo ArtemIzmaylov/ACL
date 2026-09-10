@@ -136,6 +136,7 @@ type
     constructor Create(AStream: TStream); overload;
     constructor Create(AStream: TStream; ASize: Integer); overload;
     constructor Create(const AFileName: string); overload;
+    constructor CreateOwned(AStream: TMemoryStream);
     destructor Destroy; override;
     // IACLDataContainer
     function GetDataPtr: PByte;
@@ -484,9 +485,7 @@ end;
 
 constructor TACLDataContainer.Create;
 begin
-  inherited Create;
-  FData := TMemoryStream.Create;
-  FDataLock := TACLCriticalSection.Create(Self, ClassName + '.Lock');
+  CreateOwned(TMemoryStream.Create);
 end;
 
 constructor TACLDataContainer.Create(AStream: TStream);
@@ -512,6 +511,13 @@ begin
   finally
     LStream.Free;
   end;
+end;
+
+constructor TACLDataContainer.CreateOwned(AStream: TMemoryStream);
+begin
+  inherited Create;
+  FData := AStream;
+  FDataLock := TACLCriticalSection.Create(Self, ClassName + '.Lock');
 end;
 
 destructor TACLDataContainer.Destroy;

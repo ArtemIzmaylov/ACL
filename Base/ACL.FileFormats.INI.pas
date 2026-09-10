@@ -143,7 +143,7 @@ type
       out ASection: TACLIniFileSection; out AIndex: Integer): Boolean;
     procedure Changed; virtual;
   public
-    class function DecodeStream(const S: string): TStream{nullable};
+    class function DecodeStream(const S: string): TMemoryStream{nullable};
     class function EncodeStream(const S: TStream{nullable}): string;
   public
     constructor Create; overload;
@@ -352,7 +352,7 @@ end;
 
 function TACLIniFileSection.ReadObject(const AKey: string; ALoadProc: TACLStreamProc): Boolean;
 var
-  LStream: TMemoryStream;
+  LStream: TStream;
 begin
   Result := False;
   try
@@ -402,13 +402,7 @@ var
   LIndex: Integer;
 begin
   if FindValue(AKey, LIndex) then
-  begin
-    Result := TMemoryStream.Create;
-    if TACLHexCode.Decode(ValueFromIndex[LIndex], Result) then
-      Result.Position := 0
-    else
-      FreeAndNil(Result);
-  end
+    Result := TACLIniFile.DecodeStream(ValueFromIndex[LIndex])
   else
     Result := nil;
 end;
@@ -692,7 +686,7 @@ begin
   end;
 end;
 
-class function TACLIniFile.DecodeStream(const S: string): TStream;
+class function TACLIniFile.DecodeStream(const S: string): TMemoryStream;
 begin
   if S = '' then Exit(nil);
   Result := TMemoryStream.Create;
