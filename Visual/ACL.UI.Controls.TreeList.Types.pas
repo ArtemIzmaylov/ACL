@@ -977,27 +977,17 @@ begin
 end;
 
 procedure TACLTreeListColumns.ConfigLoad(AConfig: TACLIniFile; const ASection, AItem: string);
-var
-  AStream: TMemoryStream;
 begin
-  if AConfig.ExistsKey(ASection, AItem) then
-  begin
-    AStream := TMemoryStream.Create;
-    try
-      AConfig.ReadStream(ASection, AItem, AStream);
-      ConfigLoad(AStream);
-    finally
-      AStream.Free;
-    end;
-  end;
+  AConfig.ReadObject(ASection, AItem, ConfigLoad);
 end;
 
 procedure TACLTreeListColumns.ConfigSave(AStream: TStream);
 var
   AColumn: TACLTreeListColumn;
-  {%H-}AInfo: TACLTreeListColumnInfo;
+  AInfo: TACLTreeListColumnInfo;
   I: Integer;
 begin
+  AInfo := Default(TACLTreeListColumnInfo);
   for I := 0 to Count - 1 do
   begin
     AColumn := Items[I];
@@ -1011,17 +1001,8 @@ begin
 end;
 
 procedure TACLTreeListColumns.ConfigSave(AConfig: TACLIniFile; const ASection, AItem: string);
-var
- AStream: TMemoryStream;
 begin
-  AStream := TMemoryStream.Create;
-  try
-    ConfigSave(AStream);
-    AStream.Position := 0;
-    AConfig.WriteStream(ASection, AItem, AStream);
-  finally
-    AStream.Free;
-  end;
+  AConfig.WriteObject(ASection, AItem, ConfigSave);
 end;
 
 function TACLTreeListColumns.GetColumnClass: TACLTreeListColumnClass;

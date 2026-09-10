@@ -549,32 +549,29 @@ class procedure TACLWebSettings.ConfigLoad(AConfig: TACLIniFile);
     Result := acString(U);
   end;
 
-  procedure ReadProxyData;
-  var
-    AStream: TStream;
-    ID: Integer;
-  begin
-    AStream := TMemoryStream.Create;
-    try
-      if AConfig.ReadStream(sWebConfigSection, 'Proxy', AStream) then
-      begin
-        ID := AStream.ReadInt32;
-        if ID <> PROXY_SETTINGS_ID then
-          AStream.Position := 0;
-        FProxyInfo.Server := ReadString(AStream, ID);
-        FProxyInfo.ServerPort := ReadString(AStream, ID);
-        FProxyInfo.UserName := ReadString(AStream, ID);
-        FProxyInfo.UserPass := ReadString(AStream, ID);
-      end;
-    finally
-      AStream.Free;
-    end;
+var
+  LId: Integer;
+  LSection: TACLIniFileSection;
+  LStream: TStream;
+begin
+  LSection := AConfig.GetSection(sWebConfigSection, True);
+
+  LStream := LSection.ReadStream('Proxy');
+  if LStream <> nil then
+  try
+    LId := LStream.ReadInt32;
+    if LId <> PROXY_SETTINGS_ID then
+      LStream.Position := 0; // backward compatibility
+    FProxyInfo.Server := ReadString(LStream, LId);
+    FProxyInfo.ServerPort := ReadString(LStream, LId);
+    FProxyInfo.UserName := ReadString(LStream, LId);
+    FProxyInfo.UserPass := ReadString(LStream, LId);
+  finally
+    LStream.Free;
   end;
 
-begin
-  ReadProxyData;
-  ConnectionMode := AConfig.ReadEnum<TACLWebConnectionMode>(sWebConfigSection, 'Mode', acWebDefaultConnectionMode);
-  ConnectionTimeOut := AConfig.ReadInteger(sWebConfigSection, 'TimeOut', acWebTimeOutDefault);
+  ConnectionMode := LSection.ReadEnum<TACLWebConnectionMode>('Mode', acWebDefaultConnectionMode);
+  ConnectionTimeOut := LSection.ReadInt32('TimeOut', acWebTimeOutDefault);
 end;
 
 class procedure TACLWebSettings.ConfigSave(AConfig: TACLIniFile);
@@ -588,31 +585,25 @@ class procedure TACLWebSettings.ConfigSave(AConfig: TACLIniFile);
     AStream.WriteStringWithLength(U);
   end;
 
-  procedure WriteProxyData;
-  var
-    AStream: TStream;
-    ID: Integer;
-  begin
-    AStream := TMemoryStream.Create;
-    try
-      ID := PROXY_SETTINGS_ID;
-      AStream.WriteInt32(ID);
-      WriteString(AStream, FProxyInfo.Server);
-      WriteString(AStream, FProxyInfo.ServerPort);
-      WriteString(AStream, FProxyInfo.UserName);
-      WriteString(AStream, FProxyInfo.UserPass);
-      AStream.Position := 0;
-      AConfig.WriteStream(sWebConfigSection, 'Proxy', AStream);
-    finally
-      AStream.Free;
-    end;
-  end;
-
+var
+  LSection: TACLIniFileSection;
+  LStream: TStream;
 begin
-  WriteProxyData;
-  AConfig.WriteEnum<TACLWebConnectionMode>(
-    sWebConfigSection, 'Mode', ConnectionMode, acWebDefaultConnectionMode);
-  AConfig.WriteInteger(sWebConfigSection, 'TimeOut', ConnectionTimeOut, acWebTimeOutDefault);
+  LSection := AConfig.GetSection(sWebConfigSection, True);
+  LSection.WriteEnum<TACLWebConnectionMode>('Mode', ConnectionMode, acWebDefaultConnectionMode);
+  LSection.WriteInt32('TimeOut', ConnectionTimeOut, acWebTimeOutDefault);
+
+  LStream := TMemoryStream.Create;
+  try
+    LStream.WriteInt32(PROXY_SETTINGS_ID);
+    WriteString(LStream, FProxyInfo.Server);
+    WriteString(LStream, FProxyInfo.ServerPort);
+    WriteString(LStream, FProxyInfo.UserName);
+    WriteString(LStream, FProxyInfo.UserPass);
+    LSection.WriteStream('Proxy', LStream);
+  finally
+    LStream.Free;
+  end;
 end;
 
 class procedure TACLWebSettings.SetConnectionTimeOut(AValue: Integer);

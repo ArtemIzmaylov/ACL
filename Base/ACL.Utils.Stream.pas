@@ -195,7 +195,7 @@ type
     function ReadInt32BE: Integer; inline;
     function ReadInt64: Int64; inline;
     function ReadInt64BE: Int64; inline;
-    function ReadPackedInt: UInt64;
+    function ReadPackedInt: UInt64; // uleb128
     function ReadRect: TRect; inline;
     function ReadSingle: Single; inline;
     function ReadSize: TSize; inline;
@@ -219,7 +219,7 @@ type
     procedure WriteInt64(const AValue: Int64); inline;
     procedure WriteInt64BE(const AValue: Int64); inline;
     function WritePadding(ASize: Integer): Integer;
-    procedure WritePackedInt(AValue: UInt64);
+    procedure WritePackedInt(AValue: UInt64); // uleb128
     procedure WriteRect(const AValue: TRect); inline;
     procedure WriteSingle(const AValue: Single); inline;
     procedure WriteSize(const AValue: TSize); inline;
@@ -1305,17 +1305,13 @@ end;
 
 function TACLStreamHelper.WritePadding(ASize: Integer): Integer;
 var
-  P: Pointer;
+  LBytes: TBytes;
 begin
   if ASize > 0 then
   begin
-    P := AllocMem(ASize);
-    try
-      FastZeroMem(P, ASize);
-      WriteBuffer(P^, ASize);
-    finally
-      FreeMem(P, ASize);
-    end;
+    SetLength(LBytes, ASize);
+    FastZeroMem(@LBytes[0], ASize);
+    WriteBuffer(LBytes[0], ASize);
   end;
   Result := ASize;
 end;

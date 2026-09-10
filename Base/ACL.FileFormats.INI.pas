@@ -6,7 +6,7 @@
 //  Purpose:   Fast-way cross platform INI-file implementation
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2024
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -78,10 +78,12 @@ type
     function ReadFloat(const AKey: string; const ADefault: Double = 0): Double;
     function ReadInt32(const AKey: string; ADefault: Integer = 0): Integer; virtual;
     function ReadInt64(const AKey: string; const ADefault: Int64 = 0): Int64;
+    function ReadObject(const AKey: string; ALoadProc: TACLStreamProc): Boolean; overload;
+    function ReadObject(const AKey: string; ALoadProc: TACLStreamMethod): Boolean; overload;
     function ReadRect(const AKey: string): TRect; overload;
     function ReadRect(const AKey: string; const ADefault: TRect): TRect; overload;
     function ReadSize(const AKey: string): TSize;
-    function ReadStream(const AKey: string; AStream: TStream): Boolean;
+    function ReadStream(const AKey: string): TMemoryStream{nullable};
     function ReadString(const AKey: string; const ADefault: string = ''): string;
     function ReadStringEx(const AKey: string; out AValue: string): Boolean; virtual;
   {$IFNDEF ACL_BASE_NOVCL}
@@ -98,9 +100,11 @@ type
     procedure WriteInt64(const AKey: string; const AValue, ADefaultValue: Int64); overload;
     procedure WriteInt32(const AKey: string; const AValue: Integer); overload;
     procedure WriteInt32(const AKey: string; const AValue, ADefaultValue: Integer); overload;
+    procedure WriteObject(const AKey: string; ASaveProc: TACLStreamMethod); overload;
+    procedure WriteObject(const AKey: string; ASaveProc: TACLStreamProc); overload;
     procedure WriteRect(const AKey: string; const AValue: TRect);
     procedure WriteSize(const AKey: string; const AValue: TSize);
-    procedure WriteStream(const AKey: string; AStream: TStream);
+    procedure WriteStream(const AKey: string; AStream: TStream{nullable});
     procedure WriteString(const AKey, AValue: string); overload; virtual;
     procedure WriteString(const AKey, AValue, ADefaultValue: string); overload;
   {$IFNDEF ACL_BASE_NOVCL}
@@ -139,6 +143,9 @@ type
       out ASection: TACLIniFileSection; out AIndex: Integer): Boolean;
     procedure Changed; virtual;
   public
+    class function DecodeStream(const S: string): TStream{nullable};
+    class function EncodeStream(const S: TStream{nullable}): string;
+  public
     constructor Create; overload;
     constructor Create(const AFileName: string; AutoSave: Boolean = True); overload; virtual;
     destructor Destroy; override;
@@ -170,7 +177,7 @@ type
     function ReadRect(const ASection, AKey: string): TRect; overload;
     function ReadRect(const ASection, AKey: string; const ADefault: TRect): TRect; overload;
     function ReadSize(const ASection, AKey: string): TSize;
-    function ReadStream(const ASection, AKey: string; AStream: TStream): Boolean;
+    function ReadStream(const ASection, AKey: string): TMemoryStream;{nullable}
     function ReadString(const ASection, AKey: string; const ADefault: string = ''): string;
     function ReadStringEx(const ASection, AKey: string; out AValue: string): Boolean; virtual;
     function ReadStrings(const ASection: string; AStrings: TACLStringList): Integer; overload;
@@ -343,6 +350,33 @@ begin
     Result := ADefault;
 end;
 
+function TACLIniFileSection.ReadObject(const AKey: string; ALoadProc: TACLStreamProc): Boolean;
+var
+  LStream: TMemoryStream;
+begin
+  Result := False;
+  try
+    LStream := ReadStream(AKey);
+    if LStream <> nil then
+    try
+      if LStream.Size > 0 then
+      begin
+        ALoadProc(LStream);
+        Result := True;
+      end;
+    finally
+      LStream.Free;
+    end;
+  except
+    // do nothing
+  end;
+end;
+
+function TACLIniFileSection.ReadObject(const AKey: string; ALoadProc: TACLStreamMethod): Boolean;
+begin
+  Result := ReadObject(AKey, procedure (AStream: TStream) begin ALoadProc(AStream); end);
+end;
+
 function TACLIniFileSection.ReadRect(const AKey: string): TRect;
 begin
   Result := ReadRect(AKey, NullRect);
@@ -363,19 +397,28 @@ begin
   Result := acStringToSize(ReadString(AKey));
 end;
 
-function TACLIniFileSection.ReadStream(const AKey: string; AStream: TStream): Boolean;
+function TACLIniFileSection.ReadStream(const AKey: string): TMemoryStream;
+var
+  LIndex: Integer;
 begin
-  Result := TACLHexCode.Decode(ReadString(AKey), AStream);
-  if Result then
-    AStream.Position := 0;
+  if FindValue(AKey, LIndex) then
+  begin
+    Result := TMemoryStream.Create;
+    if TACLHexCode.Decode(ValueFromIndex[LIndex], Result) then
+      Result.Position := 0
+    else
+      FreeAndNil(Result);
+  end
+  else
+    Result := nil;
 end;
 
 function TACLIniFileSection.ReadString(const AKey, ADefault: string): string;
 var
-  AIndex: Integer;
+  LIndex: Integer;
 begin
-  if FindValue(AKey, AIndex) then
-    Result := ValueFromIndex[AIndex]
+  if FindValue(AKey, LIndex) then
+    Result := ValueFromIndex[LIndex]
   else
     Result := ADefault;
 end;
@@ -446,6 +489,24 @@ begin
     Delete(AKey);
 end;
 
+procedure TACLIniFileSection.WriteObject(const AKey: string; ASaveProc: TACLStreamProc);
+var
+  LStream: TMemoryStream;
+begin
+  LStream := TMemoryStream.Create;
+  try
+    ASaveProc(LStream);
+    WriteStream(AKey, LStream);
+  finally
+    LStream.Free;
+  end;
+end;
+
+procedure TACLIniFileSection.WriteObject(const AKey: string; ASaveProc: TACLStreamMethod);
+begin
+  WriteObject(AKey, procedure (S: TStream) begin ASaveProc(S); end);
+end;
+
 procedure TACLIniFileSection.WriteInt64(const AKey: string; const AValue: Int64);
 begin
   WriteString(AKey, IntToStr(AValue));
@@ -463,7 +524,7 @@ end;
 
 procedure TACLIniFileSection.WriteStream(const AKey: string; AStream: TStream);
 begin
-  WriteString(AKey, TACLHexCode.Encode(AStream), '');
+  WriteString(AKey, TACLIniFile.EncodeStream(AStream), '');
 end;
 
 procedure TACLIniFileSection.WriteString(const AKey, AValue, ADefaultValue: string);
@@ -629,6 +690,22 @@ begin
       M.Free;
     end;
   end;
+end;
+
+class function TACLIniFile.DecodeStream(const S: string): TStream;
+begin
+  if S = '' then Exit(nil);
+  Result := TMemoryStream.Create;
+  if not TACLHexcode.Decode(S, Result) then
+    FreeAndNil(Result);
+end;
+
+class function TACLIniFile.EncodeStream(const S: TStream): string;
+begin
+  if (S <> nil) and (S.Size > 0) then
+    Result := TACLHexcode.Encode(S)
+  else
+    Result := '';
 end;
 
 procedure TACLIniFile.Merge(const AFileName: string; AOverwriteExisting: Boolean);
@@ -803,12 +880,15 @@ begin
   Result := acStringToSize(ReadString(ASection, AKey));
 end;
 
-function TACLIniFile.ReadStream(const ASection, AKey: string; AStream: TStream): Boolean;
+function TACLIniFile.ReadStream(const ASection, AKey: string): TMemoryStream;{nullable}
 var
   LSection: TACLIniFileSection;
 begin
   LSection := GetSection(ASection);
-  Result := (LSection <> nil) and LSection.ReadStream(AKey, AStream);
+  if LSection <> nil then
+    Result := LSection.ReadStream(AKey)
+  else
+    Result := nil;
 end;
 
 function TACLIniFile.ReadString(const ASection, AKey: string; const ADefault: string = ''): string;
@@ -931,28 +1011,18 @@ end;
 
 function TACLIniFile.ReadObject(const ASection, AKey: string; ALoadProc: TACLStreamProc): Boolean;
 var
-  AStream: TMemoryStream;
+  LSection: TACLIniFileSection;
 begin
-  try
-    AStream := TMemoryStream.Create;
-    try
-      Result := ReadStream(ASection, AKey, AStream) and (AStream.Size > 0);
-      if Result then
-      begin
-        AStream.Position := 0;
-        ALoadProc(AStream);
-      end;
-    finally
-      AStream.Free;
-    end;
-  except
-    Result := False;
-  end;
+  LSection := GetSection(ASection);
+  Result := (LSection <> nil) and LSection.ReadObject(AKey, ALoadProc);
 end;
 
 function TACLIniFile.ReadObject(const ASection, AKey: string; ALoadProc: TACLStreamMethod): Boolean;
+var
+  LSection: TACLIniFileSection;
 begin
-  Result := ReadObject(ASection, AKey, procedure (S: TStream) begin ALoadProc(S); end);
+  LSection := GetSection(ASection);
+  Result := (LSection <> nil) and LSection.ReadObject(AKey, ALoadProc);
 end;
 
 procedure TACLIniFile.WriteBool(const ASection, AKey: string; AValue: Boolean);
@@ -1016,18 +1086,14 @@ end;
 
 procedure TACLIniFile.WriteObject(const ASection, AKey: string; ASaveProc: TACLStreamProc);
 var
-  AStream: TMemoryStream;
+  LStream: TMemoryStream;
 begin
-  AStream := TMemoryStream.Create;
+  LStream := TMemoryStream.Create;
   try
-    ASaveProc(AStream);
-    if AStream.Size > 0 then
-    begin
-      AStream.Position := 0;
-      WriteStream(ASection, AKey, AStream);
-    end;
+    ASaveProc(LStream);
+    WriteString(ASection, AKey, EncodeStream(LStream), '');
   finally
-    AStream.Free;
+    LStream.Free;
   end;
 end;
 
