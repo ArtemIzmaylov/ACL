@@ -636,11 +636,11 @@ type
     // 2) scroll_event не работает на Gnome
     case ShellDesktopEnv of
       sdeGnome:
-        Result := [ticClick];
+        Result := [ticClick, ticClickMid];
       sdeKDE:
-        Result := [ticClick, ticWheel];
+        Result := [ticClick, ticClickMid, ticWheel];
     else
-      Result := [ticClick, ticWheel, ticMove];
+      Result := [ticClick, ticClickMid, ticMove, ticWheel];
     end;
   end;
 

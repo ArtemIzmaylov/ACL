@@ -174,6 +174,6 @@ type
 
   class function TACLTrayIcon.Capabilities: TACLTrayIconCapabilities;
   begin
-    Result := [ticClick, ticMove];
+    Result := [ticClick, ticClickMid, ticMove];
   end;
 

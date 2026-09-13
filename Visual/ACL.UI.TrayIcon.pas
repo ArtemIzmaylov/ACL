@@ -53,7 +53,7 @@ type
   TACLTrayBalloonIcon = (tbiNone, tbiInfo, tbiWarning, tbiError);
 
   TACLTrayIcon = class;
-  TACLTrayIconCapability = (ticClick, ticMove, ticWheel);
+  TACLTrayIconCapability = (ticClick, ticClickMid, ticMove, ticWheel);
   TACLTrayIconCapabilities = set of TACLTrayIconCapability;
   TACLTrayIconMouseWheelEvent = procedure (Sender: TObject; Down: Boolean) of object;
 
@@ -151,6 +151,7 @@ type
     // Events - check ticClick in Capabilities
     property OnClick: TNotifyEvent read FOnClick write FOnClick;
     property OnDblClick: TNotifyEvent read FOnDblClick write FOnDblClick;
+    // Events - check ticClickMid in Capabilities
     property OnMidClick: TNotifyEvent read FOnMidClick write FOnMidClick;
     // Events - check ticMove in Capabilities
     property OnMouseEnter: TNotifyEvent read FOnMouseEnter write FOnMouseEnter;
