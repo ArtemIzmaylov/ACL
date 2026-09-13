@@ -503,6 +503,7 @@ type
       // Because it failed to hide/recreate the indicator that lead to
       // abnormal popup menu's handle desctruction that lead app to crash.
       if not (ShellDesktopEnv in [sdeCinnamon, sdeMate, sdeXFCE]) then
+      // + ref.to: TACLAppIndicatorImpl.HandlerScroll
       begin
 //TODO:    LLibHandle := acLoadLibrary('libayatana-appindicator-glib.so.2');
 // https://github.com/AyatanaIndicators/libayatana-appindicator-glib/blob/main/src/ayatana-appindicator.h
@@ -565,7 +566,9 @@ type
       LogEntry(acGeneralLogFileName, 'Tray', 'Scroll(%d)', [Integer(Direction)]);
     {$ENDIF}
       if Direction in [GDK_SCROLL_UP, GDK_SCROLL_DOWN] then
-        Self.Owner.MouseWheel(Direction = GDK_SCROLL_UP);
+        // В Gnome и KDE направление разное.
+        // Другие шелы у нас тут не поддерживаются, см. TACLAppIndicatorImpl.CheckInit
+        Self.Owner.MouseWheel((Direction = GDK_SCROLL_UP) and (ShellDesktopEnv <> sdeKDE));
     except
       if Assigned(ApplicationHandleException) then
         ApplicationHandleException(Self);
