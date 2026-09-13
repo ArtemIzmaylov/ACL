@@ -244,6 +244,22 @@ type
 
   TACLBinToTextEncodingClass = class of TACLBinToTextEncoding;
   TACLBinToTextEncoding = class abstract
+  public type
+  {$REGION ' Encoder '}
+    TEncoder = class
+    protected
+      FOutput: TBytes;
+      FOutputUsage: Integer;
+      function Finalize: Boolean; virtual;
+    public
+      constructor Create(ACapacity: Integer);
+      procedure EnsureCapacity(ACount: Integer); inline;
+      function Put(ABytes: PByte; ACount: Integer): TEncoder; virtual; abstract;
+      // Encoder will be automatically freed on call toString!
+      function ToAnsiString: AnsiString;
+      function ToString: string; override;
+    end;
+  {$ENDREGION}
   public
     // Decoding
     class function Decode(const ACode: AnsiString): TBytesStream; overload; inline;
@@ -252,24 +268,30 @@ type
     class function DecodeString(const ACode: string): UnicodeString;
     // Encoding
     class function Encode(ABytes: PByte; ACount: Integer): string; overload;
+    class function Encode(ACapacity: NativeUInt = 0): TEncoder; overload; virtual; abstract;
     class function Encode(AStream: TStream): string; overload;
     class function EncodeString(const AValue: AnsiString): string; overload; inline;
     class function EncodeString(const AValue: UnicodeString): string; overload; inline;
-    // Encoder
-    class function EncodingBegin(ACapacity: NativeUInt = 64): Pointer; virtual;
-    class procedure Encoding(AHandle: Pointer; ABytes: PByte; ACount: Integer); virtual; abstract;
-    class function EncodingDone(AHandle: Pointer): string; virtual;
   end;
 
   { TACLHexcode }
 
   TACLHexcode = class(TACLBinToTextEncoding)
-  strict private const
-    Map: array[0..15] of Char = (
-      '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-      'a', 'b', 'c', 'd', 'e', 'f');
+  public type
+    TEncoder = TACLBinToTextEncoding.TEncoder;
   strict private
+  {$REGION ' Internal Types '}
+    const Map: array[0..15] of Char = (
+      '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+      'a', 'b', 'c', 'd', 'e', 'f'
+    );
     class var FByteToHexMap: array[Byte] of string;
+    type
+      TEncoderImpl = class(TEncoder)
+      public
+        function Put(ABytes: PByte; ACount: Integer): TEncoder; override;
+      end;
+  {$ENDREGION}
   public
     class constructor Create;
 
@@ -279,26 +301,27 @@ type
     class function Decode(ACode: PChar; ACount: Integer): TBytesStream; overload; override;
 
     class function Encode(AByte: Byte): string; overload; static; inline;
+    class function Encode(ACapacity: NativeUInt = 0): TEncoder; overload; override;
     class function Encode(AChar: AnsiChar): string; overload; static; inline;
     class function Encode(AChar: WideChar): string; overload; static; inline;
     class function Encode(AChar: WideChar; ABuffer: PWideChar): PWideChar; overload; static;
-
-    // Encoder
-    class function EncodingBegin(ACapacity: NativeUInt = 64): Pointer; override;
-    class procedure Encoding(AHandle: Pointer; ABytes: PByte; ACount: Integer); override;
   end;
 
   { TACLMimecode }
 
   TACLMimecode = class(TACLBinToTextEncoding)
+  public type
+    TEncoder = TACLBinToTextEncoding.TEncoder;
   strict private type
   {$REGION ' Internal Types '}
-    TEncoder = class(TACLStringBuilder)
-    public
+    TEncoderImpl = class(TEncoder)
+    strict private
       Buffer: array[0..2] of Byte;
-      BufferSize: Integer;
-      CharBuffer: array[0..3] of Char;
-      procedure Output(ABank, ASize: Integer);
+      BufferUsage: Integer;
+    protected
+      function Finalize: Boolean; override;
+    public
+      function Put(ABytes: PByte; ACount: Integer): TEncoder; override;
     end;
   {$ENDREGION}
   strict private const
@@ -333,10 +356,7 @@ type
   {$ENDREGION}
   public
     class function Decode(ACode: PChar; ACount: Integer): TBytesStream; overload; override;
-    // Encoder
-    class function EncodingBegin(ACapacity: NativeUInt = 64): Pointer; override;
-    class procedure Encoding(AHandle: Pointer; ABytes: PByte; ACount: Integer); override;
-    class function EncodingDone(AHandle: Pointer): string; override;
+    class function Encode(ACapacity: NativeUInt = 0): TEncoder; overload; override;
   end;
 
   { TACLPunycode }
@@ -3676,15 +3696,9 @@ begin
 end;
 
 class function TACLBinToTextEncoding.Encode(ABytes: PByte; ACount: Integer): string;
-var
-  LHandle: Pointer;
 begin
   if ACount > 0 then
-  begin
-    LHandle := EncodingBegin(ACount);
-    Encoding(LHandle, ABytes, ACount);
-    Result := EncodingDone(LHandle);
-  end
+    Result := Encode(ACount).Put(ABytes, ACount).ToString
   else
     Result := '';
 end;
@@ -3695,13 +3709,13 @@ const
 var
   LData: PByte;
   LDataRead: Integer;
-  LHandle: Pointer;
+  LEncoder: TEncoder;
 begin
   if AStream is TCustomMemoryStream then
     Result := Encode(TCustomMemoryStream(AStream).Memory, AStream.Size)
   else
   begin
-    LHandle := EncodingBegin(AStream.Size);
+    LEncoder := Encode(AStream.Size);
     try
       LData := AllocMem(DataSize);
       try
@@ -3709,13 +3723,13 @@ begin
         repeat
           LDataRead := AStream.Read(LData^, DataSize);
           if LDataRead > 0 then
-            Encoding(LHandle, LData, LDataRead);
+            LEncoder.Put(LData, LDataRead);
         until LDataRead < 1;
       finally
         FreeMem(LData, DataSize);
       end;
     finally
-      Result := EncodingDone(LHandle);
+      Result := LEncoder.ToString;
     end;
   end;
 end;
@@ -3738,17 +3752,45 @@ begin
   Result := EncodeString(acEncodeUtf8(AValue));
 end;
 
-class function TACLBinToTextEncoding.EncodingBegin(ACapacity: NativeUInt): Pointer;
+{ TACLBinToTextEncoding.TEncoder }
+
+constructor TACLBinToTextEncoding.TEncoder.Create(ACapacity: Integer);
 begin
-  Result := TACLStringBuilder.Create(ACapacity);
+  SetLength(FOutput, ACapacity);
 end;
 
-class function TACLBinToTextEncoding.EncodingDone(AHandle: Pointer): string;
-var
-  LBuilder: TACLStringBuilder absolute AHandle;
+procedure TACLBinToTextEncoding.TEncoder.EnsureCapacity(ACount: Integer);
 begin
-  Result := LBuilder.ToString;
-  LBuilder.Free;
+  Inc(ACount, FOutputUsage);
+  if ACount > Length(FOutput) then
+    SetLength(FOutput, ACount + ACount div 2);
+end;
+
+function TACLBinToTextEncoding.TEncoder.Finalize: Boolean;
+begin
+  Result := FOutputUsage > 0;
+end;
+
+function TACLBinToTextEncoding.TEncoder.ToAnsiString: AnsiString;
+begin
+  if Finalize then
+    Result := acMakeString(PAnsiChar(@FOutput[0]), FOutputUsage)
+  else
+    Result := '';
+  Free;
+end;
+
+function TACLBinToTextEncoding.TEncoder.ToString: string;
+begin
+{$IFDEF UNICODE}
+  if Finalize then
+    Result := acUStringFromBytes(@FOutput[0], FOutputUsage)
+  else
+    Result := '';
+  Free;
+{$ELSE}
+  Result := ToAnsiString;
+{$ENDIF}
 end;
 
 { TACLHexcode }
@@ -3842,22 +3884,26 @@ begin
   Result := FByteToHexMap[Ord(AChar)];
 end;
 
-class function TACLHexcode.EncodingBegin(ACapacity: NativeUInt): Pointer;
+class function TACLHexcode.Encode(ACapacity: NativeUInt): TEncoder;
 begin
-  Result := inherited EncodingBegin(ACapacity * 2);
+  Result := TEncoderImpl.Create(ACapacity * 2);
 end;
 
-class procedure TACLHexcode.Encoding(AHandle: Pointer; ABytes: PByte; ACount: Integer);
-var
-  LBuilder: TACLStringBuilder absolute AHandle;
+{ TACLHexcode.TEncoderImpl }
+
+function TACLHexcode.TEncoderImpl.Put(ABytes: PByte; ACount: Integer): TEncoder;
 begin
+  EnsureCapacity(ACount);
   while ACount > 0 do
   begin
-    LBuilder.Append(Map[ABytes^ shr 4]);
-    LBuilder.Append(Map[ABytes^ and $F]);
+    FOutput[FOutputUsage] := Byte(Map[ABytes^ shr 4]);
+    Inc(FOutputUsage);
+    FOutput[FOutputUsage] := Byte(Map[ABytes^ and $F]);
+    Inc(FOutputUsage);
     Inc(ABytes);
     Dec(ACount);
   end;
+  Result := Self;
 end;
 
 { TACLMimecode }
@@ -3890,9 +3936,7 @@ class function TACLMimecode.Decode(ACode: PChar; ACount: Integer): TBytesStream;
   end;
 
 var
-  LData: Integer;
-  LDataBytes: array[0..3] of Byte absolute LData;
-  LTemp: Integer;
+  LData: LongWord;
 begin
   Result := nil;
   if (ACount > 0) and CheckCodeAlphabet(ACode, ACount) then
@@ -3900,7 +3944,7 @@ begin
     Dec(ACount, CalcDiscardValue(ACode, ACount));
     if ACount < 1 then Exit;
     Result := TBytesStream.Create;
-    Result.Size := MulDiv(ACount, 10, 12); // ~137% max
+    Result.Size := (3 * ACount) div 4 + 1;
     while ACount > 0 do
     begin
       LData := DecodeTable[Byte(ACode^)] shl 18;
@@ -3911,13 +3955,11 @@ begin
       Inc(ACode);
       LData := LData or DecodeTable[Byte(ACode^)];
       Inc(ACode);
-
-      LTemp := LDataBytes[2];
-      LDataBytes[2] := LDataBytes[0];
-      LDataBytes[0] := LTemp;
-
-      LTemp := Min(ACount - 1, 3);
-      Result.Write(LDataBytes[0], LTemp);
+      LData :=
+        ((LData and $00FF00)) or
+        ((LData and $0000FF) shl 16) or
+        ((LData and $FF0000) shr 16);
+      Result.Write(LData, Min(ACount - 1, 3));
       Dec(ACount, 4);
     end;
     Result.Size := Result.Position;
@@ -3925,60 +3967,72 @@ begin
   end;
 end;
 
-class function TACLMimecode.EncodingBegin(ACapacity: NativeUInt = 64): Pointer;
+class function TACLMimecode.Encode(ACapacity: NativeUInt): TEncoder;
 begin
-  Result := TEncoder.Create((ACapacity * 14) div 10); // 137% max;
+  // на каждые 3 байта пишется 4 символа,
+  // если размер некратен 3м, то хвост всё равно состоит из 4х символов.
+  Result := TEncoderImpl.Create(4 * (ACapacity div 3 + 1));
 end;
 
-class procedure TACLMimecode.Encoding(AHandle: Pointer; ABytes: PByte; ACount: Integer);
+{ TACLMimecode.TEncoderImpl }
+
+function TACLMimecode.TEncoderImpl.Finalize: Boolean;
 var
-  LEncoder: TEncoder absolute AHandle;
+  LBank: Integer;
 begin
-  while ACount > 0 do
-  begin
-    LEncoder.Buffer[LEncoder.BufferSize] := ABytes^;
-    Inc(LEncoder.BufferSize);
-    Inc(ABytes);
-    Dec(ACount);
-    if LEncoder.BufferSize = 3 then
+  case BufferUsage of
+    1:
     begin
-      LEncoder.Output(
-        (LEncoder.Buffer[0] shl 16) or
-        (LEncoder.Buffer[1] shl 8) or
-        (LEncoder.Buffer[2]), 4);
-      LEncoder.BufferSize := 0;
+      EnsureCapacity(4);
+      LBank := Buffer[0] shl 4;
+      FOutput[FOutputUsage + 3] := Ord(PadByte);
+      FOutput[FOutputUsage + 2] := Ord(PadByte);
+      FOutput[FOutputUsage + 1] := EncodeTable[LBank and $3F];
+      FOutput[FOutputUsage    ] := EncodeTable[LBank shr 6];
+      Inc(FOutputUsage, 4);
+    end;
+
+    2:
+    begin
+      EnsureCapacity(4);
+      LBank := Buffer[0] shl 10 + Buffer[1] shl 2;
+      FOutput[FOutputUsage + 3] := Ord(PadByte);
+      FOutput[FOutputUsage + 2] := EncodeTable[LBank and $3F];
+      LBank := LBank shr 6;
+      FOutput[FOutputUsage + 1] := EncodeTable[LBank and $3F];
+      FOutput[FOutputUsage    ] := EncodeTable[LBank shr 6];
+      Inc(FOutputUsage, 4);
     end;
   end;
+  Result := inherited;
 end;
 
-class function TACLMimecode.EncodingDone(AHandle: Pointer): string;
+function TACLMimecode.TEncoderImpl.Put(ABytes: PByte; ACount: Integer): TEncoder;
 var
-  LEncoder: TEncoder absolute AHandle;
+  LBank: Integer;
 begin
-  case LEncoder.BufferSize of
-    1: LEncoder.Output(LEncoder.Buffer[0] shl 4, 2);
-    2: LEncoder.Output(LEncoder.Buffer[0] shl 10 + LEncoder.Buffer[1] shl 2, 3);
-  end;
-  Result := LEncoder.ToString;
-  LEncoder.Free;
-end;
-
-{ TACLMimecode.TEncoder }
-
-procedure TACLMimecode.TEncoder.Output(ABank, ASize: Integer);
-var
-  I: Integer;
-begin
-  for I := ASize to 3 do
-    CharBuffer[I] := PadByte;
-  for I := ASize - 1 downto 1 do
+  EnsureCapacity(4 * (ACount div 3));
+  while ACount > 0 do
   begin
-    CharBuffer[I] := Char(EncodeTable[ABank and $3F]);
-    ABank := ABank shr 6;
+    Buffer[BufferUsage] := ABytes^;
+    Inc(BufferUsage);
+    Inc(ABytes);
+    Dec(ACount);
+    if BufferUsage = 3 then
+    begin
+      BufferUsage := 0;
+      EnsureCapacity(4);
+      LBank := (Buffer[0] shl 16) or (Buffer[1] shl 8) or (Buffer[2]);
+      FOutput[FOutputUsage + 3] := EncodeTable[LBank and $3F];
+      LBank := LBank shr 6;
+      FOutput[FOutputUsage + 2] := EncodeTable[LBank and $3F];
+      LBank := LBank shr 6;
+      FOutput[FOutputUsage + 1] := EncodeTable[LBank and $3F];
+      FOutput[FOutputUsage    ] := EncodeTable[LBank shr 6];
+      Inc(FOutputUsage, 4);
+    end;
   end;
-  CharBuffer[0] := Char(EncodeTable[ABank]);
-  for I := Low(CharBuffer) to High(CharBuffer) do
-    Append(CharBuffer[I]);
+  Result := Self;
 end;
 
 { TACLPunycode }
