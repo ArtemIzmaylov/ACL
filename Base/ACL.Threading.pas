@@ -77,6 +77,7 @@ type
     function TryEnter: Boolean; overload; inline;
     function TryEnter(ACancelFunc: TFunc<Boolean>): Boolean; overload; inline;
     function TryEnter(ACancelToken: PBoolean): Boolean; overload; inline;
+    function TryEnter(ATimeOut: LongWord): Boolean; overload; inline;
   end;
 
   { TACLEvent }
@@ -488,6 +489,20 @@ begin
     if TryEnter then
       Exit(True);
     if ACancelToken^ then
+      Exit(False);
+  end;
+end;
+
+function TACLCriticalSection.TryEnter(ATimeOut: LongWord): Boolean;
+var
+  LTimestamp: LongWord;
+begin
+  LTimestamp := TACLThread.Timestamp;
+  while True do
+  begin
+    if TryEnter then
+      Exit(True);
+    if TACLThread.IsTimeout(LTimestamp, ATimeOut) then
       Exit(False);
   end;
 end;
