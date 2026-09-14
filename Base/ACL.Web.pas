@@ -559,13 +559,17 @@ begin
   LStream := LSection.ReadStream('Proxy');
   if LStream <> nil then
   try
-    LId := LStream.ReadInt32;
-    if LId <> PROXY_SETTINGS_ID then
-      LStream.Position := 0; // backward compatibility
-    FProxyInfo.Server := ReadString(LStream, LId);
-    FProxyInfo.ServerPort := ReadString(LStream, LId);
-    FProxyInfo.UserName := ReadString(LStream, LId);
-    FProxyInfo.UserPass := ReadString(LStream, LId);
+    try
+      LId := LStream.ReadInt32;
+      if LId <> PROXY_SETTINGS_ID then
+        LStream.Position := 0; // backward compatibility
+      FProxyInfo.Server := ReadString(LStream, LId);
+      FProxyInfo.ServerPort := ReadString(LStream, LId);
+      FProxyInfo.UserName := ReadString(LStream, LId);
+      FProxyInfo.UserPass := ReadString(LStream, LId);
+    except
+      FProxyInfo := Default(TACLWebProxyInfo);
+    end;
   finally
     LStream.Free;
   end;

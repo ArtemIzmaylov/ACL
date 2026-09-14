@@ -255,6 +255,7 @@ type
       constructor Create(ACapacity: Integer);
       procedure EnsureCapacity(ACount: Integer); inline;
       function Put(ABytes: PByte; ACount: Integer): TEncoder; virtual; abstract;
+      function SetPreamble(const ABytes: TBytes): TEncoder;
       // Encoder will be automatically freed on call toString!
       function ToAnsiString: AnsiString;
       function ToString: string; override;
@@ -269,7 +270,7 @@ type
     // Encoding
     class function Encode(ABytes: PByte; ACount: Integer): string; overload;
     class function Encode(ACapacity: NativeUInt = 0): TEncoder; overload; virtual; abstract;
-    class function Encode(AStream: TStream): string; overload;
+    class function Encode(AStream: TStream; const APreamble: string = ''): string; overload;
     class function EncodeString(const AValue: AnsiString): string; overload; inline;
     class function EncodeString(const AValue: UnicodeString): string; overload; inline;
   end;
@@ -3703,20 +3704,24 @@ begin
     Result := '';
 end;
 
-class function TACLBinToTextEncoding.Encode(AStream: TStream): string;
+class function TACLBinToTextEncoding.Encode(
+  AStream: TStream; const APreamble: string = ''): string;
 const
   DataSize = 8192;
 var
   LData: PByte;
   LDataRead: Integer;
   LEncoder: TEncoder;
+  LPreamble: TBytes;
 begin
-  if AStream is TCustomMemoryStream then
-    Result := Encode(TCustomMemoryStream(AStream).Memory, AStream.Size)
-  else
-  begin
-    LEncoder := Encode(AStream.Size);
-    try
+  LPreamble := TEncoding.UTF8.GetBytes(APreamble);
+  LEncoder := Encode(AStream.Size + Length(LPreamble));
+  try
+    LEncoder.SetPreamble(LPreamble);
+    if AStream is TCustomMemoryStream then
+      LEncoder.Put(TCustomMemoryStream(AStream).Memory, AStream.Size)
+    else
+    begin
       LData := AllocMem(DataSize);
       try
         AStream.Position := 0;
@@ -3724,13 +3729,13 @@ begin
           LDataRead := AStream.Read(LData^, DataSize);
           if LDataRead > 0 then
             LEncoder.Put(LData, LDataRead);
-        until LDataRead < 1;
+        until LDataRead <= 0;
       finally
         FreeMem(LData, DataSize);
       end;
-    finally
-      Result := LEncoder.ToString;
     end;
+  finally
+    Result := LEncoder.ToString;
   end;
 end;
 
@@ -3769,6 +3774,22 @@ end;
 function TACLBinToTextEncoding.TEncoder.Finalize: Boolean;
 begin
   Result := FOutputUsage > 0;
+end;
+
+function TACLBinToTextEncoding.TEncoder.SetPreamble(const ABytes: TBytes): TEncoder;
+var
+  LLength: Integer;
+begin
+  if FOutputUsage > 0 then
+    raise EInvalidOperation.Create(ClassName + ': cannot set preamble, because output is already started');
+  LLength := Length(ABytes);
+  if LLength > 0 then
+  begin
+    EnsureCapacity(LLength);
+    FastMove(ABytes[0], FOutput[0], LLength);
+    FOutputUsage := LLength;
+  end;
+  Result := Self;
 end;
 
 function TACLBinToTextEncoding.TEncoder.ToAnsiString: AnsiString;

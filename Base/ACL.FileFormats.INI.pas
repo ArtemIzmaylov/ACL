@@ -688,16 +688,18 @@ end;
 
 class function TACLIniFile.DecodeStream(const S: string): TMemoryStream;
 begin
-  if S = '' then Exit(nil);
-  Result := TMemoryStream.Create;
-  if not TACLHexcode.Decode(S, Result) then
-    FreeAndNil(Result);
+  if S = '' then
+    Exit(nil);
+  if S[1] = '!' then
+    Result := TACLMimecode.Decode(PChar(S) + 1, Length(S) - 1)
+  else
+    Result := TACLHexcode.Decode(S); // backward compatibility
 end;
 
 class function TACLIniFile.EncodeStream(const S: TStream): string;
 begin
   if (S <> nil) and (S.Size > 0) then
-    Result := TACLHexcode.Encode(S)
+    Result := TACLMimecode.Encode(S, '!')
   else
     Result := '';
 end;
