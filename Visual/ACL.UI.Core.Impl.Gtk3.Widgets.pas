@@ -479,6 +479,7 @@ var
 var
   LGeometry: TGdkGeometry;
   LGeometryHints: TGdkWindowHints;
+  LGdkWindow: PGdkWindow;
   LRect: TGdkRectangle;
   LWindow: PGtkWindow;
 begin
@@ -529,11 +530,13 @@ begin
       LGeometryHints := LGeometryHints + [GDK_HINT_MAX_SIZE, GDK_HINT_MIN_SIZE];
     LWindow^.set_geometry_hints(nil, @LGeometry, LGeometryHints);
 
-    if GetWindow <> nil then
+    LGdkWindow := GetWindow;
+    if LGdkWindow <> nil then
     begin
       LWindow^.set_resizable(True);
       LWindow^.resize(AWidth, AHeight);
       LWindow^.move(ALeft, ATop);
+      LGdkWindow^.move_resize(ALeft, ATop, AWidth, AHeight);
     end;
   finally
     EndUpdate;
