@@ -128,8 +128,8 @@ type
       IID: TGUID; out Obj): HRESULT; {$IFDEF MSWINDOWS}stdcall{$ELSE}cdecl{$ENDIF};
   public
     procedure BeforeDestruction; override;
+    procedure Kill;
     procedure Terminate; virtual;
-    procedure TerminateForce;
   {$IF DEFINED(ACL_THREADING_DEBUG_DEADLOCKS)}
     function WaitFor: LongWord;
   {$ENDIF}
@@ -596,7 +596,7 @@ end;
 
 procedure TACLThread.BeforeDestruction;
 begin
-  inherited BeforeDestruction;
+  inherited;
   Terminate;
 end;
 
@@ -670,6 +670,21 @@ begin
     ATimestamp := LNow;
 end;
 
+procedure TACLThread.Kill;
+begin
+  if not Finished then
+  begin
+  {$IFDEF MSWINDOWS}
+    TerminateThread(Handle, ReturnValue);
+  {$ELSE}
+    KillThread(Handle);
+  {$ENDIF}
+    DoTerminate;
+    // last
+    PBoolean(@Finished)^ := True;
+  end;
+end;
+
 {$IF DEFINED(ACL_THREADING_DEBUG) AND DEFINED(MSWINDOWS)}
 class procedure TACLThread.NameThreadForDebugging(const AName: string);
 var
@@ -710,21 +725,6 @@ begin
   begin
     Suspended := False;
     inherited Terminate;
-  end;
-end;
-
-procedure TACLThread.TerminateForce;
-begin
-  if not Finished then
-  begin
-  {$IFDEF MSWINDOWS}
-    TerminateThread(Handle, ReturnValue);
-  {$ELSE}
-    KillThread(Handle);
-  {$ENDIF}
-    DoTerminate;
-    // last
-    PBoolean(@Finished)^ := True;
   end;
 end;
 
