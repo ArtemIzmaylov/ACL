@@ -715,13 +715,17 @@ end;
 
 procedure TACLThread.TerminateForce;
 begin
-{$IFDEF MSWINDOWS}
-  TerminateThread(Handle, ReturnValue);
-  DoTerminate;
-{$ELSE}
-  KillThread(Handle);
-  DoTerminate;
-{$ENDIF}
+  if not Finished then
+  begin
+  {$IFDEF MSWINDOWS}
+    TerminateThread(Handle, ReturnValue);
+  {$ELSE}
+    KillThread(Handle);
+  {$ENDIF}
+    DoTerminate;
+    // last
+    PBoolean(@Finished)^ := True;
+  end;
 end;
 
 {$IFDEF ACL_THREADING_DEBUG_DEADLOCKS}
