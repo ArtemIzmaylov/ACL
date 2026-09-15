@@ -128,6 +128,7 @@ type
       IID: TGUID; out Obj): HRESULT; {$IFDEF MSWINDOWS}stdcall{$ELSE}cdecl{$ENDIF};
   public
     procedure BeforeDestruction; override;
+    procedure Free(AWaitForTimeOut: LongWord); overload;
     procedure Kill;
     procedure Terminate; virtual;
   {$IF DEFINED(ACL_THREADING_DEBUG_DEADLOCKS)}
@@ -598,6 +599,29 @@ procedure TACLThread.BeforeDestruction;
 begin
   inherited;
   Terminate;
+end;
+
+procedure TACLThread.Free(AWaitForTimeOut: LongWord);
+{$IFNDEF MSWINDOWS}
+var
+  LTimestamp: LongWord;
+{$ENDIF}
+begin
+  if Self = nil then Exit;
+
+  Terminate;
+  if not Finished then
+  begin
+  {$IFDEF MSWINDOWS}
+    WaitForSyncObject(Handle, AWaitForTimeOut);
+  {$ELSE}
+    LTimestamp := TACLThread.Timestamp;
+    while not (Finished or IsTimeoutEx(LTimestamp, AWaitForTimeOut)) do
+      Sleep(100);
+  {$ENDIF}
+    Kill;
+  end;
+  Free;
 end;
 
 class function TACLThread.GetName(AThreadId: TThreadId): string;
