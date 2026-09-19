@@ -438,12 +438,10 @@ begin
     // need to initialize the object; only the unique address of a cairo_data_key_t object is used.
     cairo_font_face_set_user_data(LFontFace, Pcairo_user_data_key_t(Self), LFtFace, @FreeFtFace);
 
+    cairo_font_options_set_hint_metrics(LOptions, CAIRO_HINT_METRICS_ON);
     cairo_font_options_set_hint_style(LOptions, CAIRO_HINT_STYLE_SLIGHT);
     cairo_font_options_set_antialias(LOptions, CAIRO_ANTIALIAS_SUBPIXEL);
     cairo_font_options_set_subpixel_order(LOptions, CAIRO_SUBPIXEL_ORDER_RGB);
-    // Иначе у нас будут разночтения между посчитанным значением (на базе MeasureCanvas)
-    // и отрисоваемым (на базе Gtk3.Cairo), и текст будет обрезаться (особенно заметно на high dpi)
-    cairo_font_options_set_hint_metrics(LOptions, CAIRO_HINT_METRICS_OFF);
 
     cairo_matrix_init_identity(@LCtmMatrix);
     cairo_matrix_init_scale(@LFontMatrix, FPixelSize, FPixelSize);

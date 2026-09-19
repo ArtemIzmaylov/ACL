@@ -235,37 +235,31 @@ type
     property ClientRect: TRect read GetClientRect;
   end;
 
-  { TACLMeasureCanvas }
-
-  TACLMeasureCanvas = class(TCanvas)
-  strict private
-    FBitmap: HBITMAP;
-  {$IFDEF FPC}
-    function GetFont: TFont;
-    procedure SetFont(AValue: TFont); reintroduce;
-  {$ENDIF}
-  protected
-    procedure CreateHandle; override;
-    procedure FreeHandle; {$IFDEF FPC}override;{$ENDIF}
-  public
-    destructor Destroy; override;
-  {$IFDEF FPC}
-    property Font: TFont read GetFont write SetFont;
-  {$ENDIF}
-  end;
-
   { TACLScreenCanvas }
 
   TACLScreenCanvas = class(TCanvas)
-  strict private
-    FDeviceContext: HDC;
   protected
     procedure CreateHandle; override;
-    procedure FreeHandle; {$IFDEF FPC}override;{$ENDIF}
+    procedure FreeHandle; {$IFDEF FPC}override{$ELSE}virtual{$ENDIF};
   public
     destructor Destroy; override;
     procedure Release;
   end;
+
+  { TACLMeasureCanvas }
+
+  TACLMeasureCanvas = class(TACLScreenCanvas)
+  strict private
+    procedure SetFont(AValue: TFont); reintroduce;
+  protected
+  {$IFNDEF LCLGtk3}
+    procedure CreateHandle; override;
+    procedure FreeHandle; override;
+  {$ENDIF}
+  public
+    property Font write SetFont;
+  end;
+
 
 {$REGION ' Regions '}
 
@@ -754,7 +748,6 @@ function acTextSizeMultiline(ACanvas: TCanvas;
 
 procedure acSysDrawText(ACanvas: TCanvas; var R: TRect; const AText: string; AFlags: Cardinal);
 
-// Screen
 function MeasureCanvas: TACLMeasureCanvas;
 function ScreenCanvas: TACLScreenCanvas;
 implementation
@@ -1510,11 +1503,10 @@ end;
 procedure TACLScreenCanvas.CreateHandle;
 begin
 {$IFDEF FPC}
-  FDeviceContext := GetDC(0);
+  Handle := GetDC(0);
 {$ELSE}
-  FDeviceContext := GetDCEx(0, 0, DCX_CACHE or DCX_LOCKWINDOWUPDATE);
+  Handle := GetDCEx(0, 0, DCX_CACHE or DCX_LOCKWINDOWUPDATE);
 {$ENDIF}
-  Handle := FDeviceContext;
 end;
 
 procedure TACLScreenCanvas.Release;
@@ -1524,12 +1516,14 @@ begin
 end;
 
 procedure TACLScreenCanvas.FreeHandle;
+var
+  LHandle: HDC;
 begin
-  if FDeviceContext <> 0 then
+  if HandleAllocated then
   begin
+    LHandle := Handle;
     Handle := 0;
-    ReleaseDC(0, FDeviceContext);
-    FDeviceContext := 0;
+    ReleaseDC(0, LHandle);
   end;
 end;
 
@@ -1546,43 +1540,33 @@ end;
 
 { TACLMeasureCanvas }
 
-destructor TACLMeasureCanvas.Destroy;
-begin
-  FreeHandle;
-  inherited Destroy;
-end;
-
+{$IFNDEF LCLGtk3}
 procedure TACLMeasureCanvas.CreateHandle;
 begin
-  FBitmap := CreateCompatibleBitmap(0, 1, 1);
   Handle := CreateCompatibleDC(0);
-  SelectObject(Handle, FBitmap);
+  SelectObject(Handle, CreateCompatibleBitmap(Handle, 1, 1));
 end;
 
 procedure TACLMeasureCanvas.FreeHandle;
 var
+  LBitmap: HBITMAP;
   LHandle: HDC;
 begin
   if HandleAllocated then
   begin
     LHandle := Handle;
-    Handle := 0; // first
+    LBitmap := GetCurrentObject(LHandle, OBJ_BITMAP);
+    Handle := 0;
     DeleteDC(LHandle);
-    DeleteObject(FBitmap);
+    DeleteObject(LBitmap);
   end;
 end;
-
-{$IFDEF FPC}
-function TACLMeasureCanvas.GetFont: TFont;
-begin
-  Result := inherited Font;
-end;
+{$ENDIF}
 
 procedure TACLMeasureCanvas.SetFont(AValue: TFont);
 begin
   SetScaledFont(AValue);
 end;
-{$ENDIF}
 
 //----------------------------------------------------------------------------------------------------------------------
 // Bitmaps
