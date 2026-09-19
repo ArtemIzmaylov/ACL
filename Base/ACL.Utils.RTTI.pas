@@ -6,7 +6,7 @@
 //  Purpose:   RTTI Utilities
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2024
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -34,7 +34,9 @@ type
   ERttiError = class(EPropertyError)
   public
     constructor CreateNoProp(const AClassName, AFieldName: string);
+    constructor CreatePropError(AObject: TObject; APropInfo: PPropInfo; const AErrorText: string);
     constructor CreateUnsupportedPropType(APropInfo: PPropInfo);
+    class procedure EnsureWritable(AObject: TObject; APropInfo: PPropInfo);
   end;
 
   { TRTTI }
@@ -42,8 +44,8 @@ type
   TRTTI = class
   strict private
     class var FContext: TRttiContext;
-    class function GetPropertiesCore(
-      AClassInfo: Pointer; out AList: PPropList; out ACount: Integer): Boolean;
+    class function GetPropertiesCore(AClassInfo: Pointer;
+      out AList: PPropList; out ACount: Integer): Boolean;
   public
     class constructor Create;
     class destructor Destroy;
@@ -142,12 +144,6 @@ uses
   ACL.Utils.Common,
   ACL.Utils.Strings;
 
-const
-  sErrorReadOnly = 'The %s is read only';
-  sErrorNoRttiInfo = 'The %s has no RTTI info';
-  sErrorSetEnumPropValue = 'Can''t set "%s" to "%s"';
-  sErrorValueOutOfRange = 'Value is out of range';
-
 {$IFDEF FPC}
 function GetObjectPropClass(PropInfo: PPropInfo): TClass;
 var
@@ -182,10 +178,26 @@ begin
   CreateFmt('The %s.%s property was not found', [AClassName, AFieldName]);
 end;
 
+constructor ERttiError.CreatePropError(
+  AObject: TObject; APropInfo: PPropInfo; const AErrorText: string);
+begin
+  CreateFmt('%s.%s - %s', [AObject.ClassName, GetPropName(APropInfo), AErrorText]);
+end;
+
 constructor ERttiError.CreateUnsupportedPropType(APropInfo: PPropInfo);
 begin
   CreateFmt('The %s property has unsupported type (%d)',
     [GetPropName(APropInfo), Ord(GetPropType(APropInfo)^.Kind)]);
+end;
+
+class procedure ERttiError.EnsureWritable(AObject: TObject; APropInfo: PPropInfo);
+begin
+  if AObject = nil then
+    raise ERttiError.Create('Object cannot be nil');
+  if APropInfo = nil then
+    raise ERttiError.CreateFmt('%s: property is not specified', [AObject.ClassName]);
+  if APropInfo.SetProc = nil then
+    raise ERttiError.CreateFmt('The %s.%s is read only', [AObject.ClassName, GetPropName(APropInfo)]);
 end;
 
 { TRTTI }
@@ -203,25 +215,25 @@ end;
 class procedure TRTTI.EnumClassProperties<T>(AObject: TObject;
   AEnumProc: TRttiEnumProc<T>; ARecursive: Boolean; AVisibility: TMemberVisibilities);
 var
-  AProperties: TArray<TRttiProperty>;
-  AProperty: TRttiProperty;
-  APropertyValue: TObject;
+  LProperties: TArray<TRttiProperty>;
+  LProperty: TRttiProperty;
+  LPropertyValue: TObject;
   I: Integer;
 begin
-  AProperties := GetType(AObject).GetProperties;
-  for I := 0 to Length(AProperties) - 1 do
+  LProperties := GetType(AObject).GetProperties;
+  for I := 0 to Length(LProperties) - 1 do
   begin
-    AProperty := AProperties[I];
-    if (AProperty.PropertyType.TypeKind = tkClass) and (AProperty.Visibility in AVisibility) then
+    LProperty := LProperties[I];
+    if (LProperty.PropertyType.TypeKind = tkClass) and (LProperty.Visibility in AVisibility) then
     begin
-      APropertyValue := AProperty.GetValue(AObject).AsObject;
-      if (APropertyValue = nil) or (APropertyValue is TComponent) then
+      LPropertyValue := LProperty.GetValue(AObject).AsObject;
+      if (LPropertyValue = nil) or (LPropertyValue is TComponent) then
         Continue;
-      if APropertyValue.InheritsFrom(T) then
-        AEnumProc(T(APropertyValue))
+      if LPropertyValue.InheritsFrom(T) then
+        AEnumProc(T(LPropertyValue))
       else
         if ARecursive then
-          EnumClassProperties<T>(APropertyValue, AEnumProc, ARecursive, AVisibility);
+          EnumClassProperties<T>(LPropertyValue, AEnumProc, ARecursive, AVisibility);
     end;
   end;
 end;
@@ -299,7 +311,7 @@ class function TRTTI.GetType(AObject: TObject): TRttiType;
 begin
   Result := Context.GetType(AObject.ClassInfo);
   if Result = nil then
-    raise EInvalidOperation.CreateFmt(sErrorNoRttiInfo, [AObject.ClassName]);
+    raise ERttiError.CreateFmt('%s clas has no RTTI info', [AObject.ClassName]);
 end;
 
 class function TRTTI.ResolvePropInfo(var AObject: TObject;
@@ -461,39 +473,25 @@ end;
 class procedure TRTTI.SetEnumPropValue(
   AObject: TObject; const APropInfo: PPropInfo; const AValue: string);
 var
-  AData: Integer;
-  ATypeData: PTypeData;
-  AValueOrd: Integer;
+  LData: Integer;
+  LTypeData: PTypeData;
+  LValueOrd: Integer;
 begin
-  AData := GetEnumValue(GetPropType(APropInfo), AValue);
-  if AData < 0 then
-  begin
-    ATypeData := GetTypeData(GetPropType(APropInfo));
-    AValueOrd := StrToIntDef(AValue, ATypeData^.MinValue - 1);
-    if (AValueOrd >= ATypeData^.MinValue) and (AValueOrd <= ATypeData^.MaxValue) then
-      AData := AValueOrd;
-  end;
-  if AData >= 0 then
-    SetOrdProp(AObject, APropInfo, AData)
-  else
-    raise EPropertyConvertError.CreateFmt(sErrorSetEnumPropValue, [AValue, APropInfo^.Name]);
-end;
+  ERttiError.EnsureWritable(AObject, APropInfo);
 
-class procedure TRTTI.SetPropValue(
-  AObject: TObject; const APropInfo: PPropInfo; const AValue: string);
-begin
-  if APropInfo = nil then
-    Exit;
-  if APropInfo.SetProc = nil then
-    raise EPropReadOnly.CreateFmt(sErrorReadOnly, [APropInfo.Name]);
-  case APropInfo^.PropType^.Kind of
-    tkEnumeration:
-      SetEnumPropValue(AObject, APropInfo, AValue);
-    tkFloat:
-      SetFloatProp(AObject, APropInfo, StrToFloat(AValue, InvariantFormatSettings));
-  else
-    TypInfo.SetPropValue(AObject, APropInfo, AValue);
+  LData := GetEnumValue(GetPropType(APropInfo), AValue);
+  if LData < 0 then
+  begin
+    LTypeData := GetTypeData(GetPropType(APropInfo));
+    LValueOrd := StrToIntDef(AValue, LTypeData^.MinValue - 1);
+    if (LValueOrd >= LTypeData^.MinValue) and (LValueOrd <= LTypeData^.MaxValue) then
+      LData := LValueOrd;
   end;
+  if LData >= 0 then
+    SetOrdProp(AObject, APropInfo, LData)
+  else
+    raise ERttiError.CreateFmt('Can''t set "%s" to "%s.%s"',
+      [AValue, AObject.ClassName, GetPropName(APropInfo)]);
 end;
 
 class procedure TRTTI.SetPropValue(AObject: TObject; const AName, AValue: string);
@@ -501,15 +499,39 @@ begin
   SetPropValue(AObject, GetPropInfo(AObject, AName), AValue);
 end;
 
+class procedure TRTTI.SetPropValue(AObject: TObject; const APropInfo: PPropInfo; const AValue: string);
+begin
+  ERttiError.EnsureWritable(AObject, APropInfo);
+  try
+    case APropInfo^.PropType^.Kind of
+      tkEnumeration:
+        SetEnumPropValue(AObject, APropInfo, AValue);
+      tkFloat:
+        SetFloatProp(AObject, APropInfo, StrToFloat(AValue, InvariantFormatSettings));
+    else
+      TypInfo.SetPropValue(AObject, APropInfo, AValue);
+    end;
+  except
+    on E: Exception do
+      raise ERttiError.CreatePropError(AObject, APropInfo, E.Message);
+  end;
+end;
+
 class procedure TRTTI.SetPropValueAsVariant(
   AObject: TObject; const APropInfo: PPropInfo; const AValue: Variant);
 begin
-  if APropInfo.SetProc = nil then
-    raise EPropReadOnly.CreateFmt(sErrorReadOnly, [APropInfo.Name]);
-  if IsBoolean(APropInfo) and VarIsNumeric(AValue) then
-    SetBoolProp(AObject, APropInfo, FastTrunc(AValue) <> 0)
-  else
-    TypInfo.SetPropValue(AObject, APropInfo, AValue);
+  ERttiError.EnsureWritable(AObject, APropInfo);
+  try
+    if IsBoolean(APropInfo) and VarIsNumeric(AValue) then
+      SetBoolProp(AObject, APropInfo, FastTrunc(AValue) <> 0)
+    else if VarIsStr(AValue) then
+      SetPropValue(AObject, APropInfo, VarToStr(AValue))
+    else
+      TypInfo.SetPropValue(AObject, APropInfo, AValue);
+  except
+    on E: Exception do
+      raise ERttiError.CreatePropError(AObject, APropInfo, E.Message);
+  end;
 end;
 
 class procedure TRTTI.SetPropValueAsVariant(
@@ -523,8 +545,7 @@ begin
   Result := T(TryGetPropObject(AObject, AName, T));
 end;
 
-class function TRTTI.TryGetPropObject(AObject: TObject;
-  const AName: string; AMinClass: TClass): TObject;
+class function TRTTI.TryGetPropObject(AObject: TObject; const AName: string; AMinClass: TClass): TObject;
 var
   LPropInfo: PPropInfo;
 begin
@@ -548,17 +569,21 @@ end;
 { TValueHelper }
 
 class function TValueHelper.FromOrdinal(AType: TRttiType; const AValue: Int64): TValue;
+const
+  sErrorValueOutOfRange = 'Value %d is out of range [%d..%d]';
 begin
   if AType is TRttiOrdinalType then
   begin
     if not InRange(AValue, TRttiOrdinalType(AType).MinValue, TRttiOrdinalType(AType).MaxValue) then
-      raise EPropertyError.Create(sErrorValueOutOfRange);
+      raise EPropertyError.CreateFmt(sErrorValueOutOfRange, [AValue,
+        TRttiOrdinalType(AType).MinValue, TRttiOrdinalType(AType).MaxValue]);
   end
   else
     if AType is TRttiInt64Type then
     begin
       if not InRange(AValue, TRttiInt64Type(AType).MinValue, TRttiInt64Type(AType).MaxValue) then
-        raise EPropertyError.Create(sErrorValueOutOfRange);
+        raise EPropertyError.CreateFmt(sErrorValueOutOfRange, [AValue,
+          TRttiInt64Type(AType).MinValue, TRttiInt64Type(AType).MaxValue]);
     end;
 
   Result := FromOrdinal(AType.Handle, AValue);
