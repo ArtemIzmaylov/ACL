@@ -18,6 +18,9 @@ unit ACL.UI.DesignTime.PropEditors.Texture;
 interface
 
 uses
+{$IFNDEF FPC}
+  System.ImageList,
+{$ENDIF}
   {System.}Classes,
   {System.}Math,
   {System.}SysUtils,
@@ -31,6 +34,7 @@ uses
   {Vcl.}ExtCtrls,
   {Vcl.}ImgList,
   // ACL
+  ACL.Math,
   ACL.Geometry,
   ACL.Geometry.Utils,
   ACL.Graphics,
@@ -38,6 +42,7 @@ uses
   ACL.Graphics.SkinImage,
   ACL.Graphics.SkinImageSet,
   ACL.UI.Controls.Base,
+  ACL.UI.Controls.BaseEditors,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.ComboBox,
   ACL.UI.Controls.DropDown,
@@ -45,6 +50,7 @@ uses
   ACL.UI.Controls.Labels,
   ACL.UI.Controls.Panel,
   ACL.UI.Controls.SpinEdit,
+  ACL.UI.Controls.TextEdit,
   ACL.UI.Dialogs,
   ACL.UI.Forms,
   ACL.UI.ImageList,
@@ -281,15 +287,20 @@ end;
 
 procedure TACLTextureEditorDialog.cbSourceButtons0Click(Sender: TObject);
 var
-  AValue: string;
+  LValue: string;
 begin
-  AValue := '';
-  if InputQuery(Caption, 'Enter the DPI:', AValue) then
+  LValue := '';
+  if InputQuery(Caption, 'Enter the DPI (or %):', LValue) then
   begin
-    ImageSet.Add(StrToInt(AValue));
+    if LValue.EndsWith('%') then
+    begin
+      LValue := Copy(LValue, 1, Length(LValue) - 1);
+      LValue := IntToStr(MulDiv(96, StrToInt(LValue), 100));
+    end;
+    ImageSet.Add(StrToInt(LValue));
     InitializeImageSetSettings;
     InitializeImageSettings;
-    cbSource.ChangeItemIndex(cbSource.Count - 1);
+    cbSource.ChangeItemIndex(cbSource.IndexOf(LValue));
   end;
 end;
 

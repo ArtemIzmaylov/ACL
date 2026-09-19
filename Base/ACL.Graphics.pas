@@ -428,6 +428,7 @@ type
     procedure Unpremultiply;
     procedure Reset; overload; virtual;
     procedure Reset(const ARect: TRect); overload; virtual;
+    procedure Rotate;
 
     // Export
     procedure SaveToBitmapFile(const AFileName: string);
@@ -578,7 +579,8 @@ type
     class procedure Grayscale(P: PACLPixel32; Count: Integer); overload; static;
     class procedure Grayscale(var P: TACLPixel32); overload; inline; static;
     class function Hue(Color: TColor): Single; static;
-    class function Invert(Color: TColor): TColor; static;
+    class function InvertLightness(Color: TColor): TColor; overload; static;
+    class procedure InvertLightness(P: PACLPixel32; Count: Integer); overload; static;
     class function Lightness(Color: TColor): Single; static;
     class function Luminance(const Color: TACLPixel32): Double; static;
     class procedure MakeDisabled(P: PACLPixel32; Count: Integer; IgnoreMask: Boolean = False); static;
@@ -3484,6 +3486,25 @@ begin
   end;
 end;
 
+procedure TACLBaseDib.Rotate;
+var
+  I: Integer;
+  LSourceColors: PACLPixel32Array;
+  LTargetColors: PACLPixel32Array;
+begin
+  if Empty then Exit;
+  LSourceColors := AllocMem(ColorCount * SizeOf(TACLPixel32));
+  try
+    FastMove(Colors^, LSourceColors^, ColorCount * SizeOf(TACLPixel32));
+    Resize(Height, Width);
+    LTargetColors := PACLPixel32Array(Colors);
+    for I := 0 to ColorCount - 1 do
+      LongWord(LTargetColors^[CoordToFlatIndex(I div Height, I mod Height)]) := LongWord(LSourceColors[I]);
+  finally
+    FreeMem(LSourceColors);
+  end;
+end;
+
 procedure TACLBaseDib.SaveToBitmapFile(const AFileName: string);
 var
   LStream: TStream;
@@ -4942,12 +4963,25 @@ begin
   RGBToHSL(Color, Result, S, L);
 end;
 
-class function TACLColors.Invert(Color: TColor): TColor;
+class function TACLColors.InvertLightness(Color: TColor): TColor;
 var
   H, S, L: Byte;
 begin
   RGBtoHSLi(Color, H, S, L);
   Result := HSLtoRGBi(H, S, 255 - L);
+end;
+
+class procedure TACLColors.InvertLightness(P: PACLPixel32; Count: Integer);
+var
+  H, S, L: Byte;
+begin
+  while Count > 0 do
+  begin
+    RGBtoHSLi(P^.R, P^.G, P^.B, H, S, L);
+    HSLtoRGBi(H, S, 255 - L, P^.R, P^.G, P^.B);
+    Dec(Count);
+    Inc(P);
+  end;
 end;
 
 class procedure TACLColors.RGBtoHSV(R, G, B: Byte; out H, S, V: Single);

@@ -532,7 +532,7 @@ begin
       end;
   end;
 
-  if IsInputEvent(AEvent) then
+  if IsInputEvent(AEvent) and (FGrabbedInputControl <> nil) then
   begin
     AHandled := True;
     LWidget := gtk_get_event_widget(AEvent);
@@ -545,7 +545,7 @@ begin
     gtk_widget_event(LWidget, AEvent);
   end;
 
-  if IsLooseFocusEvent(AEvent) then
+  if IsLooseFocusEvent(AEvent) and (FGrabbedInputControl <> nil) then
   begin
     if Screen.ActiveCustomForm <> FGrabbedInputControl then
       FGrabbedInputControl.Perform(CM_CANCELMODE, 0, 0);

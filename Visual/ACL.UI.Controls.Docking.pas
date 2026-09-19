@@ -14,7 +14,6 @@
 unit ACL.UI.Controls.Docking;
 
 {$I ACL.Config.inc}
-{$R ACL.UI.Controls.Docking.res} // TODO: move to Styles
 
 {$DEFINE ACL_DOCKING_ANIMATE_SIDEBAR}
 {$DEFINE ACL_DOCKING_PIN_TABBED_GROUP}
@@ -54,6 +53,7 @@ uses
   ACL.Graphics,
   ACL.Graphics.Ex,
   ACL.Graphics.SkinImage,
+  ACL.Graphics.SkinImageSet,
   ACL.Math,
   ACL.Timers,
   ACL.UI.Animation,
@@ -128,7 +128,7 @@ type
   TACLDockZone = class(TACLDragImage)
   strict private
     FActive: Boolean;
-    FSkin: TACLSkinImage;
+    FSkin: TACLSkinImageSetItem;
 
     function GetParent: TACLDockControl;
     function GetSkinSize: TSize;
@@ -140,6 +140,7 @@ type
     function CalculateBounds: TRect; virtual;
     function CreateDockGroupForReplacement(AControl: TACLDockControl): TACLDockGroup;
     function GetCurrentDpi: Integer;
+    procedure InitSkin(const ATextureId: string);
     procedure Paint; override;
   public
     constructor Create(AOwner: TComponent); override;
@@ -152,7 +153,7 @@ type
     //# Properties
     property Active: Boolean read FActive write SetActive;
     property Parent: TACLDockControl read GetParent;
-    property Skin: TACLSkinImage read FSkin;
+    property Skin: TACLSkinImageSetItem read FSkin;
   end;
 
   { TACLDockZones }
@@ -175,6 +176,7 @@ type
   protected
     function CalculateBounds: TRect; override;
     function GetLayoutDirection: TACLDockGroupLayout;
+    procedure PaintWindow(DC: HDC); override;
     property Side: TACLBorder read FSide;
   public
     constructor Create(AOwner: TComponent; ASide: TACLBorder); reintroduce;
@@ -801,7 +803,7 @@ begin
   inherited;
   AlphaBlend := False;
   DoubleBuffered := True;
-  FSkin := TACLSkinImage.Create;
+  FSkin := TACLSkinImageSetItem.Create;
 end;
 
 destructor TACLDockZone.Destroy;
@@ -823,12 +825,8 @@ begin
 end;
 
 function TACLDockZone.CalculateBounds: TRect;
-const
-  Padding = 5;
 begin
   Result := TRect.Create(GetSkinSize);
-  Inc(Result.Bottom, 2 * dpiApply(Padding, Parent.GetCurrentDpi));
-  Inc(Result.Right, 2 * dpiApply(Padding, Parent.GetCurrentDpi));
 end;
 
 function TACLDockZone.CreateDockGroupForReplacement(AControl: TACLDockControl): TACLDockGroup;
@@ -863,13 +861,20 @@ end;
 
 function TACLDockZone.GetSkinSize: TSize;
 begin
-  Result := dpiApply(Skin.FrameSize, GetCurrentDpi);
+  Result := dpiApply(Skin.FrameSize, MulDiv(GetCurrentDpi, acDefaultDpi, Skin.DPI));
+end;
+
+procedure TACLDockZone.InitSkin(const ATextureId: string);
+var
+  LTexture: TACLResourceTexture;
+begin
+  LTexture := Parent.Style.GetResource(ATextureId, TACLResourceTexture) as TACLResourceTexture;
+  if LTexture <> nil then
+    Skin.Assign(LTexture.ImageSet.Get(GetCurrentDpi));
 end;
 
 procedure TACLDockZone.Paint;
 begin
-  acFillRect(Canvas, ClientRect, TAlphaColor($FFFAFAFA));
-  acDrawFrame(Canvas, ClientRect, TAlphaColor($FFA5A5A5));
   Skin.Draw(Canvas, ClientRect.CenterTo(GetSkinSize), Ord(Active and Enabled), Enabled);
 end;
 
@@ -946,12 +951,10 @@ end;
 { TACLDockZoneSide }
 
 constructor TACLDockZoneSide.Create(AOwner: TComponent; ASide: TACLBorder);
-const
-  NameMap: array[TACLBorder] of string = ('LEFT', 'TOP', 'RIGHT', 'BOTTOM');
 begin
   FSide := ASide;
   inherited Create(AOwner);
-  Skin.LoadFromResource(HInstance, 'ACLDOCKING_' + NameMap[ASide], RT_BITMAP);
+  InitSkin('Docking.Textures.TargetEdge')
 end;
 
 function TACLDockZoneSide.AllowDock(ASource: TACLDockControl): Boolean;
@@ -1045,12 +1048,29 @@ begin
     Result := TACLDockGroupLayout.Vertical;
 end;
 
+procedure TACLDockZoneSide.PaintWindow(DC: HDC);
+var
+  LDib: TACLDib;
+begin
+  LDib := TACLDib.Create(ClientRect);
+  try
+    inherited PaintWindow(LDib.Handle);
+    if Side in [mRight, mBottom] then
+      LDib.Flip(True, False);
+    if Side in [mTop, mBottom] then
+      LDib.Rotate;
+    acBitBlt(DC, LDib.Handle, ClientRect, NullPoint);
+  finally
+    LDib.Free;
+  end;
+end;
+
 { TACLDockZoneClient }
 
 constructor TACLDockZoneClient.Create(AOwner: TComponent);
 begin
   inherited;
-  Skin.LoadFromResource(HInstance, 'ACLDOCKING_CLIENT', RT_BITMAP);
+  InitSkin('Docking.Textures.TargetClient');
 end;
 
 function TACLDockZoneClient.AllowDock(ASource: TACLDockControl): Boolean;
