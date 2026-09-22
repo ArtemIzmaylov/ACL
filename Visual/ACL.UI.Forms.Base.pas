@@ -907,6 +907,16 @@ begin
   TakeParentFontIfNecessary;
 end;
 
+procedure TACLBasicForm.PaintWindow(DC: HDC);
+begin
+  if FNeedToRestoreClipChildren then
+  begin
+    FNeedToRestoreClipChildren := False;
+    acUpdateWindowLong(Handle, GWL_STYLE, WS_CLIPCHILDREN, True);
+  end;
+  inherited;
+end;
+
 procedure TACLBasicForm.DpiChanged;
 begin
   TakeParentFontIfNecessary;
@@ -914,13 +924,19 @@ end;
 
 procedure TACLBasicForm.ScaleForCurrentDPI;
 begin
+{$IFDEF DELPHI120}
+  if csLoading in ComponentState then
+  begin
+    inherited;
+    Exit;
+  end;
+  if csDesigning in ComponentState then
+    Exit;
+{$ENDIF}
   DisableAlign;
   try
     if Scaled and not (csDesigning in ComponentState) and (Parent = nil) then
       ScaleForPPI(TACLApplication.GetTargetDPI(Self));
-  {$IFDEF DELPHI120}
-    inherited;
-  {$ENDIF}
     ScalingFlags := [];
     Perform(CM_PARENTBIDIMODECHANGED, 0, 0);
   finally

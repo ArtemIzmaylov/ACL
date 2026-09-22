@@ -26,6 +26,7 @@ uses
   {System.}Classes,
   {System.}Math,
   {System.}SysUtils,
+  {System.}Types,
   System.UITypes,
   // VCL
   {Vcl.}Graphics,
@@ -113,7 +114,8 @@ type
 
     class function GetActualColor(ALightColor, ADarkColor: TColor): TColor; overload;
     class function GetActualColor(ALightColor, ADarkColor: TAlphaColor): TAlphaColor; overload;
-    class function GetTargetDPI(AControl: TWinControl): Integer;
+    class function GetTargetDPI(const ABounds: TRect): Integer; overload;
+    class function GetTargetDPI(const AControl: TWinControl): Integer; overload;
     class function IsDarkMode: Boolean;
     class function IsDarkModeOfSystemBar: Boolean;
 
@@ -254,7 +256,15 @@ begin
   TACLColors.ApplyColorSchema(Result, ColorSchema);
 end;
 
-class function TACLApplication.GetTargetDPI(AControl: TWinControl): Integer;
+class function TACLApplication.GetTargetDPI(const ABounds: TRect): Integer;
+begin
+  if TargetDPI <> 0 then
+    Result := TargetDPI
+  else
+    Result := acGetTargetDPI(ABounds.CenterPoint);
+end;
+
+class function TACLApplication.GetTargetDPI(const AControl: TWinControl): Integer;
 begin
   if TargetDPI <> 0 then
     Result := TargetDPI

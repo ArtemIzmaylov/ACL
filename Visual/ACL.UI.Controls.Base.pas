@@ -3401,6 +3401,7 @@ begin
   Dec(FScaleChangeCount);
   if FScaleChangeCount = 0 then
   begin
+    Perform(CM_PARENTFONTCHANGED, 0, 0);
     ResourceChanged;
     TACLControls.ScaleChanged(Self, FScaleChangeState);
   end;

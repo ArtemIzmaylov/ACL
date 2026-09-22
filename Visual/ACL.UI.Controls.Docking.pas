@@ -57,6 +57,7 @@ uses
   ACL.Math,
   ACL.Timers,
   ACL.UI.Animation,
+  ACL.UI.Application,
   ACL.UI.Controls.Base,
   ACL.UI.Controls.Category,
   ACL.UI.Forms,
@@ -1485,7 +1486,7 @@ begin
   LSelectionBounds := FExecutor.ClientToScreen(FExecutor.ClientRect);
   LSelectionBounds.Inflate(FNonClientExtends);
   LSelectionBounds.Offset(AScreenPos.X - FInitialPos.X, AScreenPos.Y - FInitialPos.Y);
-  LTargetDpi := acGetTargetDPI(LSelectionBounds.CenterPoint);
+  LTargetDpi := TACLApplication.GetTargetDPI(LSelectionBounds);
   if LTargetDpi <> FExecutor.FCurrentPPI then
   begin
     LSize := dpiApply(dpiRevert(LSelectionBounds.Size, FExecutor.FCurrentPPI), LTargetDpi);
@@ -3263,11 +3264,11 @@ end;
 
 procedure TACLFloatDockForm.LayoutLoad(ANode: TACLXMLNode);
 var
-  ABounds: TRect;
+  LBounds: TRect;
 begin
-  ABounds := ANode.Attrs.GetAsRect(TACLDockingSchema.AttrPosition);
-  ScaleForPPI(acGetTargetDPI(ABounds.CenterPoint));
-  BoundsRect := dpiApply(ABounds, FCurrentPPI);
+  LBounds := ANode.Attrs.GetAsRect(TACLDockingSchema.AttrPosition);
+  ScaleForPPI(TACLApplication.GetTargetDPI(LBounds));
+  BoundsRect := dpiApply(LBounds, FCurrentPPI);
   DockGroup.LayoutLoad(ANode);
   DockGroup.Align := alClient;
   DockGroup.Visible := True;
