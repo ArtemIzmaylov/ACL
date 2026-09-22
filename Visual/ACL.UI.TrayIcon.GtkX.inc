@@ -568,7 +568,7 @@ type
       if Direction in [GDK_SCROLL_UP, GDK_SCROLL_DOWN] then
         // В Gnome и KDE направление разное.
         // Другие шелы у нас тут не поддерживаются, см. TACLAppIndicatorImpl.CheckInit
-        Self.Owner.MouseWheel((Direction = GDK_SCROLL_UP) and (ShellDesktopEnv <> sdeKDE));
+        Self.Owner.MouseWheel((Direction = GDK_SCROLL_UP) = (ShellDesktopEnv <> sdeKDE));
     except
       if Assigned(ApplicationHandleException) then
         ApplicationHandleException(Self);
