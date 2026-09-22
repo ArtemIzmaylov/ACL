@@ -1009,6 +1009,8 @@ procedure acInvalidateRect(AControl: TWinControl;
 function acIsSemitransparentFill(
   AContentColor1, AContentColor2: TACLResourceColor): Boolean;
 function acOpacityToAlphaBlendValue(AOpacity: Integer): Byte;
+function acUpdateWindowLong(AHandle: TWndHandle;
+  AStyleIndex: Integer; AFlag: Cardinal; ASet: Boolean): Boolean;
 
 function acElementRectIncludeOffset(const R: TRect; ATargetDpi: Integer): TRect;
 function acIsChildOrSelf(AControl, AChildToTest: TControl): Boolean;
@@ -1280,8 +1282,24 @@ begin
 {$ENDIF}
 end;
 
-function CallCustomDrawEvent(Sender: TObject; AEvent: TACLCustomDrawEvent;
-  ACanvas: TCanvas; const R: TRect): Boolean;
+function acUpdateWindowLong(AHandle: TWndHandle;
+  AStyleIndex: Integer; AFlag: Cardinal; ASet: Boolean): Boolean;
+var
+  LOldStyle: Cardinal;
+  LNewStyle: Cardinal;
+begin
+  LOldStyle := GetWindowLong(AHandle, AStyleIndex);
+  if ASet then
+    LNewStyle := LOldStyle or AFlag
+  else
+    LNewStyle := LOldStyle and not AFlag;
+  Result := LNewStyle <> LOldStyle;
+  if Result then
+    SetWindowLong(AHandle, AStyleIndex, LNewStyle);
+end;
+
+function CallCustomDrawEvent(Sender: TObject;
+  AEvent: TACLCustomDrawEvent; ACanvas: TCanvas; const R: TRect): Boolean;
 begin
   Result := False;
   if Assigned(AEvent) then

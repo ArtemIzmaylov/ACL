@@ -1637,21 +1637,12 @@ procedure TACLCustomForm.SetShowInTaskBar(AValue: TShowInTaskbar);
 begin
   inherited ShowInTaskBar := AValue
 {$ELSE}
-var
-  LExStyle: Cardinal;
 begin
   if FShowInTaskBar <> AValue then
   begin
     FShowInTaskBar := AValue;
     if HandleAllocated and not (csDesigning in ComponentState) then
-    begin
-      LExStyle := GetWindowLong(Handle, GWL_EXSTYLE);
-      if ShowInTaskBar = stAlways then
-        LExStyle := LExStyle or WS_EX_APPWINDOW
-      else
-        LExStyle := LExStyle and not WS_EX_APPWINDOW;
-      SetWindowLong(Handle, GWL_EXSTYLE, LExStyle);
-    end;
+      acUpdateWindowLong(Handle, GWL_EXSTYLE, WS_EX_APPWINDOW, ShowInTaskBar = stAlways);
   end;
 {$ENDIF}
 end;

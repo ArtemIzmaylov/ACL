@@ -245,22 +245,17 @@ end;
 procedure TACLAbstractScrollingControl.SetBorderStyle(AValue: TBorderStyle);
 const
   SWP_RECALC_NC = SWP_NOSIZE or SWP_NOMOVE or SWP_NOZORDER or SWP_FRAMECHANGED;
-var
-  LStyle: Cardinal;
 begin
   if FBorderStyle <> AValue then
   begin
     FBorderStyle := AValue;
     if HandleAllocated then
     begin
-      LStyle := GetWindowLong(Handle, GWL_EXSTYLE);
-      if FBorderStyle = bsSingle then
-        LStyle := LStyle or WS_EX_CLIENTEDGE
-      else
-        LStyle := LStyle and not WS_EX_CLIENTEDGE;
-      SetWindowLong(Handle, GWL_EXSTYLE, LStyle);
-      SetWindowPos(Handle, 0, 0, 0, 0, 0, SWP_RECALC_NC);
-      Realign;
+      if acUpdateWindowLong(Handle, GWL_EXSTYLE, WS_EX_CLIENTEDGE, FBorderStyle = bsSingle) then
+      begin
+        SetWindowPos(Handle, 0, 0, 0, 0, 0, SWP_RECALC_NC);
+        Realign;
+      end;
     end;
   end;
 end;
