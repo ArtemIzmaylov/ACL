@@ -112,6 +112,7 @@ type
   strict private
     FLoadedClientHeight: Integer;
     FLoadedClientWidth: Integer;
+    FNeedToRestoreClipChildren: Boolean;
   {$IFNDEF DELPHI120}
     FParentFontLocked: Boolean;
   {$ENDIF}
@@ -154,11 +155,15 @@ type
   {$ENDIF}
   protected
     procedure AlignControls(AControl: TControl; var Rect: TRect); override;
+  {$IFDEF MSWINDOWS}
+    procedure CreateWindowHandle(const Params: TCreateParams); override;
+  {$ENDIF}
     function DialogChar(var Message: TWMKey): Boolean; {$IFDEF FPC}override;{$ELSE}virtual;{$ENDIF}
     procedure DoShow; override;
     procedure DpiChanged; virtual;
     procedure InitializeNewForm; {$IFDEF FPC}virtual;{$ELSE}override;{$ENDIF}
     procedure Loaded; override;
+    procedure PaintWindow(DC: HDC); override;
     procedure ReadState(Reader: TReader); override;
     procedure SetClientHeight(Value: Integer); virtual;
     procedure SetClientWidth(Value: Integer); virtual;
@@ -735,6 +740,13 @@ end;
 procedure TACLBasicForm.ChangeScale(M, D: Integer; IsDpiChange: Boolean);
 begin
   ScaleForPPI(MulDiv(FCurrentPPI, M, D));
+end;
+{$ENDIF}
+
+{$IFDEF MSWINDOWS}
+procedure TACLBasicForm.CreateWindowHandle(const Params: TCreateParams);
+begin
+  inherited CreateWindowHandle(TACLControls.ApplyAntiBlinkingWorkaround(Params, FNeedToRestoreClipChildren));
 end;
 {$ENDIF}
 

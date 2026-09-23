@@ -676,6 +676,7 @@ type
     FFocusOnClick: Boolean;
     FMargins: TACLMargins;
     FMouseInClient: Boolean;
+    FNeedToRestoreClipChildren: Boolean;
     FPadding: TACLPadding;
     FResourceCollection: TACLCustomResourceCollection;
     FScaleChangeCount: Integer;
@@ -735,6 +736,9 @@ type
   {$ENDIF}
     procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
     function CreatePadding: TACLPadding; virtual;
+  {$IFDEF MSWINDOWS}
+    procedure CreateWindowHandle(const Params: TCreateParams); override;
+  {$ENDIF}
     function DialogChar(var Message: TWMKey): Boolean; {$IFDEF FPC}override;{$ELSE}virtual;{$ENDIF}
     function IsInScaling: Boolean;
     function GetClientRect: TRect; override;
@@ -940,6 +944,9 @@ type
     class procedure AlignControl(AControl: TControl; const ABounds: TRect);
     class procedure BufferedPaint(ACaller: TWinControl);
     class procedure RefreshMousePos(AControl: TWinControl);
+    // Anti-white-blinking in dark mode on Windows
+    class function ApplyAntiBlinkingWorkaround(const AParams: TCreateParams;
+      out ANeedToRestoreClipChildren: Boolean): TCreateParams;
     // Scaling
     class procedure ScaleChanging(AControl: TWinControl; var AState: TObject);
     class procedure ScaleChanged(AControl: TWinControl; var AState: TObject);
@@ -3230,6 +3237,11 @@ end;
 
 procedure TACLCustomControl.PaintWindow(DC: HDC);
 begin
+  if FNeedToRestoreClipChildren then
+  begin
+    FNeedToRestoreClipChildren := False;
+    acUpdateWindowLong(Handle, GWL_STYLE, WS_CLIPCHILDREN, True);
+  end;
 {$IFNDEF LCLGtk3}
   if not (csOpaque in ControlStyle) then
     acDrawTransparentControlBackground(Self, DC, ClientRect, False);
@@ -3599,6 +3611,13 @@ begin
   Result := TACLPadding.Create(0);
 end;
 
+{$IFDEF MSWINDOWS}
+procedure TACLCustomControl.CreateWindowHandle(const Params: TCreateParams);
+begin
+  inherited CreateWindowHandle(TACLControls.ApplyAntiBlinkingWorkaround(Params, FNeedToRestoreClipChildren));
+end;
+{$ENDIF}
+
 function TACLCustomControl.DialogChar(var Message: TWMKey): Boolean;
 begin
 {$IFDEF FPC}
@@ -3893,6 +3912,24 @@ begin
   finally
     AControl.ControlState := AControl.ControlState - [csAligning];
   end;
+end;
+
+class function TACLControls.ApplyAntiBlinkingWorkaround(
+  const AParams: TCreateParams;
+  out ANeedToRestoreClipChildren: Boolean): TCreateParams;
+begin
+  Result := AParams;
+  //   Проблема: при запуске приложения в ночном режиме, при первом показе формы
+  // зоны некоторых контролов промелькивают белой подложкой. Суть в том, что
+  // контролы не успели вовремя отрисоваться и из-за clip-children образовалась
+  // дырка на холсте.
+  //   Решение: на время показа формы отключаем клиппинг дочерних контролов.
+{$IFDEF MSWINDOWS}
+  ANeedToRestoreClipChildren := AParams.Style and WS_CLIPCHILDREN <> 0;
+  Result.Style := Result.Style and not WS_CLIPCHILDREN;
+{$ELSE}
+  ANeedToRestoreClipChildren := False;
+{$ENDIF}
 end;
 
 class procedure TACLControls.BufferedPaint(ACaller: TWinControl);
