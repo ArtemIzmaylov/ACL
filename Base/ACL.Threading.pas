@@ -132,8 +132,9 @@ type
     procedure Kill;
     procedure Terminate; virtual;
   {$IF DEFINED(ACL_THREADING_DEBUG_DEADLOCKS)}
-    function WaitFor: LongWord;
+    function WaitFor: LongWord; overload;
   {$ENDIF}
+    function WaitFor(ATimeOut: LongWord): Boolean; overload;
   {$IF DEFINED(ACL_THREADING_DEBUG) AND DEFINED(MSWINDOWS)}
     class procedure NameThreadForDebugging(const AName: string);
   {$ENDIF}
@@ -602,23 +603,13 @@ begin
 end;
 
 procedure TACLThread.Free(AWaitForTimeOut: LongWord);
-{$IFNDEF MSWINDOWS}
-var
-  LTimestamp: LongWord;
-{$ENDIF}
 begin
   if Self = nil then Exit;
 
   Terminate;
   if not Finished then
   begin
-  {$IFDEF MSWINDOWS}
-    WaitForSyncObject(Handle, AWaitForTimeOut);
-  {$ELSE}
-    LTimestamp := TACLThread.Timestamp;
-    while not (Finished or IsTimeoutEx(LTimestamp, AWaitForTimeOut)) do
-      Sleep(100);
-  {$ENDIF}
+    WaitFor(AWaitForTimeOut);
     Kill;
   end;
   Free;
@@ -759,6 +750,25 @@ begin
   Result := inherited WaitFor;
 end;
 {$ENDIF}
+
+function TACLThread.WaitFor(ATimeOut: LongWord): Boolean;
+{$IFNDEF MSWINDOWS}
+var
+  LTimestamp: LongWord;
+{$ENDIF}
+begin
+  if not Finished then
+  begin
+  {$IFDEF MSWINDOWS}
+    WaitForSyncObject(Handle, ATimeOut);
+  {$ELSE}
+    LTimestamp := TACLThread.Timestamp;
+    while not (Finished or IsTimeoutEx(LTimestamp, ATimeOut)) do
+      Sleep(10);
+  {$ENDIF}
+  end;
+  Result := Finished;
+end;
 
 function TACLThread._AddRef: Integer;
 begin
