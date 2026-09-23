@@ -3360,7 +3360,7 @@ procedure TACLTreeListEditingController.HandlerApply(Sender: TObject; AChanges: 
 var
   LValue: string;
 begin
-  if not IsLocked and (Sender = Edit) then
+  if not IsLocked and (Edit <> nil) then
   try
     Inc(FLockCount);
     try
@@ -3400,7 +3400,7 @@ end;
 
 procedure TACLTreeListEditingController.HandlerCancel(Sender: TObject);
 begin
-  if Sender = Edit then Close;
+  Close;
 end;
 
 procedure TACLTreeListEditingController.HandlerDelayedStart(Sender: TObject);
