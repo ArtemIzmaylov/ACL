@@ -1540,7 +1540,7 @@ end;
 
 { TACLMeasureCanvas }
 
-{$IFNDEF LCLGtk3}
+{$IFNDEF LCLGtk3} // CAIRO_HINT_METRICS_ON требует контекст реального окна
 procedure TACLMeasureCanvas.CreateHandle;
 begin
   Handle := CreateCompatibleDC(0);

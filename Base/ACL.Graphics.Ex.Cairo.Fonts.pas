@@ -25,6 +25,7 @@ uses
 {$ENDIF}
 {$IF DEFINED(LCLGtk3)}
   Gtk3Int,
+  LazGdk3,
 {$ELSEIF DEFINED(LCLGtk2)}
   Gtk2Proc,
 {$ENDIF}
@@ -594,15 +595,20 @@ begin
   if (FMeasurer <> nil) and (cairo_status(FMeasurer) <> CAIRO_STATUS_SUCCESS) then
   begin
     cairo_destroy(FMeasurer);
-    cairo_surface_destroy(FMeasurerSurface);
+    if FMeasurerSurface <> nil then
+      cairo_surface_destroy(FMeasurerSurface);
     FMeasurerSurface := nil;
     FMeasurer := nil;
   end;
 
   if FMeasurer = nil then
   begin
+  {$IFDEF LCLGtk3} // CAIRO_HINT_METRICS_ON требует контекст реального окна
+    FMeasurer := Pcairo_t(gdk_cairo_create(gdk_get_default_root_window));
+  {$ELSE}
     FMeasurerSurface := cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 1, 1);
     FMeasurer := cairo_create(FMeasurerSurface);
+  {$ENDIF}
   end;
   Result := FMeasurer;
 end;
