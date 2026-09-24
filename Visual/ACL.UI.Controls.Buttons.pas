@@ -2088,9 +2088,9 @@ var
 begin
   P := SmallPointToPoint(Message.Pos);
   Message.Result := Ord(
-    PtInRect(SubClass.ButtonRect, P) or
-    PtInRect(SubClass.FocusRect, P) or
-    ShowLine and PtInRect(SubClass.Bounds, P)
+    ShowLine and SubClass.Bounds.Contains(P) or
+    SubClass.ButtonRect.Contains(P) or
+    SubClass.TextRect.Contains(P)
   {$IFDEF LCLGtk2}
     // Gtk2: не приходит MouseUp, если отвести мышь за пределы контрола
     or MouseCapture
