@@ -2756,7 +2756,7 @@ begin
         FLastClickCount := 1
       else if acCanStartDragging(FLastClickPoint, P, acDefaultDpi) then
         FLastClickCount := 1
-      else
+      else {$IFDEF LCLGtkX}if [ssDouble, ssTriple, ssQuad] * Shift = [] then{$ENDIF}
         Inc(FLastClickCount);
 
       if FLastClickCount = 1 then
