@@ -2011,7 +2011,7 @@ begin
   FCheckBoxRect := Owner.NodeViewInfo.CheckBoxRect;
   if not FCheckBoxRect.IsEmpty then
   begin
-    FCheckBoxRect.CenterVert(R.Height);
+    FCheckBoxRect.Offset(0, acHalfCoordinate(R.Height - FCheckBoxRect.Height));
     R.Left := CheckBoxRect.Right + FIndentBetweenElements;
   end;
 end;
