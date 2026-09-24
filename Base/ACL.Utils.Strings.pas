@@ -1928,15 +1928,13 @@ begin
     end
     else
     begin
-      if LIsDigit1 then Exit( 1);
-      if LIsDigit2 then Exit(-1);
       SL1 := 0;
       SL2 := 0;
       while (SL1 < P1Len) and not acIsDigit((P1 + SL1)^) do
         Inc(SL1);
       while (SL2 < P2Len) and not acIsDigit((P2 + SL2)^) do
         Inc(SL2);
-      SL1 := Min(SL1, SL2);
+      SL1 := Max(Min(SL1, SL2), 1);
       SL2 := SL1;
       Result := acCompareStrings(P1, P2, SL1, SL2, AIgnoreCase);
       if Result <> 0 then Exit;
