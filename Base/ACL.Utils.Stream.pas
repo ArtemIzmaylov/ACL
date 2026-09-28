@@ -1331,6 +1331,16 @@ begin
   WriteBuffer(AValue, SizeOf(AValue));
 end;
 
+{$IFNDEF UNICODE}
+function TACLStreamHelper.WriteString(const S: string; AEncoding: TEncoding = nil): Integer;
+begin
+  if acIsNativeStringEncoding(AEncoding) then
+    Result := WriteStringA(S)
+  else
+    Result := WriteString(acUString(S), AEncoding);
+end;
+{$ENDIF}
+
 function TACLStreamHelper.WriteString(const S: UnicodeString; AEncoding: TEncoding): Integer;
 begin
   if AEncoding <> nil then
@@ -1369,16 +1379,6 @@ begin
     WriteBuffer(S[1], Result);
   Inc(Result, SizeOf(Result));
 end;
-
-{$IFNDEF UNICODE}
-function TACLStreamHelper.WriteString(const S: string; AEncoding: TEncoding = nil): Integer;
-begin
-  if acIsNativeStringEncoding(AEncoding) then
-    Result := WriteStringA(S)
-  else
-    Result := WriteString(acUString(S), AEncoding);
-end;
-{$ENDIF}
 
 procedure TACLStreamHelper.WriteVariant(const AValue: Variant);
 

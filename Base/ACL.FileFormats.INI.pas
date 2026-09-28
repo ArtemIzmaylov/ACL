@@ -40,6 +40,7 @@ uses
   ACL.Classes.Collections,
   ACL.Classes.StringList,
   ACL.Hashes,
+  ACL.Parsers,
   ACL.Utils.Common,
   ACL.Utils.FileSystem,
   ACL.Utils.Stream,
@@ -47,32 +48,54 @@ uses
 
 type
 
+  { TACLIniFileEntry }
+
+  PACLIniFileEntry = ^TACLIniFileEntry;
+  TACLIniFileEntry = packed record
+    Key: string;
+    KeyHash: Integer;
+    Value: string;
+  end;
+  TACLIniFileEntries = array of TACLIniFileEntry;
+
   { TACLIniFileSection }
 
-  TACLIniFileSection = class(TACLStringList)
+  TACLIniFileSection = class
   strict private
+    FCount: Integer;
     FLockCount: Integer;
     FName: string;
-    FNameHash: Integer;
 
+    function GetKey(Index: Integer): string;
+    function GetText: string;
+    function GetValueFromIndex(Index: Integer): string;
     function GetValueFromName(const Name: string): string;
+    procedure SetText(const AText: string);
+    procedure SetValueFromIndex(Index: Integer; const AValue: string);
+  private
+    FNameHash: Integer;
     procedure SetName(const AValue: string);
   protected
+    FEntries: TACLIniFileEntries;
     FOnChange: TNotifyEvent;
 
-    procedure CalculateNameHash;
-    procedure Changed; override;
-    function FindValue(const AName: string; out AIndex: Integer): Boolean; overload;
-    function FindValue(const AName: string; ANameHash: Integer; out AIndex: Integer): Boolean; overload;
-    // Properties
-    property NameHash: Integer read FNameHash;
+    procedure Changed;
+    function FindValue(const AKey: string; out AEntry: PACLIniFileEntry;
+      AKeyHash: Integer = 0; AEntryIndex: PInteger = nil): Boolean;
   public
-    procedure BeginUpdate; override;
-    procedure EndUpdate; override;
-    function Exists(const AKey: string): Boolean;
+    procedure AddPair(const AKey, AValue: string; AKeyHash: Integer = 0);
+    procedure Assign(ASource: TACLIniFileSection); overload;
+    procedure Assign(ASource: TACLStringList); overload;
+    procedure AssignTo(ATarget: TACLStringList);
+    procedure BeginUpdate;
+    procedure EndUpdate;
+    procedure EnsureCapacity(ACount: Integer);
     // Deleting
+    procedure Clear;
+    function Delete(const AIndex: Integer): Boolean; overload;
     function Delete(const AKey: string): Boolean; overload;
     // Reading
+    function Exists(const AKey: string): Boolean;
     function ReadBool(const AKey: string; ADefault: Boolean = False): Boolean;
     function ReadEnum<T>(const AKey: string; const ADefault: T): T;
     function ReadFloat(const AKey: string; const ADefault: Double = 0): Double;
@@ -91,6 +114,7 @@ type
     function ReadFont(const AKey: string; AFont: TFont): Boolean;
   {$ENDIF}
     // Writing
+    procedure Merge(ASource: TACLIniFileSection; AOverwriteExisting: Boolean = True);
     procedure WriteBool(const AKey: string; const AValue: Boolean); overload;
     procedure WriteBool(const AKey: string; const AValue, ADefaultValue: Boolean); overload;
     procedure WriteEnum<T>(const AKey: string; const AValue: T); overload;
@@ -112,8 +136,12 @@ type
     procedure WriteFont(const AKey: string; AFont: TFont);
   {$ENDIF}
     // Properties
-    property Name: string read FName write SetName;
-    property ValueFromName[const Name: string]: string read GetValueFromName write WriteString;
+    property Count: Integer read FCount;
+    property Keys[Index: Integer]: string read GetKey; default;
+    property Name: string read FName;
+    property Text: string read GetText write SetText;
+    property ValueFromIndex[Index: Integer]: string read GetValueFromIndex write SetValueFromIndex;
+    property Values[const Name: string]: string read GetValueFromName write WriteString;
   end;
 
   { TACLIniFile }
@@ -130,17 +158,13 @@ type
 
     function GetName(AIndex: Integer): string;
     function GetSectionCount: Integer;
-    function GetSectionData(const ASection: string): string;
     function GetSectionObj(Index: Integer): TACLIniFileSection;
     procedure SectionChangeHandler(Sender: TObject);
     procedure SetFileName(const AValue: string);
-    procedure SetSectionData(const ASection, AData: string);
   protected
     FModified: Boolean;
     FSections: TACLObjectListOf<TACLIniFileSection>;
 
-    function FindValue(const AName, AKey: string;
-      out ASection: TACLIniFileSection; out AIndex: Integer): Boolean;
     procedure Changed; virtual;
   public
     class function DecodeStream(const S: string): TMemoryStream{nullable};
@@ -164,6 +188,8 @@ type
     function IsEmpty: Boolean; virtual;
 
     // Sections
+    procedure CopySection(const ATargetName, ASourceName: string); overload;
+    procedure CopySection(const ATargetName: string; ASource: TACLIniFile; const ASourceName: string); overload;
     function GetSection(const AName: string; ACanCreate: Boolean = False): TACLIniFileSection;
 
     // Reading
@@ -233,6 +259,7 @@ type
     procedure SaveToStream(AStream: TStream); overload;
     procedure SaveToStream(AStream: TStream; AEncoding: TEncoding); overload; virtual;
     function UpdateFile: Boolean; virtual;
+
     //# Properties
     property AutoSave: Boolean read FAutoSave write FAutoSave;
     property Encoding: TEncoding read FEncoding write FEncoding;
@@ -240,7 +267,6 @@ type
     property Modified: Boolean read FModified write FModified;
     //# Sections
     property SectionCount: Integer read GetSectionCount;
-    property SectionData[const ASection: string]: string read GetSectionData write SetSectionData;
     property SectionObjs[Index: Integer]: TACLIniFileSection read GetSectionObj;
     property Sections[Index: Integer]: string read GetName;
     //# Events
@@ -264,6 +290,73 @@ uses
 
 { TACLIniFileSection }
 
+procedure TACLIniFileSection.AddPair(const AKey, AValue: string; AKeyHash: Integer);
+begin
+  if FCount + 1 >= Length(FEntries) then
+    EnsureCapacity(16);
+  FEntries[FCount].Key := AKey;
+  FEntries[FCount].KeyHash := AKeyHash;
+  FEntries[FCount].Value := AValue;
+  Inc(FCount);
+  if FLockCount = 0 then Changed;
+end;
+
+procedure TACLIniFileSection.Assign(ASource: TACLIniFileSection);
+var
+  I: Integer;
+begin
+  if ASource = Self then Exit;
+  BeginUpdate;
+  try
+    Clear;
+    if ASource <> nil then
+    begin
+      EnsureCapacity(ASource.Count);
+      for I := 0 to ASource.Count - 1 do
+      begin
+        with ASource.FEntries[I] do
+          AddPair(Key, Value, KeyHash);
+      end;
+    end;
+  finally
+    EndUpdate;
+  end;
+end;
+
+procedure TACLIniFileSection.Assign(ASource: TACLStringList);
+var
+  I: Integer;
+begin
+  BeginUpdate;
+  try
+    Clear;
+    if ASource <> nil then
+    begin
+      for I := 0 to ASource.Count - 1 do
+        AddPair(ASource.Names[I], ASource.ValueFromIndex[I]);
+    end;
+  finally
+    EndUpdate;
+  end;
+end;
+
+procedure TACLIniFileSection.AssignTo(ATarget: TACLStringList);
+var
+  I: Integer;
+  LItem: PACLIniFileEntry;
+begin
+  ATarget.Clear;
+  ATarget.Capacity := Count;
+  for I := 0 to Count - 1 do
+  begin
+    LItem := @FEntries[I];
+    if LItem.Key <> '' then
+      ATarget.AddPair(LItem.Key, LItem.Value)
+    else
+      ATarget.Add(LItem.Value);
+  end;
+end;
+
 procedure TACLIniFileSection.BeginUpdate;
 begin
   Inc(FLockCount);
@@ -272,42 +365,102 @@ end;
 procedure TACLIniFileSection.EndUpdate;
 begin
   Dec(FLockCount);
-  if FLockCount = 0 then
-    Changed;
+  if FLockCount = 0 then Changed;
+end;
+
+procedure TACLIniFileSection.EnsureCapacity(ACount: Integer);
+begin
+  if FCount + ACount >= Length(FEntries) then
+    SetLength(FEntries, FCount + ACount);
 end;
 
 function TACLIniFileSection.Exists(const AKey: string): Boolean;
 var
-  LIndex: Integer;
+  LEntry: PACLIniFileEntry;
 begin
-  Result := FindValue(AKey, LIndex);
+  Result := FindValue(AKey, LEntry);
 end;
 
 function TACLIniFileSection.Delete(const AKey: string): Boolean;
 var
-  AIndex: Integer;
+  LEntry: PACLIniFileEntry;
+  LEntryIndex: Integer;
 begin
-  Result := FindValue(AKey, AIndex);
+  Result := FindValue(AKey, LEntry, 0, @LEntryIndex);
   if Result then
-    Delete(AIndex);
+    Delete(LEntryIndex);
+end;
+
+procedure TACLIniFileSection.Changed;
+begin
+  if FLockCount = 0 then
+    CallNotifyEvent(Self, FOnChange);
+end;
+
+procedure TACLIniFileSection.Clear;
+begin
+  FCount := 0;
+end;
+
+function TACLIniFileSection.Delete(const AIndex: Integer): Boolean;
+var
+  I: Integer;
+begin
+  if AIndex < 0 then
+    Exit(False);
+  if AIndex >= Count then
+    Exit(False);
+  for I := AIndex to FCount - 2 do
+    FEntries[I] := FEntries[I + 1];
+  FEntries[FCount] := Default(TACLIniFileEntry);
+  Dec(FCount);
+  Result := True;
+end;
+
+function TACLIniFileSection.FindValue(
+  const AKey: string; out AEntry: PACLIniFileEntry;
+  AKeyHash: Integer = 0; AEntryIndex: PInteger = nil): Boolean;
+var
+  I: Integer;
+  LEntry: PACLIniFileEntry;
+begin
+  if Count = 0 then
+    Exit(False);
+  if AKeyHash = 0 then
+    AKeyHash := ElfHash(AKey);
+  for I := 0 to Count - 1 do
+  begin
+    LEntry := @FEntries[I];
+    if LEntry^.KeyHash = 0 then
+      LEntry^.KeyHash := ElfHash(LEntry^.Key);
+    if (LEntry^.KeyHash = AKeyHash) and acCompareTokens(AKey, LEntry^.Key) then
+    begin
+      AEntry := LEntry;
+      if AEntryIndex <> nil then
+        AEntryIndex^ := I;
+      Exit(True);
+    end;
+  end;
+  Result := False;
 end;
 
 function TACLIniFileSection.ReadBool(const AKey: string; ADefault: Boolean): Boolean;
 var
-  AIndex: Integer;
+  LEntry: PACLIniFileEntry;
 begin
-  if FindValue(AKey, AIndex) then
-    Result := StrToIntDef(ValueFromIndex[AIndex], Ord(ADefault)) <> 0
+  if FindValue(AKey, LEntry) then
+    Result := StrToIntDef(LEntry^.Value, Ord(ADefault)) <> 0
   else
     Result := ADefault;
 end;
 
 function TACLIniFileSection.ReadEnum<T>(const AKey: string; const ADefault: T): T;
 var
-  AValue: Integer;
+  LEntry: PACLIniFileEntry;
+  LValue: Integer;
 begin
-  if FindValue(AKey, AValue) and TryStrToInt(ValueFromIndex[AValue], AValue) then
-    Result := TACLEnumHelper.SetValue<T>(AValue)
+  if FindValue(AKey, LEntry) and TryStrToInt(LEntry^.Value, LValue) then
+    Result := TACLEnumHelper.SetValue<T>(LValue)
   else
     Result := ADefault;
 end;
@@ -332,20 +485,20 @@ end;
 
 function TACLIniFileSection.ReadInt32(const AKey: string; ADefault: Integer): Integer;
 var
-  AIndex: Integer;
+  LEntry: PACLIniFileEntry;
 begin
-  if FindValue(AKey, AIndex) then
-    Result := StrToIntDef(ValueFromIndex[AIndex], ADefault)
+  if FindValue(AKey, LEntry) then
+    Result := StrToIntDef(LEntry^.Value, ADefault)
   else
     Result := ADefault;
 end;
 
 function TACLIniFileSection.ReadInt64(const AKey: string; const ADefault: Int64): Int64;
 var
-  AIndex: Integer;
+  LEntry: PACLIniFileEntry;
 begin
-  if FindValue(AKey, AIndex) then
-    Result := StrToInt64Def(ValueFromIndex[AIndex], ADefault)
+  if FindValue(AKey, LEntry) then
+    Result := StrToInt64Def(LEntry^.Value, ADefault)
   else
     Result := ADefault;
 end;
@@ -384,10 +537,10 @@ end;
 
 function TACLIniFileSection.ReadRect(const AKey: string; const ADefault: TRect): TRect;
 var
-  AIndex: Integer;
+  LEntry: PACLIniFileEntry;
 begin
-  if FindValue(AKey, AIndex) then
-    Result := acStringToRect(ValueFromIndex[AIndex])
+  if FindValue(AKey, LEntry) then
+    Result := acStringToRect(LEntry^.Value)
   else
     Result := ADefault;
 end;
@@ -399,31 +552,31 @@ end;
 
 function TACLIniFileSection.ReadStream(const AKey: string): TMemoryStream;
 var
-  LIndex: Integer;
+  LEntry: PACLIniFileEntry;
 begin
-  if FindValue(AKey, LIndex) then
-    Result := TACLIniFile.DecodeStream(ValueFromIndex[LIndex])
+  if FindValue(AKey, LEntry) then
+    Result := TACLIniFile.DecodeStream(LEntry^.Value)
   else
     Result := nil;
 end;
 
 function TACLIniFileSection.ReadString(const AKey, ADefault: string): string;
 var
-  LIndex: Integer;
+  LEntry: PACLIniFileEntry;
 begin
-  if FindValue(AKey, LIndex) then
-    Result := ValueFromIndex[LIndex]
+  if FindValue(AKey, LEntry) then
+    Result := LEntry.Value
   else
     Result := ADefault;
 end;
 
 function TACLIniFileSection.ReadStringEx(const AKey: string; out AValue: string): Boolean;
 var
-  AIndex: Integer;
+  LEntry: PACLIniFileEntry;
 begin
-  Result := FindValue(AKey, AIndex);
+  Result := FindValue(AKey, LEntry);
   if Result then
-    AValue := ValueFromIndex[AIndex]
+    AValue := LEntry.Value
 end;
 
 procedure TACLIniFileSection.WriteBool(const AKey: string; const AValue: Boolean);
@@ -531,18 +684,17 @@ end;
 
 procedure TACLIniFileSection.WriteString(const AKey, AValue: string);
 var
-  AIndex: Integer;
-  AKeyHash: Integer;
+  LEntry: PACLIniFileEntry;
+  LKeyHash: Integer;
 begin
-  AKeyHash := ElfHash(AKey);
-  if FindValue(AKey, AKeyHash, AIndex) then
+  LKeyHash := ElfHash(AKey);
+  if FindValue(AKey, LEntry, LKeyHash) then
   begin
-    List^[AIndex].FString := AKey + Delimiter + AValue;
-    List^[AIndex].FObject := TObject(AKeyHash);
+    LEntry^.Value := AValue;
     Changed;
   end
   else
-    Add(AKey + Delimiter + AValue, AKeyHash);
+    AddPair(AKey, AValue, LKeyHash);
 end;
 
 {$IFNDEF ACL_BASE_NOVCL}
@@ -579,52 +731,68 @@ begin
 end;
 {$ENDIF}
 
-procedure TACLIniFileSection.CalculateNameHash;
+function TACLIniFileSection.GetKey(Index: Integer): string;
 begin
-  FNameHash := ElfHash(Name);
+  Result := FEntries[Index].Key;
 end;
 
-procedure TACLIniFileSection.Changed;
-begin
-  if FLockCount = 0 then
-    CallNotifyEvent(Self, FOnChange);
-end;
-
-function TACLIniFileSection.FindValue(const AName: string; out AIndex: Integer): Boolean;
-begin
-  Result := (Count > 0) and FindValue(AName, ElfHash(AName), AIndex)
-end;
-
-function TACLIniFileSection.FindValue(const AName: string; ANameHash: Integer; out AIndex: Integer): Boolean;
+function TACLIniFileSection.GetText: string;
 var
-  AKeyHash: Integer;
-  I: Integer;
+  LList: TACLStringList;
 begin
-  for I := 0 to Count - 1 do
-  begin
-    AKeyHash := NativeUInt(List^[I].FObject);
-    if AKeyHash = 0 then
-    begin
-      AKeyHash := ElfHash(Names[I]);
-      List^[I].FObject := TObject(AKeyHash);
-    end;
-    if (AKeyHash = ANameHash) and acSameText(AName, Names[I]) then
-    begin
-      AIndex := I;
-      Exit(True);
-    end;
+  if Count = 0 then
+    Exit('');
+
+  LList := TACLStringList.Create;
+  try
+    AssignTo(LList);
+    Result := LList.Text;
+  finally
+    LList.Free;
   end;
-  Result := False;
+end;
+
+function TACLIniFileSection.GetValueFromIndex(Index: Integer): string;
+begin
+  if InRange(Index, 0, Count - 1) then
+    Result := FEntries[Index].Value
+  else
+    Result := '';
 end;
 
 function TACLIniFileSection.GetValueFromName(const Name: string): string;
 var
-  AIndex: Integer;
+  LEntry: PACLIniFileEntry;
 begin
-  if FindValue(Name, AIndex) then
-    Result := ValueFromIndex[AIndex]
+  if FindValue(Name, LEntry) then
+    Result := LEntry.Value
   else
     Result := '';
+end;
+
+procedure TACLIniFileSection.Merge(ASource: TACLIniFileSection; AOverwriteExisting: Boolean);
+var
+  I: Integer;
+  LSource: PACLIniFileEntry;
+  LTarget: PACLIniFileEntry;
+begin
+  if Count = 0 then
+  begin
+    Assign(ASource);
+    Exit;
+  end;
+
+  for I := 0 to ASource.Count - 1 do
+  begin
+    LSource := @ASource.FEntries[I];
+    if FindValue(LSource^.Key, LTarget, LSource^.KeyHash) then
+    begin
+      if AOverwriteExisting then
+        LTarget^.Value := LSource^.Value;
+    end
+    else
+      AddPair(LSource^.Key, LSource^.Value, LSource^.KeyHash);
+  end;
 end;
 
 procedure TACLIniFileSection.SetName(const AValue: string);
@@ -635,6 +803,24 @@ begin
     FNameHash := 0;
     Changed;
   end;
+end;
+
+procedure TACLIniFileSection.SetText(const AText: string);
+var
+  LList: TACLStringList;
+begin
+  LList := TACLStringList.Create(AText, True);
+  try
+    Assign(LList);
+  finally
+    LList.Free;
+  end;
+end;
+
+procedure TACLIniFileSection.SetValueFromIndex(Index: Integer; const AValue: string);
+begin
+  if InRange(Index, 0, Count - 1) then
+    FEntries[Index].Value := AValue;
 end;
 
 { TACLIniFile }
@@ -706,48 +892,34 @@ end;
 
 procedure TACLIniFile.Merge(const AFileName: string; AOverwriteExisting: Boolean);
 var
-  AIniFile: TACLIniFile;
+  LSource: TACLIniFile;
 begin
-  AIniFile := TACLIniFile.Create(AFileName, False);
+  LSource := TACLIniFile.Create(AFileName, False);
   try
-    Merge(AIniFile, AOverwriteExisting);
+    Merge(LSource, AOverwriteExisting);
   finally
-    AIniFile.Free;
+    LSource.Free;
   end;
 end;
 
 procedure TACLIniFile.Merge(const AIniFile: TACLIniFile; AOverwriteExisting: Boolean = True);
-
-  procedure MergeSection(const ASection: string);
-  var
-    AKey: string;
-    AKeys: TACLStringList;
-    I: Integer;
-  begin
-    if ExistsSection(ASection) then
-    begin
-      AKeys := TACLStringList.Create;
-      try
-        AIniFile.ReadKeys(ASection, AKeys);
-        for I := 0 to AKeys.Count - 1 do
-        begin
-          AKey := AKeys[I];
-          if AOverwriteExisting or not ExistsKey(ASection, AKey) then
-            WriteString(ASection, AKey, AIniFile.ReadString(ASection, AKey));
-        end;
-      finally
-        AKeys.Free;
-      end;
-    end
-    else
-      SectionData[ASection] := AIniFile.SectionData[ASection];
-  end;
-
 var
   I: Integer;
+  LSource: TACLIniFileSection;
+  LTarget: TACLIniFileSection;
 begin
-  for I := 0 to AIniFile.SectionCount - 1 do
-    MergeSection(AIniFile.Sections[I]);
+  BeginUpdate;
+  try
+    for I := 0 to AIniFile.SectionCount - 1 do
+    begin
+      LSource := AIniFile.SectionObjs[I];
+      LTarget := GetSection(LSource.Name, True);
+      LTarget.Merge(LSource, AOverwriteExisting);
+    end;
+    Changed;
+  finally
+    EndUpdate;
+  end;
 end;
 
 function TACLIniFile.Equals(Obj: TObject): Boolean;
@@ -784,10 +956,10 @@ end;
 
 function TACLIniFile.ExistsKey(const ASection, AKey: string): Boolean;
 var
-  AIndex: Integer;
-  AList: TACLIniFileSection;
+  LSection: TACLIniFileSection;
 begin
-  Result := FindValue(ASection, AKey, AList, AIndex);
+  LSection := GetSection(ASection);
+  Result := (LSection <> nil) and LSection.Exists(AKey);
 end;
 
 function TACLIniFile.ExistsSection(const ASection: string): Boolean;
@@ -903,50 +1075,38 @@ end;
 
 function TACLIniFile.ReadStrings(const ASection: string; AStrings: TACLStringList): Integer;
 var
-  ACount: Integer;
-  AList: TACLIniFileSection;
-  AValueIndex: Integer;
   I: Integer;
+  LCount: Integer;
+  LSection: TACLIniFileSection;
 begin
   AStrings.Clear;
-  AList := GetSection(ASection);
-  if AList <> nil then
+  LSection := GetSection(ASection);
+  if LSection <> nil then
   begin
-    if AList.FindValue('Count', AValueIndex) then
+    LCount := LSection.ReadInt32('Count', -1);
+    if LCount > -1 then
     begin
-      ACount := StrToIntDef(AList.ValueFromIndex[AValueIndex], 0);
-      AStrings.Capacity := ACount;
-      for I := 1 to ACount do
-        AStrings.Add(AList.ValueFromName['i' + IntToStr(I)]);
+      AStrings.Capacity := LCount;
+      for I := 1 to LCount do
+        AStrings.Add(LSection.Values['i' + IntToStr(I)]);
     end
     else
-      AStrings.Text := AList.Text; // backward compatibility
+      LSection.AssignTo(AStrings); // backward compatibility
   end;
   Result := AStrings.Count;
 end;
 
 function TACLIniFile.ReadStrings(const ASection: string; AStrings: TStrings): Integer;
 var
-  ACount: Integer;
-  AList: TACLIniFileSection;
-  AValueIndex: Integer;
-  I: Integer;
+  LStrings: TACLStringList;
 begin
-  AStrings.Clear;
-  AList := GetSection(ASection);
-  if AList <> nil then
-  begin
-    if AList.FindValue('Count', AValueIndex) then
-    begin
-      ACount := StrToIntDef(AList.ValueFromIndex[AValueIndex], 0);
-      AStrings.Capacity := ACount;
-      for I := 1 to ACount do
-        AStrings.Add(AList.ValueFromName['i' + IntToStr(I)]);
-    end
-    else
-      AStrings.Text := AList.Text; // backward compatibility
+  LStrings := TACLStringList.Create;
+  try
+    Result := ReadStrings(ASection, LStrings);
+    AStrings.Assign(LStrings);
+  finally
+    LStrings.Free;
   end;
-  Result := AStrings.Count;
 end;
 
 {$IFNDEF ACL_BASE_NOVCL}
@@ -982,7 +1142,7 @@ begin
     AKeys.EnsureCapacity(AList.Count);
     for I := 0 to AList.Count - 1 do
     begin
-      AName := AList.Names[I];
+      AName := AList.Keys[I];
       if AName <> '' then
         AKeys.Add(AName);
     end;
@@ -999,7 +1159,7 @@ begin
   if AList <> nil then
     for I := 0 to AList.Count - 1 do
     begin
-      AName := AList.Names[I];
+      AName := AList.Keys[I];
       if AName <> '' then
         AProc(AName);
     end;
@@ -1137,8 +1297,8 @@ begin
   try
     LSection := GetSection(ASection, True);
     LSection.Clear;
-    LSection.Capacity := AStrings.Count;
-    LSection.WriteString('Count', IntToStr(AStrings.Count));
+    LSection.EnsureCapacity(AStrings.Count + 1);
+    LSection.WriteInt32('Count', AStrings.Count);
     for I := 0 to AStrings.Count - 1 do
       LSection.WriteString('i' + IntToStr(I + 1), AStrings[I]);
   finally
@@ -1148,17 +1308,17 @@ end;
 
 procedure TACLIniFile.WriteStrings(const ASection: string; AStrings: TStrings);
 var
-  AList: TACLIniFileSection;
+  LSection: TACLIniFileSection;
   I: Integer;
 begin
   BeginUpdate;
   try
-    AList := GetSection(ASection, True);
-    AList.Clear;
-    AList.Capacity := AStrings.Count;
-    AList.WriteString('Count', IntToStr(AStrings.Count));
+    LSection := GetSection(ASection, True);
+    LSection.Clear;
+    LSection.EnsureCapacity(AStrings.Count + 1);
+    LSection.WriteInt32('Count', AStrings.Count);
     for I := 0 to AStrings.Count - 1 do
-      AList.WriteString('i' + IntToStr(I + 1), AStrings[I]);
+      LSection.WriteString('i' + IntToStr(I + 1), AStrings[I]);
   finally
     EndUpdate;
   end;
@@ -1196,6 +1356,17 @@ begin
   end;
 end;
 
+procedure TACLIniFile.CopySection(const ATargetName, ASourceName: string);
+begin
+  CopySection(ATargetName, Self, ASourceName);
+end;
+
+procedure TACLIniFile.CopySection(const ATargetName: string;
+  ASource: TACLIniFile; const ASourceName: string);
+begin
+  GetSection(ATargetName, True).Assign(ASource.GetSection(ASourceName));
+end;
+
 function TACLIniFile.DeleteKey(const ASection, AKey: string): Boolean;
 var
   AList: TACLIniFileSection;
@@ -1226,30 +1397,31 @@ end;
 
 procedure TACLIniFile.RenameKey(const ASection, AKeyName, ANewSection, ANewKeyName: string);
 var
-  AIndex: Integer;
-  AList: TACLIniFileSection;
-  AValue: string;
+  LEntry: PACLIniFileEntry;
+  LEntryIndex: Integer;
+  LSection: TACLIniFileSection;
+  LValue: string;
 begin
-  if FindValue(ASection, AKeyName, AList, AIndex) then
+  LSection := GetSection(ASection);
+  if (LSection <> nil) and LSection.FindValue(AKeyName, LEntry, 0, @LEntryIndex) then
   begin
-    BeginUpdate;
-    try
-      AValue := AList.ValueFromIndex[AIndex];
-      AList.Delete(AIndex);
-      WriteString(ANewSection, ANewKeyName, AValue);
-    finally
-      EndUpdate;
-    end;
+    LValue := LEntry^.Value;
+    LSection.Delete(LEntryIndex);
+    WriteString(ANewSection, ANewKeyName, LValue);
   end;
 end;
 
 procedure TACLIniFile.RenameSection(const ASection, ANewName: string);
 var
-  AList: TACLIniFileSection;
+  LSection: TACLIniFileSection;
 begin
-  AList := GetSection(ASection);
-  if AList <> nil then
-    AList.Name := ANewName;
+  LSection := GetSection(ASection);
+  if LSection <> nil then
+  begin
+    if GetSection(ANewName) <> nil then
+      raise EInvalidOperation.CreateFmt('Failed to rename "%s", the "%s" section is already exists', [ASection, ANewName]);
+    LSection.SetName(ANewName);
+  end;
 end;
 
 procedure TACLIniFile.LoadFromFile(const AFileName: string);
@@ -1314,8 +1486,10 @@ end;
 
 procedure TACLIniFile.SaveToStream(AStream: TStream; AEncoding: TEncoding);
 var
-  LSection: TACLIniFileSection;
   I, J: Integer;
+  LKey: string;
+  LSection: TACLIniFileSection;
+  LValue: string;
 begin
   if AEncoding = TEncoding.Unicode then
     AEncoding := nil; // TACLStreamHelper will operate in more optimal way
@@ -1324,19 +1498,29 @@ begin
   for I := 0 to FSections.Count - 1 do
   begin
     LSection := FSections.List[I];
-    if LSection.Count > 0 then
+    if LSection.Count = 0 then
+      Continue;
+    // We cannot use that because of SectionData[''] allow us to set raw data
+    // LSection.SortLogical;
+    AStream.WriteString('[', AEncoding);
+    AStream.WriteString(LSection.Name, AEncoding);
+    AStream.WriteString(']', AEncoding);
+    AStream.WriteString(acCRLF, AEncoding);
+    for J := 0 to LSection.Count - 1 do
     begin
-      // We cannot use that because of SectionData[''] allow us to set raw data
-      // LSection.SortLogical;
-      AStream.WriteString('[' + LSection.Name + ']', AEncoding);
-      AStream.WriteString(acCRLF, AEncoding);
-      for J := 0 to LSection.Count - 1 do
+      LKey := LSection.FEntries[J].Key;
+      LValue := LSection.FEntries[J].Value;
+      if LKey = '' then // raw data
+        AStream.WriteString(LValue, AEncoding)
+      else
       begin
-        AStream.WriteString(LSection.Strings[J], AEncoding);
-        AStream.WriteString(acCRLF, AEncoding);
+        AStream.WriteString(LKey, AEncoding);
+        AStream.WriteString('=', AEncoding);
+        AStream.WriteString(LValue, AEncoding);
       end;
       AStream.WriteString(acCRLF, AEncoding);
     end;
+    AStream.WriteString(acCRLF, AEncoding);
   end;
 end;
 
@@ -1353,26 +1537,26 @@ end;
 
 function TACLIniFile.GetSection(const AName: string; ACanCreate: Boolean): TACLIniFileSection;
 var
-  AHash: Integer;
-  ASection: TACLIniFileSection;
   I: Integer;
+  LNameHash: Integer;
+  LSection: TACLIniFileSection;
 begin
   Result := nil;
-
+  LNameHash := 0;
   if FSections.Count > 0 then
   begin
-    if (FPrevSection <> nil) and acSameText(FPrevSection.Name, AName) then
+    if (FPrevSection <> nil) and acCompareTokens(FPrevSection.Name, AName) then
       Exit(FPrevSection);
 
-    AHash := ElfHash(AName);
+    LNameHash := ElfHash(AName);
     for I := 0 to FSections.Count - 1 do
     begin
-      ASection := FSections.List[I];
-      if ASection.NameHash = 0 then
-        ASection.CalculateNameHash;
-      if (ASection.NameHash = AHash) and acSameText(ASection.Name, AName) then
+      LSection := FSections.List[I];
+      if LSection.FNameHash = 0 then
+        LSection.FNameHash := ElfHash(LSection.Name);
+      if (LSection.FNameHash = LNameHash) and acCompareTokens(LSection.Name, AName) then
       begin
-        FPrevSection := ASection;
+        FPrevSection := LSection;
         Exit(FPrevSection);
       end;
     end;
@@ -1381,20 +1565,11 @@ begin
   if (Result = nil) and ACanCreate then
   begin
     Result := TACLIniFileSection.Create;
-    Result.Name := AName;
+    Result.SetName(AName);
+    Result.FNameHash := LNameHash;
     Result.FOnChange := SectionChangeHandler;
     FSections.Add(Result);
   end;
-end;
-
-function TACLIniFile.FindValue(const AName, AKey: string;
-  out ASection: TACLIniFileSection; out AIndex: Integer): Boolean;
-begin
-  ASection := GetSection(AName);
-  if ASection <> nil then
-    Result := ASection.FindValue(AKey, AIndex)
-  else
-    Result := False;
 end;
 
 procedure TACLIniFile.Changed;
@@ -1408,23 +1583,26 @@ procedure TACLIniFile.LoadFromString(const AString: PChar; ACount: Integer);
 
   procedure ParseLine(S, F: PChar; var ASection: TACLIniFileSection);
   var
-    ALength: Integer;
+    K: PChar;
   begin
-    ALength := acStringLength(S, F);
-    if ALength > 0 then
-    begin
-      if S^ = '[' then
-        ASection := GetSection(acMakeString(S + 1, ALength - 2), True)
-      else if ASection <> nil then
-        ASection.Add(acMakeString(S, ALength));
-    end;
+    if S = F then
+      Exit;
+    if S^ = '[' then
+      ASection := GetSection(acMakeString(S + 1, F - 1), True)
+    else
+      if ASection <> nil then
+      begin
+        K := acStrScan(S, acStringLength(S, F), '=');
+        if K = nil then // raw data
+          ASection.AddPair('', acMakeString(S, F))
+        else
+          ASection.AddPair(acMakeString(S, K), acMakeString(K + 1, F));
+      end;
   end;
 
 var
-  ASection: TACLIniFileSection;
-  F: PChar;
-  P: PChar;
-  S: PChar;
+  LSection: TACLIniFileSection;
+  S, P, F: PChar;
 begin
   BeginUpdate;
   try
@@ -1432,14 +1610,14 @@ begin
     P := AString;
     S := P;
     F := S + ACount;
-    ASection := nil;
+    LSection := nil;
     while P < F do
     begin
       if (P^ <> #10) and (P^ <> #13){$IFDEF UNICODE}and (Ord(P^) <> Ord(acLineSeparator)){$ENDIF} then
         Inc(P)
       else
       begin
-        ParseLine(S, P, ASection);
+        ParseLine(S, P, LSection);
       {$IFDEF UNICODE}
         if Ord(P^) = Ord(acLineSeparator) then Inc(P);
       {$ENDIF}
@@ -1448,7 +1626,7 @@ begin
         S := P;
       end;
     end;
-    ParseLine(S, P, ASection);
+    ParseLine(S, P, LSection);
   finally
     EndUpdate;
   end;
@@ -1462,17 +1640,6 @@ end;
 function TACLIniFile.GetName(AIndex: Integer): string;
 begin
   Result := SectionObjs[AIndex].Name;
-end;
-
-function TACLIniFile.GetSectionData(const ASection: string): string;
-var
-  AList: TACLIniFileSection;
-begin
-  AList := GetSection(ASection);
-  if AList <> nil then
-    Result := AList.Text
-  else
-    Result := EmptyStr;
 end;
 
 function TACLIniFile.GetSectionObj(Index: Integer): TACLIniFileSection;
@@ -1492,11 +1659,6 @@ begin
     FFileName := AValue;
     Changed;
   end;
-end;
-
-procedure TACLIniFile.SetSectionData(const ASection, AData: string);
-begin
-  GetSection(ASection, True).Text := AData;
 end;
 
 { TACLSyncSafeIniFile }

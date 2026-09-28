@@ -866,7 +866,7 @@ begin
   begin
     Attrs.EnsureCapacity(ASource.Count);
     for I := 0 to ASource.Count - 1 do
-      Attrs.Add(ASource.Names[I], ASource.ValueFromIndex[I]);
+      Attrs.Add(ASource.Keys[I], ASource.ValueFromIndex[I]);
   end;
 end;
 

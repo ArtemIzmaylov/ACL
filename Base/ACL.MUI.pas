@@ -605,7 +605,7 @@ begin
     LSection := ALinks.SectionObjs[I];
     for J := 0 to LSection.Count - 1 do
     begin
-      LKey := LSection.Names[J];
+      LKey := LSection.Keys[J];
       if not ExistsKey(LSection.Name, LKey) then
       begin
         LValue := LSection.ValueFromIndex[J];

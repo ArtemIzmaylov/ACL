@@ -199,14 +199,14 @@ end;
 
 class procedure TACLFolderBrowser.ConfigLoad(AConfig: TACLIniFile; const ASection: string);
 begin
-  TACLFileDialog.MRUPaths.Text := AConfig.SectionData[ASection + ConfigMruSuffix];
-  FPrivateConfig.SectionData[ConfigDialog] := AConfig.SectionData[ASection];
+  AConfig.ReadStrings(ASection + ConfigMruSuffix, TACLFileDialog.MRUPaths);
+  FPrivateConfig.CopySection(ConfigDialog, AConfig, ASection);
 end;
 
 class procedure TACLFolderBrowser.ConfigSave(AConfig: TACLIniFile; const ASection: string);
 begin
-  AConfig.SectionData[ASection] := FPrivateConfig.SectionData[ConfigDialog];
-  AConfig.SectionData[ASection + ConfigMruSuffix] := TACLFileDialog.MRUPaths.Text;
+  AConfig.CopySection(ASection, FPrivateConfig, ConfigDialog);
+  AConfig.WriteStrings(ASection + ConfigMruSuffix, TACLFileDialog.MRUPaths);
 end;
 
 class function TACLFolderBrowser.Execute(const ASelectedPath: string;
