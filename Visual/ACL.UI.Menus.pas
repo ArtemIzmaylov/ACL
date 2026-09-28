@@ -642,7 +642,7 @@ type
 
   TACLMainMenu = class(TACLMenuWindow,
     IACLColorSchema,
-    IACLLocalizationListener,
+    IACLLocalizableComponent,
     IACLResourceChangeListener)
   strict private
     FMenu: TACLPopupMenu;
@@ -678,8 +678,6 @@ type
 
     // IACLResourceChangeListener
     procedure ResourceChanged(Sender: TObject; Resource: TACLResource = nil);
-    // IACLLocalizationListener
-    procedure IACLLocalizationListener.LangChanged = Rebuild;
 
     //# Messages
     procedure CMExit(var Message: TMessage); message CM_EXIT;
@@ -697,6 +695,8 @@ type
     procedure Rebuild;
     // IACLColorSchema
     procedure ApplyColorSchema(const ASchema: TACLColorSchema);
+    // IACLLocalizableComponent
+    procedure Localize(const ASection: string; const AName: string);
   published
     property Menu: TACLPopupMenu read FMenu write SetMenu;
     property Style: TACLStyleMenu read FStyle write SetStyle;
@@ -3108,13 +3108,11 @@ begin
   Align := alTop;
   ControlStyle := ControlStyle + [csMenuEvents];
   FStyle := TACLStyleMenu.Create(Self);
-  TACLLocalization.ListenerAdd(Self);
   AutoSize := True;
 end;
 
 destructor TACLMainMenu.Destroy;
 begin
-  TACLLocalization.ListenerRemove(Self);
   FreeAndNil(FPopupWnd);
   FreeAndNil(FStyle);
   inherited;
@@ -3306,6 +3304,19 @@ begin
     SelectFirst
   else
     inherited;
+end;
+
+procedure TACLMainMenu.Localize(const ASection, AName: string);
+var
+  I: Integer;
+begin
+  if Menu <> nil then
+  begin
+    for I := 0 to Menu.Items.Count - 1 do
+      LangApplyTo(ASection, Menu.Items[I]);
+  end;
+  CalculateLayout;
+  Invalidate;
 end;
 
 procedure TACLMainMenu.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
