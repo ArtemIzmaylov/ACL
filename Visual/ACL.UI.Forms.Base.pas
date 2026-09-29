@@ -1393,8 +1393,7 @@ procedure TACLCustomForm.LoadPosition(AConfig: TACLIniFile);
   {$IFDEF FPC}
     BoundsRect := ABounds;
   {$ELSE}
-    var LPlacement: TWindowPlacement;
-    ZeroMemory(@LPlacement, SizeOf(LPlacement));
+    var LPlacement := Default(TWindowPlacement);
     LPlacement.Length := SizeOf(TWindowPlacement);
     LPlacement.rcNormalPosition := ABounds;
     SetWindowPlacement(Handle, LPlacement);
@@ -1427,30 +1426,23 @@ var
   LBounds: TRect;
   LCfgSection: string;
   LIsMaximized: Boolean;
-{$IFNDEF FPC}
   LPlacement: TWindowPlacement;
-{$ENDIF}
 begin
   if HandleAllocated then
   begin
-    LCfgSection := GetConfigSection;
-  {$IFDEF FPC}
     LBounds := BoundsRect;
     LIsMaximized := WindowState = wsMaximized;
-  {$ELSE}
+
+    LPlacement := Default(TWindowPlacement);
     LPlacement.Length := SizeOf(TWindowPlacement);
-    if not GetWindowPlacement(Handle, LPlacement) then
-      Exit;
-    LBounds := LPlacement.rcNormalPosition;
-    case WindowState of
-      wsMaximized:
-        LIsMaximized := True;
-      wsMinimized:
+    if GetWindowPlacement(Handle, LPlacement) then
+    begin
+      LBounds := LPlacement.rcNormalPosition;
+      if WindowState = wsMinimized then
         LIsMaximized := LPlacement.flags and WPF_RESTORETOMAXIMIZED = WPF_RESTORETOMAXIMIZED;
-    else
-      LIsMaximized := False;
     end;
-  {$ENDIF}
+
+    LCfgSection := GetConfigSection;
     LBounds.Height := dpiRevert(LBounds.Height, FCurrentPPI);
     LBounds.Width := dpiRevert(LBounds.Width, FCurrentPPI);
     AConfig.WriteBool(LCfgSection, 'WindowMaximized', LIsMaximized);

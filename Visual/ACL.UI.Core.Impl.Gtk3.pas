@@ -191,7 +191,15 @@ type
     class function Check(AControl: TWinControl; X, Y, AThreshold: Integer): Boolean;
   end;
 
+  { TWindowPlacement }
+
+  TWindowPlacement = record
+    Length, Flags: Integer;
+    rcNormalPosition: TRect;
+  end;
+
 function FindVCLWindow(const P: TPoint): TWinControl;
+function GetWindowPlacement(AHandle: TWndHandle; var APlacement: TWindowPlacement): Boolean;
 function IsAlphaComposingSupports: Boolean;
 function LoadDialogIcon(AOwnerWnd: TWndHandle; AType: TMsgDlgType; ASize: Integer): TACLDib;
 procedure LoadSystemThemedCursors;
@@ -255,20 +263,27 @@ begin
   Result := FindLCLWindow(P);
 end;
 
-function IsChild(AChild, AParent: PGtkWidget): Boolean;
+function GetWindowPlacement(AHandle: TWndHandle; var APlacement: TWindowPlacement): Boolean;
+var
+  LWindow: TACLGtk3AdvancedWindow;
+  LWindowState: TGdkWindowState;
 begin
-  while AChild <> nil do
+  Result :=
+    (GetWindowRect(AHandle, APlacement.rcNormalPosition) <> 0) and
+    (Safe.Cast(TObject(AHandle), TACLGtk3AdvancedWindow, LWindow)) and
+    (wtWindow in LWindow.WidgetType) and LWindow.WidgetMapped;
+  if Result then
   begin
-    if AChild = AParent then
-      Exit(True);
-    AChild := AChild.parent;
+    APlacement.Flags := 0;
+    LWindowState := LWindow.GetWindowState;
+    if GDK_WINDOW_STATE_MAXIMIZED in LWindowState then
+    begin
+      if not LWindow.RestoredBounds.IsEmpty then
+        APlacement.rcNormalPosition := LWindow.RestoredBounds;
+      if GDK_WINDOW_STATE_ICONIFIED in LWindowState then
+        APlacement.Flags := APlacement.Flags or WPF_RESTORETOMAXIMIZED;
+    end;
   end;
-  Result := False;
-end;
-
-function IsAlphaComposingSupports: Boolean;
-begin
-  Result := TGdkScreen.get_default^.is_composited;
 end;
 
 function GtkLoadStockIcon(AWidget: PGtkWidget; AName: PChar; ASize: Integer): TACLDib;
@@ -373,6 +388,22 @@ begin
       end;
     end;
   end;
+end;
+
+function IsAlphaComposingSupports: Boolean;
+begin
+  Result := TGdkScreen.get_default^.is_composited;
+end;
+
+function IsChild(AChild, AParent: PGtkWidget): Boolean;
+begin
+  while AChild <> nil do
+  begin
+    if AChild = AParent then
+      Exit(True);
+    AChild := AChild.parent;
+  end;
+  Result := False;
 end;
 
 function LoadDialogIcon(AOwnerWnd: TWndHandle; AType: TMsgDlgType; ASize: Integer): TACLDib;

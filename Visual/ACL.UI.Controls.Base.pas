@@ -89,6 +89,8 @@ const
   WM_RBUTTONDOWN = LM_RBUTTONDOWN;
   WM_MBUTTONDOWN = LM_MBUTTONDOWN;
 
+  WPF_RESTORETOMAXIMIZED = 2;
+
   csAligning     = csCreating; // просто потому, что оно в LCL не используется
 
   // Interactive gesture id's (maps to Windows 7's WM_GESTURE)

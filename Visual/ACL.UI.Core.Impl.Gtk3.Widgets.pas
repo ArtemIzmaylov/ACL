@@ -86,7 +86,11 @@ type
 
   TACLGtk3AdvancedWindow = class(TGtk3Window)
   strict private
+    FAcceptFocus: Boolean;
     FCreatingWorkaround: TProc;
+    FRestoredBounds: TRect;
+    FUpdateBoundsOnMap: Boolean;
+
     class function OnAlphaExpose(AWidget: PGtkWindow;
       AContext: Pcairo_t; AImpl: TGtk3Widget): gboolean; cdecl; static;
     class function OnMapped(AWindow: PGtkWindow; AEvent: PGdkEventAny;
@@ -101,8 +105,11 @@ type
     procedure OffsetMousePos(const aGlobalX, aGlobalY: double; APoint: PPoint); override;
     procedure Repaint(const ARect: PRect=nil); override;
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: integer); override;
-    procedure SetText(const AValue: String); override;
+    procedure SetText(const AValue: string); override;
+    procedure SetVisible(AValue: Boolean); override;
     procedure UpdateWindowFunctions; override;
+    //# Properties
+    property RestoredBounds: TRect read FRestoredBounds; // valid only for Maximized state
   public
     class function ResolveWndParent(const AParams: TCreateParams): PGtkWindow;
     class procedure SetAlphaExposing(AWidget: TGtk3Widget);
@@ -305,6 +312,10 @@ begin
 end;
 
 function TACLGtk3AdvancedWindow.CreateWidget(const Params: TCreateParams): PGtkWidget;
+var
+  LForm: TCustomForm;
+  LWindowState: TWindowState;
+  LWindowStateHack: ^TWindowState;
 begin
   FWidget := nil;
   try
@@ -353,15 +364,31 @@ begin
     if Params.ExStyle and WS_EX_NOACTIVATE <> 0 then
       FWidgetType := [wtHintWindow]; // to force to the GTK_WINDOW_POPUP
 
-    Result := inherited;
+    if Safe.Cast(LCLObject, TCustomForm, LForm) and (LForm.WindowState <> wsNormal) then
+    begin
+      // Гасим вызов UpdateWindowState из CreateWidget предка, ибо он не
+      // отработает из-за трюков в SetBounds и "попортит" исходное положение окна
+      // UpdateWindowState будет вызван нами на OnMapped.
+      LWindowStateHack := @LForm.WindowState;
+      LWindowState := LWindowStateHack^;
+      LWindowStateHack^ := wsNormal;
+      Result := inherited;
+      LWindowStateHack^ := LWindowState;
+    end
+    else
+      Result := inherited;
   finally
     FCreatingWorkaround := nil;
   end;
 
-  if Gtk3IsGtkWindow(Widget) and (Params.ExStyle and WS_EX_LAYERED <> 0) then
+  if Gtk3IsGtkWindow(Result) then
   begin
-    PGtkWindow(Widget)^.set_decorated(False);
-    PGtkWindow(Widget)^.window^.set_decorations([]);
+    FAcceptFocus := PGtkWindow(Result)^.accept_focus;
+    if Params.ExStyle and WS_EX_LAYERED <> 0 then
+    begin
+      PGtkWindow(Result)^.set_decorated(False);
+      PGtkWindow(Result)^.window^.set_decorations([]);
+    end;
   end;
 end;
 
@@ -410,22 +437,38 @@ var
   LRect: TRect;
 begin
   if AImpl.LCLObject = Application.MainForm then
-    LogEntry(acGeneralLogFileName, 'Main', 'WindowMapped');
-  LRect := AImpl.LCLObject.BoundsRect;
-  // Manjaro 26, KDE
-  // У окон со сложным лейаутом не показывается кнопка закрытия до тех пор,
-  // пока не поресайзишь окно. По началу я грешил на кривые декорации, но
-  // оказалось, что кнопка есть, просто она рисуется за пределами экрана.
-  // Видимо, комплексный лейаут формы что-то где-то залочил и зона заголовка
-  // не пересчиталась.
-  if (AImpl.FParams.ExStyle and WS_EX_LAYERED = 0) and (ShellDesktopEnv = sdeKDE) then
   begin
-    AImpl.SetBounds(LRect.Left, LRect.Top, LRect.Width + 1, LRect.Height);
-    while g_main_context_pending(nil) do
-      g_main_context_iteration(nil, false);
+    LogEntry(acGeneralLogFileName, 'Main', 'WindowMapped(%s)',
+      [BoolToStr(AImpl.FUpdateBoundsOnMap, True)]);
   end;
-  AImpl.SetBounds(LRect.Left, LRect.Top, LRect.Width, LRect.Height);
-  AImpl.UpdateWindowState;
+
+  if AImpl.FUpdateBoundsOnMap then
+  begin
+    LRect := AImpl.LCLObject.BoundsRect;
+    // Manjaro 26 (KDE)
+    // У окон со сложным лейаутом не показывается кнопка закрытия до тех пор,
+    // пока не поресайзишь окно. По началу я грешил на кривые декорации, но
+    // оказалось, что кнопка есть, просто она рисуется за пределами экрана.
+    // Видимо, комплексный лейаут формы что-то где-то залочил и зона заголовка
+    // не пересчиталась.
+    if (AImpl.FParams.ExStyle and WS_EX_LAYERED = 0) and (ShellDesktopEnv = sdeKDE) then
+    begin
+      AImpl.SetBounds(LRect.Left, LRect.Top, LRect.Width + 1, LRect.Height);
+      while g_main_context_pending(nil) do
+        g_main_context_iteration(nil, false);
+    end;
+    AImpl.SetBounds(LRect.Left, LRect.Top, LRect.Width, LRect.Height);
+
+    if TCustomForm(AImpl.LCLObject).WindowState <> wsNormal then
+    begin
+      // Alt.Linux 11 (Gnome)
+      // Без этого окно не всегда максимизируется на старте приложения
+      while g_main_context_pending(nil) do
+        g_main_context_iteration(nil, false);
+      AImpl.UpdateWindowState;
+    end;
+  end;
+
   Result := False;
 end;
 
@@ -435,6 +478,11 @@ var
   LMessage: TLMActivate;
   LState: TGdkWindowState;
 begin
+  if GDK_WINDOW_STATE_MAXIMIZED in AEvent^.window_state.changed_mask then
+  begin
+    if GDK_WINDOW_STATE_MAXIMIZED in AEvent^.window_state.new_window_state then
+      AImpl.FRestoredBounds := AImpl.LCLObject.BoundsRect;
+  end;
   if GDK_WINDOW_STATE_FOCUSED in AEvent^.window_state.changed_mask then
   begin
     LState := AEvent^.window_state.new_window_state;
@@ -500,8 +548,9 @@ begin
     //    Похожая проблема была замечена на Manjaro 26, но там это решение не сработало
     //    - см. TACLWSForm.CheckAndFixGeometry
 
+    FUpdateBoundsOnMap := not WidgetMapped;
     LForm := TCustomForm(LCLObject);
-    LFormSizeIsFixed := not WidgetMapped or
+    LFormSizeIsFixed := FUpdateBoundsOnMap or
       (LForm.BorderStyle in [bsDialog, bsSingle, bsToolWindow]);
 
     LRect.x := ALeft;
@@ -543,11 +592,20 @@ begin
   end;
 end;
 
-procedure TACLGtk3AdvancedWindow.SetText(const AValue: String);
+procedure TACLGtk3AdvancedWindow.SetText(const AValue: string);
 begin
   // Эта хрень дергается между созданием Window и Layout. Cм.CreateHandle.
   if Assigned(FCreatingWorkaround) then FCreatingWorkaround();
   inherited SetText(AValue);
+end;
+
+procedure TACLGtk3AdvancedWindow.SetVisible(AValue: Boolean);
+begin
+  // Gnome, при сворачивании программы в трей посредством меню иконки в трее (через dbus)
+  // Возникает ошибка BadMatch на команду XSetInputFocus. Вот этот код эту херню решает
+  if wtWindow in WidgetType then
+    PGtkWindow(Widget)^.set_accept_focus(AValue and FAcceptFocus);
+  inherited SetVisible(AValue);
 end;
 
 procedure TACLGtk3AdvancedWindow.UpdateWindowFunctions;

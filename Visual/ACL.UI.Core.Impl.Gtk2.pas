@@ -200,8 +200,16 @@ type
     class function Check(AControl: TWinControl; X, Y, AThreshold: Integer): Boolean;
   end;
 
+  { TWindowPlacement }
+
+  TWindowPlacement = record
+    Length, Flags: Integer;
+    rcNormalPosition: TRect;
+  end;
+
 function FindVCLWindow(const P: TPoint): TWinControl;
 function IsAlphaComposingSupports: Boolean;
+function GetWindowPlacement(AHandle: TWndHandle; var APlacement: TWindowPlacement): Boolean;
 function LoadDialogIcon(AOwnerWnd: TWndHandle; AType: TMsgDlgType; ASize: Integer): TACLDib;
 procedure LoadSystemThemedCursors;
 procedure SetDragImageListOpacity(Opacity: Byte);
@@ -235,6 +243,11 @@ end;
 function IsAlphaComposingSupports: Boolean;
 begin
   Result := gdk_screen_is_composited(gdk_screen_get_default);
+end;
+
+function GetWindowPlacement(AHandle: TWndHandle; var APlacement: TWindowPlacement): Boolean;
+begin
+  Result := False;
 end;
 
 procedure LoadSystemThemedCursors;
