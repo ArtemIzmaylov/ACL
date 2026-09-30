@@ -428,7 +428,7 @@ type
 
   TACLDockPanel = class(TACLDockControl)
   strict private type
-    TCaptionButton = (Close, Maximize{not implemented}, Pin);
+    TCaptionButton = (Close, Maximize{not implemented}, Pin, Help);
   strict private
     FCaptionButtonActiveIndex: Integer;
     FCaptionButtonPressedIndex: Integer;
@@ -437,14 +437,17 @@ type
     FCaptionTextRect: TRect;
     FShowCaption: Boolean;
     FShowFrame: Boolean;
+    FOnHelp: TNotifyEvent;
 
     procedure CalculateCaptionButtons;
     procedure CaptionButtonClick(AButton: TCaptionButton);
     function GetCaptionButtonState(AButton: TCaptionButton): Integer;
     function HasBorders: Boolean;
     function HitOnCaptionButton(const P: TPoint): Integer;
+    procedure ModifyFrame(AProc: TProc);
     procedure SetCaptionButtonActiveIndex(AValue: Integer);
     procedure SetCaptionButtonPressedIndex(AValue: Integer);
+    procedure SetOnHelp(AValue: TNotifyEvent);
     procedure SetShowCaption(AValue: Boolean);
     procedure SetShowFrame(AValue: Boolean);
   protected
@@ -480,6 +483,8 @@ type
     property ShowCaption: Boolean read FShowCaption write SetShowCaption default True;
     property ShowFrame: Boolean read FShowFrame write SetShowFrame default True;
     property Style;
+    //# Events
+    property OnHelp: TNotifyEvent read FOnHelp write SetOnHelp;
   end;
 
 {$ENDREGION}
@@ -2881,6 +2886,14 @@ begin
   else
     FCaptionButtons[TCaptionButton.Pin] := NullRect;
 
+  if Assigned(OnHelp) then
+  begin
+    FCaptionButtons[TCaptionButton.Help] := ARect.Split(srRight, ARect.Height);
+    Dec(ARect.Right, ARect.Height + dpiApply(acTextIndent, FCurrentPPI));
+  end
+  else
+    FCaptionButtons[TCaptionButton.Help] := NullRect;
+
   FCaptionTextRect.Right := ARect.Right;
   if Style.HeaderTextAlignment = taCenter then
     FCaptionTextRect.Left := FCaptionRect.Left + (FCaptionRect.Right - ARect.Right)
@@ -2901,6 +2914,9 @@ var
 begin
   ADockGroup := Parent as TACLDockGroup;
   case AButton of
+    TCaptionButton.Help:
+      CallNotifyEvent(Self, OnHelp);
+
     TCaptionButton.Close:
       Visible := False;
 
@@ -3035,6 +3051,19 @@ begin
     ANode.Attrs.SetAsBool(TACLDockingSchema.AttrVisible, False);
 end;
 
+procedure TACLDockPanel.ModifyFrame(AProc: TProc);
+begin
+  Aligning;
+  try
+    AProc();
+  finally
+    Aligned;
+  end;
+  if csDesigning in ComponentState then
+    Realign;
+  Invalidate;
+end;
+
 procedure TACLDockPanel.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 var
   LHandler: TACLDockControl;
@@ -3096,6 +3125,7 @@ end;
 procedure TACLDockPanel.Paint;
 var
   LClipRgn: TRegionHandle;
+  LRect: TRect;
   I: TCaptionButton;
 begin
   inherited;
@@ -3111,8 +3141,11 @@ begin
       try
         for I := Low(FCaptionButtons) to High(FCaptionButtons) do
         begin
-          Style.HeaderButton.Draw(Canvas, FCaptionButtons[I], GetCaptionButtonState(I));
-          Style.HeaderButtonGlyphs.Draw(Canvas, FCaptionButtons[I].InflateTo(-4), Ord(I));
+          LRect := FCaptionButtons[I];
+          if LRect.IsEmpty then Continue;
+          Style.HeaderButton.Draw(Canvas, LRect, GetCaptionButtonState(I));
+          LRect.Inflate(-4);
+          Style.HeaderButtonGlyphs.Draw(Canvas, LRect, Ord(I));
         end;
       finally
         acEndClippedDraw(Canvas, LClipRgn);
@@ -3149,17 +3182,10 @@ end;
 procedure TACLDockPanel.SetShowFrame(AValue: Boolean);
 begin
   if FShowFrame <> AValue then
-  begin
-    Aligning;
-    try
+    ModifyFrame(procedure
+    begin
       FShowFrame := AValue;
-    finally
-      Aligned;
-    end;
-    if csDesigning in ComponentState then
-      Realign;
-    Invalidate;
-  end;
+    end);
 end;
 
 procedure TACLDockPanel.SetCaptionButtonActiveIndex(AValue: Integer);
@@ -3178,6 +3204,14 @@ begin
     FCaptionButtonPressedIndex := AValue;
     InvalidateRect(FCaptionRect);
   end;
+end;
+
+procedure TACLDockPanel.SetOnHelp(AValue: TNotifyEvent);
+begin
+  ModifyFrame(procedure
+  begin
+    FOnHelp := AValue;
+  end);
 end;
 
 function TACLDockPanel.ToString: string;
