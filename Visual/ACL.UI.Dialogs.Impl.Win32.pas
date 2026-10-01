@@ -91,15 +91,19 @@ type
 
   { TACLFileDialogVistaImpl }
 
-  TACLFileDialogVistaImpl = class(TACLFileDialogImpl, IFileDialogEvents)
-  protected
-    FExts: UnicodeString;
+  TACLFileDialogVistaImpl = class(TACLFileDialogImpl,
+    IFileDialogControlEvents,
+    IFileDialogEvents)
+  strict private const
+    CustomControlID = 1;
+  strict private
     FFileDialog: IFileDialog;
     FFilter: TStringDynArray;
 
     function GetItemName(const AItem: IShellItem): UnicodeString;
-    procedure Initialize; virtual;
-    procedure InitializeFilter; virtual;
+    procedure Initialize;
+    procedure InitializeCustomControl;
+    procedure InitializeFilter;
     procedure QuerySeletectedFiles(AFileList: TACLStringList);
     // IFileDialogEvents
     function OnFileOk(const pfd: IFileDialog): HRESULT; virtual; stdcall;
@@ -112,6 +116,15 @@ type
     function OnShareViolation(const pfd: IFileDialog;
       const psi: IShellItem; out pResponse: Cardinal): HRESULT; virtual; stdcall;
     function OnTypeChange(const pfd: IFileDialog): HRESULT; virtual; stdcall;
+    // IFileDialogControlEvents
+    function OnButtonClicked(const pfdc: IFileDialogCustomize;
+      dwIDCtl: Cardinal): HRESULT; stdcall;
+    function OnCheckButtonToggled(const pfdc: IFileDialogCustomize;
+      dwIDCtl: Cardinal; bChecked: LongBool): HRESULT; stdcall;
+    function OnControlActivating(const pfdc: IFileDialogCustomize;
+      dwIDCtl: Cardinal): HRESULT; stdcall;
+    function OnItemSelected(const pfdc: IFileDialogCustomize;
+      dwIDCtl: Cardinal; dwIDItem: Cardinal): HRESULT; stdcall;
   public
     constructor Create(ADialog: TACLFileDialog; ADialogIntf: IFileDialog; ASaveDialog: Boolean);
     destructor Destroy; override;
@@ -396,6 +409,7 @@ var
 begin
   Initialize;
   InitializeFilter;
+  InitializeCustomControl;
   Result := Succeeded(FFileDialog.Show(AOwnerWnd));
   if Result then
   begin
@@ -448,6 +462,23 @@ begin
   FFileDialog.Advise(Self, LCookie);
 end;
 
+procedure TACLFileDialogVistaImpl.InitializeCustomControl;
+var
+  LCustom: TACLFileDialogCustomControl;
+  LCustomize: IFileDialogCustomize;
+begin
+  if Supports(FFileDialog, IFileDialogCustomize, LCustomize) then
+  begin
+    LCustom := FDialog.CustomControl;
+    case LCustom.Kind of
+      dcbButton:
+        LCustomize.AddPushButton(CustomControlID, PChar(LCustom.Caption));
+      dcbCheckBox:
+        LCustomize.AddCheckButton(CustomControlID, PChar(LCustom.Caption), LCustom.Checked);
+    end;
+  end;
+end;
+
 procedure TACLFileDialogVistaImpl.InitializeFilter;
 var
   LParts: TComdlgFilterSpecArray;
@@ -467,43 +498,32 @@ begin
 end;
 
 procedure TACLFileDialogVistaImpl.QuerySeletectedFiles(AFileList: TACLStringList);
-
-  procedure OpenDialogPopulateSelectedFiles(AFileList: TACLStringList);
-  var
-    LCount: Integer;
-    LEnumerator: IEnumShellItems;
-    LItems: IShellItemArray;
-    LResult: HRESULT;
-    LShellItem: IShellItem;
+var
+  LCount: Integer;
+  LEnumerator: IEnumShellItems;
+  LItem: IShellItem;
+  LItems: IShellItemArray;
+  LResult: HRESULT;
+begin
+  AFileList.Clear;
+  if FSaveDialog then
   begin
+    if Succeeded((FFileDialog as IFileSaveDialog).GetResult(LItem)) then
+      AFileList.Add(GetItemName(LItem));
+  end
+  else
     if Succeeded((FFileDialog as IFileOpenDialog).GetResults(LItems)) then
     begin
       if Succeeded(LItems.EnumItems(LEnumerator)) then
       begin
-        LResult := LEnumerator.Next(1, LShellItem, @LCount);
+        LResult := LEnumerator.Next(1, LItem, @LCount);
         while Succeeded(LResult) and (LCount <> 0) do
         begin
-          AFileList.Add(GetItemName(LShellItem));
-          LResult := LEnumerator.Next(1, LShellItem, @LCount);
+          AFileList.Add(GetItemName(LItem));
+          LResult := LEnumerator.Next(1, LItem, @LCount);
         end;
       end;
     end;
-  end;
-
-  procedure SaveDialogPopulateSelectedFileName(AFileList: TACLStringList);
-  var
-    LItems: IShellItem;
-  begin
-    if Succeeded((FFileDialog as IFileSaveDialog).GetResult(LItems)) then
-      AFileList.Add(GetItemName(LItems));
-  end;
-
-begin
-  AFileList.Clear;
-  if FSaveDialog then
-    SaveDialogPopulateSelectedFileName(AFileList)
-  else
-    OpenDialogPopulateSelectedFiles(AFileList);
 end;
 
 function TACLFileDialogVistaImpl.OnFileOk(const pfd: IFileDialog): HRESULT;
@@ -540,6 +560,37 @@ begin
 end;
 
 function TACLFileDialogVistaImpl.OnTypeChange(const pfd: IFileDialog): HRESULT;
+begin
+  Result := S_OK;
+end;
+
+function TACLFileDialogVistaImpl.OnButtonClicked(
+  const pfdc: IFileDialogCustomize; dwIDCtl: Cardinal): HRESULT;
+begin
+  if dwIDCtl = CustomControlID then
+    FDialog.CustomControl.Click;
+  Result := S_OK;
+end;
+
+function TACLFileDialogVistaImpl.OnCheckButtonToggled(
+  const pfdc: IFileDialogCustomize; dwIDCtl: Cardinal; bChecked: LongBool): HRESULT;
+begin
+  if dwIDCtl = CustomControlID then
+  begin
+    FDialog.CustomControl.Checked := bChecked;
+    FDialog.CustomControl.Click;
+  end;
+  Result := S_OK;
+end;
+
+function TACLFileDialogVistaImpl.OnControlActivating(
+  const pfdc: IFileDialogCustomize; dwIDCtl: Cardinal): HRESULT;
+begin
+  Result := S_OK;
+end;
+
+function TACLFileDialogVistaImpl.OnItemSelected(
+  const pfdc: IFileDialogCustomize; dwIDCtl, dwIDItem: Cardinal): HRESULT;
 begin
   Result := S_OK;
 end;

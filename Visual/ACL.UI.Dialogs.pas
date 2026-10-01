@@ -94,6 +94,29 @@ type
 
 {$REGION ' FileDialogs '}
 
+  { TACLFileDialogCustomControl }
+
+  TACLFileDialogCustomControl = class(TPersistent)
+  public type
+    TKind = (dcbNone, dcbButton, dcbCheckBox);
+  strict private
+    FCaption: string;
+    FChecked: Boolean;
+    FKind: TKind;
+    FOnClick: TNotifyEvent;
+    FOnClickProc: TProc;
+  public
+    procedure Assign(Source: TPersistent); override;
+    procedure Click;
+    //# Properties
+    property OnClickProc: TProc read FOnClickProc write FOnClickProc;
+  published
+    property Caption: string read FCaption write FCaption;
+    property Checked: Boolean read FChecked write FChecked default False;
+    property Kind: TKind read FKind write FKind default dcbNone;
+    property OnClick: TNotifyEvent read FOnClick write FOnClick;
+  end;
+
   { TACLFileDialog }
 
   TACLFileDialogOption = (ofOverwritePrompt, ofHideReadOnly, ofAllowMultiSelect,
@@ -104,6 +127,7 @@ type
   public const
     DefaultOptions = [ofHideReadOnly, ofEnableSizing, ofOverwritePrompt, ofAutoExtension];
   strict private
+    FCustomControl: TACLFileDialogCustomControl;
     FFileName: string;
     FFiles: TACLStringList;
     FFilter: string;
@@ -112,6 +136,7 @@ type
     FMRUId: string;
     FOptions: TACLFileDialogOptions;
     FTitle: string;
+    procedure SetCustomControl(AValue: TACLFileDialogCustomControl);
   protected
     function AutoExtension(const AFileName: string): string;
     function CreateImpl(ASaveDialog: Boolean): TObject; virtual;
@@ -129,6 +154,7 @@ type
     property Files: TACLStringList read FFiles;
     property InitialDir: string read FInitialDir write FInitialDir;
   published
+    property CustomControl: TACLFileDialogCustomControl read FCustomControl write SetCustomControl;
     property Filter: string read FFilter write FFilter;
     property FilterIndex: Integer read FFilterIndex write FFilterIndex default 0;
     property MRUId: string read FMRUId write FMRUId;
@@ -606,10 +632,12 @@ begin
   inherited Create(AOwner);
   FFiles := TACLStringList.Create;
   FOptions := DefaultOptions;
+  FCustomControl := TACLFileDialogCustomControl.Create;
 end;
 
 destructor TACLFileDialog.Destroy;
 begin
+  FreeAndNil(FCustomControl);
   FreeAndNil(FFiles);
   inherited Destroy;
 end;
@@ -700,6 +728,33 @@ begin
     Result := MRUPaths.ValueFromName[MRUId]
   else
     Result := EmptyStr;
+end;
+
+procedure TACLFileDialog.SetCustomControl(AValue: TACLFileDialogCustomControl);
+begin
+  FCustomControl.Assign(AValue);
+end;
+
+{ TACLFileDialogCustomControl }
+
+procedure TACLFileDialogCustomControl.Assign(Source: TPersistent);
+begin
+  if Source is TACLFileDialogCustomControl then
+  begin
+    FKind := TACLFileDialogCustomControl(Source).FKind;
+    FCaption := TACLFileDialogCustomControl(Source).FCaption;
+    FChecked := TACLFileDialogCustomControl(Source).FChecked;
+    FOnClick := TACLFileDialogCustomControl(Source).FOnClick;
+    FOnClickProc := TACLFileDialogCustomControl(Source).FOnClickProc;
+  end
+  else
+    inherited;
+end;
+
+procedure TACLFileDialogCustomControl.Click;
+begin
+  if Assigned(OnClick) then OnClick(Self);
+  if Assigned(OnClickProc) then OnClickProc();
 end;
 
 {$ENDREGION}

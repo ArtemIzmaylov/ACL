@@ -30,6 +30,7 @@ uses
   LCLIntf,
   LCLType,
   Gtk3Int,
+  Gtk3Procs,
   Gtk3Widgets,
   // LCL
   Controls,
@@ -50,6 +51,10 @@ type
   strict private
     FModalResult: TACLBoolean;
     class function OnDestroy(Widget: PGtkFileChooser;
+      Dlg: TACLFileDialogImpl): GBoolean; cdecl; static;
+    class function OnButtonClick(Widget: PGtkWidget; Event: PGdkEvent;
+      Dlg: TACLFileDialogImpl): GBoolean; cdecl; static;
+    class function OnCheckBoxClick(Widget: PGtkToggleButton;
       Dlg: TACLFileDialogImpl): GBoolean; cdecl; static;
     class procedure OnNotify(Widget: PGtkFileChooser; Spec: PGParamSpec;
       Dlg: TACLFileDialogImpl); cdecl; static;
@@ -89,6 +94,7 @@ const
   );
   ButtonText: array[Boolean] of pgChar = (GTK_STOCK_OPEN, GTK_STOCK_SAVE);
 var
+  LExtraWidget: PGtkWidget;
   LDialog: PGtkFileChooser;
   LFilter: PGtkFileFilter;
   LFilterExts: TStringDynArray;
@@ -106,15 +112,15 @@ begin
   LDialog := PGtkFileChooser(FWidget);
 
   if ASaveDialog then
-    gtk_file_chooser_set_do_overwrite_confirmation(LDialog, ofOverwritePrompt in ADialog.Options);
+    LDialog^.do_overwrite_confirmation := ofOverwritePrompt in ADialog.Options;
   if ADialog.InitialDir <> '' then
-    gtk_file_chooser_set_current_folder(LDialog, Pgchar(ADialog.InitialDir));
+    LDialog^.set_current_folder(Pgchar(ADialog.InitialDir));
   if ASaveDialog then
-    gtk_file_chooser_set_current_name(LDialog, Pgchar(ADialog.FileName));
+    LDialog^.set_current_name(Pgchar(ADialog.FileName));
   if (ofAllowMultiSelect in ADialog.Options) and not ASaveDialog then
-    gtk_file_chooser_set_select_multiple(LDialog, True);
+    LDialog^.select_multiple := True;
   if (ofForceShowHidden in ADialog.Options) then
-    gtk_file_chooser_set_show_hidden(LDialog, True);
+    LDialog^.show_hidden := True;
   if ADialog.Filter <> '' then
   begin
     ADialog.FilterIndex := Max(ADialog.FilterIndex, 1); // 0 is "default" (for Windows)
@@ -123,15 +129,33 @@ begin
     begin
       if acSplitString(LParts[2 * I + 1], ';', LFilterExts, [ssoNonEmpty]) > 0 then
       begin
-        LFilter := gtk_file_filter_new;
-        gtk_file_filter_set_name(LFilter, Pgchar(LParts[2 * I]));
-        gtk_file_chooser_add_filter(LDialog, LFilter);
+        LFilter := TGtkFileFilter.new;
+        LFilter^.set_name(Pgchar(LParts[2 * I]));
         for J := Low(LFilterExts) to High(LFilterExts) do
-          gtk_file_filter_add_pattern(LFilter, Pgchar(LFilterExts[J]));
+          LFilter^.add_pattern(Pgchar(LFilterExts[J]));
+        LDialog^.add_filter(LFilter);
         if I + 1 = ADialog.FilterIndex then
-          gtk_file_chooser_set_filter(LDialog, LFilter);
+          LDialog^.set_filter(LFilter);
       end;
     end;
+  end;
+
+  case FDialog.CustomControl.Kind of
+    dcbButton:
+      begin
+        LExtraWidget := TGtkButton.new_with_label(Pgchar(FDialog.CustomControl.Caption));
+        g_signal_connect_data(LExtraWidget, 'button-release-event',
+          TGCallback(@OnButtonClick), Self, nil, G_CONNECT_DEFAULT);
+        LDialog^.set_extra_widget(LExtraWidget);
+      end;
+    dcbCheckBox:
+      begin
+        LExtraWidget := TGtkCheckButton.new_with_label(Pgchar(FDialog.CustomControl.Caption));
+        PGtkCheckButton(LExtraWidget).set_active(FDialog.CustomControl.Checked);
+        g_signal_connect_data(LExtraWidget, 'toggled',
+          TGCallback(@OnCheckBoxClick), Self, nil, G_CONNECT_DEFAULT);
+        LDialog^.set_extra_widget(LExtraWidget);
+      end;
   end;
 
   InitializeWidget;
@@ -152,7 +176,7 @@ begin
   FDialog.FileName := '';
   if (ofAllowMultiSelect in FDialog.Options) and not FSaveDialog then
   begin
-    LFiles := gtk_file_chooser_get_filenames(PGtkFileChooser(Widget));
+    LFiles := PGtkFileChooser(Widget).get_filenames;
     if LFiles <> nil then
     try
       LFile := LFiles;
@@ -169,7 +193,7 @@ begin
   end
   else
   begin
-    LFileName := gtk_file_chooser_get_filename(PGtkFileChooser(Widget));
+    LFileName := PGtkFileChooser(Widget).get_filename;
     if (LFileName <> nil) and (LFileName^ <> #0) then
       FDialog.Files.Add(LFileName);
   end;
@@ -179,16 +203,24 @@ function TACLFileDialogImpl.Execute(AOwnerWnd: TWndHandle): Boolean;
 var
   LDialog: PGtkDialog;
 begin
-  Result := False;
   FModalResult := TACLBoolean.Default;
+
   LDialog := PGtkDialog(FWidget);
   LDialog^.set_position(GTK_WIN_POS_CENTER);
   LDialog^.set_application(GTK3WidgetSet.Gtk3Application);
   LDialog^.set_modal(True);
   LDialog^.show_all;
   LDialog^.present;
-  while FModalResult = TACLBoolean.Default do
-    Application.HandleMessage;
+
+  TGtkApp.ActiveDialog := LDialog;
+  try
+    while FModalResult = TACLBoolean.Default do
+      Application.HandleMessage;
+  finally
+    TGtkApp.ActiveDialog := nil;
+  end;
+
+  Result := False;
   if FModalResult = TACLBoolean.True then
   begin
     FetchSelection;
@@ -212,6 +244,21 @@ begin
     LogEntry(acGeneralLogFileName, 'Dialog', 'OnDestroy');
     Dlg.FModalResult := TACLBoolean.False;
   end;
+  Result := True;
+end;
+
+class function TACLFileDialogImpl.OnButtonClick(Widget: PGtkWidget;
+  Event: PGdkEvent; Dlg: TACLFileDialogImpl): GBoolean; cdecl;
+begin
+  Dlg.FDialog.CustomControl.Click;
+  Result := True;
+end;
+
+class function TACLFileDialogImpl.OnCheckBoxClick(
+  Widget: PGtkToggleButton; Dlg: TACLFileDialogImpl): GBoolean; cdecl;
+begin
+  Dlg.FDialog.CustomControl.Checked := Widget^.active;
+  Dlg.FDialog.CustomControl.Click;
   Result := True;
 end;
 

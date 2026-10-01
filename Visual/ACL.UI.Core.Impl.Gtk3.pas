@@ -87,6 +87,8 @@ type
     class procedure HandlerRemoving(Sender: TComponent);
     class procedure TranslateCoords(ATarget: PGtkWidget; AEvent: PGdkEvent);
   public
+    class var ActiveDialog: PGtkDialog;
+
     class constructor Create;
     class destructor Destroy;
     class procedure ProcessMessages;
@@ -1061,7 +1063,10 @@ class procedure TACLWSForm.ShowHide(const AWinControl: TWinControl);
 
   procedure SetMandatoryTransientWindow(AForm: TCustomForm; AFormWidget: PGtkWindow);
   begin
-    SetRealPopupParent(AForm, Screen.ActiveCustomForm);
+    if TGtkApp.ActiveDialog <> nil then
+      AFormWidget^.set_transient_for(TGtkApp.ActiveDialog)
+    else
+      SetRealPopupParent(AForm, Screen.ActiveCustomForm);
     if (AFormWidget^.transient_for = nil) then
       AFormWidget^.set_transient_for(GetActiveGtkWindow);
     if (AFormWidget^.transient_for = nil) and (AForm <> Application.MainForm) then
