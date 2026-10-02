@@ -246,6 +246,7 @@ type
         InternetQueryOptionW(LRequest, INTERNET_OPTION_SECURITY_FLAGS, @LFlags, LLength);
         LFlags := LFlags or
           SECURITY_FLAG_IGNORE_UNKNOWN_CA or
+          SECURITY_FLAG_IGNORE_REVOCATION or
           SECURITY_FLAG_IGNORE_CERT_CN_INVALID or
           SECURITY_FLAG_IGNORE_CERT_DATE_INVALID;
         InternetSetOptionW(LRequest, INTERNET_OPTION_SECURITY_FLAGS, @LFlags, LLength);
