@@ -252,9 +252,7 @@ type
       end;
 
       if not SendRequest(LRequest) then
-        raise EHttpWinInetError.Create(
-          'HttpSendRequest failed.' + sLineBreak +
-          'Maybe a certificate issue. Ensure that TLS 1.2/1.3 are switched on');
+        raise EHttpWinInetError.Create('HttpSendRequest failed');
 
       Result.Init;
       Result.ContentRange := HTTPQueryString(LRequest, HTTP_QUERY_CONTENT_RANGE);
@@ -281,14 +279,23 @@ type
     LBufferLength: DWORD;
     LError: DWORD;
     LErrorCode: DWORD;
+    LErrorText: string;
   begin
     LErrorCode := 0;
     LError := GetLastError; // first!
     LBufferLength := Length(LBuffer);
     if InternetGetLastResponseInfoW(LErrorCode, @LBuffer[0], LBufferLength) and (LErrorCode > 0) then
       Create(acMakeString(PWideChar(@LBuffer[0]), LBufferLength), LErrorCode)
-    else if LError <> 0 then
-      Create(IfThenW(SysErrorMessage(LError), DefaultText), LError)
     else
-      inherited Create(DefaultText);
+      if LError <> 0 then
+      begin
+        LErrorText := SysErrorMessage(LError);
+        if LErrorText = '' then
+          LErrorText := SysErrorMessage(LError, GetModuleHandle('wininet.dll'));
+        if LErrorText = '' then
+          LErrorText := DefaultText;
+        Create(LErrorText, LError);
+      end
+      else
+        inherited Create(DefaultText);
   end;
