@@ -257,7 +257,6 @@ implementation
   {$I ACL.Web.Http.WinInet.inc}
 {$ELSE}
   {$I ACL.Web.Http.CURL.inc}
-  {.$I ACL.Web.Http.FPC.inc}
 {$ENDIF}
 
 const
