@@ -9,9 +9,9 @@ const
 
 type
 
-  { EHttpWin32Error }
+  { EHttpWinInetError }
 
-  EHttpWin32Error = class(EHttpError)
+  EHttpWinInetError = class(EHttpError)
   public
     constructor Create(const DefaultText: string = ''); overload;
   end;
@@ -93,7 +93,7 @@ type
       FSession := InternetOpenW(nil, INTERNET_OPEN_TYPE_PRECONFIG, nil, nil, 0);
     end;
     if FSession = nil then
-      raise EHttpWin32Error.Create('InternetOpen failed');
+      raise EHttpWinInetError.Create('InternetOpen failed');
 
     SetOption(FSession, INTERNET_OPTION_DATA_SEND_TIMEOUT, TACLWebSettings.ConnectionTimeOut);
     SetOption(FSession, INTERNET_OPTION_DATA_RECEIVE_TIMEOUT, TACLWebSettings.ConnectionTimeOut);
@@ -101,7 +101,7 @@ type
 
     FHandle := InternetConnectW(FSession, PWideChar(URL.Host), URL.Port, nil, nil, INTERNET_SERVICE_HTTP, 0, 0);
     if FHandle = nil then
-      raise EHttpWin32Error.Create('InternetConnectW failed');
+      raise EHttpWinInetError.Create('InternetConnectW failed');
 
     if (TACLWebSettings.ActualConnectionMode = ncmUserDefined) and (TACLWebSettings.Proxy.UserName <> '') then
     begin
@@ -162,7 +162,7 @@ type
               if LDataUsed > 0 then
               begin
                 if not InternetWriteFile(ARequest, LData, LDataUsed, LDataWritten) then
-                  raise EHttpWin32Error.Create(sErrorWriteToServer, acWebErrorUnknown);
+                  raise EHttpWinInetError.Create(sErrorWriteToServer, acWebErrorUnknown);
               end;
 
               if Assigned(AOnProgress) then
@@ -197,7 +197,7 @@ type
         while InternetQueryDataAvailable(ARequest, LRemaining, 0, 0) and (LRemaining > 0) do
         begin
           if not InternetReadFile(ARequest, LBuffer, BufferSize, LBytesRead) then
-            raise EHttpWin32Error.Create('InternetReadFile failed');
+            raise EHttpWinInetError.Create('InternetReadFile failed');
           if LBytesRead = 0 then
             Break;
           if not AOnReceive(LBuffer, LBytesRead) then
@@ -238,7 +238,7 @@ type
     LRequest := HTTPOpenRequestW(FHandle, PWideChar(AMethod), PWideChar(FUrl.Path), nil, nil, nil, LFlags, 0);
     try
       if LRequest = nil then
-        raise EHttpWin32Error.Create('HttpOpenRequest failed');
+        raise EHttpWinInetError.Create('HttpOpenRequest failed');
 
       if AIgnoreCertificateIssues then
       begin
@@ -252,7 +252,7 @@ type
       end;
 
       if not SendRequest(LRequest) then
-        raise EHttpWin32Error.Create(
+        raise EHttpWinInetError.Create(
           'HttpSendRequest failed.' + sLineBreak +
           'Maybe a certificate issue. Ensure that TLS 1.2/1.3 are switched on');
 
@@ -273,9 +273,9 @@ type
     end;
   end;
 
-  { EHttpWin32Error }
+  { EHttpWinInetError }
 
-  constructor EHttpWin32Error.Create(const DefaultText: string = '');
+  constructor EHttpWinInetError.Create(const DefaultText: string = '');
   var
     LBuffer: array[Byte] of WideChar;
     LBufferLength: DWORD;

@@ -254,7 +254,7 @@ type
 implementation
 
 {$IFDEF MSWINDOWS}
-  {$I ACL.Web.Http.Win32.inc}
+  {$I ACL.Web.Http.WinInet.inc}
 {$ELSE}
   {$I ACL.Web.Http.CURL.inc}
   {.$I ACL.Web.Http.FPC.inc}
