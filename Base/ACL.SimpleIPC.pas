@@ -47,7 +47,7 @@ type
 
   IACLIPCClient = interface
   ['{1E225ABC-7B42-4631-95BD-7078CFD1583C}']
-    function Send(ACmd: Cardinal; const AData: string): TACLIPCResult;
+    function Send(ACmd: Cardinal; const AData: string; ATimeOut: LongWord): TACLIPCResult;
   end;
 
   { TACLAppAtom }
@@ -67,6 +67,7 @@ type
   TACLIPCHub = class
   public const
     CmdIdParams = 753; // don't change, for backward compatibility
+    DefaultTimeOut = 3000;
   public type
     TReceiver = procedure (ACmd: Cardinal; const AData: string) of object;
   private
@@ -77,7 +78,7 @@ type
   public
     class constructor Create;
     class destructor Destroy;
-    class procedure Initialize(const AAppId: string);
+    class procedure Initialize(const AAppId: string; const ACompanionAppIds: array of string);
     // Registry
     class procedure Register(AReceiver: TReceiver);
     class function RegisterCmd(const AName: string): Cardinal;
@@ -101,13 +102,14 @@ implementation
   {$I ACL.SimpleIPC.Impl.Unix.inc}
 {$ENDIF}
 
-function SendDataToApplication(const AAppFileName, AIpcServerName: string;
-  ACmd: Cardinal; const AData: string): Boolean;
+function SendDataToApplication(
+  const AAppFileName, AIpcServerName: string; ACmd: Cardinal;
+  const AData: string): Boolean;
 begin
   if SendDataToIPC(AIpcServerName, ACmd, AData) then
     Exit(True);
   if TACLProcess.Execute(AAppFileName) then
-    Result := SendDataToIPC(AIpcServerName, ACmd, AData, 3000)
+    Result := SendDataToIPC(AIpcServerName, ACmd, AData, TACLIPCHub.DefaultTimeOut)
   else
     Result := False;
 end;
@@ -116,17 +118,21 @@ function SendDataToIPC(const AIpcServerName: string;
   ACmd: Cardinal; const AData: string; ATimeOut: Integer): Boolean;
 var
   LClient: IACLIPCClient;
+  LTimestamp: LongWord;
 begin
   Result := False;
   try
+    LTimestamp := TACLThread.Timestamp;
     repeat
       LClient := TIPCServer.TryConnect(AIpcServerName);
       if LClient <> nil then
-        Exit(LClient.Send(ACmd, AData) = irSucceeded);
-      if ATimeOut <= 0 then
+      begin
+        Dec(ATimeOut, Integer(TACLThread.Timestamp - LTimestamp));
+        Exit(LClient.Send(ACmd, AData, Max(ATimeOut, 0)) = irSucceeded);
+      end;
+      if (ATimeOut = 0) or TACLThread.IsTimeout(LTimestamp, ATimeOut) then
         Exit(False);
-      Sleep(Min(100, ATimeOut));
-      Dec(ATimeOut, 100);
+      Sleep(50);
     until False;
   finally
     LogEntry(acGeneralLogFileName, 'IPC', 'SendData(%s, %d, %s) = %s',
@@ -150,11 +156,12 @@ begin
   FreeAndNil(FReceivers);
 end;
 
-class procedure TACLIPCHub.Initialize(const AAppId: string);
+class procedure TACLIPCHub.Initialize(
+  const AAppId: string; const ACompanionAppIds: array of string);
 begin
   CheckIsMainThread;
   if FServer = nil then
-    FServer := TIPCServer.Create(AAppId);
+    FServer := TIPCServer.Create(AAppId, ACompanionAppIds);
 end;
 
 class procedure TACLIPCHub.ProcessCopyMessage(var Msg: TMessage);
@@ -213,7 +220,7 @@ begin
   begin
     if FClients.Read(LIndex, LClient) then
     begin
-      if LClient.Send(ACmd, AData) = irAbandoned then
+      if LClient.Send(ACmd, AData, DefaultTimeOut) = irAbandoned then
         FClients.Remove(LClient);
     end;
     Dec(LIndex);

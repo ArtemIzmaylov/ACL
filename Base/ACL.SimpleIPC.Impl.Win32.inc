@@ -10,7 +10,7 @@ type
     FWndHandle: TWndHandle;
   public
     constructor Create(AWndHandle: TWndHandle);
-    function Send(ACmd: Cardinal; const AData: string): TACLIPCResult;
+    function Send(ACmd: Cardinal; const AData: string; ATimeOut: LongWord): TACLIPCResult;
   end;
 
   { TIPCServer }
@@ -20,7 +20,7 @@ type
     FHelloMessage: Cardinal;
     FWndHandle: TWndHandle;
   public
-    constructor Create(const AAppId: string);
+    constructor Create(const AAppId: string; const ACompanionAppIds: array of string);
     destructor Destroy; override;
     procedure WndProc(var AMessage: TMessage);
     class function TryConnect(const AServerName: string): IACLIPCClient;
@@ -51,7 +51,7 @@ begin
   FWndHandle := AWndHandle;
 end;
 
-function TIPCClient.Send(ACmd: Cardinal; const AData: string): TACLIPCResult;
+function TIPCClient.Send(ACmd: Cardinal; const AData: string; ATimeOut: LongWord): TACLIPCResult;
 var
   LCopyData: TCopyDataStruct;
   LResult: DWORD_PTR;
@@ -61,7 +61,7 @@ begin
   if not IsWindow(FWndHandle) then
     Exit(irAbandoned);
 
-  ZeroMemory(@LCopyData, SizeOf(LCopyData));
+  LCopyData := Default(TCopyDataStruct);
   LCopyData.dwData := ACmd;
   LTempFileNameUsed := TACLProcess.IsWow64 <> TACLProcess.IsWow64Window(FWndHandle);
   if LTempFileNameUsed then
@@ -77,9 +77,9 @@ begin
   end;
 
   if SendMessageTimeout(FWndHandle, WM_COPYDATA, 0, LPARAM(@LCopyData),
-    SMTO_NORMAL or SMTO_ABORTIFHUNG, 3000, @LResult) = 0
+    SMTO_NORMAL or SMTO_ABORTIFHUNG, ATimeOut, @LResult) = 0
   then
-    Result := irAbandoned
+    Result := irFailed
   else
     Result := irSucceeded;
 
@@ -89,21 +89,21 @@ end;
 
 { TIPCServer }
 
-constructor TIPCServer.Create(const AAppId: string);
+constructor TIPCServer.Create(const AAppId: string; const ACompanionAppIds: array of string);
 var
   LClientHandle: HWND;
 begin
   FHelloMessage := RegisterWindowMessage('ACL.IPC:Hello');
   FWndHandle := acWndAlloc(WndProc, ClassName, False, AAppId);
-  LClientHandle := 0;
-  repeat
-    LClientHandle := FindWindowExW(0, LClientHandle, PWideChar(ClassName), nil);
-    if (LClientHandle <> 0) and (FWndHandle <> LClientHandle) then
+  for var I := Low(ACompanionAppIds) to High(ACompanionAppIds) do
+  begin
+    LClientHandle := FindWindow(PChar(ClassName), PChar(ACompanionAppIds[I]));
+    if (LClientHandle <> 0) and (LClientHandle <> FWndHandle) then
     begin
       TACLIPCHub.FClients.Add(TIPCClient.Create(LClientHandle));
       PostMessage(LClientHandle, FHelloMessage, 0, FWndHandle);
     end;
-  until LClientHandle = 0;
+  end;
 end;
 
 destructor TIPCServer.Destroy;

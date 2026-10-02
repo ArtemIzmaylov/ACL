@@ -1,8 +1,5 @@
 ﻿uses
-  baseunix,
-  simpleipc,
-  // ACL
-  ACL.Timers;
+  BaseUnix, ACL.Timers;
 
 type
 
@@ -10,12 +7,13 @@ type
 
   TIPCClient = class(TInterfacedObject, IACLIPCClient)
   strict private
-    FCore: TSimpleIPCClient;
+    FFileName: string;
+    FFileStream: TFileStream;
   public
-    constructor Create(const AServerName: string);
+    constructor Create(const AAppId: string);
     destructor Destroy; override;
-    function IsServerRunning: Boolean;
-    function Send(ACmd: Cardinal; const AData: string): TACLIPCResult;
+    function Connect: Boolean;
+    function Send(ACmd: Cardinal; const AData: string; ATimeOut: LongWord): TACLIPCResult;
   end;
 
   { TIPCServer }
@@ -23,127 +21,158 @@ type
   TIPCServer = class
   strict private const
     HelloCmd = 1;
-    Prefix = 'taclipc_';
   strict private
-    FCore: TSimpleIPCServer;
+    FFileName: string;
+    FFileStream: TFileStream;
     FIdle: TACLTimer;
-    procedure HandlerMessage(Sender: TObject);
-    procedure HandlerPoolMessage(Sender: TObject);
+
+    procedure HandlerPollMessage(Sender: TObject);
   public
-    constructor Create(const AAppId: string);
+    constructor Create(const AAppId: string; const ACompanionAppIds: array of string);
     destructor Destroy; override;
-    class function TryConnect(const AServerName: string): IACLIPCClient;
+    class function GetServerFileName(const AAppId: string): string;
+    class function TryConnect(const AAppId: string): IACLIPCClient;
   end;
 
 { TIPCClient }
 
-constructor TIPCClient.Create(const AServerName: string);
+constructor TIPCClient.Create(const AAppId: string);
 begin
-  FCore := TSimpleIPCClient.Create(nil);
-  FCore.ServerID := AServerName;
-  FCore.SystemGlobal := False;
-  FCore.Connect;
+  FFileName := TIPCServer.GetServerFileName(AAppId);
 end;
 
 destructor TIPCClient.Destroy;
 begin
-  FreeAndNil(FCore);
+  FreeAndNil(FFileStream);
   inherited Destroy;
 end;
 
-function TIPCClient.IsServerRunning: Boolean;
+function TIPCClient.Connect: Boolean;
+var
+  fd: Integer;
 begin
-  Result := FCore.ServerRunning;
+  Result := FileExists(FFileName);
+  // it's possible to have a stale file that is not open for reading which will
+  // cause fpOpen to hang/block later when .Active is set to true while it
+  // waits for the pipe to be opened on the other end
+  if Result then
+  begin
+    // O_WRONLY | O_NONBLOCK causes fpOpen to return -1 if the file is not open for reading
+    // so in fact the 'server' is not running
+    fd := FpOpen(FFileName, O_WRONLY or O_NONBLOCK);
+    if fd = -1 then
+    begin
+      Result := False;
+      // delete the named pipe since it's orphaned
+      FpUnlink(FFileName);
+    end
+    else
+      FpClose(fd);
+  end;
+
+  if Result and (FFileStream = nil) then
+    FFileStream := TFileStream.Create(FFileName, fmOpenWrite or fmShareDenyNone);
 end;
 
-function TIPCClient.Send(ACmd: Cardinal; const AData: string): TACLIPCResult;
+function TIPCClient.Send(ACmd: Cardinal; const AData: string; ATimeOut: LongWord): TACLIPCResult;
 begin
+  Result := irAbandoned;
+  if Connect then
   try
-    FCore.SendStringMessage(TMessageType(ACmd), AData);
+    FFileStream.WriteInt32(ACmd);
+    FFileStream.WriteInt32(Length(AData));
+    FFileStream.WriteStringA(AData);
     Result := irSucceeded;
   except
-    Result := irAbandoned;
+    Result := irFailed;
   end;
 end;
 
 { TIPCServer }
 
-constructor TIPCServer.Create(const AAppId: string);
+constructor TIPCServer.Create(const AAppId: string; const ACompanionAppIds: array of string);
 var
   LClient: IACLIPCClient;
+  LError: Integer;
   LInfo: TACLFindFileInfo;
-  LName: string;
+  I: Integer;
 begin
-  LName := Prefix + AAppId;
+  FFileName := GetServerFileName(AAppId);
 
-  FCore := TSimpleIPCServer.Create(nil);
-  FCore.OnMessage := HandlerMessage;
-  FCore.Global := False;
-  FCore.ServerID := LName;
-  FCore.SystemGlobal := False;
-  FCore.StartServer;
+  // Start the server
+  if not FileExists(FFileName) then
+  begin
+    LError := FpMkfifo(FFileName, &666);
+    if LError <> 0 then
+      raise Exception.CreateFmt('Cannot create named pipe "%s" (%d)', [FFileName, LError]);
+  end;
+  fpChmod(FFileName, &600);
+  FFileStream := TFileStream.Create(FFileName, fmOpenReadWrite or fmShareDenyNone);
 
-  // GetTempDir: refer to unix\simpleipc.inc (TPipeClientComm)
-  // Requires for patch for issue #39690
-  if acFindFileFirst(GetTempDir(FCore.SystemGlobal), [ffoFile], LInfo) then
-  try
-    repeat
-      if LInfo.FileName.StartsWith(Prefix) and (LInfo.FileName <> LName) then
-      try
-        LClient := TIPCClient.Create(LInfo.FileName);
-        LClient.Send(HelloCmd, LName);
+  // Connect to already running companion servers
+  for I := Low(ACompanionAppIds) to High(ACompanionAppIds) do
+  begin
+    if ACompanionAppIds[I] <> AAppId then
+    begin
+      LClient := TIPCClient.Create(ACompanionAppIds[I]);
+      if LClient.Send(HelloCmd, AAppId, 0) = irSucceeded then
         TACLIPCHub.FClients.Add(LClient);
-      except
-        // do nothing
-      end;
-    until not acFindFileNext(LInfo);
-  finally
-    acFindFileClose(LInfo);
+    end;
   end;
 
-  FIdle := TACLTimer.Create(nil);
-  FIdle.OnTimer := HandlerPoolMessage;
-  FIdle.Enabled := True;
+  // Start the processor
+  FIdle := TACLTimer.CreateEx(HandlerPollMessage, 100).Start;
 end;
 
 destructor TIPCServer.Destroy;
 begin
   FreeAndNil(FIdle);
-  Safe.Call(FCore.StopServer);
-  Safe.Call(FCore.Free);
+  FreeAndNil(FFileStream);
+  if not DeleteFile(FFileName) then
+    LogEntry(acGeneralLogFileName, 'IPC', 'failed to remove pipe %s', [FFileName]);
   inherited Destroy;
 end;
 
-procedure TIPCServer.HandlerMessage(Sender: TObject);
-var
-  LCmd: Cardinal;
-  LMsg: string;
+class function TIPCServer.GetServerFileName(const AAppId: string): string;
 begin
+  Result := GetTempDir(False) + 'ipc_' + acValidateFileName(AAppId, '-');
+end;
+
+procedure TIPCServer.HandlerPollMessage(Sender: TObject);
+// Timeout values:
+//   >  0  -- Number of milliseconds to wait
+//   =  0  -- return immediately
+//   = -1  -- wait infinitely
+const
+  TimeOut = 1;
+var
+  FDS: TFDSet;
+  LCommand: Integer;
+  LMessage: string;
+begin
+  fpfd_zero(FDS);
+  fpfd_set(FFileStream.Handle, FDS);
+  if fpSelect(FFileStream.Handle + 1, @FDS, nil, nil, TimeOut) > 0 then
   try
-    LCmd := Cardinal(FCore.Message.MsgType);
-    LMsg := FCore.Message.StringMessage;
-    if LCmd = HelloCmd then
-      TACLIPCHub.FClients.Add(TIPCClient.Create(LMsg))
+    LCommand := FFileStream.ReadInt32;
+    LMessage := FFileStream.ReadStringA(FFileStream.ReadInt32);
+    if LCommand = HelloCmd then
+      TACLIPCHub.FClients.Add(TIPCClient.Create(LMessage))
     else
-      TACLIPCHub.Receive(LCmd, LMsg);
+      TACLIPCHub.Receive(LCommand, LMessage);
   except
     // do nothing
   end;
 end;
 
-procedure TIPCServer.HandlerPoolMessage(Sender: TObject);
-begin
-  FCore.PeekMessage(1, True);
-end;
-
-class function TIPCServer.TryConnect(const AServerName: string): IACLIPCClient;
+class function TIPCServer.TryConnect(const AAppId: string): IACLIPCClient;
 var
   LClient: TIPCClient;
 begin
   Result := nil;
   try
-    LClient := TIPCClient.Create(Prefix + AServerName);
-    if LClient.IsServerRunning then
+    LClient := TIPCClient.Create(AAppId);
+    if LClient.Connect then
       Result := LClient
     else
       LClient.Free;
@@ -176,7 +205,7 @@ begin
     // delete the named pipe since it's abandoned
     FpUnlink(PChar(FSysPath));
   end;
-  if fpmkFifo(FSysPath, 438) = 0 then // create the named pipe
+  if fpmkFifo(FSysPath, &666) = 0 then // create the named pipe
     FHandle := FileOpen(FSysPath, fmOpenReadWrite or fmShareDenyNone);
 end;
 
