@@ -3819,8 +3819,9 @@ begin
       FBlocks.Rebase(LOldBase, PChar(FText));
       if LOffset <> 0 then
       begin
+        LOldBase := PChar(FText);
         for I := LStartIndex to FBlocks.Count - 1 do
-          Inc(FBlocks.List[I].FPositionInText, LOffset);
+          FBlocks.List[I].Rebase(LOldBase, LOldBase + LOffset); // тут могут быть Spanы
       end;
       // Вставка новых блоков
       for I := 0 to LNewBlocks.Count - 1 do
