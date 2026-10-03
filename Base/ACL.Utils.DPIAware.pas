@@ -6,7 +6,7 @@
 //  Purpose:   DpiAware utilities
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2024
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -49,7 +49,9 @@ const
   acMinDpi = 48; // don't forget to change cMinVCLPPIValue (Vcl.Forms)
   acMaxDpi = 480;
 
-  acDefaultDpiValues: array[0..7] of Integer = (96, 120, 144, 168, 192, 216, 240, 288);
+  acDefaultDpiValues: array[0..7] of Integer = (
+    96, 120, 144, 168, 192, 216, 240, 288
+  );
 
 type
 
@@ -63,17 +65,16 @@ type
 var
   FSystemDpiCache: Integer = 0; // for internal use
 
-function acCheckDpiValue(AValue: Integer): Integer; inline; deprecated 'use EnsureRange directly';
 function acGetCurrentDpi(AObject: TObject): Integer; inline;
 function acGetSystemDpi: Integer;
-function acTryGetCurrentDpi(AObject: TObject): Integer; // returns 0 if failed
-
-// Fonts
-function acGetFontHeight(AFontSize: Integer; ATargetDpi: Integer = acDefaultDpi): Integer;
+function acGetSystemDpiMax: Integer;
 function acGetTargetDPI(const APoint: TPoint): Integer; overload;
 {$IFDEF USE_VCL}
 function acGetTargetDPI(const AControl: TWinControl): Integer; overload;
 {$ENDIF}
+function acTryGetCurrentDpi(AObject: TObject): Integer; // returns 0 if failed
+
+function acGetFontHeight(AFontSize: Integer; ATargetDpi: Integer = acDefaultDpi): Integer;
 
 function dpiApply(const AValue: Integer; ATargetDpi: Integer): Integer; overload;
 function dpiApply(const AValue: TPoint; ATargetDpi: Integer): TPoint; overload;
@@ -105,11 +106,6 @@ type
 function gdk_screen_get_default: Pointer; cdecl; external gdklib;
 function gdk_screen_get_resolution(screen: Pointer): Double; cdecl; external gdklib;
 {$ENDIF}
-
-function acCheckDpiValue(AValue: Integer): Integer;
-begin
-  Result := EnsureRange(AValue, acMinDpi, acMaxDpi);
-end;
 
 function acGetCurrentDpi(AObject: TObject): Integer;
 begin
@@ -191,6 +187,19 @@ begin
     end;
   end;
   Result := FSystemDpiCache;
+end;
+
+function acGetSystemDpiMax: Integer;
+begin
+{$IF DEFINED(USE_VCL)}
+  Result := Screen.WorkAreaHeight;
+{$ELSE}
+  var LRect := TRect.Empty;
+  SystemParametersInfo(SPI_GETWORKAREA, 0, LRect, 0);
+  Result := LRect.Height;
+{$ENDIF}
+  Result := Ceil(100{%} * (Result / 600{px}) / 25{%}) * 25{%};
+  Result := EnsureRange(Result, acMinDpi, acMaxDpi);
 end;
 
 function acTryGetCurrentDpi(AObject: TObject): Integer;
