@@ -193,7 +193,7 @@ type
 {$ENDREGION}
 
   TShellDesktopEnvironment = (sdeUnknown, sdeWindows,
-    sdeCinnamon, sdeGnome, sdeKDE, sdeMate, sdeXFCE);
+    sdeCinnamon, sdeGnome, sdeKDE, sdeMate, sdeFly, sdeXFCE);
   TShellPowerState = set of (psKeepPowerOn, psKeepScreenOn);
   TShellShutdownMode = (sdPowerOff, sdLogOff, sdHibernate, sdSleep, sdReboot);
 
@@ -393,6 +393,8 @@ begin
     Exit(sdeXFCE);
   if acContains('mate', DesktopEnv) then
     Exit(sdeMate);
+  if acSameText('fly', DesktopEnv) then
+    Exit(sdeFly);
   Result := sdeUnknown;
 {$ENDIF}
 end;
