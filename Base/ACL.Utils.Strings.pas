@@ -398,8 +398,9 @@ type
     ColChar = 33;
     RArrayL = UnicodeString('абвгдеёжзийклмнопрстуфхцчшщьыъэюя');
     Translit: array[1..ColChar] of UnicodeString = (
-      'a', 'b', 'v', 'g', 'd', 'e', 'yo', 'zh', 'z', 'i', 'i''', 'k', 'l', 'm', 'n', 'o', 'p', 'r', 's', 't', 'u',
-      'f', 'h', 'ts', 'ch', 'sh', 'sch', #39, 'y', #39, 'e', 'yu', 'ya'
+      'a', 'b', 'v', 'g', 'd', 'e', 'yo', 'zh', 'z', 'i', 'i''', 'k', 'l', 'm',
+      'n', 'o', 'p', 'r', 's', 't', 'u', 'f', 'h', 'ts', 'ch', 'sh', 'sch', #39,
+      'y', #39, 'e', 'yu', 'ya'
     );
   public
   {$IFNDEF UNICODE}
@@ -445,7 +446,7 @@ type
   {$SCOPEDENUMS OFF}
 
 var
-  DefaultCodePage: Integer = CP_ACP;
+  DefaultCodePage: Cardinal = CP_ACP;
 
   acLangSizeSuffixB: string = 'B';
   acLangSizeSuffixKB: string = 'KB';
@@ -845,9 +846,28 @@ begin
     Result := IntToStr(ATrack);
 end;
 
-// ---------------------------------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // Text Conversions
-// ---------------------------------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
+
+function acGetActualCodePage(ACodePage: Integer): Integer;
+begin
+  if ACodePage < 0 then
+    ACodePage := DefaultCodePage;
+{$IFDEF MSWINDOWS}
+  if ACodePage = CP_ACP then
+  begin
+    ACodePage := GetACP;
+    // В случае CP_ACP, программа ожидает single-byte кодировку на основе локали системы,
+    // одноко Windows 11 может вернуть UTF8, если включена соответствующая опция.
+    // В этом случае у нас ломается чтение тегов, т.к. штатный MultiByteToWideChar
+    // в случае невалидной последовательности UTF8 выдаёт ерунду.
+    if (ACodePage = CP_UTF7) or (ACodePage = CP_UTF8) then // since Win11
+      ACodePage := 1250;
+  end;
+{$ENDIF}
+  Result := ACodePage;
+end;
 
 function acAString(const S: string): AnsiString;
 begin
@@ -897,15 +917,11 @@ end;
 
 function acStringFromAnsiString(const S: AnsiString; CodePage: Integer = -1): string;
 begin
-  if CodePage < 0 then
-    CodePage := DefaultCodePage;
   Result := acString(acUStringFromAnsiString(S, CodePage));
 end;
 
 function acStringToAnsiString(const S: string; CodePage: Integer = -1): AnsiString;
 begin
-  if CodePage < 0 then
-    CodePage := DefaultCodePage;
   Result := acUStringToAnsiString(acUString(S), CodePage);
 end;
 
@@ -925,7 +941,6 @@ function acUStringToAnsiString(const S: UnicodeString; CodePage: Integer): AnsiS
 var
   LData: TBytes;
 begin
-  if CodePage < 0 then CodePage := DefaultCodePage;
   LData := TACLEncodings.Get(CodePage).GetBytes(S);
   Result := acMakeString(PAnsiChar(@LData[0]), Length(LData));
 {$ELSE}
@@ -933,7 +948,7 @@ var
   LLen: Integer;
   LTmp: PWideChar;
 begin
-  if CodePage < 0 then CodePage := DefaultCodePage;
+  CodePage := acGetActualCodePage(CodePage);
   LTmp := PWideChar(S);
   LLen := LocaleCharsFromUnicode(CodePage, 0, LTmp, Length(S), nil, 0, nil, nil);
   SetLength(Result, LLen);
@@ -969,7 +984,7 @@ begin
 {$IFDEF FPC}
   Result := PWideChar(acUStringFromAnsiString(PAnsiChar(@S), 1, DefaultCodePage))^;
 {$ELSE}
-  UnicodeFromLocaleChars(DefaultCodePage, 0, @S, 1, @Result, 1);
+  UnicodeFromLocaleChars(acGetActualCodePage(DefaultCodePage), 0, @S, 1, @Result, 1);
 {$ENDIF}
 end;
 
@@ -988,6 +1003,7 @@ begin
 var
   LLen: Integer;
 begin
+  CodePage := acGetActualCodePage(CodePage);
   LLen := UnicodeFromLocaleChars(CodePage, 0, S, Length, nil, 0);
   SetLength(Result, LLen);
   UnicodeFromLocaleChars(CodePage, 0, S, Length, PWideChar(Result), LLen);
@@ -2636,7 +2652,7 @@ var
   LCodePageInfo: TCPInfoEx;
 begin
   LCodePage := StrToIntDef(lpCodePageString, -1);
-  if (LCodePage > 0) and GetCPInfoEx(LCodePage, 0, LCodePageInfo) then
+  if (LCodePage > 0) and GetCPInfoEx(LCodePage, 0, LCodePageInfo) and (LCodePageInfo.MaxCharSize = 1) then
     TACLStringList(FCodePages).Add(LCodePageInfo.CodePageName, LCodePage);
   Result := 1;
 end;
@@ -2675,6 +2691,8 @@ class function TACLEncodings.Get(const CodePage: Integer): TEncoding;
 var
   LMap: TACLDictionary<Integer, TEncoding>;
 begin
+  if CodePage < 0 then
+    Exit(Get(DefaultCodePage));
   if CodePage = CP_ACP then
     Exit(SingleByteDefault); // fetched from String-to-AnsiString conversion functions
 
@@ -2719,10 +2737,7 @@ end;
 
 class function TACLEncodings.Default: TEncoding;
 begin
-//  if DefaultCodePage > CP_ACP then
-    Result := Get(DefaultCodePage)
-//  else
-//    Result := SingleByteDefault;
+  Result := Get(DefaultCodePage);
 end;
 
 class function TACLEncodings.SingleByteDefault: TEncoding;
