@@ -238,8 +238,6 @@ function WaitForSyncObject(AHandle: TObjHandle; ATimeOut: Cardinal): TWaitResult
 procedure CallThreadMethod(AMethod: TThreadMethod; ACallInMainThread: Boolean); overload;
 procedure CallThreadMethod(AMethod: TThreadMethod; AMode: TACLThreadMethodCallMode); overload;
 
-procedure RunInMainThread(AProc: TProc; AWaitFor: Boolean = True); overload; inline;
-procedure RunInMainThread(AProc: TThreadMethod; AWaitFor: Boolean = True); overload; inline;
 procedure RunInThread(Func: TThreadStartRoutine; Context: Pointer);
 implementation
 
@@ -343,18 +341,8 @@ begin
     if AMode = tmcmAsync then
       AMethod
     else
-      RunInMainThread(AMethod, AMode = tmcmSync);
+      TACLMainThread.Run(AMethod, AMode = tmcmSync);
   end;
-end;
-
-procedure RunInMainThread(AProc: TProc; AWaitFor: Boolean = True);
-begin
-  TACLMainThread.Run(AProc, AWaitFor);
-end;
-
-procedure RunInMainThread(AProc: TThreadMethod; AWaitFor: Boolean = True);
-begin
-  TACLMainThread.Run(AProc, AWaitFor);
 end;
 
 procedure RunInThread(Func: TThreadStartRoutine; Context: Pointer);
@@ -721,12 +709,12 @@ end;
 
 procedure TACLThread.Synchronize(AProc: TThreadMethod);
 begin
-  RunInMainThread(AProc);
+  TACLMainThread.RunNow(AProc);
 end;
 
 procedure TACLThread.Synchronize(AProc: TProc);
 begin
-  RunInMainThread(AProc);
+  TACLMainThread.RunNow(AProc);
 end;
 
 class function TACLThread.Timestamp: Cardinal;

@@ -937,7 +937,7 @@ end;
 procedure TACLHttpRequestTask.CallEvent(AProc: TProc; ASync: Boolean);
 begin
   if ASync then
-    RunInMainThread(AProc)
+    TACLMainThread.RunNow(AProc)
   else
     AProc();
 end;

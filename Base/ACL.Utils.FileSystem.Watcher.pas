@@ -577,7 +577,7 @@ end;
 procedure TACLFileSystemWatcherCustomTask.Changed;
 begin
   if FLockCount = 0 then
-    RunInMainThread(SafeChanged);
+    TACLMainThread.RunNow(SafeChanged);
 end;
 
 function TACLFileSystemWatcherCustomTask.GetChanges: TACLFileSystemChanges;

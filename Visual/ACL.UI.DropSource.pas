@@ -480,18 +480,18 @@ begin
     if not IsMainThread then
       TACLThread.NameThreadForDebugging('DropSourceThread');
   {$ENDIF}
-    RunInMainThread(DoStart);
+    TACLMainThread.RunNow(DoStart);
     try
       Safe.Call(ExecuteImpl);
     finally
-      RunInMainThread(DoFinish);
+      TACLMainThread.RunNow(DoFinish);
     end;
   finally
     InterlockedDecrement(FActiveInstances);
     if IsMainThread or not (csFreeNotification in ComponentState) then
       Free
     else
-      RunInMainThread(Free, False);
+      TACLMainThread.RunPostponed(Free);
   end;
 end;
 {$ENDREGION}
