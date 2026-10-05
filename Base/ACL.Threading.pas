@@ -760,6 +760,7 @@ end;
 function TACLThread.WaitFor(ATimeOut: LongWord): Boolean;
 {$IFNDEF MSWINDOWS}
 var
+  LIsMainThread: Boolean;
   LTimestamp: LongWord;
 {$ENDIF}
 begin
@@ -768,9 +769,14 @@ begin
   {$IFDEF MSWINDOWS}
     WaitForSyncObject(Handle, ATimeOut);
   {$ELSE}
-    LTimestamp := TACLThread.Timestamp;
+    LTimestamp := Timestamp;
+    LIsMainThread := IsMainThread;
     while not (Finished or IsTimeoutEx(LTimestamp, ATimeOut)) do
+    begin
+      if LIsMainThread then
+        TACLMainThread.CheckSynchronize;
       Sleep(10);
+    end;
   {$ENDIF}
   end;
   Result := Finished;

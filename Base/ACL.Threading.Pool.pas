@@ -649,7 +649,7 @@ begin
     Result := wrAbandoned;
 
   if IsMainThread then
-    CheckSynchronize;
+    TACLMainThread.CheckSynchronize;
 end;
 
 class function TACLTaskDispatcher.CurrentTask: TACLTask;
