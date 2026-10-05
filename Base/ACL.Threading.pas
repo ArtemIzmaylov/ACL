@@ -219,8 +219,8 @@ type
     class procedure CheckSynchronize;
     class procedure Run(AProc: TProc; AWaitFor: Boolean; AReceiver: Pointer = nil); overload;
     class procedure Run(AProc: TThreadMethod; AWaitFor: Boolean; AReceiver: Pointer = nil); overload;
-    class procedure RunImmediately(AProc: TProc); overload;
-    class procedure RunImmediately(AProc: TThreadMethod); overload;
+    class procedure RunNow(AProc: TProc); overload;
+    class procedure RunNow(AProc: TThreadMethod); overload;
     class procedure RunPostponed(AProc: TProc; AReceiver: Pointer = nil); overload;
     class procedure RunPostponed(AProc: TThreadMethod; AReceiver: Pointer = nil); overload;
     class procedure Unsubscribe(AProc: TThreadMethod); overload;
@@ -1083,12 +1083,12 @@ begin
   end;
 end;
 
-class procedure TACLMainThread.RunImmediately(AProc: TThreadMethod);
+class procedure TACLMainThread.RunNow(AProc: TThreadMethod);
 begin
   Run(AProc, True);
 end;
 
-class procedure TACLMainThread.RunImmediately(AProc: TProc);
+class procedure TACLMainThread.RunNow(AProc: TProc);
 begin
   Run(AProc, True);
 end;

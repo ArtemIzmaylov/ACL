@@ -978,7 +978,7 @@ begin
     LReturn := 0;
     if DeviceIoControl(LHandle, IOCTL_STORAGE_CHECK_VERIFY2, nil, 0, nil, 0, LReturn, nil) then
     begin
-      TACLMainThread.RunImmediately(
+      TACLMainThread.RunNow(
         procedure
         begin
           TACLDriveManager.Changed(FDrive, True);
