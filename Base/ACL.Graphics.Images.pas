@@ -1282,6 +1282,7 @@ begin
   try
     LGraphic.LoadFromStream(AStream);
     AImage.LoadFromGraphic(LGraphic);
+    AImage.FFormat := Self;
   finally
     LGraphic.Free;
   end;
