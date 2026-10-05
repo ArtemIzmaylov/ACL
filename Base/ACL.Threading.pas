@@ -119,6 +119,7 @@ type
 
   TACLThread = class(TThread, IUnknown)
   protected
+    procedure Execute; override;
     procedure Synchronize(AProc: TProc); overload;
     procedure Synchronize(AProc: TThreadMethod); overload;
     // IUnknown
@@ -127,6 +128,7 @@ type
     function QueryInterface({$IFDEF FPC}constref{$ELSE}const{$ENDIF}
       IID: TGUID; out Obj): HRESULT; {$IFDEF MSWINDOWS}stdcall{$ELSE}cdecl{$ENDIF};
   public
+    destructor Destroy; override;
     procedure BeforeDestruction; override;
     procedure Free(AWaitForTimeOut: LongWord); overload;
     procedure Kill;
@@ -584,6 +586,21 @@ end;
 
 { TACLThread }
 
+destructor TACLThread.Destroy;
+begin
+{$IFDEF ACL_THREADING_DEBUG_DEADLOCKS}
+  TACLMainThread.CheckForDeadlock(Handle);
+{$ENDIF}
+  inherited Destroy;
+end;
+
+procedure TACLThread.Execute;
+begin
+{$IFDEF ACL_THREADING_DEBUG}
+  NameThreadForDebugging(ClassName);
+{$ENDIF}
+end;
+
 procedure TACLThread.BeforeDestruction;
 begin
   inherited;
@@ -703,7 +720,8 @@ begin
       CloseHandle(LHandle);
     end;
   end;
-  TThread.NameThreadForDebugging(AName);
+  if IsDebuggerPresent then
+    TThread.NameThreadForDebugging(AName);
 end;
 {$ENDIF}
 
@@ -1050,9 +1068,9 @@ begin
   else
   begin
     FQueue.Add(ARecord);
-    // Unlike the WaitFor condition, here we prefer for system's postpone mechanism. 
+    // Unlike the WaitFor condition, here we prefer for system's postpone mechanism.
     // This way, we can avoid deadlocks between postponed methods and UI synchronization from other threads
-    if FWnd <> 0 then    
+    if FWnd <> 0 then
       acPostMessage(FWnd, FWndMessage, 0, 0)
     else
     {$IFDEF ACL_THREADING_DEBUG_DEADLOCKS}
@@ -1190,8 +1208,8 @@ initialization
   IsMultiThread := True;
   // Linux: main thread name will be displayed in the Top utility output
 {$IF DEFINED(MSWINDOWS) AND DEFINED(ACL_THREADING_DEBUG)}
-  TACLThread.NameThreadForDebugging('Main');
   FGetThreadDescription := GetProcAddress(GetModuleHandle(kernel32), 'GetThreadDescription');
   FSetThreadDescription := GetProcAddress(GetModuleHandle(kernel32), 'SetThreadDescription');
+  TACLThread.NameThreadForDebugging('Main');
 {$ENDIF}
 end.

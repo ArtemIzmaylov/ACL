@@ -585,10 +585,7 @@ var
   LNextTick: Int64;
   LTicked: Boolean;
 begin
-{$IFDEF ACL_THREADING_DEBUG}
-  NameThreadForDebugging('HighResolutionTimers');
-{$ENDIF}
-
+  inherited;
   while not Terminated do
   begin
     LTicked := False;

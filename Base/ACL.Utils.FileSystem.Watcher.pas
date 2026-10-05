@@ -369,6 +369,7 @@ var
   ACode: Integer;
   AIndex: Integer;
 begin
+  inherited;
   while not Terminated do
   begin
     ACode := WaitForMultipleObjects(FHandleCount, @FHandles[0], False, INFINITE);
