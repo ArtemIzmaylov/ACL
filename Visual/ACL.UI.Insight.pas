@@ -168,7 +168,7 @@ type
   strict private const
     HideDelay = 1000; // msec
   strict private
-    FTimestamp: Cardinal;
+    FTimestamp: TACLTimestamp;
     procedure CMCancelMode(var Msg: TMessage); message CM_CANCELMODE;
     procedure CMShowingChanged(var Msg: TMessage); message CM_SHOWINGCHANGED;
     procedure WMGetDlgCode(var Message: TWMGetDlgCode); message WM_GETDLGCODE;

@@ -118,7 +118,7 @@ function SendDataToIPC(const AIpcServerName: string;
   ACmd: Cardinal; const AData: string; ATimeOut: Integer): Boolean;
 var
   LClient: IACLIPCClient;
-  LTimestamp: LongWord;
+  LTimestamp: TACLTimestamp;
 begin
   Result := False;
   try

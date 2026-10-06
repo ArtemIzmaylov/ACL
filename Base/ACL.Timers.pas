@@ -351,15 +351,13 @@ begin
   if (FPerformanceCounterFrequency > 0) and QueryPerformanceCounter(Result) then
     Result := (Result * 1000) div FPerformanceCounterFrequency
   else
-    Result := GetTickCount;
-{$ELSE}
-  Result := GetTickCount64; // in milliseconds
 {$ENDIF}
+    Result := TACLThread.Timestamp;
 end;
 
 class procedure TACLTimerManager.ForceUpdate(ATimer: TACLTimer);
 begin
-  TimerProc(0, 0, ATimer.FId, TACLThread.Timestamp);
+  TimerProc(0, 0, ATimer.FId, LongWord(TACLThread.Timestamp));
 end;
 
 class procedure TACLTimerManager.ForceUpdate(ATimerClass: TACLTimerClass);
@@ -556,7 +554,7 @@ begin
     if Message.Msg = WM_NULL then
       ExecuteTickedTimers
     else if Message.Msg = WM_TIMER then
-      TimerProc(FHandle, WM_TIMER, Message.WParam, TACLThread.Timestamp)
+      TimerProc(FHandle, WM_TIMER, Message.WParam, LongWord(TACLThread.Timestamp))
     else
       acWndDefaultProc(FHandle, Message);
   except

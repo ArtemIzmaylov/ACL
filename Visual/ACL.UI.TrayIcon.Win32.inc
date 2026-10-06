@@ -16,7 +16,7 @@ type
   strict private
     FHandle: HWND;
     FIconData: TNotifyIconData;
-    FTimestamp: Cardinal;
+    FTimestamp: TACLTimestamp;
     function Build: PNotifyIconDataW;
     procedure CMMouseEnter(var Message: TMessage); message CM_MOUSEENTER;
     procedure CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;

@@ -735,7 +735,7 @@ type
     FHoveredObjectPart: NativeInt;
     FLastClickCount: Integer;
     FLastClickPoint: TPoint;
-    FLastClickTimestamp: Cardinal;
+    FLastClickTimestamp: TACLTimestamp;
     FLockCount: Integer;
     FLongOperationCount: Integer;
     FPressedObject: TObject;

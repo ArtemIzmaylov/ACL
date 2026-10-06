@@ -30,7 +30,7 @@ uses
   LCLIntf,
   LCLType,
 {$ELSE}
-  Winapi.Windows,
+  Windows,
 {$ENDIF}
   {Winapi.}Messages,
   // System
@@ -117,6 +117,8 @@ type
 
   { TACLThread }
 
+  TACLTimestamp = LongWord;
+
   TACLThread = class(TThread, IUnknown)
   protected
     procedure Execute; override;
@@ -145,14 +147,14 @@ type
     ///    Returns True if after AStartTime the specified ATimeout is passed.
     ///    If ATimeout = 0 or ATimeout = INFINITY - function always returns False.
     /// </summary>
-    class function IsTimeout(AStartTime, ATimeOut: Cardinal): Boolean; static;
+    class function IsTimeout(AStartTime: TACLTimestamp; ATimeOut: Cardinal): Boolean; static;
     /// <summary>
     ///    Returns True if after ATimestamp the specified ATimeout is passed.
     ///    If ATimeout = 0 or ATimeout = INFINITY - function always returns False.
     ///    If ATimeout is passed the ATimestamp will be updated to current timestamp
     /// </summary>
-    class function IsTimeoutEx(var ATimestamp: Cardinal; ATimeOut: Cardinal): Boolean; static;
-    class function Timestamp: Cardinal;
+    class function IsTimeoutEx(var ATimestamp: TACLTimestamp; ATimeOut: Cardinal): Boolean; static;
+    class function Timestamp: TACLTimestamp;
   end;
 
   { TACLPauseableThread }
@@ -284,7 +286,7 @@ const
 var
   AHandles: array[0..1] of TObjHandle;
   AMsg: TMsg;
-  AStartWaitTime: Cardinal;
+  AStartWaitTime: TACLTimestamp;
   AWaitResult: Cardinal;
 begin
   Result := wrError;
@@ -297,7 +299,7 @@ begin
 
     AHandles[0] := AHandle;
     AHandles[1] := SyncEvent;
-    AStartWaitTime := TACLThread.GetTickCount;
+    AStartWaitTime := TACLThread.Timestamp;
     while ATimeOut > 0 do
     begin
       AWaitResult := MsgWaitForMultipleObjects(2, AHandles, False, Min(MaxWaitTime, ATimeOut), QS_SENDMESSAGE);
@@ -487,7 +489,7 @@ end;
 
 function TACLCriticalSection.TryEnter(ATimeOut: LongWord): Boolean;
 var
-  LTimestamp: LongWord;
+  LTimestamp: TACLTimestamp;
 begin
   LTimestamp := TACLThread.Timestamp;
   while True do
@@ -536,7 +538,7 @@ end;
 const
   MaxWaitTime = 100;
 var
-  LStartWaitTime: Cardinal;
+  LStartWaitTime: TACLTimestamp;
 begin
   if IsMainThread then
   begin
@@ -668,22 +670,26 @@ begin
   Result := IntToStr(AThreadId);
 end;
 
-class function TACLThread.IsTimeout(AStartTime, ATimeOut: Cardinal): Boolean;
+class function TACLThread.IsTimeout(
+  AStartTime: TACLTimestamp; ATimeOut: Cardinal): Boolean;
 begin
   Result := IsTimeoutEx(AStartTime, ATimeOut);
 end;
 
-class function TACLThread.IsTimeoutEx(var ATimestamp: Cardinal; ATimeOut: Cardinal): Boolean;
+class function TACLThread.IsTimeoutEx(
+  var ATimestamp: TACLTimestamp; ATimeOut: Cardinal): Boolean;
 var
-  LNow: Cardinal;
+  LNow: TACLTimestamp;
 begin
   if (ATimeOut = 0) or (ATimeOut = INFINITE) then
     Exit(False);
 
   LNow := Timestamp;
+{$IF SizeOf(TACLTimestamp) = 4}
   if LNow < ATimestamp then
     Result := High(Cardinal) - ATimestamp + LNow >= ATimeOut
   else
+{$ENDIF}
     Result := LNow - ATimestamp >= Cardinal(ATimeOut);
 
   if Result then
@@ -735,9 +741,15 @@ begin
   TACLMainThread.RunNow(AProc);
 end;
 
-class function TACLThread.Timestamp: Cardinal;
+class function TACLThread.Timestamp: TACLTimestamp;
 begin
-  Result := GetTickCount{%H-};
+{$IFDEF FPC}
+  Result := TACLTimestamp(SysUtils.GetTickCount64);
+{$ELSE}
+  // Delphi has fallback for GetTickCount64 for Windows XP
+  //Result := TACLTimestamp(Windows.GetTickCount64);
+  Result := TACLTimestamp(TThread.GetTickCount64);
+{$ENDIF}
 end;
 
 procedure TACLThread.Terminate;
@@ -761,7 +773,7 @@ function TACLThread.WaitFor(ATimeOut: LongWord): Boolean;
 {$IFNDEF MSWINDOWS}
 var
   LIsMainThread: Boolean;
-  LTimestamp: LongWord;
+  LTimestamp: TACLTimestamp;
 {$ENDIF}
 begin
   if not Finished then

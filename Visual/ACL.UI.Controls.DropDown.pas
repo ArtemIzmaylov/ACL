@@ -62,7 +62,7 @@ type
     FDropDownAlignment: TAlignment;
     FDropDownButton: TACLButtonSubClass;
     FDropDownButtonVisible: Boolean;
-    FDropDownClosedAt: Cardinal;
+    FDropDownClosedAt: TACLTimestamp;
     FDropDownWindow: TACLPopupWindow;
 
     FOnDropDown: TNotifyEvent;

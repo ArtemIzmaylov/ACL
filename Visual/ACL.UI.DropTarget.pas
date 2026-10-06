@@ -111,7 +111,7 @@ type
   strict private
     FHook: IACLDropTargetHook;
     FOptions: TACLDropTargetOptions;
-    FScrollTimestamp: Cardinal;
+    FScrollTimestamp: TACLTimestamp;
     FTarget: TWinControl;
     FTargetIsActive: Boolean;
 

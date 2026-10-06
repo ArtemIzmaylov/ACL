@@ -78,7 +78,7 @@ type
     FDelayShow: Cardinal;
     FDelayTimer: TACLTimer;
     FEnabledControls: TList;
-    FLastUpdateTime: Cardinal;
+    FLastUpdateTime: TACLTimestamp;
     FOptions: TACLProgressBoxOptions;
     FProgress: TACLProgressBar;
     FProgressActive: Boolean;

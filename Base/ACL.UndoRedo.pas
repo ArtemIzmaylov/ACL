@@ -23,7 +23,8 @@ uses
   SysUtils,
   // ACL
   ACL.Classes.Collections,
-  ACL.Math;
+  ACL.Math,
+  ACL.Threading;
 
 type
 
@@ -57,7 +58,7 @@ type
 
   TACLHistoryAction = class
   private
-    FTimestamp: Cardinal;
+    FTimestamp: TACLTimestamp;
   protected
     FCommands: TACLObjectListOf<TACLHistoryCommand>;
     FName: string;
@@ -167,7 +168,6 @@ implementation
 
 uses
   ACL.Classes,
-  ACL.Threading,
   ACL.Utils.Common,
   ACL.Utils.Strings;
 
@@ -347,7 +347,7 @@ end;
 procedure TACLCustomHistoryManager.Run(ACommand: TACLHistoryCommand);
 var
   LAction: TACLHistoryAction;
-  LTimestamp: Cardinal;
+  LTimestamp: TACLTimestamp;
 begin
   if FInProcess then
   begin
