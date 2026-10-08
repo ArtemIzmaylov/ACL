@@ -148,11 +148,12 @@ type
 
   TACLProcess = class
   strict private
-  {$IFDEF LINUX}
+  {$IF DEFINED(LINUX) AND NOT DEFINED(LCLGtk3)}
     class procedure ChildSignalHandler(signal: longint;
       info: psiginfo; context: psigcontext); cdecl; static;
   {$ENDIF}
   public
+    class constructor Create;
     class function Execute(const ACmdLine: string; ALog: TACLStringEnumMethod;
       AOptions: TExecuteOptions = [eoShowGUI]): LongBool; overload;
     class function Execute(const ACmdLine: string;
@@ -889,6 +890,22 @@ end;
 
 { TACLProcess }
 
+class constructor TACLProcess.Create;
+{$IF DEFINED(LINUX) AND NOT DEFINED(LCLGtk3)}
+var
+  LChildSignal: SigActionRec;
+begin
+  // If parent process don't react on SIGCHLD signals and (or) don't call
+  // wait function then zombee process's quantity will multiply until the
+  // parent process's termination.
+  LChildSignal := Default(SigActionRec);
+  LChildSignal.sa_handler := ChildSignalHandler;
+  FPSigAction(SIGCHLD, @LChildSignal, nil);
+{$ELSE}
+begin
+{$ENDIF}
+end;
+
 class function TACLProcess.Execute(const ACmdLine: string;
   AOptions: TExecuteOptions = [eoShowGUI]; AOutputData: TStream = nil;
   AErrorData: TStream = nil; AExitCode: PCardinal = nil): LongBool;
@@ -1001,7 +1018,6 @@ const
   HangTimeout = 5000;
 var
   I: Integer;
-  LChildSignal: SigActionRec;
   LError: string;
   LErrorCapacity: Integer;
   LErrorLength: Integer;
@@ -1087,13 +1103,6 @@ begin
     end
     else
     begin
-      // If parent process don't react on SIGCHLD signals and (or) don't call
-      // wait function then zombee process's quantity will multiply until the
-      // parent process's termination.
-      LChildSignal := Default(SigActionRec);
-      LChildSignal.sa_handler := ChildSignalHandler;
-      FPSigAction(SIGCHLD, @LChildSignal, nil);
-
       LProcess.InheritHandles := False;
       LProcess.Options := [poDetached, poNewProcessGroup];
       LProcess.Execute;
@@ -1151,7 +1160,7 @@ begin
   end;
 end;
 
-{$IFDEF LINUX}
+{$IF DEFINED(LINUX) AND NOT DEFINED(LCLGtk3)}
 class procedure TACLProcess.ChildSignalHandler(
   signal: longint; info: psiginfo; context: psigcontext); cdecl;
 var
