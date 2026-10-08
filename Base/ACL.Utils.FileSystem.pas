@@ -262,7 +262,8 @@ type
 
   TACLTemporaryFileStream = class(TACLBufferedFileStream)
   public
-    constructor Create(const APrefix: string); reintroduce;
+    constructor Create(const APrefix: string;
+      ABufferSize: Integer = TACLBufferedStream.DefaultBufferSize); reintroduce;
     destructor Destroy; override;
   end;
 
@@ -2033,9 +2034,9 @@ end;
 
 { TACLTemporaryFileStream }
 
-constructor TACLTemporaryFileStream.Create(const APrefix: string);
+constructor TACLTemporaryFileStream.Create(const APrefix: string; ABufferSize: Integer);
 begin
-  inherited Create(acTempFileName(APrefix), fmCreate);
+  inherited Create(acTempFileName(APrefix), fmCreate, ABufferSize);
 end;
 
 destructor TACLTemporaryFileStream.Destroy;
