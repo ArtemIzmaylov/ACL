@@ -298,6 +298,7 @@ begin
   if Dlg <> nil then
   begin
     LogEntry(acGeneralLogFileName, 'Dialog', 'OnResponce(%d)', [Ord(Response)]);
+    TGtkApp.ActiveDialog := nil;
     case Response of
       GTK_RESPONSE_YES, GTK_RESPONSE_OK:
         Dlg.FModalResult := TACLBoolean.True;
