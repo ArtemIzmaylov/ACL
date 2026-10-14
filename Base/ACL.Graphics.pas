@@ -287,8 +287,8 @@ type
     destructor Destroy; override;
     //# Methods
     function Clone: TRegionHandle;
-    function Contains(const P: TPoint): Boolean; overload; inline;
-    function Contains(const R: TRect): Boolean; overload; inline;
+    function Contains(const P: TPoint): Boolean; overload;
+    function Contains(const R: TRect): Boolean; overload;
     procedure Combine(ARegion: TACLRegion;
       ACombineFunc: TACLRegionCombineFunc; AFreeRegion: Boolean = False); overload;
     procedure Combine(const R: TRect;

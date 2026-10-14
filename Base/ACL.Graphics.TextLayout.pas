@@ -6,7 +6,7 @@
 //  Purpose:   Formatted Text based on BB-codes
 //
 //  Author:    Artem Izmaylov
-//             © 2006-2025
+//             © 2006-2026
 //             www.aimp.ru
 //
 //  FPC:       OK
@@ -2121,7 +2121,9 @@ begin
     if RowIndex >= 0 then
     begin
       LRow := Owner.FRows.List[RowIndex];
-      if (LRow <> nil) and (FPosition >= LRow.LineEndPosition) then
+      if (LRow <> nil) and (
+        (FPosition = nil){end-ellipsis} or
+        (FPosition >= LRow.LineEndPosition)) then
       begin
         SetResult(Block, LRow.LineEndPosition, RowIndex);
         FPositionInLineEnd := True;
