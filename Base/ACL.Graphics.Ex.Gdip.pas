@@ -1418,14 +1418,26 @@ var
   LFamily: GpFontFamily;
   LHeight: Integer;
   LLogFont: TLogFontW;
+  LStyle: Integer;
 begin
   if FHandle <> nil then
   begin
     if GdipCreateFontFamilyFromName(PChar(AFont.Name), FHandle, LFamily) = Ok then
-    begin
+    try
       LHeight := -acResolveFontHeight(AFont, AFont.Height);
-      if GdipCreateFont(LFamily, LHeight, 0, Ord(UnitPixel), Result) = Ok then
+      LStyle := FontStyleRegular;
+      if fsBold in AFont.Style then
+        LStyle := LStyle or FontStyleBold;
+      if fsItalic in AFont.Style then
+        LStyle := LStyle or FontStyleItalic;
+      if fsUnderline in AFont.Style then
+        LStyle := LStyle or FontStyleUnderline;
+      if fsStrikeOut in AFont.Style then
+        LStyle := LStyle or FontStyleStrikeout;
+      if GdipCreateFont(LFamily, LHeight, LStyle, Ord(UnitPixel), Result) = Ok then
         Exit;
+    finally
+      GdipDeleteFontFamily(LFamily);
     end;
   end;
 
