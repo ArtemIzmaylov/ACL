@@ -1020,7 +1020,8 @@ begin
     // GdipCloneImage(Image.Handle,)
     Image := Image.Clone;
   end;
-  Result := TACLGdiplusRenderImage.Create(Self, Image.Handle, Usage <> suReference);
+  // The handle belongs to the Image, which disposes it (FOwnedData)
+  Result := TACLGdiplusRenderImage.Create(Self, Image.Handle, False);
   if Usage <> suReference then
     TACLGdiplusRenderImage(Result).FOwnedData := Image;
 end;
