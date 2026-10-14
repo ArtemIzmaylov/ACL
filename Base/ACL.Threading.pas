@@ -117,7 +117,7 @@ type
 
   { TACLThread }
 
-  TACLTimestamp = LongWord;
+  TACLTimestamp = UInt64;
 
   TACLThread = class(TThread, IUnknown)
   protected
