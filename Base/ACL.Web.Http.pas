@@ -93,7 +93,7 @@ type
       AOnProgress: THttpProgressProc = nil;
       AOnReceive: THttpDataProc = nil): THttpResponse; virtual; abstract;
   public
-    class function Open(const URL: TACLWebURL): THttpConnection;
+    class function Open(URL: TACLWebURL): THttpConnection;
     function Request(const AMethod: string;
       ARange: IACLWebRequestRange = nil;
       APostData: TStream = nil;
@@ -307,8 +307,9 @@ begin
   Result := InRange(StatusCode, 200, 299);
 end;
 
-class function THttpConnection.Open(const URL: TACLWebURL): THttpConnection;
+class function THttpConnection.Open(URL: TACLWebURL): THttpConnection;
 begin
+  URL.Host := acString(TACLPunycode.EncodeDomain(acUString(URL.Host)));
   Result := THttpConnectionImpl.Create(URL);
 end;
 

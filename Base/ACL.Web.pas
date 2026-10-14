@@ -34,7 +34,7 @@ type
 const
   acWebDefaultConnectionMode = ncmSystemDefaults;
   acWebTimeOutDefault = 5000;
-  acWebTimeOutMax = 30000;
+  acWebTimeOutMax = 60000;
   acWebTimeOutMin = 1000;
 
   acWebErrorUnknown     = -1;
@@ -162,6 +162,8 @@ type
 
 function acDecodeDateTime(const Value: string; AFormat: TACLDateTimeFormat): TDateTime;
 function acIsEmail(Text: PChar; TextLength: Integer): Boolean;
+function acUrlPunycodeDecode(const S: string): string;
+function acUrlPunycodeEncode(const S: string): string;
 implementation
 
 uses
@@ -332,6 +334,24 @@ begin
   if not InRange(LUserNameLen, 1, 63) then
     Exit(False);
   Result := True;
+end;
+
+function acUrlPunycodeDecode(const S: string): string;
+var
+  LUrl: TACLWebURL;
+begin
+  LUrl := TACLWebURL.Parse(S, '');
+  LUrl.Host := acString(TACLPunycode.DecodeDomain(acAString(LUrl.Host)));
+  Result := LUrl.ToString;
+end;
+
+function acUrlPunycodeEncode(const S: string): string;
+var
+  LUrl: TACLWebURL;
+begin
+  LUrl := TACLWebURL.Parse(S, '');
+  LUrl.Host := acString(TACLPunycode.EncodeDomain(acUString(LUrl.Host)));
+  Result := LUrl.ToString;
 end;
 
 { TACLWebURL }

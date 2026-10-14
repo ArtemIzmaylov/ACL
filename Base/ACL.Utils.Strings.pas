@@ -33,6 +33,7 @@ uses
   {System.}Classes,
   {System.}Generics.Collections,
   {System.}Math,
+  {System.}StrUtils,
   {System.}SysUtils,
   {System.}Types,
   System.UITypes,
@@ -4191,23 +4192,23 @@ end;
 
 class function TACLPunycode.DecodeDomain(const S: AnsiString): UnicodeString;
 var
-  AResult: UnicodeString;
+  LResult: UnicodeString;
 begin
-  AResult := '';
+  LResult := '';
   acSplitString(PAnsiChar(S), Length(S), '.',
     procedure (ACursorStart, ACursorFinish: PAnsiChar)
     var
       A: AnsiString;
     begin
       A := acMakeString(ACursorStart, ACursorFinish);
-      if AResult <> '' then
-        AResult := AResult + '.';
-      if {$IFDEF UNICODE}System.AnsiStrings.{$ENDIF}SameText(Copy(A, 1, 4), 'xn--') then
-        AResult := AResult + Decode(Copy(A, 5, MaxInt))
+      if LResult <> '' then
+        LResult := LResult + '.';
+      if {$IFDEF UNICODE}System.AnsiStrings.{$ENDIF}StartsStr('xn--', A) then
+        LResult := LResult + Decode(Copy(A, 5))
       else
-        AResult := AResult + UnicodeString(A);
+        LResult := LResult + UnicodeString(A);
     end);
-  Result := AResult;
+  Result := LResult;
 end;
 
 class function TACLPunycode.Encode(const S: UnicodeString): AnsiString;
