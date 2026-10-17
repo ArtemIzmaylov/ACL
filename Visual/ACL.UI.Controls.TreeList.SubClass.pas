@@ -6117,17 +6117,24 @@ begin
   case AKey of
     vkA: // A
       if [ssAlt, ssShift, ssCtrl] * AShift = [ssCtrl] then
+      begin
         SelectAll;
+        AKey := 0;
+      end;
 
     vkAdd: // Num +
       if ssCtrl in AShift then
       begin
         if not OptionsView.Columns.AutoWidth then
           Columns.ApplyBestFit;
+        AKey := 0;
       end;
 
     vkMultiply: // Num *
-      SelectInvert;
+      begin
+        SelectInvert;
+        AKey := 0;
+      end;
 
     vkShift:
       begin
@@ -6138,25 +6145,33 @@ begin
       end;
 
     vkSpace:
-      if not IncSearch.ProcessKey(AKey, AShift) then
-        ToggleCheckboxes;
+      begin
+        if not IncSearch.ProcessKey(AKey, AShift) then
+          ToggleCheckboxes;
+        AKey := 0;
+      end;
 
     vkDelete:
       if OptionsBehavior.Deleting then
+      begin
         DeleteSelected;
+        AKey := 0;
+      end;
 
     vkReturn, vkF2:
       if FocusedObject is TACLTreeListNode then
+      begin
         StartEditing(TACLTreeListNode(FocusedObject), FocusedColumn);
+        AKey := 0;
+      end;
 
     vkLeft:
       if CheckFocusedObject then
-      try
+      begin
         if OptionsSelection.FocusCell and GetPrevColumn(LColumn) then
           FocusedColumn := LColumn
         else if not TryExpand(FocusedObject, False) then
           NavigateTo(GetObjectParent(FocusedObject), AShift);
-      finally
         AKey := 0;
       end;
 
@@ -6215,7 +6230,8 @@ begin
       end;
 
   else
-    IncSearch.ProcessKey(AKey, AShift);
+    if IncSearch.ProcessKey(AKey, AShift) then
+      AKey := 0;
   end;
   inherited;
 end;
