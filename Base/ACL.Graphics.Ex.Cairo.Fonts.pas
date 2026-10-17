@@ -26,6 +26,7 @@ uses
 {$IF DEFINED(LCLGtk3)}
   Gtk3Int,
   LazGdk3,
+  LazHarfBuzz0,
 {$ELSEIF DEFINED(LCLGtk2)}
   Gtk2Proc,
 {$ENDIF}
@@ -55,7 +56,6 @@ uses
   ACL.Hashes,
   ACL.Graphics.Fonts,
   ACL.Threading,
-  ACL.Utils.Logger,
   ACL.Utils.Strings;
 
 const
@@ -71,9 +71,10 @@ type
     TextOffsets: array of Integer;
     TextReference: PAnsiChar;
     procedure Free;
-    // кластеры будут прибиты автоматически
+    procedure Init(AText: PAnsiChar; AGlyphCount: Integer); overload;
     procedure Init(AText: PAnsiChar; AGlyphCount: Integer;
-      AClusters: Pcairo_text_cluster_t; AClusterCount: Integer);
+      // кластеры будут прибиты автоматически
+      AClusters: Pcairo_text_cluster_t; AClusterCount: Integer); overload;
     function TextAt(AGlyphIndex: Integer): PAnsiChar;
   end;
 
@@ -113,6 +114,7 @@ type
   strict private
     FDescriptor: TCairoFontFaceDescriptor;
   {$IFDEF LINUX}
+    FFtFace: PFT_Face;
     FHandle: Pcairo_scaled_font_t;
     FPixelSize: Single;
     class procedure FreeFtFace(AFace: PFT_Face); cdecl; static;
@@ -124,6 +126,12 @@ type
   {$IFDEF LINUX}
     destructor Destroy; override;
   {$ENDIF}
+    function TextToGlyphs(ACairo: Pcairo_t;
+      AText: PChar; ATextLength: Integer;
+      var AGlyphs: Pcairo_glyph_t;
+      var AGlyphCount: Integer;
+      var AMapping: TCairoTextMapping): Boolean;
+    // Properties
     property Descriptor: TCairoFontFaceDescriptor read FDescriptor;
   end;
 
@@ -152,7 +160,6 @@ type
     class var FUtf8Buffer: PAnsiChar;
     class var FUtf8BufferSize: Integer;
     class procedure EnsureInit;
-    class function UseFontForSubstitution(const ADescriptor: TCairoFontFaceDescriptor): LongWord;
   public
     class constructor Create;
     class destructor Destroy;
@@ -165,9 +172,11 @@ type
     class procedure Select(ACairo: Pcairo_t; AFontId: LongWord); overload;
     class function Substitute(ACairo: Pcairo_t; AFont: TCairoFontFace;
       AGlyphs: Pcairo_glyph_t; AGlyphCount: Integer; const AMapping: TCairoTextMapping): Boolean; overload;
+    class function Substitute(var AFont: TCairoFontFace; AChar: UCS4Char): Boolean; overload;
     class function Substitute(var AFont: TCairoFontFaceDescriptor; AChar: UCS4Char = 0): Boolean; overload;
     class function ToUtf8(AText: PAnsiChar; ATextLen: Integer; out Utf8Len: Integer): PAnsiChar; overload;
     class function ToUtf8(AText: PWideChar; ATextLen: Integer; out Utf8Len: Integer): PAnsiChar; overload;
+    class function UseFontForSubstitution(const ADescriptor: TCairoFontFaceDescriptor): LongWord;
     // Properties
     class property LibraryHandle: TFontLibraryHandle read FLibrary;
     class property Lock: TACLCriticalSection read FLock;
@@ -175,7 +184,11 @@ type
 
 function cairo_get_glyph_index(ACairo: Pcairo_t; AText: PAnsiChar; ATextLen: Integer): LongWord;
 function cairo_get_glyph_width(ACairo: Pcairo_t; AGlyphIndex: LongWord): cairo_text_extents_t;
-procedure OffsetGlyphs(AGlyphs: Pcairo_glyph_t; ACount: Integer; ADeltaX, ADeltaY: Double);
+function cairo_has_unknown_glyphs(AGlyphs: Pcairo_glyph_t; ACount: Integer): Boolean;
+procedure cairo_offset_glyphs(AGlyphs: Pcairo_glyph_t; ACount: Integer; ADeltaX, ADeltaY: Double);
+procedure cairo_set_fontId(AGlyphs: Pcairo_glyph_t; ACount: Integer; AFontId: LongWord);
+procedure cairo_text_to_glyphs(ACairo: Pcairo_t; AText: PAnsiChar; ATextLen: Integer;
+  var AGlyphs: Pcairo_glyph_t; var AGlyphCount: LongInt; var AMapping: TCairoTextMapping);
 implementation
 
 const
@@ -233,6 +246,10 @@ function FcPatternGetLangSet(const pattern:PFcPattern; const obj: PChar; n:cint;
 function FcPatternGetString(const pattern: PFcPattern; const obj: PChar; n: cint; s: PFcChar8): TFcResult; cdecl; external libfontconfig.DefaultLibName;
 {$ENDIF}
 
+{$IFDEF LCLGtk3}
+function hb_ft_font_create_referenced(ft_face: Pointer): Phb_font_t; cdecl; external LazHarfBuzz0_library;
+{$ENDIF}
+
 function cairo_get_glyph_index(ACairo: Pcairo_t; AText: PAnsiChar; ATextLen: Integer): LongWord;
 var
   LGlyph: cairo_glyph_t;
@@ -271,7 +288,19 @@ begin
   end;
 end;
 
-procedure OffsetGlyphs(AGlyphs: Pcairo_glyph_t; ACount: Integer; ADeltaX, ADeltaY: Double);
+function cairo_has_unknown_glyphs(AGlyphs: Pcairo_glyph_t; ACount: Integer): Boolean;
+var
+  I: Integer;
+begin
+  for I := 0 to ACount - 1 do
+  begin
+    if AGlyphs[I].index = 0 then
+      Exit(True);
+  end;
+  Result := False;
+end;
+
+procedure cairo_offset_glyphs(AGlyphs: Pcairo_glyph_t; ACount: Integer; ADeltaX, ADeltaY: Double);
 var
   I: Integer;
 begin
@@ -283,12 +312,44 @@ begin
     end;
 end;
 
+procedure cairo_set_fontId(AGlyphs: Pcairo_glyph_t; ACount: Integer; AFontId: LongWord);
+begin
+  AFontId := AFontId and GLYPH_MASK_FONTINDEX;
+  while ACount > 0 do
+  begin
+    if AGlyphs^.index <> 0 then
+      AGlyphs^.index := AFontId or AGlyphs^.index and GLYPH_MASK_GLYPHINDEX;
+    Inc(AGlyphs);
+    Dec(ACount);
+  end;
+end;
+
+procedure cairo_text_to_glyphs(ACairo: Pcairo_t; AText: PAnsiChar; ATextLen: Integer;
+  var AGlyphs: Pcairo_glyph_t; var AGlyphCount: LongInt; var AMapping: TCairoTextMapping);
+var
+  LClusterCount: Integer;
+  LClusterFlags: cairo_text_cluster_flags_t;
+  LClusters: Pcairo_text_cluster_t;
+begin
+  LClusters := nil;
+  LClusterCount := 0;
+  cairo_scaled_font_text_to_glyphs(cairo_get_scaled_font(ACairo), 0, 0,
+    AText, ATextLen, @AGlyphs, @AGlyphCount, @LClusters, @LClusterCount, @LClusterFlags);
+  AMapping.Init(AText, AGlyphCount, LClusters, LClusterCount);
+end;
+
 { TCairoTextMapping }
 
 procedure TCairoTextMapping.Free;
 begin
   TextReference := nil;
   TextOffsets := nil;
+end;
+
+procedure TCairoTextMapping.Init(AText: PAnsiChar; AGlyphCount: Integer);
+begin
+  TextReference := AText;
+  SetLength(TextOffsets, AGlyphCount);
 end;
 
 procedure TCairoTextMapping.Init(AText: PAnsiChar; AGlyphCount: Integer;
@@ -301,8 +362,7 @@ begin
   try
     LGlyphIndex := 0;
     LTextOffset := 0;
-    TextReference := AText;
-    SetLength(TextOffsets, AGlyphCount);
+    Init(AText, AGlyphCount);
     for I := 0 to AClusterCount - 1 do
     begin
       for J := 1 to AClusters[I].num_glyphs do
@@ -422,22 +482,21 @@ var
   LCtmMatrix: cairo_matrix_t;
   LFontFace: Pcairo_font_face_t;
   LFontMatrix: cairo_matrix_t;
-  LFtFace: PFT_Face;
   LOptions: Pcairo_font_options_t;
   LSynthesizesFlags: LongWord;
 begin
   FPixelSize := 18;
   FDescriptor := ADescriptor;
-  LCode := FT_New_Face(TCairoFonts.LibraryHandle, PChar(Descriptor.Path), Descriptor.FaceIndex, LFtFace);
+  LCode := FT_New_Face(TCairoFonts.LibraryHandle, PChar(Descriptor.Path), Descriptor.FaceIndex, FFtFace);
   if LCode <> 0 then
     raise EInvalidGraphicOperation.CreateFmt('FT_New_Face(%s) failed (%d).', [Descriptor.Path, LCode]);
 
   LOptions := cairo_font_options_create;
-  LFontFace := cairo_ft_font_face_create_for_ft_face(LFtFace, 0);
+  LFontFace := cairo_ft_font_face_create_for_ft_face(FFtFace, 0);
   try
     // The actual contents of the cairo_user_data_key_t struct is never used, and there is no
     // need to initialize the object; only the unique address of a cairo_data_key_t object is used.
-    cairo_font_face_set_user_data(LFontFace, Pcairo_user_data_key_t(Self), LFtFace, @FreeFtFace);
+    cairo_font_face_set_user_data(LFontFace, Pcairo_user_data_key_t(Self), FFtFace, @FreeFtFace);
 
     cairo_font_options_set_hint_metrics(LOptions, CAIRO_HINT_METRICS_ON);
     cairo_font_options_set_hint_style(LOptions, CAIRO_HINT_STYLE_SLIGHT);
@@ -448,9 +507,9 @@ begin
     cairo_matrix_init_scale(@LFontMatrix, FPixelSize, FPixelSize);
 
     LSynthesizesFlags := 0;
-    if (fsItalic in Descriptor.Styles) and (LFtFace^.style_flags and FT_STYLE_FLAG_ITALIC = 0) then
+    if (fsItalic in Descriptor.Styles) and (FFtFace^.style_flags and FT_STYLE_FLAG_ITALIC = 0) then
       LSynthesizesFlags := LSynthesizesFlags or CAIRO_FT_SYNTHESIZE_OBLIQUE;
-    if (fsBold in Descriptor.Styles) and Descriptor.Embolden then// (LFtFace^.style_flags and FT_STYLE_FLAG_BOLD = 0) - failed on "NotoSans ExtraCondensed ExtraBold"
+    if (fsBold in Descriptor.Styles) and Descriptor.Embolden then// (FFtFace^.style_flags and FT_STYLE_FLAG_BOLD = 0) - failed on "NotoSans ExtraCondensed ExtraBold"
       LSynthesizesFlags := LSynthesizesFlags or CAIRO_FT_SYNTHESIZE_BOLD;
     if LSynthesizesFlags <> 0 then
       cairo_ft_font_face_set_synthesize(LFontFace, LSynthesizesFlags);
@@ -504,6 +563,107 @@ begin
 end;
 
 {$ENDIF}
+
+function TCairoFontFace.TextToGlyphs;
+{$IFDEF LCLGtk3}
+const
+  Directions: array[TACLTextReadingDirection] of Thb_direction_t = (
+    HB_DIRECTION_INVALID, HB_DIRECTION_LTR, HB_DIRECTION_RTL
+  );
+  Scripts: array[TACLCharsetGroup] of Thb_script_t = (HB_SCRIPT_INVALID,
+    HB_SCRIPT_LATIN, HB_SCRIPT_CYRILLIC, HB_SCRIPT_GREEK, HB_SCRIPT_ARMENIAN,
+    HB_SCRIPT_GEORGIAN, HB_SCRIPT_HEBREW, HB_SCRIPT_ARABIC, HB_SCRIPT_SYRIAC,
+    HB_SCRIPT_THAANA, HB_SCRIPT_DEVANAGARI, HB_SCRIPT_BENGALI, HB_SCRIPT_GURMUKHI,
+    HB_SCRIPT_GUJARATI, HB_SCRIPT_ORIYA, HB_SCRIPT_TAMIL, HB_SCRIPT_TELUGU,
+    HB_SCRIPT_KANNADA, HB_SCRIPT_MALAYALAM, HB_SCRIPT_SINHALA, HB_SCRIPT_THAI,
+    HB_SCRIPT_LAO, HB_SCRIPT_TIBETAN, HB_SCRIPT_MYANMAR, HB_SCRIPT_KHMER,
+    HB_SCRIPT_ETHIOPIC, HB_SCRIPT_CHEROKEE, HB_SCRIPT_INVALID,
+    HB_SCRIPT_OGHAM, HB_SCRIPT_RUNIC, HB_SCRIPT_MONGOLIAN, HB_SCRIPT_HIRAGANA,
+    HB_SCRIPT_KATAKANA, HB_SCRIPT_HANGUL, HB_SCRIPT_HAN, HB_SCRIPT_YI,
+    HB_SCRIPT_BOPOMOFO, HB_SCRIPT_TAGALOG, HB_SCRIPT_HANUNOO, HB_SCRIPT_BUHID,
+    HB_SCRIPT_TAGBANWA, HB_SCRIPT_BUGINESE, HB_SCRIPT_BALINESE, HB_SCRIPT_SUNDANESE,
+    HB_SCRIPT_JAVANESE, HB_SCRIPT_LIMBU, HB_SCRIPT_INVALID, HB_SCRIPT_INVALID,
+    HB_SCRIPT_INVALID, HB_SCRIPT_LEPCHA, HB_SCRIPT_INVALID, HB_SCRIPT_VAI,
+    HB_SCRIPT_BAMUM, HB_SCRIPT_INVALID, HB_SCRIPT_CHAM, HB_SCRIPT_INVALID,
+    HB_SCRIPT_INVALID, HB_SCRIPT_NKO, HB_SCRIPT_TIFINAGH,
+    HB_SCRIPT_INVALID, HB_SCRIPT_INVALID, HB_SCRIPT_INVALID,
+    HB_SCRIPT_INVALID, HB_SCRIPT_INVALID, HB_SCRIPT_BRAILLE, HB_SCRIPT_BRAHMI,
+    HB_SCRIPT_AVESTAN, HB_SCRIPT_EGYPTIAN_HIEROGLYPHS, HB_SCRIPT_CUNEIFORM,
+    HB_SCRIPT_INVALID, HB_SCRIPT_PHOENICIAN, HB_SCRIPT_INVALID
+  );
+var
+  I, X, Y: Integer;
+  LBuffer: Phb_buffer_t;
+  LChar: UCS4Char;
+  LCharDirection: TACLTextReadingDirection;
+  LCharGroup: TACLCharsetGroup;
+  LCharLength: Integer;
+  LFont: Phb_font_t;
+  LFontMatrix: cairo_matrix_t;
+  LFontId: LongWord;
+  LFontScale: Double;
+  LFontUpem: Double;
+  LGlyphCount: Integer;
+  LGlyphs: Phb_glyph_info_t;
+  LGlyphsPos: Phb_glyph_position_t;
+begin
+  Result := False;
+  LBuffer := hb_buffer_create;
+  if LBuffer <> nil then
+  try
+    LFont := hb_ft_font_create_referenced(FFtFace);
+    if LFont <> nil then
+    try
+      LChar := acCharUCS4FromUtf8(AText, ATextLength, LCharLength);
+      LCharGroup := acGetCharsetGroup(LChar);
+      LCharDirection := acGetReadingDirection(LChar);
+      if Scripts[LCharGroup] <> HB_SCRIPT_INVALID then
+        hb_buffer_set_script(LBuffer, Scripts[LCharGroup]);
+      if Directions[LCharDirection] <> HB_DIRECTION_INVALID then
+        hb_buffer_set_direction(LBuffer, Directions[LCharDirection]);
+      hb_buffer_add_utf8(LBuffer, AText, ATextLength, 0, -1);
+      hb_shape(LFont, LBuffer, nil, 0);
+
+      LGlyphCount := 0;
+      LGlyphs := hb_buffer_get_glyph_infos(LBuffer, @LGlyphCount);
+      LGlyphsPos := hb_buffer_get_glyph_positions(LBuffer, nil);
+      if (LGlyphs <> nil) and (LGlyphCount > 0) then
+      begin
+        if AGlyphCount > 0 then
+          LGlyphCount := Min(LGlyphCount, AGlyphCount);
+        if AGlyphs = nil then
+          AGlyphs := cairo_glyph_allocate(LGlyphCount);
+
+        cairo_get_font_matrix(ACairo, @LFontMatrix);
+        LFontUpem := hb_face_get_upem(hb_font_get_face(LFont));
+        LFontScale := LFontMatrix.xx / IfThen(LFontUpem > 0, LFontUpem, 64.0);
+
+        X := 0; Y := 0;
+        AMapping.Init(AText, LGlyphCount);
+        for I := 0 to LGlyphCount - 1 do
+        begin
+          AGlyphs[I].index := LGlyphs[I].codepoint;
+          AGlyphs[I].x := Round(LFontScale * (LGlyphsPos[I].x_offset + X));
+          AGlyphs[I].y := Round(LFontScale * (LGlyphsPos[I].y_offset + Y));
+          AMapping.TextOffsets[I] := LGlyphs[I].cluster;
+          Inc(X, LGlyphsPos[I].x_advance);
+          Inc(Y, LGlyphsPos[I].y_advance);
+        end;
+
+        AGlyphCount := LGlyphCount;
+        Exit(True);
+      end;
+    finally
+      hb_font_destroy(LFont);
+    end;
+  finally
+    hb_buffer_destroy(LBuffer);
+  end;
+{$ELSE}
+begin
+  Result := False;
+{$ENDIF}
+end;
 
 { TCairoFonts }
 
@@ -656,19 +816,6 @@ class function TCairoFonts.Substitute(
   ACairo: Pcairo_t; AFont: TCairoFontFace;
   AGlyphs: Pcairo_glyph_t; AGlyphCount: Integer;
   const AMapping: TCairoTextMapping): Boolean;
-
-  function HasUnknownGlyphs: Boolean;
-  var
-    I: Integer;
-  begin
-    for I := 0 to AGlyphCount - 1 do
-    begin
-      if AGlyphs[I].index = 0 then
-        Exit(True);
-    end;
-    Result := False;
-  end;
-
 var
   LChar: UCS4Char;
   LCharLen: Integer;
@@ -681,7 +828,7 @@ var
   I: Integer;
 begin
   Result := False;
-  if HasUnknownGlyphs then
+  if cairo_has_unknown_glyphs(AGlyphs, AGlyphCount) then
   begin
     Lock.Enter;
     cairo_save(ACairo);
@@ -716,11 +863,6 @@ begin
             LCurrentFontId := UseFontForSubstitution(LFont);
             Select(ACairo, LCurrentFontId);
             LGlyphIndex := cairo_get_glyph_index(ACairo, LCharPtr, LCharLen);
-            if (LGlyphIndex <> 0) and (acGeneralLogFileName <> '') then
-            begin
-              LogEntry(acGeneralLogFileName, 'Fonts', 'Substitute(%x: %s -> %s)',
-                [LChar, AFont.Descriptor.Name, LFont.Name]);
-            end;
           end;
           FGlyphSubstitutions.Add(AFont.Descriptor, LChar, LCurrentFont, LGlyphIndex);
         end;
@@ -734,7 +876,7 @@ begin
           begin
             LDelta := cairo_get_glyph_width(ACairo, LGlyphIndex).x_advance - (AGlyphs[I + 1].x - AGlyphs[I].x);
             if LDelta <> 0 then
-              OffsetGlyphs(@AGlyphs[I + 1], AGlyphCount - I - 1, LDelta, 0);
+              cairo_offset_glyphs(@AGlyphs[I + 1], AGlyphCount - I - 1, LDelta, 0);
           end;
           Result := True; // Eсть подстановка!
         end;
@@ -744,6 +886,24 @@ begin
       Lock.Leave;
     end;
   end;
+end;
+
+class function TCairoFonts.Substitute(var AFont: TCairoFontFace; AChar: UCS4Char): Boolean;
+var
+  LDescription: TCairoFontFaceDescriptor;
+begin
+  //if FGlyphSubstitutions.Find(AFont.Descriptor, AChar, LDescription, LUnused) then
+  //begin
+  //  AFont := Get(LDescription);
+  //  Exit(True);
+  //end;
+  LDescription := AFont.Descriptor;
+  if Substitute(LDescription, AChar) then
+  begin
+    AFont := Get(LDescription);
+    Exit(True);
+  end;
+  Result := False;
 end;
 
 class function TCairoFonts.Substitute(

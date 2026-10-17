@@ -58,6 +58,7 @@ uses
   ACL.Graphics.Ex,
   ACL.Graphics.Ex.Cairo.Fonts,
   ACL.Graphics.Ex.Stub,
+  ACL.Graphics.Fonts,
   ACL.Graphics.TextLayout,
   ACL.Threading,
   ACL.Utils.Common,
@@ -1112,7 +1113,7 @@ begin
     else
       LDeltaY := ARect.Top;
 
-    OffsetGlyphs(LGlyphs, LGlyphCount, ARect.Left, LDeltaY + LFontMetrics.baseline);
+    cairo_offset_glyphs(LGlyphs, LGlyphCount, ARect.Left, LDeltaY + LFontMetrics.baseline);
   end;
 end;
 
@@ -1396,7 +1397,7 @@ begin
         try
           cairo_set_source_color(LCairo, TCairoColor.From(ACanvas.Font));
           cairo_font_metrics(cairo_get_scaled_font(LCairo), LMetrics);
-          OffsetGlyphs(LGlyphs.Glyphs, LGlyphs.GlyphCount, X, Y + LMetrics.baseline);
+          cairo_offset_glyphs(LGlyphs.Glyphs, LGlyphs.GlyphCount, X, Y + LMetrics.baseline);
           CairoDrawGlyphs(LCairo, LGlyphs.Glyphs, LGlyphs.GlyphCount, LGlyphs.HasSubstitutions);
           if CairoTextStyleLines * ACanvas.Font.Style <> [] then
             CairoDrawTextStyleLines(LCairo, ACanvas.Font.Style, X, Y, LGlyphs.MeasureWidth(LCairo), LMetrics);
@@ -1457,25 +1458,15 @@ end;
 function TCairoTextGlyphs.Init(ACairo: Pcairo_t;
   AText: PChar; ATextLength: Integer; AFont: TCairoFontFace): Boolean;
 var
-  LClusterCount: Integer;
-  LClusterFlags: cairo_text_cluster_flags_t;
-  LClusters: Pcairo_text_cluster_t;
   LUtf8: PAnsiChar;
   LUtf8Len: Integer;
 begin
   Glyphs := nil;
   GlyphCount := 0;
-  LClusters := nil;
-  LClusterCount := 0;
   LUtf8 := TCairoFonts.ToUtf8(AText, ATextLength, LUtf8Len);
-  cairo_scaled_font_text_to_glyphs(cairo_get_scaled_font(ACairo), 0, 0,
-    LUtf8, LUtf8Len, @Glyphs, @GlyphCount, @LClusters, @LClusterCount, @LClusterFlags);
+  cairo_text_to_glyphs(ACairo, LUtf8, LUtf8Len, Glyphs, GlyphCount, Mapping);
+  HasSubstitutions := TCairoFonts.Substitute(ACairo, AFont, Glyphs, GlyphCount, Mapping);
   Result := Glyphs <> nil;
-  if Result then
-  begin
-    Mapping.Init(LUtf8, GlyphCount, LClusters, LClusterCount);
-    HasSubstitutions := TCairoFonts.Substitute(ACairo, AFont, Glyphs, GlyphCount, Mapping);
-  end;
 end;
 
 function TCairoTextGlyphs.MeasureWidth(ACairo: Pcairo_t): Double;
@@ -1503,7 +1494,7 @@ begin
       LDeltaX := -Glyphs^.x;
 
     if LDeltaX <> 0 then
-      OffsetGlyphs(Glyphs, GlyphCount, LDeltaX, 0);
+      cairo_offset_glyphs(Glyphs, GlyphCount, LDeltaX, 0);
   end;
   if NextLine <> nil then
     NextLine^.Align(ARightBound, AAlignment);
@@ -1581,11 +1572,9 @@ end;
 procedure TCairoTextLayoutMetrics.Calculate(
   ACairo: Pcairo_t; AText: PChar; ATextLength: Integer; AFont: TCairoFontFace);
 var
+  LChar: Word;
+  LFontId: LongWord;
   LGlyphs: Pcairo_glyph_t;
-  LGlyphCount: Integer;
-  LClusterCount: Integer;
-  LClusterFlags: cairo_text_cluster_flags_t;
-  LClusters: Pcairo_text_cluster_t;
   LMapping: TCairoTextMapping;
   LUtf8: PAnsiChar;
   LUtf8Len: Integer;
@@ -1593,22 +1582,31 @@ begin
   if ATextLength > Capacity then
     raise EInvalidArgument.CreateFmt('TCairoTextLayoutMetrics capacity exceeded (%d -> %d)', [ATextLength, Capacity]);
 
-  // используем для глифов память, что мы сами выделили. Дабы избежать реалокации и move
+  Count := Capacity;
+  LFontId := 0;
   LGlyphs := @Glyphs;
-  LGlyphCount := Capacity;
-  LClusterCount := 0;
-  LClusters := nil;
   LUtf8 := TCairoFonts.ToUtf8(AText, ATextLength, LUtf8Len);
-  cairo_scaled_font_text_to_glyphs(cairo_get_scaled_font(ACairo), 0, 0,
-    LUtf8, LUtf8Len, @LGlyphs, @LGlyphCount,
-    @LClusters, @LClusterCount, @LClusterFlags);
 
-  if LGlyphs <> @Glyphs then // хм, что-то пошло не так - cairo перетер наш буфер
-    raise EInvalidArgument.CreateFmt('TCairoTextLayoutMetrics glyphs reallocated (%d -> %d)', [LGlyphCount, Capacity]);
-  Count := LGlyphCount;
+{$IF DEFINED(ACL_RTL_CAIRO) AND DEFINED(ACL_RTL_TEXTLAYOUT)}
+  if (acUtf8ToUnicode(@LChar, 1, LUtf8, LUtf8Len) = 1) and
+     (acGetReadingDirection(LChar) = TACLTextReadingDirection.RightToLeft) and
+     (TCairoFonts.Substitute(AFont, LChar)) and
+     (AFont.TextToGlyphs(ACairo, AText, ATextLength, LGlyphs, Count, LMapping))
+  then
+    LFontId := TCairoFonts.UseFontForSubstitution(AFont.Descriptor)
+  else
+{$ENDIF}
+    cairo_text_to_glyphs(ACairo, LUtf8, LUtf8Len, LGlyphs, Count, LMapping);
 
-  LMapping.Init(LUtf8, LGlyphCount, LClusters, LClusterCount);
-  HasSubstitutions := TCairoFonts.Substitute(ACairo, AFont, LGlyphs, Count, LMapping);
+  if LGlyphs <> @Glyphs then
+    raise EInvalidArgument.CreateFmt('TCairoTextLayoutMetrics glyphs reallocated (%d -> %d)', [Count, Capacity]);
+  if LFontId <> 0 then
+  begin
+    cairo_set_fontId(LGlyphs, Count, LFontId);
+    HasSubstitutions := True;
+  end;
+  if TCairoFonts.Substitute(ACairo, AFont, LGlyphs, Count, LMapping) then
+    HasSubstitutions := True;
 end;
 
 function TCairoTextLayoutMetrics.MeasureWidth(ACairo: Pcairo_t): Double;
@@ -1693,9 +1691,9 @@ begin
       cairo_set_source_color(FHandle, FFontColor);
     end;
 
-    OffsetGlyphs(@LMetrics^.Glyphs, LMetrics^.Count,  X,  Y + FFontMetrics.baseline);
+    cairo_offset_glyphs(@LMetrics^.Glyphs, LMetrics^.Count,  X,  Y + FFontMetrics.baseline);
     CairoDrawGlyphs(FHandle, @LMetrics^.Glyphs, LMetrics^.Count, LMetrics^.HasSubstitutions);
-    OffsetGlyphs(@LMetrics^.Glyphs, LMetrics^.Count, -X, -Y - FFontMetrics.baseline);
+    cairo_offset_glyphs(@LMetrics^.Glyphs, LMetrics^.Count, -X, -Y - FFontMetrics.baseline);
 
     if FFontHasLines then
       CairoDrawTextStyleLines(FHandle, Canvas.Font.Style, X, Y, ABlock.TextWidth, FFontMetrics);

@@ -767,7 +767,7 @@ type
     FOrigin: TPoint;
     FRow: TACLTextLayoutRow;
     FRowTruncated: Boolean;
-  {$IFDEF ACL_TEXTLAYOUT_RTL}
+  {$IFDEF ACL_RTL_TEXTLAYOUT}
     FRowRtlRange: Boolean;
     FRowRtlRanges: TACLListOf<TACLRange>;
   {$ENDIF}
@@ -979,13 +979,13 @@ begin
     LTextLayout.Bounds := ABounds;
 
     // Result
-    if AFlags and DT_CALCRECT = 0 then
-      LTextLayout.Draw(ACanvas)
-    else
+    if AFlags and DT_CALCRECT <> 0 then
     begin
       LTextLayout.Calculate(ACanvas);
       ABounds.Size := LTextLayout.MeasureSize;
-    end;
+    end
+    else
+      LTextLayout.Draw(ACanvas);
   finally
     LTextLayout.Free;
   end;
@@ -2507,7 +2507,7 @@ begin
   FRow := TACLTextLayoutRow.Create;
   FRow.FHead := PChar(AOwner.Text);
   FRow.FTail := FRow.FHead;
-{$IFDEF ACL_TEXTLAYOUT_RTL}
+{$IFDEF ACL_RTL_TEXTLAYOUT}
   FRowRtlRanges := TACLListOf<TACLRange>.Create;
   FRowRtlRanges.Capacity := RtlRangeCapacity;
 {$ENDIF}
@@ -2529,7 +2529,7 @@ constructor TACLTextLayoutCalculator.CreateSpan(ACalculator: TACLTextLayoutCalcu
 begin
   inherited Create(ACalculator.Owner, ACalculator.Render);
   FRow := TACLTextLayoutRow.Create;
-{$IFDEF ACL_TEXTLAYOUT_RTL}
+{$IFDEF ACL_RTL_TEXTLAYOUT}
   FRowRtlRanges := TACLListOf<TACLRange>.Create;
   FRowRtlRanges.Capacity := RtlRangeCapacity;
 {$ENDIF}
@@ -2546,7 +2546,7 @@ begin
   if FRows <> nil then
     AlignRows;
   FreeAndNil(FPrevRowEndEllipsis);
-{$IFDEF ACL_TEXTLAYOUT_RTL}
+{$IFDEF ACL_RTL_TEXTLAYOUT}
   FreeAndNil(FRowRtlRanges);
 {$ENDIF}
   inherited;
@@ -2571,7 +2571,7 @@ begin
 end;
 
 function TACLTextLayoutCalculator.AddBlockOfContent(ABlock: TACLTextLayoutBlock; AWidth: Integer): Boolean;
-{$IFDEF ACL_TEXTLAYOUT_RTL}
+{$IFDEF ACL_RTL_TEXTLAYOUT}
 var
   LReadingDirection: TACLTextReadingDirection;
 {$ENDIF}
@@ -2600,7 +2600,7 @@ begin
   if FRowTruncated then
     Exit(True);
 
-{$IFDEF ACL_TEXTLAYOUT_RTL}
+{$IFDEF ACL_RTL_TEXTLAYOUT}
   LReadingDirection := acGetReadingDirection(ABlock.FPositionInText, ABlock.FLength);
   if LReadingDirection = TACLTextReadingDirection.LeftToRight then
     FRowRtlRange := False
@@ -2681,7 +2681,7 @@ begin
   FOrigin.Y := FRow.Bounds.Bottom;
   FRows.Add(FRow);
 
-{$IFDEF ACL_TEXTLAYOUT_RTL}
+{$IFDEF ACL_RTL_TEXTLAYOUT}
   for I := 0 to FRowRtlRanges.Count - 1 do
     Reorder(FRow, FRowRtlRanges.List[I]);
   FRowRtlRanges.Count := 0;
