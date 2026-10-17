@@ -1332,7 +1332,12 @@ begin
       end;
   end;
 
-  CairoDrawTextCore(ACanvas, LText, R, AFlags);
+{$IFDEF ACL_RTL_CAIRO}
+  if acIsBiDirectionalText(PChar(S), Length(S)) then
+    acAdvDrawText(ACanvas, S, R, AFlags, 0)
+  else
+{$ENDIF}
+    CairoDrawTextCore(ACanvas, LText, R, AFlags);
 end;
 
 function CairoTextGetLastVisible(ACanvas: TCanvas; const S: string; AMaxWidth: Integer): Integer;
@@ -1375,7 +1380,28 @@ var
   LMetrics: TCairoFontMetrics;
   LOrigin: TPoint;
   LSurface: Pcairo_surface_t;
+{$IFDEF ACL_RTL_CAIRO}
+  LRegion: TRegionHandle;
+  LBounds: TRect;
+{$ENDIF}
 begin
+{$IFDEF ACL_RTL_CAIRO}
+  if acIsBiDirectionalText(AText, ALength) then
+  begin
+    LBounds := Rect(X, Y, MaxWord, MaxWord);
+    if AClipRect = nil then
+      acAdvDrawText(ACanvas, acMakeString(AText, ALength), LBounds, 0, 0)
+    else
+      if acStartClippedDraw(ACanvas, AClipRect^, LRegion) then
+      try
+        acAdvDrawText(ACanvas, acMakeString(AText, ALength), LBounds, 0, 0);
+      finally
+        acEndClippedDraw(ACanvas, LRegion);
+      end;
+    Exit;
+  end;
+{$ENDIF}
+
   cairo_lock;
   try
     LCairo := cairo_create_context(ACanvas, LSurface, LOrigin, LContext);
@@ -1419,7 +1445,23 @@ var
   LFont: TCairoFontFace;
   LFontExtents: cairo_font_extents_t;
   LGlyphs: TCairoTextGlyphs;
+{$IFDEF ACL_RTL_CAIRO}
+  LBounds: TRect;
+{$ENDIF}
 begin
+{$IFDEF ACL_RTL_CAIRO}
+  if acIsBiDirectionalText(PChar(S), Length(S)) then
+  begin
+    LBounds := Rect(0, 0, MaxInt, MaxInt);
+    acAdvDrawText(ACanvas, S, LBounds, DT_CALCRECT, 0);
+    if AWidth <> nil then
+      AWidth^ := LBounds.Width;
+    if AHeight <> nil then
+      AHeight^ := LBounds.Height;
+    Exit;
+  end;
+{$ENDIF}
+
   cairo_lock;
   try
     LCairo := TCairoFonts.MeasurerContext;

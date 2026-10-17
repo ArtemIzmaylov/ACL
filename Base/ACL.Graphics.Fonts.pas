@@ -144,6 +144,7 @@ function acGetFontFaceId(AFont: TFont): string;
 function acGetReadingDirection(C: Word): TACLTextReadingDirection; overload;
 function acGetReadingDirection(P: PChar; L: Integer): TACLTextReadingDirection; overload; inline;
 function acGetTrueTypeFontName(AStream: TStream): string;
+function acIsBiDirectionalText(P: PChar; L: Integer): Boolean;
 
 function acResolveFontHeight(AFont: TFont; AHeight: Integer): Integer;
 procedure acSetFontHeight(AFont: TFont; AHeight, ATargetDpi: Integer);
@@ -994,6 +995,27 @@ begin
   finally
     AStream.Position := LPrevPosition;
   end;
+end;
+
+function acIsBiDirectionalText(P: PChar; L: Integer): Boolean;
+var
+  LChar: UCS4Char;
+  LCharLength: Integer;
+begin
+  while L > 0 do
+  begin
+  {$IFDEF UNICODE}
+    LChar := UCS4Char(P^);
+    LCharLength := 1;
+  {$ELSE}
+    LChar := UTF8CodepointToUnicode(P, LCharLength);
+  {$ENDIF}
+    if acGetReadingDirection(Word(LChar)) = TACLTextReadingDirection.RightToLeft then
+      Exit(True);
+    Inc(P, LCharLength);
+    Dec(L, LCharLength);
+  end;
+  Result := False;
 end;
 
 function acResolveFontHeight(AFont: TFont; AHeight: Integer): Integer;

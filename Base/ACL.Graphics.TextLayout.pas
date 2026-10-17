@@ -712,8 +712,10 @@ var
   DefaultTextLayoutCanvasRender: TACLTextLayoutCanvasRenderClass = TACLTextLayoutCanvasRender;
 
 /// <summary>
-///  Аналог функции DrawText на базе TextLayout (c поддержкой форматирования)<p>
-///  Поддерживаются следующие флаги:
+///  Аналог функции DrawText на базе TextLayout,
+///  с поддержкой форматирования (ADT_FORMATTING in ExFlags)
+///  с поддержкой альфа-канала   (ADT_ALPHABLEND in ExFlags)
+///  <p>Поддерживаются следующие флаги:
 ///    DT_LEFT, DT_CENTER, DT_RIGHT, DT_CALCRECT, DT_TOP, DT_VCENTER, DT_BOTTOM,
 ///    DT_WORDBREAK, DT_NOCLIP, DT_SINGLELINE, DT_END_ELLIPSIS, DT_EDITCONTROL,
 ///    DT_NOPREFIX, DT_HIDEPREFIX
