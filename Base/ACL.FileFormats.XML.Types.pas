@@ -5,7 +5,7 @@
 //
 //  Purpose:   General Types for stream-based XML
 //             Based on .NET platform code:
-//             https://github.com/microsoft/referencesource/tree/master/System.Xml/System/Xml/Core
+//             https://github.com/microsoft/referencesource/tree/main/System.Xml/System/Xml/Core
 //
 //  Author:    Artem Izmaylov
 //             © 2006-2024
@@ -169,6 +169,7 @@ type
   //# https://msdn.microsoft.com/en-us/library/system.xml.xmlconvert.decodename(v=vs.110).aspx
   TACLXMLConvert = class
   strict private
+    class var FCharUnescape: TACLDictionary<Char, string>;
     class var FMap: TACLStringsMap;
 
     class function IsEncodedCharacter(const S: string;
@@ -551,10 +552,12 @@ end;
 
 class constructor TACLXMLConvert.Create;
 begin
-  FMap := TACLStringsMap.Create;
-  FMap.Add(#09, #09);
-  FMap.Add(#10, #10);
-  FMap.Add(#13, #13);
+  FCharUnescape := TACLDictionary<Char, string>.Create(4);
+  FCharUnescape.Add('n', sLineBreak);
+  FCharUnescape.Add('t', #9);
+  FCharUnescape.Add('"', '"');
+
+  FMap := TACLStringsMap.Create(5);
   FMap.Add(#39, 'apos');
   FMap.Add('"', 'quot');
   FMap.Add('&', 'amp');
@@ -564,6 +567,7 @@ end;
 
 class destructor TACLXMLConvert.Destroy;
 begin
+  FreeAndNil(FCharUnescape);
   FreeAndNil(FMap);
 end;
 
@@ -591,22 +595,31 @@ end;
 
 class function TACLXMLConvert.DecodeName(const S: string): string;
 
-  function GetReplacement(const S: string): string;
+  function DecodeCharCode(B: TACLStringBuilder; P: PChar; C: Integer): Boolean;
+  var
+    LByte: Byte;
+    LNumber: LongWord;
   begin
-    if not FMap.TryGetKey(S, Result) then
+    LNumber := 0;
+    if C <= 0 then
+      Exit(False);
+    while C > 0 do
     begin
-      if (S <> '') and (S[1] = '#') then
-        Result := Char(StrToIntDef(Copy(S, 2, MaxInt), 0))
-      else
-        Result := S;
+      if not TACLHexcode.Decode(P^, LByte) then
+        Exit(False);
+      LNumber := (LNumber shl 4) or LByte;
+      Inc(P);
+      Dec(C);
     end;
+    B.Append(WideChar(LNumber and $FFFF));
+    Result := True;
   end;
 
 var
   B: TACLStringBuilder;
   L, LS: Integer;
   P, PS: PChar;
-  V: string;
+  T, V: string;
 begin
   P := PChar(S);
   L := Length(S);
@@ -614,25 +627,44 @@ begin
   try
     while L > 0 do
     begin
-      if (P^ = '\') and (L > 0) and FMap.TryGetValue((P + 1)^, V) then
+      if (P^ = '\') and (L > 1) then
       begin
-        // Skip backslash and add next symbol to the queue
-        Inc(P);
-        Dec(L);
-      end
-      else
-        if P^ = '&' then
+        if FCharUnescape.TryGetValue((P + 1)^, V) then
         begin
-          PS := P + 1;
-          LS := L - 1;
-          if IsHTMLCode(PS, LS) then
-          begin
-            B.Append(GetReplacement(acMakeString(P + 1, PS)));
-            P := PS + 1;
-            L := LS - 1;
-            Continue;
-          end;
+          B.Append(V);
+          Inc(P, 2);
+          Dec(L, 2);
+          Continue;
         end;
+        if (L > 5) and ((P + 1)^ = 'u') and DecodeCharCode(B, P + 2, 4) then
+        begin
+          Inc(P, 6);
+          Dec(L, 6);
+          Continue;
+        end;
+      end;
+
+      if P^ = '&' then
+      begin
+        PS := P + 1;
+        LS := L - 1;
+        if IsHTMLCode(PS, LS) then
+        begin
+          if (P + 1)^ = '#' then
+            DecodeCharCode(B, P + 2, acStringLength(P + 2, PS))
+          else
+          begin
+            T := acMakeString(P + 1, PS);
+            if FMap.TryGetKey(T, V) then
+              B.Append(V)
+            else
+              B.Append('&').Append(T).Append(';');
+          end;
+          P := PS + 1;
+          L := LS - 1;
+          Continue;
+        end;
+      end;
 
       B.Append(P^);
       Dec(L);
@@ -680,14 +712,14 @@ begin
     for I := 1 to ALength do
     begin
       AChar := S[I];
-      if ARemoveBreakLines and ((Ord(AChar) = 13) or (Ord(AChar) = 10)) then
+      if ARemoveBreakLines and CharInSet(AChar, [#13, #10]) then
         ABuilder.Append(' ')
       else if not ASkipServiceCharacters and FMap.TryGetValue(AChar, AReplacement) then
         ABuilder.Append('&').Append(AReplacement).Append(';')
       else if IsInvalidXmlChar(Ord(AChar)) then
         ABuilder.Append(EncodeChar(AChar))
       else if IsEncodedCharacter(S, I, ALength, X) then
-        ABuilder.Append(EncodeChar('_'))
+        ABuilder.Append(EncodeChar(WideChar(X)))
       else
         ABuilder.Append(AChar);
     end;

@@ -5,7 +5,7 @@
 //
 //  Purpose:   Stream-based XML Reader
 //             Based on .NET platform code:
-//             https://github.com/microsoft/referencesource/tree/master/System.Xml/System/Xml/Core
+//             https://github.com/microsoft/referencesource/tree/main/System.Xml/System/Xml/Core
 //
 //  Author:    Artem Izmaylov
 //             © 2006-2025

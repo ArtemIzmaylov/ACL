@@ -96,6 +96,8 @@ type
   TACLRipperRuleRemoveHtmlTags = class(TACLRipperRule)
   protected
     procedure ProcessCore(const ATarget: TACLListOfString; const ASource: string); override;
+  public
+    class function Run(const ASource: string): string;
   end;
 
 implementation
@@ -487,78 +489,68 @@ end;
 
 { TACLRipperRuleRemoveHtmlTags }
 
-procedure TACLRipperRuleRemoveHtmlTags.ProcessCore(const ATarget: TACLListOfString; const ASource: string);
-var
-  ABuffer: TACLStringBuilder;
-  AByte1, AByte2: Byte;
-  ACount: Integer;
-  AData: string;
-  AScan: PChar;
+procedure TACLRipperRuleRemoveHtmlTags.ProcessCore(
+  const ATarget: TACLListOfString; const ASource: string);
 begin
-  AData := TACLXMLConvert.DecodeName(ASource);
-  ABuffer := TACLStringBuilder.Get(Length(AData));
+  ATarget.Add(Run(ASource));
+end;
+
+class function TACLRipperRuleRemoveHtmlTags.Run(const ASource: string): string;
+var
+  LBuffer: TACLStringBuilder;
+  LHasRemoves: Boolean;
+  LScan: PChar;
+  LScanCount: Integer;
+begin
+  Result  := ASource;
+  LBuffer := TACLStringBuilder.Get(Length(ASource));
   try
-    AScan := PChar(AData);
-    ACount := Length(AData);
-    repeat
-      case AScan^ of
+    LScan := PChar(ASource);
+    LScanCount := Length(ASource);
+    LHasRemoves := False;
+    while LScanCount > 0 do
+    begin
+      case LScan^ of
         #0:
           Break;
 
         #13, #10:
           begin
-            Dec(ACount);
-            Inc(AScan);
+            Dec(LScanCount);
+            Inc(LScan);
           end;
-
-        '\':
-          if (AScan + 1)^ = 'n' then // \n
-          begin
-            ABuffer.AppendLine;
-            Dec(ACount, 2);
-            Inc(AScan, 2);
-          end
-          else
-            if ((AScan + 1)^ = 'u') and (ACount >= 6) and // \uXXXX
-              TACLHexcode.Decode((AScan + 2)^, (AScan + 3)^, AByte1) and
-              TACLHexcode.Decode((AScan + 4)^, (AScan + 5)^, AByte2) then
-            begin
-              ABuffer.Append(WideChar(AByte1 shl 8 or AByte2));
-              Dec(ACount, 6);
-              Inc(AScan, 6);
-            end
-            else
-            begin
-              ABuffer.Append('\');
-              Dec(ACount);
-              Inc(AScan);
-            end;
 
         '<':
           begin
-            Inc(AScan);
-            Dec(ACount);
-            if acCompareStrings(AScan, 'br', Min(ACount, 2), 2, True) = 0 then
-              ABuffer.AppendLine;
-            while (ACount > 0) and (AScan^ <> '>') do
+            Inc(LScan);
+            Dec(LScanCount);
+            if acCompareStrings(LScan, 'br', Min(LScanCount, 2), 2, True) = 0 then
+              LBuffer.AppendLine;
+            while LScanCount > 0 do
             begin
-              Inc(AScan);
-              Dec(ACount);
+              if LScan^ = '>' then
+              begin
+                LHasRemoves := True;
+                Dec(LScanCount);
+                Inc(LScan);
+                Break;
+              end;
+              Dec(LScanCount);
+              Inc(LScan);
             end;
-            Inc(AScan);
-            Dec(ACount);
           end;
       else
-        ABuffer.Append(AScan^);
-        Inc(AScan);
-        Dec(ACount);
+        LBuffer.Append(LScan^);
+        Dec(LScanCount);
+        Inc(LScan);
       end;
-    until ACount = 0;
-
-    ATarget.Add(ABuffer.ToTrimmedString);
+    end;
+    if LHasRemoves then
+      Result := LBuffer.ToTrimmedString;
   finally
-    ABuffer.Release;
+    LBuffer.Release;
   end;
+  Result := TACLXMLConvert.DecodeName(Result);
 end;
 
 end.
