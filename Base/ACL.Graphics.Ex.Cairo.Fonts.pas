@@ -840,7 +840,7 @@ begin
           Continue;
 
         LCharPtr := AMapping.TextAt(I);
-        LChar := UTF8CodepointToUnicode(LCharPtr, LCharLen);
+        LChar := acCharUCS4FromUtf8(LCharPtr, 4{?!}, LCharLen);
         if LChar < 32 then Continue;
 
         if FGlyphSubstitutions.Find(AFont.Descriptor, LChar, LFont, LGlyphIndex) then

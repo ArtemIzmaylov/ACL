@@ -96,6 +96,7 @@
 
 {$DEFINE ACL_ALPHACOMPOSED_POPUPMENUS}
 {$DEFINE ACL_RTL_TEXTLAYOUT}  // support for right-to-left text direction
+{$DEFINE ACL_RTL_TEXTLAYOUT_MIXED_BLOCKS}
 {$DEFINE ACL_RTL_CAIRO}       // Linux only! Requires for ACL_RTL_TEXTLAYOUT too
 
 {$IFDEF LCLGtkX}

@@ -3105,12 +3105,31 @@ var
   I: Integer;
   LCursor: PChar;
   LLength: Integer;
+{$IFDEF ACL_RTL_TEXTLAYOUT_MIXED_BLOCKS}
+  LCharLength: Integer;
+  LRtl: Boolean;
+{$ENDIF}
 begin
   Result := True;
 
+{$IFDEF ACL_RTL_TEXTLAYOUT_MIXED_BLOCKS}
+  LLength := acStringLength(Scan, ScanEnd);
+  LRtl := acGetReadingDirection(Scan, LLength) = TACLTextReadingDirection.RightToLeft;
+{$ENDIF}
   LCursor := Scan;
   while (LCursor < ScanEnd) and not acContains(LCursor^, Delimiters) do
+  begin
+  {$IFDEF ACL_RTL_TEXTLAYOUT_MIXED_BLOCKS}
+    case acGetReadingDirection(acCharUCS4FromString(LCursor, LLength, LCharLength)) of
+      TACLTextReadingDirection.RightToLeft: if not LRtl then Break;
+      TACLTextReadingDirection.LeftToRight: if     LRtl then Break;
+    end;
+    Dec(LLength, LCharLength);
+    Inc(LCursor, LCharLength);
+  {$ELSE}
     Inc(LCursor);
+  {$ENDIF}
+  end;
 
   LLength := acStringLength(Scan, LCursor);
   if LLength > 0 then

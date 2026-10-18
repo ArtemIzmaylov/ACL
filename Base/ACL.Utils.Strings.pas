@@ -50,6 +50,13 @@ const
   acLineSeparator  = {$IFDEF UNICODE}#$2028{$ELSE}#$E2#$80#$A8{$ENDIF};
   acZeroWidthSpace = {$IFDEF UNICODE}#$200B{$ELSE}#$E2#$80#$8B{$ENDIF};
 
+  acHighSurrogateShift = 10;
+  acMaxHighSurrogate = $DBFF;
+  acMaxLowSurrogate  = $DFFF;
+  acMinHighSurrogate = $D800;
+  acMinLowSurrogate  = $DC00;
+  acUCS4Base         = $10000;
+
   CP_UTF16LE = 1200; // aka Unicode
   CP_UTF16BE = 1201; // aka Unicode-BigEndian
 
@@ -507,9 +514,6 @@ function acUtf8ToUnicode(Dest: PWideChar; MaxDestChars: Integer; Source: PAnsiCh
 // FPC: returns string as it is (we asume that AnsiString is already utf8-encoded);
 function acStringFromUtf8(const S: AnsiString): string;
 function acStringToUtf8(const S: string): AnsiString;
-{$IFNDEF FPC}
-function UTF8CodepointToUnicode(Source: PAnsiChar; out ALength: Integer): UCS4Char;
-{$ENDIF}
 
 // Characters
 function acCharCopy(const S: string; AIndex, ACount: Integer): string;
@@ -519,7 +523,12 @@ function acCharCount(P: PChar; ALength: Integer; const ACharacters: string): Int
 function acCharLength(const P: PChar): Integer; overload;
 function acCharLength(const S: string; Index: Integer): Integer; overload;
 function acCharPrevLength(const S: string; Index: Integer): Integer;
-function acCharUCS4(const S: string; AIndex: Integer): UCS4Char;
+function acCharUCS4(const S: string; AIndex: Integer): UCS4Char; overload;
+function acCharUCS4(const AHighSurrogate, ALowSurrogate: WideChar): UCS4Char; overload;
+function acCharUCS4FromString(Source: PChar; SourceLen: Integer;
+  out CharLen: Integer{>=1}): UCS4Char{0 on error};
+function acCharUCS4FromUtf8(Source: PAnsiChar; SourceLen: Integer;
+  out CharLen: Integer{>=1}): UCS4Char{0 on error};
 
 // Search
 function acContains(const AChar: AnsiChar; const AString: AnsiString): Boolean; inline; overload;
@@ -1335,9 +1344,10 @@ begin
         Break;
       if Dest <> nil then
       begin
-        Dest^ := WideChar((((LCharAccumulator - $10000) shr 10) and $3FF) or $D800);
+        Dec(LCharAccumulator, acUCS4Base);
+        Dest^ := WideChar(acMinHighSurrogate or ((LCharAccumulator shr acHighSurrogateShift) and $3FF));
         Inc(Dest);
-        Dest^ := WideChar((((LCharAccumulator - $10000) and $3FF) or $DC00));
+        Dest^ := WideChar(acMinLowSurrogate  or ((LCharAccumulator and $3FF)));
         Inc(Dest);
       end;
       Inc(Result, 2);
@@ -1402,22 +1412,6 @@ begin
   Result := S;
 {$ENDIF}
 end;
-
-{$IFNDEF FPC}
-function UTF8CodepointToUnicode(Source: PAnsiChar; out ALength: Integer): UCS4Char;
-var
-  LBuffer: array[0..1] of WideChar;
-  LReturn: Integer;
-begin
-  ALength := acUtf8CharLength(Source);
-  LReturn := acUtf8ToUnicode(@LBuffer[0], 2, Source, ALength);
-  if LReturn = 2 then
-    Exit(Char.ConvertToUtf32(LBuffer[0], LBuffer[1]));
-  if LReturn = 1 then
-    Exit(UCS4Char(LBuffer[0]));
-  Result := 0; // some error
-end;
-{$ENDIF}
 
 // -----------------------------------------------------------------------------
 // Characters
@@ -1503,16 +1497,57 @@ begin
 end;
 
 function acCharUCS4(const S: string; AIndex: Integer): UCS4Char;
-{$IFNDEF UNICODE}
 var
   LCharLen: Integer;
-{$ENDIF}
+begin
+  Result := acCharUCS4FromString(@S[AIndex], Length(S) - AIndex + 1, LCharLen);
+end;
+
+function acCharUCS4(const AHighSurrogate, ALowSurrogate: WideChar): UCS4Char;
+var
+  H, L: Integer;
+begin
+  H := Ord(AHighSurrogate) - acMinHighSurrogate;
+  if (H < 0) or (H > $3FF) then Exit(0);
+  L := Ord(ALowSurrogate)  - acMinLowSurrogate;
+  if (L < 0) or (L > $3FF) then Exit(0);
+  Result := acUCS4Base + H shl acHighSurrogateShift + L;
+end;
+
+function acCharUCS4FromString(Source: PChar; SourceLen: Integer; out CharLen: Integer{>=1}): UCS4Char;
 begin
 {$IFDEF UNICODE}
-  Result := Char.ConvertToUtf32(S, AIndex - 1{0-based});
+  CharLen := 1; // !
+  if (Source = nil) or (SourceLen = 0) then
+    Exit(0);
+  if Source^.IsHighSurrogate and (SourceLen > 1) then
+  begin
+    Result := acCharUCS4(Source^, (Source + 1)^);
+    if Result <> 0 then
+    begin
+      CharLen := 2;
+      Exit;
+    end;
+  end;
+  Result := UCS4Char(Source^);
 {$ELSE}
-  Result := UTF8CodepointToUnicode(@S[AIndex], LCharLen);
+  Result := acCharUCS4FromUtf8(Source, SourceLen, CharLen);
 {$ENDIF}
+end;
+
+function acCharUCS4FromUtf8(Source: PAnsiChar; SourceLen: Integer; out CharLen: Integer{>=1}): UCS4Char;
+var
+  LChars: array[0..1] of WideChar;
+begin
+  Result := 0;
+  CharLen := 1; // !
+  if (Source = nil) or (SourceLen = 0) then Exit;
+  CharLen := acUtf8CharLength(Source);
+  if CharLen > SourceLen then Exit;
+  case acUtf8ToUnicode(@LChars[0], 2, Source, CharLen) of
+    1: Exit(UCS4Char(LChars[0]));
+    2: Exit(acCharUCS4(LChars[0], LChars[1]));
+  end;
 end;
 
 // -----------------------------------------------------------------------------
@@ -2236,7 +2271,7 @@ begin
   AScan := PWideChar(S);
   while Ord(AScan^) <> 0 do
   begin
-    if Ord(AScan^) >= $D800 then
+    if Ord(AScan^) >= acMinHighSurrogate then
     begin
       AHasSurrogates := True;
       Break;
@@ -2251,7 +2286,8 @@ begin
       AScan := PWideChar(S);
       while Ord(AScan^) <> 0 do
       begin
-        if (Ord(AScan^) >= $D800) and (Ord(PWideChar(AScan + 1)^) and $DC00 = $DC00) then
+        if (Ord(AScan^) >= acMinHighSurrogate) and
+           (Ord(PWideChar(AScan + 1)^) and acMinLowSurrogate = acMinLowSurrogate) then
         begin
           if Ord(AReplaceBy) <> 0 then
             ABuffer.Append(AReplaceBy);
