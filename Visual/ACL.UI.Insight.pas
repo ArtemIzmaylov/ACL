@@ -552,7 +552,7 @@ begin
   {$IFDEF LCLGtk3}
     TACLWSCustomControl.SetOpacity(Self, 128);
   {$ELSE}
-    LRegion := CreateRectRgnIndirect(ClientRect);
+    LRegion := acRegion(ClientRect);
     acRegionCombine(LRegion, ClientRect.InflateTo(-dpiApply(2, FCurrentPPI)), RGN_DIFF);
     acRegionSetToWindow(Handle, LRegion, True);
   {$ENDIF}

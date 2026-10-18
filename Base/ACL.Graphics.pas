@@ -686,6 +686,7 @@ function acStartClippedDraw(ACanvas: TCanvas; const R: TRect; out APrevRegion: T
 procedure acEndClippedDraw(ACanvas: TCanvas; ASavedRegion: TRegionHandle);
 
 // Regions
+function acRegion(const ARect: TRect): TRegionHandle; inline;
 function acRegionClone(ARegion: TRegionHandle): TRegionHandle;
 function acRegionCombine(ATarget, ASource: TRegionHandle; AOperation: Integer): Integer; overload;
 function acRegionCombine(ATarget: TRegionHandle; const ASource: TRect; AOperation: Integer): Integer; overload;
@@ -1041,7 +1042,7 @@ begin
     Result := TACLDibCanvas(ACanvas).ClipRect.IntersectsWith(R);
     if Result then
     begin
-      APrevRegion := CreateRectRgnIndirect(TACLDibCanvas(ACanvas).ClipRect);
+      APrevRegion := acRegion(TACLDibCanvas(ACanvas).ClipRect);
       TACLDibCanvas(ACanvas).ClipRect.Intersect(R);
     end;
     Exit;
@@ -1077,9 +1078,18 @@ begin
   end;
 end;
 
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // Regions
-//----------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+function acRegion(const ARect: TRect): TRegionHandle;
+begin
+{$IFDEF FPC}
+  if ARect.IsEmpty then // LCLGtk fails on negative width or height
+    Exit(CreateRectRgn(0, 0, 0, 0));
+{$ENDIF}
+  Result := CreateRectRgnIndirect(ARect);
+end;
 
 function acRegionClone(ARegion: TRegionHandle): TRegionHandle;
 begin
@@ -1096,7 +1106,7 @@ function acRegionCombine(ATarget: TRegionHandle; const ASource: TRect; AOperatio
 var
   ASourceRgn: TRegionHandle;
 begin
-  ASourceRgn := CreateRectRgnIndirect(ASource);
+  ASourceRgn := acRegion(ASource);
   try
     Result := acRegionCombine(ATarget, ASourceRgn, AOperation);
   finally
@@ -2706,7 +2716,7 @@ end;
 
 constructor TACLRegion.CreateRect(const R: TRect);
 begin
-  FHandle := CreateRectRgnIndirect(R);
+  FHandle := acRegion(R);
 end;
 
 constructor TACLRegion.CreateFromDC(DC: HDC);
@@ -2764,7 +2774,7 @@ end;
 
 function TACLRegion.Clone: TRegionHandle;
 begin
-  Result := CreateRectRgnIndirect(NullRect);
+  Result := acRegion(NullRect);
   CombineRgn(Result, Result, Handle, RGN_OR);
 end;
 
@@ -2780,7 +2790,7 @@ procedure TACLRegion.Combine(const R: TRect; ACombineFunc: TACLRegionCombineFunc
 var
   LRegion: TRegionHandle;
 begin
-  LRegion := CreateRectRgnIndirect(R);
+  LRegion := acRegion(R);
   if ACombineFunc <> rcmCopy then
     CombineRgn(Handle, Handle, LRegion, CombineFuncMap[ACombineFunc])
   else
@@ -2933,9 +2943,9 @@ end;
 function TACLRegionData.CreateHandle: TRegionHandle;
 begin
   if Count = 0 then
-    Exit(CreateRectRgnIndirect(NullRect));
+    Exit(acRegion(NullRect));
   if Count = 1 then
-    Exit(CreateRectRgnIndirect(Rects^[0]));
+    Exit(acRegion(Rects^[0]));
   Result := CreateHandle(BoundingBox);
 end;
 
@@ -2947,9 +2957,9 @@ var
 {$ENDIF}
 begin
   if Count = 0 then
-    Exit(CreateRectRgnIndirect(NullRect));
+    Exit(acRegion(NullRect));
   if Count = 1 then
-    Exit(CreateRectRgnIndirect(Rects^[0]));
+    Exit(acRegion(Rects^[0]));
 
 {$IF DEFINED(MSWINDOWS)}
   PRgnData(FData)^.rdh.rcBound := ABoundingBox;
@@ -2958,7 +2968,7 @@ begin
   TGtk3Region(Result) := TGtk3Region.Create(False);
   TGtk3Region(Result).Handle := Pointer(cairo_create_region_ex(Rects, Count));
 {$ELSEIF DEFINED(LCLGtk2)}
-  Result := CreateRectRgnIndirect(NullRect);
+  Result := acRegion(NullRect);
   for I := 0 to Count - 1 do
   begin
     with Rects^[I] do

@@ -1169,8 +1169,8 @@ begin
     acInvalidateRect(AControl, ARect, AErase)
   else
   begin
-    LRegion1 := CreateRectRgnIndirect(ARect);
-    LRegion2 := CreateRectRgnIndirect(ARect.Split(ABorders));
+    LRegion1 := acRegion(ARect);
+    LRegion2 := acRegion(ARect.Split(ABorders));
     CombineRgn(LRegion1, LRegion1, LRegion2, RGN_DIFF);
     InvalidateRgn(AControl.Handle, LRegion1, AErase);
     DeleteObject(LRegion2);
