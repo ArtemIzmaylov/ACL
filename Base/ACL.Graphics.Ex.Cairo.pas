@@ -1614,7 +1614,10 @@ end;
 procedure TCairoTextLayoutMetrics.Calculate(
   ACairo: Pcairo_t; AText: PChar; ATextLength: Integer; AFont: TCairoFontFace);
 var
-  LChar: Word;
+{$IFDEF ACL_RTL_CAIRO}
+  LChar: UCS4Char;
+  LCharLen: Integer;
+{$ENDIF}
   LFontId: LongWord;
   LGlyphs: Pcairo_glyph_t;
   LMapping: TCairoTextMapping;
@@ -1629,9 +1632,9 @@ begin
   LGlyphs := @Glyphs;
   LUtf8 := TCairoFonts.ToUtf8(AText, ATextLength, LUtf8Len);
 
-{$IF DEFINED(ACL_RTL_CAIRO) AND DEFINED(ACL_RTL_TEXTLAYOUT)}
-  if (acUtf8ToUnicode(@LChar, 1, LUtf8, LUtf8Len) = 1) and
-     (acGetReadingDirection(LChar) = TACLTextReadingDirection.RightToLeft) and
+{$IFDEF ACL_RTL_CAIRO}
+  LChar := acCharUCS4FromUtf8(LUtf8, LUtf8Len, LCharLen);
+  if (acGetReadingDirection(LChar) = TACLTextReadingDirection.RightToLeft) and
      (TCairoFonts.Substitute(AFont, LChar)) and
      (AFont.TextToGlyphs(ACairo, AText, ATextLength, LGlyphs, Count, LMapping))
   then

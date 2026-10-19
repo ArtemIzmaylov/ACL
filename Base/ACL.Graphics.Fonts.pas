@@ -141,8 +141,8 @@ type
 
 function acGetCharsetGroup(Char: UCS4Char): TACLCharsetGroup;
 function acGetFontFaceId(AFont: TFont): string;
-function acGetReadingDirection(C: Word): TACLTextReadingDirection; overload;
-function acGetReadingDirection(P: PChar; L: Integer): TACLTextReadingDirection; overload; inline;
+function acGetReadingDirection(C: PChar; Count: Integer): TACLTextReadingDirection; overload;
+function acGetReadingDirection(C: UCS4Char): TACLTextReadingDirection; overload;
 function acGetTrueTypeFontName(AStream: TStream): string;
 function acIsBiDirectionalText(P: PChar; L: Integer): Boolean;
 
@@ -683,10 +683,19 @@ const
     $0001, $0001, $0001, $0001, $0001, $0001, $0001, $0001, $0001, $0000, $0000, $0000, $0000, $0000, $0001, $0001
   );
 
-function acGetReadingDirection(C: Word): TACLTextReadingDirection;
+function acGetReadingDirection(C: PChar; Count: Integer): TACLTextReadingDirection;
+var
+  L: Integer;
+begin
+  Result := acGetReadingDirection(acCharUCS4FromString(C, Count, L));
+end;
+
+function acGetReadingDirection(C: UCS4Char): TACLTextReadingDirection;
 var
   W: Word;
 begin
+  Result := TACLTextReadingDirection.Neutral;
+  if C > $FFFF then Exit;
   W := BiDirectionTable[C shr 8] + (C shr 4) and $0F;
   W := BiDirectionTable[W];
   W := BiDirectionTable[W + C and $0F];
@@ -700,26 +709,8 @@ begin
     TCharacterDirection.LRE,
     TCharacterDirection.LRO:
       Result := TACLTextReadingDirection.LeftToRight;
-  else
-    Result := TACLTextReadingDirection.Neutral;
   end;
 end;
-
-function acGetReadingDirection(P: PChar; L: Integer): TACLTextReadingDirection;
-{$IFDEF UNICODE}
-begin
-  if L > 0 then
-    Exit(acGetReadingDirection(Word(P^)));
-{$ELSE}
-var
-  LChar: WideChar;
-begin
-  if acUtf8ToUnicode(@LChar, 1, P, L) = 1 then
-    Exit(acGetReadingDirection(Word(LChar)));
-{$ENDIF}
-  Result := TACLTextReadingDirection.Neutral;
-end;
-
 {$ENDREGION}
 
 {$REGION ' Charset Groups '}
@@ -1004,16 +995,13 @@ var
 begin
   while L > 0 do
   begin
-  {$IFDEF UNICODE}
-    LChar := UCS4Char(P^);
-    LCharLength := 1;
-  {$ELSE}
-    LChar := UTF8CodepointToUnicode(P, LCharLength);
-  {$ENDIF}
-    if acGetReadingDirection(Word(LChar)) = TACLTextReadingDirection.RightToLeft then
+    LChar := acCharUCS4FromString(P, L, LCharLength);
+    if LChar = 0 then
+      Break;
+    if acGetReadingDirection(LChar) = TACLTextReadingDirection.RightToLeft then
       Exit(True);
-    Inc(P, LCharLength);
     Dec(L, LCharLength);
+    Inc(P, LCharLength);
   end;
   Result := False;
 end;

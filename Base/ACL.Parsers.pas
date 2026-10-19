@@ -189,23 +189,31 @@ end;
 
 function acExtractString(const S, ABeginStr, AEndStr: string): string;
 var
-  APos1, APos2: Integer;
+  LPos1, LPos2: Integer;
 begin
-  Result := acExtractString(S, ABeginStr, AEndStr, APos1, APos2);
+  Result := acExtractString(S, ABeginStr, AEndStr, LPos1, LPos2);
 end;
 
 function acExtractString(const S, ABeginStr, AEndStr: string; out APos1, APos2: Integer): string;
+var
+  LPos1: Integer;
 begin
+  APos2 := 0;
   APos1 := acPos(ABeginStr, S, True);
   if APos1 = 0 then
     Exit('');
 
-  if AEndStr <> '' then
-    APos2 := acPos(AEndStr, S, True, APos1 + Length(ABeginStr))
+  LPos1 := APos1 + Length(ABeginStr);
+  if AEndStr = '' then
+    APos2 := Length(S) + 1
   else
-    APos2 := Length(S) + 1;
+  begin
+    APos2 := acPos(AEndStr, S, True, LPos1);
+    if APos2 = 0 then Exit('');
+  end;
 
-  Result := Copy(S, APos1 + Length(ABeginStr), APos2 - APos1 - Length(ABeginStr));
+  Result := Copy(S, LPos1, APos2 - LPos1);
+  Inc(APos2, Length(AEndStr) - 1);
 end;
 
 function acUnquot(var AToken: TACLParserToken): Boolean;
