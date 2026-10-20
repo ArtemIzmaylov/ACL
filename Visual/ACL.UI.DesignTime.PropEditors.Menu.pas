@@ -27,6 +27,7 @@ uses
 {$ELSE}
   Winapi.Messages,
   Winapi.Windows,
+  System.Actions,
 {$ENDIF}
   // System
   {System.}Classes,
@@ -59,12 +60,14 @@ uses
   ACL.UI.Controls.Base,
   ACL.UI.Controls.Buttons,
   ACL.UI.Controls.CompoundControl,
+  ACL.UI.Controls.Panel,
   ACL.UI.Controls.TreeList,
   ACL.UI.Controls.TreeList.Options,
   ACL.UI.Controls.TreeList.SubClass,
   ACL.UI.Controls.TreeList.Types,
-  ACL.UI.Controls.Panel,
   ACL.UI.Dialogs,
+  ACL.UI.DropSource,
+  ACL.UI.DropTarget,
   ACL.UI.Forms,
   ACL.UI.Menus,
   ACL.UI.Resources;
@@ -152,14 +155,14 @@ type
 procedure TACLMenuEditorDialog.ItemDeleted(const ADesigner: IDesigner; Item: TPersistent);
 begin
   inherited;
-  if Item is TMenuItem then
+  if lvItems.RootNode.Find(Item) <> nil then
     PopulateTree;
 end;
 
 procedure TACLMenuEditorDialog.ItemInserted(const ADesigner: IDesigner; Item: TPersistent);
 begin
   inherited;
-  if Item is TMenuItem then
+  if (Item is TMenuItem) and (TMenuItem(Item).Menu = FMenu) then
     PopulateTree;
 end;
 
