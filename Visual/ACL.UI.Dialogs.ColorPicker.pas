@@ -163,7 +163,7 @@ begin
   if Caption <> '' then
   begin
     FImageRect.Left := FImageRect.Right - FImageRect.Height;
-    R.Right := FImageRect.Left - GetIndentBetweenElements;
+    R.Right := FImageRect.Left - dpiApply(acIndentBetweenElements, CurrentDpi);
   end
   else
     R := NullRect;

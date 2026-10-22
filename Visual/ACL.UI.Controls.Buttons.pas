@@ -114,7 +114,6 @@ type
     FTextRect: TRect;
 
     function CalculateState: TACLButtonState; virtual;
-    function GetIndentBetweenElements: Integer; inline;
     function GetTextColor: TColor; virtual;
     function GetTransparent: Boolean; virtual;
     procedure RefreshState;
@@ -258,6 +257,7 @@ type
     FocusThickness = 1;
     TextIndent = acTextIndent - 1;
   strict private
+    FCompanion: TACLButtonSubClass;
     FHasArrow: Boolean;
     FImageIndex: Integer;
     FImageList: TCustomImageList;
@@ -269,14 +269,17 @@ type
     FArrowRect: TRect;
     FImageRect: TRect;
 
+    function CalculateState: TACLButtonState; override;
+    function GetGlyph: TACLGlyph; virtual;
+    function GetHasImage: Boolean; virtual;
     procedure CalculateArrowRect(var R: TRect); virtual;
     procedure CalculateImageRect(var R: TRect); virtual;
     procedure CalculateTextRect(var R: TRect); virtual;
-    function GetGlyph: TACLGlyph; virtual;
-    function GetHasImage: Boolean; virtual;
     procedure DrawBackground(ACanvas: TCanvas; const R: TRect); override;
     procedure DrawContent(ACanvas: TCanvas); override;
+    procedure StateChanged; override;
     //# Properties
+    property Companion: TACLButtonSubClass read FCompanion write FCompanion;
     property Glyph: TACLGlyph read GetGlyph;
   public
     constructor Create(AOwner: IACLControl; AStyle: TACLStyleButton); override;
@@ -331,6 +334,7 @@ type
   {$ENDIF}
   protected
     procedure ActionChange(Sender: TObject; CheckDefaults: Boolean); override;
+    procedure Calculate(R: TRect); override;
     function CreateStyle: TACLStyleButton; override;
     function CreateSubClass: TACLSimpleButtonSubClass; override;
     function GetActionLinkClass: TControlActionLinkClass; override;
@@ -793,14 +797,17 @@ begin
   if LNewState <> FState then
   begin
     if AllowAnimation and not ButtonRect.IsEmpty and
-      (FState = absHover) and (LNewState in [absActive, absNormal]) then
+      (FState in [absActive, absHover]) and (LNewState in [absActive, absNormal]) then
     begin
       LAnimation := TACLBitmapAnimation.Create(Self, ButtonRect, TACLAnimatorFadeOut.Create);
       LAnimation.BuildFrame1(DrawBackground);
       FState := LNewState;
       LAnimation.BuildFrame2(DrawBackground);
       LAnimation.Run;
-    end;
+    end
+    else
+      AnimationManager.RemoveOwner(Self);
+
     FState := LNewState;
     StateChanged;
     Invalidate;
@@ -810,25 +817,19 @@ end;
 function TACLSimpleButtonSubClass.CalculateState: TACLButtonState;
 begin
   if not (IsEnabled and Owner.GetEnabled) then
-    Result := absDisabled
-  else if IsPressed or IsDown then
-    Result := absPressed
-  else if IsHovered then
-    Result := absHover
-  else if IsFocused or IsDefault then
-    Result := absActive
-  else
-    Result := absNormal;
+    Exit(absDisabled);
+  if IsPressed or IsDown then
+    Exit(absPressed);
+  if IsHovered then
+    Exit(absHover);
+  if IsFocused or IsDefault then
+    Exit(absActive);
+  Result := absNormal;
 end;
 
 procedure TACLSimpleButtonSubClass.CMEnabledChanged(var Message: TMessage);
 begin
   RefreshState;
-end;
-
-function TACLSimpleButtonSubClass.GetIndentBetweenElements: Integer;
-begin
-  Result := dpiApply(acIndentBetweenElements, CurrentDpi);
 end;
 
 function TACLSimpleButtonSubClass.GetTextColor: TColor;
@@ -1115,7 +1116,7 @@ begin
   FArrowRect := R;
   if Part <> abpDropDownArrow then
   begin
-    LIndent := GetIndentBetweenElements;
+    LIndent := dpiApply(acIndentBetweenElements, CurrentDpi);
     LWidth := acGetArrowSize(makBottom, CurrentDpi).cx;
     FArrowRect.Right := FArrowRect.Right - LIndent;
     FArrowRect.Left := FArrowRect.Right - LWidth;
@@ -1136,13 +1137,13 @@ begin
   if HasArrow then
   begin
     Inc(AWidth, acGetArrowSize(makBottom, CurrentDpi).cx);
-    Inc(AWidth, GetIndentBetweenElements);
+    Inc(AWidth, dpiApply(acIndentBetweenElements, CurrentDpi));
   end;
   if HasImage then
   begin
     LSize := ImageSize;
     Inc(AWidth, LSize.cx);
-    Inc(AWidth, GetIndentBetweenElements);
+    Inc(AWidth, dpiApply(acIndentBetweenElements, CurrentDpi));
     AHeight := Max(AHeight, LSize.cy);
   end;
   Inc(AHeight, 2 * FocusThickness);
@@ -1167,7 +1168,16 @@ begin
   else
     FImageRect.Center(LImageSize);
 
-  R.Left := FImageRect.Right + GetIndentBetweenElements;
+  R.Left := FImageRect.Right + dpiApply(acIndentBetweenElements, CurrentDpi);
+end;
+
+function TACLButtonSubClass.CalculateState: TACLButtonState;
+begin
+  Result := inherited;
+  if Result <> absNormal then
+    Exit;
+  if (FCompanion <> nil) and (FCompanion.State in [absHover, absPressed]) then
+    Result := absActive;
 end;
 
 procedure TACLButtonSubClass.CalculateTextRect(var R: TRect);
@@ -1246,6 +1256,13 @@ begin
   end;
 end;
 
+procedure TACLButtonSubClass.StateChanged;
+begin
+  inherited;
+  if Companion <> nil then
+    Companion.RefreshState;
+end;
+
 { TACLSimpleButton }
 
 constructor TACLSimpleButton.Create(AOwner: TComponent);
@@ -1282,6 +1299,12 @@ procedure TACLSimpleButton.BeforeDestruction;
 begin
   inherited BeforeDestruction;
   Images := nil;
+end;
+
+procedure TACLSimpleButton.Calculate(R: TRect);
+begin
+  SubClass.ImageIndex := ImageIndex;
+  inherited;
 end;
 
 procedure TACLSimpleButton.Click;
@@ -1564,10 +1587,12 @@ end;
 constructor TACLButton.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  RegisterSubClass(FDropDownSubClass, TACLButtonSubClass.Create(Self, Style));
+  RegisterSubClass(FDropDownSubClass, CreateSubClass);
+  FDropDownSubClass.Companion := SubClass;
   FDropDownSubClass.OnClick := HandlerDropDownClick;
   FDropDownSubClass.HasArrow := True;
   FDropDownSubClass.Part := abpDropDownArrow;
+  SubClass.Companion := FDropDownSubClass;
 end;
 
 procedure TACLButton.Calculate(ARect: TRect);
@@ -1718,9 +1743,8 @@ begin
   begin
     // ref. TACLCheckBoxSubClass.Calculate
     // ref. TACLCheckBoxSubClass.CalculateAutoSize
-    LIndent :=
-      Owner.SubClass.TextureSize.cx +
-      Owner.SubClass.GetIndentBetweenElements - acTextIndent;
+    LIndent := Owner.SubClass.TextureSize.cx +
+      dpiApply(acIndentBetweenElements, Owner.SubClass.CurrentDpi) - acTextIndent;
     Inc(AClientRect.Left, LIndent);
     inherited AlignControl(AClientRect);
     Dec(AClientRect.Left, LIndent);
@@ -1796,7 +1820,7 @@ begin
     end;
     // ref. TACLCheckBoxSubControlOptions.AlignControl
     // ref. TACLCheckBoxSubClass.CalculateAutoSize
-    LGap := IfThen(Caption <> '', GetIndentBetweenElements - acTextIndent);
+    LGap := IfThen(Caption <> '', dpiApply(acIndentBetweenElements, CurrentDpi) - acTextIndent);
     if (Alignment = taCenter) and (Caption = '') then
       FButtonRect.Offset((Bounds.Width - FButtonRect.Width) div 2, 0)
     else
@@ -1860,7 +1884,7 @@ begin
   if ShowCheckMark then
     // ref. TACLCheckBoxSubClass.Calculate
     // ref. TACLCheckBoxSubControlOptions.AlignControl
-    Inc(LTextRect.Left, TextureSize.cx + GetIndentBetweenElements - acTextIndent);
+    Inc(LTextRect.Left, TextureSize.cx + dpiApply(acIndentBetweenElements, CurrentDpi) - acTextIndent);
   MeasureText(LTextRect);
 
   AHeight := Max(TextureSize.cy, LTextRect.Height + 2 * acFocusRectIndent);
@@ -1868,7 +1892,7 @@ begin
   if ShowCheckMark then
   begin
     if AWidth > 0 then
-      Inc(AWidth, GetIndentBetweenElements);
+      Inc(AWidth, dpiApply(acIndentBetweenElements, CurrentDpi));
     Inc(AWidth, TextureSize.cx);
   end;
 end;
