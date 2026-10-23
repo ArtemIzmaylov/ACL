@@ -710,10 +710,12 @@ end;
 function TACLEditSubClass.CanExecute(AAction: TACLEditAction): Boolean;
 begin
   case AAction of
-    eaCut, eaDelete:
+    eaCut:
+      Result := CanExecute(eaCopy) and CanExecute(eaDelete);
+    eaDelete:
       Result := (SelLength > 0) and not ReadOnly;
     eaCopy:
-      Result := (SelLength > 0);
+      Result := (SelLength > 0) and (PasswordChar = #0);
     eaPaste:
       Result := not ReadOnly and Clipboard.HasPlainText;
     eaUndo:
