@@ -1295,12 +1295,10 @@ end;
 function TACLResourceSimple<T>.GetValue: T;
 begin
   if Master <> nil then
-    Result := TACLResourceSimple<T>(Master).Value
-  else
-    if CompareValues(FValue, GetDefaultValue) then
-      Result := ValueDefault
-    else
-      Result := FValue;
+    Exit(TACLResourceSimple<T>(Master).Value);
+  if CompareValues(FValue, GetDefaultValue) then
+    Exit(ValueDefault);
+  Result := FValue;
 end;
 
 procedure TACLResourceSimple<T>.SetValue(const AValue: T);
@@ -1430,12 +1428,10 @@ end;
 function TACLResourceColor.GetActualAllowColoration: Boolean;
 begin
   if FAllowColoration <> TACLBoolean.Default then
-    Result := FAllowColoration = TACLBoolean.True
-  else
-    if Master <> nil then
-      Result := TACLResourceColor(Master).ActualAllowColoration
-    else
-      Result := True;
+    Exit(FAllowColoration = TACLBoolean.True);
+  if Master <> nil then
+    Exit(TACLResourceColor(Master).ActualAllowColoration);
+  Result := True;
 end;
 
 function TACLResourceColor.GetAsColor: TColor;
@@ -1489,15 +1485,14 @@ end;
 function TACLResourceMargins.GetSide(AIndex: Integer): Integer;
 begin
   if Master <> nil then
-    Result := TACLResourceMargins(Master).GetSide(AIndex)
+    Exit(TACLResourceMargins(Master).GetSide(AIndex));
+  case AIndex of
+    0: Result := Value.Left;
+    1: Result := Value.Top;
+    2: Result := Value.Right;
   else
-    case AIndex of
-      0: Result := Value.Left;
-      1: Result := Value.Top;
-      2: Result := Value.Right;
-    else
-      Result := Value.Bottom;
-    end;
+    Result := Value.Bottom;
+  end;
 end;
 
 function TACLResourceMargins.IsSideStored(const Index: Integer): Boolean;
@@ -1647,23 +1642,19 @@ end;
 function TACLResourceFont.GetName: TFontName;
 begin
   if rfavName in AssignedValues then
-    Result := FName
-  else
-    if Master <> nil then
-      Result := TACLResourceFont(Master).Name
-    else
-      Result := TFontName(DefFontData.Name);
+    Exit(FName);
+  if Master <> nil then
+    Exit(TACLResourceFont(Master).Name);
+  Result := TFontName(DefFontData.Name);
 end;
 
 function TACLResourceFont.GetQuality: TFontQuality;
 begin
   if rfavQuality in AssignedValues then
-    Result := FQuality
-  else
-    if Master <> nil then
-      Result := TACLResourceFont(Master).Quality
-    else
-      Result := DefFontData.Quality;
+    Exit(FQuality);
+  if Master <> nil then
+    Exit(TACLResourceFont(Master).Quality);
+  Result := DefFontData.Quality;
 end;
 
 function TACLResourceFont.GetActualFont: TFont;
@@ -1710,24 +1701,20 @@ end;
 function TACLResourceFont.GetColorID: string;
 begin
   if rfavColor in AssignedValues then
-    Result := FColor.ID
-  else
-    if Master <> nil then
-      Result := TACLResourceFont(Master).ColorID
-    else
-      Result := '';
+    Exit(FColor.ID);
+  if Master <> nil then
+    Exit(TACLResourceFont(Master).ColorID);
+  Result := '';
 end;
 
 function TACLResourceFont.GetHeight: Integer;
 begin
   if rfavHeight in AssignedValues then
-    Result := FHeight
-  else
-    if Master <> nil then
-      Result := TACLResourceFont(Master).Height
-    else
-      // У нас все размеры определяются для 100% масштаба
-      Result := MulDiv(TACLApplication.DefaultFont.Height, acDefaultDPI, acGetSystemDpi);
+    Exit(FHeight);
+  if Master <> nil then
+    Exit(TACLResourceFont(Master).Height);
+  // У нас все размеры определяются для 100% масштаба
+  Result := MulDiv(TACLApplication.DefaultFont.Height, acDefaultDPI, acGetSystemDpi);
 end;
 
 function TACLResourceFont.GetSize: Integer;
@@ -1738,12 +1725,10 @@ end;
 function TACLResourceFont.GetStyle: TFontStyles;
 begin
   if rfavStyle in AssignedValues then
-    Result := FStyle
-  else
-    if Master <> nil then
-      Result := TACLResourceFont(Master).Style
-    else
-      Result := DefFontData.Style;
+    Exit(FStyle);
+  if Master <> nil then
+    Exit(TACLResourceFont(Master).Style);
+  Result := DefFontData.Style;
 end;
 
 function TACLResourceFont.IsColorIDStored: Boolean;
