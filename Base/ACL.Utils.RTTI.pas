@@ -499,7 +499,8 @@ begin
   SetPropValue(AObject, GetPropInfo(AObject, AName), AValue);
 end;
 
-class procedure TRTTI.SetPropValue(AObject: TObject; const APropInfo: PPropInfo; const AValue: string);
+class procedure TRTTI.SetPropValue(
+  AObject: TObject; const APropInfo: PPropInfo; const AValue: string);
 begin
   ERttiError.EnsureWritable(AObject, APropInfo);
   try
@@ -522,12 +523,20 @@ class procedure TRTTI.SetPropValueAsVariant(
 begin
   ERttiError.EnsureWritable(AObject, APropInfo);
   try
-    if IsBoolean(APropInfo) and VarIsNumeric(AValue) then
-      SetBoolProp(AObject, APropInfo, FastTrunc(AValue) <> 0)
-    else if VarIsStr(AValue) then
-      SetPropValue(AObject, APropInfo, VarToStr(AValue))
+    if VarIsNumeric(AValue) then
+    begin
+      if IsBoolean(APropInfo) then
+        SetBoolProp(AObject, APropInfo, FastTrunc(AValue) <> 0)
+      else if APropInfo^.PropType^.Kind = tkSet then
+        SetOrdProp(AObject, APropInfo, AValue)
+      else
+        TypInfo.SetPropValue(AObject, APropInfo, AValue);
+    end
     else
-      TypInfo.SetPropValue(AObject, APropInfo, AValue);
+      if VarIsStr(AValue) then
+        SetPropValue(AObject, APropInfo, VarToStr(AValue))
+      else
+        TypInfo.SetPropValue(AObject, APropInfo, AValue);
   except
     on E: Exception do
       raise ERttiError.CreatePropError(AObject, APropInfo, E.Message);
