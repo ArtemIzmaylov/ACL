@@ -530,6 +530,7 @@ type
     FColor: TAlphaColor;
     FData: PByte;
     FFrame: Integer;
+    FIgnoreSourceAlpha: Boolean;
     FOpaqueRange: TPoint;
     procedure ApplyCore(AMask, AMaskEnd: PByte; AColors: PACLPixel32; ACount: Integer); inline;
   public
@@ -541,7 +542,10 @@ type
     procedure Flush;
     procedure Init(AColor: TAlphaColor); overload;
     procedure Init(ADib: TACLBaseDib); overload;
+    // Properties
+    property Color: TAlphaColor read FColor;
     property Frame: Integer read FFrame write FFrame;
+    property IgnoreSourceAlpha: Boolean read FIgnoreSourceAlpha write FIgnoreSourceAlpha;
   end;
 
 {$ENDREGION}
@@ -4180,25 +4184,36 @@ end;
 procedure TACLDibMask.ApplyCore(AMask, AMaskEnd: PByte; AColors: PACLPixel32; ACount: Integer);
 var
   LAlpha: Byte;
+  LIgnoreSourceAlpha: Boolean;
 begin
+  LIgnoreSourceAlpha := IgnoreSourceAlpha;
   while ACount > 0 do
   begin
     LAlpha := AMask^;
     if LAlpha = 0 then
       DWORD(AColors^) := 0
     else
+    begin
+      if LIgnoreSourceAlpha and (AColors^.A < 255) then
+      begin
+        AColors^.R := TACLColors.UnpremultiplyTable[AColors^.R, AColors^.A];
+        AColors^.G := TACLColors.UnpremultiplyTable[AColors^.G, AColors^.A];
+        AColors^.B := TACLColors.UnpremultiplyTable[AColors^.B, AColors^.A];
+        AColors^.A := 255;
+      end;
       if LAlpha < 255 then
       begin
-        // less quality, but 2x faster
-        //    TACLColors.Unpremultiply(C^);
-        //    C^.A := TACLColors.PremultiplyTable[C^.A, S^];
-        //    TACLColors.Premultiply(C^);
-        AColors^.B := TACLColors.PremultiplyTable[AColors^.B, LAlpha];
-        AColors^.G := TACLColors.PremultiplyTable[AColors^.G, LAlpha];
-        AColors^.A := TACLColors.PremultiplyTable[AColors^.A, LAlpha];
+        // TACLColors.Unpremultiply(AColors^);
+        // AColors.A := TACLColors.PremultiplyTable[AColors^.A, LAlpha];
+        // TACLColors.Premultiply(AColors^);
+        //
+        // Less quality, but up x2 times faster
         AColors^.R := TACLColors.PremultiplyTable[AColors^.R, LAlpha];
+        AColors^.G := TACLColors.PremultiplyTable[AColors^.G, LAlpha];
+        AColors^.B := TACLColors.PremultiplyTable[AColors^.B, LAlpha];
+        AColors^.A := TACLColors.PremultiplyTable[AColors^.A, LAlpha];
       end;
-
+    end;
     if AMask < AMaskEnd then
       Inc(AMask);
     Inc(AColors);
