@@ -53,6 +53,10 @@ function MinMax(const AValue, AMinValue, AMaxValue: Int64): Int64; overload; inl
 function MinMax(const AValue, AMinValue, AMaxValue: Integer): Integer; overload; inline;
 function MinMax(const AValue, AMinValue, AMaxValue: Single): Single; overload; inline;
 
+// PowerOf2
+function NextPowerOf2(AValue: Integer): Integer;
+function PrevPowerOf2(AValue: Integer): Integer;
+
 // Random
 function acRandom(ACount: Integer): Integer; inline;
 function acRandomRange(AMin, AMax: Integer): Integer; inline;
@@ -88,6 +92,30 @@ begin
   // https://docwiki.embarcadero.com/RADStudio/Athens/en/Floating_Point_Operation_Exception_Masks
   // Restoring the old behavior:
   SetExceptionMask([exPrecision, exUnderflow, exDenormalized]);
+end;
+
+function NextPowerOf2(AValue: Integer): Integer;
+begin
+  if AValue < 1 then Exit(1);
+  Result := AValue - 1;
+  Result := Result or (Result shr 1);
+  Result := Result or (Result shr 2);
+  Result := Result or (Result shr 4);
+  Result := Result or (Result shr 8);
+  Result := Result or (Result shr 16);
+  Inc(Result);
+end;
+
+function PrevPowerOf2(AValue: Integer): Integer;
+begin
+  if AValue < 1 then Exit(0);
+  Result := AValue;
+  Result := Result or (Result shr 1);
+  Result := Result or (Result shr 2);
+  Result := Result or (Result shr 4);
+  Result := Result or (Result shr 8);
+  Result := Result or (Result shr 16);
+  Dec(Result, Result shr 1);
 end;
 
 { MinMax / MaxMin }
