@@ -430,8 +430,8 @@ type
     class var FInstance: TACLMouseTracker;
     class function Get: TACLMouseTracker;
   protected
-    function CanAdd(const AObject: IACLMouseTracking): Boolean; override;
-    procedure TimerObject(const AObject: IACLMouseTracking); override;
+    function CanAdd(const ATracker: IACLMouseTracking): Boolean; override;
+    procedure TimerObject(const ATracker: IACLMouseTracking); override;
   public
     class destructor Destroy;
     class procedure Release(const AIntf: IACLMouseTracking); overload;
@@ -2338,11 +2338,11 @@ begin
   FreeAndNil(FInstance);
 end;
 
-function TACLMouseTracker.CanAdd(const AObject: IACLMouseTracking): Boolean;
+function TACLMouseTracker.CanAdd(const ATracker: IACLMouseTracking): Boolean;
 begin
-  Result := AObject.IsMouseAtControl;
+  Result := ATracker.IsMouseAtControl;
   if Result then
-    AObject.MouseEnter;
+    ATracker.MouseEnter;
 end;
 
 class function TACLMouseTracker.Get: TACLMouseTracker;
@@ -2374,12 +2374,12 @@ begin
   Get.Add(AIntf);
 end;
 
-procedure TACLMouseTracker.TimerObject(const AObject: IACLMouseTracking);
+procedure TACLMouseTracker.TimerObject(const ATracker: IACLMouseTracking);
 begin
-  if not AObject.IsMouseAtControl then
+  if not ATracker.IsMouseAtControl then
   begin
-    Remove(AObject); // first
-    AObject.MouseLeave;
+    Remove(ATracker); // first
+    ATracker.MouseLeave;
   end;
 end;
 

@@ -889,9 +889,9 @@ begin
   if AWinControl.HandleAllocated then
   begin
     LWidget := TGtk3Widget(AWinControl.Handle).Widget;
-    if Gtk3IsGtkWindow(LWidget) and (LWidget^.window <> nil) then
-      LWidget^.window^.set_opacity(AOpacity / 255)
-    else
+    //if Gtk3IsGtkWindow(LWidget) and (LWidget^.window <> nil) then
+    //  LWidget^.window^.set_opacity(AOpacity / 255);
+    //else same as in TGtk3Window.CreateWidget
       LWidget^.set_opacity(AOpacity / 255);
   end;
 end;

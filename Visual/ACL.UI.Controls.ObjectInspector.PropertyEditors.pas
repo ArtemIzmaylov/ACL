@@ -399,8 +399,10 @@ procedure TACLPropertyEditor.SetValue(const AValue: string);
 begin
   if IsReadOnly then
     Exit;
-  if Value = AValue then
-    Exit;
+  // Changing the property may affects to other properties
+  // like TACLRect.All, TControl.ParentBackground and etc.
+  //# if Value = AValue then
+  //#   Exit;
   if Changing(AValue) then
   begin
     TRTTI.SetPropValue(Owner, Info, AValue);

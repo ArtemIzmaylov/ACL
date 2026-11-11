@@ -78,7 +78,9 @@ type
     FBorderStyle: TBorderStyle;
     procedure SetBorderStyle(AValue: TBorderStyle);
   protected
+    procedure BoundsChanged; override;
     procedure CreateParams(var Params: TCreateParams); override;
+    //# Properties
     property BorderStyle: TBorderStyle read FBorderStyle write SetBorderStyle default bsSingle;
   {$ENDIF}
   public
@@ -235,6 +237,11 @@ begin
   RegisterWSComponent(TACLAbstractScrollingControl, TACLWSScrollingControl);
 end;
 {$ELSE}
+procedure TACLAbstractScrollingControl.BoundsChanged;
+begin
+  Perform(WM_NCPAINT, 0, 0);
+end;
+
 procedure TACLAbstractScrollingControl.CreateParams(var Params: TCreateParams);
 begin
   inherited;
@@ -249,13 +256,12 @@ begin
   if FBorderStyle <> AValue then
   begin
     FBorderStyle := AValue;
-    if HandleAllocated then
+    if not HandleAllocated then
+      Exit;
+    if acUpdateWindowLong(Handle, GWL_EXSTYLE, WS_EX_CLIENTEDGE, FBorderStyle = bsSingle) then
     begin
-      if acUpdateWindowLong(Handle, GWL_EXSTYLE, WS_EX_CLIENTEDGE, FBorderStyle = bsSingle) then
-      begin
-        SetWindowPos(Handle, 0, 0, 0, 0, 0, SWP_RECALC_NC);
-        Realign;
-      end;
+      SetWindowPos(Handle, 0, 0, 0, 0, 0, SWP_RECALC_NC);
+      Realign;
     end;
   end;
 end;
@@ -301,6 +307,7 @@ begin
   for LStep := False to True do
   begin
     ARect := ClientRect;
+    ARect.Offset(-HorzScrollBar.Position, -VertScrollBar.Position);
     inherited AlignControls(AControl, ARect);
     ARect := ClientRect;
     AdjustClientRect(ARect);
