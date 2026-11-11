@@ -20,11 +20,13 @@ interface
 
 uses
 {$IFDEF MSWINDOWS}
+  Win.ComObj,
   Winapi.ActiveX,
   Winapi.ShellApi,
   Winapi.ShlObj,
   Winapi.Windows,
-  Win.ComObj,
+  Winapi.PropKey,
+  Winapi.PropSys,
 {$ELSE}
   LazFileUtils,
   LCLIntf,
@@ -229,8 +231,10 @@ procedure ShellExpandPath(const APath: string; AReceiver: TACLStringEnumMethod);
 function ShellIsLibraryPath(const APath: string): Boolean;
 
 // Shell - Shortcuts
-function ShellShortcutCreate(const ALinkFileName, AFileName: string): Boolean;
-function ShellShortcutResolve(const AShortcutFileName: string; out AFileName: string): Boolean;
+function ShellShortcutCreate(const AShortcutFileName: string;
+  AFileName: string; const AAppId: string = ''): Boolean;
+function ShellShortcutResolve(const AShortcutFileName: string;
+  out AFileName: string): Boolean;
 
 // Shell - Misc
 function HasUserElevatedRights: Boolean;
@@ -833,11 +837,14 @@ begin
 end;
 {$ENDIF}
 
-function ShellShortcutCreate(const ALinkFileName, AFileName: string): Boolean;
+function ShellShortcutCreate(const AShortcutFileName: string;
+  AFileName: string; const AAppId: string = ''): Boolean;
 {$IFDEF MSWINDOWS}
 var
   LFile: IPersistFile;
   LLink: IShellLinkW;
+  LProperties: IPropertyStore;
+  LProperty: TPropVariant;
   LTemp: WideString;
 {$ENDIF}
 begin
@@ -849,11 +856,22 @@ begin
     begin
       LTemp := AFileName; // Note: AV on 64x OS
       LLink.SetPath(PWideChar(LTemp));
-      Result := Succeeded(LFile.Save(PWideChar(ALinkFileName), True));
+      if acOSCheckVersion(6, 1) and (AAppId <> '') then // Windows 7
+      begin
+        if Supports(LLink, IPropertyStore, LProperties) then
+        begin
+          LProperty := Default(TPropVariant);
+          LProperty.vt := VT_LPWSTR;
+          LProperty.pwszVal := PWideChar(AAppId);
+          if Succeeded(LProperties.SetValue(PKEY_AppUserModel_ID, LProperty)) then
+            LProperties.Commit;
+        end;
+      end;
+      Result := Succeeded(LFile.Save(PWideChar(AShortcutFileName), True));
     end;
   {$ENDIF}
   {$IFDEF LINUX}
-    with TACLIniFile.Create(ALinkFileName) do
+    with TACLIniFile.Create(AShortcutFileName) do
     try
       Encoding := TEncoding.UTF8;
       WriteString('Desktop Entry', 'Version', '1.0');
