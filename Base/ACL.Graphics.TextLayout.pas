@@ -770,8 +770,8 @@ type
     FRow: TACLTextLayoutRow;
     FRowTruncated: Boolean;
   {$IFDEF ACL_RTL_TEXTLAYOUT}
-    FRowRtlRange: Boolean;
-    FRowRtlRanges: TACLListOf<TACLRange>;
+    FRowRtlRange: TACLLinkedListItem<TACLRange>;
+    FRowRtlRanges: TACLLinkedListOf<TACLRange>;
   {$ENDIF}
     FRows: TACLTextLayoutRows;
     FPrevRowEndEllipsis: TACLTextLayoutBlockText;
@@ -782,7 +782,7 @@ type
       AWidth: Integer): Boolean; {$IFNDEF DEBUG}inline;{$ENDIF}
     procedure AlignRows;
     procedure CompleteRow;
-    procedure Reorder(ABlocks: TACLTextLayoutBlockList; const ARange: TACLRange);
+    procedure RtlMirror(ABlocks: TACLTextLayoutBlockList; ARange: TACLRange);
     procedure TruncateAll;
     procedure TruncateRow;
   protected
@@ -2510,8 +2510,7 @@ begin
   FRow.FHead := PChar(AOwner.Text);
   FRow.FTail := FRow.FHead;
 {$IFDEF ACL_RTL_TEXTLAYOUT}
-  FRowRtlRanges := TACLListOf<TACLRange>.Create;
-  FRowRtlRanges.Capacity := RtlRangeCapacity;
+  FRowRtlRanges := TACLLinkedListOf<TACLRange>.Create;
 {$ENDIF}
   FEditControl := atoEditControl and Owner.Options <> 0;
   FEndEllipsis := atoEndEllipsis and Owner.Options <> 0;
@@ -2532,8 +2531,7 @@ begin
   inherited Create(ACalculator.Owner, ACalculator.Render);
   FRow := TACLTextLayoutRow.Create;
 {$IFDEF ACL_RTL_TEXTLAYOUT}
-  FRowRtlRanges := TACLListOf<TACLRange>.Create;
-  FRowRtlRanges.Capacity := RtlRangeCapacity;
+  FRowRtlRanges := TACLLinkedListOf<TACLRange>.Create;
 {$ENDIF}
   FMaxLineCount := MaxInt;
   FMaxHeight := MaxInt;
@@ -2605,16 +2603,11 @@ begin
 {$IFDEF ACL_RTL_TEXTLAYOUT}
   LReadingDirection := acGetReadingDirection(ABlock.FPositionInText, ABlock.FLength);
   if LReadingDirection = TACLTextReadingDirection.LeftToRight then
-    FRowRtlRange := False
-  else
-    if FRowRtlRange then
-      FRowRtlRanges.List[FRowRtlRanges.Count - 1].Finish := FRow.Count
-    else
-      if LReadingDirection = TACLTextReadingDirection.RightToLeft then
-      begin
-        FRowRtlRanges.Add(TACLRange.Create(FRow.Count, FRow.Count));
-        FRowRtlRange := True;
-      end;
+    FRowRtlRange := nil
+  else if FRowRtlRange <> nil then
+    FRowRtlRange.Value.Finish := FRow.Count
+  else if LReadingDirection = TACLTextReadingDirection.RightToLeft then
+    FRowRtlRange := FRowRtlRanges.Add(TACLRange.Create(FRow.Count, FRow.Count));
 {$ENDIF}
 
   Result := AddBlock(ABlock, AWidth);
@@ -2660,8 +2653,6 @@ begin
 end;
 
 procedure TACLTextLayoutCalculator.CompleteRow;
-var
-  I: Integer;
 begin
   if FRow = nil then
     Exit;
@@ -2684,10 +2675,12 @@ begin
   FRows.Add(FRow);
 
 {$IFDEF ACL_RTL_TEXTLAYOUT}
-  for I := 0 to FRowRtlRanges.Count - 1 do
-    Reorder(FRow, FRowRtlRanges.List[I]);
-  FRowRtlRanges.Count := 0;
-  FRowRtlRange := False;
+  while FRowRtlRanges.Last <> nil do
+  begin
+    RtlMirror(FRow, FRowRtlRanges.Last.Value);
+    FRowRtlRanges.Delete(FRowRtlRanges.Last)
+  end;
+  FRowRtlRange := nil;
 {$ENDIF}
 
   if FEndEllipsis then
@@ -2856,11 +2849,21 @@ begin
   end;
 end;
 
-procedure TACLTextLayoutCalculator.Reorder(ABlocks: TACLTextLayoutBlockList; const ARange: TACLRange);
+procedure TACLTextLayoutCalculator.RtlMirror(
+  ABlocks: TACLTextLayoutBlockList; ARange: TACLRange);
 var
+  B: TACLTextLayoutBlock;
   R, L: TRect;
   I: Integer;
 begin
+  while ARange.Finish > ARange.Start do
+  begin
+    B := ABlocks.List[ARange.Finish];
+    if acGetReadingDirection(B.FPositionInText, B.Length) = TACLTextReadingDirection.Neutral then
+      Dec(ARange.Finish)
+    else
+      Break;
+  end;
   if ARange.Finish > ARange.Start then
   begin
     R := ABlocks.List[ARange.Start].Bounds;
@@ -3122,7 +3125,7 @@ begin
   {$IFDEF ACL_RTL_TEXTLAYOUT_MIXED_BLOCKS}
     case acGetReadingDirection(acCharUCS4FromString(LCursor, LLength, LCharLength)) of
       TACLTextReadingDirection.RightToLeft: if not LRtl then Break;
-      TACLTextReadingDirection.LeftToRight: if     LRtl then Break;
+    else if LRtl then Break;
     end;
     Dec(LLength, LCharLength);
     Inc(LCursor, LCharLength);

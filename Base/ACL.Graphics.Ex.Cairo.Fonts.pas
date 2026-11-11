@@ -591,6 +591,18 @@ const
     HB_SCRIPT_AVESTAN, HB_SCRIPT_EGYPTIAN_HIEROGLYPHS, HB_SCRIPT_CUNEIFORM,
     HB_SCRIPT_INVALID, HB_SCRIPT_PHOENICIAN, HB_SCRIPT_INVALID
   );
+
+  procedure GetFontScales(AFont: Phb_font_t; out AScaleX, AScaleY: Double);
+  var
+    LMatrix: cairo_matrix_t;
+    LScaleX, LScaleY: Integer;
+  begin
+    cairo_get_font_matrix(ACairo, @LMatrix);
+    hb_font_get_scale(AFont, @LScaleX, @LScaleY);
+    AScaleX := LMatrix.xx / IfThen(LScaleX > 0, LScaleX, 64.0);
+    AScaleY := LMatrix.yy / IfThen(LScaleY > 0, LScaleY, 64.0);
+  end;
+
 var
   I, X, Y: Integer;
   LBuffer: Phb_buffer_t;
@@ -599,10 +611,9 @@ var
   LCharGroup: TACLCharsetGroup;
   LCharLength: Integer;
   LFont: Phb_font_t;
-  LFontMatrix: cairo_matrix_t;
   LFontId: LongWord;
-  LFontScale: Double;
-  LFontUpem: Double;
+  LFontScaleX: Double;
+  LFontScaleY: Double;
   LGlyphCount: Integer;
   LGlyphs: Phb_glyph_info_t;
   LGlyphsPos: Phb_glyph_position_t;
@@ -634,17 +645,14 @@ begin
         if AGlyphs = nil then
           AGlyphs := cairo_glyph_allocate(LGlyphCount);
 
-        cairo_get_font_matrix(ACairo, @LFontMatrix);
-        LFontUpem := hb_face_get_upem(hb_font_get_face(LFont));
-        LFontScale := LFontMatrix.xx / IfThen(LFontUpem > 0, LFontUpem, 64.0);
-
         X := 0; Y := 0;
         AMapping.Init(AText, LGlyphCount);
+        GetFontScales(LFont, LFontScaleX, LFontScaleY);
         for I := 0 to LGlyphCount - 1 do
         begin
           AGlyphs[I].index := LGlyphs[I].codepoint;
-          AGlyphs[I].x := Round(LFontScale * (LGlyphsPos[I].x_offset + X));
-          AGlyphs[I].y := Round(LFontScale * (LGlyphsPos[I].y_offset + Y));
+          AGlyphs[I].x := Round(LFontScaleX * (LGlyphsPos[I].x_offset + X));
+          AGlyphs[I].y := Round(LFontScaleY * (LGlyphsPos[I].y_offset + Y));
           AMapping.TextOffsets[I] := LGlyphs[I].cluster;
           Inc(X, LGlyphsPos[I].x_advance);
           Inc(Y, LGlyphsPos[I].y_advance);

@@ -1390,11 +1390,11 @@ begin
   begin
     LBounds := Rect(X, Y, MaxWord, MaxWord);
     if AClipRect = nil then
-      acAdvDrawText(ACanvas, acMakeString(AText, ALength), LBounds, 0, 0)
+      acAdvDrawText(ACanvas, acMakeString(AText, ALength), LBounds, DT_NOPREFIX or DT_NOCLIP, 0)
     else
       if acStartClippedDraw(ACanvas, AClipRect^, LRegion) then
       try
-        acAdvDrawText(ACanvas, acMakeString(AText, ALength), LBounds, 0, 0);
+        acAdvDrawText(ACanvas, acMakeString(AText, ALength), LBounds, DT_NOPREFIX or DT_NOCLIP, 0);
       finally
         acEndClippedDraw(ACanvas, LRegion);
       end;

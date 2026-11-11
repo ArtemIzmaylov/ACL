@@ -150,6 +150,7 @@ type
     procedure AddCore(const AItem: TACLLinkedListItem<T>);
   public
     constructor Create(AOwnValues: Boolean = False);
+    destructor Destroy; override;
     function Add(const AItem: TACLLinkedListItem<T>): TACLLinkedListItem<T>; overload; inline;
     function Add(const AValue: T): TACLLinkedListItem<T>; overload; inline;
     procedure Clear;
@@ -1017,6 +1018,12 @@ begin
     EnsureTypeIsObject(TypeInfo(T));
 end;
 
+destructor TACLLinkedListOf<T>.Destroy;
+begin
+  Clear;
+  inherited;
+end;
+
 function TACLLinkedListOf<T>.Add(const AItem: TACLLinkedListItem<T>): TACLLinkedListItem<T>;
 begin
   Result := AItem;
@@ -1050,6 +1057,7 @@ end;
 procedure TACLLinkedListOf<T>.Delete(AItem: TACLLinkedListItem<T>);
 begin
   AItem := Extract(AItem);
+  if AItem <> nil then
   try
     if FOwnValues then
       PObject(@AItem.Value)^.Free;
@@ -1060,15 +1068,22 @@ end;
 
 function TACLLinkedListOf<T>.Extract(AItem: TACLLinkedListItem<T>): TACLLinkedListItem<T>;
 begin
+  if AItem = nil then
+    Exit(nil);
+
   if AItem.Next <> nil then
     AItem.Next.Prev := AItem.Prev
+  else if AItem = FLast then
+    FLast := AItem.Prev
   else
-    FLast := AItem.Prev;
+    raise EInvalidArgument.Create('Item.Last');
 
   if AItem.Prev <> nil then
     AItem.Prev.Next := AItem.Next
+  else if AItem = FFirst then
+    FFirst := AItem.Next
   else
-    FFirst := AItem.Next;
+    raise EInvalidArgument.Create('Item.First');
 
   Result := AItem;
   Result.Next := nil;
