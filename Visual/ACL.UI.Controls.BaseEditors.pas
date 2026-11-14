@@ -1302,13 +1302,13 @@ begin
     LText := PChar(LTextStr);
     LTextCur := LText;
     LTextEnd := LText + Length(LTextStr);
-    while LText < LTextEnd do
+    while LTextCur < LTextEnd do
     begin
       LCharLen := acCharLength(LTextCur);
       LRect.Width := acTextSize(MeasureCanvas, LTextCur, LCharLen).cx;
       if PtInRect(LRect, Point(X, Y)) then
       begin
-        if X > (LRect.Right + LRect.Left) div 2 then
+        if X >= (LRect.Right + LRect.Left) div 2 then
           Inc(LTextCur, LCharLen);
         Exit(LTextCur - LText);
       end;
