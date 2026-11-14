@@ -34,7 +34,8 @@ type
   ERttiError = class(EPropertyError)
   public
     constructor CreateNoProp(const AClassName, AFieldName: string);
-    constructor CreatePropError(AObject: TObject; APropInfo: PPropInfo; const AErrorText: string);
+    constructor CreateSetPropError(AObject: TObject; APropInfo: PPropInfo;
+      const AErrorText, APropValue: string);
     constructor CreateUnsupportedPropType(APropInfo: PPropInfo);
     class procedure EnsureWritable(AObject: TObject; APropInfo: PPropInfo);
   end;
@@ -178,8 +179,9 @@ begin
   CreateFmt('The %s.%s property was not found', [AClassName, AFieldName]);
 end;
 
-constructor ERttiError.CreatePropError(
-  AObject: TObject; APropInfo: PPropInfo; const AErrorText: string);
+constructor ERttiError.CreateSetPropError(
+  AObject: TObject; APropInfo: PPropInfo;
+  const AErrorText, APropValue: string);
 begin
   CreateFmt('%s.%s - %s', [AObject.ClassName, GetPropName(APropInfo), AErrorText]);
 end;
@@ -514,7 +516,7 @@ begin
     end;
   except
     on E: Exception do
-      raise ERttiError.CreatePropError(AObject, APropInfo, E.Message);
+      raise ERttiError.CreateSetPropError(AObject, APropInfo, E.Message, AValue);
   end;
 end;
 
@@ -539,7 +541,8 @@ begin
         TypInfo.SetPropValue(AObject, APropInfo, AValue);
   except
     on E: Exception do
-      raise ERttiError.CreatePropError(AObject, APropInfo, E.Message);
+      raise ERttiError.CreateSetPropError(AObject,
+        APropInfo, E.Message, VarToStrDef(AValue, '?'));
   end;
 end;
 
