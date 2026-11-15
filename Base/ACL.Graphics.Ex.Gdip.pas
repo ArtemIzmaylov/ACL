@@ -255,7 +255,7 @@ type
   public
     constructor Create; override;
     destructor Destroy; override;
-    procedure BeginPaint(DC: HDC); override;
+    function BeginPaint(DC: HDC): TACL2DRender; override;
     procedure BeginPaint(DC: HDC; const Unused1, Unused2: TRect); override;
     procedure EndPaint; override;
   end;
@@ -1505,7 +1505,7 @@ begin
   inherited Destroy;
 end;
 
-procedure TACLGdiplusPaintCanvas.BeginPaint(DC: HDC);
+function TACLGdiplusPaintCanvas.BeginPaint(DC: HDC): TACL2DRender;
 var
   LHandle: GpGraphics;
   LResult: GpStatus;
@@ -1521,6 +1521,7 @@ begin
   if NativeHandle <> nil then
     FSavedHandles.Push(NativeHandle);
   FGraphics := LHandle;
+  Result := Self;
 end;
 
 procedure TACLGdiplusPaintCanvas.BeginPaint(DC: HDC; const Unused1, Unused2: TRect);

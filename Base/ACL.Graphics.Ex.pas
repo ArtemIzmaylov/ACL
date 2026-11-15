@@ -186,10 +186,10 @@ type
   public
     constructor Create; virtual;
     destructor Destroy; override;
-    procedure BeginPaint(DC: HDC); overload; virtual;
+    function BeginPaint(DC: HDC): TACL2DRender; overload; virtual;
     procedure BeginPaint(DC: HDC; const BoxRect: TRect); overload;
     procedure BeginPaint(DC: HDC; const BoxRect, UpdateRect: TRect); overload; virtual; abstract;
-    procedure BeginPaint(ACanvas: TCanvas); overload; virtual;
+    function BeginPaint(ACanvas: TCanvas): TACL2DRender; overload; virtual;
     procedure EndPaint; virtual; abstract;
 
     // General
@@ -1519,13 +1519,14 @@ begin
   inherited Destroy;
 end;
 
-procedure TACL2DRender.BeginPaint(DC: HDC);
+function TACL2DRender.BeginPaint(DC: HDC): TACL2DRender;
 var
   LRect: TRect;
 begin
   LRect := NullRect;
   GetClipBox(DC, {$IFDEF FPC}@{$ENDIF}LRect);
   BeginPaint(DC, LRect);
+  Result := Self;
 end;
 
 procedure TACL2DRender.BeginPaint(DC: HDC; const BoxRect: TRect);
@@ -1533,9 +1534,9 @@ begin
   BeginPaint(DC, BoxRect, BoxRect)
 end;
 
-procedure TACL2DRender.BeginPaint(ACanvas: TCanvas);
+function TACL2DRender.BeginPaint(ACanvas: TCanvas): TACL2DRender;
 begin
-  BeginPaint(ACanvas.Handle);
+  Result := BeginPaint(ACanvas.Handle);
 end;
 
 function TACL2DRender.CreateImage(Image: TACLImage;

@@ -175,11 +175,11 @@ type
     procedure PathEllipseArc(X1, Y1, X2, Y2: Double);
     procedure PathPolyline(Points: PPoint; Count: Integer; ClosePath: Boolean);
   public
-    procedure BeginPaint(ACairo: Pcairo_t); overload;
-    procedure BeginPaint(ACanvas: TCanvas); override;
-    procedure BeginPaint(AColors: PACLPixel32; AWidth, AHeight: Integer); overload;
-    procedure BeginPaint(ADib: TACLBaseDib); overload;
-    procedure BeginPaint(ASurface: Pcairo_surface_t); overload;
+    function BeginPaint(ACairo: Pcairo_t): TACL2DRender; overload;
+    function BeginPaint(ACanvas: TCanvas): TACL2DRender; overload; override;
+    function BeginPaint(AColors: PACLPixel32; AWidth, AHeight: Integer): TACL2DRender; overload;
+    function BeginPaint(ADib: TACLBaseDib): TACL2DRender; overload;
+    function BeginPaint(ASurface: Pcairo_surface_t): TACL2DRender; overload;
     procedure BeginPaint(DC: HDC; const BoxRect, UpdateRect: TRect); overload; override;
     procedure EndPaint; override;
 
@@ -1929,7 +1929,7 @@ end;
 
 { TACLCairoRender }
 
-procedure TACLCairoRender.BeginPaint(ACairo: Pcairo_t);
+function TACLCairoRender.BeginPaint(ACairo: Pcairo_t): TACL2DRender;
 begin
   FLock.Enter;
   try
@@ -1940,13 +1940,14 @@ begin
     FImageSmoothStretching := TACLBoolean.Default;
     FOrigin := NullPoint;
     SetTextAntialiasMode(tamDefault);
+    Result := Self;
   except
     FLock.Leave;
     raise;
   end;
 end;
 
-procedure TACLCairoRender.BeginPaint(ACanvas: TCanvas);
+function TACLCairoRender.BeginPaint(ACanvas: TCanvas): TACL2DRender;
 begin
   FLock.Enter;
   try
@@ -1956,13 +1957,14 @@ begin
     FImageSmoothStretching := TACLBoolean.Default;
     cairo_set_clipping(Handle, ACanvas, FContext);
     SetTextAntialiasMode(tamDefault);
+    Result := Self;
   except
     FLock.Leave;
     raise;
   end;
 end;
 
-procedure TACLCairoRender.BeginPaint(AColors: PACLPixel32; AWidth, AHeight: Integer);
+function TACLCairoRender.BeginPaint(AColors: PACLPixel32; AWidth, AHeight: Integer): TACL2DRender;
 begin
   FLock.Enter;
   try
@@ -1973,18 +1975,19 @@ begin
     FHandle := cairo_create(FTargetSurface);
     FImageSmoothStretching := TACLBoolean.Default;
     SetTextAntialiasMode(tamDefault);
+    Result := Self;
   except
     FLock.Leave;
     raise;
   end;
 end;
 
-procedure TACLCairoRender.BeginPaint(ADib: TACLBaseDib);
+function TACLCairoRender.BeginPaint(ADib: TACLBaseDib): TACL2DRender;
 begin
-  BeginPaint(ADib.Colors, ADib.Width, ADib.Height);
+  Result := BeginPaint(ADib.Colors, ADib.Width, ADib.Height);
 end;
 
-procedure TACLCairoRender.BeginPaint(ASurface: Pcairo_surface_t);
+function TACLCairoRender.BeginPaint(ASurface: Pcairo_surface_t): TACL2DRender;
 begin
   FLock.Enter;
   try
@@ -1995,6 +1998,7 @@ begin
     FImageSmoothStretching := TACLBoolean.Default;
     FOrigin := NullPoint;
     SetTextAntialiasMode(tamDefault);
+    Result := Self;
   except
     FLock.Leave;
     raise;
