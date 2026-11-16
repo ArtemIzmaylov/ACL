@@ -42,12 +42,6 @@
   {$DEFINE ACL_PUREPASCAL} // disable inline assembler
 {$IFEND}
 
-{$IF NOT DEFINED(FPC)}
-  // Disable some Delphi's warnings
-  {$WARN DUPLICATE_CTOR_DTOR OFF}
-  {$WARN OVERLOADING_ARRAY_PROPERTY OFF}
-{$IFEND}
-
 // -----------------------------------------------------------------------------
 // IDE Versions
 // -----------------------------------------------------------------------------
@@ -87,6 +81,12 @@
 // -----------------------------------------------------------------------------
 // Options
 // -----------------------------------------------------------------------------
+
+{$IFDEF DELPHI130}
+  // Disable some Delphi's warnings
+  {$WARN DUPLICATE_CTOR_DTOR OFF}
+  {$WARN OVERLOADING_ARRAY_PROPERTY OFF}
+{$IFEND}
 
 {$IF DEFINED(DEBUG) OR DEFINED(MADEXCEPT) OR DEFINED(EUREKALOG)}
   {.$DEFINE ACL_LOG_REGISTRY}

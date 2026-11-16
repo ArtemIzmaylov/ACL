@@ -1190,6 +1190,8 @@ begin
 begin
   Result := False;
 {$ELSE}
+const
+  IMAGE_FILE_MACHINE_ARM64 = $AA64;  { ARM64 Little-Endian }
 type
   TIsWow64Process2 = function (Process: THandle; out ProcessMachine, NativeMachine: Word): LongBool; stdcall;
 var

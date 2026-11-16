@@ -3496,7 +3496,7 @@ end;
 
 class function TACLTextFormatSettings.Default: TACLTextFormatSettings;
 begin
-  FillChar(Result{%H-}, SizeOf(Result), 0);
+  Result := System.Default(TACLTextFormatSettings);
   Result.AllowAutoURLDetect := True;
   Result.AllowCppLikeLineBreaks := True;
   Result.AllowFormatting := True;
@@ -3504,13 +3504,13 @@ end;
 
 class function TACLTextFormatSettings.Formatted: TACLTextFormatSettings;
 begin
-  FillChar(Result{%H-}, SizeOf(Result), 0);
+  Result := System.Default(TACLTextFormatSettings);
   Result.AllowFormatting := True;
 end;
 
 class function TACLTextFormatSettings.PlainText: TACLTextFormatSettings;
 begin
-  FillChar(Result{%H-}, SizeOf(Result), 0);
+  Result := System.Default(TACLTextFormatSettings);
 end;
 
 class operator TACLTextFormatSettings.Equal(const V1, V2: TACLTextFormatSettings): Boolean;
