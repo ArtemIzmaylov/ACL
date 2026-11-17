@@ -815,7 +815,7 @@ type
   { TACLTextImporter }
 
   TACLTextImporter = class
-  strict private const
+  protected const
     FontScalingBig = 1.10;
     FontScalingSmall = 0.9;
     Spaces = acParserDefaultSpaceChars;
@@ -3188,7 +3188,7 @@ begin
     Exit(True);
   end;
 
-  if (L > 4) and CompareMem(S, Prefix, 4) then
+  if (L > 4) and CompareMem(S, Prefix, 4 * SizeOf(Char)) then
   begin
     if acStrScan(S + 4, L - 4, '.') <> nil then
     begin

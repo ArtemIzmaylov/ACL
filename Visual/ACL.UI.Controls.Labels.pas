@@ -211,8 +211,10 @@ type
 
   TACLFormattedLabel = class(TACLCustomLabel)
   strict private
+    FAutoDetectUrls: Boolean;
     FText: TACLTextLayout;
     procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
+    procedure SetAutoDetectUrls(AValue: Boolean);
   protected
     function GetHyperlinkAt(const P: TPoint; out AUrl: string): Boolean; override;
     procedure PaintText; override;
@@ -225,6 +227,7 @@ type
     property Alignment;
     property AlignmentVert;
     property Anchors;
+    property AutoDetectUrls: Boolean read FAutoDetectUrls write SetAutoDetectUrls default False;
     property AutoSize;
     property Caption;
     property Constraints;
@@ -754,9 +757,16 @@ begin
 end;
 
 procedure TACLFormattedLabel.CMTextChanged(var Message: TMessage);
+var
+  LSettings: TACLTextFormatSettings;
 begin
   if FText <> nil then
-    FText.SetText(Caption, TACLTextFormatSettings.Formatted);
+  begin
+    LSettings := TACLTextFormatSettings.Formatted;
+    LSettings.AllowAutoEmailDetect := AutoDetectUrls;
+    LSettings.AllowAutoURLDetect := AutoDetectUrls;
+    FText.SetText(Caption, LSettings);
+  end;
   inherited;
 end;
 
@@ -794,6 +804,15 @@ procedure TACLFormattedLabel.PaintText;
 begin
   FText.Bounds := FTextRect;
   FText.Draw(Canvas, FTextRect);
+end;
+
+procedure TACLFormattedLabel.SetAutoDetectUrls(AValue: Boolean);
+begin
+  if FAutoDetectUrls <> AValue then
+  begin
+    FAutoDetectUrls := AValue;
+    Perform(CM_TEXTCHANGED, 0, 0);
+  end;
 end;
 
 {$ENDREGION}
