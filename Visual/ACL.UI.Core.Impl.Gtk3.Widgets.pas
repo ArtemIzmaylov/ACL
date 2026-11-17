@@ -404,9 +404,12 @@ begin
     // Положение DropDown-окна сбрасывается в (0,0) при инициализации показа на Wayland.
     if InUpdate and GTK3WidgetSet.IsWayland then
       Exit(0);
-    // KDE: сворачиваем максимизированное окно в трей, ОС присылает Configure со смещением координат окна на 10пкс...
-    // Короче говоря, если окно в фиксированном режиме и не отображается на экране - игнорируем configure
-    if (TCustomForm(LCLObject).WindowState <> wsNormal) and not PGtkWindow(Widget)^.get_mapped then
+    // KDE: сворачиваем максимизированное окно в трей, ОС присылает Configure со
+    // смещением координат окна на 10пкс. GetWindowSize возворащает размеры окна
+    // в 1х1. В итоге, при разворачивании окно смещается и схлопывается до
+    // минимальных размеров.
+    // В общем, если мы на KDE и окно не готово - Move игнорируем
+    if not PGtkWindow(Widget)^.get_mapped and (ShellDesktopEnv = sdeKDE) then
       Exit(0);
   end;
   Result := inherited DeliverMessage(Msg, AIsInput);
