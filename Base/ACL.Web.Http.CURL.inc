@@ -22,10 +22,12 @@ type
     FResponce: THttpResponse;
 
     FOnAccept: TConsumerC<THttpResponse>;
+    FOnCheckCanceled: TACLTaskCancelCallback;
     FOnProgress: THttpProgressProc;
     FOnReceive: THttpDataProc;
 
     procedure Progress(APosition, ATotal: Int64);
+    procedure RaiseIfCanceled;
     procedure SetUserError(AError: Exception);
   protected
     class function OnHeader(buffer: PAnsiChar; size: size_t;
@@ -37,6 +39,7 @@ type
     procedure ProcessHeaders;
   public
     constructor Create(
+      ACheckCanceled: TACLTaskCancelCallback;
       APostData: TStream = nil;
       AOnAccept: TConsumerC<THttpResponse> = nil;
       AOnProgress: THttpProgressProc = nil;
@@ -57,6 +60,7 @@ type
   protected
     function RequestCore(const AMethod: string;
       AHeaders: TACLStringList;
+      AIsCanceled: TACLTaskCancelCallback;
       APostData: TStream = nil;
       AIgnoreCertificateIssues: Boolean = False;
       AOnAccept: TConsumerC<THttpResponse> = nil;
@@ -70,9 +74,11 @@ type
   { THttpRequestData }
 
   constructor THttpRequestData.Create(
+    ACheckCanceled: TACLTaskCancelCallback;
     APostData: TStream; AOnAccept: TConsumerC<THttpResponse>;
     AOnProgress: THttpProgressProc; AOnReceive: THttpDataProc);
   begin
+    FOnCheckCanceled := ACheckCanceled;
     FOnReceive := AOnReceive;
     FOnAccept := AOnAccept;
     FOnProgress := AOnProgress;
@@ -106,6 +112,7 @@ type
     try
       Result := data.FPostData.Read(buffer^, size * nitems);
       data.Progress(data.FPostData.Position, data.FPostData.Size);
+      data.RaiseIfCanceled;
     except
       on E: Exception do
       begin
@@ -122,10 +129,11 @@ type
     try
       if not data.FHeadersProcessed then
         data.ProcessHeaders;
-      Inc(data.FPosition, Result);
       if not data.FOnReceive(PByte(buffer), Result) then
         raise EHttpWriteError.Create;
+      Inc(data.FPosition, Result);
       data.Progress(data.FPosition, data.FResponce.ContentLength);
+      data.RaiseIfCanceled;
     except
       on E: Exception do
       begin
@@ -137,7 +145,13 @@ type
 
   procedure THttpRequestData.Progress(APosition, ATotal: Int64);
   begin
-    if Assigned(FOnProgress) and not FOnProgress(APosition, ATotal) then
+    if Assigned(FOnProgress) then
+      FOnProgress(APosition, ATotal);
+  end;
+
+  procedure THttpRequestData.RaiseIfCanceled;
+  begin
+    if Assigned(FOnCheckCanceled) and FOnCheckCanceled() then
       raise EHttpCancel.Create;
   end;
 
@@ -202,7 +216,9 @@ type
   end;
 
   function THttpConnectionImpl.RequestCore(const AMethod: string;
-    AHeaders: TACLStringList; APostData: TStream;
+    AHeaders: TACLStringList;
+    AIsCanceled: TACLTaskCancelCallback;
+    APostData: TStream;
     AIgnoreCertificateIssues: Boolean;
     AOnAccept: TConsumerC<THttpResponse>;
     AOnProgress: THttpProgressProc;
@@ -225,7 +241,10 @@ type
 
   var
     I: Integer;
+    LCount: Integer;
     LHeaders: Pcurl_slist;
+    LMsg: PCURLMSG;
+    LMulti: PCURLM;
     LProxy: string;
     LResult: CURLcode;
     LRequest: THttpRequestData;
@@ -264,7 +283,7 @@ type
     SetOpt(CURLOPT_URL, PChar(LUrl.ToString));
     SetOpt(CURLOPT_CUSTOMREQUEST, PChar(AMethod));
 
-    LRequest := THttpRequestData.Create(APostData, AOnAccept, AOnProgress, AOnReceive);
+    LRequest := THttpRequestData.Create(AIsCanceled, APostData, AOnAccept, AOnProgress, AOnReceive);
     try
       if APostData <> nil then
       begin
@@ -284,7 +303,34 @@ type
       try
         if LHeaders <> nil then
           SetOpt(CURLOPT_HTTPHEADER, LHeaders);
-        LResult := curl_easy_perform(FHandle);
+
+        if Assigned(AIsCanceled) then
+        begin
+          LMulti := curl_multi_init;
+          try
+            curl_multi_add_handle(LMulti, FHandle);
+            repeat
+              LCount := 0;
+              curl_multi_wait(LMulti, nil, 0, 50, nil);
+              curl_multi_perform(LMulti, @LCount);
+            until (LCount = 0) or AIsCanceled();
+
+            LResult := CURLE_ABORTED_BY_CALLBACK;
+            repeat
+              LMsg := curl_multi_info_read(LMulti, @LCount);
+              if (LMsg <> nil) and
+                 (LMsg^.msg = CURLMSG_DONE) and
+                 (LMsg^.easy_handle = FHandle)
+              then
+                LResult := LMsg^.data.result;
+            until LMsg = nil;
+          finally
+            curl_multi_remove_handle(LMulti, FHandle);
+            curl_multi_cleanup(LMulti);
+          end;
+        end
+        else
+          LResult := curl_easy_perform(FHandle);
       finally
         if LHeaders <> nil then
           curl_slist_free_all(LHeaders);

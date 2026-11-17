@@ -80,13 +80,14 @@ type
 
   THttpAcceptProc = reference to function (const AResponse: THttpResponse): Boolean;
   THttpDataProc = reference to function (Data: PByte; Count: Integer): Boolean;
-  THttpProgressProc = reference to function (const APosition, ASize: Int64): Boolean;
+  THttpProgressProc = reference to procedure (Position, Size: Int64);
 
   THttpConnection = class
   protected
     FURL: TACLWebURL;
     function RequestCore(const AMethod: string;
       AHeaders: TACLStringList;
+      ACheckCanceled: TACLTaskCancelCallback = nil;
       APostData: TStream = nil;
       AIgnoreCertificateIssues: Boolean = False;
       AOnAccept: TConsumerC<THttpResponse> = nil;
@@ -95,6 +96,7 @@ type
   public
     class function Open(URL: TACLWebURL): THttpConnection;
     function Request(const AMethod: string;
+      ACheckCanceled: TACLTaskCancelCallback = nil;
       ARange: IACLWebRequestRange = nil;
       APostData: TStream = nil;
       AIgnoreCertificateIssues: Boolean = False;
@@ -178,9 +180,9 @@ type
       ACallInMainThread: Boolean = False): IACLHttpRequest; overload;
     function OnComplete(AProc: TProc<TACLWebErrorInfo>;
       ACallInMainThread: Boolean = False): IACLHttpRequest;
+    function OnData(AStream: TStream): IACLHttpRequest; overload;
     function OnData(AContainer: IACLDataContainer): IACLHttpRequest; overload;
     function OnData(AProc: THttpDataProc): IACLHttpRequest; overload;
-    function OnData(AStream: TStream): IACLHttpRequest; overload;
     function OnPost(AStream: TStream;
       AOwnership: TStreamOwnership = soReference): IACLHttpRequest; overload;
     function OnPost(const AStr: AnsiString): IACLHttpRequest; overload;
@@ -191,8 +193,8 @@ type
     function SetRange(ARange: IACLWebRequestRange): IACLHttpRequest;
     // Run
     function Run: TObjHandle;
-    function RunNoThread: TACLWebErrorInfo; overload;
-    function RunNoThread(ACheckCanceled: TACLTaskCancelCallback): TACLWebErrorInfo; overload;
+    function RunNoThread(ACheckCanceled: TACLTaskCancelCallback = nil): TACLWebErrorInfo; overload;
+    function RunNoThread(ACheckCanceled: TACLTaskCancelCallbackRef): TACLWebErrorInfo; overload;
   end;
 
   { TACLHttp }
@@ -203,7 +205,6 @@ type
     FMethod: string;
     FOnAccept: THttpAcceptProc;
     FOnAcceptSync: Boolean;
-    FOnCheckCanceled: TACLTaskCancelCallback;
     FOnComplete: TProc<TACLWebErrorInfo>;
     FOnCompleteSync: Boolean;
     FOnData: THttpDataProc;
@@ -220,8 +221,6 @@ type
     function OnAccept(AMaxSize: Int64): IACLHttpRequest; overload;
     function OnAccept(AProc: THttpAcceptProc;
       ACallInMainThread: Boolean = False): IACLHttpRequest; overload;
-    function OnCheckCanceled(
-      ACheckCanceled: TACLTaskCancelCallback): IACLHttpRequest;
     function OnComplete(AProc: TProc<TACLWebErrorInfo>;
       ACallInMainThread: Boolean = False): IACLHttpRequest;
     function OnData(AContainer: IACLDataContainer): IACLHttpRequest; overload;
@@ -237,8 +236,8 @@ type
     function SetPriority(APriority: TACLTaskPriority): IACLHttpRequest;
     // Run
     function Run: TObjHandle;
-    function RunNoThread: TACLWebErrorInfo; overload;
-    function RunNoThread(ACheckCanceled: TACLTaskCancelCallback): TACLWebErrorInfo; overload;
+    function RunNoThread(ACheckCanceled: TACLTaskCancelCallback = nil): TACLWebErrorInfo; overload;
+    function RunNoThread(ACheckCanceled: TACLTaskCancelCallbackRef): TACLWebErrorInfo; overload;
   public
     destructor Destroy; override;
     class function Get(const AUrl: string): IACLHttpRequest;
@@ -307,6 +306,8 @@ begin
   Result := InRange(StatusCode, 200, 299);
 end;
 
+{ THttpConnection }
+
 class function THttpConnection.Open(URL: TACLWebURL): THttpConnection;
 begin
   URL.Host := acString(TACLPunycode.EncodeDomain(acUString(URL.Host)));
@@ -314,6 +315,7 @@ begin
 end;
 
 function THttpConnection.Request(const AMethod: string;
+  ACheckCanceled: TACLTaskCancelCallback = nil;
   ARange: IACLWebRequestRange = nil;
   APostData: TStream = nil;
   AIgnoreCertificateIssues: Boolean = False;
@@ -365,7 +367,7 @@ begin
       AddHeaderValue(LHeaders, THttpHeaders.IdentContentType, 'application/x-www-form-urlencoded');
     if (ARange <> nil) and ((ARange.GetOffset > 0) or (ARange.GetSize > 0)) then
       AddHeaderValue(LHeaders, THttpHeaders.IdentRange, BuildRange);
-    Result := RequestCore(AMethod, LHeaders, APostData,
+    Result := RequestCore(AMethod, LHeaders, ACheckCanceled, APostData,
       AIgnoreCertificateIssues, LAcceptProc, AOnProgress, AOnReceive);
   finally
     LHeaders.Free;
@@ -403,6 +405,7 @@ type
     FBlockBuffer: TACLByteBuffer;
     FStream: TACLHttpInputStream;
     function GetNextBlockIndex(out ABlockIndex: Integer): Boolean;
+    function IsCanceled: Boolean;
     procedure WriteBuffer(ABlockIndex: Integer);
   protected
     procedure Execute; override;
@@ -654,7 +657,7 @@ begin
     if GetNextBlockIndex(ABlockIndex) then
     try
       FBlockBuffer.Used := 0;
-      FStream.FConnection.Request('GET',
+      FStream.FConnection.Request('GET', IsCanceled,
         TACLWebRequestRange.Create(ABlockIndex * TACLHttpInputStream.BlockSize),
         {post-data}nil, {IgnoreCertIssues}False, {onAccept}nil, {onProgress}nil,
         function (Data: PByte; Count: Integer): Boolean
@@ -719,6 +722,11 @@ begin
   Result := ABlockIndex >= 0;
 end;
 
+function TACLHttpInputStreamUpdateThread.IsCanceled: Boolean;
+begin
+  Result := Terminated;
+end;
+
 procedure TACLHttpInputStreamUpdateThread.WriteBuffer(ABlockIndex: Integer);
 begin
   if FBlockBuffer.Used > 0 then
@@ -756,8 +764,7 @@ type
     FRequestIntf: IACLHttpRequest;
     procedure CallEvent(AProc: TProc; ASync: Boolean);
     function DoAccept(const AResponse: THttpResponse): Boolean;
-    function DoCanContinue: Boolean;
-    function DoProgess(const APosition, ASize: Int64): Boolean;
+    procedure DoProgess(APosition, ASize: Int64);
   protected
     procedure Complete; override;
     procedure Execute; override;
@@ -825,13 +832,6 @@ begin
       end;
 end;
 
-function TACLHttp.OnCheckCanceled(
-  ACheckCanceled: TACLTaskCancelCallback): IACLHttpRequest;
-begin
-  FOnCheckCanceled := FOnCheckCanceled;
-  Result := Self;
-end;
-
 function TACLHttp.OnComplete(AProc: TProc<TACLWebErrorInfo>;
   ACallInMainThread: Boolean = False): IACLHttpRequest;
 begin
@@ -896,15 +896,23 @@ begin
   Result := TaskDispatcher.Run(TACLHttpRequestTask.Create(Self));
 end;
 
-function TACLHttp.RunNoThread(ACheckCanceled: TACLTaskCancelCallback): TACLWebErrorInfo;
+function TACLHttp.RunNoThread(ACheckCanceled: TACLTaskCancelCallbackRef): TACLWebErrorInfo;
+var
+  LTask: TACLHttpRequestTask;
 begin
-  FOnCheckCanceled := ACheckCanceled;
-  Result := RunNoThread;
+  LTask := TACLHttpRequestTask.Create(Self);
+  LTask.OnCheckCanceledRef := ACheckCanceled;
+  LTask.RunInCurrentThread;
+  Result := FResult;
 end;
 
-function TACLHttp.RunNoThread: TACLWebErrorInfo;
+function TACLHttp.RunNoThread(ACheckCanceled: TACLTaskCancelCallback): TACLWebErrorInfo;
+var
+  LTask: TACLHttpRequestTask;
 begin
-  TACLHttpRequestTask.Create(Self).RunInCurrentThread;
+  LTask := TACLHttpRequestTask.Create(Self);
+  LTask.OnCheckCanceled := ACheckCanceled;
+  LTask.RunInCurrentThread;
   Result := FResult;
 end;
 
@@ -962,7 +970,7 @@ function TACLHttpRequestTask.DoAccept(const AResponse: THttpResponse): Boolean;
 var
   LResult: Boolean;
 begin
-  LResult := DoCanContinue;
+  LResult := not IsCanceled;
   if LResult and Assigned(FRequest.FOnAccept) then
   begin
     CallEvent(
@@ -974,26 +982,16 @@ begin
   Result := LResult;
 end;
 
-function TACLHttpRequestTask.DoCanContinue: Boolean;
+procedure TACLHttpRequestTask.DoProgess(APosition, ASize: Int64);
 begin
-  Result := not (Assigned(FRequest.FOnCheckCanceled) and
-    FRequest.FOnCheckCanceled or IsCanceled);
-end;
-
-function TACLHttpRequestTask.DoProgess(const APosition, ASize: Int64): Boolean;
-var
-  LResult: Boolean;
-begin
-  LResult := DoCanContinue;
-  if LResult and Assigned(FRequest.FOnProgress) then
+  if Assigned(FRequest.FOnProgress) then
   begin
     CallEvent(
       procedure
       begin
-        LResult := FRequest.FOnProgress(APosition, ASize);
+        FRequest.FOnProgress(APosition, ASize);
       end, FRequest.FOnProgressSync);
   end;
-  Result := LResult;
 end;
 
 procedure TACLHttpRequestTask.Execute;
@@ -1004,8 +1002,12 @@ begin
     LConnection := THttpConnection.Open(FRequest.FUrl);
     try
       if not IsCanceled then
-        LConnection.Request(FRequest.FMethod, FRequest.FRange, FRequest.FPostData,
-          FRequest.FIgnoreCertificateIssues, DoAccept, DoProgess, FRequest.FOnData);
+      begin
+        LConnection.Request(FRequest.FMethod, IsCanceled,
+          FRequest.FRange, FRequest.FPostData,
+          FRequest.FIgnoreCertificateIssues,
+          DoAccept, DoProgess, FRequest.FOnData);
+      end;
     finally
       LConnection.Free;
     end;

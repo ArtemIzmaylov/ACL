@@ -16,6 +16,19 @@ type
     constructor Create(const DefaultText: string = ''); overload;
   end;
 
+  { THttpCancelationMonitor }
+
+  THttpCancelationMonitor = class(TThread)
+  strict private
+    FCheckCanceled: TACLTaskCancelCallback;
+    FHandle: HINTERNET;
+  protected
+    procedure Execute; override;
+  public
+    class function Obtain(AHandle: HINTERNET;
+      ACheckCanceled: TACLTaskCancelCallback = nil): TObject;
+  end;
+
   { THttpConnectionImpl }
 
   THttpConnectionImpl = class(THttpConnection)
@@ -24,7 +37,9 @@ type
     FSession: HINTERNET;
   protected
     function RequestCore(const AMethod: string;
-      AHeaders: TACLStringList; APostData: TStream = nil;
+      AHeaders: TACLStringList;
+      ACheckCanceled: TACLTaskCancelCallback = nil;
+      APostData: TStream = nil;
       AIgnoreCertificateIssues: Boolean = False;
       AOnAccept: TConsumerC<THttpResponse> = nil;
       AOnProgress: THttpProgressProc = nil;
@@ -74,6 +89,35 @@ type
     InternetSetOption(Handle, Option, @Value, SizeOf(Value));
   end;
 
+  { THttpCancelationMonitor }
+
+  class function THttpCancelationMonitor.Obtain(AHandle: HINTERNET;
+    ACheckCanceled: TACLTaskCancelCallback = nil): TObject;
+  begin
+    if Assigned(ACheckCanceled) and (AHandle <> nil) then
+    begin
+      THttpCancelationMonitor(Result) := THttpCancelationMonitor.Create;
+      THttpCancelationMonitor(Result).FHandle := AHandle;
+      THttpCancelationMonitor(Result).FCheckCanceled := ACheckCanceled;
+    end
+    else
+      Result := nil;
+  end;
+
+  procedure THttpCancelationMonitor.Execute;
+  begin
+    while not Terminated do
+    begin
+      if Assigned(FCheckCanceled) and FCheckCanceled() then
+      begin
+        InternetCloseHandle(FHandle);
+        Terminate;
+      end
+      else
+        Sleep(50);
+    end;
+  end;
+
   { THttpConnectionImpl }
 
   constructor THttpConnectionImpl.Create(const URL: TACLWebURL);
@@ -120,7 +164,9 @@ type
   end;
 
   function THttpConnectionImpl.RequestCore(const AMethod: string;
-    AHeaders: TACLStringList; APostData: TStream = nil;
+    AHeaders: TACLStringList;
+    ACheckCanceled: TACLTaskCancelCallback = nil;
+    APostData: TStream = nil;
     AIgnoreCertificateIssues: Boolean = False;
     AOnAccept: TConsumerC<THttpResponse> = nil;
     AOnProgress: THttpProgressProc = nil;
@@ -164,12 +210,12 @@ type
                 if not InternetWriteFile(ARequest, LData, LDataUsed, LDataWritten) then
                   raise EHttpWinInetError.Create(sErrorWriteToServer, acWebErrorUnknown);
               end;
-
+              if Assigned(ACheckCanceled) and ACheckCanceled() then
+                raise EHttpCancel.Create;
               if Assigned(AOnProgress) then
               begin
                 Inc(LContentPosition, LDataWritten);
-                if not AOnProgress(LContentPosition, LContentSize) then
-                  raise EHttpCancel.Create;
+                AOnProgress(LContentPosition, LContentSize);
               end;
             until LDataUsed = 0;
           finally
@@ -202,11 +248,12 @@ type
             Break;
           if not AOnReceive(LBuffer, LBytesRead) then
             raise EHttpWriteError.Create;
+          if Assigned(ACheckCanceled) and ACheckCanceled() then
+            raise EHttpCancel.Create;
           if Assigned(AOnProgress) then
           begin
             Inc(LContentPosition, LBytesRead);
-            if not AOnProgress(LContentPosition, LContentSize) then
-              raise EHttpCancel.Create;
+            AOnProgress(LContentPosition, LContentSize);
           end;
         end;
       finally
@@ -218,6 +265,7 @@ type
     LCookieURL: string;
     LFlags: Cardinal;
     LLength: Cardinal;
+    LMonitor: TObject;
     LRequest: HINTERNET;
   begin
     LCookieURL := 'http' + IfThenW(URL.Secured, 's') + '://' + URL.Host;
@@ -252,8 +300,13 @@ type
         InternetSetOptionW(LRequest, INTERNET_OPTION_SECURITY_FLAGS, @LFlags, LLength);
       end;
 
-      if not SendRequest(LRequest) then
-        raise EHttpWinInetError.Create('HttpSendRequest failed');
+      LMonitor := THttpCancelationMonitor.Obtain(LRequest, ACheckCanceled);
+      try
+        if not SendRequest(LRequest) then
+          raise EHttpWinInetError.Create('HttpSendRequest failed');
+      finally
+        LMonitor.Free;
+      end;
 
       Result.Init;
       Result.ContentRange := HTTPQueryString(LRequest, HTTP_QUERY_CONTENT_RANGE);

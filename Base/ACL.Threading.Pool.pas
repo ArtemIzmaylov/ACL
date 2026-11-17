@@ -40,6 +40,7 @@ uses
 
 type
   TACLTaskCancelCallback = function: Boolean of object;
+  TACLTaskCancelCallbackRef = reference to function: Boolean;
   TACLTaskProc = reference to procedure (CheckCanceled: TACLTaskCancelCallback);
 
   TACLTaskDispatcher = class;
@@ -65,6 +66,8 @@ type
     FOwnerTask: TACLTask;
     FThreadId: TThreadId;
 
+    FOnCheckCanceled: TACLTaskCancelCallback;
+    FOnCheckCanceledRef: TACLTaskCancelCallbackRef;
     FOnComplete: TThreadMethod;
     FOnCompleteMode: TACLThreadMethodCallMode;
 
@@ -86,6 +89,8 @@ type
     property Handle: TObjHandle read GetHandle;
     property FreeOnTerminate: Boolean read GetFreeOnTerminate write SetFreeOnTerminate;
     //# Events
+    property OnCheckCanceled: TACLTaskCancelCallback read FOnCheckCanceled write FOnCheckCanceled; // Async
+    property OnCheckCanceledRef: TACLTaskCancelCallbackRef read FOnCheckCanceledRef write FOnCheckCanceledRef; // Async
     property OnComplete: TThreadMethod read FOnComplete write FOnComplete;
     property OnCompleteMode: TACLThreadMethodCallMode read FOnCompleteMode write FOnCompleteMode;
   end;
@@ -288,8 +293,19 @@ begin
 end;
 
 function TACLTask.IsCanceled: Boolean;
+var
+  LCallback: TACLTaskCancelCallback;
+  LCallbackRef: TACLTaskCancelCallbackRef;
 begin
-  Result := (FCanceled <> 0) or (FOwnerTask <> nil) and FOwnerTask.IsCanceled;
+  if FCanceled <> 0 then
+    Exit(True);
+  if (FOwnerTask <> nil) and FOwnerTask.IsCanceled then
+    Exit(True);
+  LCallback := OnCheckCanceled;
+  if Assigned(LCallback) and LCallback() then
+    Exit(True);
+  LCallbackRef := OnCheckCanceledRef;
+  Result := Assigned(LCallbackRef) and LCallbackRef();
 end;
 
 procedure TACLTask.RunInCurrentThread;
