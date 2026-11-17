@@ -202,6 +202,20 @@ type
   {$ENDIF}
   end;
 
+  { TACLListEnumerator }
+
+  TACLListEnumerator<T: class> = class(TInterfacedObject, IACLEnumerator<T>)
+  strict private
+    FOwner: TList;
+    FIndex: Integer;
+  protected
+    // IACLEnumerator<T>
+    function GetCurrent: T;
+    function MoveNext: Boolean;
+  public
+    constructor Create(AOwner: TList);
+  end;
+
   { TACLInterfaceHelper }
 
   TACLInterfaceHelper<T: IUnknown> = class
@@ -302,9 +316,9 @@ type
     property OnNotify: TCollectionNotifyEvent<T> read FOnNotify write SetOnNotify;
   end;
 
-  { TACLListEnumerator }
+  { TACLListOfEnumerator }
 
-  TACLListEnumerator<T> = class(TInterfacedObject, IACLEnumerator<T>)
+  TACLListOfEnumerator<T> = class(TInterfacedObject, IACLEnumerator<T>)
   strict private
     FOwner: TACLListOf<T>;
     FIndex: Integer;
@@ -1230,7 +1244,7 @@ end;
 
 function TACLListOf<T>.GetEnumerator: IACLEnumerator<T>;
 begin
-  Result := TACLListEnumerator<T>.Create(Self);
+  Result := TACLListOfEnumerator<T>.Create(Self);
 end;
 
 function TACLListOf<T>.Add(const Value: T): Integer;
@@ -1659,20 +1673,20 @@ begin
     OutOfMemoryError;
 end;
 
-{ TACLListEnumerator<T> }
+{ TACLListOfEnumerator<T> }
 
-constructor TACLListEnumerator<T>.Create(AOwner: TACLListOf<T>);
+constructor TACLListOfEnumerator<T>.Create(AOwner: TACLListOf<T>);
 begin
   FIndex := -1;
   FOwner := AOwner;
 end;
 
-function TACLListEnumerator<T>.GetCurrent: T;
+function TACLListOfEnumerator<T>.GetCurrent: T;
 begin
   Result := FOwner.List[FIndex];
 end;
 
-function TACLListEnumerator<T>.MoveNext: Boolean;
+function TACLListOfEnumerator<T>.MoveNext: Boolean;
 begin
   Inc(FIndex);
   Result := FIndex < FOwner.Count;
@@ -1815,6 +1829,25 @@ begin
     Delete(Result);
 end;
 {$ENDIF}
+
+{ TACLListEnumerator<T> }
+
+constructor TACLListEnumerator<T>.Create(AOwner: TList);
+begin
+  FOwner := AOwner;
+  FIndex := -1;
+end;
+
+function TACLListEnumerator<T>.GetCurrent: T;
+begin
+  Result := T(FOwner.List[FIndex]);
+end;
+
+function TACLListEnumerator<T>.MoveNext: Boolean;
+begin
+  Inc(FIndex);
+  Result := FIndex < FOwner.Count;
+end;
 
 { TACLObjectComparer }
 
