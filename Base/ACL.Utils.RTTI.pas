@@ -34,9 +34,9 @@ type
   ERttiError = class(EPropertyError)
   public
     constructor CreateNoProp(const AClassName, AFieldName: string);
-    constructor CreateSetPropError(AObject: TObject; APropInfo: PPropInfo;
-      const AErrorText, APropValue: string);
     constructor CreateUnsupportedPropType(APropInfo: PPropInfo);
+    class procedure AppendInfo(AError: Exception;
+      APropInfo: PPropInfo; const APropValue: string);
     class procedure EnsureWritable(AObject: TObject; APropInfo: PPropInfo);
   end;
 
@@ -174,16 +174,15 @@ end;
 
 { ERttiError }
 
+class procedure ERttiError.AppendInfo(
+  AError: Exception; APropInfo: PPropInfo; const APropValue: string);
+begin
+  AError.Message := AError.Message + ' (' + GetPropName(APropInfo) + ', "' + APropValue + '")';
+end;
+
 constructor ERttiError.CreateNoProp(const AClassName, AFieldName: string);
 begin
   CreateFmt('The %s.%s property was not found', [AClassName, AFieldName]);
-end;
-
-constructor ERttiError.CreateSetPropError(
-  AObject: TObject; APropInfo: PPropInfo;
-  const AErrorText, APropValue: string);
-begin
-  CreateFmt('%s.%s - %s', [AObject.ClassName, GetPropName(APropInfo), AErrorText]);
 end;
 
 constructor ERttiError.CreateUnsupportedPropType(APropInfo: PPropInfo);
@@ -516,13 +515,22 @@ begin
     end;
   except
     on E: Exception do
-      raise ERttiError.CreateSetPropError(AObject, APropInfo, E.Message, AValue);
+    begin
+      ERttiError.AppendInfo(E, APropInfo, AValue);
+      raise;
+    end;
   end;
 end;
 
 class procedure TRTTI.SetPropValueAsVariant(
   AObject: TObject; const APropInfo: PPropInfo; const AValue: Variant);
 begin
+  if VarIsStr(AValue) then
+  begin
+    SetPropValue(AObject, APropInfo, VarToStr(AValue));
+    Exit;
+  end;
+
   ERttiError.EnsureWritable(AObject, APropInfo);
   try
     if VarIsNumeric(AValue) then
@@ -535,14 +543,13 @@ begin
         TypInfo.SetPropValue(AObject, APropInfo, AValue);
     end
     else
-      if VarIsStr(AValue) then
-        SetPropValue(AObject, APropInfo, VarToStr(AValue))
-      else
-        TypInfo.SetPropValue(AObject, APropInfo, AValue);
+      TypInfo.SetPropValue(AObject, APropInfo, AValue);
   except
     on E: Exception do
-      raise ERttiError.CreateSetPropError(AObject,
-        APropInfo, E.Message, VarToStrDef(AValue, '?'));
+    begin
+      ERttiError.AppendInfo(E, APropInfo, VarToStrDef(AValue, '?'));
+      raise;
+    end;
   end;
 end;
 
