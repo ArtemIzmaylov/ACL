@@ -181,6 +181,19 @@ uses
   ACL.Utils.RTTI,
   ACL.Utils.Stream;
 
+{$IFNDEF DELPHI130}
+function GetRGBFromColor(Value: TColor): DWORD;
+begin
+  Result := ColorToRGB(Value);
+  case Result of
+    Graphics.clNone:
+      Result := CLR_NONE;
+    Graphics.clDefault:
+      Result := CLR_DEFAULT;
+  end;
+end;
+{$ENDIF}
+
 function acGetImage(AImages: TCustomImageList; AImageIndex: Integer): TACLDib;
 {$IFDEF FPC}
 var
@@ -214,8 +227,8 @@ begin
     begin
       acFillRect(Result.Canvas, Result.ClientRect, clFuchsia);
       ImageList_DrawEx(AImages.Handle, AImageIndex, Result.Handle, 0, 0, 0, 0,
-        GetColorFromRGB(AImages.BkColor),
-        GetColorFromRGB(AImages.BlendColor), ILD_NORMAL);
+        GetRGBFromColor(AImages.BkColor),
+        GetRGBFromColor(AImages.BlendColor), ILD_NORMAL);
       Result.MakeTransparent(clFuchsia);
     end;
   end;

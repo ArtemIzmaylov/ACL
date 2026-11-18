@@ -1081,7 +1081,7 @@ begin
 end;
 
 procedure TACLSoftwareImplStackBlur.Apply(AColors: PACLPixel32; AWidth, AHeight: Integer);
-{$PUSHOPT}
+{$IFDEF DELPHI130}{$PUSHOPT}{$ENDIF}
 {$OPTIMIZATION ON}
 {$Q-}{$R-}
 var
@@ -1392,7 +1392,7 @@ begin
   finally
     FLock.Leave;
   end;
-{$POPOPT}
+{$IFDEF DELPHI130}{$POPOPT}{$ENDIF}
 end;
 
 {$ENDREGION}
