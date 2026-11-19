@@ -1205,7 +1205,7 @@ var
   LTail: Integer;
   LValue: string;
 begin
-  LValue := Value;
+  LValue := acReplaceLineBreaks(Value, ' ');
   LPart1 := GetPart1(Text);
   LPart2 := GetPart2(Text);
   if CanInput(LValue, LPart1, LPart2) then
