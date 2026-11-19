@@ -1000,7 +1000,7 @@ begin
         end;
       end
       else
-        if (LastClickCount > 1) and not EditingController.IsEditing then
+        if (LastClickCounter.Value > 1) and not EditingController.IsEditing then
         begin
           if HitTest.Node.ChildrenCount = 0 then
             TACLObjectInspectorNode(HitTest.Node).Edit

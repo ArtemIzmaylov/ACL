@@ -56,6 +56,7 @@ uses
   ACL.Math,
   ACL.MUI,
   ACL.ObjectLinks,
+  ACL.Threading,
   ACL.Timers,
   ACL.UI.Animation,
   ACL.UI.Application,
@@ -421,6 +422,21 @@ type
     function IsMouseAtControl: Boolean;
     procedure MouseEnter;
     procedure MouseLeave;
+  end;
+
+  { TACLMouseClickCounter }
+
+  TACLMouseClickCounter = record
+  strict private
+    FPoint: TPoint;
+    FTimestamp: TACLTimestamp;
+    FValue: Integer;
+  public
+    procedure OnDown(Button: TMouseButton;
+      var Shift: TShiftState; const P: TPoint);
+    procedure Reset;
+    // Properties
+    property Value: Integer read FValue;
   end;
 
   { TACLMouseTracker }
@@ -1055,7 +1071,6 @@ implementation
 
 uses
 {$I ACL.UI.Core.Impl.inc},
-  ACL.Threading,
   ACL.UI.Forms.Base,
   ACL.UI.HintWindow,
   ACL.Utils.RTTI;
@@ -2330,6 +2345,31 @@ end;
 {$ENDREGION}
 
 {$REGION ' Mouse Tracker '}
+
+{ TACLMouseClickCounter }
+
+procedure TACLMouseClickCounter.OnDown(
+  Button: TMouseButton; var Shift: TShiftState; const P: TPoint);
+begin
+  if Button <> mbLeft then
+    FValue := 1
+  else if TACLThread.IsTimeoutEx(FTimestamp, GetDoubleClickTime) then
+    FValue := 1
+  else if acCanStartDragging(FPoint, P, acDefaultDpi) then
+    FValue := 1
+  else {$IFDEF LCLGtkX}if [ssDouble, ssTriple, ssQuad] * Shift = [] then{$ENDIF}
+    Inc(FValue);
+
+  if FValue = 1 then
+    FPoint := P;
+  if Value > 1 then
+    Include(Shift, ssDouble);
+end;
+
+procedure TACLMouseClickCounter.Reset;
+begin
+  FValue := 0;
+end;
 
 { TACLMouseTracker }
 

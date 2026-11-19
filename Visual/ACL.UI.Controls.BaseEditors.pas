@@ -135,6 +135,7 @@ type
   strict private
     FCaretBlink: TACLTimer;
     FCaretPos: Integer;
+    FClickCounter: TACLMouseClickCounter;
     FMaxLength: Integer;
     FOffset: Integer;
     FPasswordChar: Char;
@@ -1073,19 +1074,23 @@ begin
   end;
   if (Button = mbLeft) and Bounds.Contains(P) then
   begin
+    FClickCounter.OnDown(Button, Shift, P);
     CaretPos := TextHitTest(P.X, P.Y, True);
-    if ssDouble in Shift then
-    begin
-      LRange := EditGetWordSelection(Text, CaretPos, 0);
-      if LRange.Length > 0 then
-        Select(LRange.Start, LRange.Length);
-      FSelPin := SelStart;
-    end
+    if FClickCounter.Value > 2 then
+      Select(0, MaxInt)
     else
-    begin
-      Include(FState, esDragging);
-      FSelPin := CaretPos;
-    end;
+      if FClickCounter.Value = 2 then
+      begin
+        LRange := EditGetWordSelection(Text, CaretPos, 0);
+        if LRange.Length > 0 then
+          Select(LRange.Start, LRange.Length);
+        FSelPin := SelStart;
+      end
+      else
+      begin
+        Include(FState, esDragging);
+        FSelPin := CaretPos;
+      end;
   end;
 end;
 
@@ -1098,6 +1103,7 @@ begin
     LIndex := TextHitTest(P.X, P.Y, True);
     if LIndex >= 0 then
       Select(Min(LIndex, FSelPin), Abs(LIndex - FSelPin), LIndex >= FSelPin);
+    FClickCounter.Reset;
   end;
 end;
 

@@ -733,9 +733,7 @@ type
     FHitTest: TACLHitTestInfo;
     FHoveredObject: TObject;
     FHoveredObjectPart: NativeInt;
-    FLastClickCount: Integer;
-    FLastClickPoint: TPoint;
-    FLastClickTimestamp: TACLTimestamp;
+    FLastClickCounter: TACLMouseClickCounter;
     FLockCount: Integer;
     FLongOperationCount: Integer;
     FPressedObject: TObject;
@@ -815,7 +813,7 @@ type
     procedure CMCancelMode(var Message: TMessage); message CM_CANCELMODE;
     procedure CMHintShow(var Message: TCMHintShow); message CM_HINTSHOW;
     // Properties
-    property LastClickCount: Integer read FLastClickCount;
+    property LastClickCounter: TACLMouseClickCounter read FLastClickCounter;
   public
     constructor Create(AOwner: IACLCompoundControlSubClassContainer);
     destructor Destroy; override;
@@ -2749,20 +2747,7 @@ begin
       DragAndDropController.Cancel;
       Application.CancelHint;
       UpdateHitTest(P, Shift);
-
-      if Button <> mbLeft then
-        FLastClickCount := 1
-      else if TACLThread.IsTimeoutEx(FLastClickTimestamp, GetDoubleClickTime) then
-        FLastClickCount := 1
-      else if acCanStartDragging(FLastClickPoint, P, acDefaultDpi) then
-        FLastClickCount := 1
-      else {$IFDEF LCLGtkX}if [ssDouble, ssTriple, ssQuad] * Shift = [] then{$ENDIF}
-        Inc(FLastClickCount);
-
-      if FLastClickCount = 1 then
-        FLastClickPoint := P;
-      if LastClickCount > 1 then
-        Include(Shift, ssDouble);
+      LastClickCounter.OnDown(Button, Shift, P);
       PressedObject := HitTest.HitObject;
       ProcessMouseDown(Button, Shift);
     finally
@@ -2791,7 +2776,7 @@ begin
       UpdateHitTest(P, Shift);
       DragAndDropController.MouseMove(Shift, P);
       if DragAndDropController.IsActive then
-        FLastClickCount := 0
+        LastClickCounter.Reset
       else
         ProcessMouseMove(Shift, P.X, P.Y);
     finally
@@ -2808,11 +2793,11 @@ begin
     FActionType := ccatMouse;
     try
       if DragAndDropController.IsActive then
-        FLastClickCount := 0;
+        LastClickCounter.Reset;
       DragAndDropController.MouseUp;
 
       UpdateHitTest(P, Shift);
-      if (Button = mbLeft) and (LastClickCount > 0) then
+      if (Button = mbLeft) and (LastClickCounter.Value > 0) then
       begin
         if PressedObject = HitTest.HitObject then
           ProcessMouseClick(Shift);
@@ -3037,7 +3022,7 @@ var
 begin
   if Supports(PressedObject, IACLPressableObject, LHandler) then
     LHandler.MouseDown(AButton, AShift, HitTest);
-  if (AButton = mbLeft) and (FLastClickCount = 1) then
+  if (AButton = mbLeft) and (LastClickCounter.Value = 1) then
     DragAndDropController.MouseDown(AShift, HitTest.Point);
 end;
 

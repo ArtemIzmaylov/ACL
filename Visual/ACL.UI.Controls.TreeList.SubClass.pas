@@ -6279,7 +6279,7 @@ end;
 procedure TACLTreeListSubClass.ProcessMouseClickAtColumn(
   AShift: TShiftState; AColumn: TACLTreeListColumn);
 begin
-  if HitTest.IsResizable and (LastClickCount > 1) then
+  if HitTest.IsResizable and (LastClickCounter.Value > 1) then
     HitTest.Column.ApplyBestFit
   else
     if HitTest.IsCheckable then
@@ -6306,7 +6306,7 @@ begin
         ToggleExpanded(AGroup);
     end
     else
-      if LastClickCount > 1 then
+      if LastClickCounter.Value > 1 then
       begin
         ToggleGroupExpanded(AGroup, AShift);
         if not OptionsBehavior.GroupsFocusOnClick and AGroup.Expanded then
@@ -6328,7 +6328,7 @@ begin
         ToggleExpanded(ANode);
     end
     else
-      if LastClickCount > 1 then
+      if LastClickCounter.Value > 1 then
       begin
         if OptionsBehavior.EditingStartingMode = esmOnDoubleClick then
           StartEditing(ANode, HitTest.Column);

@@ -455,7 +455,7 @@ end;
 
 procedure TACLCalendarSubClass.ProcessMouseClick(AShift: TShiftState);
 begin
-  if LastClickCount > 1 then
+  if LastClickCounter.Value > 1 then
     Exit;
   if HitTest.HitObject is TACLCalendarMonthCell then
     ViewInfo.ActivateDayView(TACLCalendarMonthCell(HitTest.HitObject).Value)

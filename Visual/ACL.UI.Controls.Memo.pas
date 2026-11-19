@@ -1114,9 +1114,9 @@ procedure TACLMemoSubClass.ProcessMouseClick(AShift: TShiftState);
 begin
   if not Editable then
     Exit;
-  if LastClickCount > 2 then
+  if LastClickCounter.Value > 2 then
     SelectNearestRow(LayoutHitTest.PositionInText - Ord(LayoutHitTest.PositionInLineEnd))
-  else if LastClickCount = 2 then
+  else if LastClickCounter.Value = 2 then
     SelectNearestWord(LayoutHitTest.PositionInText)
   else
     if (LayoutHitTest.Hyperlink <> nil) and (not Editable or
@@ -1138,7 +1138,7 @@ begin
   begin
     if AButton = mbLeft then
     begin
-      if LastClickCount > 1 then
+      if LastClickCounter.Value > 1 then
         Exit;
       if (ssShift in AShift) and (FSelectionPin >= 0) then
         LSelLength := FSelectionPin - FLayoutHitTest.PositionInText
