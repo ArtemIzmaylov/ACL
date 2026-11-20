@@ -5567,6 +5567,7 @@ var
 begin
   for I := 0 to FDataCount - 1 do
     FreeAndNil(FData[I].LoaderInstance);
+  FreeAndNil(FDefault.LoaderInstance);
   inherited;
 end;
 
